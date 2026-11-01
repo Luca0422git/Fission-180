@@ -5,6 +5,31 @@ its own section of this file (the release notes are made from it), so every rele
 section here whose heading is exactly its version number, like `## 0.1.0-beta` below. Known
 problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
 
+## 0.1.0-beta.3.2
+
+**A full build after 0.1.0-beta.3.1.3.** The Linux AppImage needed a change in how it is
+packed, so this version comes as a new installer: SciForge's **Update now** downloads and runs
+it (the AppImage: download the new one).
+
+### Fixed
+
+- **Renaming: the new name could end up after the old one.** Right after Rename (a timeline
+  step or group, or a row in the browser) the 3D view takes the keyboard for a moment; the name
+  field took it back, but the old name was no longer selected, so what you typed went after it
+  ("Extrude 2Boss" instead of "Boss"). The old name now stays selected, and typing replaces it.
+- **Closing a design could crash SciForge** in two cases: when its drawing was the tab you were
+  looking at, and when a dialog with drag arrows (such as Point Probes on simulation results)
+  was still open. Both close cleanly now.
+- **Timeline playback went on after a command.** If you pressed Play on the timeline, then
+  started a command (E for Extrude, say) and cancelled it quickly, the playback kept going and
+  the design moved on under you. Starting a command now stops the playback at once, as in
+  Fusion.
+
+### Under the hood
+
+- SciForge's own tests now wait for what the program is doing instead of for fixed times, so
+  they give the same result on every computer; they found the bugs above.
+
 ## 0.1.0-beta.3.1.3
 
 ### Fixed
