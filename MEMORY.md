@@ -19,7 +19,8 @@ on one commit (ae69b62a, 2026-10-30: CI #340 - #344, all green; the sets before 
 see the session log; #346 on 97ee6139 green too) [x] build dry run (build #16 on the branch,
 97ee6139, 2026-10-30: Linux AppImage, Windows portable and installer built, release files made,
 all 9 scenario parts green on the built AppImage; #15 before it failed at appimagetool's icon
-check, fixed by core patch #20) [ ] merged into develop (Luca) [ ] delete the
+check, fixed by core patch #20) [x] merged into develop (2026-11-01, released as
+0.1.0-beta.3.2: `Release` at 76eaf22a, the tag pushed by Luca) [ ] delete the
 branches sf/gui-tests-proof-1/2/3 (copies of the branch for runs side by side; this sandbox
 may not delete branches: HTTP 403).
 Newest session log "GUI test rework".
@@ -1908,6 +1909,18 @@ branch off develop (a patch release was going out from develop). How it all work
   green runs on one commit). Still open, with diagnostics in place: the INSERT file dialog
   race, mesh_separate_combine 1240, vex_shaft's turn (Known issues). The build dry run found
   appimagetool's new icon check (Known issues): Luca decides the create_bundle.sh fix.
+- **2026-11-01, release 0.1.0-beta.3.2 (Luca: "go for it. release it").** develop merged with
+  the branch, VERSION / _FALLBACK_VERSION 0.1.0-beta.3.2 (a full build: core patch #20) and its
+  CHANGELOG section (d1f25ebb). The gate run on d1f25ebb (#348) caught the file dialog race
+  once more, now with its cause (Known issues, solved); fixed in 76eaf22a. Gate run #349 on
+  76eaf22a: every GUI part green at once; "tests (Windows simulation)" failed once with
+  CalculiX 2.22 crashing (exit 0xC0000005, then the SPOOLES retry failed too, "a body in a
+  moved component"), green on its one re-run (the known ccx access violation on Windows, see
+  CI #284 below; not touched by this release; if it comes back, solve with SPOOLES first on
+  Windows). `Release` fast-forwarded to 76eaf22a. **The tag push was refused again (this
+  sandbox: HTTP 403, like branch deletes): Luca pushes `sciforge-v0.1.0-beta.3.2` on 76eaf22a
+  himself**; then the build (~3-4 h) publishes, and the release page is to be checked (assets,
+  notes, prerelease flag, checksums).
 - **Evening of 2026-10-30.** Luca: "fix the packaging with the PNG icon and the linux stuff. and
   then lets build". Core patch #20 (97ee6139): create_bundle.sh puts the installed 256 px PNG
   next to the desktop file and as `.DirIcon`, and runs `chmod -R a+rX AppDir` before
