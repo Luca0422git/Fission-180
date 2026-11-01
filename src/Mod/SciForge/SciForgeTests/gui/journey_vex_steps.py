@@ -180,8 +180,13 @@ def answer_file_dialog(paths, report):
     Ctrl-clicking them does) and Enter. The folder is set on the dialog, not typed: typing its
     path let the name box's completer take the Enter on a busy machine (CI #283: the dialog
     stayed in the home folder, a "file not found" box waited, and the scenario hung until it
-    was killed). A file dialog that does not close after the Enter fails the step within
-    h.WAIT_S, with the dialog and any message box on it closed."""
+    was killed). The names are typed once Qt counts the dialog the active window, as a hand
+    types into the dialog it sees in front: while the main window was still the active one
+    (the dialog just opened, CI #348), the name box had no focus, and Qt's file dialog then
+    rewrites the box from the list's selection as the names come in (the first file selected:
+    the box became its bare name and the rest went after it); the Enter on that took the folder
+    for a pick, opened it and emptied the box. A file dialog that does not close after the
+    Enter fails the step within h.WAIT_S, with the dialog and any message box on it closed."""
     folder = os.path.dirname(paths[0])
     names = " ".join('"%s"' % os.path.basename(p) for p in paths)
     wanted = {os.path.basename(p) for p in paths}
@@ -210,7 +215,11 @@ def answer_file_dialog(paths, report):
             dlg.reject()
             return
         dlg.setDirectory(folder)
-        h.when(lambda: listed(dlg), lambda: type_names(dlg, edit), "the file dialog to list the parts")
+        h.when(
+            lambda: listed(dlg) and QtWidgets.QApplication.activeWindow() is dlg,
+            lambda: type_names(dlg, edit),
+            "the file dialog to list the parts and have the keyboard",
+        )
 
     def type_names(dlg, edit):
         try:

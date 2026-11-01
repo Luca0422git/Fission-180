@@ -683,7 +683,15 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   after Ctrl+A and types at once gave "Body2Bracket" before and "Bracket" after (727e6908 only
   put the selection back on the refocus: too late for keys typed in between). The 18 scenarios
   that rename in place pass. Needs a CHANGELOG line in the next patch.
-- **Open (CI #332 and the sandbox, 2026-10-30): INSERT's file dialog sometimes stays open after
+- **Solved 2026-11-01 (a test race, not an app bug): INSERT's file dialog sometimes stayed open
+  after the Enter.** The diagnostics caught it on CI #348: at the Enter Qt still counted the
+  main window active (the dialog had just opened) and the name box had no focus; Qt's file
+  dialog then rewrites the box from the list's selection while the names come in, so the box
+  read `c_channel_1x2x1x25.step" "c_channel_1x2x1x25_round.step" ...` (the first name bare),
+  the Enter took the folder for a pick, opened it and emptied the box. A throwaway that types
+  the eight names into the unfocused box gives exactly that text; with the box focused, the
+  names as typed. answer_file_dialog now types once the dialog is the active window.
+  Was: **INSERT's file dialog sometimes stays open after
   the Enter** (journey_vex, journey_vex_sim j1: the name box empty, a file selected in the list,
   no message box). Not reproduced alone (36 of 36 under `--stress`). The failure now says what
   the dialog held at the Enter, each change of its name box, whether the box took the Enter and
