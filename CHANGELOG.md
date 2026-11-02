@@ -37,6 +37,14 @@ problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
   the piece to the centre of the design or flipped it into the other piece. A click on the cut
   face now picks the face, so the piece goes back exactly where it was, and aligning to a plane
   just slides the piece straight onto it, keeping its side (Flip puts it on the other side).
+- **A second click in the browser now renames.** Click a body, sketch or component (or another
+  row that can be renamed) that is already selected, wait a moment, and its name opens for
+  typing, as in Fusion and Windows Explorer. A quick double-click still edits the sketch or
+  activates the body; clicks on the eye or the icon do what they always did.
+- **A "Body" showed in the browser before anything was solid.** Starting a sketch in a new
+  design listed a body although there were none yet (SciForge makes one to hold the sketch).
+  It is no longer listed; it appears with your first extrude, as in Fusion. The sketch still
+  shows under Sketches.
 
 ## 0.1.0-beta.3.2
 
