@@ -31,6 +31,12 @@ problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
   wherever the pointer touched the curve, a degree or two off. The line now keeps its 90
   degrees (or level, or upright) and ends exactly where that meets the curve, with the
   constraints that keep it so.
+- **Align was way off after splitting a body.** When you split a body with one of the XY / XZ
+  / YZ planes, moved a piece and aligned it back, a click on the cut face could pick the plane
+  drawn in the same place instead (or do nothing), and aligning to one of those planes threw
+  the piece to the centre of the design or flipped it into the other piece. A click on the cut
+  face now picks the face, so the piece goes back exactly where it was, and aligning to a plane
+  just slides the piece straight onto it, keeping its side (Flip puts it on the other side).
 
 ## 0.1.0-beta.3.2
 
