@@ -21,6 +21,12 @@ Code (all in `src/Mod/SciForge/sciforge/`):
 | `bodies_panel.py` | the dialog base all of them share (selection boxes, preview, OK/Cancel/Esc/Enter, Ctrl+Z) |
 | `bodies_gui.py` | the view provider of their timeline steps; a document watch that keeps the view in line after recomputes, undo and deletes |
 
+## When a body appears in the browser (2026-11-02)
+
+| Fusion | SciForge |
+|---|---|
+| A body is made by its first solid feature (Extrude's New Body adds Bodies > Body1); a new design or a sketch alone has no body (**Autodesk** tutorial and **Forum** "Body missing from browser", search summaries) | SciForge holds a new design's first sketch in a PartDesign Body made by Create Sketch. A body with no step that makes a shape yet (`bodies.is_empty`: only its origin, sketches, construction) is not listed in the browser, also in a component; its sketches are. The first solid step goes into it and it is listed from then on. Hidden, surface, sheet metal and rolled-back bodies stay listed. Details and the Esc / Undo cases: `parity/timeline-browser.md`, "No body before the first solid". |
+
 ## What gets built (and why)
 
 | Tool | Built as |

@@ -336,5 +336,98 @@ class HoverTests(unittest.TestCase):
         self.assertNotEqual(core.signature(tree), core.signature(after))  # the row is redrawn
 
 
+class EmptyBodyTests(unittest.TestCase):
+    """Luca: "when making a sketch, a body appears in the browser. but there are no bodies?"
+    Fusion has no body until the first solid feature (Extrude's New Body); the body SciForge
+    makes to hold a new design's first sketch (browser_ui: "empty") is not listed."""
+
+    SKETCH_ONLY = [
+        obj("Body", "PartDesign::Body", empty=True),
+        obj("Origin", "App::Origin", body="Body"),
+        obj("XY_Plane", "App::Plane", False, "Body", "XY_Plane"),
+        obj("X_Axis", "App::Line", False, "Body", "X_Axis"),
+        obj("Sketch", "Sketcher::SketchObject", True, "Body", display="Sketch 1"),
+    ]
+
+    def labels(self, node):
+        return [c["label"] for c in node["children"]]
+
+    def test_a_new_design_with_a_sketch_lists_no_body(self):
+        tree = core.build("Design", self.SKETCH_ONLY, active_body="Body")
+        self.assertEqual(
+            self.labels(tree), ["Document Settings", "Named Views", "Origin", "Sketches"]
+        )
+        self.assertIsNone(core.find(tree, "body:Body"))
+        # the design's Origin is still the (unlisted) body's
+        self.assertEqual(self.labels(core.find(tree, "origin")), ["X", "XY"])
+        self.assertEqual(self.labels(core.find(tree, "sketches")), ["Sketch 1"])
+
+    def test_the_first_solid_feature_lists_it(self):
+        made = [dict(o) for o in self.SKETCH_ONLY] + [obj("Pad", "PartDesign::Pad", True, "Body")]
+        made[0].pop("empty")
+        tree = core.build("Design", made, active_body="Body")
+        self.assertEqual(self.labels(core.find(tree, "bodies")), ["Body"])
+        self.assertTrue(core.find(tree, "body:Body")["active"])
+
+    def test_only_the_empty_one_is_left_out(self):
+        objects = self.SKETCH_ONLY + [
+            obj("Body001", "PartDesign::Body", False),  # hidden, but it has a solid: listed
+            obj("Body002", "PartDesign::Body", surface=True),  # a surface body: listed
+        ]
+        tree = core.build("Design", objects, active_body="Body")
+        self.assertEqual(self.labels(core.find(tree, "bodies")), ["Body001", "Body002"])
+
+    def test_in_a_component(self):
+        objects = [
+            obj("Part", "App::Part", label="Bracket"),
+            obj("Body", "PartDesign::Body", component="Part", empty=True),
+            obj("Sketch", "Sketcher::SketchObject", True, "Body", component="Part"),
+        ]
+        tree = core.build("Design", objects, active_component="Part")
+        part = core.find(tree, "component:Part")
+        self.assertEqual(self.labels(part), ["Sketches"])  # no Bodies folder
+        # the sketch is still found and lit (Find in Browser, the 3D view's hover)
+        self.assertEqual(core.node_for_object(tree, "Sketch", "Body"), "sketch:Sketch")
+        self.assertEqual(core.hover_row(tree, ["Part", "Body", "Sketch", "Body"]), "sketch:Sketch")
+
+
+class SecondClickTests(unittest.TestCase):
+    """A second click on the selected row's name renames it (Fusion, Windows Explorer)."""
+
+    KINDS = ("body", "sketch", "component")
+
+    def test_the_second_click_on_the_same_row(self):
+        self.assertTrue(
+            core.second_click("body:Body", "body", "body:Body", ["body:Body"], True, self.KINDS)
+        )
+
+    def test_a_first_click_only_selects(self):
+        # the row was not clicked before (selected from the 3D view, or another row was)
+        self.assertFalse(
+            core.second_click("body:Body", "body", None, ["body:Body"], True, self.KINDS)
+        )
+        self.assertFalse(
+            core.second_click("body:Body", "body", "sketch:S", ["body:Body"], True, self.KINDS)
+        )
+
+    def test_not_on_the_eye_or_icon(self):
+        self.assertFalse(
+            core.second_click("body:Body", "body", "body:Body", ["body:Body"], False, self.KINDS)
+        )
+
+    def test_not_with_more_rows_selected(self):
+        self.assertFalse(
+            core.second_click(
+                "body:Body", "body", "body:Body", ["body:Body", "body:B2"], True, self.KINDS
+            )
+        )
+
+    def test_not_a_row_that_has_no_name_of_its_own(self):
+        self.assertFalse(
+            core.second_click("origin:XY", "origin", "origin:XY", ["origin:XY"], True, self.KINDS)
+        )
+        self.assertFalse(core.second_click(None, "body", None, [], True, self.KINDS))
+
+
 if __name__ == "__main__":
     unittest.main()

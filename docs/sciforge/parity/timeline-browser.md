@@ -63,10 +63,66 @@ Suppressed sketches and planes are greyed and struck through, not shown as warni
   (Show/Hide, Create Sketch), Named Views (New Named View), saved view (Go to View, Rename,
   Delete), document (Show All Bodies, Show All Sketches, Hide All Sketches, Rename).
 - Double-click a body: activate it (bold, with a dot). Double-click a sketch/plane: edit it.
+- A second click on the selected row's name renames it in place (section below).
+- A body with nothing solid in it yet is not listed (section below).
 - Units: click "Units: mm" for Change Active Units (Millimeter, Centimeter, Meter, Inch, Foot,
   Set as Default) in the task panel. FreeCAD keeps units per document (`Document.UnitSystem`).
 - Named Views: TOP, FRONT, RIGHT, HOME, plus saved views (stored in the document's `Meta`).
 - F2 renames, Delete deletes (one undo step, same rules as the timeline).
+
+### A second click renames (Luca, 2026-11-02)
+
+Luca: "a second click on a body in the browser should allow me to rename the body. same with
+sketches and assemblies". Sources (search summaries only: forums.autodesk.com is blocked from
+the sandbox): **Forum** "Unable to slow double click" (2019) and "Rename a body, component,
+sketch": a body, sketch or component is renamed in the browser by clicking its name, pausing,
+then clicking it again (a "slow double-click"); a quick double-click instead edits a sketch;
+users click the name text, not the icons. **Forum** "Can't mass rename anymore": an Autodesk
+engineer suggests selecting, then a long click to rename. **Guess**: Windows Explorer's and
+Qt's own rule (SelectedClicked): the field opens once the system's double-click time has
+passed, so a double-click still does its own thing.
+
+| Fusion | SciForge |
+|---|---|
+| Click a row: it is selected | Same (and in the 3D view) |
+| Click the selected row's name again (not a double-click): the name becomes editable, as Rename | Same, for every row that has Rename in its right-click menu and stays selected: bodies, sketches, components, construction planes, joints, joint origins, rigid groups, motion links, contact sets, motion studies, canvases, decals, mesh bodies, analyses, flat patterns, the SIMULATION workspace's studies and items. The field opens after the double-click time (Windows: 500 ms unless changed), with the name selected: typing replaces it, Enter keeps it, Esc cancels, one undo step. It is Rename's own field (also F2 and right-click > Rename). |
+| Double-click | Unchanged (edit a sketch or plane, activate a body or component, open a drawing): the rename its first click started is dropped |
+| Not a rename | The first click (it only selects); a click on a row selected elsewhere (the 3D view, the timeline: that click is the first one in the browser; **Guess**, the safer reading of "a second click"); a click on the eye, the icon, the expand arrow or a component's activate ring; a drag of the row; Ctrl / Shift clicks or several rows selected; a click while a command's dialog is open or a sketch is being edited (the click is a pick for the command); a key pressed in the double-click time (F2, Delete win) |
+
+The field keeps the keyboard when the 3D view takes it for a moment (`inline_edit.GRACE_MS`,
+MEMORY "Typing right after Rename"). Code: `browser_core.second_click` (unit tested,
+`SecondClickTests`), `BrowserWidget._note_press` / `_note_release` / `_slow_rename`.
+Scenario `browser_second_click` (a body, a sketch and a component renamed with two clicks;
+a double-click still edits; the eye, the icon, a drag, Ctrl+click, F2 and the menu).
+
+### No body before the first solid (Luca, 2026-11-02)
+
+Luca: "when making a sketch, a body appears in the browser. but there are no bodies?" (a new
+design, Create Sketch just clicked: the browser showed Bodies > Body). Sources (search
+summaries only): **Autodesk** tutorial (part modeling): an extrude with the default New Body
+operation adds a folder named Bodies to the browser; **Forum** "Body missing from browser":
+the Bodies folder is only there when the component has bodies. A Fusion body is made by its
+first solid feature; a sketch belongs to the component, not to a body.
+
+| Fusion | SciForge |
+|---|---|
+| A new design: Origin, no Bodies | SciForge makes a PartDesign Body to hold the first sketch (its origin planes are what Create Sketch offers). Such a body, with no step that makes a shape (only its origin, sketches and construction: `bodies.is_empty`), is not listed: no Bodies folder while Create Sketch waits, after Esc, while sketching and with sketches only. Its sketches are under Sketches, its planes under Construction, its origin is the design's Origin. |
+| The first Extrude (New Body) adds Bodies > Body1 | The first solid step goes into that body (`extrude._structure`), which is then listed as before. Undo of that step: unlisted again. |
+| A body that exists stays listed | Unchanged: a hidden body, a surface body, a sheet metal body, a mesh body, a body whose steps the history marker stands before, a body whose only step is in error, bodies in components. |
+| A component's empty body | The same in a component: Origin, Sketches, then Bodies once something solid is in it. |
+| The body a rebuild is made in (Rebuild with Timeline (AI)) | SciForge only: listed from the start, empty (its right-click carries Compare / Finish / Stop Rebuild). |
+
+Create Sketch cancelled with Esc on an empty design leaves its (unlisted) body in the design,
+and FreeCAD's "Add a Body" in the undo history: the next Create Sketch uses the same body (no
+pile of empty bodies), and Undo then takes it away with no visible change but the Origin
+folder (it is that body's origin). Not removed on Esc: that would mean an undo of FreeCAD's
+own step from the sketch code. Elsewhere bodies were already listed only with a solid
+(Derive, export, the Physical Material dialog); the version compare (`versions.summary`)
+counts every PartDesign Body in the file, so a sketch-only design shows "Bodies 1" there.
+Code: `bodies.is_empty`, `browser_ui._empty_body` (row flag "empty"), `browser_core._folders`
+(unit tests `EmptyBodyTests`). Scenario `browser_empty_body` (Create Sketch and Esc on a new
+design, a sketch, undo to the empty design and redo, save and reopen, the first extrude,
+Ctrl+Z / Ctrl+Y, a hidden body, a component).
 
 ### The 3D view's hover lights the browser row (Luca's request, 2026-10-23)
 

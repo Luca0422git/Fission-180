@@ -4,7 +4,8 @@
 Input: one dict per document object
     {"name", "label", "type_id", "visible", "body" (name of its body or None), "role",
      "sciforge_type" (optional), "error"/"warning" (optional reason), "suppressed" (bool),
-     "display" (optional: the timeline's name for it, "Sketch 2", shown instead of "label")}
+     "display" (optional: the timeline's name for it, "Sketch 2", shown instead of "label"),
+     "empty" (optional, bodies: nothing solid in it yet, so no row)}
 Output: a tree of nodes
     {"key", "label", "icon", "kind", "object" (name or None), "visible" (bool or None),
      "active" (bool), "status" ("ok"|"warning"|"error"|"suppressed"), "tip", "children": [...]}
@@ -244,6 +245,11 @@ def _folders(objects, active_body, component):
             )
             continue
         if type_id in BODY_TYPES:
+            if obj.get("empty"):
+                # Fusion has no body until its first solid feature (Extrude's New Body): the
+                # body SciForge makes to hold a new design's first sketch is not listed (its
+                # sketches are, under Sketches; its origin is the design's Origin)
+                continue
             grounded = bool(obj.get("grounded"))
             # A surface body (surface.py) has its own icon, like Fusion's browser; a sheet
             # metal body (sheetmetal.py) a bent sheet, its rule in the tooltip.
@@ -526,6 +532,22 @@ def shown_row(tree, key, is_open):
         if not is_open(parent):
             return parent
     return key
+
+
+def second_click(key, kind, last_click, selected, on_name, renamable):
+    """Whether a plain left click on row `key` (of `kind`) is the second click that renames
+    it in place, like Fusion's browser and Windows Explorer: the click before it in the
+    browser was a plain click on this same row, the row is still the only one selected, and
+    this click is on its name (not its eye, icon, expand arrow or activate ring).
+    `selected`: keys of the selected rows; `renamable`: the kinds that can be renamed. The
+    browser waits the double-click time before it opens the field (a double-click edits)."""
+    return (
+        bool(on_name)
+        and key is not None
+        and key == last_click
+        and list(selected) == [key]
+        and kind in renamable
+    )
 
 
 def path_to(tree, key, _path=None):

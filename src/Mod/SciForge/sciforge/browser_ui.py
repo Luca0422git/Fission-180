@@ -4,9 +4,12 @@
 Each row: expand arrow, eye (show/hide), icon, name. Click selects (also in the
 3D view, and a selection made in the 3D view shows here), double-click edits a
 sketch or construction plane or activates a body, hover lights the object up in
-the 3D view, F2 renames, Delete deletes, right click opens Fusion's menu for
-that kind of row. Structure: browser_core.py; deleting goes through
-timeline_ops.py (one undo step, later steps kept working where possible).
+the 3D view, F2 or a second click on the selected row's name renames (after the
+double-click time, like Fusion and Windows Explorer), Delete deletes, right click
+opens Fusion's menu for that kind of row. A body with nothing solid in it yet is
+not listed (Fusion has no body before the first solid feature). Structure:
+browser_core.py; deleting goes through timeline_ops.py (one undo step, later steps
+kept working where possible).
 """
 
 import time
@@ -211,6 +214,19 @@ def _plastic_rows(doc):
         return ()
 
 
+def _empty_body(body):
+    """A body with nothing solid in it yet (bodies.is_empty: the one Create Sketch makes
+    for a new design's first sketch): Fusion lists no body until the first solid feature.
+    The body a rebuild is made in stays listed from the start (its right-click holds the
+    rebuild's own entries, REBUILD_ENTRIES)."""
+    try:
+        from . import bodies
+
+        return bodies.is_empty(body) and not _rebuilt_body(body)
+    except Exception:
+        return False
+
+
 def _is_surface_body(body):
     try:
         from . import surface
@@ -310,6 +326,8 @@ def _objects(doc):
                 note = _mesh_note(obj)  # Fusion's warning beside a mesh body that is not closed
                 if note:
                     row[note[0]] = note[1]
+            if obj.TypeId in core.BODY_TYPES and _empty_body(obj):
+                row["empty"] = True  # nothing solid yet: no row (Fusion, browser_core)
             if obj.TypeId in core.BODY_TYPES and _is_surface_body(obj):
                 row["surface"] = True  # the surface icon (surface.py)
             if obj.TypeId in core.BODY_TYPES and getattr(obj, "SciForgeSheetMetalRule", ""):
@@ -731,6 +749,25 @@ def _clipboard_action(name, node, obj, selected_nodes, tree):
     clipboard_ui.paste(into=into, new=name == "paste_new")
 
 
+def _double_click_ms():
+    """The system's double-click time (Windows: 500 ms unless changed; Qt's default 400)."""
+    try:
+        return int(QtGui.QGuiApplication.styleHints().mouseDoubleClickInterval())
+    except Exception:
+        return 400
+
+
+def _command_running():
+    """A command's dialog is open or something is being edited (a sketch)."""
+    try:
+        if Gui.Control.activeDialog():
+            return True
+        gdoc = Gui.ActiveDocument
+        return gdoc is not None and gdoc.getInEdit() is not None
+    except Exception:
+        return False
+
+
 def _later(fn, *args):
     def run():
         try:
@@ -965,6 +1002,14 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         self._press = None  # (row key, pos) of a left press on a draggable row
         self._dragging = False
         self._drop_key = None  # row under a dragged body / component
+        # A second click on the name of the selected row renames it (Fusion, Windows
+        # Explorer), once the double-click time has passed without a double-click.
+        self._click = None  # (row key, pos, is a second click) of a plain left press
+        self._last_click = None  # key of the row the last plain click selected
+        self._slow_key = None  # the row whose rename waits for the double-click time
+        self._slow_timer = QtCore.QTimer(self)
+        self._slow_timer.setSingleShot(True)
+        self._slow_timer.timeout.connect(self._slow_rename)
         self.itemClicked.connect(self._clicked)
         self.itemDoubleClicked.connect(self._double_clicked)
         self.itemEntered.connect(self._entered)
@@ -1008,6 +1053,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
 
     def stop(self):
         hover_ghost.hide()
+        self._slow_stop()
         self._timer.stop()
         if self._observer is not None:
             try:
@@ -1187,6 +1233,8 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def mousePressEvent(self, event):
         self._press = None
         try:
+            self._slow_stop()  # any press ends a rename a second click had started
+            self._note_press(event)
             if event.button() == QtCore.Qt.LeftButton:
                 pos = event.position().toPoint()
                 item, node = self._node_at(pos)
@@ -1197,6 +1245,18 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         except Exception as exc:
             warn("browser: %s" % exc)
         super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        # a double-click keeps doing its own thing (edit a sketch, activate a body): the
+        # rename its first click may have started is dropped, and its last release is no
+        # click of its own
+        try:
+            self._slow_stop()
+            self._click = None
+            self._last_click = None
+        except Exception as exc:
+            warn("browser: %s" % exc)
+        super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event):
         try:
@@ -1219,7 +1279,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def mouseReleaseEvent(self, event):
         dragging, press, key = self._dragging, self._press, self._drop_key
         self._dragging, self._press, self._drop_key = False, None, None
+        click, self._click = self._click, None
         if dragging:
+            self._last_click = None  # a drag is no click
             self.viewport().update()
             try:
                 moving = [i.data(1, ROLE_NODE) for i in self.selectedItems()]
@@ -1234,6 +1296,90 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 warn("browser drag: %s" % exc)
             return
         super().mouseReleaseEvent(event)
+        try:
+            self._note_release(click, event)
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    # -- a second click on the selected row's name renames it --------------------------------
+    def _on_name(self, item, node, pos):
+        """Whether a viewport point is on a row's name: not on its expand arrow, eye, icon or
+        activate ring (a click there does what it always did)."""
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        if not rect.contains(pos) or pos.x() < rect.left() + EYE + 22:  # (where the field opens)
+            return False
+        if self.delegate.has_radio(node) and pos.x() >= self.delegate.radio_rect(rect).left() - 2:
+            return False
+        return True
+
+    def _selected_keys(self):
+        return [(i.data(1, ROLE_NODE) or {}).get("key") for i in self.selectedItems()]
+
+    def _note_press(self, event):
+        """A plain left press on a row's name is a click to look at on its release; any
+        other press (right button, Ctrl or Shift, the eye, a double-click's) is no click,
+        so the click after it is a first click again."""
+        self._click = None
+        plain = (
+            event.type() == QtCore.QEvent.MouseButtonPress
+            and event.button() == QtCore.Qt.LeftButton
+            and event.modifiers() == QtCore.Qt.NoModifier
+        )
+        pos = event.position().toPoint()
+        item, node = self._node_at(pos) if plain else (None, None)
+        if node is None or not self._on_name(item, node, pos):
+            self._last_click = None
+            return
+        again = core.second_click(
+            node["key"],
+            node["kind"],
+            self._last_click,
+            self._selected_keys(),
+            True,
+            self.RENAMABLE + SIM_RENAMABLE,
+        )
+        self._click = (node["key"], pos, again)
+
+    def _note_release(self, click, event):
+        """The release of a plain click on a row: that row is the last click (if it is the only
+        one selected now); a second click on it starts the rename, after the double-click time
+        (like Qt's own SelectedClicked: a double-click arriving first drops it)."""
+        self._last_click = None
+        if click is None or event.button() != QtCore.Qt.LeftButton:
+            return
+        key, at, again = click
+        pos = event.position().toPoint()
+        _item, node = self._node_at(pos)
+        if node is None or node["key"] != key:
+            return
+        if (pos - at).manhattanLength() >= QtWidgets.QApplication.startDragDistance():
+            return  # the mouse moved away: a drag, not a click
+        if self._selected_keys() != [key]:
+            return
+        self._last_click = key
+        if again:
+            self._slow_key = key
+            self._slow_timer.start(_double_click_ms())
+
+    def _slow_stop(self):
+        self._slow_key = None
+        self._slow_timer.stop()
+
+    def _slow_rename(self):
+        """The double-click time after a second click has passed: rename the row in place
+        (Rename's own code), unless something else happened meanwhile."""
+        key, self._slow_key = self._slow_key, None
+        try:
+            if key is None or self._renaming is not None or self._busy or self._doc is None:
+                return
+            if not self.isVisible() or _command_running():
+                return  # a click on a row while a command is open is a pick for it (Fusion)
+            item = self.item_for(key)
+            if item is None or self._selected_keys() != [key]:
+                return  # the row went, or something else got selected meanwhile
+            self.rename(item)
+        except Exception as exc:
+            warn("browser rename: %s" % exc)
 
     def move_to(self, nodes, target_node):
         """Move bodies / components into the component of ``target_node`` (the design's
@@ -1271,6 +1417,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         keep = (_simulation_call("keep_selected", self._doc, sim_rows) or set()) if sim_rows else ()
         self._syncing = True
         self.blockSignals(True)
+        changed = False
         try:
             for item in self._items():
                 node = item.data(1, ROLE_NODE)
@@ -1279,14 +1426,21 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                     want = node["key"] in keep
                 if item.isSelected() != want:
                     item.setSelected(want)
+                    changed = True
         finally:
             self.blockSignals(False)
             self._syncing = False
+        if changed:
+            # selected from elsewhere (the 3D view, the timeline): the next click on a row
+            # is a first click, it selects (it does not rename)
+            self._last_click = None
 
     def _selection_changed(self):
         """Rows picked in the browser are selected in the 3D view too."""
         if self._building or self._syncing or self._doc is None:
             return
+        if self._last_click is not None and self._selected_keys() != [self._last_click]:
+            self._last_click = None  # (keys, Ctrl+A ...): the next click is a first click
         self._syncing = True
         try:
             Gui.Selection.clearSelection()
@@ -1538,6 +1692,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
 
     def keyPressEvent(self, event):
         try:
+            self._slow_stop()  # a key after a second click: the key wins (F2, Delete...)
             item = self.currentItem()
             node = item.data(1, ROLE_NODE) if item is not None else None
             if node is not None and event.key() == QtCore.Qt.Key_F2:
@@ -1603,6 +1758,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def rename(self, item):
         """The name becomes editable in place (Enter keeps it, Esc cancels)."""
         node = item.data(1, ROLE_NODE)
+        self._slow_stop()  # (F2 or the menu after a second click: one field)
         if node["kind"] not in self.RENAMABLE + SIM_RENAMABLE:
             return
         if node["kind"] not in ("document", "saved_view") and not commands.finish_open_dialog():
@@ -1777,6 +1933,8 @@ class BrowserWidget(QtWidgets.QTreeWidget):
 
     # -- context menu ----------------------------------------------------------------
     def _menu(self, pos):
+        self._slow_stop()
+        self._last_click = None
         item = self.itemAt(pos)
         if item is None:
             return

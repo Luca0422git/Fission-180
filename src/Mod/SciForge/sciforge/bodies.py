@@ -10,6 +10,7 @@ body (bold in the browser) is where new sketches and features go.
     active_body(doc)            the active body (GUI), or None
     set_active_body(body)       make a body the active one
     find_body(doc)              the active body, else the first one (never creates one)
+    is_empty(body)              no step that makes a shape yet (not listed in the browser)
     body_of(obj)                the body an object belongs to (a body is its own)
     global_shape(feature)       a feature's solid in design coordinates (a copy)
     to_local(shape, body)       design coordinates -> the body's own coordinates
@@ -160,6 +161,23 @@ def ensure_body(doc):
 def has_solid(body):
     try:
         return alive(body) and not body.Shape.isNull() and bool(body.Shape.Solids)
+    except Exception:
+        return False
+
+
+def is_empty(body):
+    """True for a body with no step that makes a shape yet: only its origin, sketches and
+    construction (the body Create Sketch makes for a new design's first sketch). Fusion has
+    no body until the first solid feature, so the browser leaves such a body out. A body
+    with steps counts as made even when its shape is empty right now (the history marker
+    before them, a step in error, a surface)."""
+    try:
+        if not is_body(body) or getattr(body, "BaseFeature", None) is not None:
+            return False
+        for obj in body.Group:
+            if obj.isDerivedFrom("PartDesign::Feature"):  # (also FeatureBase, FeaturePython)
+                return False
+        return body.Shape.isNull()
     except Exception:
         return False
 
