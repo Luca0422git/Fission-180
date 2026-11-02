@@ -1,0 +1,61 @@
+{
+  "id": "sketch_offset_slot_fixed_in",
+  "title": "Sketch Offset: a fixed slot (Block) offset 1 mm in, the dimension changed to 2, the ring extruded 10",
+  "tags": [
+    "sketch",
+    "sketch-offset"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "slot": [
+            0,
+            0,
+            30,
+            0,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "op": "sketch_offset_expect",
+      "sketch": "s1",
+      "distance": 1,
+      "side": "in",
+      "block": true,
+      "edit": 2
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "regions": [
+        [
+          15,
+          4
+        ]
+      ],
+      "distance": 10
+    }
+  ],
+  "expect": {
+    "volume": 1702.654824574367,
+    "area": 2043.1857894892403,
+    "solids": 1,
+    "bbox": [
+      -5,
+      -5,
+      0,
+      35,
+      5,
+      10
+    ],
+    "source": "analytic",
+    "note": "Slot of centre distance L = 30, radius 5; offset 2 in: the same slot with radius 3 (the ends stay half circles, joined smoothly). A(r) = 2*r*L + pi*r^2; ring = A(5) - A(3) = 120 + 16*pi; V = 10*ring; A = 2*ring + (2*L + 2*pi*5)*10 + (2*L + 2*pi*3)*10 = 1440 + 192*pi"
+  }
+}

@@ -4,8 +4,6 @@
 - Finish Sketch: always closes the sketch, also with a drawing tool running.
 - Circumscribed / Inscribed Polygon: 6 sides, no "how many sides?" pop-up; the
   number of sides is changed in the panel on the right (or U / J) while drawing.
-- Offset (O): with nothing selected it waits for you to click a curve; the whole
-  connected chain is offset, like Fusion's chain selection.
 - Include 3D Geometry: brings part edges into the sketch as reference curves.
 
 Every command explains next to the mouse when it cannot start (no sketch open).
@@ -139,122 +137,17 @@ def selected_curves(sketch):
     return ids
 
 
-_last = {"offset": []}
-
-
 def last_offset():
-    """Geometry indices the last Offset was started with (for tests and diagnostics)."""
-    return list(_last["offset"])
+    """The curves the last Offset worked on (tests and diagnostics). Offset is SciForge's
+    own tool now, with Fusion's OFFSET panel: sketch_offset_tool.py, command in
+    sketch_offset_ui.py."""
+    from . import sketch_offset_tool
 
-
-def run_offset(sketch, ids):
-    """Select the whole chain of the picked curves and start FreeCAD's offset tool
-    (drag or type the distance, click to place)."""
-    from . import sketch_regions
-
-    chain = sketch_regions.connected_chain(sketch, ids)
-    _last["offset"] = list(chain)
-    Gui.Selection.clearSelection()
-    for index in chain:
-        Gui.Selection.addSelection(sketch.Document.Name, sketch.Name, "Edge%d" % (index + 1))
-    Gui.runCommand("Sketcher_Offset")
-    QtCore.QTimer.singleShot(0, _sharp_corners)
-    log("offset: %d curve(s); move the mouse or type the distance, then click" % len(chain))
-
-
-def _sharp_corners():
-    """Fusion's offset keeps corners sharp; FreeCAD's tool starts in "Arc" mode (round
-    corners). Pick its "Intersection" mode in the tool's own panel."""
-    from .compat import QtWidgets
-
-    try:
-        for widget in Gui.getMainWindow().findChildren(QtWidgets.QWidget):
-            if widget.metaObject().className() != "SketcherGui::TaskSketcherTool":
-                continue
-            for box in widget.findChildren(QtWidgets.QComboBox):
-                texts = [box.itemText(i) for i in range(box.count())]
-                if "Intersection" in texts and box.currentText() != "Intersection":
-                    box.setCurrentIndex(texts.index("Intersection"))
-                    return
-    except Exception as exc:
-        warn("offset corners: %s" % exc)
-
-
-class _WaitForCurve:
-    """Offset with nothing selected: wait for a click on a sketch curve."""
-
-    current = None
-
-    def __init__(self, sketch):
-        if _WaitForCurve.current is not None:
-            _WaitForCurve.current.stop()
-        _WaitForCurve.current = self
-        self.sketch = sketch
-        self.active = True
-        Gui.Selection.addObserver(self)
-        self._timer = QtCore.QTimer()
-        self._timer.setInterval(250)
-        self._timer.timeout.connect(self._check)
-        self._timer.start()
-
-    def addSelection(self, doc, obj, sub, pnt):
-        QtCore.QTimer.singleShot(30, self._picked)
-
-    def _check(self):
-        # stop waiting when the sketch closes or another tool starts
-        if sketch_mode.editing_sketch() is not self.sketch:
-            self.stop()
-
-    def _picked(self):
-        if not self.active:
-            return
-        try:
-            ids = selected_curves(self.sketch)
-            if not ids:
-                return
-            self.stop()
-            run_offset(self.sketch, ids)
-        except Exception as exc:
-            self.stop()
-            warn("Offset failed: %s" % exc)
-
-    def stop(self):
-        self.active = False
-        try:
-            self._timer.stop()
-        except Exception:
-            pass
-        try:
-            Gui.Selection.removeObserver(self)
-        except Exception:
-            pass
-        if _WaitForCurve.current is self:
-            _WaitForCurve.current = None
+    return sketch_offset_tool.last_offset()
 
 
 def stop_waiting():
-    if _WaitForCurve.current is not None:
-        _WaitForCurve.current.stop()
-
-
-class SketchOffset(_SketchCommand):
-    title = "Offset"
-    tip = "Offset curves: click a curve (its connected chain is used), then drag or type the distance (O)"
-    icon = "sk_offset"
-
-    def run(self):
-        sketch = _in_sketch(self.title)
-        if sketch is None:
-            return
-        if not sketch.Geometry:
-            commands.tell("Offset: draw some curves first.")
-            return
-        ids = selected_curves(sketch)
-        if ids:
-            run_offset(sketch, ids)
-            return
-        _WaitForCurve(sketch)
-        commands.tell("Offset: click a curve of the sketch.")
+    """Nothing here waits for a pick any more (Offset used to); kept for its callers."""
 
 
 # -- Project / Include -----------------------------------------------------------------
@@ -413,7 +306,6 @@ COMMANDS = {
     "SciForge_SketchLine": SketchLine,
     "SciForge_PolygonCircumscribed": PolygonCircumscribed,
     "SciForge_PolygonInscribed": PolygonInscribed,
-    "SciForge_SketchOffset": SketchOffset,
     "SciForge_SketchProject": SketchProject,
     "SciForge_SketchInclude3D": SketchInclude3D,
 }

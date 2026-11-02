@@ -1,0 +1,62 @@
+{
+  "id": "sketch_offset_circle_symmetric",
+  "title": "Sketch Offset: circle r 10 offset 2 mm Symmetric, the dimension changed to 3, both rings extruded 10",
+  "tags": [
+    "sketch",
+    "sketch-offset"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            20,
+            20,
+            10
+          ],
+          "name": "c"
+        }
+      ]
+    },
+    {
+      "op": "sketch_offset_expect",
+      "sketch": "s1",
+      "distance": 2,
+      "side": "symmetric",
+      "edit": 3
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "regions": [
+        [
+          20,
+          31.5
+        ],
+        [
+          20,
+          28.5
+        ]
+      ],
+      "distance": 10
+    }
+  ],
+  "expect": {
+    "volume": 3769.9111843077517,
+    "solids": 1,
+    "bbox": [
+      7,
+      7,
+      0,
+      33,
+      33,
+      10
+    ],
+    "source": "analytic",
+    "note": "Symmetric 3: circles r 13 and r 7 about the circle r 10; the two rings between them make one ring 7..13. V = pi*(13^2 - 7^2)*10 = 1200*pi"
+  }
+}

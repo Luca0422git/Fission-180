@@ -1,0 +1,123 @@
+{
+  "id": "sketch_offset_rounded_fixed_out",
+  "title": "Sketch Offset: a fixed 30 x 20 rectangle with r 3 corners offset 2 mm out, the dimension changed to 3, the ring extruded 10",
+  "tags": [
+    "sketch",
+    "sketch-offset"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "segments": [
+            {
+              "line": [
+                3,
+                0,
+                27,
+                0
+              ]
+            },
+            {
+              "arc": [
+                27,
+                3,
+                3,
+                -90,
+                0
+              ]
+            },
+            {
+              "line": [
+                30,
+                3,
+                30,
+                17
+              ]
+            },
+            {
+              "arc": [
+                27,
+                17,
+                3,
+                0,
+                90
+              ]
+            },
+            {
+              "line": [
+                27,
+                20,
+                3,
+                20
+              ]
+            },
+            {
+              "arc": [
+                3,
+                17,
+                3,
+                90,
+                180
+              ]
+            },
+            {
+              "line": [
+                0,
+                17,
+                0,
+                3
+              ]
+            },
+            {
+              "arc": [
+                3,
+                3,
+                3,
+                180,
+                270
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "op": "sketch_offset_expect",
+      "sketch": "s1",
+      "distance": 2,
+      "side": "out",
+      "block": true,
+      "edit": 3
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "regions": [
+        [
+          15,
+          -1.5
+        ]
+      ],
+      "distance": 10
+    }
+  ],
+  "expect": {
+    "volume": 3128.230016469244,
+    "solids": 1,
+    "bbox": [
+      -3,
+      -3,
+      0,
+      33,
+      23,
+      10
+    ],
+    "source": "analytic",
+    "note": "The rounded corners stay smooth: offset 3 out is 36 x 26 with r 6 corners (same centres). A(w, h, r) = w*h - (4 - pi)*r^2; ring = A(36, 26, 6) - A(30, 20, 3) = (792 + 36*pi) - (564 + 9*pi) = 228 + 27*pi; V = 10*ring"
+  }
+}

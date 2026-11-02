@@ -190,34 +190,3 @@ def regions(edges, tolerance=TOLERANCE):
 def sketch_regions(sketch):
     """Closed regions of a sketch in sketch coordinates."""
     return regions(sketch_edges(sketch))
-
-
-def _ends(geometry):
-    """End points (App.Vector) of an open curve; [] for closed curves and points."""
-    try:
-        if geometry.TypeId in ("Part::GeomCircle", "Part::GeomEllipse", "Part::GeomPoint"):
-            return []
-        return [geometry.StartPoint, geometry.EndPoint]
-    except Exception:
-        return []
-
-
-def connected_chain(sketch, start_ids, tolerance=1e-6):
-    """Fusion's chain selection: the curves joined end to end with the given ones
-    (0-based geometry indices; construction curves only if picked)."""
-    geometry = sketch.Geometry
-    picked = [i for i in start_ids if 0 <= i < len(geometry)]
-    usable = {i for i in range(len(geometry)) if i in picked or not sketch.getConstruction(i)}
-    ends = {i: _ends(geometry[i]) for i in usable}
-    chain = set(picked)
-    todo = list(picked)
-    while todo:
-        current = todo.pop()
-        for point in ends.get(current, []):
-            for other in usable:
-                if other in chain:
-                    continue
-                if any((point - q).Length <= tolerance for q in ends[other]):
-                    chain.add(other)
-                    todo.append(other)
-    return sorted(chain)

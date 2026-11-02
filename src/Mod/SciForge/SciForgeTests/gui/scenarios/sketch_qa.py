@@ -506,18 +506,27 @@ def c_after_esc():
     h.press("o")
 
 
-def c_offset_waits():
-    from sciforge import sketch_tools_ui
+def _offset_tool():
+    """SciForge's Offset (its OFFSET panel) while it runs, else None."""
+    from sciforge import sketch_draw, sketch_offset_tool
 
-    h.check("C: Offset with nothing selected waits", sketch_tools_ui._WaitForCurve.current)
+    tool = sketch_draw.current_tool()
+    return tool if isinstance(tool, sketch_offset_tool.SketchOffset) else None
+
+
+def c_offset_waits():
+    tool = _offset_tool()
+    h.check(
+        "C: Offset with nothing selected waits",
+        tool is not None and not tool.curves,
+        tool and tool.curves,
+    )
     h.check("C: no pop-up", not h.popups(), h.popups())
     esc()
 
 
 def c_offset_stopped():
-    from sciforge import sketch_tools_ui
-
-    h.check("C: Esc stops Offset waiting", sketch_tools_ui._WaitForCurve.current is None)
+    h.check("C: Esc stops Offset waiting", _offset_tool() is None)
     c = s["sk"].Geometry[0]
     si.click(c.Center + V(0, c.Radius, 0))
 

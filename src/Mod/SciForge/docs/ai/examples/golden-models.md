@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/SciForge/sciforge/ai/catalog) by tools/sciforge/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-SciForge's golden models are 617 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are SciForge's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource sciforge://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something SciForge does not do yet.
+SciForge's golden models are 621 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are SciForge's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource sciforge://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something SciForge does not do yet.
 
 ## By feature
 
@@ -547,6 +547,21 @@ Each model is listed under its first tag; its other tags follow it.
 - `shell_filleted_box`: Enclosure: box 60x40x30, vertical edges r5, shell 2 open top [fillet, enclosure]
 - `shell_open_box`: Box 60x40x30 shelled 2 mm inward, top removed [enclosure]
 
+### sketch (12)
+
+- `sketch_face_line_through_circle`: Block 100x40x20, sketch on its top with the face's edges projected, a line across the face and a circle r6 on it: both halves of the circle extruded 10 [auto-project, regions]
+- `sketch_face_line_through_circle_half`: Same sketch: only the left half of the circle extruded 10 [auto-project, regions]
+- `sketch_face_projected_corner`: Block 40x30x10, sketch on its top with the face's edges projected, a 10x10 rectangle from the projected corner: only the rectangle extruded 5 [auto-project, regions]
+- `sketch_face_projected_rest`: Block 40x30x10, sketch on its top with the face's edges projected, a 10x10 rectangle from the projected corner: the L-shaped rest of the face extruded 5 [auto-project, regions]
+- `sketch_inscribed_pentagon`: Plate with an inscribed pentagon (corner radius 8) cut through [polygon]
+- `sketch_line_through_circle_overhang`: Rectangle 40x30, a line past both its sides through a circle r5: both halves of the circle extruded 8 [regions]
+- `sketch_nut_trap_polygon`: Plate with a circumscribed hexagon (5.5 across flats) cut through, resized to 8 [polygon, edit]
+- `sketch_offset_circle_symmetric`: Sketch Offset: circle r 10 offset 2 mm Symmetric, the dimension changed to 3, both rings extruded 10 [sketch-offset]
+- `sketch_offset_rect_edit`: Sketch Offset: a 40 x 20 rectangle offset 3 mm out, its dimension changed to 5, the ring extruded 10 [sketch-offset]
+- `sketch_offset_rounded_fixed_out`: Sketch Offset: a fixed 30 x 20 rectangle with r 3 corners offset 2 mm out, the dimension changed to 3, the ring extruded 10 [sketch-offset]
+- `sketch_offset_slot_fixed_in`: Sketch Offset: a fixed slot (Block) offset 1 mm in, the dimension changed to 2, the ring extruded 10 [sketch-offset]
+- `sketch_trim_union`: Circle and overlapping rectangle trimmed into one outline, extruded 10 [trim]
+
 ### chamfer (10)
 
 - `blend_chamfer_angle`: Chamfer dialog: Distance and Angle, 3 mm at 30 degrees on the front top edge [blend]
@@ -606,17 +621,6 @@ Each model is listed under its first tag; its other tags follow it.
 - `sf_scale_non_uniform`: Box scaled non uniformly X 2, Y 1, Z 0.5 about the origin [sciforge-scale]
 - `sf_scale_non_uniform_keeps_faces`: Scale 2, Press Pull the top 5, the scale edited to Non Uniform 2 / 1 / 1: the Press Pull keeps the top [edit, press-pull, reference-stability]
 - `sf_scale_uniform`: Box 40x30x10 scaled 2 about the origin [sciforge-scale]
-
-### sketch (8)
-
-- `sketch_face_line_through_circle`: Block 100x40x20, sketch on its top with the face's edges projected, a line across the face and a circle r6 on it: both halves of the circle extruded 10 [auto-project, regions]
-- `sketch_face_line_through_circle_half`: Same sketch: only the left half of the circle extruded 10 [auto-project, regions]
-- `sketch_face_projected_corner`: Block 40x30x10, sketch on its top with the face's edges projected, a 10x10 rectangle from the projected corner: only the rectangle extruded 5 [auto-project, regions]
-- `sketch_face_projected_rest`: Block 40x30x10, sketch on its top with the face's edges projected, a 10x10 rectangle from the projected corner: the L-shaped rest of the face extruded 5 [auto-project, regions]
-- `sketch_inscribed_pentagon`: Plate with an inscribed pentagon (corner radius 8) cut through [polygon]
-- `sketch_line_through_circle_overhang`: Rectangle 40x30, a line past both its sides through a circle r5: both halves of the circle extruded 8 [regions]
-- `sketch_nut_trap_polygon`: Plate with a circumscribed hexagon (5.5 across flats) cut through, resized to 8 [polygon, edit]
-- `sketch_trim_union`: Circle and overlapping rectangle trimmed into one outline, extruded 10 [trim]
 
 ### thread (8)
 
@@ -789,7 +793,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `expect_move_refused` | (a test helper) | 1 | `extrude_multi_move` |
 | `expect_radius` | (a test helper) | 1 | `sf_sweep_guide_surface` |
 | `export_report_expect` | (a test helper) | 2 | `export_report_design`, `export_report_sketch_dxf` |
-| `extrude` | `extrude` | 413 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `extrude` | `extrude` | 417 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `fillet` | (a test helper) | 23 | `bodies_delete_face_fillet`, `bracket_inner_fillet`, `edit_fillet_radius`, `edit_width_after_fillet_and_hole`, `fillet_all_edges` |
 | `fillet_sets` | `fillet_sets` | 14 | `fillet2_chamfer_sets_angle_flip`, `fillet2_chord_90_120`, `fillet2_face_and_its_edge_in_two_sets`, `fillet2_presspull_set_radius`, `fillet2_sets_tangent_chain_each` |
 | `full_round` | `full_round_fillet` | 1 | `fillet2_full_round_rib` |
@@ -887,8 +891,9 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_unfold` | (a test helper) | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
 | `shell` | `shell` | 28 | `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain` |
 | `silhouette_split` | `silhouette_split` | 3 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
-| `sketch` | `create_sketch` | 523 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `sketch` | `create_sketch` | 527 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `sketch_extras` | (a test helper) | 1 | `export_report_sketch_dxf` |
+| `sketch_offset_expect` | (a test helper) | 4 | `sketch_offset_circle_symmetric`, `sketch_offset_rect_edit`, `sketch_offset_rounded_fixed_out`, `sketch_offset_slot_fixed_in` |
 | `sketch_polygon` | `sketch_polygon` | 2 | `sketch_inscribed_pentagon`, `sketch_nut_trap_polygon` |
 | `sketch_trim` | `sketch_trim` | 1 | `sketch_trim_union` |
 | `split_body` | `split_body` | 11 | `bodies_split_by_body`, `bodies_split_edit_tool`, `bodies_split_face_extended`, `bodies_split_sketch_line`, `bodies_split_two_planes` |

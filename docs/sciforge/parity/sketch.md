@@ -30,8 +30,9 @@ can give that sort of error". So in SciForge (shared helper `sciforge/value_limi
 In sketch mode: Fillet (the radius: the pointer far out or a typed number; Enter makes the
 largest fillet that fits and the text by the pointer says so) and Chamfer between two
 lines (Distance and Distance 2). Not held: the chamfer's angle and a chamfer between a
-line and an arc (their refusals stay); Offset has no such limit. `sketch2_fillet` B
-updated.
+line and an arc (their refusals stay). `sketch2_fillet` B updated. Offset (2026-11-02):
+an inner offset wider than the curves allow stops at the largest that fits (section
+"Sketch Offset with Fusion's OFFSET panel").
 
 **The largest sketch fillet or chamfer takes the curve whole** (2026-10-22, integration
 fixes). In a sketch the limit is where the fillet or chamfer reaches the far end of a curve.
@@ -227,6 +228,45 @@ Scenario `polish2_sketch_check` (the check beside the end, on top of the view, f
 zoom; a click ends the chain and the tool stays on; a new chain; Ctrl+Z; Esc; a spline;
 Finish Sketch).
 
+## Sketch Offset with Fusion's OFFSET panel (2026-11-02)
+
+Luca (2026-11-02): "sketching an offset does not have a dialog box. usually you could select
+if you want chain select or not. theres no option for that. so its always chain select. what
+if i just want to offset 1 line?", with a screen capture of Fusion's OFFSET panel: Curves
+(Select), Chain Selection (ticked), Direction (One Side), Flip, OK (greyed until curves are
+picked), Cancel. SciForge's Offset was FreeCAD's offset tool started on the whole chain of
+the clicked curve, with round corners (its switch to sharp corners did not take).
+
+Sources: Autodesk's hosts cannot be opened from the sandbox (help.autodesk.com and
+forums.autodesk.com are outside its network), so the **Autodesk** rows come from web-search
+excerpts of Fusion help "Offset sketch geometry" (SKT-OFFSET), the Fusion API reference
+(Sketch.offset, SketchOffsetDimension, OffsetConstraint) and the support article "Cannot
+select lines / edges to Offset in a Fusion sketch"; **Forum**: Autodesk Community threads
+"Negative offset in sketch not working" (Fusion added Flip so the side changes without a
+negative value), "Offset multiple sketch curves", "offset editing", "Sketch offset dimension
+value"; **Luca**: his capture; **Guess**: no source found, SciForge's choice.
+
+| Fusion (source) | SciForge |
+|---|---|
+| MODIFY > Offset, key O; the OFFSET panel: Curves (Select), Chain Selection, Direction, Flip, OK / Cancel (Luca; Autodesk) | Same: SciForge's own tool (`sketch_offset_tool.py`, command in `sketch_offset_ui.py`, maths in `sketch_offset_core.py`, constraints in `sketch_offset_build.py`). The panel sits at the top of the sketch panel, above the SKETCH PALETTE (where SciForge's other sketch panels sit); its buttons never take the keyboard (Esc, Enter and typed values stay with the 3D view) |
+| Pick a sketch curve, a chain of connected curves or a profile; Chain Selection on: one click takes the connected chain; off: each click takes just that curve; several curves can be picked (Autodesk; Luca) | Same: clicks on the sketch's curves (projected ones too) pick them; Chain Selection uses the double-click chain rule (curves of the same line type joined end to end). A click on a picked curve drops it (with Chain Selection on, its chain) (Guess: Fusion's selection toggle); the x drops all; the panel counts them. The picks are yellow, what a click would add lights up, what it would drop is red. Curves selected before O are the picks, as they are (no chain added: Guess). Lines, arcs and circles |
+| (Is Chain Selection remembered?) | Remembered between sessions, like the palette's options; Direction for the session (Guess) |
+| Drag or type the distance; a value box in the canvas (Autodesk) | The offset follows the pointer: it runs through the pointer, on the pointer's side. A click (or a press-drag) off the curves keeps that distance; a number typed goes into the box by the pointer, or into Distance in the panel. A plain number is in the design's units. The first distance before the pointer moves: the last one used (Guess) |
+| Direction One Side / Symmetric (both sides, one distance) (Luca's capture; Autodesk also lists Two Sides) | One Side and Symmetric. Two Sides: gap |
+| Flip changes the side (Forum) | Same: the offset goes to the other side and keeps the distance shown; greyed for Symmetric. 0 or a negative value is refused (Flip is the way) |
+| OK / Enter makes it, Cancel / Esc makes nothing (Autodesk) | Same; one undo step "Offset"; OK in the right-click menu too. O again, or another sketch tool, ends Offset without making anything (Guess) |
+| Corners stay sharp: a rectangle offset outwards is a bigger rectangle (Luca) | Same: neighbouring offset lines and arcs are cut or extended to where they meet; smooth joints (a slot, rounded corners) stay smooth; an open chain's ends stay square to the original's ends |
+| After OK: the offset curves, an offset dimension and an offset constraint; editing the dimension moves the offset; deleting the glyph unlinks them (Autodesk; Forum) | The offset keeps one dimension (its text just beyond the offset): a double-click, a new value, and the whole offset moves (both sides for Symmetric). Underneath, unseen (FreeCAD's "virtual space"): each offset line is Parallel to its original, an arc or circle shares its centre, short construction lines square to the originals are Equal to the one that carries the dimension (FreeCAD's own offset uses such lines), corners meet. Fixed (Fix/Unfix, FreeCAD's Block) originals get the same ties by their position (FreeCAD 1.1.4 calls a sketch over-constrained when any constraint names a blocked curve). Originals whose own size is free: FreeCAD's solver may share a new distance between them and the offset (give them sizes, as typed values do) |
+| A value past what fits (this page's top) | An inner offset wider than the curves allow stops at the largest that fits; the note by the pointer says so ("20 mm does not fit: limited to 14.99 mm"); Fusion refuses it |
+
+Tests: scenario `sketch_offset_dialog` (real clicks: Chain Selection off and one line of a
+rectangle; on and the whole rectangle with sharp corners and the exact typed distance; the
+dimension changed by a double-click moves the whole offset; picks dropped; Cancel; Symmetric
+on a circle; Flip; Esc; a line selected first; O again; one Ctrl+Z per offset; an inner
+offset held at the largest that fits), `sketch_modify` (O, a click, 3: a rectangle 3 mm
+out, sharp corners), `sketch_qa` C (Offset waits for a pick, Esc ends it); unit
+`test_sketch_offset_core.py`.
+
 ## What the user does (and what SciForge does)
 
 | Fusion | SciForge |
@@ -239,7 +279,7 @@ Finish Sketch).
 | D: click a curve (or two), place, a value box opens; Enter keeps it, Esc keeps the measured value | Same (`DimensionEditor`). Refuses 0, negative sizes, text and wrong units with the reason in the box; takes expressions (`10+15*2`, `=Parameters.w`). A plain number is in the design's units and the box shows them, like Fusion (a design in inches: "1.5" is 1.5 in; the boxes of SciForge's own tools too: beta 3 VEX QA) |
 | A dimension on a size that is already set: Fusion offers a driven dimension | Made a driven dimension at once (no pop-up), with a message; the sketch never ends up over-constrained |
 | Double-click a dimension to change it | Same (also radius/diameter); a driven dimension says it cannot be changed |
-| T trim, O offset (chain), X construction, P project, Include 3D Geometry, Mirror/patterns with nothing selected | Same (first pass). Offset keeps sharp corners. T is SciForge's Trim (press and drag across pieces) since `sf/sketch-tools` |
+| T trim, O offset, X construction, P project, Include 3D Geometry, Mirror/patterns with nothing selected | Same (first pass). T is SciForge's Trim (press and drag across pieces) since `sf/sketch-tools`; O is SciForge's Offset with its OFFSET panel (Chain Selection, One Side / Symmetric, Flip, sharp corners) since 2026-11-02 (section "Sketch Offset with Fusion's OFFSET panel") |
 | A constraint tool clicked with a selection that does not fit (Parallel with one line) starts and waits for picks | Same (`sketch_tools_ui._Constraint`); FreeCAD alone only noted "Wrong selection" |
 | Fix/Unfix with curves selected fixes them where they are | Same: FreeCAD's Block on curves, Lock on points |
 | Sketch fillet: click a corner, type the radius | Same: the radius box opens on a new radius dimension |
@@ -427,3 +467,7 @@ SciForge's Trim and P SciForge's Project (`config.PREFERRED`).
 | Every closed area is a profile, also where a line crosses a circle inside another area (a line across a face to find its middle and a circle on it: each half of the circle is a profile) | FreeCAD 1.1.4 made no area at all for this layout (the whole sketch lost its areas; Extrude took the face; Luca 2026-10-18). `sketch_area_fill.py` adds them as above. Golden `sketch_face_line_through_circle`, `_half`, `sketch_line_through_circle_overhang`; scenario `sketch_line_through_circle` (real clicks: line, circle on its middle, E, a click in each half) |
 | Auto project from a face changed by a later step (a fillet on its edges, a hole in it) | The outline is the face of the step the sketch hangs on (stable when the later step is suppressed): a fillet's rounded corners or a later hole are not in it; P adds them |
 | Fusion's exact glyph pictures | SciForge's own (Guess) |
+| Offset: Direction Two Sides (a distance for each side) | Not built: One Side and Symmetric are |
+| Offset of splines, ellipses and conics | Refused with the reason (lines, arcs and circles only); untick Chain Selection to offset the lines and arcs of such a chain |
+| Offset: the offset glyph (delete it to unlink), right-click "Add Offset Dimension", an arrow to drag | Not built: one dimension and unseen constraints; the pointer (or a press-drag) gives the distance |
+| Offset: an inner offset whose curves would cross each other further away (a narrow notch closing up) | Only a curve that turns over or vanishes is caught (held at the largest that fits); crossings between far apart curves are not trimmed |

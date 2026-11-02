@@ -1824,3 +1824,8 @@ from . import surface3_schema  # noqa: E402,F401  (SURFACE part 3)
 from . import export_schema  # noqa: E402,F401  (export report checks; it wraps validate)
 # Fillet / Chamfer live picture on the exact result (live_checks.py)
 STEP_KEYS["live_blend_expect"] = ({"target"}, {"tol", "sizes", "min_points", "comment"})
+# Sketch Offset made as OK does, checked, its dimension changed (offset_checks.py)
+STEP_KEYS["sketch_offset_expect"] = (
+    {"sketch", "distance"},
+    {"curves", "side", "block", "edit", "comment"},
+)
