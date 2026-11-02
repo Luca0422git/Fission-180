@@ -12,9 +12,12 @@ written (module files only: a patch release). Status: [x] 1 arrow keys in sketch
 corner hover [x] 4 Offset panel (Chain Selection, One Side / Symmetric, Flip) [x] 5 snap dot
 [x] 6 90 degrees kept onto a curve [x] 7 second click renames in the browser [x] 8 no empty
 Body in the browser [x] 9 Align after Split / Move [x] local tests (unit, golden, the new and
-the touched scenarios) [ ] "SciForge tests" green on GitHub for develop's newest commit [ ]
-Luca runs Actions > SciForge patch release. Guesses to confirm are under "Questions waiting
-for Luca".
+the touched scenarios) [x] "SciForge tests" green on GitHub (#358 on `eae078aa`) [x]
+**PUBLISHED 2026-11-02 22:48 UTC** by Luca's patch release run #14 (prepare, linux, windows
+with the installer tests, release: all green; Release and the tag `sciforge-v0.1.0-beta.3.2.1`
+on `eae078aa`; six files: installer 495 MB, portable 422 MB, AppImage 827 MB, quick update
+8 MB, sciforge-release.json, SHA256SUMS.txt; the notes' checksums = GitHub's asset digests).
+Guesses to confirm are under "Questions waiting for Luca".
 
 **2026-10-29: GUI test rework, on branch `sf/gui-tests-rework` (not `develop`).** Luca's brief
 "SciForge GUI tests: rework brief for Claude Code" (claude.ai artifact; its rules are copied in
