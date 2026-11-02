@@ -46,6 +46,7 @@ class PickConstraint(draw.DrawTool):
 
     needs = 2
     points_ok = False  # a sketch point can be picked (Midpoint)
+    snap_dot = False  # it picks curves: they light up instead
 
     def steps(self):
         return self.needs

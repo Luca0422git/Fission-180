@@ -22,6 +22,7 @@ class ProjectToSurface(draw.DrawTool):
     title = "Project to Surface"
     command = "SciForge_SketchProjectToSurface"
     repeat = False
+    snap_dot = False  # it picks faces and curves of the part
 
     def __init__(self, session):
         super().__init__(session)

@@ -5,6 +5,33 @@ its own section of this file (the release notes are made from it), so every rele
 section here whose heading is exactly its version number, like `## 0.1.0-beta` below. Known
 problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
 
+## 0.1.0-beta.3.2.1
+
+### Fixed
+
+- **Sketch value boxes: the arrow keys moved the view.** While you typed a value in a box
+  beside the pointer (a fillet radius, a rectangle's width, a slot...), Left and Right panned
+  the view instead of moving the typing cursor. The box now shows a cursor; Left, Right, Home
+  and End move it, Backspace and Delete remove the character before or after it, and what you
+  type goes in where the cursor is.
+- **Picking another sketch tool did not stop the one running.** With Rectangle running,
+  clicking Offset (or Mirror, a pattern, Move/Copy, Scale or a constraint) left Rectangle
+  going: your clicks drew a rectangle instead of picking curves. Any sketch tool now replaces
+  the one before, as in Fusion.
+- **Sketch Fillet: several corners at once, and corners show when you point at them.** Click a
+  corner, then more corners, then type the radius and press Enter: they are all rounded with
+  the same radius in one step (one radius dimension; the others stay equal to it). With the
+  pointer on a corner, both of its lines light up, the rounding it would get shows, and a dot
+  sits on the corner. Enter with nothing typed now makes the fillet at the size shown.
+- **Snapping had no clear feedback.** While drawing, a white dot now shows exactly where the
+  point will land when it snaps: on an end, a middle, a centre, a crossing, or on a line or
+  curve.
+- **A line at 90 degrees did not stay at 90 degrees when it ended on a curve.** Drawing a line
+  straight out from another line (or level, or upright) onto an arc or circle used to end it
+  wherever the pointer touched the curve, a degree or two off. The line now keeps its 90
+  degrees (or level, or upright) and ends exactly where that meets the curve, with the
+  constraints that keep it so.
+
 ## 0.1.0-beta.3.2
 
 **A full build after 0.1.0-beta.3.1.3.** The Linux AppImage needed a change in how it is

@@ -136,6 +136,10 @@ class Result:
         self.along = None
         self.start = None  # the line's first point (None before the first click)
         self.snap = None  # SnapPoint the point sits on exactly (snap_result), or None
+        # the line ends on a curve where its direction meets it (a line drawn at 90
+        # degrees from the line it starts on, onto an arc): the index of that curve in the
+        # `curves` given to infer(), or None
+        self.on_curve = None
 
     def __repr__(self):
         return "Result(%r, guides=%r, kind=%r, other=%r)" % (
@@ -217,10 +221,58 @@ def curve_distance(p, curve):
     return float("inf")
 
 
-def poly(points):
-    """A curve given by points ("poly", points, bounding box) for near_curve."""
+def nearest_on_curve(p, curve):
+    """The point of a curve (as for curve_distance) nearest to p, or None."""
+    kind = curve[0]
+    if kind == "seg":
+        a, b = curve[1], curve[2]
+        ab = sub(b, a)
+        n2 = dot(ab, ab)
+        if n2 < 1e-24:
+            return a
+        t = max(0.0, min(1.0, dot(sub(p, a), ab) / n2))
+        return add(a, mul(ab, t))
+    if kind == "line":
+        d = unit(curve[2])
+        if d is None:
+            return curve[1]
+        return add(curve[1], mul(d, dot(sub(p, curve[1]), d)))
+    if kind == "circle":
+        u = unit(sub(p, curve[1]))
+        return add(curve[1], mul(u, curve[2])) if u is not None else None
+    if kind == "poly":
+        pts = curve[1]
+        if len(pts) == 1:
+            return pts[0]
+        best = None
+        for i in range(len(pts) - 1):
+            q = nearest_on_curve(p, ("seg", pts[i], pts[i + 1]))
+            if best is None or dist(p, q) < dist(p, best):
+                best = q
+        return best
+    return None
+
+
+def disc(centre, radius, n=20):
+    """A filled round dot as a polygon (n points round the centre)."""
+    return [
+        (
+            centre[0] + radius * math.cos(2 * math.pi * i / n),
+            centre[1] + radius * math.sin(2 * math.pi * i / n),
+        )
+        for i in range(n)
+    ]
+
+
+def poly(points, circle=None):
+    """A curve given by points ("poly", points, bounding box) for near_curve. `circle`:
+    ("circle", centre, radius) when the points are an arc of it (ray_hits then meets the
+    arc exactly)."""
     xs, ys = [p[0] for p in points], [p[1] for p in points]
-    return ("poly", list(points), (min(xs), min(ys), max(xs), max(ys)))
+    box = (min(xs), min(ys), max(xs), max(ys))
+    if circle is not None:
+        return ("poly", list(points), box, circle)
+    return ("poly", list(points), box)
 
 
 def near_curve(p, curve, tol):
@@ -558,6 +610,11 @@ def infer(raw, start, acquired, lines, vertices, curves, px, opt, parallel_lines
         return None  # FreeCAD snaps to that point
     if any(near_curve(raw, c, pick) for c in curves):
         result = _ends_on_line(raw, start, lines, pick, px, opt) if start else None
+        met = None
+        if start is not None and dist(raw, start) >= opt.min_len_px * px:
+            met = direction_meets_curve(raw, start, lines, parallel_lines, curves, px, opt)
+        if met is not None and (result is None or dist(met.point, raw) < dist(result.point, raw)):
+            result = met
         if result is not None:
             result.start = start
         return result  # None: FreeCAD snaps onto that curve
@@ -606,6 +663,88 @@ def _ends_on_line(raw, start, lines, pick, px, opt):
         far = a if dist(a, foot) > dist(b, foot) else b
         result.along = unit(sub(far, foot))
     return result
+
+
+def direction_meets_curve(raw, start, lines, parallel_lines, curves, px, opt):
+    """The pointer is on a curve and the line from `start` points the way it would snap to
+    in free space (90 degrees to the line it starts on, level, upright, 45 degrees...):
+    the line ends where that direction meets the curve, so it keeps its direction AND
+    ends on the curve (Luca, 2026-11-02: a line drawn at 90 degrees from a line to an arc
+    went to the arc wherever the pointer touched it, a degree or two off the right
+    angle). A Result with `on_curve` (the curve's index in `curves`), or None.
+
+    The meeting point must be about as near the pointer as the direction's own snap
+    allows (its angle tolerance at the pointer's distance, plus the pick radius)."""
+    direction = _direction(raw, start, lines, parallel_lines, px, opt)
+    if direction is None:
+        return None
+    kind, d, other, corner, along = direction
+    degrees = max(opt.hv_deg, opt.perp_deg, opt.diag_deg, opt.parallel_deg if opt.parallel else 0)
+    reach = opt.pick_px * px + dist(raw, start) * math.tan(math.radians(degrees))
+    best = None
+    for index, curve in enumerate(curves):
+        for t, point in ray_hits(start, d, curve):
+            if t < opt.min_len_px * px:
+                continue
+            gap = dist(point, raw)
+            if gap <= reach and (best is None or gap < best[0]):
+                best = (gap, point, index)
+    if best is None:
+        return None
+    result = Result(best[1], [], kind, d, other)
+    result.on_curve = best[2]
+    if kind == PERPENDICULAR:
+        result.corner, result.along = corner, along
+    return result
+
+
+def ray_hits(start, d, curve):
+    """Where the ray start + t d (d a unit vector, t > 0) meets a curve given as for
+    curve_distance: [(t, point)]. An arc drawn as a polyline that carries its circle
+    (poly(points, circle=...)) is met on the circle itself, exactly."""
+    kind = curve[0]
+    eps = 1e-9
+    out = []
+    if kind in ("seg", "line"):
+        a = curve[1]
+        e = sub(curve[2], a) if kind == "seg" else curve[2]
+        denom = d[0] * e[1] - d[1] * e[0]
+        if abs(denom) < 1e-12:
+            return []  # parallel: no single meeting point
+        w = sub(a, start)
+        t = (w[0] * e[1] - w[1] * e[0]) / denom
+        u = (w[0] * d[1] - w[1] * d[0]) / denom
+        if t > eps and (kind == "line" or -1e-9 <= u <= 1 + 1e-9):
+            out.append((t, add(start, mul(d, t))))
+        return out
+    if kind == "circle":
+        return _ray_circle(start, d, curve[1], curve[2])
+    if kind == "poly":
+        pts = curve[1]
+        exact = curve[3] if len(curve) > 3 else None
+        if exact is not None and exact[0] == "circle":
+            # on the circle, where the arc is (its polyline within a hair of it)
+            tol = max(1e-6, 0.01 * exact[2])
+            return [
+                (t, p)
+                for t, p in _ray_circle(start, d, exact[1], exact[2])
+                if curve_distance(p, ("poly", pts)) <= tol
+            ]
+        for i in range(len(pts) - 1):
+            out += ray_hits(start, d, ("seg", pts[i], pts[i + 1]))
+        return out
+    return []
+
+
+def _ray_circle(start, d, centre, r):
+    w = sub(start, centre)
+    b = dot(d, w)
+    c = dot(w, w) - r * r
+    disc = b * b - c
+    if disc < 0:
+        return []
+    root = math.sqrt(disc)
+    return [(t, add(start, mul(d, t))) for t in (-b - root, -b + root) if t > 1e-9]
 
 
 def _axis_kind(d, tol):
@@ -785,7 +924,11 @@ def exact_point(result, placed, px, start=None):
     start = start if start is not None else result.start
     if result.snap is not None:
         return result.point if dist(placed, result.point) <= tol else None
-    if result.on_line or (result.guides and result.direction is not None):
+    if (
+        result.on_line
+        or result.on_curve is not None
+        or (result.guides and result.direction is not None)
+    ):
         return result.point if dist(placed, result.point) <= tol else None
     if result.guides or result.kind in (HORIZONTAL, VERTICAL):
         # a free coordinate within a pixel of the inferred one (the grid) takes its value

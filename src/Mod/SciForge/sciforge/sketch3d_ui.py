@@ -583,6 +583,8 @@ class Snap3D:
 class Line3D(draw.DrawTool):
     """Lines joined end to end whose points may leave the sketch plane."""
 
+    snap_dot = False  # its points are 3D (the sketch's flat dot does not apply)
+
     title = "3D Line"
     command = "SciForge_SketchLine"
 

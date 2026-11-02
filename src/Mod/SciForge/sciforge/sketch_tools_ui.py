@@ -45,7 +45,7 @@ class _SketchCommand:
         try:
             session = sketch_mode.current()
             if session is not None:
-                session.stop_tool()  # SciForge's own drawing tool gives way
+                session.give_way()  # the running tool ends, SciForge's or FreeCAD's
             self.run()
         except Exception as exc:
             warn("%s failed: %s" % (self.title, exc))

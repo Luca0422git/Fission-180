@@ -98,10 +98,10 @@ class _PickCommand:
     def Activated(self):
         try:
             session = sketch_mode.current()
-            if session is not None:
-                session.stop_tool()  # SciForge's own drawing tool gives way
             sketch = sketch_mode.editing_sketch()
             if sketch is None:
+                if session is not None:
+                    session.stop_tool()
                 commands.tell(
                     "%s works inside a sketch: click Create Sketch (or edit a sketch) first."
                     % self.title
@@ -111,6 +111,8 @@ class _PickCommand:
             if waiter is not None and waiter.title == self.title:
                 waiter.confirm()  # the command clicked again: go on
                 return
+            if session is not None:
+                session.give_way()  # the running tool ends, SciForge's or FreeCAD's
             if not sketch.Geometry:
                 commands.tell("%s: draw some curves first." % self.title)
                 return

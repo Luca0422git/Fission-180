@@ -182,6 +182,114 @@ class Perpendicular(unittest.TestCase):
         self.assertIsNone(run(mid, start=start, lines=[line], curves=curves))
 
 
+class DirectionOntoACurve(unittest.TestCase):
+    """A line drawn at 90 degrees from the line it starts on, ending on an arc or another
+    curve, keeps its 90 degrees and ends where that direction meets the curve (Luca,
+    2026-11-02: it went to the arc wherever the pointer touched it)."""
+
+    SLANT = (5, (-20.0, -12.0), (0.0, 0.0))  # the line the new one starts from (31 degrees)
+
+    def normal(self):
+        u = core.unit((20.0, 12.0))
+        return (-u[1], u[0])
+
+    def arc_through(self, point, radius=30.0):
+        """A quarter arc (as a polyline carrying its circle) whose middle is `point`, its
+        centre further out along the normal."""
+        n = self.normal()
+        centre = core.add(point, core.mul(n, radius))
+        mid = math.atan2(-n[1], -n[0])
+        pts = [
+            core.add(centre, (radius * math.cos(a), radius * math.sin(a)))
+            for a in [mid - math.pi / 4 + i * (math.pi / 2) / 48 for i in range(49)]
+        ]
+        return core.poly(pts, ("circle", centre, radius)), centre
+
+    def test_perpendicular_kept_up_to_an_arc(self):
+        n = self.normal()
+        target = core.mul(n, 25.0)
+        arc, centre = self.arc_through(target)
+        # the pointer on the arc, 2 degrees round from where the perpendicular meets it
+        raw = rot(core.sub(target, centre), 2.0)
+        raw = core.add(centre, raw)
+        self.assertLess(core.curve_distance(raw, arc), 0.01)
+        r = run(raw, start=(0.0, 0.0), lines=[self.SLANT], curves=[arc])
+        self.assertIsNotNone(r)
+        self.assertEqual(r.kind, core.PERPENDICULAR)
+        self.assertEqual(r.other, 5)
+        self.assertEqual(r.on_curve, 0)
+        self.assertFalse(r.on_line)
+        self.assertAlmostEqual(core.dot(r.point, (20.0, 12.0)), 0.0)  # on the perpendicular
+        self.assertAlmostEqual(core.dist(r.point, centre), 30.0)  # exactly on the arc
+        self.assertAlmostEqual(r.point[0], target[0])
+        self.assertAlmostEqual(r.point[1], target[1])
+        self.assertEqual(r.corner, (0.0, 0.0))  # the right-angle mark at the start
+
+    def test_onto_a_circle(self):
+        n = self.normal()
+        centre = core.mul(n, 40.0)
+        circle = ("circle", centre, 15.0)
+        raw = core.add(centre, rot(core.mul(n, -15.0), 5.0))  # on the circle, off the normal
+        r = run(raw, start=(0.0, 0.0), lines=[self.SLANT], curves=[circle])
+        self.assertEqual(r.kind, core.PERPENDICULAR)
+        self.assertAlmostEqual(core.dist(r.point, centre), 15.0)
+        self.assertAlmostEqual(core.dot(r.point, (20.0, 12.0)), 0.0)
+        self.assertAlmostEqual(core.dist(r.point, (0.0, 0.0)), 25.0)  # the near side
+
+    def test_level_kept_up_to_a_slanted_line(self):
+        other = ("seg", (40.0, -20.0), (60.0, 30.0))
+        # level from (0, 5): meets the line at x = 40 + 20 * 25 / 50 = 50
+        raw = (50.0 + 1.0, 5.0 + 2.5)  # on the line, 1.2 degrees above level
+        self.assertLess(core.curve_distance(raw, other), 0.2)
+        r = run(raw, start=(0.0, 5.0), curves=[other])
+        self.assertEqual(r.kind, core.HORIZONTAL)
+        self.assertAlmostEqual(r.point[1], 5.0)
+        self.assertAlmostEqual(r.point[0], 50.0)
+        self.assertEqual(r.on_curve, 0)
+
+    def test_the_line_landed_on_at_90_degrees_still_wins_when_closer(self):
+        # the old rule: a line ending on another line at about 90 degrees goes to the foot
+        line = (7, (10.0, -20.0), (50.0, 4.0))
+        u = core.unit((40.0, 24.0))
+        n = (-u[1], u[0])
+        foot = (10.0 + 40.0 * 0.3, -20.0 + 24.0 * 0.3)
+        start = core.add(foot, core.mul(n, 18.0))
+        gap = 18.0 * math.tan(math.radians(2.0))
+        raw = core.add(core.add(foot, core.mul(u, gap)), core.mul(n, 1.5 * PX))
+        r = run(raw, start=start, lines=[line], curves=[("seg", line[1], line[2])])
+        self.assertTrue(r.on_line)
+        self.assertIsNone(r.on_curve)
+
+    def test_too_far_round_the_curve_is_freecads_snap(self):
+        n = self.normal()
+        target = core.mul(n, 25.0)
+        arc, centre = self.arc_through(target)
+        raw = core.add(centre, rot(core.sub(target, centre), 30.0))  # 30 degrees round
+        self.assertLess(core.curve_distance(raw, arc), 0.01)
+        self.assertIsNone(run(raw, start=(0.0, 0.0), lines=[self.SLANT], curves=[arc]))
+
+    def test_after_the_click_the_point_goes_to_the_meeting_point(self):
+        n = self.normal()
+        target = core.mul(n, 25.0)
+        arc, centre = self.arc_through(target)
+        raw = core.add(centre, rot(core.sub(target, centre), 2.0))
+        r = run(raw, start=(0.0, 0.0), lines=[self.SLANT], curves=[arc])
+        placed = core.add(r.point, (0.1 * PX, -0.2 * PX))  # where FreeCAD put it
+        self.assertEqual(core.exact_point(r, placed, PX), r.point)
+        self.assertIsNone(core.exact_point(r, core.add(r.point, (5.0, 0.0)), PX))
+
+    def test_ray_hits(self):
+        hits = core.ray_hits((0.0, 0.0), (1.0, 0.0), ("seg", (10.0, -5.0), (10.0, 5.0)))
+        self.assertEqual([round(t, 9) for t, _p in hits], [10.0])
+        self.assertEqual(
+            core.ray_hits((0.0, 0.0), (-1.0, 0.0), ("seg", (10.0, -5.0), (10.0, 5.0))), []
+        )
+        hits = core.ray_hits((0.0, 0.0), (1.0, 0.0), ("circle", (20.0, 0.0), 5.0))
+        self.assertEqual([round(t, 9) for t, _p in hits], [15.0, 25.0])
+        hits = core.ray_hits((0.0, 0.0), (0.0, 1.0), ("line", (0.0, 7.0), (1.0, 0.0)))
+        self.assertEqual([round(p[1], 9) for _t, p in hits], [7.0])
+
+
 class Parallel(unittest.TestCase):
     LINE = (8, (95.0, 2.0), (115.0, 14.0))
 

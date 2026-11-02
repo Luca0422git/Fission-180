@@ -173,6 +173,7 @@ class Inference:
         self.last_step = None  # which click `last` was computed for
         self.last_start = None  # the line's first point as last previewed
         self._cache = None
+        self._curve_geos = []  # the sketch curve of each curve of the cache (-1 / -2 the axes)
         self.aiming = False  # SciForge's Line chain clicks a point itself: no snapping
         self._items = []  # the curves as sketch_infer_core descriptions (snap points)
         self._snaps = []  # their snap points (sketch_infer_core.SnapPoint)
@@ -317,6 +318,9 @@ class Inference:
             self._remember_press(result, view.px, step, view, False)
         if result is None:
             self.overlay.clear()
+            spot = self._freecad_snap(view)
+            if spot is not None:
+                self.overlay.show_dot(spot, view.px)
             return None
         pos = view.pixel_for(result.point)
         if pos is None:
@@ -441,7 +445,31 @@ class Inference:
         result = core.infer(
             raw, start, acquired, lines, verts, curves, view.px, opt, parallel, self.placed
         )
+        if result is not None and result.on_curve is not None:
+            # which sketch curve the line ends on (kept on it after the click)
+            geos = self._curve_geos
+            result.on_curve_geo = geos[result.on_curve] if result.on_curve < len(geos) else None
         return result, opt.grid
+
+    def _freecad_snap(self, view):
+        """Where FreeCAD's own snapping puts the point when SciForge leaves it alone: a
+        sketch point under the pointer, else the nearest point of a curve under it (within
+        FreeCAD's pick radius), or None."""
+        verts, curves, _lines, _keyed = self._geometry()
+        pick = _pick_pixels(view.ratio) * view.px
+        hit = core.nearest_vertex(view.raw, verts, pick)
+        if hit is not None:
+            return hit[1]
+        best = None
+        for curve in curves:
+            if not core.near_curve(view.raw, curve, pick):
+                continue
+            q = core.nearest_on_curve(view.raw, curve)
+            if q is not None and (
+                best is None or core.dist(q, view.raw) < core.dist(best, view.raw)
+            ):
+                best = q
+        return best
 
     def _geometry(self):
         """(vertices, curves, lines, {key: point}) of the sketch, rebuilt when it
@@ -451,6 +479,7 @@ class Inference:
         sketch = self.session.sketch
         verts = [((-1, 1), (0.0, 0.0))]  # the origin
         curves = [("line", (0.0, 0.0), (1.0, 0.0)), ("line", (0.0, 0.0), (0.0, 1.0))]
+        curve_geos = [-1, -2]  # the sketch curve of each entry of `curves` (the axes)
         lines = []
         for i, geo in enumerate(sketch.Geometry):
             try:
@@ -458,12 +487,15 @@ class Inference:
             except Exception:
                 construction = False
             _add_geometry(verts, curves, lines, i, geo, construction)
+            curve_geos += [i] * (len(curves) - len(curve_geos))
         try:
             external = list(sketch.ExternalGeo)[2:]  # the first two are the axes
         except Exception:
             external = []
         for k, geo in enumerate(external):
             _add_geometry(verts, curves, lines, -3 - k, geo, False)
+            curve_geos += [-3 - k] * (len(curves) - len(curve_geos))
+        self._curve_geos = curve_geos
         keyed = dict(verts)
         self._cache = (verts, curves, lines, keyed)
         items = [("point", -1, (0.0, 0.0))]  # the origin (FreeCAD's point -1, 1)
@@ -775,6 +807,14 @@ class Inference:
                 }
             for guide in result.guides:
                 constraints.append(self._alignment(key, guide, new))
+            curve = getattr(result, "on_curve_geo", None)
+            if curve is not None and curve not in new:
+                # a line that keeps its direction up to a curve stays on that curve
+                # (FreeCAD usually adds it: the pointer it got was on the curve)
+                if curve >= 0:
+                    held.add(curve)
+                if not _point_on(sketch, key, curve):
+                    constraints.append(Sketcher.Constraint("PointOnObject", key[0], key[1], curve))
             if directed:
                 line = self._direction_line(new, geos, result)
                 if line is None:
@@ -1223,6 +1263,14 @@ def _point_at(sketch, key, point, eps=1e-6):
         return False
 
 
+def _point_on(sketch, key, curve):
+    """The point `key` (geo, pos) is already kept on `curve` (a PointOnObject)."""
+    return any(
+        c.Type == "PointOnObject" and (c.First, c.FirstPos) == tuple(key) and c.Second == curve
+        for c in sketch.Constraints
+    )
+
+
 def _has(sketch, name, index):
     return any(c.Type == name and c.First == index and c.Second < -1999 for c in sketch.Constraints)
 
@@ -1246,8 +1294,11 @@ def _add_geometry(verts, curves, lines, i, geo, construction):
             verts += [((i, 1), _xy(geo.StartPoint)), ((i, 2), _xy(geo.EndPoint))]
         if hasattr(geo, "Center"):
             verts.append(((i, 3), _xy(geo.Center)))
+        circle = None
+        if kind == "Part::GeomArcOfCircle":
+            circle = ("circle", _xy(geo.Center), geo.Radius)
         try:
-            curves.append(core.poly([_xy(p) for p in geo.discretize(48)]))
+            curves.append(core.poly([_xy(p) for p in geo.discretize(48)], circle))
         except Exception:
             pass
 
@@ -1392,6 +1443,56 @@ class _ViewMap:
         return QtCore.QPointF(qx, qy)
 
 
+DOT_RIM = "#15181d"  # the snap dot: a white disc with a dark rim (seen on any background)
+DOT_FILL = "#ffffff"
+DOT_PIXELS = (5.5, 3.5)  # their radii, in screen pixels
+
+
+class SnapDot:
+    """A dot where the point being placed snaps to something (an end, a middle, a centre,
+    a crossing, a curve, a corner): a white disc with a dark rim, a few screen pixels wide
+    at any zoom (Luca, 2026-11-02: "there should be a dot at the end of the snap point to
+    signify that its snapping"). Coin nodes of our own, in sketch coordinates; the parent
+    places them on the sketch and draws them on top."""
+
+    def __init__(self):
+        from pivy import coin
+
+        self.root = coin.SoSeparator()
+        self.root.setName("SciForgeSnapDot")
+        model = coin.SoLightModel()
+        model.model = coin.SoLightModel.BASE_COLOR
+        self.root.addChild(model)
+        self.parts = []
+        for colour in (DOT_RIM, DOT_FILL):
+            sep = coin.SoSeparator()
+            col = coin.SoBaseColor()
+            col.rgb.setValue(*_rgb(colour))
+            coords = coin.SoCoordinate3()
+            faces = coin.SoFaceSet()
+            for node in (col, coords, faces):
+                sep.addChild(node)
+            self.root.addChild(sep)
+            self.parts.append((coords, faces))
+        self.point = None
+        self.clear()
+
+    def show(self, point, px):
+        """The dot at sketch point `point`; px: mm per screen pixel there."""
+        for (coords, faces), radius in zip(self.parts, DOT_PIXELS):
+            pts = core.disc(point, radius * px)
+            coords.point.setNum(0)
+            coords.point.setValues(0, len(pts), [(x, y, 0.0) for x, y in pts])
+            faces.numVertices.setValues(0, 1, [len(pts)])
+        self.point = tuple(point)
+
+    def clear(self):
+        for coords, faces in self.parts:
+            coords.point.setNum(0)
+            faces.numVertices.setNum(0)
+        self.point = None
+
+
 class Overlay:
     """SciForge's dashed guides, inference marks and the tangent-arc preview, drawn
     over the sketch (Coin nodes of our own under the view's root; never FreeCAD's edit
@@ -1404,7 +1505,7 @@ class Overlay:
 
         self.session = session
         self.attached = False
-        self._drawn = {"guides": [], "marks": [], "preview": []}
+        self._drawn = {"guides": [], "marks": [], "preview": [], "dot": []}
         self.root = coin.SoAnnotation()  # on top of everything, like Fusion's guides
         self.root.setName("SciForgeSketchInference")
         pick = coin.SoPickStyle()
@@ -1443,6 +1544,8 @@ class Overlay:
         for node in (mark_style, self.mark_coords, self.mark_lines):
             solid.addChild(node)
         self.root.addChild(solid)
+        self.dot = SnapDot()  # last: on top of the marks
+        self.root.addChild(self.dot.root)
         self.clear()
 
     def _attach(self):
@@ -1471,6 +1574,18 @@ class Overlay:
             # (circle and dot), a quadrant (diamond), a crossing (X)
             marks += core.snap_mark(result.snap, 6 * px)
         self._draw(guides, marks, [])
+        if result.snap is not None or result.on_line or result.on_curve is not None:
+            self._dot(result.point, px)
+
+    def show_dot(self, point, px):
+        """Only the snap dot: FreeCAD snaps the point itself (onto a curve or a point
+        under the pointer), SciForge shows where."""
+        self._draw([], [], [])
+        self._dot(point, px)
+
+    def _dot(self, point, px):
+        self.dot.show(point, px)
+        self._drawn["dot"] = [tuple(point)]
 
     def show_arc(self, arc, guides, marks):
         """The tangent arc being dragged (None: no arc, the pointer is straight ahead),
@@ -1485,7 +1600,8 @@ class Overlay:
         self._set(self.guide_coords, self.guide_lines, guides)
         self._set(self.mark_coords, self.mark_lines, marks)
         self._set(self.preview_coords, self.preview_lines, preview)
-        self._drawn = {"guides": guides, "marks": marks, "preview": preview}
+        self.dot.clear()
+        self._drawn = {"guides": guides, "marks": marks, "preview": preview, "dot": []}
         self._attach()
 
     def _set(self, coords, lineset, polylines):
@@ -1505,7 +1621,8 @@ class Overlay:
         self._set(self.guide_coords, self.guide_lines, [])
         self._set(self.mark_coords, self.mark_lines, [])
         self._set(self.preview_coords, self.preview_lines, [])
-        self._drawn = {"guides": [], "marks": [], "preview": []}
+        self.dot.clear()
+        self._drawn = {"guides": [], "marks": [], "preview": [], "dot": []}
 
     def drawn(self):
         return {key: list(value) for key, value in self._drawn.items()}

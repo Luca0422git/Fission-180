@@ -286,6 +286,8 @@ class Preview:
         for node in (col, style, self.point_coords, self.point_set):
             sep.addChild(node)
         self.root.addChild(sep)
+        self.dot = sketch_infer.SnapDot()  # where the point snaps (DrawTool.show_dot); on top
+        self.root.addChild(self.dot.root)
         self._drawn = {}
         self.clear()
 
@@ -331,10 +333,24 @@ class Preview:
             _col, coords, lines = self.parts[name]
             _set(coords, lines, [])
         self.point_coords.point.setNum(0)
+        self.dot.clear()
         self._drawn = {}
 
+    def show_dot(self, point, px):
+        """The snap dot at sketch point `point` (None: no dot)."""
+        if point is None:
+            self.dot.clear()
+            return
+        placement = self.session.sketch.getGlobalPlacement()
+        self.transform.translation.setValue(*placement.Base)
+        self.transform.rotation.setValue(*placement.Rotation.Q)
+        self.dot.show(point, px)
+        self._attach()
+
     def drawn(self):
-        return {key: list(value) for key, value in self._drawn.items()}
+        out = {key: list(value) for key, value in self._drawn.items()}
+        out["dot"] = [self.dot.point] if self.dot.point is not None else []
+        return out
 
     def remove(self):
         try:
@@ -494,17 +510,58 @@ BOX_STYLE = (
     ' QLineEdit[bad="true"] { border: 2px solid #d9480f; }'
 )
 BOX_NAME = "SciForgeSketchValue"
+CARET_COLOUR = "#111111"  # the box's text colour (BOX_STYLE)
+# keys that move the caret in the box being typed into (Fusion; FreeCAD's 3D view pans
+# with the arrow keys, which is where they went: Luca, 2026-11-02)
+CARET_KEYS = (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Home, QtCore.Qt.Key_End)
+UP_DOWN = (QtCore.Qt.Key_Up, QtCore.Qt.Key_Down)
+
+
+class ValueBox(QtWidgets.QLineEdit):
+    """One value box. Read-only and never has the keyboard (keys come from the 3D view),
+    so Qt draws no text cursor in it: the caret is drawn here, where the next key typed
+    goes."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.caret = None  # character position of the caret in the box's text, or None
+
+    def set_caret(self, position):
+        # (setText puts Qt's cursor at the end: put it back at the caret each time)
+        if position is not None and self.cursorPosition() != position:
+            self.setCursorPosition(position)
+        if position != self.caret:
+            self.caret = position
+            self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.caret is None:
+            return
+        try:
+            rect = self.cursorRect()
+            painter = QtGui.QPainter(self)
+            painter.setPen(QtGui.QPen(QtGui.QColor(CARET_COLOUR), 1))
+            x = rect.center().x()
+            painter.drawLine(x, rect.top() + 1, x, rect.bottom() - 1)
+            painter.end()
+        except Exception:
+            pass
 
 
 class Boxes:
     """The value boxes of the step being drawn. They never take the keyboard: keys
-    typed on the 3D view come here (DrawTool.key)."""
+    typed on the 3D view come here (DrawTool.key). While a value is typed, a caret shows
+    where the next key goes; Left / Right / Home / End move it, Backspace / Delete take
+    out the character before / after it (Fusion's value box; the arrow keys panned the
+    view before)."""
 
     def __init__(self, tool):
         self.tool = tool
         self.fields = []
         self.current = 0
         self.typing = None  # text being typed into the current box (None: not typing)
+        self.caret = 0  # where in `typing` the next character goes
         self.widgets = {}
 
     def set_fields(self, fields):
@@ -513,9 +570,10 @@ class Boxes:
         self.fields = list(fields)
         self.current = 0
         self.typing = None
+        self.caret = 0
         gl = self.tool.session.gl
         for field in self.fields:
-            box = QtWidgets.QLineEdit(gl)
+            box = ValueBox(gl)
             box.setObjectName(BOX_NAME)
             box.setFocusPolicy(QtCore.Qt.NoFocus)
             box.setReadOnly(True)
@@ -554,12 +612,16 @@ class Boxes:
                 box.hide()
                 continue
             text = field.label + " " if field.label else ""
+            caret = None
             if i == self.current and self.typing is not None:
+                caret = len(text) + max(0, min(self.caret, len(self.typing)))
                 text += self.typing
             else:
                 text += field.shown()
             if box.text() != text:
                 box.setText(text)
+            if isinstance(box, ValueBox):
+                box.set_caret(caret)
             for prop, value in (
                 ("current", i == self.current),
                 ("typed", field.typed is not None),
@@ -601,20 +663,56 @@ class Boxes:
             self.refresh()
             return True
         if key == QtCore.Qt.Key_Backspace:
-            if self.typing is not None:
-                self.typing = self.typing[:-1]
+            if self.typing is not None and self.caret > 0:
+                self.typing = self.typing[: self.caret - 1] + self.typing[self.caret :]
+                self.caret -= 1
                 self.refresh()
             return True
+        if key == QtCore.Qt.Key_Delete:
+            if self.typing is None:
+                return False  # the sketch's Delete
+            if self.caret < len(self.typing):
+                self.typing = self.typing[: self.caret] + self.typing[self.caret + 1 :]
+                self.refresh()
+            return True
+        if key in CARET_KEYS:
+            self.move_caret(key)
+            return True
+        if key in UP_DOWN:
+            return self.typing is not None  # nothing to step through: kept off the view
         value_char = text and (text.isdigit() or text in ".,-+*/()")
         unit_char = text and text.isalpha() and self.typing
         if value_char or unit_char or (text == " " and self.typing):
             if self.typing is None:
                 self.typing = ""
-            self.typing += text
+                self.caret = 0
+            self.caret = max(0, min(self.caret, len(self.typing)))
+            self.typing = self.typing[: self.caret] + text + self.typing[self.caret :]
+            self.caret += len(text)
             self._bad(False)
             self.refresh()
             return True
         return False
+
+    def move_caret(self, key):
+        """Left / Right / Home / End in the current box. A box showing the pointer's value
+        is typed into from that value (Fusion edits the shown value), the caret at its end
+        before the move."""
+        if self.typing is None:
+            shown = self.fields[self.current].shown()
+            if not shown:
+                return
+            self.typing = shown
+            self.caret = len(shown)
+        if key == QtCore.Qt.Key_Left:
+            self.caret = max(0, self.caret - 1)
+        elif key == QtCore.Qt.Key_Right:
+            self.caret = min(len(self.typing), self.caret + 1)
+        elif key == QtCore.Qt.Key_Home:
+            self.caret = 0
+        elif key == QtCore.Qt.Key_End:
+            self.caret = len(self.typing)
+        self.refresh()
 
     def take(self):
         """Take what was typed into the current box. False (box marked) when it is not a
@@ -1014,6 +1112,7 @@ class DrawTool:
                 self.dragged(snap, view)
                 return True
             self.moved(snap)
+            self.show_dot(snap)
             self.boxes.refresh()
             return False  # FreeCAD lights up what is under the pointer
         if kind in PRESSES:
@@ -1141,9 +1240,19 @@ class DrawTool:
         if on_curve is not None:
             if start is not None and enabled:
                 result = icore._ends_on_line(raw, start, geo.lines, pick, px, opt)
+                curve = on_curve[0]
+                met = None
+                if icore.dist(raw, start) >= opt.min_len_px * px:
+                    # the direction it snaps to in free space, kept up to the curve
+                    hits = [c for _g, c in geo.hits]
+                    met = icore.direction_meets_curve(raw, start, geo.lines, (), hits, px, opt)
+                if met is not None and (
+                    result is None or icore.dist(met.point, raw) < icore.dist(result.point, raw)
+                ):
+                    result, curve = met, geo.hits[met.on_curve][0]
                 if result is not None:
                     result.start = start
-                    return Snap(result.point, raw, curve=on_curve[0], result=result)
+                    return Snap(result.point, raw, curve=curve, result=result)
             return Snap(project_on(self.sketch, on_curve[0], raw), raw, curve=on_curve[0])
         if enabled:
             keys = [k for k in self.acquired if k in geo.keyed]
@@ -1204,6 +1313,10 @@ class DrawTool:
         key = event.key()
         if key in (QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab, QtCore.Qt.Key_Backspace):
             return bool(self.boxes.fields)
+        if key in CARET_KEYS:
+            return bool(self.boxes.fields)
+        if key in UP_DOWN or key == QtCore.Qt.Key_Delete:
+            return self.boxes.typing is not None
         text = event.text()
         mods = event.modifiers() & ~(QtCore.Qt.KeypadModifier | QtCore.Qt.ShiftModifier)
         if mods != QtCore.Qt.NoModifier or not text:
@@ -1346,6 +1459,34 @@ class DrawTool:
         return out
 
     # -- shared preview hints ----------------------------------------------------------------
+    snap_dot = True  # a dot where the point being placed snaps (tools that pick curves: off)
+
+    def snapped_to(self, snap):
+        """The sketch point the snap sits on something at (a point, a middle, a curve, a
+        crossing...), or None. In a step that picks curves, only a point counts (a corner
+        to fillet or chamfer)."""
+        if not isinstance(snap, Snap) or snap.free:
+            return None  # (a 3D Sketch tool's own snap: no flat dot)
+        if self.step in self.pick_steps:
+            return snap.point if snap.key is not None else None
+        result = snap.result
+        on = (
+            snap.key is not None
+            or snap.mid_of is not None
+            or snap.curve is not None
+            or snap.target is not None
+            or (result is not None and (result.on_line or result.on_curve is not None))
+        )
+        return snap.point if on else None
+
+    def show_dot(self, snap):
+        """After each move: the snap dot (Luca, 2026-11-02: snapping had no real feedback)."""
+        try:
+            point = self.snapped_to(snap) if self.snap_dot else None
+            self.preview.show_dot(point, self._px() if point is not None else None)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+
     def hint_marks(self, snap):
         """(guides, marks, points) the snap shows: dashed guides, the level / upright
         mark, a dot where the point lands on something."""
@@ -1398,6 +1539,7 @@ class DrawTool:
             "last": self.last,
             "fields": {f.name: (f.value, f.typed) for f in self.boxes.fields},
             "typing": self.boxes.typing,
+            "caret": self.boxes.caret,
             "preview": self.preview.drawn(),
         }
 

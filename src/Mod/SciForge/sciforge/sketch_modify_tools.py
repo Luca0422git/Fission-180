@@ -24,6 +24,8 @@ from . import sketch_infer_core as icore
 class _CurveTool(draw.DrawTool):
     """A tool that works on the sketch curve under the pointer (no points placed)."""
 
+    snap_dot = False  # it picks curves: they light up instead
+
     def steps(self):
         return 1
 

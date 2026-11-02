@@ -370,3 +370,59 @@ def suggested(c1, c2):
         else:
             sizes.append(curve[2] * 2 * math.pi)
     return max(min(sizes) * 0.2, 1e-3)
+
+
+# -- several corners at once ---------------------------------------------------------------
+SHARED_REST = 0.01  # two fillets on one line leave at least this share of it between them
+
+
+def shared_fit(corners, r):
+    """True when the fillets of radius r at several corners fit together: a line that two of
+    the corners share keeps a piece between the two fillets (each fillet alone may run to the
+    line's far end, two cannot both reach the middle). `corners`: [(c1, c2, ref1, ref2, ids)]
+    with `ids` the two curves' identities (the same id: the same curve). Arcs are left to
+    each fillet's own check."""
+    setbacks = {}  # line id -> [(corner, touch point)]
+    lines = {}
+    for c1, c2, ref1, ref2, ids in corners:
+        try:
+            _centre, t1, t2 = fillet(c1, c2, r, ref1, ref2)
+        except FilletError:
+            return False
+        corner = corner_of(c1, c2, ref1, ref2)
+        if corner is None:
+            continue
+        for curve, touch, key in ((c1, t1, ids[0]), (c2, t2, ids[1])):
+            if curve[0] != "line":
+                continue
+            setbacks.setdefault(key, []).append((corner, touch))
+            lines[key] = curve
+    for key, ends in setbacks.items():
+        if len(ends) < 2:
+            continue
+        line = lines[key]
+        length = _len(_sub(line[2], line[1]))
+        used = sum(_len(_sub(touch, corner)) for corner, touch in ends)
+        if used > length * (1.0 - SHARED_REST) + EPS:
+            return False
+    return True
+
+
+def largest_shared(corners, high):
+    """The largest radius up to `high` at which the corners' fillets fit together
+    (shared_fit), found to a millionth of a millimetre; `high` when they fit there, None when
+    not even a tiny one does."""
+    if shared_fit(corners, high):
+        return high
+    lo, hi = 0.0, high
+    if not shared_fit(corners, max(high * 1e-6, 1e-7)):
+        return None
+    for _ in range(60):
+        mid = (lo + hi) / 2.0
+        if shared_fit(corners, mid):
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1e-7:
+            break
+    return lo

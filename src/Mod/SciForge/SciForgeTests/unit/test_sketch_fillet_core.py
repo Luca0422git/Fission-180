@@ -139,5 +139,42 @@ class Circles(unittest.TestCase):
         self.assertAlmostEqual(core.suggested(BOTTOM, RIGHT), 6.0)
 
 
+class SeveralCorners(unittest.TestCase):
+    """Several corners filleted at once (Luca, 2026-11-02): two fillets on one line must
+    leave a piece of it between them."""
+
+    B = ("line", (0.0, 0.0), (40.0, 0.0))  # a 40 x 30 rectangle's bottom
+    R = ("line", (40.0, 0.0), (40.0, 30.0))
+    L = ("line", (0.0, 30.0), (0.0, 0.0))
+    T = ("line", (40.0, 30.0), (0.0, 30.0))
+
+    @staticmethod
+    def mid(line):
+        return ((line[1][0] + line[2][0]) / 2.0, (line[1][1] + line[2][1]) / 2.0)
+
+    def corners(self, *pairs):
+        sides = {"b": self.B, "r": self.R, "l": self.L, "t": self.T}
+        return [
+            (sides[a], sides[b], self.mid(sides[a]), self.mid(sides[b]), (a, b)) for a, b in pairs
+        ]
+
+    def test_two_corners_on_the_bottom_share_it(self):
+        both = self.corners(("b", "l"), ("b", "r"))
+        self.assertTrue(core.shared_fit(both, 10.0))
+        self.assertFalse(core.shared_fit(both, 20.0))  # 20 + 20 would use the bottom up
+        self.assertAlmostEqual(core.largest_shared(both, 25.0), 40.0 * 0.99 / 2.0, places=5)
+
+    def test_corners_with_nothing_shared_keep_their_own_limit(self):
+        apart = self.corners(("b", "l"), ("t", "r"))
+        self.assertEqual(core.largest_shared(apart, 25.0), 25.0)
+
+    def test_a_single_corner_is_not_limited_here(self):
+        self.assertEqual(core.largest_shared(self.corners(("b", "l")), 28.0), 28.0)
+
+    def test_three_corners_the_shorter_shared_side_rules(self):
+        three = self.corners(("b", "l"), ("b", "r"), ("r", "t"))  # right side (30) shared too
+        self.assertAlmostEqual(core.largest_shared(three, 25.0), 30.0 * 0.99 / 2.0, places=5)
+
+
 if __name__ == "__main__":
     unittest.main()

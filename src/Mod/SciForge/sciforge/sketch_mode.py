@@ -1196,6 +1196,52 @@ class SketchSession:
                 warn("sketch tool: %s" % exc)
             self.tool = None
 
+    def give_way(self):
+        """A SKETCH command that waits for picks of its own starts (Offset, Mirror, the
+        patterns, Move/Copy, Scale, a constraint): the tool running now ends first,
+        SciForge's or FreeCAD's, as in Fusion where any tool replaces the one before. A
+        FreeCAD tool kept drawing under it: with Rectangle running, Offset waited for a
+        curve while every click still went to the rectangle (Luca, 2026-11-02). What is
+        selected stays selected (FreeCAD's stop clears it; the new command may use it);
+        a half-drawn shape goes, as with Esc."""
+        if self.closed:
+            return
+        self.stop_tool()
+        self.line.stop()
+        if self.infer is not None:
+            self.infer.reset()
+        try:
+            from . import sketch_pick_ui, sketch_tools_ui
+
+            sketch_tools_ui.stop_waiting()
+            sketch_pick_ui.stop_waiting()
+        except Exception as exc:
+            warn("sketch tool: %s" % exc)
+        if not self.tool_running():
+            return
+        kept = []
+        try:
+            for sel in Gui.Selection.getSelectionEx():
+                for name in sel.SubElementNames or ("",):
+                    kept.append((sel.DocumentName, sel.ObjectName, name))
+        except Exception:
+            kept = []
+        spline = self._spline_tool()
+        try:
+            Gui.runCommand("Sketcher_StopOperation")  # quits FreeCAD's tool
+        except Exception as exc:
+            warn("sketch tool: %s" % exc)
+        if spline:
+            self._drop_spline()  # a half-drawn spline goes, as with Esc
+        _state["polygon"] = None if not self.polygon.active else _state["polygon"]
+        try:
+            if kept and not Gui.Selection.getSelectionEx():
+                for doc, obj, name in kept:
+                    Gui.Selection.addSelection(doc, obj, name)
+        except Exception as exc:
+            warn("sketch tool: %s" % exc)
+        log("sketch: the running tool ended for the next command")
+
     def _spline_tool(self):
         """FreeCAD's spline tool is drawing (Fusion's Fit Point / Control Point Spline)."""
         from . import recent
