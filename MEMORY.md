@@ -1926,7 +1926,8 @@ branch off develop (a patch release was going out from develop). How it all work
   build #17 (core id 97ee6139a1). Assets: installer .exe 509 MB, portable .7z 430 MB, AppImage
   827 MB, quick-update zip 8 MB, sciforge-release.json, SHA256SUMS.txt; every SHA256SUMS line
   and sciforge-release.json's sha256 match GitHub's own asset digests; notes = the CHANGELOG
-  section. Still to do (small, next release): `make_release_files.DEFAULT_REPO` is still
+  section. Build #17 green to the end: all 9 GUI scenario parts passed on the published
+  AppImage. Still to do (small, next release): `make_release_files.DEFAULT_REPO` is still
   `Luca0422git/SciForge`, so a full build's `notes_url` uses the old repo name (works through
   GitHub's rename redirect; the patch workflow passes the new name), see "Repo name" above.
 - **Evening of 2026-10-30.** Luca: "fix the packaging with the PNG icon and the linux stuff. and
