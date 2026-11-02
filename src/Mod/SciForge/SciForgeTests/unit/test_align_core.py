@@ -83,6 +83,78 @@ class MovementTests(unittest.TestCase):
         self.assertEqual(q, core.IDENTITY)
         self.assertTrue(close(core.apply(q, t, (1, 1, 1)), (0, 0, 20)))
 
+    def test_a_split_piece_goes_back_face_to_face(self):
+        # Luca, beta 3.2 ("The align tool is WAY off"): a block split by the YZ plane, the
+        # right piece moved by (60, 0, 60); its cut face (normal -X, centre (60, 20, 80))
+        # onto the left piece's cut face (normal +X, centre (0, 20, 20)): back where it was.
+        moved = core.frame((60, 20, 80), (-1, 0, 0), oriented=True)
+        cut = core.frame((0, 20, 20), (1, 0, 0), oriented=True)
+        q, t = core.movement(moved, cut)
+        self.assertEqual(q, core.IDENTITY)
+        self.assertTrue(close(t, (-60, 0, -60)))
+
+    def test_onto_an_origin_plane_the_point_goes_straight_across(self):
+        # The same piece's cut face onto the YZ plane (as align.frame_of gives it: drawn from
+        # the origin, two-sided): it only moves across onto the plane (Fusion: aligning to a
+        # plane moves along one axis). It went to the plane's origin: (60, 20, 80) ->
+        # (0, 0, 0), 20 too far back and 80 too low.
+        moved = core.frame((60, 20, 80), (-1, 0, 0), oriented=True)
+        yz = core.frame((0, 0, 0), (1, 0, 0), endless="plane")
+        q, t = core.movement(moved, yz)
+        self.assertEqual(q, core.IDENTITY)
+        self.assertTrue(close(core.apply(q, t, (60, 20, 80)), (0, 20, 80)))
+        self.assertTrue(close(t, (-60, 0, 0)))
+
+    def test_the_piece_on_the_minus_side_stays_there(self):
+        # The other piece (x < 0, its cut face facing +X) moved to (-60, 20, 80), onto YZ: it
+        # slides back to x 0 without turning. A plane has two sides; made to "face" YZ's
+        # normal it was turned over into the space of the other piece.
+        moved = core.frame((-60, 20, 80), (1, 0, 0), oriented=True)
+        yz = core.frame((0, 0, 0), (1, 0, 0), endless="plane")
+        q, t = core.movement(moved, yz)
+        self.assertEqual(q, core.IDENTITY)
+        self.assertTrue(close(t, (60, 0, 0)))
+        self.assertTrue(close(core.apply(q, t, (-100, 20, 80)), (-40, 20, 80)))  # its far end
+        # Flip puts it on the other side
+        q, t = core.movement(moved, yz, flip=True)
+        self.assertTrue(close(core.apply(q, t, (-100, 20, 80)), (40, 20, 80)))
+
+    def test_onto_a_tilted_plane_the_part_turns_about_its_point(self):
+        # a block's top face (up, centre (5, 5, 10)) onto a construction plane through
+        # (0, 0, 50) facing +X: the block takes the smaller turn to lie in it, its point
+        # lands straight across
+        top = core.frame((5, 5, 10), (0, 0, 1), oriented=True)
+        plane = core.frame((0, 0, 50), (1, 0, 0), endless="plane")
+        q, t = core.movement(top, plane)
+        self.assertTrue(close(core.rotate(q, (0, 0, 1)), (1, 0, 0)))
+        self.assertTrue(close(core.apply(q, t, (5, 5, 10)), (0, 5, 10)))
+
+    def test_onto_an_axis_the_point_goes_straight_across(self):
+        # a hole's centre and axis (up, at (30, 40, 5)) onto the Z axis: the part slides
+        # across onto the axis, its height kept
+        hole = core.frame((30, 40, 5), (0, 0, 1))
+        z_axis = core.frame((0, 0, 0), (0, 0, 1), endless="line")
+        q, t = core.movement(hole, z_axis)
+        self.assertEqual(q, core.IDENTITY)
+        self.assertTrue(close(core.apply(q, t, (30, 40, 5)), (0, 0, 5)))
+
+    def test_flip_and_angle_onto_a_plane_keep_the_point(self):
+        bottom = core.frame((7, 3, 2), (0, 0, -1), oriented=True)
+        xy = core.frame((0, 0, 0), (0, 0, 1), endless="plane")
+        for flip in (False, True):
+            for turns in range(4):
+                q, t = core.movement(bottom, xy, flip, turns)
+                self.assertTrue(close(core.apply(q, t, (7, 3, 2)), (7, 3, 0)), (flip, turns))
+
+    def test_a_face_keeps_its_centre(self):
+        # a face (not endless) is still met at its centre (A7)
+        face = core.frame((0, 0, 0), (1, 0, 0), oriented=True)
+        self.assertNotIn("endless", face)
+        self.assertEqual(core.landing((5, 6, 7), face), (0.0, 0.0, 0.0))
+
+    def test_endless_needs_a_direction(self):
+        self.assertNotIn("endless", core.frame((1, 2, 3), None, endless="plane"))
+
     def test_describe(self):
         self.assertEqual(core.describe(False, 0), "")
         self.assertEqual(core.describe(True, 1), "flipped, turned 90 degrees")

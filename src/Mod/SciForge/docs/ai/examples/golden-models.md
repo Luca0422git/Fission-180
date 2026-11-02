@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/SciForge/sciforge/ai/catalog) by tools/sciforge/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-SciForge's golden models are 616 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are SciForge's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource sciforge://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something SciForge does not do yet.
+SciForge's golden models are 617 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are SciForge's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource sciforge://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something SciForge does not do yet.
 
 ## By feature
 
@@ -513,6 +513,23 @@ Each model is listed under its first tag; its other tags follow it.
 - `sf_sweep_tube_bend`: Sweep: circle r2 along a line, a bend of radius 10 and a line (a bent tube) [fusion-sweep]
 - `sf_sweep_twist_square`: Sweep: a 10 x 10 square up a straight 50 mm path with a 45 degree twist [fusion-sweep]
 
+### direct (14)
+
+- `direct_align_block_on_table`: Align: a block's top face onto a table's top face (they end up facing each other) [modify, align]
+- `direct_align_flip_angle`: Align with Flip and one Angle click: turned over into the table and a quarter turn [modify, align]
+- `direct_align_split_onto_plane`: Align: a split piece moved away, its cut face put back onto the YZ plane it was split with (it only slides across onto the plane) [modify, align, split]
+- `direct_history_off_on`: Capture Design History off (one frozen step), on again, then a Press Pull step [history, press-pull]
+- `direct_remove_body`: Remove: a body taken out of the design by a timeline step [modify, remove]
+- `direct_replace_face_edit_down`: Replace Face edited: the target changed to a lower body's top, the box comes down [modify, replace-face, edit]
+- `direct_replace_face_up_to_body`: Replace Face: a box's top goes up to the top of another body [modify, replace-face]
+- `direct_silhouette_body_sphere`: Silhouette Split, Split Solid Body: a ball split into two halves at its outline [modify, silhouette-split]
+- `direct_silhouette_edit_to_faces`: Silhouette Split edited from Split Solid Body back to Split Faces Only [modify, silhouette-split, edit]
+- `direct_silhouette_faces_sphere`: Silhouette Split, Split Faces Only: a ball seen from above, split at its equator [modify, silhouette-split]
+- `direct_split_face_closest_point`: Split Face, Closest Point: another body's face edges split a box's side [modify, split-face]
+- `direct_split_face_extend`: Split Face, Extend Splitting Tool: a face beside the box, taken as its whole plane [modify, split-face]
+- `direct_split_face_then_press_pull`: Split Face then Press Pull on one half of the split top [modify, split-face, press-pull]
+- `direct_split_face_yz`: Split Face: a box's top split by the YZ origin plane (one more face, same solid) [modify, split-face]
+
 ### shell (14)
 
 - `modify2_shell_two_bodies`: Two boxes shelled in one step: the first opened at the top, the second hollow [multi-body, fusion-dialog]
@@ -529,22 +546,6 @@ Each model is listed under its first tag; its other tags follow it.
 - `sf_shell_swap_presspull_follows`: Shell inside 2 (FreeCAD's Thickness), Press Pull on the front wall, the shell edited to Both 1 out (SciForge's shell): the Press Pull keeps its wall [sciforge-shell, edit, press-pull, reference-stability]
 - `shell_filleted_box`: Enclosure: box 60x40x30, vertical edges r5, shell 2 open top [fillet, enclosure]
 - `shell_open_box`: Box 60x40x30 shelled 2 mm inward, top removed [enclosure]
-
-### direct (13)
-
-- `direct_align_block_on_table`: Align: a block's top face onto a table's top face (they end up facing each other) [modify, align]
-- `direct_align_flip_angle`: Align with Flip and one Angle click: turned over into the table and a quarter turn [modify, align]
-- `direct_history_off_on`: Capture Design History off (one frozen step), on again, then a Press Pull step [history, press-pull]
-- `direct_remove_body`: Remove: a body taken out of the design by a timeline step [modify, remove]
-- `direct_replace_face_edit_down`: Replace Face edited: the target changed to a lower body's top, the box comes down [modify, replace-face, edit]
-- `direct_replace_face_up_to_body`: Replace Face: a box's top goes up to the top of another body [modify, replace-face]
-- `direct_silhouette_body_sphere`: Silhouette Split, Split Solid Body: a ball split into two halves at its outline [modify, silhouette-split]
-- `direct_silhouette_edit_to_faces`: Silhouette Split edited from Split Solid Body back to Split Faces Only [modify, silhouette-split, edit]
-- `direct_silhouette_faces_sphere`: Silhouette Split, Split Faces Only: a ball seen from above, split at its equator [modify, silhouette-split]
-- `direct_split_face_closest_point`: Split Face, Closest Point: another body's face edges split a box's side [modify, split-face]
-- `direct_split_face_extend`: Split Face, Extend Splitting Tool: a face beside the box, taken as its whole plane [modify, split-face]
-- `direct_split_face_then_press_pull`: Split Face then Press Pull on one half of the split top [modify, split-face, press-pull]
-- `direct_split_face_yz`: Split Face: a box's top split by the YZ origin plane (one more face, same solid) [modify, split-face]
 
 ### chamfer (10)
 
@@ -758,7 +759,7 @@ Each model is listed under its first tag; its other tags follow it.
 | Op | Built by the tools | Models | Some of them |
 |---|---|---|---|
 | `age` | (a test helper) | 2 | `sf_coil_old_narrow_upgraded`, `sf_pipe_old_upgraded` |
-| `align_bodies` | `align` | 2 | `direct_align_block_on_table`, `direct_align_flip_angle` |
+| `align_bodies` | `align` | 3 | `direct_align_block_on_table`, `direct_align_flip_angle`, `direct_align_split_onto_plane` |
 | `blend_chamfer` | `chamfer` | 9 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `live_blend_chamfer_angle` |
 | `blend_edit` | `edit_step` | 1 | `blend_edit_keeps_later_chamfer` |
 | `blend_fillet` | `fillet` | 14 | `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain` |
@@ -788,7 +789,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `expect_move_refused` | (a test helper) | 1 | `extrude_multi_move` |
 | `expect_radius` | (a test helper) | 1 | `sf_sweep_guide_surface` |
 | `export_report_expect` | (a test helper) | 2 | `export_report_design`, `export_report_sketch_dxf` |
-| `extrude` | `extrude` | 412 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `extrude` | `extrude` | 413 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `fillet` | (a test helper) | 23 | `bodies_delete_face_fillet`, `bracket_inner_fillet`, `edit_fillet_radius`, `edit_width_after_fillet_and_hole`, `fillet_all_edges` |
 | `fillet_sets` | `fillet_sets` | 14 | `fillet2_chamfer_sets_angle_flip`, `fillet2_chord_90_120`, `fillet2_face_and_its_edge_in_two_sets`, `fillet2_presspull_set_radius`, `fillet2_sets_tangent_chain_each` |
 | `full_round` | `full_round_fillet` | 1 | `fillet2_full_round_rib` |
@@ -808,7 +809,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `mirror` | (a test helper) | 1 | `mirror_boss` |
 | `modify_edit` | `edit_step` | 2 | `direct_replace_face_edit_down`, `direct_silhouette_edit_to_faces` |
 | `move` | `move_step` | 2 | `extrude_multi_move`, `tl_move_fillet_earlier` |
-| `move_bodies` | `move_copy` | 13 | `bodies_move_copy`, `bodies_move_edit`, `bodies_move_free`, `bodies_move_point_to_point`, `bodies_move_point_to_position` |
+| `move_bodies` | `move_copy` | 14 | `bodies_move_copy`, `bodies_move_edit`, `bodies_move_free`, `bodies_move_point_to_point`, `bodies_move_point_to_position` |
 | `move_face` | `move_copy` | 6 | `modify2_move_face_boss_down`, `modify2_move_face_edit`, `modify2_move_face_hole`, `modify2_move_face_tilt`, `modify2_move_face_top` |
 | `move_face_edit` | `edit_step` | 1 | `modify2_move_face_edit` |
 | `parameter` | `set_parameter` | 13 | `export_report_design`, `param_driven_box`, `pattern_quantity_parameter`, `pattern_symmetric_parameter`, `sf_box_param_driven` |
@@ -886,11 +887,11 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_unfold` | (a test helper) | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
 | `shell` | `shell` | 28 | `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain` |
 | `silhouette_split` | `silhouette_split` | 3 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
-| `sketch` | `create_sketch` | 522 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `sketch` | `create_sketch` | 523 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `sketch_extras` | (a test helper) | 1 | `export_report_sketch_dxf` |
 | `sketch_polygon` | `sketch_polygon` | 2 | `sketch_inscribed_pentagon`, `sketch_nut_trap_polygon` |
 | `sketch_trim` | `sketch_trim` | 1 | `sketch_trim_union` |
-| `split_body` | `split_body` | 10 | `bodies_split_by_body`, `bodies_split_edit_tool`, `bodies_split_face_extended`, `bodies_split_sketch_line`, `bodies_split_two_planes` |
+| `split_body` | `split_body` | 11 | `bodies_split_by_body`, `bodies_split_edit_tool`, `bodies_split_face_extended`, `bodies_split_sketch_line`, `bodies_split_two_planes` |
 | `split_face` | `split_face` | 5 | `direct_split_face_closest_point`, `direct_split_face_extend`, `direct_split_face_then_press_pull`, `direct_split_face_yz`, `surface4_split_face_merge` |
 | `suppress` | `suppress_step` | 9 | `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `extrude_multi_move`, `hole_second_survives_first`, `plastic2_lip_suppress` |
 | `thread` | `thread` | 8 | `thread_edit_length`, `thread_hole_modeled`, `thread_second_after_modeled`, `thread_shaft_cosmetic`, `thread_shaft_modeled` |

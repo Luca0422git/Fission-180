@@ -85,5 +85,31 @@ class LabelCorner(unittest.TestCase):
         self.assertEqual(look.label_corner(self.CORNERS, (-5, 5, 3)), 1)
 
 
+class PartOrSquare(unittest.TestCase):
+    """Who takes a click over an origin square: the part (in front, or lying in the square's
+    plane) or the square (Luca, beta 3.2: the cut face of a split made with YZ lost its
+    clicks to the YZ square in Align, both at the same depth)."""
+
+    def test_no_part_the_square(self):
+        self.assertFalse(look.part_takes_click(None, 30.0))
+
+    def test_part_in_front_takes_it(self):
+        self.assertTrue(look.part_takes_click(12.0, 30.0))
+
+    def test_part_behind_leaves_it_to_the_square(self):
+        self.assertFalse(look.part_takes_click(45.0, 30.0, 100.0))
+
+    def test_a_face_in_the_plane_takes_it(self):
+        # measured in the 3D view: both depths 30.00000762939453 (the old rule wanted the
+        # part strictly in front)
+        self.assertTrue(look.part_takes_click(30.00000762939453, 30.00000762939453, 60.0))
+        # single precision noise either way
+        self.assertTrue(look.part_takes_click(30.0 + 4e-6, 30.0, 60.0))
+        self.assertTrue(look.part_takes_click(30.0 - 4e-6, 30.0, 60.0))
+
+    def test_a_face_a_little_behind_the_plane_does_not(self):
+        self.assertFalse(look.part_takes_click(30.05, 30.0, 60.0))
+
+
 if __name__ == "__main__":
     unittest.main()

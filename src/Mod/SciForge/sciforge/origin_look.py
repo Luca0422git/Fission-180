@@ -95,6 +95,20 @@ def square_corner(key, side):
     return (gap, gap)
 
 
+def part_takes_click(depth, square_depth, scale=1.0):
+    """True when the part under the mouse (`depth` along the mouse ray; None: no part there)
+    takes a click over an origin square hit at `square_depth`: the part is in front of the
+    square, or lies in the square's plane. A face lying in an origin plane (the cut face of
+    a Split Body made with that plane) is what the person sees and clicks; it used to lose
+    to the square, both depths coming out the same, and Align then took the plane instead
+    of the face (Luca, beta 3.2: "The align tool is WAY off"). `scale`: how big the
+    coordinates are (the picked point comes from the graphics in single precision)."""
+    if depth is None:
+        return False
+    tolerance = 1e-5 * max(1.0, abs(float(scale)), abs(float(square_depth)))
+    return float(depth) <= float(square_depth) + tolerance
+
+
 def part_size(box=None):
     """The part's square size of before (0.6 x its largest side, EMPTY_SIZE without a
     part): what the picks' "on the plane" tolerances are measured against."""

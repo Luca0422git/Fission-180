@@ -357,12 +357,14 @@ def front_planes():
                 point, t = hit
                 if self.on_square(role, point - base):
                     if best is None or t < best[1]:
-                        best = (role, t)
+                        best = (role, t, point.Length)
             if best is None:
                 return None
             depth = _part_depth(self.view, position)
-            if depth is not None and depth < best[1]:
-                return None  # the part is in front of the square: the click is the part's
+            if origin_look.part_takes_click(depth, best[1], best[2]):
+                # the part is in front of the square, or lies in its plane (a face made by
+                # a split with that plane): the click is the part's
+                return None
             return best[0]
 
         def _moved(self, info):

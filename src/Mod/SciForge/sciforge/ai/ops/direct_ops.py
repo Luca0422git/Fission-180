@@ -30,7 +30,9 @@ is one of:
       Measured: the body and the bodies the split made.
 
   {"op": "align_bodies", "id": "a1", "from": ref, "to": ref, "flip": false, "turns": 0}
-      Measured: the body that moved.
+      Two flat faces end up facing each other, centre on centre. "to" an origin plane or
+      axis ("XY", "Z"): the From point goes straight across onto it and the body keeps its
+      side of the plane. Measured: the body that moved.
 
   {"op": "modify_edit", "target": "r1", "set": {option: value or ref}}
       Double-click one of the steps above in the timeline and change it.

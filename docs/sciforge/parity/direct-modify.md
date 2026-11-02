@@ -152,6 +152,8 @@ Community "Can't modify from existing radius with press pull"
 | A9 | Ctrl held keeps the face under the pointer, so a point on its boundary can be reached without the edge or corner taking over. | Autodesk (15: Move Point to Point); Guess for Align |
 | A10 | Luca (2026-10-16): "the align tool should have the option to select what part of the face you should align to. there should be a middle point, edge point, etc." | Luca |
 | A11 | **(SciForge, beta 3 vex)** the centre of a square (any non-round) hole is a dot too (Fusion has none); taken on the hole's edge or wall it brings the hole's direction; Shift held turns the dots off (Fusion: snapping off in Align). See parity/vex-assembly.md. | Autodesk ([1][2] in research/fusion-vex-assembly.md); Luca (2026-10-26: "we will need center points on squares and such") |
+| A12 | To = a plane (an origin plane or a construction plane, also an axis): the part moves straight across onto it, along one axis only (not to the plane's origin), and keeps its side of the plane (a plane has no outside: the smaller turn; Flip puts it on the other side). The origin planes are the design's, not the moving body's: they can be the To geometry, never "on what moves". | Forum (10: "to align in one axis only you have to target a plane"; "How to Align a body with origin plane"), Guess (the side kept) |
+| A13 | A click on a face that lies in an origin plane (the cut face of a Split Body made with that plane) takes the face, not the origin square drawn in the same place. | Luca (beta 3.2: "The align tool is WAY off ... i split the body, moved it, then aligned it") |
 
 ### Remove (SOLID > MODIFY)
 
@@ -220,16 +222,19 @@ body's **first step**:
 | S1-S4: Split Face | Faces to Split, Splitting Tool (a sketch or one of its curves, an origin square, a construction plane, a face of any body, another body), Split Type (Split with Surface by default, Along Vector with its Direction, Closest Point), Extend Splitting Tool (off by default, only for Split with Surface); one body with more faces; a "Split Face N" step |
 | L1-L5: Silhouette Split | View Direction (an origin square or construction plane, an axis, a straight edge, a flat face, a cylinder's axis; a ball's face gives none and is refused), Target Body, Operation Split Faces Only (default) / Split Solid Body (refused when the outline is not flat, as in Fusion) / Split Shelled Body; split pieces become new bodies like Split Body's |
 | A1-A6: Align | Objects (Bodies / Components), From, To, Flip, Angle (90 degrees per click about the To geometry); two flat faces end up facing each other; an "Align N" step (bodies: a step in the body; components: a step outside the bodies that set the component's placement, deleting it puts the component back); no key (A is Appearance) |
+| A12, A13: Align onto a plane, a face in an origin plane | an origin / construction plane or axis is endless (`align_core.frame(endless=...)`, `landing`): the From point goes straight across onto it, the part takes the smaller turn and stays on its side; origin features belong to no body (`align.is_origin_feature`), so the squares the To box shows (the moving body's own origin) are taken; the Modify dialogs' origin squares give the click to a part lying in their plane (`origin_look.part_takes_click`, used by `pattern_ui.front_planes`: Align, Split Body, Split Face, Replace Face, Silhouette, Mirror). Before (beta 3.2): the cut face's click went to the square and was refused ("That is on what moves"), a plane picked in the browser sent the piece's cut face centre to the origin, and the piece on the minus side was turned over into the other piece |
 | X1-X3: Remove | Modify > Remove (selection first, or a dialog that waits for clicks) and Remove in a body's / component's browser menu: a "Remove N" step per body (named after the component for a component); the body hides and leaves the browser; rolling the marker before it, deleting or suppressing it brings the body back. In a design without history Remove deletes (there is no timeline to hold it) and says so |
 
 ### Tested
 
 Scenarios (real mouse and keyboard in FreeCAD 1.1.4 under xvfb): `direct_history`,
 `direct_step_box`, `direct_base_feature`, `direct_components`, `direct_commands`, `modify_replace_face`,
-`modify_split_face`, `modify_silhouette`, `modify_align`, `modify_remove`. Golden models
+`modify_split_face`, `modify_silhouette`, `modify_align`, `modify_align_split` (Luca's split,
+move, align: the cut face clicked where the YZ square is, then the YZ plane itself),
+`modify_remove`. Golden models
 (`golden/models/direct_*.json`, analytic numbers): Replace Face up / edited down, Split Face
 (origin plane, then a Press Pull on one half, Closest Point, Extend), Silhouette Split (faces,
-solid, edited back), Align (faces facing, Flip + Angle), Remove, history off / on with a Press
+solid, edited back), Align (faces facing, Flip + Angle, a split piece onto the YZ plane), Remove, history off / on with a Press
 Pull after it. Unit tests: `test_direct_core.py`, `test_align_core.py`,
 `test_direct_schema.py`. modify-2: scenario `modify2_presspull_type` (Modify Existing Feature on an extrude's end, undo / redo, New Offset, Modify Existing on that offset, a side face refused); golden models `modify2_presspull_modify_extrude`, `modify2_presspull_modify_pocket`, `modify2_presspull_modify_offset`, `modify2_presspull_new_offset`, `modify2_replace_face_cone`.
 

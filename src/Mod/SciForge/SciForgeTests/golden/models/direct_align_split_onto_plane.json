@@ -1,0 +1,83 @@
+{
+  "id": "direct_align_split_onto_plane",
+  "title": "Align: a split piece moved away, its cut face put back onto the YZ plane it was split with (it only slides across onto the plane)",
+  "tags": [
+    "direct",
+    "modify",
+    "align",
+    "split"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "rect": [
+            -40,
+            -10,
+            40,
+            50
+          ],
+          "name": "s1r"
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 40
+    },
+    {
+      "op": "split_body",
+      "id": "x1",
+      "body": "e1",
+      "tool": "YZ"
+    },
+    {
+      "op": "move_bodies",
+      "id": "m1",
+      "bodies": [
+        "e1"
+      ],
+      "move_type": "translate",
+      "dx": -60,
+      "dz": 60
+    },
+    {
+      "op": "align_bodies",
+      "id": "a1",
+      "from": {
+        "face": {
+          "type": "plane",
+          "normal": [
+            1,
+            0,
+            0
+          ],
+          "count": 1
+        },
+        "of": "m1"
+      },
+      "to": "YZ"
+    }
+  ],
+  "expect": {
+    "volume": 96000,
+    "area": 12800,
+    "faces": 6,
+    "solids": 1,
+    "bbox": [
+      -40,
+      -10,
+      60,
+      0,
+      50,
+      100
+    ],
+    "source": "analytic",
+    "note": "The block -40..40 x -10..50 x 0..40 split at x = 0; Body keeps x -40..0 (40 x 60 x 40 = 96000, A = 2*(2400 + 1600 + 2400)). Moved by (-60, 0, 60): x -100..-60, z 60..100. Its cut face (normal +X, centre (-60, 20, 80)) onto the YZ plane: an endless plane, so the centre only goes across to (0, 20, 80) and the body is x -40..0, z still 60..100 (Luca, beta 3.2: before, the YZ plane of the body that moves was refused, and a plane sent the centre to the plane's origin (0, 0, 0): x -40..0, y -30..30, z -20..20). Measured: the body that moved."
+  }
+}

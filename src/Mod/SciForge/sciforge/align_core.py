@@ -12,7 +12,9 @@ movement(from, to, flip, turns) is the move that puts the From frame onto the To
     end up facing each other, like a part put down on a table (Fusion: the faces end up
     aligned); unoriented ones take the smaller turn. Flip turns the result 180 degrees.
   * Angle turns the result 90 degrees about the To axis per click (Fusion's Angle button).
-  * then the From point is moved onto the To point.
+  * then the From point is moved onto the To point; onto a construction or origin plane (or
+    axis), which has no point of its own, straight across onto it (frame(endless=...)):
+    a part put onto XY only moves up or down.
 Rotations are quaternions (x, y, z, w); a point p moves to R(p) + T.
 """
 
@@ -106,12 +108,35 @@ def between(a, b):
     return axis_angle(axis, math.degrees(math.acos(max(-1.0, min(1.0, c)))))
 
 
-def frame(point, axis=None, oriented=False):
-    return {
+ENDLESS = ("plane", "line")
+
+
+def frame(point, axis=None, oriented=False, endless=None):
+    """``endless``: "plane" / "line" for a construction or origin plane / axis, which goes on
+    for ever: its ``point`` is only where it is drawn from (the origin for XY), not a point
+    of it the From geometry goes to (see movement)."""
+    out = {
         "point": _v(point),
         "axis": _v(unit(axis)) if axis is not None else None,
         "oriented": bool(oriented) and axis is not None,
     }
+    if endless in ENDLESS and axis is not None:
+        out["endless"] = endless
+    return out
+
+
+def landing(src_point, dst):
+    """Where the From point lands on the To frame ``dst``: its point, or, on an endless plane
+    or axis, the point of it straight across from the From point (the From point only moves
+    across to it, as Fusion's Align onto a plane moves along one axis only)."""
+    p1, p2 = _v(src_point), _v(dst["point"])
+    endless, axis = dst.get("endless"), dst.get("axis")
+    if endless not in ENDLESS or axis is None:
+        return p2
+    n = unit(axis)
+    if endless == "plane":
+        return add(p1, scale(n, dot(sub(p2, p1), n)))
+    return add(p2, scale(n, dot(sub(p1, p2), n)))
 
 
 def movement(src, dst, flip=False, turns=0):
@@ -135,7 +160,7 @@ def movement(src, dst, flip=False, turns=0):
     turn_axis = a2 if a2 is not None else a1
     if turns % 4 and turn_axis is not None:
         rotation = multiply(axis_angle(turn_axis, 90.0 * (turns % 4)), rotation)
-    translation = sub(p2, rotate(rotation, p1))
+    translation = sub(landing(p1, dst), rotate(rotation, p1))
     return rotation, translation
 
 

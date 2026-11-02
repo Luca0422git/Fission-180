@@ -151,7 +151,7 @@ def _unmove(frame, place):
     axis = frame.get("axis")
     if axis is not None:
         axis = back.Rotation.multVec(App.Vector(*axis))
-    return align_core.frame(point, axis, frame.get("oriented"))
+    return align_core.frame(point, axis, frame.get("oriented"), frame.get("endless"))
 
 
 class AlignPanel(BodyPanel):

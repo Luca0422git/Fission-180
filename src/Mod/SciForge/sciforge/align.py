@@ -88,12 +88,18 @@ def frame_of(obj, sub, point=None):
     if obj is None:
         return None
     if obj.TypeId in PLANE_TYPES and not sub:
+        # An endless plane (Luca, beta 3.2: a split piece aligned to the plane it was split
+        # with ended "WAY off"): a From point goes straight across onto it, not to the point
+        # it is drawn from (XY's is the origin); and it has two sides, no outside: the part
+        # takes the smaller turn and stays on its side (as a face it was made "to face" the
+        # plane's normal, so the piece on the - side of YZ was turned over into the other).
         place = obj.getGlobalPlacement()
-        return core.frame(place.Base, place.Rotation.multVec(App.Vector(0, 0, 1)), True)
+        normal = place.Rotation.multVec(App.Vector(0, 0, 1))
+        return core.frame(place.Base, normal, False, endless="plane")
     if obj.TypeId in LINE_TYPES and not sub:
         place = obj.getGlobalPlacement()
         axis = App.Vector(1, 0, 0) if obj.TypeId == "App::Line" else App.Vector(0, 0, 1)
-        return core.frame(place.Base, place.Rotation.multVec(axis))
+        return core.frame(place.Base, place.Rotation.multVec(axis), endless="line")
     if obj.TypeId in POINT_TYPES and not sub:
         return core.frame(obj.getGlobalPlacement().Base)
     if not sub:
@@ -242,8 +248,25 @@ def describe_pick(pick):
     return "%s of %s" % (sub.rstrip("0123456789"), where)
 
 
+def is_origin_feature(obj):
+    """True for an origin plane, axis or point (XY, X, O...). FreeCAD keeps one origin in
+    every body, but a design has one origin (as in Fusion: the browser shows one): an Align
+    step moves the body's solid, never its origin."""
+    try:
+        return (
+            obj is not None
+            and obj.TypeId in ("App::Plane", "App::Line", "App::Point")
+            and any(o.TypeId == "App::Origin" for o in obj.InList)
+        )
+    except Exception:
+        return False
+
+
 def moving(pick, objects):
-    """What the From pick moves: its body, or (Objects: Components) its component."""
+    """What the From pick moves: its body, or (Objects: Components) its component. An origin
+    plane, axis or point is on no body (Bodies): it stays where it is, so it is never "on what
+    moves" (the origin squares the To box shows are the moving body's own origin: they were
+    refused, and a click on a face lying in such a plane went to the square)."""
     if not pick:
         return None
     obj = pick[0]
@@ -251,6 +274,8 @@ def moving(pick, objects):
         from . import components
 
         return components.component_of(obj)
+    if is_origin_feature(obj):
+        return None
     return bodies.body_of(obj)
 
 

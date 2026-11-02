@@ -60,5 +60,5 @@ Done: AI: Align. Its id is 'Align'. Bodies now: Body1: 4000 mm3, 20 x 20 x 10 mm
 
 ## See also
 
-- Golden models built with its steps (read one with docs_read golden/<id>): `direct_align_block_on_table`, `direct_align_flip_angle`
+- Golden models built with its steps (read one with docs_read golden/<id>): `direct_align_block_on_table`, `direct_align_flip_angle`, `direct_align_split_onto_plane`
 - [All tools](sciforge://docs/tools.md), [the handbook](sciforge://docs/handbook.md)
