@@ -4,6 +4,18 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/sciforge/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "sciforge sketch fixes" list (9 items), on
+`develop`.** All nine fixed, each with a scenario that fails on the old code (newest session
+log "Sketch fixes list"). VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.2.1, CHANGELOG section
+written (module files only: a patch release). Status: [x] 1 arrow keys in sketch value boxes
+[x] 2 another tool replaces the running one (FreeCAD's too) [x] 3 Fillet: several corners,
+corner hover [x] 4 Offset panel (Chain Selection, One Side / Symmetric, Flip) [x] 5 snap dot
+[x] 6 90 degrees kept onto a curve [x] 7 second click renames in the browser [x] 8 no empty
+Body in the browser [x] 9 Align after Split / Move [x] local tests (unit, golden, the new and
+the touched scenarios) [ ] "SciForge tests" green on GitHub for develop's newest commit [ ]
+Luca runs Actions > SciForge patch release. Guesses to confirm are under "Questions waiting
+for Luca".
+
 **2026-10-29: GUI test rework, on branch `sf/gui-tests-rework` (not `develop`).** Luca's brief
 "SciForge GUI tests: rework brief for Claude Code" (claude.ai artifact; its rules are copied in
 `docs/sciforge/dev/gui-tests.md`): make the GUI scenarios pass when SciForge works and fail only
@@ -1765,6 +1777,14 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 
 (See outline section 12. Also:)
 
+- **Patch 0.1.0-beta.3.2.1 guesses (2026-11-02), check in your Fusion:** (a) several sketch
+  fillets made together: are they kept Equal (SciForge: one Radius dimension, the rest Equal)?
+  (b) Align onto an origin / construction plane: does the part keep its side (SciForge) or go
+  to the plane's other side? (c) Offset: does a click on a picked curve drop it, are Chain
+  Selection and Direction remembered, does O again end Offset without making it? Offset's
+  "Two Sides" (a distance per side) is not built yet. (d) A row selected in the 3D view or
+  the timeline needs two clicks in the browser before its name opens (safer than one): fine?
+
 - (Answered 2026-10-27: "Do both the quick route and the complex one": beta 3 went out by the
   quick route; the compiled VEX speed change and Selectable come as the full build
   0.1.0-beta.3.1, whose tag Luca pushes.)
@@ -1792,6 +1812,66 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Sketch fixes list, patch 0.1.0-beta.3.2.1 (`develop`, 2026-11-02)
+
+Luca's file "sciforge sketch fixes" (9 items, 5 screenshots: Fusion's OFFSET dialog, a corner
+hovered with Fusion's sketch Fillet, a Fusion line with its boxes, SciForge's browser with a
+"Body" during Create Sketch, his split/aligned block with raised text). Items 1, 2, 3, 5, 6 done
+in this session; 4 (Offset), 7 + 8 (browser) and 9 (Align) by three agents in their own git
+worktrees, cherry-picked onto develop and retested on the merged tree. How each works, with
+sources: `docs/sciforge/parity/sketch.md` ("Luca's sketch fixes", "Sketch Offset with Fusion's
+OFFSET panel"), `timeline-browser.md`, `bodies.md`, `direct-modify.md` (A12, A13).
+
+- **1 Arrow keys.** SciForge's own tools' value boxes (`sketch_draw.Boxes`) never take the
+  keyboard (keys come from the 3D view) and had no caret: Left / Right went on to FreeCAD's
+  navigation, which pans with the arrow keys. `ValueBox` draws a caret (`cursorRect`, read-only
+  QLineEdit); Left/Right/Home/End/Backspace/Delete edit at it; Up/Down kept off the view while
+  typing. FreeCAD's own fields (Line, Rectangle) and the dimension box were already right.
+  Scenario `sketch_value_box_keys`.
+- **2 Tool switching.** `sketch_tools_ui._SketchCommand` and `sketch_pick_ui` stopped only
+  SciForge's tool: FreeCAD's Rectangle went on taking the clicks (reproduced: two clicks after
+  Mirror drew a rectangle). `SketchSession.give_way()` ends either (Sketcher_StopOperation,
+  selection kept). Scenario `sketch_tool_switch`.
+- **3 Fillet.** `sketch_fillet_tool.SketchFillet` rewritten: hover a corner = both curves lit +
+  the arc + the dot; more corners clicked in the radius step are added; one undo step, Radius on
+  the first arc, Equal on the others (Guess); with 2+ corners the pointer no longer sizes the
+  radius (it travelled from corner to corner and blew the radius up to the limit: seen in a
+  screenshot); shared lines capped by `sketch_fillet_core.largest_shared` (1 % of the line
+  kept); Enter makes it with nothing typed. Scenario `sketch_fillet_corners`, unit
+  `SeveralCorners`.
+- **5 Snap dot.** `sketch_infer.SnapDot` (white disc, dark rim, 5.5 / 3.5 px, SoFaceSet in
+  BASE_COLOR) in the FreeCAD-tools overlay (also where FreeCAD snaps by itself:
+  `Inference._freecad_snap`) and in `sketch_draw.Preview` (`DrawTool.show_dot`, after each
+  `moved`). Off for tools that pick curves (`snap_dot = False`: Trim/Extend/Break, pick-two
+  constraints, Project to Surface, Offset, the 3D Sketch tools: their `Snap3D` broke
+  `sketch2_3d` / `sketch2_palette` in the sweep until then). Scenario `sketch_snap_dot` (screen
+  pixels).
+- **6 90 degrees onto a curve.** `sketch_infer_core.infer` left a pointer on a curve to FreeCAD
+  (only "ends on a line at 90" was tried): `direction_meets_curve` / `ray_hits` keep the
+  snapped direction to the curve (arcs exactly: `poly(..., circle)`), `on_curve`, PointOnObject
+  ensured after the click, same in `DrawTool.snap`. Before: 1.9 degrees off. Unit
+  `DirectionOntoACurve`, scenario `sketch_line_perpendicular_to_curve`.
+- **4 Offset (agent).** New `sketch_offset_core/_build/_tool/_ui.py`: OFFSET panel, own
+  DrawTool, sharp corners, hidden construction keeps the distance one editable dimension;
+  the old `_WaitForCurve` / FreeCAD Sketcher_Offset path is gone (`sketch_tools_ui.last_offset`
+  and an empty `stop_waiting` kept). Scenario `sketch_offset_dialog`, 4 golden models.
+- **7 + 8 Browser (agent).** `browser_ui` second click (after the double-click time,
+  `browser_core.second_click`); `bodies.is_empty` rows not listed (the rebuild body still is).
+  Scenarios `browser_second_click`, `browser_empty_body`.
+- **9 Align (agent).** The origin square won the click on a cut face lying in its plane
+  (`origin_look.part_takes_click`); origin features belong to no body in Bodies mode; planes /
+  axes as To are endless and two-sided (`align_core.landing`). Scenario `modify_align_split`,
+  golden `direct_align_split_onto_plane`.
+- Tests: unit 2809 OK; the 64 existing sketch scenarios swept on a snapshot of the module
+  (`run_tests.sh` symlinks the live module: copy `tools/sciforge` + `src/Mod/SciForge` to a
+  scratch folder and run from there to keep editing meanwhile); the agents ran their areas'
+  scenarios (browser: 158, align: 21, offset: 6, 3 of 3 under `--stress`).
+- Open (Known issues / later): `versions.summary` still counts an empty body ("Bodies 1" for
+  a sketch-only design); Esc on Create Sketch leaves the empty body (unlisted, reused by the
+  next sketch); Align with a rotated Move keeps the twist, face onto edge unchanged; Offset
+  "Two Sides", splines / ellipses not offset; Chamfer has the dot on corners but not the
+  corner hover preview of Fillet.
 
 ### Session log: GUI test rework (`sf/gui-tests-rework`, 2026-10-29)
 

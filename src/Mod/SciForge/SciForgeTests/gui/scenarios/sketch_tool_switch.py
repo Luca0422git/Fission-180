@@ -85,10 +85,17 @@ def a_click():
 def a_check():
     from sciforge import recent
 
-    h.check("A the click drew no rectangle", count() <= s["n"] + 1, count() - s["n"])
+    h.check("A the click drew no rectangle", count() == s["n"], count() - s["n"])
     last = recent.last()
     h.check(
         "A Offset is the command now", last is not None and last[0] == "SciForge_SketchOffset", last
+    )
+    t = st.tool()
+    h.check("A SciForge's Offset runs", st.tool_title() == "Offset", st.tool_title())
+    h.check(
+        "A ...and the click picked the bottom line",
+        t is not None and 0 in getattr(t, "curves", []),
+        t and getattr(t, "curves", None),
     )
     h.shot("A-offset-after-rectangle")
     stop()

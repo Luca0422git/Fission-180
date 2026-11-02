@@ -70,6 +70,7 @@ class SketchOffset(draw.DrawTool):
     title = "Offset"
     command = "SciForge_SketchOffset"
     repeat = False  # Fusion's Offset ends with OK
+    snap_dot = False  # it picks curves: they light up instead
     direction = ONE_SIDE  # the direction used last (this session)
 
     def __init__(self, session):

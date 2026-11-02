@@ -23,6 +23,12 @@ problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
   the same radius in one step (one radius dimension; the others stay equal to it). With the
   pointer on a corner, both of its lines light up, the rounding it would get shows, and a dot
   sits on the corner. Enter with nothing typed now makes the fillet at the size shown.
+- **Sketch Offset had no dialog and always took the whole chain.** Offset (O) now opens an
+  OFFSET panel like Fusion's: untick **Chain Selection** to offset just one line (or pick
+  several lines one by one; a click on a picked line drops it), choose **One Side** or
+  **Symmetric** (both sides at once), **Flip** to change the side, type or drag the distance,
+  then OK or Enter. Corners stay sharp (a rectangle offset is a bigger rectangle, not a rounded
+  one), and the distance stays a dimension you can double-click and change later.
 - **Snapping had no clear feedback.** While drawing, a white dot now shows exactly where the
   point will land when it snaps: on an end, a middle, a centre, a crossing, or on a line or
   curve.
