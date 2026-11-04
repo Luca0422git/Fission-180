@@ -116,7 +116,7 @@ macro(PrintFinalReport)
     value(BUILD_REVERSEENGINEERING)
     value(BUILD_ROBOT)
     value(BUILD_SANDBOX)
-    value(BUILD_SCIFORGE)  # SCIFORGE: docs/sciforge/core-patches.md #3
+    value(BUILD_FISSION180)  # FISSION180: docs/fission180/core-patches.md #3
     value(BUILD_SHOW)
     value(BUILD_SKETCHER)
     value(BUILD_SPREADSHEET)

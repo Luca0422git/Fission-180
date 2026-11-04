@@ -3279,7 +3279,7 @@ std::unique_ptr<Constraint> getNewConstraintAtTrimCut(
     newConstr->First = cutGeoId;
     newConstr->FirstPos = cutPosId;
     newConstr->Second = cuttingGeoId;
-    // SCIFORGE: a full circle/ellipse has no start or end point for the solver, but
+    // FISSION180: a full circle/ellipse has no start or end point for the solver, but
     // getPoint() returns its 0-degree point for them. Trimming a curve exactly there
     // (e.g. a line through the centre of a circle) made a "Coincident with the circle's
     // start" constraint: "Sketcher constraint number N is malformed!". Only open curves

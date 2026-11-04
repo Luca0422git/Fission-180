@@ -36,6 +36,6 @@ if %ERRORLEVEL% neq 0 exit 1
 ninja -C build install
 if %ERRORLEVEL% neq 0 exit 1
 
-@REM SCIFORGE: the programs are built as SciForge.exe and SciForgeCmd.exe (src/Main) and keep
-@REM those names, so the Task Manager and the installer show "SciForge"
-@REM (docs/sciforge/core-patches.md #12). FreeCAD's pipeline renamed its own to lower case here.
+@REM FISSION180: the programs are built as Fission180.exe and Fission180Cmd.exe (src/Main) and keep
+@REM those names, so the Task Manager and the installer show "Fission180"
+@REM (docs/fission180/core-patches.md #12). FreeCAD's pipeline renamed its own to lower case here.

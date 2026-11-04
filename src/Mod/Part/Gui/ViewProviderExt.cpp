@@ -443,7 +443,7 @@ void ViewProviderPartExt::onChanged(const App::Property* prop)
         }
     }
     else if (prop == &ShowPlacement) {
-        // SCIFORGE: the indicator is made the first time it is shown (core-patches.md #18)
+        // FISSION180: the indicator is made the first time it is shown (core-patches.md #18)
         showPlacementIndicator(ShowPlacement.getValue() && Visibility.getValue());
     }
     else {

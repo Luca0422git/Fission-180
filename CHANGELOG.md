@@ -1,9 +1,9 @@
-# SciForge changelog
+# Fission 180 changelog
 
 What changed in each release, newest first, in plain words. Each release's page on GitHub shows
 its own section of this file (the release notes are made from it), so every release gets a
 section here whose heading is exactly its version number, like `## 0.1.0-beta` below. Known
-problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
+problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.md).
 
 ## 0.1.0-beta.3.2.1
 
@@ -48,14 +48,14 @@ problems are in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md).
   typing, as in Fusion and Windows Explorer. A quick double-click still edits the sketch or
   activates the body; clicks on the eye or the icon do what they always did.
 - **A "Body" showed in the browser before anything was solid.** Starting a sketch in a new
-  design listed a body although there were none yet (SciForge makes one to hold the sketch).
+  design listed a body although there were none yet (Fission 180 makes one to hold the sketch).
   It is no longer listed; it appears with your first extrude, as in Fusion. The sketch still
   shows under Sketches.
 
 ## 0.1.0-beta.3.2
 
 **A full build after 0.1.0-beta.3.1.3.** The Linux AppImage needed a change in how it is
-packed, so this version comes as a new installer: SciForge's **Update now** downloads and runs
+packed, so this version comes as a new installer: Fission 180's **Update now** downloads and runs
 it (the AppImage: download the new one).
 
 ### Fixed
@@ -64,7 +64,7 @@ it (the AppImage: download the new one).
   step or group, or a row in the browser) the 3D view takes the keyboard for a moment; the name
   field took it back, but the old name was no longer selected, so what you typed went after it
   ("Extrude 2Boss" instead of "Boss"). The old name now stays selected, and typing replaces it.
-- **Closing a design could crash SciForge** in two cases: when its drawing was the tab you were
+- **Closing a design could crash Fission180** in two cases: when its drawing was the tab you were
   looking at, and when a dialog with drag arrows (such as Point Probes on simulation results)
   was still open. Both close cleanly now.
 - **Timeline playback went on after a command.** If you pressed Play on the timeline, then
@@ -74,7 +74,7 @@ it (the AppImage: download the new one).
 
 ### Under the hood
 
-- SciForge's own tests now wait for what the program is doing instead of for fixed times, so
+- Fission 180's own tests now wait for what the program is doing instead of for fixed times, so
   they give the same result on every computer; they found the bugs above.
 
 ## 0.1.0-beta.3.1.3
@@ -95,14 +95,14 @@ it (the AppImage: download the new one).
 
 ### Fixed
 
-- **Updating to a new full version could leave you with no SciForge (Windows).** If you had
-  connected SciForge to Claude Desktop (or Gemini CLI, Claude Code), that app keeps SciForge's
-  AI connector running, a program from SciForge's own folder. The installer deleted every file
+- **Updating to a new full version could leave you with no Fission 180 (Windows).** If you had
+  connected Fission 180 to Claude Desktop (or Gemini CLI, Claude Code), that app keeps Fission 180's
+  AI connector running, a program from Fission 180's own folder. The installer deleted every file
   it could, stopped at the connector's files ("Failed to remove ... no files are in use") and
-  gave up, with half of SciForge gone. Now the installer first stops the AI connector (it asks;
+  gave up, with half of Fission 180 gone. Now the installer first stops the AI connector (it asks;
   the AI app starts it again the next time it opens), says which other program is still using
-  the folder and lets you close it and click Retry, and only then replaces the old SciForge, in
-  one step: if anything still holds a file, nothing has been removed and your SciForge keeps
+  the folder and lets you close it and click Retry, and only then replaces the old Fission 180, in
+  one step: if anything still holds a file, nothing has been removed and your Fission 180 keeps
   working. Uninstalling stops the connector too. This version's installer has the fix; it is
   what **Update now** runs when you come from 0.1.0-beta.3 or older.
 
@@ -126,7 +126,7 @@ it (the AppImage: download the new one).
 ## 0.1.0-beta.3.1
 
 **A full build after beta 3, for VEX robots.** The program itself was built again with one
-change to FreeCAD's own code, so it comes as a new installer: SciForge's **Update now**
+change to FreeCAD's own code, so it comes as a new installer: Fission 180's **Update now**
 downloads and runs it (the AppImage: download the new one).
 
 ### Improved
@@ -148,14 +148,14 @@ without a timeline, such as a STEP file or a simple mesh, into a real part with 
 steps you can edit), and **VEX robotics assemblies** (snapping to the centre of square holes,
 many STEP parts at once, Duplicate With Joints, and big assemblies much faster). Nothing in the
 compiled program changed: if you have 0.1.0-beta.2 or later, **Update now** only replaces
-SciForge's own part.
+Fission 180's own part.
 
 ### Simulation (Static Stress)
 
 - **Workspace > Simulation** opens Fusion's SIMULATION workspace with its **SETUP** and
   **RESULTS** tabs; your studies are saved in the design, and **Design** takes you back.
 - **New Simulation Study**: Static Stress. Fusion's other study types are listed greyed (they
-  are not in SciForge yet). A study can be cloned (right-click > Clone Study) for another load
+  are not in Fission 180 yet). A study can be cloned (right-click > Clone Study) for another load
   case.
 - **Study Materials** (try another material in the study only; yield or ultimate strength for
   the safety factor), **Study Settings** (mesh size, element type, adaptive mesh refinement,
@@ -189,9 +189,9 @@ SciForge's own part.
 
 - **Right-click a body > Rebuild with Timeline (AI)...** (also on the 3D view's right-click and in
   UTILITIES > AI). The part becomes a faint reference; a new body takes the rebuild. If
-  SciForge's chat has an AI set up, it opens with a ready message (you press Send); otherwise the
+  Fission 180's chat has an AI set up, it opens with a ready message (you press Send); otherwise the
   message is copied for your AI app (Claude Desktop, Gemini CLI...).
-- SciForge reads the part for the AI: its base shape and profile, holes (counterbores,
+- Fission 180 reads the part for the AI: its base shape and profile, holes (counterbores,
   countersinks, patterns), pockets, bosses, fillets, chamfers, revolved parts, and gives a step-by-
   step plan in Fusion's order. The AI builds it with the normal tools, so every step is a real
   timeline step, and checks itself after each one. The result really is parametric: make the
@@ -201,7 +201,7 @@ SciForge's own part.
   original's name, place, material and spot in the timeline; joints, grounds and patterns that
   used the original move onto the rebuild (a VEX part keeps its joints). **Stop Rebuild...**
   gives a rebuild up. A design saved half way carries on when you open it again.
-- Simple meshes (STL, OBJ, 3MF; closed, up to 10,000 triangles) work too. What SciForge cannot
+- Simple meshes (STL, OBJ, 3MF; closed, up to 10,000 triangles) work too. What Fission 180 cannot
   read (free-form surfaces, threads, raised or engraved text) is named, never guessed.
 
 ### VEX robotics and big assemblies
@@ -222,7 +222,7 @@ SciForge's own part.
   two minutes), hovering a rail with 245 holes is instant, and driving a joint is live.
 - **Aluminium AlMg3 (5754)** in the materials: the alloy next to the 5052 VEX metal is made
   of, so a stress test of a VEX part reads a realistic safety factor.
-- A page for teams: [docs/sciforge/vex.md](docs/sciforge/vex.md).
+- A page for teams: [docs/fission180/vex.md](docs/fission180/vex.md).
 
 ### Fixed
 
@@ -235,7 +235,7 @@ SciForge's own part.
 
 ### Known problems
 
-The list is in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md). New in this beta:
+The list is in [docs/fission180/known-issues.md](docs/fission180/known-issues.md). New in this beta:
 simulation does Static Stress only (one load case per study, bonded contacts only); opening a
 300-part robot still takes about half a minute; Auto Timeline reads prismatic and turned parts,
 not free-form ones.
@@ -269,7 +269,7 @@ not free-form ones.
 
 ## 0.1.0-beta.2.1
 
-**A patch of 0.1.0-beta.2.** Only SciForge's own files changed: **Help > Check for Updates >
+**A patch of 0.1.0-beta.2.** Only Fission 180's own files changed: **Help > Check for Updates >
 Update now** installs it in about a minute.
 
 ### Fixed
@@ -286,8 +286,8 @@ Update now** installs it in about a minute.
 ## 0.1.0-beta.2
 
 **The second beta.** Two new tabs, a complete SURFACE tab, a Data Panel like Fusion's, and a big
-round of work on speed and on SciForge explaining itself. If you have 0.1.0-beta, **Update now**
-only has to replace SciForge's own part: the compiled program has not changed.
+round of work on speed and on Fission 180 explaining itself. If you have 0.1.0-beta, **Update now**
+only has to replace Fission 180's own part: the compiled program has not changed.
 
 ### New tabs and tools
 
@@ -350,13 +350,13 @@ only has to replace SciForge's own part: the compiled program has not changed.
 
 ### Known problems
 
-The list is in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md). New in this beta:
-the SHEET METAL and PLASTIC tabs are the least used parts of SciForge so far, and the AI cannot
+The list is in [docs/fission180/known-issues.md](docs/fission180/known-issues.md). New in this beta:
+the SHEET METAL and PLASTIC tabs are the least used parts of Fission 180 so far, and the AI cannot
 use them yet.
 
 ## 0.1.0-beta
 
-**The first public beta.** SciForge is parametric CAD that works the way people who know Fusion
+**The first public beta.** Fission 180 is parametric CAD that works the way people who know Fusion
 expect it to, free and open source, built on FreeCAD 1.1.4. It is a beta: every feature is tested
 by driving the real program, but it has had little use by anyone but its author, so expect rough
 edges (read the known issues).
@@ -390,36 +390,36 @@ edges (read the known issues).
 - **Parameters** you can use in every number field, and **version history** for each design.
 - **AI features, off unless you use them**: a chat panel where you connect your own Claude,
   ChatGPT, Gemini or local (Ollama, LM Studio) key and ask it to build; and a connector so AI
-  apps such as Claude Desktop can build in SciForge (off until you switch it on in Preferences,
+  apps such as Claude Desktop can build in Fission 180 (off until you switch it on in Preferences,
   asks you before the first change in each session, every step is one Undo).
-- **FreeCAD Tools**: FreeCAD's own workbenches one click away, with a "Back to SciForge" bar.
-- **An example design**: a Raspberry Pi 5 case, built with SciForge, in
-  [docs/sciforge/examples/pi5-case](docs/sciforge/examples/pi5-case/README.md).
+- **FreeCAD Tools**: FreeCAD's own workbenches one click away, with a "Back to Fission 180" bar.
+- **An example design**: a Raspberry Pi 5 case, built with Fission 180, in
+  [docs/fission180/examples/pi5-case](docs/fission180/examples/pi5-case/README.md).
 
-### New in the way you get and look after SciForge
+### New in the way you get and look after Fission 180
 
 - **Windows installer and portable download, and a Linux AppImage**, from the
-  [Releases page](https://github.com/Luca0422git/SciForge/releases). SciForge installs next to
+  [Releases page](https://github.com/Luca0422git/Fission-180/releases). Fission 180 installs next to
   FreeCAD without touching it (its own settings folder, own installer entry).
 - **Help > Report a Problem**: one dialog that gathers the useful details (versions, graphics
-  card, recent SciForge messages, the last crash log) with your name and folders removed. You
+  card, recent Fission 180 messages, the last crash log) with your name and folders removed. You
   see everything first, then Save it, Copy it, or Open it on GitHub in your browser. Nothing is
-  uploaded by SciForge.
-- **A crash log**: if SciForge closes unexpectedly, the next start shows a one-line note on Home
+  uploaded by Fission 180.
+- **A crash log**: if Fission 180 closes unexpectedly, the next start shows a one-line note on Home
   with a button to report it.
-- **Help > Check for Updates**, and a quiet check when SciForge starts (at most once a day, off in
+- **Help > Check for Updates**, and a quiet check when Fission 180 starts (at most once a day, off in
   Preferences > General). A new version shows as an **update icon in the top right** of the window
   (next to the search button; it stays until you update) and as one line on Home with **Update
   now**, **What's new** and **Later**. Nothing is installed without your click.
 - **A one-line welcome** on Home the first time you start it. It can be closed for good.
-- **Version 0.1.0-beta** shown quietly on Home, in SciForge > Diagnostics, on the splash and in
+- **Version 0.1.0-beta** shown quietly on Home, in Fission 180 > Diagnostics, on the splash and in
   Help > About.
 - **Privacy**: no accounts, no telemetry; the update check and the AI features you connect are
-  the only things that go online ([docs/sciforge/privacy.md](docs/sciforge/privacy.md)).
+  the only things that go online ([docs/fission180/privacy.md](docs/fission180/privacy.md)).
 
 ### Known problems
 
-The list is in [docs/sciforge/known-issues.md](docs/sciforge/known-issues.md). The ones to know
+The list is in [docs/fission180/known-issues.md](docs/fission180/known-issues.md). The ones to know
 before you start: Windows will show "Windows protected your PC" for the unsigned installer
 (the exact clicks are in the release notes and in the README); Press Pull is still work in
-progress on complex curved shapes; SciForge has no macOS version and is English only.
+progress on complex curved shapes; Fission 180 has no macOS version and is English only.

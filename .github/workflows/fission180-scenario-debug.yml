@@ -1,0 +1,253 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Fission 180: runs GUI scenarios on the Linux AppImage of an EARLIER "Fission 180 build" run, without
+# compiling anything, and prints the scenario logs. For finding out why a build's scenario
+# shards fail (the shards only upload their logs): Actions > "Fission 180 scenario debug" >
+# Run workflow, with the run number's id and the scenario names.
+name: Fission 180 scenario debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Id of the Fission 180 build run whose Linux AppImage to use"
+        default: "39490600523"
+      shard:
+        description: "A shard like 1/9 (what a build's shard runs), or none to run the scenarios below"
+        default: "1/9"
+      scenarios:
+        description: "Scenario names, comma separated"
+        default: "version_label"
+      repeat:
+        description: "Run each scenario this many times and report how often it passed"
+        default: "1"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # The unit tests the way a build's "Test the Linux build" step runs them (same image, the same
+  # clean-up of the runner, a checkout with submodules, the build ids written into the module):
+  # prints the names of the tests that fail.
+  unit:
+    if: inputs.scenarios != 'rerun-test'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - name: Maximize build space
+        uses: AdityaGarg8/remove-unwanted-software@90e01b21170618765a73370fcc3abbd1684a7793 # v5
+        with:
+          remove-android: 'true'
+          remove-cached-tools: 'true'
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Write the build ids into the Fission 180 module
+        run: bash tools/fission180/write_build_info.sh --module src/Mod/Fission180 --commit "$GITHUB_SHA" --date "$(date -u +%Y-%m-%d)" --core e32ed0e90b
+
+      - name: Unit tests
+        run: |
+          python3 --version
+          tools/fission180/run_tests.sh --only unit --out test-output || true
+          grep -aE "^(FAIL|ERROR):" test-output/unit.log || echo "(no FAIL/ERROR lines)"
+          grep -a -B2 -A25 -E "^(FAIL|ERROR):" test-output/unit.log | head -150
+
+  # The release job's steps (notes, fission180-release.json, SHA256SUMS, the list of files to
+  # attach) on the files of an earlier build run, without publishing: a dry run of "release"
+  # without compiling again.
+  release-dry:
+    if: inputs.scenarios != 'rerun-test'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CORE_ID: e32ed0e90b
+      PLATFORMS: both
+      PUBLISH: "false"
+      GH_TOKEN: ${{ github.token }}
+      SRC_RUN: "39490600523"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Tag and version
+        run: |
+          version="$(tr -d '[:space:]' < src/Mod/Fission180/VERSION)"
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+          echo "TAG=fission180-v${version}" >> "$GITHUB_ENV"
+
+      - name: Get the built files of the earlier run
+        run: gh run download "$SRC_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'Fission180-*' --dir assets
+
+      - name: Quick update (Fission 180 module only)
+        run: |
+          mkdir -p assets/quick-update
+          tools/fission180/make_quick_update.sh --out quick-update-folder \
+            --zip "assets/quick-update/Fission180-quick-update-${TAG#fission180-}.zip" \
+            --commit "$GITHUB_SHA" --date "$(date -u +%Y-%m-%d)" --core "$CORE_ID"
+
+      - name: Notes, fission180-release.json and SHA256SUMS.txt
+        run: |
+          find assets -type f | sed 's/^/asset: /'
+          python3 tools/fission180/make_release_files.py --tag "$TAG" --core "$CORE_ID" \
+            --assets assets --out release-files --list-file attach.txt --require-all
+          cp "assets/quick-update/Fission180-quick-update-${TAG#fission180-}.zip" release-files/
+          echo "---- files that would be attached:"
+          cat attach.txt
+          echo "---- fission180-release.json"
+          cat release-files/fission180-release.json
+          echo "---- SHA256SUMS.txt"
+          cat release-files/SHA256SUMS.txt
+          echo "---- release-notes.md"
+          cat release-files/release-notes.md
+
+  debug:
+    if: github.event_name == 'workflow_dispatch' && inputs.scenarios != 'rerun-test'
+    runs-on: ubuntu-24.04  # (the image of the build's scenario parts)
+    timeout-minutes: ${{ inputs.repeat != '1' && 360 || 40 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Get the AppImage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id || '39490600523' }}
+        run: |
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'Fission180-Linux-*' --dir built
+          image=$(find built -name 'Fission180_*.AppImage' | head -1)
+          chmod +x "$image"
+          mkdir -p .fission180-cache/fission180
+          (cd .fission180-cache/fission180 && "$GITHUB_WORKSPACE/$image" --appimage-extract >/dev/null)
+          ls .fission180-cache/fission180/squashfs-root/usr/bin | head -30
+
+      - name: Run the scenarios and show their logs
+        env:
+          SCENARIOS: ${{ inputs.scenarios || 'version_label,home_screen' }}
+          SHARD: ${{ inputs.shard || '1/9' }}
+          REPEAT: ${{ inputs.repeat || '1' }}
+        run: |
+          tools/fission180/gui_env.sh --install
+          if [ -n "$SHARD" ] && [ "$SHARD" != "none" ]; then
+            # exactly what a build's scenario shard runs
+            tools/fission180/run_tests.sh --freecad .fission180-cache/fission180 --out test-output --only scenarios --shard "$SHARD" --repeat "$REPEAT" 2>&1 | tail -40 || true
+          else
+            tools/fission180/run_tests.sh --freecad .fission180-cache/fission180 --out test-output --scenario "$SCENARIOS" --repeat "$REPEAT" || true
+          fi
+          ls test-output | head -20
+          for log in $(ls test-output/scenario-*.log | head -3); do
+            echo "::group::$log"
+            head -c 6000 "$log"
+            echo
+            echo "..."
+            tail -c 3000 "$log"
+            echo "::endgroup::"
+          done
+
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: scenario-debug
+          path: test-output/
+          retention-days: 7
+
+  # The Windows installer step (package/rattler-build/windows/make_installer.sh) on the portable
+  # files of an earlier build run, in the same long checkout path a build has: about 20 minutes
+  # instead of a 4-hour build. First makensis straight on the long path (expected to fail while
+  # a path is past 260 characters), then make_installer.sh (short drive letter), which must pass.
+  installer:
+    if: github.event_name == 'workflow_dispatch' && inputs.scenarios != 'rerun-test'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SRC_RUN: "39490600523"
+      NAME: Fission180_v0.1.0-beta-Windows-x86_64-py311
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: prefix-dev/setup-pixi@82d477f15f3a381dbcc8adc1206ce643fe110fb7 # v0.9.3
+        with:
+          pixi-version: v0.59.0
+          cache: false
+          run-install: false
+          # The runner is thrown away after the job; the clean-up that deletes pixi.exe failed
+          # with EPERM (file in use) on the fission180-v0.1.0-beta build and turned a green
+          # Windows build red, so the release was skipped.
+          post-cleanup: false
+
+      - name: Get the portable build of the earlier run, under the release's folder name
+        run: |
+          gh run download "$SRC_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'Fission180-Windows-portable-*' --dir portable
+          archive=$(find portable -name '*.7z' | head -1)
+          echo "archive: $archive"
+          cd package/rattler-build/windows
+          7z x -y "$GITHUB_WORKSPACE/$archive" >/dev/null
+          old=$(ls -d Fission180_*-Windows-x86_64-py311 | head -1)
+          [ "$old" = "$NAME" ] || mv "$old" "$NAME"
+          longest=$(find "$NAME" -type f | awk '{ print length($0) }' | sort -n | tail -1)
+          echo "[Fission 180] workspace: $(cygpath -w "$GITHUB_WORKSPACE")"
+          echo "[Fission 180] longest path inside the bundle folder: $longest characters (+ $(cygpath -w "$(pwd)" | wc -c) for the folder it is in)"
+
+      - name: makensis on the long path (expected to fail)
+        continue-on-error: true
+        working-directory: package/rattler-build/windows
+        run: |
+          cd ..
+          pixi run -e package bash -c 'cd windows && "${CONDA_PREFIX}/NSIS/makensis.exe" -V2 -D"ExeFile=long-path-installer.exe" -D"FILES_FREECAD=$(cygpath -w "$(pwd)")\\${NAME}" -X"SetCompressor /FINAL lzma" ../../WindowsInstaller/FreeCAD-installer.nsi'
+
+      - name: make_installer.sh (must pass)
+        working-directory: package/rattler-build
+        run: |
+          pixi run -e package bash -c 'cd windows && bash make_installer.sh "${NAME}"'
+          ls -la windows/*-installer.exe
+
+  # Does a re-run of a failed job upload an artifact under a name its first attempt already
+  # used, and what does "gh run download" then get? (Scenarios input "rerun-test" runs only
+  # this job: attempt 1 uploads and fails, then "Re-run failed jobs".)
+  rerun-test:
+    if: inputs.scenarios == 'rerun-test'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: mkdir -p out && echo "attempt ${{ github.run_attempt }}" > out/attempt.txt
+      - name: Upload under a fixed name (same action and settings as the build's uploads)
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: Fission180-rerun-test
+          path: out/
+          retention-days: 1
+          compression-level: 0
+      - name: What the run holds now
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq '.artifacts[] | "\(.name) id=\(.id) created=\(.created_at)"'
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'Fission180-*' --dir dl
+          find dl -type f -exec sh -c 'echo "$1: $(cat "$1")"' _ {} \;
+      - name: Fail the first attempt
+        if: github.run_attempt == 1
+        run: exit 1

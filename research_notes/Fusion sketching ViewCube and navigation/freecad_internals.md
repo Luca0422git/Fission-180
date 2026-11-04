@@ -1,11 +1,11 @@
-# FreeCAD 1.1.4 internals for sketch snapping/auto-constraints, the navigation cube and viewport orbit (SciForge route to Fusion-like behavior)
+# FreeCAD 1.1.4 internals for sketch snapping/auto-constraints, the navigation cube and viewport orbit (Fission 180 route to Fusion-like behavior)
 
-Source note: the main source is the local FreeCAD 1.1.4 tree at `/home/user/SciForge` (it carries full upstream git history, so 1.0-vs-1.1 dates come from `git log`). Citations are repo-relative paths with line numbers. Online pages could not be used: `wiki.freecad.org` is refused by the sandbox proxy (HTTP 403 on CONNECT). The only web source is one search result on the 1.1 release. Claims about how *Fusion* behaves are not researched here (other researchers cover that). They appear only where the SciForge repo's own notes make them, and they are marked as such.
+Source note: the main source is the local FreeCAD 1.1.4 tree at `/home/user/Fission180` (it carries full upstream git history, so 1.0-vs-1.1 dates come from `git log`). Citations are repo-relative paths with line numbers. Online pages could not be used: `wiki.freecad.org` is refused by the sandbox proxy (HTTP 403 on CONNECT). The only web source is one search result on the 1.1 release. Claims about how *Fusion* behaves are not researched here (other researchers cover that). They appear only where the Fission 180 repo's own notes make them, and they are marked as such.
 
 ## Q1. Orbit / viewport navigation: styles, parameters, defaults, and the combination closest to Fusion (Shift+middle orbit, middle pan, zoom at cursor, constrained "up" orbit)
 
 ### Takeaway
-`Gui::RevitNavigationStyle` is the only built-in style that maps middle-drag to pan and Shift+middle-drag to orbit. SciForge already selects it, along with `ZoomAtCursor=True`. For an orbit that keeps the world up axis vertical (like Fusion's Constrained Orbit), the direct route is `OrbitStyle = 2` ("Free Turntable"). It turns about world Z and tilts about the screen X axis, with no roll. Optionally `RotationMode = 1` orbits about the model point under the cursor. All of this can be set from Python through `App.ParamGet("User parameter:BaseApp/Preferences/View")`, and the change reaches open views live. No C++ is needed unless SciForge wants Y-up turntable or a different pivot behavior.
+`Gui::RevitNavigationStyle` is the only built-in style that maps middle-drag to pan and Shift+middle-drag to orbit. Fission 180 already selects it, along with `ZoomAtCursor=True`. For an orbit that keeps the world up axis vertical (like Fusion's Constrained Orbit), the direct route is `OrbitStyle = 2` ("Free Turntable"). It turns about world Z and tilts about the screen X axis, with no roll. Optionally `RotationMode = 1` orbits about the model point under the cursor. All of this can be set from Python through `App.ParamGet("User parameter:BaseApp/Preferences/View")`, and the change reaches open views live. No C++ is needed unless Fission 180 wants Y-up turntable or a different pivot behavior.
 
 ### Cited Findings
 
@@ -87,16 +87,16 @@ Source note: the main source is the local FreeCAD 1.1.4 tree at `/home/user/SciF
 - FreeCAD's own Python status-bar navigation indicator (Tux) changes these preferences with `App.ParamGet("User parameter:BaseApp/Preferences/View")`. This is a working in-tree example of the Python route. — [src/Mod/Tux/NavigationIndicatorGui.py:31-33](src/Mod/Tux/NavigationIndicatorGui.py)
 - `View3DSettings` observes the View group, so writing `NavigationStyle`, `OrbitStyle`, `Sensitivity`, `InvertZoom`, `ZoomAtCursor`, `ZoomStep`, `RotationMode`, `UseNavigationAnimations` or `ShowNaviCube` updates all open viewers immediately. — [src/Gui/View3DSettings.cpp:288-416](src/Gui/View3DSettings.cpp)
 
-**What SciForge sets today**
+**What Fission 180 sets today**
 - `theme.py` `VIEWER_SETTINGS` sets:
   - `NavigationStyle = "Gui::RevitNavigationStyle"` and `ZoomAtCursor = True`
   - background colours
   - NaviCube `BaseColor`, `EmphaseColor` and `HiliteColor`
   
-  It does **not** set `OrbitStyle`, `RotationMode`, `ZoomStep`, `InvertZoom` or the animation settings. It records each parameter's previous existence and value and restores both on disable. — [src/Mod/SciForge/sciforge/theme.py:139-218](src/Mod/SciForge/sciforge/theme.py)
-- The SciForge GUI tests turn `UseNavigationAnimations` off. — [src/Mod/SciForge/SciForgeTests/gui/journey_gui.py:149](src/Mod/SciForge/SciForgeTests/gui/journey_gui.py); [harness.py:531](src/Mod/SciForge/SciForgeTests/gui/harness.py)
+  It does **not** set `OrbitStyle`, `RotationMode`, `ZoomStep`, `InvertZoom` or the animation settings. It records each parameter's previous existence and value and restores both on disable. — [src/Mod/Fission180/fission180/theme.py:139-218](src/Mod/Fission180/fission180/theme.py)
+- The Fission 180 GUI tests turn `UseNavigationAnimations` off. — [src/Mod/Fission180/Fission180Tests/gui/journey_gui.py:149](src/Mod/Fission180/Fission180Tests/gui/journey_gui.py); [harness.py:531](src/Mod/Fission180/Fission180Tests/gui/harness.py)
 - The project notes say: "FreeCAD's 'Revit' navigation style is exactly Fusion's default mouse mapping." — [MEMORY.md:343](MEMORY.md)
-- The spec asks for "Navigation matching Fusion: orbit, pan, zoom to cursor, zoom window, fit, look-at, orbit-around-selection…" (section 7.14). — [docs/sciforge/feature-outline.md:201-203](docs/sciforge/feature-outline.md)
+- The spec asks for "Navigation matching Fusion: orbit, pan, zoom to cursor, zoom window, fit, look-at, orbit-around-selection…" (section 7.14). — [docs/fission180/feature-outline.md:201-203](docs/fission180/feature-outline.md)
 
 **1.0 vs 1.1**
 - Trackball Classic was added on 2025-04-28 (commit 8d2cb99712, #20535). Commit 3fcadd01f5 (2025-05-02) made Rounded Arcball the default. It changed the defaults from `OrbitStyle` 1 (Trackball) and `RotationMode` 1 (Drag at cursor) to `OrbitStyle` 4 and `RotationMode` 0. These commits postdate 1.0, so in 1.0 the defaults were Trackball and Drag at cursor, and the Trackball Classic and Rounded Arcball styles did not exist. — `git show 3fcadd01f5`, `git log -S TrackballClassic` in the local repo
@@ -115,7 +115,7 @@ Source note: the main source is the local FreeCAD 1.1.4 tree at `/home/user/SciF
 
   Write `NavigationStyle` **before** the others, because switching style creates a new instance that resets sensitivity to 2.0 and re-reads the other parameters.
 - Free Turntable is the closest built-in match to a "constrained orbit" because each step is world-Z yaw plus screen-X pitch, with no roll. Turntable (0) applies only one axis per mouse event, so diagonal drags feel stepped. Trackball, Trackball Classic and Rounded Arcball allow roll and do not keep the up axis vertical.
-- The turntable axis is hard-wired to world **Z** (`SbVec3f zaxis(0, 0, 1)` at NavigationStyle.cpp:243). If SciForge ever adopts a Y-up convention, which the project notes list as an open Fusion-parity decision ([MEMORY.md:330-331](MEMORY.md)), it needs a C++ change in `getTurntable`, for example reading an "up axis" parameter. That would be a small, self-contained core patch.
+- The turntable axis is hard-wired to world **Z** (`SbVec3f zaxis(0, 0, 1)` at NavigationStyle.cpp:243). If Fission 180 ever adopts a Y-up convention, which the project notes list as an open Fusion-parity decision ([MEMORY.md:330-331](MEMORY.md)), it needs a C++ change in `getTurntable`, for example reading an "up axis" parameter. That would be a small, self-contained core patch.
 - Because the pivot is fixed in `saveCursorPosition`, "orbit around the selection" (from the spec) is not a built-in mode. Two ways to get it:
   - C++: add a `RotationCenterMode` that uses the selection's bounding-box centre.
   - Python: call `NavigationStyle::setRotationCenter`. It has no Python binding, so this route would need a binding or the pivy camera.
@@ -214,9 +214,9 @@ Two direct routes exist:
 
 (The .ui file confirms the UI-exposed entries and defaults: CubeSize 132, CornerNaviCube 1, NaviRotateToNearest true, NaviStepByTurn 8, InactiveOpacity 50, BaseColor rgb(226,232,239). — [src/Gui/PreferencePages/DlgSettingsNavigation.ui](src/Gui/PreferencePages/DlgSettingsNavigation.ui))
 
-**What SciForge does with the cube today**
-- It sets only colours: `BaseColor = 0xF0F0F0E6`, `EmphaseColor = #4a4f57`, `HiliteColor = #6fb7f0`. The comment reads "a light ViewCube with dark labels and a blue hover". — [src/Mod/SciForge/sciforge/theme.py:148-161](src/Mod/SciForge/sciforge/theme.py)
-- "ViewCube shape" is still an open item in MEMORY. The spec asks for a "ViewCube with identical interaction (click faces/edges/corners, drag-orbit, home)". — [MEMORY.md:100](MEMORY.md); [docs/sciforge/feature-outline.md:203](docs/sciforge/feature-outline.md)
+**What Fission 180 does with the cube today**
+- It sets only colours: `BaseColor = 0xF0F0F0E6`, `EmphaseColor = #4a4f57`, `HiliteColor = #6fb7f0`. The comment reads "a light ViewCube with dark labels and a blue hover". — [src/Mod/Fission180/fission180/theme.py:148-161](src/Mod/Fission180/fission180/theme.py)
+- "ViewCube shape" is still an open item in MEMORY. The spec asks for a "ViewCube with identical interaction (click faces/edges/corners, drag-orbit, home)". — [MEMORY.md:100](MEMORY.md); [docs/fission180/feature-outline.md:203](docs/fission180/feature-outline.md)
 
 **1.0 vs 1.1**
 - `NaviCube.cpp` changes after 1.0 (Nov 2024) were maintenance only:
@@ -228,7 +228,7 @@ Two direct routes exist:
   The cube's design and parameters are essentially the same in 1.0 and 1.1. — local `git log -- src/Gui/NaviCube.cpp`
 
 ### Inferences
-- **Parameter-only tuning** (Python, already the SciForge pattern):
+- **Parameter-only tuning** (Python, already the Fission 180 pattern):
   - `ChamferSize` of about 0.06-0.08 makes edges and corners thin hot-zones on a more box-like cube.
   - Lower `BorderWidth` (about 0.6-0.8).
   - `ShowCS=False` if the tripod is unwanted.
@@ -244,18 +244,18 @@ Two direct routes exist:
   - removing or replacing the arrows or the backside dot
   - hover highlighting that groups facets
 
-  All of this is confined to one file. It needs a `SCIFORGE:` comment, an entry in `docs/sciforge/core-patches.md` and a full build.
+  All of this is confined to one file. It needs a `FISSION180:` comment, an entry in `docs/fission180/core-patches.md` and a full build.
 - **Python replacement** (the Fusion look without a rebuild):
   1. Set `ShowNaviCube=False` (View group, applied live).
-  2. Add a translucent `QWidget` child over the 3D view's GL viewport. SciForge's `NavBar` already floats a QWidget over the view ([navbar_ui.py](src/Mod/SciForge/sciforge/navbar_ui.py)). The viewport is a `QOpenGLWidget`, so child widgets composite correctly (NaviCube.cpp:1043 casts `viewport()` to `QOpenGLWidget`).
+  2. Add a translucent `QWidget` child over the 3D view's GL viewport. Fission 180's `NavBar` already floats a QWidget over the view ([navbar_ui.py](src/Mod/Fission180/fission180/navbar_ui.py)). The viewport is a `QOpenGLWidget`, so child widgets composite correctly (NaviCube.cpp:1043 casts `viewport()` to `QOpenGLWidget`).
   3. Paint the cube with QPainter from the camera orientation (`view.getCameraOrientation()`, or the pivy camera node's `orientation` with an `SoFieldSensor` to repaint).
   4. Hit-test in 2D.
   5. On click, call `view.setCameraOrientation(Rotation)`. It animates with FreeCAD's duration and easing (NavigationStyle.cpp:540-542).
   6. For drag-orbit, rotate the pivy camera directly per mouse move. `setCameraOrientation` would start a new animation on each move when animations are on.
   7. For Home, store or restore a camera pose.
 
-  This fits SciForge's quick-update path ([MEMORY.md:346-349](MEMORY.md)) and its rule that pivy and Qt hooks only schedule work through `QTimer`.
-- Orientation convention: in FreeCAD, Front looks along **+Y** (camera on -Y) with **Z up**; Top looks down -Z; Right looks along -X. A cube that matches Fusion only by labels keeps FreeCAD's Z-up mapping. If SciForge chooses Y-up parity, the face-to-orientation table must be remapped (C++ `prepare()`, or a Python overlay's own table) and the turntable axis changed too (see Q1).
+  This fits Fission 180's quick-update path ([MEMORY.md:346-349](MEMORY.md)) and its rule that pivy and Qt hooks only schedule work through `QTimer`.
+- Orientation convention: in FreeCAD, Front looks along **+Y** (camera on -Y) with **Z up**; Top looks down -Z; Right looks along -X. A cube that matches Fusion only by labels keeps FreeCAD's Z-up mapping. If Fission 180 chooses Y-up parity, the face-to-orientation table must be remapped (C++ `prepare()`, or a Python overlay's own table) and the turntable axis changed too (see Q1).
 
 ### Gaps
 - Fusion's ViewCube details (exact hot-zones, whether a compass or roll arrows exist, Home icon placement, fade behavior, label words) were not researched here.
@@ -407,8 +407,8 @@ These need C++ in `SnapManager` and `DrawSketchHandler`, plus an `EditModeCoinMa
   — [SketcherSettingsGrid.ui](src/Mod/Sketcher/Gui/SketcherSettingsGrid.ui); [ViewProviderSketch.cpp:331-380](src/Mod/Sketcher/Gui/ViewProviderSketch.cpp)
 - No Python API reaches the draw handlers: the only `.pyi` in Sketcher/Gui is `ViewProviderSketchGeometryExtension.pyi`. — [src/Mod/Sketcher/Gui/](src/Mod/Sketcher/Gui/)
 
-**What SciForge already overrides in sketches**
-- `sketch_mode.PARAMS` sets, while SciForge is on:
+**What Fission 180 already overrides in sketches**
+- `sketch_mode.PARAMS` sets, while Fission 180 is on:
   - `LeaveSketchWithEscape=False` and `ShowDialogOnDistanceConstraint=False`
   - both constraint and element lists collapsed
   - `AlwaysExtGeoReference=False`
@@ -417,10 +417,10 @@ These need C++ in `SnapManager` and `DrawSketchHandler`, plus an `EditModeCoinMa
   - notification balloons off (`MaxOpenNotifications 0`, which hides "Autoconstraints cause redundancy…")
   - `SnapToGrid` from the palette "snap" option
   
-  It restores everything on disable. It does **not** touch `Snap`, `SnapToObjects`, `SnapAngle`, `AutoConstraints`, `AvoidRedundantAutoconstraints`, `OnViewParameterVisibility`, `ConstraintSymbolSize` or `PickRadius`. — [src/Mod/SciForge/sciforge/sketch_mode.py:36-100, 158-169, 207-212](src/Mod/SciForge/sciforge/sketch_mode.py)
-- SciForge's Line (L) runs FreeCAD's new `Sketcher_CreateLine`, which has OVP Length and Angle fields ("type 50, Tab, 30, Enter, which also adds the dimension, like Fusion"). It chains lines by re-clicking the end point from a Qt timer, so FreeCAD's own coincident auto-constraint applies. — [src/Mod/SciForge/sciforge/sketch_line.py:1-60](src/Mod/SciForge/sciforge/sketch_line.py)
-- `ENTER_FINISHES` covers the Line, Rectangle and SciForge polygon tools. SciForge's own in-place `DimensionEditor` replaces FreeCAD's modal dimension dialog. Closed regions are shaded through `ProfileShading`. — [sketch_mode.py:116-123, 1284, 1555](src/Mod/SciForge/sciforge/sketch_mode.py)
-- The spec requires "Auto-constraining and inference while drawing (snap markers, glyphs, tangent/perpendicular/coincident inferred), constraint glyphs, hover and delete". It allows "Fork the Sketcher module as needed". — [docs/sciforge/feature-outline.md:151, 237](docs/sciforge/feature-outline.md)
+  It restores everything on disable. It does **not** touch `Snap`, `SnapToObjects`, `SnapAngle`, `AutoConstraints`, `AvoidRedundantAutoconstraints`, `OnViewParameterVisibility`, `ConstraintSymbolSize` or `PickRadius`. — [src/Mod/Fission180/fission180/sketch_mode.py:36-100, 158-169, 207-212](src/Mod/Fission180/fission180/sketch_mode.py)
+- Fission 180's Line (L) runs FreeCAD's new `Sketcher_CreateLine`, which has OVP Length and Angle fields ("type 50, Tab, 30, Enter, which also adds the dimension, like Fusion"). It chains lines by re-clicking the end point from a Qt timer, so FreeCAD's own coincident auto-constraint applies. — [src/Mod/Fission180/fission180/sketch_line.py:1-60](src/Mod/Fission180/fission180/sketch_line.py)
+- `ENTER_FINISHES` covers the Line, Rectangle and Fission 180 polygon tools. Fission 180's own in-place `DimensionEditor` replaces FreeCAD's modal dimension dialog. Closed regions are shaded through `ProfileShading`. — [sketch_mode.py:116-123, 1284, 1555](src/Mod/Fission180/fission180/sketch_mode.py)
+- The spec requires "Auto-constraining and inference while drawing (snap markers, glyphs, tangent/perpendicular/coincident inferred), constraint glyphs, hover and delete". It allows "Fork the Sketcher module as needed". — [docs/fission180/feature-outline.md:151, 237](docs/fission180/feature-outline.md)
 
 ### Inferences
 - **Already close to Fusion:**
@@ -432,7 +432,7 @@ These need C++ in `SnapManager` and `DrawSketchHandler`, plus an `EditModeCoinMa
   - Ctrl angle snap (a step of 15° may suit better than 5°)
   - continuous mode
 
-  SciForge can tune from Python (all applied live):
+  Fission 180 can tune from Python (all applied live):
   - `SnapAngle`
   - `OnViewParameterVisibility` (2 to also show X/Y position boxes before the first click)
   - `ConstraintSymbolSize`
@@ -448,7 +448,7 @@ These need C++ in `SnapManager` and `DrawSketchHandler`, plus an `EditModeCoinMa
   - Add an "alignment" step to `SnapManager::snap()`, with a new `SnapType` bit. It scans sketch vertices for |x−x_i| or |y−y_i| within a pixel tolerance and locks that coordinate, as the H/V-axis branch already does at SnapManager.cpp:263-272. It records the source vertex for drawing.
   - Extend `seekAutoConstraint()` with Parallel and Perpendicular, and with alignment-to-vertex (for example Horizontal/Vertical between points, or DistanceX/Y = 0). The icons already map from the ConstraintType enum at DrawSketchHandler.cpp:391-431.
   - Draw the dashed guides with a new attorney call into `EditModeCoinManager`. That code already supports line patterns, so the edit-curve node or a new `SoLineSet` with an `SoDrawStyle` `linePattern` can render them.
-  - These files are under `src/Mod/Sketcher/Gui/` and need `SCIFORGE:` markers, a core-patches entry and a full build.
+  - These files are under `src/Mod/Sketcher/Gui/` and need `FISSION180:` markers, a core-patches entry and a full build.
 - **Python-only stopgap:**
   - Draw dashed guide lines with a pivy `SoAnnotation` overlay driven by `view.addEventCallback("SoLocation2Event")`, scheduled through `QTimer`.
   - Add the inferred constraints after the geometry is created, as `LineChain` does.
@@ -458,6 +458,6 @@ These need C++ in `SnapManager` and `DrawSketchHandler`, plus an `EditModeCoinMa
 
 ### Gaps
 - Not verified: whether `Gui::BitmapFactory` lets a Python-added icon path override built-in `Constraint_*` SVGs. Built-ins may come from compiled Qt resources first.
-- Not verified at run time: the effect of `OnViewParameterVisibility=2` on SciForge's line chaining (`sketch_line.py`). It may show X/Y boxes that then take focus on typed numbers.
+- Not verified at run time: the effect of `OnViewParameterVisibility=2` on Fission 180's line chaining (`sketch_line.py`). It may show X/Y boxes that then take focus on typed numbers.
 - Fusion's exact inference set and tolerances (which snaps exist, glyph look, dashed-line rules) belong to the Fusion research, not here.
 - The FreeCAD wiki pages "Sketcher Preferences" and "Sketcher on-view parameters" could not be fetched (proxy 403). Everything above comes from the 1.1.4 source.

@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""Standard keys while Fission 180 is on: Ctrl+Z / Ctrl+Y undo and redo a whole
+command. FreeCAD only honours its own Ctrl+Z while its (hidden) menu bar is
+visible, so these did nothing until Fission 180 bound them itself."""
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide import QtCore
+
+from Fission180Tests.gui import arrow_input as a
+from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import plane_input as pl
+
+V = App.Vector
+s = {}
+
+
+def start():
+    Gui.activateWorkbench("Fission180Workbench")
+    App.newDocument("Keys")
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+def pick_xy():
+    pl.click_square("XY_Plane")  # where the square shows (was 12, -8, 0)
+
+
+def draw():
+    sk = h.in_sketch()
+    h.check("sketch open", sk is not None)
+    if sk:
+        h.draw_rectangle(sk, 0, 0, 40, 30)
+
+
+def finish():
+    h.ribbon("Finish Sketch")
+
+
+def extrude():
+    h.fit()
+    h.press("e")
+
+
+def extrude_distance():
+    h.check("Extrude dialog open", a.type_distance("10"))  # it starts at 0, like Fusion
+
+
+def extrude_ok():
+    h.task_button("OK")
+
+
+def after_extrude():
+    s["v"] = h.solid_volume()
+    h.check("extruded", s["v"] > 1000, s["v"])
+
+
+def undo():
+    h.press(QtCore.Qt.Key_Z, QtCore.Qt.ControlModifier)
+
+
+def after_undo():
+    v = h.solid_volume()
+    h.check("Ctrl+Z undoes the extrude", v < 1, v)
+
+
+def redo():
+    h.press(QtCore.Qt.Key_Y, QtCore.Qt.ControlModifier)
+
+
+def after_redo():
+    v = h.solid_volume()
+    h.check("Ctrl+Y redoes it", abs(v - s["v"]) < 1e-6, (v, s["v"]))
+
+
+def undo_again():
+    h.press(QtCore.Qt.Key_Z, QtCore.Qt.ControlModifier)
+
+
+def open_offset_plane():
+    h.check("undone again", h.solid_volume() < 1, h.solid_volume())
+    h.ribbon("Offset Plane")  # a dialog built on taskui.Panel
+
+
+def cancel_without_change():
+    h.task_button("Cancel")
+
+
+def redo_after_cancel():
+    # Redo still works after a dialog was opened and cancelled without a change. (The
+    # pending-undo-step fix in taskui._end_transaction came from the extrude QA, which hit it
+    # in its own dialogs; this path does not reproduce that case, it only guards Redo.)
+    h.press(QtCore.Qt.Key_Y, QtCore.Qt.ControlModifier)
+
+
+def after_redo_after_cancel():
+    v = h.solid_volume()
+    h.check("Ctrl+Y still redoes after a cancelled dialog", abs(v - s["v"]) < 1e-6, (v, s["v"]))
+
+
+h.run(
+    "keys",
+    [
+        start,
+        pick_xy,
+        draw,
+        finish,
+        extrude,
+        extrude_distance,
+        extrude_ok,
+        after_extrude,
+        undo,
+        after_undo,
+        redo,
+        after_redo,
+        undo_again,
+        open_offset_plane,
+        cancel_without_change,
+        redo_after_cancel,
+        after_redo_after_cancel,
+    ],
+    paced_by="state",
+)

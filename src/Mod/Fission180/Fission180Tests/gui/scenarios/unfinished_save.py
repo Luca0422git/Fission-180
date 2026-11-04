@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""Saves FreeCAD could not finish (Luca, 2026-10-19: in his Documents folder, backed up by
+Google Drive, every save stayed "test.FCStd.78026b5d-..." and Home showed no design).
+FreeCAD writes a save to "<design>.FCStd.<uuid>" and renames it last; Windows refused the
+rename while Google Drive held the new file. A refused rename cannot be made here, so the
+file it leaves is made by hand.
+
+Path 1, such files left in This computer's folder (three saves of one design, one of
+  another): Home makes the newest of each the design and lists them; the older ones are
+  kept in .fission180/unfinished-saves.
+Path 2, a save of an open design left that way: Fission 180 finishes it (the rename), tells
+  the listeners FreeCAD did not: Home lists it first in Recent.
+Path 3, a folder where renames are refused (as Luca's; marked so here, Linux cannot refuse
+  them): Fission 180's save writes the design directly (FreeCAD's BackupPolicy off for it),
+  no temporary file is left, FreeCAD's setting is as before afterwards.
+"""
+
+import os
+import shutil
+import tempfile
+import time
+
+import FreeCAD as App
+
+from Fission180Tests.gui import harness as h
+
+s = {}
+FILES = "User parameter:BaseApp/Preferences/Mod/Fission180/Files"
+UUIDS = (
+    "78026b5d-cb38-45d0-a35f-496a00000001",
+    "de505953-325f-48bb-888d-ba0000000002",
+    "e6be27c2-5cd8-4564-9deb-abf000000003",
+    "4f39d0fd-dfb7-492f-a4aa-000000000004",
+)
+
+
+def home():
+    from fission180 import home_ui
+
+    return home_ui.view()
+
+
+def names(row):
+    page = home()
+    return [t.split("\n")[0] for _k, _key, _p, t, _s in page.items(row)] if page else []
+
+
+def a_save(name):
+    """A complete design file, as FreeCAD writes it."""
+    from fission180 import commands
+
+    doc = App.newDocument(name)
+    commands.ensure_body()
+    box = doc.addObject("PartDesign::AdditiveBox", "Box")
+    doc.getObject("Body").addObject(box)
+    doc.recompute()
+    path = os.path.join(s["scratch"], name + ".FCStd")
+    doc.saveAs(path)
+    return doc, path
+
+
+def left_as(path, design, uuid, age):
+    target = os.path.join(s["project"], "%s.FCStd.%s" % (design, uuid))
+    shutil.copy(path, target)
+    stamp = time.time() - age
+    os.utime(target, (stamp, stamp))
+    return target
+
+
+# -- Path 1 -------------------------------------------------------------------------------
+def setup():
+    from fission180 import home_core, home_ui
+
+    s["project"] = tempfile.mkdtemp(prefix="fission180-unfinished-")
+    s["scratch"] = tempfile.mkdtemp(prefix="fission180-unfinished-src-")
+    s["old_project"] = App.ParamGet(FILES).GetString("ProjectFolder", "")
+    App.ParamGet(FILES).SetString("ProjectFolder", s["project"])
+    state = home_core.empty()
+    state["merged_mru"] = True
+    home_ui.save_state(state)
+    doc, path = a_save("Source")
+    App.closeDocument(doc.Name)
+    left_as(path, "test", UUIDS[0], 300)
+    left_as(path, "test", UUIDS[1], 200)
+    left_as(path, "test", UUIDS[2], 100)
+    left_as(path, "the THING", UUIDS[3], 60)
+    home_ui.show()
+    home().refresh()
+
+
+def designs_listed():
+    from fission180 import versions
+
+    for name in ("test", "the THING"):
+        h.check(
+            "%s.FCStd is made from its unfinished save" % name,
+            versions.complete_save(os.path.join(s["project"], name + ".FCStd")),
+        )
+    listed = names("local")
+    # (Source, saved in another folder to make the files, is listed too: "another folder")
+    h.check("This computer lists both", {"test", "the THING"} <= set(listed), listed)
+    left = [n for n in os.listdir(s["project"]) if ".FCStd." in n]
+    h.check("no unfinished save left beside them", left == [], left)
+    kept = os.listdir(os.path.join(s["project"], versions.UNFINISHED_FOLDER))
+    h.check("the two older saves of test are kept aside", len(kept) == 2, kept)
+    h.shot("listed")
+
+
+# -- Path 2 -------------------------------------------------------------------------------
+def save_left_unfinished():
+    from fission180 import versions_ui
+
+    doc, path = a_save("Rescued")
+    design = os.path.join(s["project"], "Rescued.FCStd")
+    started = time.time() - 1
+    left_as(path, "Rescued", UUIDS[0], 0)
+    s["done"] = versions_ui._finish_interrupted(doc, design, started, tries=4)
+    s["design"] = design
+
+
+def rescued():
+    from fission180 import versions
+
+    h.check("Fission 180 finished the save", s["done"] and versions.complete_save(s["design"]))
+    h.check("Home lists it first in Recent", names("recent")[:1] == ["Rescued"], names("recent"))
+
+
+# -- Path 3 -------------------------------------------------------------------------------
+def save_where_renames_are_refused():
+    from fission180 import commands, versions_ui
+
+    s["policy"] = App.ParamGet(versions_ui.DOC_PARAMS).GetBool("BackupPolicy", True)
+    s["direct"] = os.path.join(s["project"], "Direct")
+    os.makedirs(s["direct"])
+    key = os.path.normcase(os.path.abspath(s["direct"]))
+    versions_ui._rename_checked.add(key)
+    versions_ui._direct.add(key)
+    doc = App.newDocument("Direct")
+    commands.ensure_body()
+    s["direct_file"] = os.path.join(s["direct"], "Direct.FCStd")
+    versions_ui._first_save(doc.Name, s["direct_file"])
+    s["direct_doc"] = doc.Name
+    doc.getObject("Body").addObject(doc.addObject("PartDesign::AdditiveBox", "Box"))
+    doc.recompute()
+    versions_ui._save_version(doc.Name, "second save")
+
+
+def saved_directly():
+    from fission180 import versions, versions_ui
+
+    h.check("the design was written", versions.complete_save(s["direct_file"]))
+    left = [n for n in os.listdir(s["direct"]) if ".FCStd." in n]
+    h.check("no temporary file left", left == [], left)
+    h.check(
+        "FreeCAD's BackupPolicy as before",
+        App.ParamGet(versions_ui.DOC_PARAMS).GetBool("BackupPolicy", True) == s["policy"],
+    )
+    doc = App.getDocument(s["direct_doc"])
+    h.check("the design is saved (no star)", not versions_ui.is_modified(doc))
+    for name in list(App.listDocuments()):
+        App.closeDocument(name)
+    App.newDocument("Scratch")  # (the harness ends on a design)
+    if s.get("old_project"):
+        App.ParamGet(FILES).SetString("ProjectFolder", s["old_project"])
+    else:
+        App.ParamGet(FILES).RemString("ProjectFolder")
+    for folder in (s["project"], s["scratch"]):
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+h.run(
+    "unfinished_save",
+    [
+        setup,
+        designs_listed,
+        save_left_unfinished,
+        rescued,
+        save_where_renames_are_refused,
+        saved_directly,
+    ],
+    paced_by="state",
+)

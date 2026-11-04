@@ -5,7 +5,7 @@ autodesk.com, help.autodesk.com, forums.autodesk.com and even wikipedia.org). Ev
 therefore comes from search-engine extracts of the cited pages, not from reading the full page. Each line is
 tagged with its source type: **[Official]** = Autodesk help, API reference, support article or Autodesk blog;
 **[Forum]** = Autodesk Community or other user forum (including Autodesk staff replies, noted when known);
-**[Tutorial]** = third-party tutorial or course; **[Code]** = SciForge/FreeCAD source in this repo;
+**[Tutorial]** = third-party tutorial or course; **[Code]** = Fission180/FreeCAD source in this repo;
 **[Ref]** = general 3D-graphics reference. Fusion was renamed from "Fusion 360" to "Fusion" in January 2024
 ([Wikipedia](https://en.wikipedia.org/wiki/Autodesk_Fusion)), so older sources use the old name.
 
@@ -53,7 +53,7 @@ user pick one of six presets: Fusion (default), Alias, Inventor (Windows only), 
   [Orbit and pan keyboard shortcuts?](https://forums.autodesk.com/t5/fusion-design-validate-document/orbit-and-pan-keyboard-shortcuts/td-p/6813596)
 
 ### Inferences
-- For SciForge, a "Fusion" navigation style in FreeCAD terms is: MMB-drag pan, Shift+MMB-drag orbit,
+- For Fission 180, a "Fusion" navigation style in FreeCAD terms is: MMB-drag pan, Shift+MMB-drag orbit,
   wheel zoom, Ctrl+Shift+MMB-drag zoom, MMB double-click fit. Presets are just alternative button/modifier
   tables over the same pan/orbit/zoom operations, so one data table can drive all six.
 - A plain left-click must never start navigation in the Fusion preset (left button is reserved for selection),
@@ -153,7 +153,7 @@ lets the model tumble in any orientation (trackball). The "stable" feel the user
   ([I set the default orbit type... suddenly changes to constrained](https://forums.autodesk.com/t5/fusion-support-forum/i-set-the-default-orbit-type-in-the-preferences-but-it-suddenly/td-p/13659435)).
   An old (2017) user report claimed Shift+middle-drag always gave free orbit regardless of the icon —
   [Orbit - How does it really work?](https://forums.autodesk.com/t5/fusion-design-validate-document/orbit-how-does-it-really-work/td-p/6884264).
-  Recommendation for SciForge regardless: default to constrained/turntable, since that is what the owner asked for.
+  Recommendation for Fission 180 regardless: default to constrained/turntable, since that is what the owner asked for.
 - Free Orbit has known path bugs in Fusion (camera follows an unintended path on horizontal drags; toggling
   orbit type fixes it); these are bugs, not behavior to copy —
   [Free Orbit Bug - Closer to a Fix?](https://forums.autodesk.com/t5/fusion-support-forum/free-orbit-bug-closer-to-a-fix/td-p/10168742);
@@ -189,7 +189,7 @@ the four handle lines = rotation about the screen horizontal or vertical axis.
 
 ### Inferences
 - The circle-with-four-handles tool is the classic Autodesk "free orbit" gizmo (also in Inventor). It is a modal
-  command (click the button, then left-drag), whereas Shift+MMB is a transient drag. SciForge can ship the
+  command (click the button, then left-drag), whereas Shift+MMB is a transient drag. Fission 180 can ship the
   transient drag first and add the gizmo later.
 
 ### Gaps
@@ -243,7 +243,7 @@ pivot") switches between orbiting around the window center and around the model'
   [DlgSettingsNavigation.ui:521-553](../../src/Gui/PreferencePages/DlgSettingsNavigation.ui)
 
 ### Inferences
-- A faithful SciForge pivot rule: (1) if the user set an orbit center, use it until reset (Reset Orbit Center,
+- A faithful Fission 180 pivot rule: (1) if the user set an orbit center, use it until reset (Reset Orbit Center,
   Home, or Fit); (2) else if the whole model's bounding box is on screen, use its center; (3) else use the scene
   point under the cursor at drag start (fallback: focal point). Show a small green dot at the pivot for the
   duration of the drag only.
@@ -304,7 +304,7 @@ bar; double-click middle = Fit.
   animation duration — [DlgSettingsNavigation.cpp:93-150](../../src/Gui/PreferencePages/DlgSettingsNavigation.cpp)
 
 ### Inferences
-- Default SciForge: zoom-at-cursor ON, wheel-up = zoom in (Fusion default as far as can be told), with an
+- Default Fission 180: zoom-at-cursor ON, wheel-up = zoom in (Fusion default as far as can be told), with an
   "invert" checkbox mirroring "Reverse zoom direction".
 
 ### Gaps
@@ -408,7 +408,7 @@ created or edited.
 
 ### Inferences
 - "Perspective with Ortho Faces" = perspective normally, but snap to orthographic when the view is aligned to a
-  standard face (ViewCube face click / Look At). SciForge can implement it as: on view-align to an axis direction,
+  standard face (ViewCube face click / Look At). Fission 180 can implement it as: on view-align to an axis direction,
   switch Coin camera to SoOrthographicCamera; on orbit start, switch back to perspective, keeping the visible size
   at the focal distance equal.
 - Constrained orbit's yaw axis must follow the document's modeling orientation (Z up vs Y up).

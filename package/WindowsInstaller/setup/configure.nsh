@@ -31,7 +31,7 @@ Section -InstallData
   # create desktop icon
   ${if} $CreateDesktopIcon == "true"
    SetOutPath "$INSTDIR\bin"
-   CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_RUN}" "" "$INSTDIR\${APP_RUN}" "" "" "" "${APP_SHORTCUT_INFO}" # SCIFORGE: "SciForge.lnk"
+   CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_RUN}" "" "$INSTDIR\${APP_RUN}" "" "" "" "${APP_SHORTCUT_INFO}" # FISSION180: "Fission180.lnk"
   ${endif}
 
   # Uninstaller information
@@ -46,9 +46,9 @@ Section -InstallData
   WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayVersion" "${APP_VERSION}"
   WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayIcon" "$INSTDIR\${APP_RUN}"
   WriteRegStr SHCTX ${APP_UNINST_KEY} "URLUpdateInfo" "${APP_WEBPAGE}"
-  WriteRegStr SHCTX ${APP_UNINST_KEY} "URLInfoAbout" "${APP_WEBPAGE}" # SCIFORGE
-  WriteRegStr SHCTX ${APP_UNINST_KEY} "Publisher" "${APP_NAME} contributors" # SCIFORGE
-  WriteRegStr SHCTX ${APP_UNINST_KEY} "HelpLink" "${APP_WIKI}" # SCIFORGE
+  WriteRegStr SHCTX ${APP_UNINST_KEY} "URLInfoAbout" "${APP_WEBPAGE}" # FISSION180
+  WriteRegStr SHCTX ${APP_UNINST_KEY} "Publisher" "${APP_NAME} contributors" # FISSION180
+  WriteRegStr SHCTX ${APP_UNINST_KEY} "HelpLink" "${APP_WIKI}" # FISSION180
   WriteRegDWORD SHCTX ${APP_UNINST_KEY} "NoModify" 0x00000001
   WriteRegDWORD SHCTX ${APP_UNINST_KEY} "NoRepair" 0x00000001
   WriteRegStr SHCTX ${APP_UNINST_KEY} "StartMenu" "$SMPROGRAMS\$StartmenuFolder"
@@ -88,7 +88,7 @@ Section -Configure
    # .FCStd
    WriteRegStr SHCTX "Software\Classes\${APP_EXT}" "" "${APP_REGNAME_DOC}"
    WriteRegStr SHCTX "Software\Classes\${APP_EXT}" "Content Type" "${APP_MIME_TYPE}"
-   # SCIFORGE: no thumbnail DLL in System32 (it would replace FreeCAD's), see install.nsh
+   # FISSION180: no thumbnail DLL in System32 (it would replace FreeCAD's), see install.nsh
 
    # Eventually refresh shell icons
    ${RefreshShellIcons}

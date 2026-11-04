@@ -139,9 +139,9 @@ protected:
 
     CoinPtr<SoSwitch> pcPlacement;
 
-    // SCIFORGE: shows or hides the placement indicator under pcPlacement, making it the first
+    // FISSION180: shows or hides the placement indicator under pcPlacement, making it the first
     // time it is shown instead of in attach(): one for every part and datum cost about 8 s
-    // when opening a 300-part assembly (docs/sciforge/core-patches.md #18).
+    // when opening a 300-part assembly (docs/fission180/core-patches.md #18).
     void showPlacementIndicator(bool show);
 
 private:

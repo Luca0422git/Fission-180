@@ -3,9 +3,9 @@ FreeCAD Installer for Windows
 Author: Uwe Stöhr
 Compatible with NSIS 3.x
 
-SCIFORGE: builds the SciForge installer. The scripts take the program's name from the
-program itself (Settings.nsh runs SciForgeCmd.exe), so the install folder, registry keys,
-Start menu entry and uninstaller are all SciForge's own; see docs/sciforge/core-patches.md #13
+FISSION180: builds the Fission 180 installer. The scripts take the program's name from the
+program itself (Settings.nsh runs Fission180Cmd.exe), so the install folder, registry keys,
+Start menu entry and uninstaller are all Fission 180's own; see docs/fission180/core-patches.md #13
 and include/declarations.nsh for what was changed.
 */
 

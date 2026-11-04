@@ -1,9 +1,9 @@
-# SCIFORGE: replaces FreeCAD's PROBLEM_REPORT.yml (core-patches.md #16). The field ids below
+# FISSION180: replaces FreeCAD's PROBLEM_REPORT.yml (core-patches.md #16). The field ids below
 # (what_happened, expected, steps, diagnostics, version, system, extra) are used by
 # Help > Report a Problem to fill the form through the address; do not rename them without
-# changing the dialog (docs/sciforge/dev/briefs/beta-release.md, R2).
+# changing the dialog (docs/fission180/dev/briefs/beta-release.md, R2).
 name: Bug report
-description: Something in SciForge does not work, looks wrong, or crashed.
+description: Something in Fission 180 does not work, looks wrong, or crashed.
 title: "[Bug] "
 labels: ["bug", "beta"]
 body:
@@ -11,12 +11,12 @@ body:
     attributes:
       value: |
         Thank you for helping. The easiest way to fill this in is **Help > Report a Problem**
-        inside SciForge: it opens this form with the details already filled in (your name and
+        inside Fission 180: it opens this form with the details already filled in (your name and
         folders are removed, and you can read everything before it goes anywhere).
 
-        Before you write: the [known issues](https://github.com/Luca0422git/SciForge/blob/develop/docs/sciforge/known-issues.md)
+        Before you write: the [known issues](https://github.com/Luca0422git/Fission-180/blob/develop/docs/fission180/known-issues.md)
         list may already explain it. Questions ("how do I...?") belong in
-        [Discussions](https://github.com/Luca0422git/SciForge/discussions), not here.
+        [Discussions](https://github.com/Luca0422git/Fission-180/discussions), not here.
   - type: textarea
     id: what_happened
     attributes:
@@ -43,8 +43,8 @@ body:
     attributes:
       label: Diagnostics
       description: |
-        Paste the text from **SciForge > Diagnostics** or the text from **Help > Report a Problem**.
-        It holds the version and the recent SciForge messages, which is what lets us find the
+        Paste the text from **Fission 180 > Diagnostics** or the text from **Help > Report a Problem**.
+        It holds the version and the recent Fission 180 messages, which is what lets us find the
         cause. Please do not remove it.
       render: text
     validations:
@@ -52,8 +52,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: SciForge version
-      description: Shown quietly on the Home tab next to "Home", and in the first line of SciForge > Diagnostics.
+      label: Fission 180 version
+      description: Shown quietly on the Home tab next to "Home", and in the first line of Fission 180 > Diagnostics.
       placeholder: 0.1.0-beta
     validations:
       required: true
@@ -74,7 +74,7 @@ body:
       label: Anything else
       description: |
         Your graphics card, the screen scaling (100 / 125 / 150 %), whether OneDrive or Google
-        Drive backs up your Documents folder, your antivirus program. If SciForge saved a report
+        Drive backs up your Documents folder, your antivirus program. If Fission 180 saved a report
         file (Help > Report a Problem > Save report...) or a crash log, drag it into this box.
         Please do not attach a design you do not want to make public: everything on GitHub is
         public.

@@ -1,8 +1,8 @@
-# SCIFORGE: replaces FreeCAD's (it sent people to FreeCAD's forum). Blank issues stay off so
+# FISSION180: replaces FreeCAD's (it sent people to FreeCAD's forum). Blank issues stay off so
 # every report comes in through a form. Questions go to Discussions (the repository's
 # Settings > General > Features > Discussions must be switched on for that link to work).
 blank_issues_enabled: false
 contact_links:
   - name: Questions and help
-    url: https://github.com/Luca0422git/SciForge/discussions
-    about: Ask how something works, or talk about SciForge.
+    url: https://github.com/Luca0422git/Fission-180/discussions
+    about: Ask how something works, or talk about Fission 180.

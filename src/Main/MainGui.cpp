@@ -34,7 +34,7 @@
 #endif  // HAVE_CONFIG_H
 
 #include <Build/Version.h>  // For FCCopyrightYear
-#include "SciForgeBranding.h"  // SCIFORGE: the fork's name, icons and splash (patch #8)
+#include "Fission180Branding.h"  // FISSION180: the fork's name, icons and splash (patch #8)
 
 #include <cstdio>
 #include <map>
@@ -55,8 +55,8 @@
 
 void PrintInitHelp();
 
-// SCIFORGE: the banner credits FreeCAD and names the fork (SciForgeBranding.h, patch #8).
-const auto sBanner = fmt::format(SCIFORGE_BANNER_FORMAT, FCCopyrightYear);
+// FISSION180: the banner credits FreeCAD and names the fork (Fission180Branding.h, patch #8).
+const auto sBanner = fmt::format(FISSION180_BANNER_FORMAT, FCCopyrightYear);
 
 #if defined(_MSC_VER)
 void InitMiniDumpWriter(const std::string&);
@@ -186,30 +186,30 @@ int main(int argc, char** argv)
 #endif
 
     // Name and Version of the Application
-    // SCIFORGE: the fork's identity comes from SciForgeBranding.h. "ExeName" also names the
-    // settings folder, so SciForge and FreeCAD live side by side (patch #8).
-    App::Application::Config()["ExeName"] = SCIFORGE_EXE_NAME;
-    App::Application::Config()["ExeVendor"] = SCIFORGE_VENDOR;
-    App::Application::Config()["SciForgeVersion"] = SCIFORGE_VERSION;
+    // FISSION180: the fork's identity comes from Fission180Branding.h. "ExeName" also names the
+    // settings folder, so Fission 180 and FreeCAD live side by side (patch #8).
+    App::Application::Config()["ExeName"] = FISSION180_EXE_NAME;
+    App::Application::Config()["ExeVendor"] = FISSION180_VENDOR;
+    App::Application::Config()["Fission180Version"] = FISSION180_VERSION;
     App::Application::Config()["AppDataSkipVendor"] = "true";
-    App::Application::Config()["MaintainerUrl"] = SCIFORGE_URL;
+    App::Application::Config()["MaintainerUrl"] = FISSION180_URL;
 
     // set the banner (for logging and console)
     App::Application::Config()["CopyrightInfo"] = sBanner;
-    App::Application::Config()["AppIcon"] = SCIFORGE_APP_ICON;
-    App::Application::Config()["SplashScreen"] = SCIFORGE_SPLASH;
-    App::Application::Config()["AboutImage"] = SCIFORGE_ABOUT_IMAGE;
-    App::Application::Config()["StartWorkbench"] = SCIFORGE_START_WORKBENCH;
+    App::Application::Config()["AppIcon"] = FISSION180_APP_ICON;
+    App::Application::Config()["SplashScreen"] = FISSION180_SPLASH;
+    App::Application::Config()["AboutImage"] = FISSION180_ABOUT_IMAGE;
+    App::Application::Config()["StartWorkbench"] = FISSION180_START_WORKBENCH;
     // App::Application::Config()["HiddenDockWindow"] = "Property editor";
     App::Application::Config()["SplashAlignment"] = "Bottom|Left";
-    App::Application::Config()["SplashTextColor"] = SCIFORGE_SPLASH_TEXT_COLOR;
+    App::Application::Config()["SplashTextColor"] = FISSION180_SPLASH_TEXT_COLOR;
     App::Application::Config()["SplashWarningColor"] = "#CA333B";
-    App::Application::Config()["SplashInfoColor"] = SCIFORGE_SPLASH_INFO_COLOR;
-    App::Application::Config()["SplashInfoPosition"] = SCIFORGE_SPLASH_INFO_POSITION;
+    App::Application::Config()["SplashInfoColor"] = FISSION180_SPLASH_INFO_COLOR;
+    App::Application::Config()["SplashInfoPosition"] = FISSION180_SPLASH_INFO_POSITION;
     // The wordmark is part of the splash picture; only the version number is painted on it.
     App::Application::Config()["SplashInfoExeName"] = "";
-    App::Application::Config()["SplashInfoVersion"] = SCIFORGE_VERSION;
-    App::Application::Config()["DesktopFileName"] = SCIFORGE_DESKTOP_ID;
+    App::Application::Config()["SplashInfoVersion"] = FISSION180_VERSION;
+    App::Application::Config()["DesktopFileName"] = FISSION180_DESKTOP_ID;
 
     try {
         // Init phase ===========================================================

@@ -5,9 +5,9 @@ set -x
 
 conda_env="$(pwd)/../.pixi/envs/default/"
 
-# SCIFORGE: the bundle is SciForge's; the programs are SciForge.exe and SciForgeCmd.exe
-# (docs/sciforge/core-patches.md #12).
-copy_dir="SciForge_Windows"
+# FISSION180: the bundle is Fission 180's; the programs are Fission180.exe and Fission180Cmd.exe
+# (docs/fission180/core-patches.md #12).
+copy_dir="Fission180_Windows"
 mkdir -p ${copy_dir}/bin
 
 # Copy Conda's Python and (U)CRT to FreeCAD/bin
@@ -27,8 +27,8 @@ cp -a ${conda_env}/Library/mingw-w64/bin/* ${copy_dir}/bin
 cp -a ${conda_env}/Library/share ${copy_dir}/share
 # get all the dependency .dlls
 cp -a ${conda_env}/Library/bin/*.dll ${copy_dir}/bin
-# Copy FreeCAD build (SCIFORGE: the programs, then FreeCAD's libraries and Python modules)
-cp -a ${conda_env}/Library/bin/SciForge*.exe ${copy_dir}/bin
+# Copy FreeCAD build (FISSION180: the programs, then FreeCAD's libraries and Python modules)
+cp -a ${conda_env}/Library/bin/Fission180*.exe ${copy_dir}/bin
 cp -a ${conda_env}/Library/bin/FreeCAD* ${copy_dir}/bin
 cp -a ${conda_env}/Library/data ${copy_dir}/data
 cp -a ${conda_env}/Library/Ext ${copy_dir}/Ext
@@ -55,13 +55,13 @@ echo 'Prefix = ../lib/qt6' >> ${copy_dir}/bin/qt6.conf
 # convenient shortcuts to run the binaries
 if [ -x /c/ProgramData/chocolatey/tools/shimgen.exe ]; then
     pushd ${copy_dir}
-    /c/ProgramData/chocolatey/tools/shimgen.exe -p bin/SciForgeCmd.exe -i "$(pwd)/../../../WindowsInstaller/icons/SciForge.ico" -o "$(pwd)/SciForgeCmd.exe"
-    /c/ProgramData/chocolatey/tools/shimgen.exe --gui -p bin/SciForge.exe -i "$(pwd)/../../../WindowsInstaller/icons/SciForge.ico" -o "$(pwd)/SciForge.exe"
+    /c/ProgramData/chocolatey/tools/shimgen.exe -p bin/Fission180Cmd.exe -i "$(pwd)/../../../WindowsInstaller/icons/Fission180.ico" -o "$(pwd)/Fission180Cmd.exe"
+    /c/ProgramData/chocolatey/tools/shimgen.exe --gui -p bin/Fission180.exe -i "$(pwd)/../../../WindowsInstaller/icons/Fission180.ico" -o "$(pwd)/Fission180.exe"
     popd
 fi
 
 python_version=$("${copy_dir}"/bin/python.exe -c 'import platform; print("py" + platform.python_version_tuple()[0] + platform.python_version_tuple()[1])')
-version_name="SciForge_${BUILD_TAG}-Windows-$(uname -m)-${python_version}"  # SCIFORGE
+version_name="Fission180_${BUILD_TAG}-Windows-$(uname -m)-${python_version}"  # FISSION180
 
 echo -e "################"
 echo -e "version_name:  ${version_name}"
@@ -120,7 +120,7 @@ if [[ "${WINDOWS_SIGN_RELEASE:-0}" == "1" ]]; then
     done
 
     # Manually check the important one!
-    signtool verify -pa "$SIGN_DIR/bin/SciForge.exe"
+    signtool verify -pa "$SIGN_DIR/bin/Fission180.exe"
 
     echo "Signing completed."
   else
@@ -130,9 +130,9 @@ else
   echo "Not logged into Azure -- skipping signing."
 fi
 
-echo "Running SciForge command-line smoke test..."
-if ! "$SIGN_DIR/bin/SciForgeCmd.exe" --safe-mode --version; then
-  echo "SciForge command-line smoke test failed; the Windows bundle cannot start."
+echo "Running Fission 180 command-line smoke test..."
+if ! "$SIGN_DIR/bin/Fission180Cmd.exe" --safe-mode --version; then
+  echo "Fission 180 command-line smoke test failed; the Windows bundle cannot start."
   exit 1
 fi
 
@@ -141,7 +141,7 @@ fi
 sha256sum ${version_name}.7z > ${version_name}.7z-SHA256.txt
 
 if [ "${MAKE_INSTALLER}" == "true" ]; then
-    # SCIFORGE: the installer is made by make_installer.sh (short drive letter, see there)
+    # FISSION180: the installer is made by make_installer.sh (short drive letter, see there)
     bash make_installer.sh "${version_name}"
     echo "Created installer ${version_name}-installer.exe"
     # See if we can sign the installer exe as well:

@@ -1,22 +1,22 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# SCIFORGE: the programs are called SciForge and SciForgeCmd (SCIFORGE_APP_NAME from
-# InitializeFreeCADBuildOptions.cmake) and carry SciForge's icon and version strings; the
-# CMake targets keep FreeCAD's names (docs/sciforge/core-patches.md #9).
-set(SCIFORGE_WIN_ICON "sciforge.ico")
+# FISSION180: the programs are called Fission 180 and Fission180Cmd (FISSION180_APP_NAME from
+# InitializeFreeCADBuildOptions.cmake) and carry Fission 180's icon and version strings; the
+# CMake targets keep FreeCAD's names (docs/fission180/core-patches.md #9).
+set(FISSION180_WIN_ICON "fission180.ico")
 configure_file(freecad.rc.cmake ${CMAKE_CURRENT_BINARY_DIR}/freecad.rc)
 configure_file(freecadCmd.rc.cmake ${CMAKE_CURRENT_BINARY_DIR}/freecadCmd.rc)
-file(COPY ${SCIFORGE_WIN_ICON} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-# SCIFORGE: SciForge's own version ("0.1.0-beta", from src/Mod/SciForge/VERSION) for the
-# programs' About box, splash and the installer (SciForgeBranding.h, core-patches.md #15).
-add_compile_definitions(SCIFORGE_VERSION="${SCIFORGE_VERSION}")
+file(COPY ${FISSION180_WIN_ICON} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# FISSION180: Fission 180's own version ("0.1.0-beta", from src/Mod/Fission180/VERSION) for the
+# programs' About box, splash and the installer (Fission180Branding.h, core-patches.md #15).
+add_compile_definitions(FISSION180_VERSION="${FISSION180_VERSION}")
 
 ######################## FreeCADMain ########################
 if(BUILD_GUI)
 
     SET(FreeCAD_SRCS
         ${CMAKE_CURRENT_BINARY_DIR}/freecad.rc
-        ${SCIFORGE_WIN_ICON}
+        ${FISSION180_WIN_ICON}
         MainGui.cpp
     )
 
@@ -38,7 +38,7 @@ if(BUILD_GUI)
         target_compile_warn_error(FreeCADMain)
     endif()
 
-    SET_BIN_DIR(FreeCADMain ${SCIFORGE_APP_NAME})  # SCIFORGE: SciForge.exe / sciforge (#9)
+    SET_BIN_DIR(FreeCADMain ${FISSION180_APP_NAME})  # FISSION180: Fission180.exe / fission180 (#9)
 
     if(WIN32)
         INSTALL(TARGETS FreeCADMain
@@ -60,7 +60,7 @@ endif(BUILD_GUI)
 
 SET(FreeCADMainCmd_SRCS
     ${CMAKE_CURRENT_BINARY_DIR}/freecadCmd.rc
-    ${SCIFORGE_WIN_ICON}
+    ${FISSION180_WIN_ICON}
     MainCmd.cpp
 )
 
@@ -87,7 +87,7 @@ if (FREECAD_WARN_ERROR)
     target_compile_warn_error(FreeCADMainCmd)
 endif()
 
-SET_BIN_DIR(FreeCADMainCmd ${SCIFORGE_APP_NAME}Cmd)  # SCIFORGE: SciForgeCmd.exe / sciforgecmd (#9)
+SET_BIN_DIR(FreeCADMainCmd ${FISSION180_APP_NAME}Cmd)  # FISSION180: Fission180Cmd.exe / fission180cmd (#9)
 
 if(WIN32)
     INSTALL(TARGETS FreeCADMainCmd

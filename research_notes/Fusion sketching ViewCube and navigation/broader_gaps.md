@@ -15,7 +15,7 @@ Researched 2026-10-12. How to read the source tags:
 ## 1. Components and assemblies: components vs bodies, New Component, activation, browser tree, external (linked) components, Insert into Current Design
 
 ### Takeaway
-Fusion builds assemblies inside one design file. Components are containers that own bodies, sketches and construction geometry. One component is "active" at a time, and new geometry goes into it. Other designs can be inserted as linked (XREF) components, and a link can be broken. FreeCAD 1.1 has a separate Assembly workbench that works bottom-up with links, plus Part containers. A Fusion-style "one design, many components, activate one" workflow has to be built by SciForge on top of those pieces.
+Fusion builds assemblies inside one design file. Components are containers that own bodies, sketches and construction geometry. One component is "active" at a time, and new geometry goes into it. Other designs can be inserted as linked (XREF) components, and a link can be broken. FreeCAD 1.1 has a separate Assembly workbench that works bottom-up with links, plus Part containers. A Fusion-style "one design, many components, activate one" workflow has to be built by Fission 180 on top of those pieces.
 
 ### Cited Findings
 - **[3rd-party]** Bodies are raw geometry. They cannot be jointed, are hard to reuse, and have no timeline of their own. Components are containers that can be jointed and reused, and each has its own browser node and timeline. You create one by right-clicking the top-level design, or an existing component in the browser, and choosing New Component. — [Fab Academy Fusion notes](https://fabacademy.org/2026/labs/kochi/students/merin-cyriac/Assignments/Week_02/Fusion.html)
@@ -31,8 +31,8 @@ Fusion builds assemblies inside one design file. Components are containers that 
 - **[3rd-party]** In practice the FreeCAD 1.0 Assembly workbench is bottom-up: insert parts as links, ground one, add joints, then test motion, explode and make a BOM. — [LibreArts: FreeCAD 1.0](https://librearts.org/2024/11/freecad-1-0/)
 
 ### Inferences
-- **[Inference]** The biggest conceptual gap is that Fusion users think "one design file, many components, the timeline spans all of them", while FreeCAD separates "Part/Body modeling" from "Assembly". SciForge needs a "Component" concept that maps to an App::Part (or Assembly) node containing a Body, has an "active component" marker, and routes new sketches and features into the active component's Body.
-- **[Inference]** "Insert into Current Design" maps naturally onto FreeCAD's App::Link to another .FCStd file. Today that requires the file to be open, so SciForge should open it hidden on its own. "Break Link" maps onto copying the linked object into the document.
+- **[Inference]** The biggest conceptual gap is that Fusion users think "one design file, many components, the timeline spans all of them", while FreeCAD separates "Part/Body modeling" from "Assembly". Fission 180 needs a "Component" concept that maps to an App::Part (or Assembly) node containing a Body, has an "active component" marker, and routes new sketches and features into the active component's Body.
+- **[Inference]** "Insert into Current Design" maps naturally onto FreeCAD's App::Link to another .FCStd file. Today that requires the file to be open, so Fission 180 should open it hidden on its own. "Break Link" maps onto copying the linked object into the document.
 - **[Inference]** Ownership-only activation (a feature in one component can cut bodies in other components) has to be mirrored. Otherwise cross-component cuts, which robotics brackets often need (for example, a servo pocket cut by the servo model), will be blocked.
 
 ### Gaps
@@ -79,7 +79,7 @@ Fusion's Joint command positions and constrains one component against another wi
 - **[GitHub issue]** A dev build crashed on belt, gear and rack-and-pinion joints. The report is old and may already be fixed. — [FreeCAD issue #14458](https://github.com/FreeCAD/FreeCAD/issues/14458)
 
 ### Inferences
-- **[Inference]** The minimum viable Fusion-style joint workflow for a robot arm is: Ground the base, join each link with Revolute, set angle limits, then drag or "Drive Joints" to pose it. The FreeCAD 1.1 solver can already do every one of these steps. The work for SciForge is mostly UX:
+- **[Inference]** The minimum viable Fusion-style joint workflow for a robot arm is: Ground the base, join each link with Revolute, set angle limits, then drag or "Drive Joints" to pose it. The FreeCAD 1.1 solver can already do every one of these steps. The work for Fission 180 is mostly UX:
   - A single Joint dialog where component 1 moves to component 2.
   - Hover-snap keypoints (face centre, edge midpoint, circle centre, vertices), with Ctrl to lock a face.
   - Motion type chosen after picking, with an animated preview.
@@ -87,7 +87,7 @@ Fusion's Joint command positions and constrains one component against another wi
   - Joints, Ground and Rigid Groups shown in the browser and timeline.
 - **[Inference]** Pin-slot can be built by mapping it onto existing solver primitives (cylindrical plus an in-plane constraint, or a Distance-type combination). Planar can be built the same way. As-built joints amount to "do not pre-solve placement; record the current relative placement as the joint offset". Rigid Group amounts to several Fixed joints, or a sub-assembly treated as rigid (FreeCAD has an "AssemblyLinkRigid" icon, which suggests rigid sub-assembly links already exist).
 - **[Inference]** Contact sets need collision detection during drag. That is the costliest feature and the least needed by hobbyists, so defer it.
-- **[Inference]** Fusion's Capture Position / Revert maps onto FreeCAD placements that the solver resets. SciForge would need a "position state" that is temporary until captured.
+- **[Inference]** Fusion's Capture Position / Revert maps onto FreeCAD placements that the solver resets. Fission 180 would need a "position state" that is temporary until captured.
 
 ### Gaps
 - No official text on "Drive Joints" dialog fields or "Motion Link" dialog fields. Unverified recollection: Drive Joints takes one joint and a value (angle or distance) and snaps the joint to it. Motion Link takes 2 joints, with a distance/angle per joint and an Animate button. The Joint dialog has a "Motion" tab with an animate preview.
@@ -99,7 +99,7 @@ Fusion's Joint command positions and constrains one component against another wi
 ## 3. Files and versions: cloud data panel, version history, autosave/recovery, and what a local-first replacement must offer
 
 ### Takeaway
-Fusion keeps every design in the cloud, inside projects. Every save creates a new version in a version history. Fusion autosaves backups locally once a file has been saved at least once, and offers recovered documents after a crash. Offline work is limited to cached files. FreeCAD is local-file based, with 15-minute autosave, crash recovery and one backup file by default, but it has no version history. A local-first SciForge should copy Fusion's "versions on every save, browsable and restorable" without a cloud.
+Fusion keeps every design in the cloud, inside projects. Every save creates a new version in a version history. Fusion autosaves backups locally once a file has been saved at least once, and offers recovered documents after a crash. Offline work is limited to cached files. FreeCAD is local-file based, with 15-minute autosave, crash recovery and one backup file by default, but it has no version history. A local-first Fission 180 should copy Fusion's "versions on every save, browsable and restorable" without a cloud.
 
 ### Cited Findings
 - **[Forum]** Fusion autosaves backups at an interval set in Preferences, but only after the design has been saved once with a project and name. Unsaved work after a crash shows up in a recovered-documents list under the File menu. — [Forum: recently saved models](https://forums.autodesk.com/t5/fusion-support-forum/can-t-access-recently-saved-models/td-p/7256251)
@@ -128,7 +128,7 @@ Fusion keeps every design in the cloud, inside projects. Every save creates a ne
 ## 4. Direct modeling (capture design history off) and editing imported STEP bodies
 
 ### Takeaway
-Imported STEP files come into Fusion as "direct" models with no history, and users edit them with Press Pull, Move Face and Delete Face. History capture can be switched on later from the browser's root node, and recording starts from that moment. In FreeCAD, an imported STEP file is a static Part feature. Editing it means PartDesign features on a BaseFeature, or Part Defeaturing. The SciForge Press Pull already covers part of this.
+Imported STEP files come into Fusion as "direct" models with no history, and users edit them with Press Pull, Move Face and Delete Face. History capture can be switched on later from the browser's root node, and recording starts from that moment. In FreeCAD, an imported STEP file is a static Part feature. Editing it means PartDesign features on a BaseFeature, or Part Defeaturing. The Fission 180 Press Pull already covers part of this.
 
 ### Cited Findings
 - **[Autodesk blog]** Imported models are created as direct models, so the operations performed are not captured as history. Direct modeling is good for small changes to imported geometry. To capture history, right-click the base node in the browser and choose Capture Design History. — [Autodesk blog post 426](https://www.autodesk.com/products/fusion-360/blog/wp-json/wp/v2/posts/426)
@@ -138,7 +138,7 @@ Imported STEP files come into Fusion as "direct" models with no history, and use
 - **[FreeCAD source]** FreeCAD 1.1.4 has `Part_Defeaturing` (remove selected faces and heal), `Part_Thickness`, `Part_Offset` and `Part_RefineShape`. Together these are FreeCAD's building blocks for face-level editing of dumb solids. — `src/Mod/Part/Gui/Command*.cpp` (grep of `Command("Part_...")`)
 
 ### Inferences
-- **[Inference]** For hobbyists the main use is editing a downloaded STEP of a servo, motor or bracket: add a hole, delete a fillet, shorten a tab. SciForge should:
+- **[Inference]** For hobbyists the main use is editing a downloaded STEP of a servo, motor or bracket: add a hole, delete a fillet, shorten a tab. Fission 180 should:
   - Import STEP straight into a component, as a Body with a BaseFeature.
   - Let Press Pull, Delete Face, Move Face, Hole and Fillet work on it.
   - Optionally offer a per-document "do not capture history" switch, though this is low value. Fusion users mostly hit it only by accident through imports.
@@ -275,7 +275,7 @@ FreeCAD 1.1 has box selection with a similar left/right meaning for faces, and a
 ## 9. Display: visual styles, appearance, physical materials, section view, environment
 
 ### Takeaway
-Fusion separates **physical material** (density for mass and centre of mass, used by Simulation and CAM) from **appearance** (visual only, overrides the material's colour). It also has visual styles (Shaded, Shaded with Hidden Edges, Shaded with Visible Edges Only, Wireframe variants) and preset lighting environments. FreeCAD 1.1 has the Material system, appearance and draw styles, clip planes and three-point lighting. SciForge already has appearance and material dialogs, so the remaining work is visual-style presets and environment polish.
+Fusion separates **physical material** (density for mass and centre of mass, used by Simulation and CAM) from **appearance** (visual only, overrides the material's colour). It also has visual styles (Shaded, Shaded with Hidden Edges, Shaded with Visible Edges Only, Wireframe variants) and preset lighting environments. FreeCAD 1.1 has the Material system, appearance and draw styles, clip planes and three-point lighting. Fission 180 already has appearance and material dialogs, so the remaining work is visual-style presets and environment polish.
 
 ### Cited Findings
 - **[Official]** Appearances override the colour assigned by the physical material and do not affect engineering properties. Render setup handles materials, appearances, texture maps, lighting environment and decals. — [Fusion help: appearances](https://help.autodesk.com/cloudhelp/ENU/Fusion-Render/files/RND-MATS-APPEARANCES.htm)
@@ -316,7 +316,7 @@ FreeCAD has recompute, expressions in inputs (the `=` key) and Draft ShapeString
 ### Inferences
 - **[Inference]** Priority order:
   1. Sketch Text with Text on Path, plus Emboss/Deboss onto flat and curved faces. Makers label printed parts and robot links.
-  2. Expressions and parameter names in every SciForge dialog value box, which may already be partly done through Change Parameters.
+  2. Expressions and parameter names in every Fission 180 dialog value box, which may already be partly done through Change Parameters.
   3. Find in Browser and Find in Timeline, via right-click on geometry: highlight the owning feature.
   4. Compute All (Ctrl+B) mapped to recompute-all with an error summary.
 
@@ -368,7 +368,7 @@ Drawings, surfacing, decals, environments and contact sets come last. This is mo
   10. **Drawings:** base and projected views, dimensions, PDF/DXF.
   11. **Surface basics:** Patch, Stitch, Thicken, Trim.
   12. **Decals, environments, contact sets.**
-- **[Inference]** Much of the heavy lifting already exists in FreeCAD 1.1.4: the Ondsel solver, joint limits, simulation, BOM, exploded views, TechDraw and the mesh/STEP/3MF/DXF I/O. SciForge's remaining work is mostly Fusion-style UX layers over those engines, not new geometry kernels. The exceptions are contact sets (collision) and prismatic mesh conversion.
+- **[Inference]** Much of the heavy lifting already exists in FreeCAD 1.1.4: the Ondsel solver, joint limits, simulation, BOM, exploded views, TechDraw and the mesh/STEP/3MF/DXF I/O. Fission 180's remaining work is mostly Fusion-style UX layers over those engines, not new geometry kernels. The exceptions are contact sets (collision) and prismatic mesh conversion.
 
 ### Gaps
 - No survey data found on which Fusion workspaces hobbyists actually use. The ranking above is reasoned, not measured.

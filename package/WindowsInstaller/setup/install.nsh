@@ -17,10 +17,10 @@ Section -ProgramFiles SecProgramFiles
   SetDetailsPrint textonly
   ${If} $RemoveInstDir == "true"
     ${DetailPrintToBoth} "Cleaning install folder '$INSTDIR'"
-    # SCIFORGE: RMDir /r deleted file after file and gave up at the first one in use (SciForge's
-    # AI connector), leaving no working SciForge; the folder is now moved aside in one step
-    # first, after stopping the connector (include/utils.nsh, docs/sciforge/core-patches.md #19)
-    Call SciForgeReplaceInstDir
+    # FISSION180: RMDir /r deleted file after file and gave up at the first one in use (Fission 180's
+    # AI connector), leaving no working Fission 180; the folder is now moved aside in one step
+    # first, after stopping the connector (include/utils.nsh, docs/fission180/core-patches.md #19)
+    Call Fission180ReplaceInstDir
   ${EndIf}
 
   # turn on logging
@@ -65,9 +65,9 @@ Section -ProgramFiles SecProgramFiles
   ${DetailPrintToBoth} "Extracting files to '$INSTDIR\Mod\'"
   SetOutPath "$INSTDIR\Mod"
   File /r "${FILES_FREECAD}\Mod\*.*"
-  # SCIFORGE: FreeCAD's Explorer thumbnail DLL is not shipped: it registers system-wide
+  # FISSION180: FreeCAD's Explorer thumbnail DLL is not shipped: it registers system-wide
   # (System32\FCStdThumbnail.dll) and would replace or remove a FreeCAD installation's
-  # (docs/sciforge/core-patches.md #13).
+  # (docs/fission180/core-patches.md #13).
 
   SetDetailsPrint both
   DetailPrint "Writing uninstaller to '$INSTDIR'"

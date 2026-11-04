@@ -1,15 +1,15 @@
-# SciForge note
+# Fission 180 note
 
-SCIFORGE: this folder builds the **SciForge** installer (docs/sciforge/core-patches.md #13).
+FISSION180: this folder builds the **Fission180** installer (docs/fission180/core-patches.md #13).
 The scripts take the program's name from the program itself (`Settings.nsh` runs
-`SciForgeCmd.exe`, which reports `ExeName` = SciForge), so the install folder
-(`Program Files\SciForge`), the registry keys (`SOFTWARE\SciForge114`, the uninstall entry),
-the `SciForge.Document` class and the settings folder (`%APPDATA%\SciForge`) are SciForge's own:
+`Fission180Cmd.exe`, which reports `ExeName` = Fission 180), so the install folder
+(`Program Files\Fission180`), the registry keys (`SOFTWARE\Fission180114`, the uninstall entry),
+the `Fission180.Document` class and the settings folder (`%APPDATA%\Fission180`) are Fission 180's own:
 a FreeCAD installed on the same machine is not touched. Differences from FreeCAD's installer:
 the .FCStd file association is off by default, the Explorer thumbnail DLL is not shipped (it
-registers system-wide), the installer is English only, and the icon and pictures are SciForge's
-(`icons/SciForge.ico`, `graphics/sciforge-*.bmp`, made by `tools/sciforge/make_app_icons.py`).
-CI builds it in `.github/workflows/sciforge-build.yml` through
+registers system-wide), the installer is English only, and the icon and pictures are Fission 180's
+(`icons/Fission180.ico`, `graphics/fission180-*.bmp`, made by `tools/fission180/make_app_icons.py`).
+CI builds it in `.github/workflows/fission180-build.yml` through
 `package/rattler-build/windows/create_bundle.sh`. The instructions below are FreeCAD's.
 
 # Creating a Windows installer for FreeCAD

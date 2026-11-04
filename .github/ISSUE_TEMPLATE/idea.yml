@@ -1,15 +1,15 @@
-# SCIFORGE: a short form for ideas (docs/sciforge/dev/briefs/beta-release.md, R1).
+# FISSION180: a short form for ideas (docs/fission180/dev/briefs/beta-release.md, R1).
 name: Idea or request
-description: Something SciForge should do, or do differently.
+description: Something Fission 180 should do, or do differently.
 title: "[Idea] "
 labels: ["idea"]
 body:
   - type: markdown
     attributes:
       value: |
-        SciForge aims to work the way Fusion users expect. If your idea is "Fusion does X like
+        Fission 180 aims to work the way Fusion users expect. If your idea is "Fusion does X like
         this", say what you do in Fusion, step by step. Questions about how something works
-        belong in [Discussions](https://github.com/Luca0422git/SciForge/discussions).
+        belong in [Discussions](https://github.com/Luca0422git/Fission-180/discussions).
   - type: textarea
     id: idea
     attributes:

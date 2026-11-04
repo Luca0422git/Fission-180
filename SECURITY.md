@@ -1,19 +1,19 @@
 # Security Policy
 
-SciForge is a free, open-source project run by one person (see the [README](README.md)). If you find a
-security problem in SciForge itself, please do not post it publicly in an issue.
+Fission 180 is a free, open-source project run by one person (see the [README](README.md)). If you find a
+security problem in Fission 180 itself, please do not post it publicly in an issue.
 
 ## How to report
 
 Use GitHub's private reporting: open the repository's **Security** tab and click **Report a vulnerability**
-(https://github.com/Luca0422git/SciForge/security/advisories/new). If that button is not there, open a normal
+(https://github.com/Luca0422git/Fission-180/security/advisories/new). If that button is not there, open a normal
 issue that says only "I found a security problem, how can I tell you privately?" and leave out the details.
 
 There is no bounty program.
 
 ## Supported versions
 
-Only the newest release (and the `develop` branch) gets fixes. SciForge is in beta.
+Only the newest release (and the `develop` branch) gets fixes. Fission 180 is in beta.
 
 | Version       | Supported          |
 |---------------|--------------------|
@@ -21,5 +21,5 @@ Only the newest release (and the `develop` branch) gets fixes. SciForge is in be
 
 ## FreeCAD's own code
 
-SciForge is based on FreeCAD. A problem that is in FreeCAD itself (not in SciForge's additions) is best
+Fission 180 is based on FreeCAD. A problem that is in FreeCAD itself (not in Fission 180's additions) is best
 reported to the FreeCAD project: https://github.com/FreeCAD/FreeCAD/security/advisories/new

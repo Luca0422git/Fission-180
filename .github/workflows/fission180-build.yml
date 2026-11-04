@@ -1,0 +1,533 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Fission 180: full build of the fork (C++ and all), producing files Luca downloads and tests:
+#   Windows: the installer (Fission180_...-installer.exe: Program Files\Fission180, Start menu
+#            entry, uninstaller; installs next to FreeCAD) and the portable .7z (unzip
+#            anywhere, run bin\Fission180.exe)
+#   Linux:   .AppImage
+# Before compiling, quick checks (about 10 minutes): every Fission 180 file is installed, the
+# unit tests, and the golden models on the official FreeCAD for Windows. A problem they can
+# find must not cost hours of compiling first.
+# After compiling, the build is uploaded first and then tested (golden models on the built
+# Fission 180): a failing test marks the run red but no longer throws the build away, since a
+# Python problem is fixed by the quick update on top. The GUI scenarios then run on the
+# built Linux AppImage in parallel (4 parts).
+#
+# Started by hand: GitHub > Actions > "Fission 180 build" > Run workflow. It is not run on
+# every push because a build takes hours (free on this public repository, but slow).
+# Pushing a tag named fission180-v* also starts it.
+#
+# Publishing (brief docs/fission180/dev/briefs/beta-release.md, R3): the last job, "release",
+# makes fission180-release.json, SHA256SUMS.txt and the release notes and, ONLY for a tag
+# (fission180-v<version>, which must match src/Mod/Fission180/VERSION), creates the GitHub Release
+# with the installer, the portable build, the AppImage, the quick update and those files
+# (a pre-release when the version has -beta, -rc...). A run started by hand on a branch does
+# everything except that last step and prints what it would have published (the run summary,
+# and the artifact "release-files"): that is the dry run. It is the only job with write
+# permission (contents: write).
+#
+# Packaging reuses FreeCAD's own pipeline (package/rattler-build, package/WindowsInstaller),
+# rebranded by the branding pass (docs/fission180/core-patches.md #8 to #13): the program is
+# Fission180.exe, settings live in %APPDATA%\Fission180, the installer uses its own registry
+# keys, so a real FreeCAD on the same machine is not touched.
+
+name: Fission 180 build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which platforms to build"
+        type: choice
+        default: both
+        options: [both, windows, linux]
+      publish:
+        description: >-
+          Publish the GitHub Release. Only a run on a TAG can publish (choose the tag in "Use
+          workflow from"); on a branch nothing is published whatever this says.
+        type: boolean
+        default: false
+  push:
+    tags: ["fission180-v*"]
+
+# One build per branch and platform choice: a Windows-only build does not cancel a
+# running build of both.
+concurrency:
+  group: fission180-build-${{ github.ref }}-${{ github.event.inputs.platforms || 'both' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The core id: which compiled part this commit has (the last commit that changed anything
+  # outside Fission 180's own module and the docs). Written into the build and into the release's
+  # fission180-release.json: a module-only update is safe only when both ids are the same.
+  # Needs the whole history of those paths (a partial clone: commits and folders, no files).
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      core: ${{ steps.id.outputs.core }}
+    steps:
+      - name: Checkout (all history, no file contents)
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: tools/fission180
+          submodules: false
+
+      - name: Core id
+        id: id
+        run: |
+          core="$(tools/fission180/core_id.sh)"
+          echo "core id: ${core}"
+          echo "core=${core}" >> "$GITHUB_OUTPUT"
+
+  # A minute before hours of compiling: every Fission 180 file must be in the install rules
+  # (run #2 compiled for 4 hours and then lacked 81 of 116 Fission 180 modules).
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Every Fission 180 file is installed by the build
+        run: tools/fission180/check_install.sh
+
+      - name: Unit tests
+        run: tools/fission180/run_tests.sh --only unit --out test-output
+
+  # The golden models on the official FreeCAD for Windows (about 10 minutes): run #3
+  # compiled for 3 hours and then failed 2 golden models only Windows fails.
+  check-windows:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Cache FreeCAD for Windows
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .fission180-cache/freecad-windows
+          key: freecad-windows-1.1.4
+
+      - name: Golden models on FreeCAD for Windows
+        env:
+          FREECAD_VERSION: "1.1.4"
+        run: bash tools/fission180/windows_golden.sh --stock .fission180-cache/freecad-windows test-output
+
+      - name: Add golden report to the run summary
+        if: always()
+        run: |
+          if [ -f test-output/golden-report.md ]; then cat test-output/golden-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+  matrix:
+    needs: [check, check-windows]
+    runs-on: ubuntu-24.04
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+      - id: pick
+        env:
+          CHOICE: ${{ github.event.inputs.platforms || 'both' }}
+        run: |
+          win='{"target":"win-64","os":"windows-2022"}'
+          lin='{"target":"linux-64","os":"ubuntu-22.04"}'
+          case "$CHOICE" in
+            windows) echo "include=[$win]" >> "$GITHUB_OUTPUT" ;;
+            linux) echo "include=[$lin]" >> "$GITHUB_OUTPUT" ;;
+            *) echo "include=[$win,$lin]" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  build:
+    needs: [matrix, core]
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 350
+    steps:
+      # Prevent running out of disk space on Ubuntu runners.
+      - name: Maximize build space
+        if: runner.os == 'Linux'
+        uses: AdityaGarg8/remove-unwanted-software@90e01b21170618765a73370fcc3abbd1684a7793 # v5
+        with:
+          remove-android: 'true'
+          remove-cached-tools: 'true'
+
+      - name: Use drive D for caches (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo 'PIXI_CACHE_DIR=D:\rattler' >> "$GITHUB_ENV"
+          echo 'RATTLER_CACHE_DIR=D:\rattler' >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      # The file names are Fission180_<build>-Windows-x86_64-py311.7z / -installer.exe and
+      # Fission180_<build>-Linux-x86_64-py311.AppImage: the date and commit, or the tag's name.
+      - name: Build name
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#fission180-}"
+          else
+            tag="$(date -u +%Y%m%d)-${GITHUB_SHA::8}"
+          fi
+          echo "BUILD_TAG=${tag}" >> "$GITHUB_ENV"
+
+      # Which build this is, for Fission 180 > Diagnostics (commit, date) and for the update check
+      # (core id: fission180/core_info.py). The build installs fission180/*.py from this folder.
+      - name: Write the build ids into the Fission 180 module
+        shell: bash
+        env:
+          CORE_ID: ${{ needs.core.outputs.core }}
+        run: bash tools/fission180/write_build_info.sh --module src/Mod/Fission180 --commit "$GITHUB_SHA" --date "$(date -u +%Y-%m-%d)" --core "$CORE_ID"
+
+      - uses: prefix-dev/setup-pixi@82d477f15f3a381dbcc8adc1206ce643fe110fb7 # v0.9.3
+        with:
+          pixi-version: v0.59.0
+          cache: false
+          run-install: false
+          # The runner is thrown away after the job; the clean-up that deletes pixi.exe failed
+          # with EPERM (file in use) on the fission180-v0.1.0-beta build and turned a green
+          # Windows build red, so the release was skipped.
+          post-cleanup: false
+
+      # ---- Windows: compile cache kept between builds -----------------------
+      # FreeCAD already compiles through ccache (ccache is in the recipe and FreeCAD's
+      # CMakeLists uses it when found), but its cache was thrown away with the machine, so
+      # every build compiled everything (about 3 hours). It is now kept with GitHub's cache:
+      # a later build only compiles the C++ files that changed. The first build fills it.
+      # Every cache step may fail without failing the build: ccache then compiles as before.
+      # The cache folder is set in ccache's system-wide config file, which the build reads
+      # whatever environment pixi and rattler-build pass on to it.
+      - name: Compile cache settings (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          conf="$(cygpath -u "${ALLUSERSPROFILE:-C:\ProgramData}")/ccache"
+          mkdir -p "$conf"
+          printf 'cache_dir = D:/ccache\nmax_size = 4G\n' > "$conf/ccache.conf"
+          cat "$conf/ccache.conf"
+
+      - name: Restore the compile cache (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 20
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: D:\ccache
+          key: ccache-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ccache-${{ matrix.target }}-
+
+      - name: Compile cache before compiling (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          pixi exec --spec ccache -- ccache --zero-stats
+          pixi exec --spec ccache -- ccache --show-config | grep -E "cache_dir|max_size" || true
+          du -sh /d/ccache 2>/dev/null || echo "[Fission 180] no compile cache yet (this build fills it)"
+
+      - name: Compile Fission 180 (takes a long time)
+        id: compile
+        shell: bash
+        env:
+          TARGET_PLATFORM: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python3 package/scripts/write_version_info.py ../freecad_version.txt
+          cd package/rattler-build
+          pixi install
+
+      # Right after compiling, also when compiling failed or was stopped: a later failing
+      # test must not lose 3 hours of cache.
+      - name: Save the compile cache (Windows)
+        if: always() && runner.os == 'Windows' && steps.compile.outcome != 'skipped' && github.ref_type == 'branch'
+        continue-on-error: true
+        timeout-minutes: 20
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: D:\ccache
+          key: ccache-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Compile cache statistics (Windows)
+        if: always() && runner.os == 'Windows' && steps.compile.outcome != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          pixi exec --spec ccache -- ccache --show-stats --verbose
+          du -sh /d/ccache 2>/dev/null || true
+
+      # Windows: the portable .7z and then the NSIS installer from the same folder
+      # (package/rattler-build/windows/create_bundle.sh, package/WindowsInstaller).
+      - name: Package
+        shell: bash
+        env:
+          TARGET_PLATFORM: ${{ matrix.target }}
+          MAKE_INSTALLER: "true"
+          UPLOAD_RELEASE: "false"
+        run: |
+          set -euo pipefail
+          cd package/rattler-build
+          pixi run -e package create_bundle
+
+      # ---- Linux: upload the built AppImage, then test it ----------------
+      # Uploaded first: a failing test must not throw away an hour of compiling.
+      # The scenarios (about 2 hours on one machine) run afterwards in the "scenarios" job.
+      - name: Upload Linux AppImage
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: Fission180-Linux-${{ env.BUILD_TAG }}
+          path: |
+            package/rattler-build/linux/Fission180_*.AppImage
+            package/rattler-build/linux/*-SHA256.txt
+          retention-days: 30
+          compression-level: 0
+          # a re-run of a failed job uploads again under the same name
+          overwrite: true
+
+      - name: Test the Linux build (unit, golden models, GUI smoke and journey)
+        if: runner.os == 'Linux'
+        run: |
+          tools/fission180/gui_env.sh --install
+          image=$(ls package/rattler-build/linux/Fission180_*.AppImage | head -1)
+          mkdir -p .fission180-cache/fission180
+          (cd .fission180-cache/fission180 && "$GITHUB_WORKSPACE/$image" --appimage-extract >/dev/null)
+          tools/fission180/run_tests.sh --freecad .fission180-cache/fission180 --out test-output --only base
+
+      # ---- Windows: upload the installer and the portable build, then test ---
+      # Uploaded first: a failing test must not throw away 3 hours of compiling (run #3).
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: Fission180-Windows-installer-${{ env.BUILD_TAG }}
+          path: |
+            package/rattler-build/windows/*-installer.exe
+            package/rattler-build/windows/*-installer.exe-SHA256.txt
+          retention-days: 30
+          compression-level: 0
+          # a re-run of a failed job uploads again under the same name
+          overwrite: true
+
+      - name: Upload Windows portable build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: Fission180-Windows-portable-${{ env.BUILD_TAG }}
+          path: |
+            package/rattler-build/windows/*.7z
+            package/rattler-build/windows/*.7z-SHA256.txt
+          retention-days: 30
+          compression-level: 0
+          # a re-run of a failed job uploads again under the same name
+          overwrite: true
+
+      - name: Test the Windows build (golden models)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: bash tools/fission180/windows_golden.sh --built package/rattler-build/windows test-output
+
+      # Fission 180: the installer over a running AI connector and over a file in use, and the
+      # uninstaller: never half a Fission 180 (docs/fission180/core-patches.md #19)
+      - name: Test the Windows installer (install over a running AI connector)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem package/rattler-build/windows/*-installer.exe | Select-Object -First 1
+          tools/fission180/test_installer.ps1 -Installer $exe.FullName
+
+      - name: Add golden report to the run summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f test-output/golden-report.md ]; then cat test-output/golden-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: test-output-${{ matrix.target }}
+          path: test-output/
+          retention-days: 30
+
+  # The GUI scenarios on the built Linux AppImage, in 9 parts side by side (as fission180-tests.yml). They test the
+  # C++ fixes through the interface; the uploads above do not wait for them. The same machine
+  # image and GUI environment (tools/fission180/gui_env.sh) as the tests workflow's scenario parts,
+  # so a scenario green there is green here unless the compiled program differs. A failed part
+  # can be run again on its own (Re-run failed jobs): it downloads this run's AppImage again,
+  # nothing is compiled (docs/fission180/dev/gui-tests.md).
+  scenarios:
+    needs: [matrix, build]
+    if: ${{ !cancelled() && contains(needs.matrix.outputs.include, 'linux-64') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/9", "2/9", "3/9", "4/9", "5/9", "6/9", "7/9", "8/9", "9/9"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Get the AppImage built above
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'Fission180-Linux-*' --dir built || true
+          image=$(find built -name 'Fission180_*.AppImage' 2>/dev/null | head -1)
+          if [ -z "$image" ]; then
+            echo "::error::No Linux AppImage in this run: the Linux build did not finish (see its own log), so the scenarios cannot run."
+            exit 1
+          fi
+          chmod +x "$image"
+          mkdir -p .fission180-cache/fission180
+          (cd .fission180-cache/fission180 && "$GITHUB_WORKSPACE/$image" --appimage-extract >/dev/null)
+
+      - name: Scenarios ${{ matrix.shard }}
+        run: |
+          tools/fission180/gui_env.sh --install
+          tools/fission180/run_tests.sh --freecad .fission180-cache/fission180 --out test-output --only scenarios --shard ${{ matrix.shard }}
+
+      - name: Name of the reports
+        if: always()
+        run: echo "PART=$(echo '${{ matrix.shard }}' | cut -d/ -f1)" >> "$GITHUB_ENV"
+
+      - name: Upload scenario reports
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: scenarios-linux-${{ env.PART }}
+          path: test-output/
+          retention-days: 14
+
+  # The GitHub Release. Needs both builds (their uploads are the files); everything but the last
+  # step also runs on a manual run on a branch, as a dry run that prints the notes and the
+  # json. The only job that may write to the repository.
+  release:
+    needs: [core, matrix, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    env:
+      CORE_ID: ${{ needs.core.outputs.core }}
+      PLATFORMS: ${{ github.event.inputs.platforms || 'both' }}
+      # only a tag publishes (a push of the tag, or a manual run on the tag with publish ticked)
+      PUBLISH: ${{ github.ref_type == 'tag' && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      # The tag names the release; the number inside the program is src/Mod/Fission180/VERSION.
+      # A release whose tag and VERSION differ would be offered to people forever (the program
+      # would never think it is up to date), so that stops here.
+      - name: Tag and version
+        run: |
+          version="$(tr -d '[:space:]' < src/Mod/Fission180/VERSION)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+            if [ "${tag}" != "fission180-v${version}" ]; then
+              echo "::error::The tag ${tag} does not match src/Mod/Fission180/VERSION (${version}): the tag must be fission180-v${version}."
+              exit 1
+            fi
+          else
+            tag="fission180-v${version}"
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+          echo "Release ${tag}: publish=${PUBLISH}, platforms=${PLATFORMS}, core=${CORE_ID}"
+
+      - name: Get the built files
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'Fission180-*' --dir assets
+
+      # The quick update of this very commit: the module only, with the core id, for builds
+      # that have the same compiled part (tools/fission180/make_quick_update.sh).
+      - name: Quick update (Fission 180 module only)
+        run: |
+          mkdir -p assets/quick-update
+          tools/fission180/make_quick_update.sh --out quick-update-folder \
+            --zip "assets/quick-update/Fission180-quick-update-${TAG#fission180-}.zip" \
+            --commit "$GITHUB_SHA" --date "$(date -u +%Y-%m-%d)" --core "$CORE_ID"
+
+      - name: Notes, fission180-release.json and SHA256SUMS.txt
+        run: |
+          require=""
+          if [ "${PLATFORMS}" = "both" ]; then require="--require-all"; fi
+          python3 tools/fission180/make_release_files.py --tag "$TAG" --core "$CORE_ID" \
+            --assets assets --out release-files --list-file attach.txt ${require}
+          cp "assets/quick-update/Fission180-quick-update-${TAG#fission180-}.zip" release-files/
+          {
+            echo "## Release ${TAG} ($( [ "${PUBLISH}" = "true" ] && echo "published" || echo "dry run: nothing published" ))"
+            echo
+            echo "Core id: \`${CORE_ID}\`"
+            echo
+            echo "To try Update now with these files without publishing: tools/fission180/fake_release_server.py (its first lines say how)."
+            echo
+            echo "### Release notes"
+            cat release-files/release-notes.md
+            echo
+            echo "### fission180-release.json"
+            echo '```json'
+            cat release-files/fission180-release.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "---- files that would be attached:"
+          cat attach.txt
+
+      - name: Upload the release files (dry run result)
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: release-files-${{ env.TAG }}
+          path: release-files/
+          retention-days: 30
+          compression-level: 0
+
+      # The only step that publishes. A pre-release when the version has a pre-release part
+      # (-beta, -beta.2, -rc.1): the update check treats those as betas.
+      - name: Publish the GitHub Release
+        if: env.PUBLISH == 'true'
+        run: |
+          flags=()
+          case "${VERSION}" in *-*) flags+=(--prerelease) ;; esac
+          mapfile -t files < attach.txt
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Fission 180 ${VERSION}" --notes-file release-files/release-notes.md \
+            "${flags[@]}" "${files[@]}"
+          echo "Published: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" >> "$GITHUB_STEP_SUMMARY"

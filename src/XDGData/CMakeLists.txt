@@ -11,26 +11,26 @@ if(NOT DEFINED APPDATA_RELEASE_DATE)
     endif()
 endif()
 
-# SCIFORGE: SciForge's own desktop entry, AppStream data and MIME package under SciForge's
-# id (SCIFORGE_DESKTOP_ID), so a FreeCAD installed on the same machine keeps its own menu
-# entry (docs/sciforge/core-patches.md #11). FreeCAD's org.freecad.FreeCAD.* files stay in
+# FISSION180: Fission 180's own desktop entry, AppStream data and MIME package under Fission 180's
+# id (FISSION180_DESKTOP_ID), so a FreeCAD installed on the same machine keeps its own menu
+# entry (docs/fission180/core-patches.md #11). FreeCAD's org.freecad.FreeCAD.* files stay in
 # this folder unused, which keeps upstream merges simple.
 configure_file(
-    ${SCIFORGE_DESKTOP_ID}.metainfo.xml.in
-    ${CMAKE_BINARY_DIR}/${SCIFORGE_DESKTOP_ID}.metainfo.xml
+    ${FISSION180_DESKTOP_ID}.metainfo.xml.in
+    ${CMAKE_BINARY_DIR}/${FISSION180_DESKTOP_ID}.metainfo.xml
 )
 install(
-    FILES ${CMAKE_BINARY_DIR}/${SCIFORGE_DESKTOP_ID}.metainfo.xml
+    FILES ${CMAKE_BINARY_DIR}/${FISSION180_DESKTOP_ID}.metainfo.xml
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo
 )
 
 install(
-    FILES ${SCIFORGE_DESKTOP_ID}.desktop
+    FILES ${FISSION180_DESKTOP_ID}.desktop
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
 )
 
 install(
-    FILES ${SCIFORGE_DESKTOP_ID}.xml
+    FILES ${FISSION180_DESKTOP_ID}.xml
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mime/packages
 )
 

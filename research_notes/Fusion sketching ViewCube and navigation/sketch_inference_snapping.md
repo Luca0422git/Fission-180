@@ -5,7 +5,7 @@ How these notes were made: every autodesk.com domain was blocked in the research
 - **[STAFF]**: an Autodesk employee or moderator posting on the forum.
 - **[FORUM]**: a user report on the Autodesk Community forum.
 - **[TUTORIAL]**: a third-party tutorial or course (Product Design Online, Lynda/LinkedIn Learning, VDCI and similar).
-- **[INFERENCE]**: my own reasoning or a design suggestion for SciForge, not a Fusion fact.
+- **[INFERENCE]**: my own reasoning or a design suggestion for Fission 180, not a Fusion fact.
 
 No source I found gives any numeric pixel tolerance, angle tolerance or timing for Fusion's sketch inference.
 
@@ -35,7 +35,7 @@ While a sketch command is running, Fusion snaps to sketch points and endpoints, 
 - [INFERENCE] The snap model to copy has two parts:
   - a. Direct point snaps under the cursor: endpoints and sketch points, center, midpoint, on-curve, origin, projected points. Each produces a constraint on click: coincident, or midpoint for a midpoint snap.
   - b. A small most-recently-used list of acquired entities: the last 3 hovered, plus everything created in the running command. Their key points produce dashed alignment guides.
-- [INFERENCE] Intersection and quadrant snaps are places where SciForge could go beyond Fusion. To stay faithful to Fusion, SciForge would leave them out, or keep them as a pure position snap with no constraint, since Fusion has no single constraint for "on the intersection".
+- [INFERENCE] Intersection and quadrant snaps are places where Fission 180 could go beyond Fusion. To stay faithful to Fusion, Fission 180 would leave them out, or keep them as a pure position snap with no constraint, since Fusion has no single constraint for "on the intersection".
 
 ### Gaps
 - No source describes the marker shape, color or size used for endpoint, center or on-curve snaps (only the midpoint "triangle with an X" is described). From memory, unverified: the hovered point or curve is highlighted, and a small constraint-style glyph (for example a coincident or midpoint symbol) appears next to the cursor. This needs checking in a live Fusion session.
@@ -58,7 +58,7 @@ When a line being drawn is close to horizontal or vertical, Fusion snaps it to t
 
 ### Inferences
 - [INFERENCE] Apply H/V to the segment itself, measured in the sketch's own coordinate system, not the screen. Because Fusion has one combined H/V constraint, a single glyph type that is drawn rotated or labeled for each direction is enough.
-- [INFERENCE] SciForge has to choose an angle threshold. A few degrees, or an angle derived from a fixed pixel offset at the cursor, would match the feel. This is a design choice, not a Fusion number.
+- [INFERENCE] Fission 180 has to choose an angle threshold. A few degrees, or an angle derived from a fixed pixel offset at the cursor, would match the feel. This is a design choice, not a Fusion number.
 
 ### Gaps
 - No angle tolerance was found (for example plus or minus 3 or 5 degrees), and nothing on whether it is computed in degrees or in screen pixels at the cursor.
@@ -102,7 +102,7 @@ Fusion does infer Perpendicular. The documented case is a new line that ends on,
 - [TUTORIAL] "Sketch: horizontal, vertical, collinear" is a lesson title in the Lynda AutoCAD-to-Fusion course. The search summary did not say whether Collinear is inferred or only applied by hand. — [Lynda course page](https://origin-www.lynda.com/Fusion-360-tutorials/Sketch-constraints-Horizontal-vertical-collinear/667363/703400-4.html)
 
 ### Inferences
-- [INFERENCE] "Concentric" while drawing is in practice the center-point snap. Fusion's forum answer names "near a circle center" as a typical auto-constraint moment. SciForge can turn a center snap of a new circle onto an existing center into Coincident on the centers, or into a Concentric constraint. Which one Fusion records is unconfirmed.
+- [INFERENCE] "Concentric" while drawing is in practice the center-point snap. Fusion's forum answer names "near a circle center" as a typical auto-constraint moment. Fission 180 can turn a center snap of a new circle onto an existing center into Coincident on the centers, or into a Concentric constraint. Which one Fusion records is unconfirmed.
 - [INFERENCE] Tangent inference for a line drawn off the end of an arc (not via drag-arc) probably exists, given the general "suggesting tangencies" claims, but there is no direct source. Build it only behind observation.
 
 ### Gaps
@@ -124,7 +124,7 @@ Fusion does draw dashed or dotted guide lines while sketching, sometimes called 
 - [FORUM] Some users perceive "snapping to an invisible grid", which may be these guides or grid snap. See section 6. — [Snap option in sketch palette](https://forums.autodesk.com/t5/fusion-design-validate-document/snap-option-in-sketch-palette/m-p/10365852)
 
 ### Inferences
-- [INFERENCE] Spec for SciForge:
+- [INFERENCE] Spec for Fission 180:
   - When the cursor's X or Y is within N pixels of an acquired point's X or Y (in sketch coordinates), snap the cursor onto that line.
   - Draw a thin dashed line from the acquired point to the cursor, in a single accent color.
   - Keep it on screen only while the alignment holds.
@@ -157,7 +157,7 @@ Whatever inference is showing when the click lands becomes a permanent constrain
 
 ### Inferences
 - [INFERENCE] Decision rule to copy: at click time, commit exactly the set of inferences currently shown, so what you see is what you get. If Ctrl is held, commit nothing and do not snap: the raw cursor position is used. If Shift is held over a curve, snap to its midpoint and commit Midpoint.
-- [INFERENCE] One Fusion annoyance that SciForge could fix as an optional preference: Fusion has no way to keep point snaps while suppressing H/V and other glyph constraints. Leave it off by default to stay Fusion-faithful.
+- [INFERENCE] One Fusion annoyance that Fission 180 could fix as an optional preference: Fusion has no way to keep point snaps while suppressing H/V and other glyph constraints. Leave it off by default to stay Fusion-faithful.
 
 ### Gaps
 - Whether Ctrl must be held at the moment of the click only, or for the whole drag: not stated.
@@ -186,7 +186,7 @@ Whatever inference is showing when the click lands becomes a permanent constrain
 
 ### Inferences
 - [INFERENCE] Implementation split: (1) a shared "point picker" used by every tool's clicks, which handles point snaps, guides, Ctrl and Shift and returns a position plus a list of point constraints; (2) a per-tool "segment inference", currently only Line (H/V, perpendicular to the previous segment or the target line, tangent arc gesture); (3) per-tool fixed internal constraints added on finish (rectangle, slot, polygon, tangent circles).
-- [INFERENCE] The 2-point rectangle's H/V sides mean its edges always follow the sketch axes. The 3-point rectangle is the one for rotated rectangles. SciForge should keep that split.
+- [INFERENCE] The 2-point rectangle's H/V sides mean its edges always follow the sketch axes. The 3-point rectangle is the one for rotated rectangles. Fission 180 should keep that split.
 
 ### Gaps
 - Center rectangle: the exact constraints are not confirmed. From memory, unverified: recent Fusion versions add construction diagonals with the center point placed as Midpoint on a diagonal, plus H/V on the sides. This must be checked.
@@ -209,7 +209,7 @@ The inferred constraint appears as a small constraint glyph (the same symbol set
 - [OFFICIAL blog] Midpoint glyph described as a triangle, and "a triangle with an X" when the snap is hit. — [Fusion Blog midpoint quick tip](https://www.autodesk.com/products/fusion-360/blog/quick-tip-midpoint-constraint-shortcut/)
 
 ### Inferences
-- [INFERENCE] For SciForge: draw the transient glyphs and guides in a single accent color that stands apart from both the "under-constrained" and "fully constrained" geometry colors. A cyan or blue accent matches most reports. Draw the guide lines thin and dashed. Draw the glyphs with SciForge's own icon set: copy the behavior, never Fusion's icons. Update on every mouse move with no delay, and remove the glyphs the moment the condition stops holding.
+- [INFERENCE] For Fission 180: draw the transient glyphs and guides in a single accent color that stands apart from both the "under-constrained" and "fully constrained" geometry colors. A cyan or blue accent matches most reports. Draw the guide lines thin and dashed. Draw the glyphs with Fission 180's own icon set: copy the behavior, never Fusion's icons. Update on every mouse move with no delay, and remove the glyphs the moment the condition stops holding.
 - [INFERENCE] Show the transient glyph near the segment being drawn (H/V at the line's midpoint or base) or next to the snap point (coincident, midpoint). On click, turn it into the permanent glyph.
 
 ### Gaps

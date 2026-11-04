@@ -1,18 +1,18 @@
 #!/bin/bash
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# SCIFORGE: builds the Windows installer from the bundle folder <version_name> next to this
+# FISSION180: builds the Windows installer from the bundle folder <version_name> next to this
 # script (create_bundle.sh calls it; the scenario-debug workflow's "installer" job runs it on an
 # earlier build's portable files). Needs makensis in ${CONDA_PREFIX}/NSIS (pixi env "package").
 # Leaves <version_name>-installer.exe here.
 set -e
 version_name="$1"
-[ -n "${version_name}" ] && [ -d "${version_name}" ] || { echo "[SciForge] usage: make_installer.sh <bundle folder>"; exit 1; }
+[ -n "${version_name}" ] && [ -d "${version_name}" ] || { echo "[Fission 180] usage: make_installer.sh <bundle folder>"; exit 1; }
 
 FILES_FREECAD="$(cygpath -w $(pwd))\\${version_name}"
-# SCIFORGE: makensis cannot open files past Windows' 260-character path limit, and the
+# FISSION180: makensis cannot open files past Windows' 260-character path limit, and the
 # checkout folder carries the repository's name twice (D:\a\<repo>\<repo>): with the repo
-# named SciForge-Parametric-Design one debugpy file reached 277 characters and the
-# sciforge-v0.1.0-beta build stopped here. A drive letter for the bundle folder keeps every
+# named Fission-180 one debugpy file reached 277 characters and the
+# fission180-v0.1.0-beta build stopped here. A drive letter for the bundle folder keeps every
 # path short whatever the repository is called.
 bundle_drive=""
 for letter in S T U V W X Y; do
@@ -22,10 +22,10 @@ for letter in S T U V W X Y; do
     fi
 done
 if [ -n "${bundle_drive}" ]; then
-    echo "[SciForge] installer reads the bundle from ${bundle_drive} (${FILES_FREECAD})"
+    echo "[Fission 180] installer reads the bundle from ${bundle_drive} (${FILES_FREECAD})"
     FILES_FREECAD="${bundle_drive}"
 else
-    echo "[SciForge] no free drive letter for the bundle, using the long path"
+    echo "[Fission 180] no free drive letter for the bundle, using the long path"
 fi
 nsis_cmd="${CONDA_PREFIX}/NSIS/makensis.exe"
 nsis_status=0

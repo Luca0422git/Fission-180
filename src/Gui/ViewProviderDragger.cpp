@@ -472,13 +472,13 @@ void ViewProviderDragger::attach(App::DocumentObject* pcObject)
 
     getAnnotation()->addChild(pcPlacement);
 
-    // SCIFORGE: the indicator itself is made when it is first shown (showPlacementIndicator,
-    // docs/sciforge/core-patches.md #18)
+    // FISSION180: the indicator itself is made when it is first shown (showPlacementIndicator,
+    // docs/fission180/core-patches.md #18)
 }
 
 void ViewProviderDragger::showPlacementIndicator(bool show)
 {
-    // SCIFORGE: made on first use (docs/sciforge/core-patches.md #18)
+    // FISSION180: made on first use (docs/fission180/core-patches.md #18)
     if (show && pcPlacement->getNumChildren() == 0) {
         auto* pcAxisCrossKit = new Gui::SoFCPlacementIndicatorKit();
 

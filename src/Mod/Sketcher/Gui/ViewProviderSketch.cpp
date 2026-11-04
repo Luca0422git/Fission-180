@@ -3259,7 +3259,7 @@ void ViewProviderSketch::slotSolverUpdate()
     if (getSketchObject()->getExternalGeometryCount()
             + getSketchObject()->getHighestCurveIndex() + 1
         == getSolvedSketch().getGeometrySize()) {
-        // SCIFORGE: while edit mode is being left (resetEdit with a sketch tool still active,
+        // FISSION180: while edit mode is being left (resetEdit with a sketch tool still active,
         // the tool's deactivate() solves once more) editDocument() is already null and this
         // crashed FreeCAD. Skip the redraw then; the sketch is leaving edit anyway.
         Gui::Document* editDoc = Gui::Application::Instance->editDocument();

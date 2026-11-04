@@ -1,10 +1,10 @@
-# SciForge memory and progress log
+# Fission 180 memory and progress log
 
 This file is the project's memory across work sessions. **Read it first, every session**, then
-`docs/sciforge/feature-outline.md` (the spec). Update it at the end of every session: what was
+`docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
-**2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "sciforge sketch fixes" list (9 items), on
+**2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "fission180 sketch fixes" list (9 items), on
 `develop`.** All nine fixed, each with a scenario that fails on the old code (newest session
 log "Sketch fixes list"). VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.2.1, CHANGELOG section
 written (module files only: a patch release). Status: [x] 1 arrow keys in sketch value boxes
@@ -12,16 +12,16 @@ written (module files only: a patch release). Status: [x] 1 arrow keys in sketch
 corner hover [x] 4 Offset panel (Chain Selection, One Side / Symmetric, Flip) [x] 5 snap dot
 [x] 6 90 degrees kept onto a curve [x] 7 second click renames in the browser [x] 8 no empty
 Body in the browser [x] 9 Align after Split / Move [x] local tests (unit, golden, the new and
-the touched scenarios) [x] "SciForge tests" green on GitHub (#358 on `eae078aa`) [x]
+the touched scenarios) [x] "Fission 180 tests" green on GitHub (#358 on `eae078aa`) [x]
 **PUBLISHED 2026-11-02 22:48 UTC** by Luca's patch release run #14 (prepare, linux, windows
 with the installer tests, release: all green; Release and the tag `sciforge-v0.1.0-beta.3.2.1`
 on `eae078aa`; six files: installer 495 MB, portable 422 MB, AppImage 827 MB, quick update
-8 MB, sciforge-release.json, SHA256SUMS.txt; the notes' checksums = GitHub's asset digests).
+8 MB, fission180-release.json, SHA256SUMS.txt; the notes' checksums = GitHub's asset digests).
 Guesses to confirm are under "Questions waiting for Luca".
 
 **2026-10-29: GUI test rework, on branch `sf/gui-tests-rework` (not `develop`).** Luca's brief
-"SciForge GUI tests: rework brief for Claude Code" (claude.ai artifact; its rules are copied in
-`docs/sciforge/dev/gui-tests.md`): make the GUI scenarios pass when SciForge works and fail only
+"Fission 180 GUI tests: rework brief for Claude Code" (claude.ai artifact; its rules are copied in
+`docs/fission180/dev/gui-tests.md`): make the GUI scenarios pass when Fission 180 works and fail only
 when it is broken, the same on every machine; scenarios wait for the app's state, never for
 time. The brief said to work on a branch off develop (another session was releasing patch
 0.1.0-beta.3.1.3 from develop at the time: a patch release ships develop's newest commit).
@@ -46,7 +46,7 @@ Newest session log "GUI test rework".
   the joint-delete bug (MAJOR: deleting a Revolute joint from the browser leaves a body that
   shows nothing or whose fillet cannot be edited), drag a joint to set its Minimum / Maximum,
   a ghost of a hidden body when its browser row is hovered, diagonal drag arrows on Fillet and
-  Chamfer. Everything that session needs: `docs/sciforge/dev/briefs/patch-beta2.2.md`. Status:
+  Chamfer. Everything that session needs: `docs/fission180/dev/briefs/patch-beta2.2.md`. Status:
   [x] joint delete bug (the delete itself not reproduced; the related "joint loses its face
   after a later fillet" fixed)  [x] drag to set limits  [x] hover ghost  [x] diagonal arrows
   [x] released: **PUBLISHED 2026-10-26 21:37 UTC**, tag `sciforge-v0.1.0-beta.2.2` on `fac2005e`
@@ -60,17 +60,17 @@ Newest session log "GUI test rework".
   green first), on CI #284 (all 14 jobs green). Release moved fac2005e..38d817f9 by the
   workflow. Files: installer 495 MB, portable 422 MB, AppImage 827 MB, quick update 8 MB; the
   notes start "Built on 0.1.0-beta.2.2's program" (the newest release with the same core).
-  What it holds: plan `docs/sciforge/plan-beta3.md`, briefs `docs/sciforge/dev/briefs/beta3-*.md`,
-  session logs `docs/sciforge/sessions/beta3-*.md`, `journey-*.md`, CHANGELOG, `vex.md`.
+  What it holds: plan `docs/fission180/plan-beta3.md`, briefs `docs/fission180/dev/briefs/beta3-*.md`,
+  session logs `docs/fission180/sessions/beta3-*.md`, `journey-*.md`, CHANGELOG, `vex.md`.
 - **"The complex one" = `0.1.0-beta.3.1`, a FULL BUILD (2026-10-27, in progress):** the two VEX
   items held for a compiled change. (1) Core patch #18: the placement indicator made when first
   shown, not for each of a robot's ~5400 views (~8 s of opening; scenario
-  `vex_placement_indicator`, which expects it only on a SciForge program >= 0.1.0-beta.3.1).
+  `vex_placement_indicator`, which expects it only on a Fission 180 program >= 0.1.0-beta.3.1).
   (2) Selectable/Unselectable turned out NOT to need C++: inside a component a body's own
   Selectable switch is undone by its steps' pick styles; switching the body's view and every
-  step's view works (`sciforge/selectable.py`, browser right-click, scenario `vex_selectable`,
+  step's view works (`fission180/selectable.py`, browser right-click, scenario `vex_selectable`,
   36 checks). VERSION 0.1.0-beta.3.1 + CHANGELOG section. Route: develop green, then a full
-  build dry run (Actions > SciForge build on develop, publish off, ~4 h), then **Luca pushes the
+  build dry run (Actions > Fission 180 build on develop, publish off, ~4 h), then **Luca pushes the
   tag `sciforge-v0.1.0-beta.3.1` from a Codespace** (a cloud session cannot push tags) and the
   tag's build publishes. Status: [x] code [x] local tests [x] CI green (#289, all 14 jobs, on
   `2aa32dfe`) [x] full build dry run (#13 on 5bde6726: Windows + Linux compiled with patch
@@ -85,8 +85,8 @@ Newest session log "GUI test rework".
   `2aa32dfe` (session log "Sketch Text panel and wrapping"). **Luca tagged `2aa32dfe`
   (22:33 UTC, `sciforge-v0.1.0-beta.3.1`, Release moved there too; build run #14), so 3.1
   does NOT hold them:** they are the patch **0.1.0-beta.3.1.1** (VERSION, `_FALLBACK_VERSION`,
-  their own CHANGELOG section; Luca: "you do it"), released with Actions > SciForge patch
-  release once 3.1 is published and "SciForge tests" is green on develop (module files only:
+  their own CHANGELOG section; Luca: "you do it"), released with Actions > Fission 180 patch
+  release once 3.1 is published and "Fission 180 tests" is green on develop (module files only:
   the same core id as 3.1). Status: [x] prepared [x] 3.1 published (build #14, 2026-10-28
   01:12 UTC: installer, 7z, AppImage, quick update, json, SHA256SUMS; build #14's AppImage
   scenario parts: only sketch_qa_keys R4, the known built-program-only one) [x] 3.1.1
@@ -114,16 +114,16 @@ wants that branch again, fast-forward it to `develop` first (no force push neede
 lines do not drift apart again.
 
 **Next: the AI tools for wave 6's 26 steps** (SHEET METAL, PLASTIC, SURFACE part 4 modify on
-surface bodies; `sciforge/ai/catalog/__init__.py` `AI_TOOLS_TO_COME`; Luca chose to release
+surface bodies; `fission180/ai/catalog/__init__.py` `AI_TOOLS_TO_COME`; Luca chose to release
 0.1.0-beta.2 without them). Model them on the `surface` tool (`kind` + `options`), add the edit
 steps to `edit_step` (`actions/timeline_actions.py` `step_kind`, `_EDIT_OPS`, `_read`), give
-each tool calls in `SciForgeTests/headless/runner.py`, drop the ops from `AI_TOOLS_TO_COME`,
+each tool calls in `Fission180Tests/headless/runner.py`, drop the ops from `AI_TOOLS_TO_COME`,
 regenerate `docs/ai`, and update known-issues.md and the CHANGELOG. Still open from the first
 beta: GitHub Discussions on and the labels `idea` and `beta` (Luca's clicks).
 
 **2026-10-23 (overnight, wave 6): Fusion's SHEET METAL and PLASTIC tabs and the SURFACE tab's
 missing tools are built and merged on `develop`** (seven builders + QA; plan
-`docs/sciforge/plan-sheet-metal-plastic-surface.md`, newest session log). Waiting for Luca's test.
+`docs/fission180/plan-sheet-metal-plastic-surface.md`, newest session log). Waiting for Luca's test.
 
 **2026-10-23: Luca's four additions are on `develop`** (Fusion-style Data Panel, drag a design
 into an open design as a copy, Opacity Control in the browser, the 3D view's hover lighting the
@@ -131,29 +131,29 @@ browser row), then Delete on Home and in the Data Panel: newest session logs. Wa
 test on Windows.
 
 **Sandbox limit at release time: a Claude Code cloud session cannot push a tag.** A tag push
-(`git push origin sciforge-v...`) gets HTTP 403 from the session's git proxy (2026-10-21 and again
+(`git push origin fission180-v...`) gets HTTP 403 from the session's git proxy (2026-10-21 and again
 2026-10-23), and having a workflow create the tag instead was refused as a bypass. Pushing to
 `Release` was refused on 2026-10-21 but worked on 2026-10-23 (a session started on `Release`,
-fast-forward to the tested develop commit). So the tag is Luca's: `git tag sciforge-v<version>
-<tested develop sha> && git push origin sciforge-v<version>`, from Git Bash at home or, from
+fast-forward to the tested develop commit). So the tag is Luca's: `git tag fission180-v<version>
+<tested develop sha> && git push origin fission180-v<version>`, from Git Bash at home or, from
 anywhere with a browser, a GitHub Codespace (repo > Code > Codespaces > Create codespace on
 Release; delete it afterwards). A future release session must say so at the START.
-**Gate (2026-10-30, GUI test rework): a release tag goes only on a commit where SciForge tests
+**Gate (2026-10-30, GUI test rework): a release tag goes only on a commit where Fission 180 tests
 (the full workflow, every part, not a "Repeat GUI scenarios" trial run) is green on that exact
-commit** (`docs/sciforge/dev/briefs/beta-release.md`, "The fast tests gate every release"). The
+commit** (`docs/fission180/dev/briefs/beta-release.md`, "The fast tests gate every release"). The
 4-hour build's own scenario parts test the compiled program only; if one fails, Re-run failed
-jobs repeats that part on the same AppImage without compiling (`docs/sciforge/dev/gui-tests.md`).
+jobs repeats that part on the same AppImage without compiling (`docs/fission180/dev/gui-tests.md`).
 
-**PUBLISHED 2026-10-23 21:25 UTC: SciForge 0.1.0-beta.2** (pre-release),
-https://github.com/Luca0422git/SciForge-Parametric-Design/releases/tag/sciforge-v0.1.0-beta.2, tag
+**PUBLISHED 2026-10-23 21:25 UTC: Fission 180 0.1.0-beta.2** (pre-release),
+https://github.com/Luca0422git/Fission-180/releases/tag/sciforge-v0.1.0-beta.2, tag
 on `fe50c786` (= `Release`), build run #12 (Windows compile 2 h 16 min, Linux 1 h 22 min, no
 re-run needed). Core id `fd4a01850d`, the same as 0.1.0-beta: Update now from beta 1 is the 7 MB
 module-only update. Assets: installer 506 MB, portable .7z 428 MB, AppImage 826 MB, quick update,
-sciforge-release.json, SHA256SUMS.txt (the notes' checksums = GitHub's asset digests). Next:
+fission180-release.json, SHA256SUMS.txt (the notes' checksums = GitHub's asset digests). Next:
 Luca's test (install over beta 1, Update now from beta 1), then the AI tools for wave 6.
-**Repo name**: the repository was renamed to SciForge-Parametric-Design; `update_core.REPO`, the
-release notes' links and `notes_url` still say `Luca0422git/SciForge`, which works only through
-GitHub's rename redirect (it breaks if a new repo named SciForge is ever created). Point them at
+**Repo name**: the repository was renamed to Fission-180; `update_core.REPO`, the
+release notes' links and `notes_url` still say `Luca0422git/Fission-180`, which works only through
+GitHub's rename redirect (it breaks if a new repo named Fission 180 is ever created). Point them at
 the new name in the next release (beta 1 installs keep using the redirect).
 
 **Start here (2026-10-17):** read the newest session log ("Luca's improvement list").
@@ -165,7 +165,7 @@ per list, delivered directly (a zip of the module, see the log), not gated on CI
 whatever branch name the session was given (Claude Code makes up names like
 `claude/amazing-lamport-zkxex4`). `develop` started at d6ad0dd7; the older
 `claude/inspiring-cerf-ragp6j` and `claude/amazing-lamport-zkxex4` are no longer pushed to.
-Quick updates come from green "SciForge tests" runs on `develop`.
+Quick updates come from green "Fission 180 tests" runs on `develop`.
 
 ---
 
@@ -173,25 +173,25 @@ Quick updates come from green "SciForge tests" runs on `develop`.
 
 | What | Where |
 |---|---|
-| The spec (source of truth for scope) | `docs/sciforge/feature-outline.md` |
+| The spec (source of truth for scope) | `docs/fission180/feature-outline.md` |
 | This memory / progress log | `MEMORY.md` |
-| SciForge's own module (workbench, timeline, search, ...) | `src/Mod/SciForge/` |
-| Golden-model benchmark suite (step lists + runner) | `src/Mod/SciForge/SciForgeTests/golden/` |
-| Design steps the golden models and the AI tools both run (builder, `*_ops.py`, selectors) | `src/Mod/SciForge/sciforge/ai/ops/` |
-| The Home tab (recent designs, places) | `src/Mod/SciForge/sciforge/home_core.py`, `home_ui.py`; spec `docs/sciforge/parity/home.md` |
-| Places (clouds, NAS) | `sciforge/locations_core.py`, `locations_ui.py`; spec `docs/sciforge/parity/cloud.md` |
-| AI connector (MCP server, bridge, Add an AI) | `sciforge/ai/`, `sciforge/ai_ui.py`; spec `docs/sciforge/parity/ai.md` |
-| AI chat panel (own API key; providers, loop, keys) | `sciforge/ai/chat_ui.py`, `ai/chat_core.py`, `ai/providers/`, `sciforge/secrets_store.py` |
-| AI panel (right dock: switch, Your AIs, Chat, Activity) | `sciforge/ai_panel_ui.py`, `ai_ui.py` |
-| Light / dark look (colours, style-sheet swap, light icons) | `sciforge/theme.py`, `sciforge/__init__.py` (`ui_icon_path`) |
-| FreeCAD Tools (FreeCAD's own workbenches, Back to SciForge) | `sciforge/freecad_tools_ui.py` |
-| SHEET METAL tab (rules, Flange, Bend, Hem, Join by Bend, Corner Closure, Lofted Flange, unfolder, Flat Pattern + DXF, Unfold/Refold, Rip, Convert) | `sciforge/sheetmetal*.py`, `flatpattern*.py`; specs `docs/sciforge/parity/sheet-metal*.md` |
-| PLASTIC tab (plastic rules per component, Boss, Rest, Snap Fit, Lip, Design Advice, rule defaults) | `sciforge/plastic*.py`; specs `docs/sciforge/parity/plastic*.md` |
-| SURFACE part 3/4 (tool options; SOLID modify tools on surface bodies, Merge) | `sciforge/surface*.py`, `surfmod*.py`; specs `parity/surface.md`, `parity/surface-modify.md` |
-| Fusion research with sources (wave 6), integration map for new tabs/body kinds | `docs/sciforge/dev/research/` |
-| Every change to FreeCAD's own code (tagged `SCIFORGE:`) | `docs/sciforge/core-patches.md` |
-| CI workflows (SciForge's own) | `.github/workflows/sciforge-*.yml` |
-| Tooling scripts for CI / local runs | `tools/sciforge/` |
+| Fission 180's own module (workbench, timeline, search, ...) | `src/Mod/Fission180/` |
+| Golden-model benchmark suite (step lists + runner) | `src/Mod/Fission180/Fission180Tests/golden/` |
+| Design steps the golden models and the AI tools both run (builder, `*_ops.py`, selectors) | `src/Mod/Fission180/fission180/ai/ops/` |
+| The Home tab (recent designs, places) | `src/Mod/Fission180/fission180/home_core.py`, `home_ui.py`; spec `docs/fission180/parity/home.md` |
+| Places (clouds, NAS) | `fission180/locations_core.py`, `locations_ui.py`; spec `docs/fission180/parity/cloud.md` |
+| AI connector (MCP server, bridge, Add an AI) | `fission180/ai/`, `fission180/ai_ui.py`; spec `docs/fission180/parity/ai.md` |
+| AI chat panel (own API key; providers, loop, keys) | `fission180/ai/chat_ui.py`, `ai/chat_core.py`, `ai/providers/`, `fission180/secrets_store.py` |
+| AI panel (right dock: switch, Your AIs, Chat, Activity) | `fission180/ai_panel_ui.py`, `ai_ui.py` |
+| Light / dark look (colours, style-sheet swap, light icons) | `fission180/theme.py`, `fission180/__init__.py` (`ui_icon_path`) |
+| FreeCAD Tools (FreeCAD's own workbenches, Back to Fission 180) | `fission180/freecad_tools_ui.py` |
+| SHEET METAL tab (rules, Flange, Bend, Hem, Join by Bend, Corner Closure, Lofted Flange, unfolder, Flat Pattern + DXF, Unfold/Refold, Rip, Convert) | `fission180/sheetmetal*.py`, `flatpattern*.py`; specs `docs/fission180/parity/sheet-metal*.md` |
+| PLASTIC tab (plastic rules per component, Boss, Rest, Snap Fit, Lip, Design Advice, rule defaults) | `fission180/plastic*.py`; specs `docs/fission180/parity/plastic*.md` |
+| SURFACE part 3/4 (tool options; SOLID modify tools on surface bodies, Merge) | `fission180/surface*.py`, `surfmod*.py`; specs `parity/surface.md`, `parity/surface-modify.md` |
+| Fusion research with sources (wave 6), integration map for new tabs/body kinds | `docs/fission180/dev/research/` |
+| Every change to FreeCAD's own code (tagged `FISSION180:`) | `docs/fission180/core-patches.md` |
+| CI workflows (Fission 180's own) | `.github/workflows/fission180-*.yml` |
+| Tooling scripts for CI / local runs | `tools/fission180/` |
 | Original "Forge" v0.1 prototype, kept verbatim for history | `prototype/forge-freecad/` |
 | Upstream FreeCAD source | everything else (the fork base is tag `1.1.4`) |
 
@@ -200,10 +200,10 @@ Quick updates come from green "SciForge tests" runs on `develop`.
 - **Fork base:** FreeCAD tag `1.1.4` (commit `4fd3bf320d`), full upstream history kept so future
   FreeCAD releases can be merged (`git remote add upstream https://github.com/FreeCAD/FreeCAD.git`,
   then `git fetch upstream refs/tags/1.1.X:refs/tags/1.1.X` and merge the tag).
-- **Repo:** `github.com/Luca0422git/SciForge`, **public** since 2026-10-10 (was private). Standard
+- **Repo:** `github.com/Luca0422git/Fission-180`, **public** since 2026-10-10 (was private). Standard
   GitHub Actions runners are free for public repos, so pushing and full builds cost nothing; full
-  C++ builds still take hours, so they run when started by hand (Actions tab → "SciForge build" →
-  Run workflow) or by a `sciforge-v*` tag. Tests run on every push (~20 min).
+  C++ builds still take hours, so they run when started by hand (Actions tab → "Fission 180 build" →
+  Run workflow) or by a `fission180-v*` tag. Tests run on every push (~20 min).
 - **History is 2.4 GB**: GitHub rejects a single push over 2 GB, so the initial import was
   pushed in 5 fast-forward stages. Normal pushes are small and unaffected.
 - **License:** LGPL-2.1-or-later (inherited from FreeCAD). Keep FreeCAD copyright notices.
@@ -211,7 +211,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
   platform Windows 10/11, then Linux. No macOS.
 - **Sandbox can run real FreeCAD**: the official FreeCAD 1.1.4 Linux AppImage downloads and runs
   headless (`freecadcmd`) *and* with a GUI on a virtual screen (`xvfb-run`). Use
-  `tools/sciforge/get_freecad.sh` to fetch it. The 3D view renders blank under xvfb (no GPU),
+  `tools/fission180/get_freecad.sh` to fetch it. The 3D view renders blank under xvfb (no GPU),
   but widgets, toolbars, commands and geometry all work, and screenshots of the window work.
 
 ## Decisions log
@@ -220,31 +220,31 @@ Quick updates come from green "SciForge tests" runs on `develop`.
 |---|---|---|
 | 2026-10-09 | Fork at 1.1.4 with full history (not a flat copy) | Makes merging future FreeCAD releases a normal `git merge` |
 | 2026-10-09 | Removed FreeCAD-org automation workflows (translations, stale bot, backport, labeler, CodeQL, scorecards, Fedora nightly, weekly release, dependabot); `CI_master.yml` made manual-only | They serve FreeCAD's organization, fail or waste minutes here; a weekly release cron would have run on our default branch |
-| 2026-10-09 | SciForge module lives at `src/Mod/SciForge` and is installed by the normal CMake build | Ships inside every SciForge build; no separate add-on install step |
+| 2026-10-09 | Fission 180 module lives at `src/Mod/Fission180` and is installed by the normal CMake build | Ships inside every Fission 180 build; no separate add-on install step |
 | 2026-10-09 | Golden models are JSON step lists run by a small interpreter in real FreeCAD | Same file runs in CI (headless) and can later be compared with Fusion reference metrics |
 | 2026-10-09 | No SHEET METAL, PLASTIC or MANAGE tabs (Luca: "not for now") | Not used; out of scope. **Reversed 2026-10-23** for SHEET METAL and PLASTIC (next row); MANAGE stays out |
-| 2026-10-23 | Build Fusion's SHEET METAL and PLASTIC tabs and complete the SURFACE tab (Luca: "plan all the features that belong in those tabs, and then build them all. In one shot") | Plan `docs/sciforge/plan-sheet-metal-plastic-surface.md`, research `docs/sciforge/dev/research/`, wave 6 briefs |
+| 2026-10-23 | Build Fusion's SHEET METAL and PLASTIC tabs and complete the SURFACE tab (Luca: "plan all the features that belong in those tabs, and then build them all. In one shot") | Plan `docs/fission180/plan-sheet-metal-plastic-surface.md`, research `docs/fission180/dev/research/`, wave 6 briefs |
 | 2026-10-09 | Until the branding pass lands, CI's Windows build ships the portable 7z only, no installer | The FreeCAD NSIS installer would install over / clash with a real FreeCAD install |
 | 2026-10-10 | Repository made public by Luca | Free GitHub Actions minutes for tests and full builds (was the open question on cost) |
-| 2026-10-24 | **Patch releases** for bug fixes in SciForge's own files (Luca: "4 hours to have a build ready is abismal ... I need a way to quick patch the software ... a quick update without extracting a zip"; a robotics team, college students and his manager are about to use the beta). Versions `0.1.0-beta.2.1`, `.2`...; full builds stay for real releases and core changes | `docs/sciforge/patch-release.md`; the in-app Update now already installs module-only releases |
-| 2026-10-20 | First public release is **0.1.0-beta**; no code signing (Luca: no money for it), so the GitHub page and release notes explain Windows SmartScreen; update check with an easy install; a minimal welcome ("dont overdo it") | Brief `docs/sciforge/dev/briefs/beta-release.md` (milestones R0-R5) |
-| 2026-10-20 | Branch `experimental` (from develop `ae1d3768`) for fixing Fusion workflows that do not work in SciForge yet; the first is Draft of curved faces. This work is pushed to `experimental`, not `develop` | Luca: "some of the workflows that id regularly do on fusion dont exactly work ... New branch time. Call it experimental. thats where youll do your work" |
+| 2026-10-24 | **Patch releases** for bug fixes in Fission 180's own files (Luca: "4 hours to have a build ready is abismal ... I need a way to quick patch the software ... a quick update without extracting a zip"; a robotics team, college students and his manager are about to use the beta). Versions `0.1.0-beta.2.1`, `.2`...; full builds stay for real releases and core changes | `docs/fission180/patch-release.md`; the in-app Update now already installs module-only releases |
+| 2026-10-20 | First public release is **0.1.0-beta**; no code signing (Luca: no money for it), so the GitHub page and release notes explain Windows SmartScreen; update check with an easy install; a minimal welcome ("dont overdo it") | Brief `docs/fission180/dev/briefs/beta-release.md` (milestones R0-R5) |
+| 2026-10-20 | Branch `experimental` (from develop `ae1d3768`) for fixing Fusion workflows that do not work in Fission 180 yet; the first is Draft of curved faces. This work is pushed to `experimental`, not `develop` | Luca: "some of the workflows that id regularly do on fusion dont exactly work ... New branch time. Call it experimental. thats where youll do your work" |
 | 2026-10-21 | A value past what fits (fillet radius, chamfer, draft angle, shell wall, press pull ...) stops at the largest value that works, with a note, instead of an error; formulas are not rewritten (they keep the error). Deliberately differs from Fusion | Luca: "limit edits to stop at that limit ... add the functionality to any tool that can give that sort of error" |
-| 2026-10-21 | AI: expose everything SciForge can do as tools, with all documentation an AI model could use | Luca: "go crazy with 3. give all the tools possible, with absolutely all the documentation available" |
-| 2026-10-20 | Branch `Release` (from develop `a6a5f7bd`): only tested `develop` commits, fast-forwarded and tagged `sciforge-v<version>` on Luca's green light; all work stays on `develop` | Luca: "everything goes on develop until i give the green light" |
+| 2026-10-21 | AI: expose everything Fission 180 can do as tools, with all documentation an AI model could use | Luca: "go crazy with 3. give all the tools possible, with absolutely all the documentation available" |
+| 2026-10-20 | Branch `Release` (from develop `a6a5f7bd`): only tested `develop` commits, fast-forwarded and tagged `fission180-v<version>` on Luca's green light; all work stays on `develop` | Luca: "everything goes on develop until i give the green light" |
 | 2026-10-23 | `experimental` merged into `develop`; the result is **0.1.0-beta.2** (released through `Release` + tag as above) | Luca: "Experimental looks stable. And develop has some good new additions. So I think it's time to merge all 3 into our second beta release" |
 | 2026-10-26 | **Static Stress simulation is in scope** (outline 7.18; sections 0 and 8 changed). Flow / CFD, thermal, modal, nonlinear, event simulation and shape optimization stay out | Luca: "change the spec, stress-only sim is fine" (he first asked for "stress and flow") |
-| 2026-10-26 | Beta 3 = **Auto Timeline** (AI makes a featureless model parametric) **and Static Stress**; the joint-delete bug, drag-to-set joint limits, the hidden-body hover ghost and diagonal Fillet / Chamfer arrows go out first as patch 0.1.0-beta.2.2, built by a separate patch session (`docs/sciforge/dev/briefs/patch-beta2.2.md`) | Luca: "joint bug, dragging joints, ghost bodies, and angled fillet will go into a patch ... Auto Timeline and Sim is what you will work on. timeline and sim will be beta 3" |
+| 2026-10-26 | Beta 3 = **Auto Timeline** (AI makes a featureless model parametric) **and Static Stress**; the joint-delete bug, drag-to-set joint limits, the hidden-body hover ghost and diagonal Fillet / Chamfer arrows go out first as patch 0.1.0-beta.2.2, built by a separate patch session (`docs/fission180/dev/briefs/patch-beta2.2.md`) | Luca: "joint bug, dragging joints, ghost bodies, and angled fillet will go into a patch ... Auto Timeline and Sim is what you will work on. timeline and sim will be beta 3" |
 | 2026-10-26 | VEX parts come in as **STEP** files; nothing else is needed from the parts pack | Luca: "if there is a version with step files, we should be good. as long as the step files work and we are able to import large amounts of items into an assembly, thats all we need" |
 | 2026-10-23 | 0.1.0-beta.2 ships without AI tools for wave 6's 26 steps (SHEET METAL, PLASTIC, SURFACE part 4); they are listed in `catalog.AI_TOOLS_TO_COME` and in known-issues.md, and building them is the next job | Luca chose "Release now, AI later" over "Build AI tools first" (a few hours later) |
 - **2026-10-13: full (compiled) builds only for releases or a real C++ change.** Luca asked why
-  compile at all when SciForge is an add-on: all 7 core patches are housekeeping or FreeCAD bug
+  compile at all when Fission 180 is an add-on: all 7 core patches are housekeeping or FreeCAD bug
   fixes (#4, #6, #7) that already have Python workarounds, so the quick update on the official
   FreeCAD 1.1.4 is the normal delivery. Never start a 3-hour Windows build without one of those
   two reasons (Luca waited hours on builds that were not needed).
 - **2026-10-13: testing happens in one overall run; features reach Luca as soon as they are
   merged.** Luca: "could we leave the testing to an overall testing run. I want to try out the
-  features asap". So: merge, push, and let GitHub's "SciForge tests" run on that push be the
+  features asap". So: merge, push, and let GitHub's "Fission 180 tests" run on that push be the
   test; fix what it finds and push again. No long local sweeps before a push (a few minutes on
   the scenario of the exact change is fine); no adversarial review round when it would hold a
   merge back. The quick-update download still comes only from a green run, so a red run costs
@@ -254,8 +254,8 @@ Quick updates come from green "SciForge tests" runs on `develop`.
   around and doing whatever you think is right." The sketch right-click menu had no OK /
   Cancel and nothing told a line to end. Each imitation names its source in the parity doc
   (Autodesk help/course, forum answer) or is marked a guess.
-- **2026-10-13: SciForge is its own program (branding pass, branch `sf/app`).** The
-  compiled build is called SciForge (`SciForge.exe`, `%APPDATA%\SciForge`, own installer and
+- **2026-10-13: Fission 180 is its own program (branding pass, branch `sf/app`).** The
+  compiled build is called Fission 180 (`Fission180.exe`, `%APPDATA%\Fission180`, own installer and
   registry keys, own icon, splash and About), so it installs next to FreeCAD without sharing
   anything. The identity is set at compile time in `src/Main` (not through FreeCAD's
   `branding.xml`: a missing file would silently make it FreeCAD again and share FreeCAD's
@@ -274,30 +274,30 @@ Quick updates come from green "SciForge tests" runs on `develop`.
   Autodesk's closed format (reverse engineering it is forbidden, outline 2.5). STEP open /
   insert already exists (exchange-2); it brings the shapes, not the timeline. Outline 12 Q6
   closed.
-| 2026-10-28 | The core id no longer counts `package/WindowsInstaller` (`tools/sciforge/core_id.sh`, its unit test, brief beta-release.md) | The installer's scripts change how the program is put on a computer, not the program; counting them would have refused every patch release until the next full build after the installer fix (core patch #19). A patch release makes its installer from its own commit's scripts, so new downloads and Update now from an older core get the fix at once. The value for today's develop stays `5bde6726` |
+| 2026-10-28 | The core id no longer counts `package/WindowsInstaller` (`tools/fission180/core_id.sh`, its unit test, brief beta-release.md) | The installer's scripts change how the program is put on a computer, not the program; counting them would have refused every patch release until the next full build after the installer fix (core patch #19). A patch release makes its installer from its own commit's scripts, so new downloads and Update now from an older core get the fix at once. The value for today's develop stays `5bde6726` |
 
 ## Status by phase (outline section 10)
 
 ### Phase 0: Foundations (in progress)
 
-- [x] Fork FreeCAD 1.1.4 into the SciForge repo (full history)
+- [x] Fork FreeCAD 1.1.4 into the Fission 180 repo (full history)
 - [x] Commit outline + Forge prototype
 - [x] Disable upstream automation that does not apply
 - [x] First real run of the prototype in FreeCAD 1.1.4 (GUI, under xvfb): found and fixed 2 bugs
-- [x] SciForge module seeded from the prototype at `src/Mod/SciForge` (renamed, `[SciForge]` logs),
-      built by CMake (`BUILD_SCIFORGE`, core patch #3)
+- [x] Fission 180 module seeded from the prototype at `src/Mod/Fission180` (renamed, `[Fission 180]` logs),
+      built by CMake (`BUILD_FISSION180`, core patch #3)
 - [x] Golden-model harness + 32 models with hand-derived expectations (31 pass on stock 1.1.4,
       1 = upstream bug fixed by core patch #4)
 - [x] GUI smoke test in real FreeCAD under xvfb (14 checks, screenshot)
-- [x] `tools/sciforge/run_tests.sh` runs all of it with one command
-- [x] CI `sciforge-tests.yml`: unit + golden + GUI smoke on every push (against stock FreeCAD)
-- [x] First `sciforge-tests.yml` run on GitHub is green (2026-10-09)
-- [x] CI `sciforge-build.yml` written (manual): Windows portable 7z + Linux AppImage, then
-      golden models run on the built SciForge
-- [x] `sciforge-build.yml` runs: #1 (2026-10-09) green; #2 (2026-10-12) compiled and packaged on
+- [x] `tools/fission180/run_tests.sh` runs all of it with one command
+- [x] CI `fission180-tests.yml`: unit + golden + GUI smoke on every push (against stock FreeCAD)
+- [x] First `fission180-tests.yml` run on GitHub is green (2026-10-09)
+- [x] CI `fission180-build.yml` written (manual): Windows portable 7z + Linux AppImage, then
+      golden models run on the built Fission 180
+- [x] `fission180-build.yml` runs: #1 (2026-10-09) green; #2 (2026-10-12) compiled and packaged on
       Windows and Linux (core patches #4, #6, #7 compile; golden `plate_hole_grid` PASS on the
-      build) but its tests failed: the install rules listed 35 of 116 SciForge modules. Fixed
-      (glob + `tools/sciforge/check_install.sh` on every push); a new run is needed.
+      build) but its tests failed: the install rules listed 35 of 116 Fission 180 modules. Fixed
+      (glob + `tools/fission180/check_install.sh` on every push); a new run is needed.
 - [ ] First CI build downloaded and launched by Luca on Windows
 - [x] Branding pass (2026-10-13, `sf/app`, core patches #8-#13): app name, icons, settings
       folder, installer, Linux desktop entry. **Not yet proven by a full build** (see the
@@ -316,7 +316,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       unavailable items greyed), dark theme with measured colours, 131 original icons in Fusion's
       visual style, quick-access bar, navigation bar, Fusion-style timeline with playback,
       contextual SKETCH tab, Fusion shortcut keys with clash handling, Revit mouse style (=Fusion).
-      Spec + known gaps: `docs/sciforge/parity/ui-shell.md`. Not yet signed off by Luca.
+      Spec + known gaps: `docs/fission180/parity/ui-shell.md`. Not yet signed off by Luca.
 - [x] Press/Pull v1 (7.0): faces push/pull (planar + cylindrical exact), edges -> fillet, fillet face ->
       radius; parametric feature in the timeline; dialog + drag arrow + live preview; 13 golden
       models (2 documented gaps: sloped neighbours, shared corners -> need C++ per-face offset, 9.1)
@@ -332,7 +332,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
 - [ ] Unified Revolve / Hole / Fillet dialogs Fusion-style (FreeCAD's dialogs used meanwhile)
 - [ ] ViewCube shape, doc tabs in the app bar, floating command dialogs (Sketch Palette: done)
 - [x] Timeline: reorder by drag, suppress, groups (7.3); QA pass done (branch
-      `sf/timeline_browser-qa`, 4 QA scenarios, spec `docs/sciforge/parity/timeline-browser.md`)
+      `sf/timeline_browser-qa`, 4 QA scenarios, spec `docs/fission180/parity/timeline-browser.md`)
 - [ ] Sketcher parity (7.5): inference, glyphs, Fusion dimension tool feel (needs captures)
 - [x] Luca's Extrude / sketch requests of 2026-10-12 (R1-R8), 2026-10-13, **not yet checked by
       Luca**: R1 pick one closed sketch area (in the open sketch and after Finish Sketch), R2
@@ -367,7 +367,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       keyboard focus, one Ctrl+Z after Finish Sketch, curved faces refused by Create Sketch,
       typed circumscribed polygon size fixed, FreeCAD balloons off, one Enter after a typed
       value draws the line/rectangle/polygon, constraint tools with an unfitting selection
-      start and wait for picks (`SciForge_Sketch<Constraint>` in the ribbon), sketch keys
+      start and wait for picks (`Fission180_Sketch<Constraint>` in the ribbon), sketch keys
       work with a real keyboard (in the view and in FreeCAD's value fields). Spec:
       `parity/sketch.md`. Scenarios `sketch_qa.py` (12 paths), `sketch_qa_part.py`,
       `sketch_qa_keys.py`
@@ -407,27 +407,27 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       (`sf_revolve_to_*`, `sf_revolve_face_profile_follows`). Spec: `parity/revolve.md`.
 - [x] Rectangular Pattern, Circular Pattern, Pattern on Path, Mirror, Fusion-style (branch
       `sf/patterns`): Pattern Type Features (FreeCAD's LinearPattern/PolarPattern/Mirrored,
-      dress-ups included; a face click takes the feature that made it) / Faces (SciForge's
+      dress-ups included; a face click takes the feature that made it) / Faces (Fission 180's
       `PatternFeature` closes the faces into the hole or boss they bound) / Bodies (one new body
       per copy; Mirror: New Body or Join). Quantity, Distance, Extent/Spacing, One Direction/
       Symmetric per direction, Direction 2 offered at right angles, Full/Angle/Symmetric,
       Identical/Path Direction, Suppression (click the dot on a copy); origin axes and planes
       drawn to click; blue arrows and a curved angle handle; parameters/formulas; live preview;
       errors in the dialog; timeline edit.
-      Spec + gaps: `docs/sciforge/parity/patterns.md`. 6 scenarios (`patterns*.py`), 16 golden
+      Spec + gaps: `docs/fission180/parity/patterns.md`. 6 scenarios (`patterns*.py`), 16 golden
       models, unit tests `test_pattern_core.py`. Ribbon: Pattern on Path now runs
-      `SciForge_PatternOnPath` (was greyed).
+      `Fission180_PatternOnPath` (was greyed).
 - [x] Fusion-style Shell, Draft, Scale (branch `sf/shell_draft`; spec + gaps in
-      `docs/sciforge/parity/shell-draft-scale.md`). Shell (`shelling.py` / `shell_ui.py`):
+      `docs/fission180/parity/shell-draft-scale.md`). Shell (`shelling.py` / `shell_ui.py`):
       faces to take away or the body (hollow), Inside / Outside Thickness, Direction Inside /
       Outside / Both, Shell Type Sharp / Rounded, Tangent Chain, blue arrows, too-thick walls
-      explained with the thickest that fits; FreeCAD's Thickness where it can, SciForge's
+      explained with the thickest that fits; FreeCAD's Thickness where it can, Fission 180's
       `ShellFeature` for hollow/Both (swapped in place). Draft (`drafting.py` / `draft_ui.py`):
       Fixed Plane (origin squares or a flat face), pull arrow + Flip, faces, Tangent Chain,
       angle field + curved handle, on FreeCAD's Draft. Scale (`scale.py` / `scale_ui.py`):
-      SciForge's `ScaleFeature` in the body, Uniform / Non Uniform about the origin or a
+      Fission 180's `ScaleFeature` in the body, Uniform / Non Uniform about the origin or a
       corner, arrows that move with the part. Shared dialog base `pickpanel.py`. Ribbon: Scale
-      now runs `SciForge_Scale` (was greyed). 6 scenarios (`shell_draft*.py`), 20 golden models
+      now runs `Fission180_Scale` (was greyed). 6 scenarios (`shell_draft*.py`), 20 golden models
       (`sf_shell_*`, `sf_draft_*`, `sf_scale_*`), unit tests `test_shell_draft_core.py`.
 - [x] Shell / Draft / Scale QA pass (branch `sf/shell_draft-qa`, 11 bugs fixed): later steps
       keep their faces when a shell/scale/draft is edited (`follow.py`), a 1 mm cup wall is no
@@ -437,7 +437,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
 - [x] Draft of curved and free-form faces (branch `experimental`, 2026-10-20, Luca's report "I
       cant seem to select curved faces"): every face that runs along the pull direction is
       taken (the side of an extruded spline or ellipse, round walls, tangent chains of flat,
-      round and spline walls), FreeCAD's Draft kept for the faces it can tilt, SciForge's new
+      round and spline walls), FreeCAD's Draft kept for the faces it can tilt, Fission 180's new
       `draft_walls.py` for the rest. Fixed Plane / Parting Line, One / Two Side / Symmetric,
       flip, edits, followers in other bodies. Scenario `draft_curved` (50 checks), 6 golden
       models (`sf_draft_ellipse_*`, `sf_draft_spline_*`, `sf_draft_tangent_chain`), unit
@@ -455,11 +455,11 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       Split Body also takes sketch lines/arcs; Move also Point to Position. Deleting keeps
       dependants working (fillets re-pointed at the step before, Combines/copies re-routed,
       a deleted tool body kept frozen in its Combine).
-      `bodies.py` helpers for every multi-body tool. Spec + gaps: `docs/sciforge/parity/
+      `bodies.py` helpers for every multi-body tool. Spec + gaps: `docs/fission180/parity/
       bodies.md`. 6 scenarios (`bodies_*.py`), 24 golden models (`bodies_*`), unit tests
-      `test_bodies_schema.py`. Ribbon: Split Body runs `SciForge_SplitBody` (was greyed).
+      `test_bodies_schema.py`. Ribbon: Split Body runs `Fission180_SplitBody` (was greyed).
 - [x] Insert, import, export, make (7.12; branch `sf/insert`; spec + sources + gaps in
-      `docs/sciforge/parity/insert-export.md`): Insert Mesh (STL/OBJ/3MF -> a mesh body in
+      `docs/fission180/parity/insert-export.md`): Insert Mesh (STL/OBJ/3MF -> a mesh body in
       the Bodies folder, Unit Type, Flip Up, Center, Move to Ground, position/angle fields,
       the Move manipulator, timeline step, edit later), Convert Mesh (Parametric / Base
       Feature, Faceted / Prismatic; `insert.ConvertMeshFeature`), Insert STEP (one body per
@@ -476,17 +476,17 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       folder opened). `make3d*.py` replaced by `export.py` / `export_ui.py`. Ribbon: INSERT
       group wired (+ Insert STEP), MESH tab, UTILITIES > MAKE, a File menu on the quick-access
       Menu button (`ribbon_config.FILE_MENU`). 9 scenarios (`insert_*.py`, `export_*.py`,
-      320 checks), fixtures in `SciForgeTests/fixtures/`, unit tests `test_insert_core.py`,
+      320 checks), fixtures in `Fission180Tests/fixtures/`, unit tests `test_insert_core.py`,
       `test_export_core.py`.
 - [x] Fillet (F) and Chamfer, Fusion-style, plus a QA pass (branch `sf/fillet-qa`): picks of
       edges / faces / timeline features, Tangent Chain, blue arrows, live preview, errors in
       the dialog, timeline edit; QA added mm-safe value boxes with parameters/formulas,
       Ctrl+S/N/O finishing the dialog, later fillets kept on their edges after an insert or
       an edit (`blend.References`), two-solid bodies, angle limits. Spec + gaps:
-      `docs/sciforge/parity/fillet.md`. Scenarios `fillet*.py` (8 files), 10 golden models
+      `docs/fission180/parity/fillet.md`. Scenarios `fillet*.py` (8 files), 10 golden models
       `blend_*`, unit tests `test_blend_core.py`.
 - [x] CONSTRUCT and INSPECT, Fusion-style (branch `sf/inspect`; spec + gaps in
-      `docs/sciforge/parity/inspect.md`). CONSTRUCT (`construct.py` / `construct_ui.py`): all
+      `docs/fission180/parity/inspect.md`). CONSTRUCT (`construct.py` / `construct_ui.py`): all
       19 menu entries (8 planes, 5 axes, 6 points) in one dialog kind: boxes that wait blue,
       origin squares / axes / point drawn to click while a box waits, pre-selection used, live
       datum, blue arrow (Offset Plane), curved handle (Plane at Angle, Tangent Plane), sliding
@@ -501,7 +501,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       (eye shows/hides). Center of Mass (`analysis.py` / `com_ui.py`) and Interference
       (`interference_ui.py`): stored in the Analysis folder, follow the design. 7 scenarios
       (`inspect*.py`), 6 golden models (`inspect_*`), unit tests `test_inspect_core.py`. Ribbon:
-      Interference and Center of Mass now run SciForge commands (were greyed). QA pass
+      Interference and Center of Mass now run Fission 180 commands (were greyed). QA pass
       (branch `sf/inspect-qa-2`, 5 scenarios `inspect_qa*.py`, 35 paths): Measure inside a
       sketch (I keeps the sketch open), Center of Mass weighted by Physical Material and
       measurable, one Enter after a sum, picks through what the box cannot take, held
@@ -511,21 +511,21 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       takes parameters, the construction being edited never takes a click, golden
       `inspect_three_points_oblique_hole`.
 - [x] Box, Cylinder, Sphere, Torus, Coil, Pipe, Fusion-style (branch `sf/primitives`; spec +
-      gaps in `docs/sciforge/parity/primitives.md`). Pick an origin plane (squares) or a flat
+      gaps in `docs/fission180/parity/primitives.md`). Pick an origin plane (squares) or a flat
       face, place with the mouse (Box: two corners with a rubber band; Cylinder / Torus /
       Coil: centre + a point on the circle; Sphere: centre), blue on-top arrows for the sizes,
       Operation Join / Cut / Intersect / New Body picked by itself from where the shape is.
       Clicks snap to the origin, corners, sketch points and circle centres on the plane.
       Coil: 4 types, rotation, angle, 4 sections x 3 positions. Pipe: sketch or model edges
       with Chain Selection, Distance handle, 3 sections, Hollow. Parameters typed in the fields
-      keep driving the shape. On FreeCAD's PartDesign primitives / Helix / Pipe (+ SciForge
-      FeaturePython steps for Intersect). Ribbon: Pipe runs `SciForge_Pipe` (was greyed).
+      keep driving the shape. On FreeCAD's PartDesign primitives / Helix / Pipe (+ Fission 180
+      FeaturePython steps for Intersect). Ribbon: Pipe runs `Fission180_Pipe` (was greyed).
       5 scenarios (`primitives_*.py`), 25 golden models (`sf_box_*`, `sf_cylinder_*`,
       `sf_sphere_*`, `sf_torus_*`, `sf_coil_*`, `sf_pipe_*`), unit tests
       `test_primitives_core.py`.
 
 - [x] Sweep, Loft, Rib and Web, Fusion-style (branch `sf/sweep_loft`; spec + gaps in
-      `docs/sciforge/parity/sweep-loft-rib.md`). Sweep (`sweep.py` / `sweep_ui.py`): Single
+      `docs/fission180/parity/sweep-loft-rib.md`). Sweep (`sweep.py` / `sweep_ui.py`): Single
       Path / Path + Guide Rail, profile = sketch area or flat face, path/rail = sketch curves
       or part edges with Chain Selection, profile anywhere on the path (Distance / Distance
       One + Two, blue balls), Orientation, Taper, Twist, Profile Scaling, Join / Cut /
@@ -533,12 +533,12 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       (areas, faces, points; up / down / remove), Rails / Centerline, Closed, operations.
       Rib and Web (`rib.py` / `rib_ui.py`, FreeCAD has neither): Symmetric / One Side,
       Thickness and Depth arrows, To Next / Depth, Flip, Extend Curves. FreeCAD's own Pipe /
-      Loft when they give Fusion's result, SciForge's FeaturePython otherwise (swapped in
+      Loft when they give Fusion's result, Fission 180's FeaturePython otherwise (swapped in
       place on edit). Shared: `curves.py`, `curve_pick.py`. Ribbon: Rib and Web enabled (two
       lines). 7 scenarios (`sweep_loft_*.py`), 35 golden models (`sf_sweep_*`, `sf_loft_*`,
       `sf_rib_*`, `sf_web_*`). Gaps: Tangent Edges Merge, Path + Guide Surface, loft end
       conditions.
-      `SciForge_PatternOnPath` (was greyed). QA pass done (branch `sf/patterns-qa`): 17 paths
+      `Fission180_PatternOnPath` (was greyed). QA pass done (branch `sf/patterns-qa`): 17 paths
       in 5 more scenarios (`patterns_qa_*.py`), 8 bugs fixed (see Known issues).
 - [x] Sweep / Loft / Rib / Web QA pass (branch `sf/sweep_loft-qa`, 12 bugs fixed): editing a
       sweep / loft into the other kind of feature keeps the steps built on it (was refused),
@@ -557,7 +557,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       Component (drag in the browser or the menu), nested components, rename / delete /
       undo / save-reopen, a Component step in the timeline and the active component's
       timeline filter, Operation New Component in Extrude / Revolve / Sweep / Loft. Spec +
-      gaps: `docs/sciforge/parity/components.md`. 3 scenarios (`components_*.py`, 20
+      gaps: `docs/fission180/parity/components.md`. 3 scenarios (`components_*.py`, 20
       paths), unit tests `test_components_core.py`. **Not yet checked by Luca.**
 - [x] Body tools QA pass (branch `sf/bodies-qa`): 12 problems fixed (used-up body left active,
       Combine edit hiding its tools, tool clicks swallowed by the Join preview, Move type
@@ -568,7 +568,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       `bodies_qa_2.py` (10 paths), golden
       `bodies_combine_new_body_target_deleted`.
 - [x] Files, versions and recovery, Fusion-style on local folders (7.15; branch
-      `sf/versions`; spec + gaps in `docs/sciforge/parity/versions.md`): Save with Name /
+      `sf/versions`; spec + gaps in `docs/fission180/parity/versions.md`): Save with Name /
       Location / New Folder on the first save and a Version Description after, every save a
       version (git in the project folder, copies elsewhere), Version History (Open read-only,
       Promote = Save As Latest, Compare), recovery copies every 5 minutes + "Recover unsaved
@@ -589,7 +589,7 @@ Quick updates come from green "SciForge tests" runs on `develop`.
       Sheet Metal Rules dialog; Sheet Metal component type), Flange (base / contour / edge:
       height datum, bend position, angle, flip, width types, To Object, mitred corners,
       bend reliefs, overrides), Bend (Fusion's Fold), Hem (6 types), Join by Bend, Corner
-      Closure, Lofted Flange (own command), sheet metal Fillet / Chamfer, SciForge's own
+      Closure, Lofted Flange (own command), sheet metal Fillet / Chamfer, Fission 180's own
       unfolder (`sheetmetal_unfold.py`: walls rigid, bends developed by phi*(R+K*T)),
       Create Flat Pattern with the FLAT PATTERN contextual tab and Export DXF (R12, layers,
       bend notes), Unfold / Refold, Rip, Convert to Sheet Metal, drawing Bend Table / Bend
@@ -616,25 +616,25 @@ Quick updates come from green "SciForge tests" runs on `develop`.
 
 ### Beta 3 (0.1.0-beta.3): Static Stress, Auto Timeline, VEX (built 2026-10-26/27)
 
-Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`; Fusion research
-`docs/sciforge/dev/research/fusion-simulation.md`, `fusion-vex-assembly.md`; parity specs
-`docs/sciforge/parity/simulation.md`, `auto-timeline.md`, `vex-assembly.md`; session logs
-`docs/sciforge/sessions/beta3-*.md` (one per builder and QA). Nothing compiled changed.
+Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*.md`; Fusion research
+`docs/fission180/dev/research/fusion-simulation.md`, `fusion-vex-assembly.md`; parity specs
+`docs/fission180/parity/simulation.md`, `auto-timeline.md`, `vex-assembly.md`; session logs
+`docs/fission180/sessions/beta3-*.md` (one per builder and QA). Nothing compiled changed.
 
-- [x] **Static Stress** (outline 7.18). Engine `sciforge/simulation_core.py` (pure, unit tested)
+- [x] **Static Stress** (outline 7.18). Engine `fission180/simulation_core.py` (pure, unit tested)
       + `simulation.py` (Gmsh, Netgen fallback, CalculiX in a background thread, results read
-      back; SciForge writes the CalculiX constraints itself; `Job` with stages and Cancel).
+      back; Fission 180 writes the CalculiX constraints itself; `Job` with stages and Cancel).
       SETUP tab `simulation_ui.py`, `simulation_setup_*`, glyphs `simulation_glyphs.py`, solve
       dialog / Job Status; RESULTS tab `simulation_results*.py` (own Coin nodes, legend,
       probes, slice, iso-surface, Compare in Viewports, Animate GIF, HTML report). AI tools:
       create_study, add_constraint, add_load, local_mesh_control, set_study_material,
       study_settings, precheck_study, solve_study, study_results, delete_study (recipe
-      `docs/ai/recipes/static-stress.md`). Accuracy: `SciForgeTests/headless/sim_benchmarks.py`
+      `docs/ai/recipes/static-stress.md`). Accuracy: `Fission180Tests/headless/sim_benchmarks.py`
       (138 checks) and `sim_accuracy_qa.py` (205), run by `run_tests.sh --only sim` and in base,
-      and on FreeCAD for Windows by CI (`tools/sciforge/windows_sim.sh`). Gaps: one load case
+      and on FreeCAD for Windows by CI (`tools/fission180/windows_sim.sh`). Gaps: one load case
       per study (Clone Study), bonded contacts only, no remote moment / hydrostatic / bolt /
       point mass, thin walls stiff at the default mesh (a note says so), Simplify greyed.
-- [x] **Auto Timeline.** `sciforge/recognize.py` (+ `recognize_core.py`, `recognize_mesh.py`):
+- [x] **Auto Timeline.** `fission180/recognize.py` (+ `recognize_core.py`, `recognize_mesh.py`):
       describe(shape) -> base, features, plan in Fusion's order, unrecognized; `rebuild.py`
       (+ `rebuild_core.py`, `rebuild_links.py`, `rebuild_ui.py`): start / describe / compare /
       finish / stop, the reference as a ghost, Finish moves joints, grounds and patterns onto
@@ -646,16 +646,16 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 - [x] **VEX.** Hole-centre snaps `hole_snaps_core.py` / `hole_snaps.py` in Joint, Align,
       Duplicate With Joints; Insert STEP of many files; the same file again = linked occurrence
       (path + bytes); Duplicate With Joints; speed (298-part robot opens in ~28 s, was 127 s).
-      Team page `docs/sciforge/vex.md`; fixtures `SciForgeTests/fixtures/vex/`. Gaps: open speed
+      Team page `docs/fission180/vex.md`; fixtures `Fission180Tests/fixtures/vex/`. Gaps: open speed
       would gain ~8 s from a C++ change (lazy placement indicator in ViewProviderDragger),
       the "Selectable" switch needs C++ (both held for Luca), occurrence takeover keeps solids
       not history, browser forced rebuild 0.37 s (target 0.3).
 
 ## Known issues / findings
 
-- **Done 2026-10-30 (Luca: "fix the packaging with the PNG icon and the linux stuff"; core patch #20, create_bundle.sh: the 256 px PNG next to the desktop file and as `.DirIcon`, then `chmod -R a+rX AppDir`; both refusals reproduced with appimagetool build 333 on a small AppDir, which packs after). Was: BEFORE THE NEXT FULL BUILD: appimagetool's "continuous" build changed (2026-10-29, build 333) and now refuses an AppDir whose files other users cannot read** ("has mode 0700 ... found 3330 problem(s)": folders of the bundled conda environment such as usr/ssl, usr/var/cache/fontconfig, usr/cmake). It broke the 0.1.0-beta.3.1.3 patch release (run #10, linux job, nothing published). `tools/sciforge/repack_module.sh` now runs `chmod -R a+rX` on the unpacked AppImage before packing (reproduced locally: a 0700 folder is refused, after the chmod it packs). `package/rattler-build/linux/create_bundle.sh` (the full build) downloads the same continuous tool and needs the same `chmod -R a+rX AppDir` before its appimagetool call, with a SCIFORGE comment and a core-patches.md entry: not done yet because that file counts in the core id (it would have refused the patch release). Do it as the first commit of the next full build. **Confirmed by the build dry run #15 (2026-10-30, `sf/gui-tests-rework`, ee57bdd2): the Linux build compiled and passed its smoke test, then appimagetool build 333 refused the AppDir for its icon first** ("org.sciforge.SciForge{.png,.xpm} defined in desktop file but not found", "No valid .DirIcon": create_bundle.sh copies only the .svg). The fix, for Luca to decide (core id): in create_bundle.sh, next to the .svg copy, a 256 px PNG as `AppDir/org.sciforge.SciForge.png` (src/Gui/Icons/sciforge-icon-256.png) with `.DirIcon` linked to it, plus the chmod above; or pin appimagetool to a fixed release instead of `continuous`.
-- **A left release SciForge keeps from FreeCAD left its navigation thinking the button was held (Luca, 2026-10-29; fixed in 0.1.0-beta.3.1.3).** `selection_ui._ViewFilter` lets FreeCAD see every left press (a click, a box or a Component Drag cannot be told apart yet) but kept the Component Drag's moves and release: FreeCAD's `NavigationStyle.button1down` stayed true, and in the Revit style a middle-drag (pan: BUTTON3 alone) and Shift + middle-drag (orbit) matched no case until the next real left click. Now `_release_for_freecad` hands FreeCAD a release with the selection node's `selectionMode` OFF (the scene graph root IS the SoFCUnifiedSelection; AUTO 0, ON 1, OFF 2) and Ctrl (no "click on nothing clears the selection"), on every release the filter keeps (drag, box, cancelled, Select Other). FreeCAD fixed the same class itself for its ClarifySelection (gh #29090, `resetButtonState()`, not reachable from Python; a navigation-style switch would reset it but loses ZoomAtCursor and the like). Same day: the ViewCube kept turning after a release that went to another widget; a move without the left button now ends its press. Scenario `navigation_stuck_buttons` (4 checks fail on the old code).
-- **The Windows installer left NO SciForge when updating over a SciForge whose AI connector ran (Luca, 2026-10-28; fixed in 0.1.0-beta.3.1.2, core patch #19).** Claude Desktop (Gemini CLI, Claude Code) keeps SciForge's AI connector running: SciForge's own `bin\python.exe`. FreeCAD's installer checks only for `SciForge.exe` / `SciForgeCmd.exe`, then `RMDir /r` deleted file after file, stopped at the connector's open files ("Failed to remove ... no files are in use") and aborted. Now (`include/utils.nsh`): programs running from the folder are found by path (`Get-CimInstance Win32_Process`); the connector is stopped after asking, others get Retry / Cancel; the folder is moved aside to `<folder>.old` in ONE step (refused while a file is open: Retry / Cancel, nothing changed) and only then deleted; the uninstaller stops the connector too. Windows test `tools/sciforge/test_installer.ps1` (installs over a running connector, with a file held open, uninstall) in the patch release and the full build. The quick update (`install_update.ps1`) already stopped the connector. Lesson: never delete in place what cannot be put back; move first, delete after.
+- **Done 2026-10-30 (Luca: "fix the packaging with the PNG icon and the linux stuff"; core patch #20, create_bundle.sh: the 256 px PNG next to the desktop file and as `.DirIcon`, then `chmod -R a+rX AppDir`; both refusals reproduced with appimagetool build 333 on a small AppDir, which packs after). Was: BEFORE THE NEXT FULL BUILD: appimagetool's "continuous" build changed (2026-10-29, build 333) and now refuses an AppDir whose files other users cannot read** ("has mode 0700 ... found 3330 problem(s)": folders of the bundled conda environment such as usr/ssl, usr/var/cache/fontconfig, usr/cmake). It broke the 0.1.0-beta.3.1.3 patch release (run #10, linux job, nothing published). `tools/fission180/repack_module.sh` now runs `chmod -R a+rX` on the unpacked AppImage before packing (reproduced locally: a 0700 folder is refused, after the chmod it packs). `package/rattler-build/linux/create_bundle.sh` (the full build) downloads the same continuous tool and needs the same `chmod -R a+rX AppDir` before its appimagetool call, with a FISSION180 comment and a core-patches.md entry: not done yet because that file counts in the core id (it would have refused the patch release). Do it as the first commit of the next full build. **Confirmed by the build dry run #15 (2026-10-30, `sf/gui-tests-rework`, ee57bdd2): the Linux build compiled and passed its smoke test, then appimagetool build 333 refused the AppDir for its icon first** ("org.fission180.Fission180{.png,.xpm} defined in desktop file but not found", "No valid .DirIcon": create_bundle.sh copies only the .svg). The fix, for Luca to decide (core id): in create_bundle.sh, next to the .svg copy, a 256 px PNG as `AppDir/org.fission180.Fission180.png` (src/Gui/Icons/fission180-icon-256.png) with `.DirIcon` linked to it, plus the chmod above; or pin appimagetool to a fixed release instead of `continuous`.
+- **A left release Fission 180 keeps from FreeCAD left its navigation thinking the button was held (Luca, 2026-10-29; fixed in 0.1.0-beta.3.1.3).** `selection_ui._ViewFilter` lets FreeCAD see every left press (a click, a box or a Component Drag cannot be told apart yet) but kept the Component Drag's moves and release: FreeCAD's `NavigationStyle.button1down` stayed true, and in the Revit style a middle-drag (pan: BUTTON3 alone) and Shift + middle-drag (orbit) matched no case until the next real left click. Now `_release_for_freecad` hands FreeCAD a release with the selection node's `selectionMode` OFF (the scene graph root IS the SoFCUnifiedSelection; AUTO 0, ON 1, OFF 2) and Ctrl (no "click on nothing clears the selection"), on every release the filter keeps (drag, box, cancelled, Select Other). FreeCAD fixed the same class itself for its ClarifySelection (gh #29090, `resetButtonState()`, not reachable from Python; a navigation-style switch would reset it but loses ZoomAtCursor and the like). Same day: the ViewCube kept turning after a release that went to another widget; a move without the left button now ends its press. Scenario `navigation_stuck_buttons` (4 checks fail on the old code).
+- **The Windows installer left NO Fission 180 when updating over a Fission 180 whose AI connector ran (Luca, 2026-10-28; fixed in 0.1.0-beta.3.1.2, core patch #19).** Claude Desktop (Gemini CLI, Claude Code) keeps Fission 180's AI connector running: Fission 180's own `bin\python.exe`. FreeCAD's installer checks only for `Fission180.exe` / `Fission180Cmd.exe`, then `RMDir /r` deleted file after file, stopped at the connector's open files ("Failed to remove ... no files are in use") and aborted. Now (`include/utils.nsh`): programs running from the folder are found by path (`Get-CimInstance Win32_Process`); the connector is stopped after asking, others get Retry / Cancel; the folder is moved aside to `<folder>.old` in ONE step (refused while a file is open: Retry / Cancel, nothing changed) and only then deleted; the uninstaller stops the connector too. Windows test `tools/fission180/test_installer.ps1` (installs over a running connector, with a file held open, uninstall) in the patch release and the full build. The quick update (`install_update.ps1`) already stopped the connector. Lesson: never delete in place what cannot be put back; move first, delete after.
 - **Open (CI #307, 2026-10-30): `vex_shaft` once found the shaft turned 0.0175 degrees after OK**
   ("square to the channel": 3.17597 mm across instead of 3.175, also after Undo); the second
   run in a fresh profile passed (labelled FLAKY), 4 of 4 local runs under `--stress` pass. Same
@@ -718,10 +718,10 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   volume, place and box and the Combine's tools.
 - **Timeline playback went on after a command opened and was cancelled within 0.45 s (fixed
   2026-10-30 on `sf/gui-tests-rework`; not released yet).** Fusion stops the playback when a
-  command starts; SciForge's playback step looked for an open command only on its own tick
+  command starts; Fission 180's playback step looked for an open command only on its own tick
   (450 ms), so E then Cancel between two ticks left it playing: the design moved on after
   Cancel (timeline_browser_qa P4 on CI #326, 2 of 2; 2 of 3 here at full priority). taskui's
-  `set_current` (every SciForge dialog opening) now stops the playback at once
+  `set_current` (every Fission 180 dialog opening) now stops the playback at once
   (`timeline_ui.stop_playback`); 3 of 3 after. Needs a CHANGELOG line in the next patch.
 - **Closing a design while its drawing tab was the active one could crash FreeCAD (fixed
   2026-10-30 on `sf/gui-tests-rework`; not released yet).** Found by drawing2_breakout under
@@ -757,7 +757,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     step (Group): it must wait too, so `body.Shape` is stale while a dialog holds steps.
   - Fusion: editing a step rolls the timeline to it; later features are greyed out and not
     computed; everything is computed when the edit ends (Autodesk University 2018 "Under the
-    Hood of Fusion 360"). SciForge now does the same: `edit_rollback.py` (via
+    Hood of Fusion 360"). Fission 180 now does the same: `edit_rollback.py` (via
     `taskui.edit_object`) rolls the marker to the edited step and back; `preview.hold()`
     (every `taskui.Panel` opening) makes the steps after the marker wait in
     `preview.recompute`; `preview.catch_up()` rebuilds them when the dialog's undo step
@@ -765,7 +765,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     dialog's own step is never held (`preview._waiting`). Dialogs that call
     `doc.recompute()` themselves still rebuild everything (correct, just slower).
   - FreeCAD's Freeze (Std_ToggleFreeze) is no way to hold steps: not in Python, and a frozen
-    object's properties turn read-only (SciForge repairs later steps' references).
+    object's properties turn read-only (Fission 180 repairs later steps' references).
   - OpenCASCADE booleans in FreeCAD already run parallel (`SetRunParallel` in TopoShape.cpp).
     A cut with a B-spline wall of degree ~11 costs ~0.1-0.15 s where a plane or cone costs
     ~0.015 s; exactly coincident faces cost nothing extra.
@@ -776,7 +776,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     cones about the pull direction only. Any other face (`SurfaceOfExtrusion` of a spline or
     ellipse, B-splines, spheres, a cylinder lying across the pull) is skipped with "Failed to
     add some face for drafting, skip" (TopoShapeExpansion.cpp) and the step stays unchanged.
-    SciForge used to filter those faces out of the selection, so they never lit up.
+    Fission 180 used to filter those faces out of the selection, so they never lit up.
   - A wall = a face whose normal is square to the pull direction everywhere (sampled 5 x 5):
     then it is the side of a shape extruded along the pull, and its drafted form is the ruled
     surface through its cross-section on the fixed plane with rulings leaning by the angle.
@@ -816,12 +816,12 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   `setActiveObject("part", None)` clears the slot; FreeCAD's `PartDesign_Body` puts the
   body into the active Part; `part.addObject(body)` moves a body with its sketches; hiding
   a Part leaves the children's `Visibility` flags; `doc.removeObject(part)` orphans the
-  children (SciForge removes bodies first); a reopened file has no active part or body;
+  children (Fission 180 removes bodies first); a reopened file has no active part or body;
   activating a body from Python never sets the "part" slot (only FreeCAD's tree
   double-click does). FreeCAD makes labels unique by default, so a component named after
-  body "Body" became "Body001" and a second "Body1" would become "Body1001": SciForge
+  body "Body" became "Body001" and a second "Body1" would become "Body1001": Fission 180
   switches on `Preferences/Document/DuplicateLabels` while it is on (`theme.VIEWER_SETTINGS`,
-  kept and given back). Spec: `docs/sciforge/parity/components.md`.
+  kept and given back). Spec: `docs/fission180/parity/components.md`.
 - **FreeCAD facts found by the insert / export work (2026-10-13):** `Mesh::Feature.Mesh`
   comes back with the body's Placement baked into its points, bounds and Topology (copy it
   and set `Placement = App.Placement()` first: `insert.kernel_copy`); setting `.Mesh` resets
@@ -835,15 +835,15 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   (`insert.restore_active_document`). FreeCAD's DXF importer opens its own modal dialog in
   the GUI (`Mod/Draft/dxfShowDialog`): a scenario hung on it until the timeout (the FreeCAD
   log stayed empty: output is lost when the process is killed). FreeCAD's 3MF writer leaves
-  objects unnamed (SciForge writes the names into the zip). Enter in a spin box of a QDialog
+  objects unnamed (Fission 180 writes the names into the zip). Enter in a spin box of a QDialog
   or task panel presses OK (Fusion's Enter): tests commit typed spin values with Tab, and a
   separate dialog window is not the active window under xvfb, so `interpretText()` stands
   in for the focus change (`insert_steps.set_spin`).
 - **Lesson (2026-10-10): green tests, unusable product.** Luca's first real session: Create Sketch
   opened FreeCAD pop-ups, dragging the Extrude arrow crashed, Extrude ignored clicks on profiles
   and faces, a stuck dialog made E/Q/Create Sketch silently do nothing. The smoke test called
-  SciForge code directly and never clicked. Rule now: **every interactive feature gets a step in
-  `SciForgeTests/gui/journey_gui.py` driven by real mouse clicks/drags on the 3D view**, and a
+  Fission 180 code directly and never clicked. Rule now: **every interactive feature gets a step in
+  `Fission180Tests/gui/journey_gui.py` driven by real mouse clicks/drags on the 3D view**, and a
   feature is not "done" until that passes. Click one step *after* the key that opens a task panel
   (the panel narrows the 3D view).
 - CI quirks (GitHub runner, xvfb + software GL): a click on an outline edge can land on the face
@@ -863,14 +863,14 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   polls the dragger with a QTimer instead. Use FreeCAD's `view.addEventCallback` (GIL-safe) for
   mouse events; defer real work from selection observers/event callbacks with
   `QTimer.singleShot`.
-- FreeCAD 1.1 draws origin planes small and fixed-size: SciForge draws its own big squares while
+- FreeCAD 1.1 draws origin planes small and fixed-size: Fission 180 draws its own big squares while
   Create Sketch waits (`sketch_ui.PlanePicker`) and picks them by ray maths. From the isometric
   view (camera +x -y +z) the XZ square is in front of XY for y > 0, as in Fusion.
 - Extrude profiles: sketches (click inside a shaded closed region, `profile_pick.py`) or a planar
   body face `(feature, "FaceN")` as Pad/Pocket `Profile` (FreeCAD supports face profiles).
   Distances are signed along the outward normal, so a cut into the part is negative (`flip`).
 
-- Prototype bug (fixed in `src/Mod/SciForge`): `package.xml` lacked `<subdirectory>./</subdirectory>`,
+- Prototype bug (fixed in `src/Mod/Fission180`): `package.xml` lacked `<subdirectory>./</subdirectory>`,
   so FreeCAD 1.1 looked for `Forge/InitGui.py` and silently skipped the add-on. It would never have
   appeared on Luca's machine.
 - Prototype bug (fixed): `Sketcher_External` no longer exists in 1.1. It is now
@@ -878,51 +878,51 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 - **Upstream bug (core patch #4):** `LinearPattern.Spacings2` defaults to `[0.0]`, so 2-direction
   linear patterns in Spacing mode stack row 2 on row 1. Fixed in C++, compiled in build run #2
   (2026-10-12: `plate_hole_grid` PASS on the Windows build); earlier note:
-  the first `sciforge-build.yml` run verifies it (golden `plate_hole_grid` must PASS there).
+  the first `fission180-build.yml` run verifies it (golden `plate_hole_grid` must PASS there).
   Worth reporting upstream.
 - FreeCAD API: `body.newObject()` does not move `Body.Tip` for pattern/mirror features (the GUI
-  commands do it separately). The golden builder sets Tip explicitly. Anything SciForge builds
+  commands do it separately). The golden builder sets Tip explicitly. Anything Fission 180 builds
   from Python must do the same.
 - Parity item: FreeCAD leaves split seam faces unless `Refine = True`; Fusion never shows them.
-  SciForge features should default to refined. Golden models assume refined face counts.
+  Fission 180 features should default to refined. Golden models assume refined face counts.
 - Sketch on XZ extrudes toward -Y in FreeCAD. Fusion's plane orientation differs (Y-up vs Z-up
   setting): needs a parity decision during the sketch behavior spec.
 - OCC results matched the hand formulas for corner fillets (two fillets meeting a sharp edge),
   vertex blends (all-edge rounded box), chamfer corners, countersinks and shells: a good sign
   for 9.2, but these are easy cases. The real fillet benchmark (100+ hard cases) is still to do.
 - **Editing a sketch switches FreeCAD to the Sketcher workbench** (and back after). So the
-  SciForge interface is a "shell" (`shell.py`) that follows workbench changes instead of living in
+  Fission 180 interface is a "shell" (`shell.py`) that follows workbench changes instead of living in
   the workbench's Activated/Deactivated.
 - **Trap:** FreeCAD's `ToolBarManager::saveState()` saves every toolbar's visibility on workbench
-  switches. Hiding toolbars naively would hide them in plain FreeCAD forever. SciForge hides the
+  switches. Hiding toolbars naively would hide them in plain FreeCAD forever. Fission 180 hides the
   toolbar's toggle action first (saveState skips those). Menu-bar visibility is not persisted.
 - FreeCAD's Sketcher binds single letters (L, S, E, P, I, C, H, V, T...) to constraints. Fusion's
-  keys win while SciForge is on; clashing FreeCAD keys are parked and restored (`shortcuts.py`).
+  keys win while Fission 180 is on; clashing FreeCAD keys are parked and restored (`shortcuts.py`).
 - FreeCAD's "Revit" navigation style is exactly Fusion's default mouse mapping.
 - The 3D view does render under xvfb in the GUI smoke test (screenshots show the part), the
   earlier blank view was just timing.
-- **Quick updates**: SciForge is pure Python, so the CI artifact `SciForge-quick-update-<sha>`
-  (made on every green `SciForge tests` run) + `install_update.ps1` replaces Mod\SciForge in
+- **Quick updates**: Fission 180 is pure Python, so the CI artifact `Fission180-quick-update-<sha>`
+  (made on every green `Fission 180 tests` run) + `install_update.ps1` replaces Mod\Fission180 in
   Luca's portable build. Full builds only for C++ changes (core patches). Tell Luca when one is due.
 - Installer lessons (Luca's Windows): a plain `.ps1` double-click closes at once, so start it via
-  `install_update.cmd` (Bypass + pause). Renaming `Mod\SciForge` failed with "Access to the path
+  `install_update.cmd` (Bypass + pause). Renaming `Mod\Fission180` failed with "Access to the path
   is denied" (an open Explorer window/antivirus/OneDrive blocks folder renames), so the installer
-  now copies files over the old ones, removes leftovers, backs up to `<SciForge>\SciForge-backups`
+  now copies files over the old ones, removes leftovers, backs up to `<Fission 180>\Fission180-backups`
   (never inside `Mod`: FreeCAD loads every folder there) and self-elevates if the folder is not
   writable. Tested with pwsh as an unprivileged user (locked file, read-only folder).
-- FreeCAD only honours a command's shortcut if the command is in a visible menu/toolbar. SciForge
+- FreeCAD only honours a command's shortcut if the command is in a visible menu/toolbar. Fission 180
   binds keys with QShortcut on the main window instead (`shortcuts.py`); GUI test presses real keys.
-- FreeCAD saves dock visibility and toolbar state on exit: SciForge turns itself off on the main
+- FreeCAD saves dock visibility and toolbar state on exit: Fission 180 turns itself off on the main
   window's Close event (and back on if the close is cancelled). The browser lives *inside* the
   "Model" dock (its widget swapped), never hiding the dock.
-- Preferences: SciForge records whether each preference existed and removes it again on exit
+- Preferences: Fission 180 records whether each preference existed and removes it again on exit
   (writing back GetBool's False default would have turned off FreeCAD's gradient for good).
 - PartDesign::FeaturePython works as a timeline feature (Press Pull); its proxy class path is
-  stored in files: keep `sciforge.presspull.PressPullFeature` stable.
+  stored in files: keep `fission180.presspull.PressPullFeature` stable.
 - OCC's generic offset ("fill") gives BSpline end caps that do not merge with planar neighbours;
   build exact slabs for planes (prism) and cylinders (revolved ring).
 - Sketch constraint expressions: path `.Constraints[i]` works; names with dots (base.width) do not.
-- Attacher: AxisOfCurvature/CenterOfCurvature need a circular *edge*; SciForge maps a round face
+- Attacher: AxisOfCurvature/CenterOfCurvature need a circular *edge*; Fission 180 maps a round face
   to its edge (Fusion lets you click the face).
 - Fusion semantics still unknown (need parity capture before adding golden models): taper
   angle sign, chamfer two-distance side assignment, "intersect" and "new body" behavior.
@@ -937,7 +937,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   constraints, solver failures) go to `Gui::NotificationArea`; scenarios watch it
   (`sketch_input.watched`) and fail on any new message.
 - **Trap: Sketcher creates constraint actions with single-letter shortcuts (C, T, E, P...) the
-  first time a sketch opens**, after SciForge parked the clashing keys, so C/T/E/P went dead in
+  first time a sketch opens**, after Fission 180 parked the clashing keys, so C/T/E/P went dead in
   sketches. `sketch_mode.repark_keys()` re-parks them on every sketch session.
 - Ctrl+Z / Ctrl+Y did nothing (FreeCAD only honours shortcuts of visible menus and the menu bar
   is hidden): `config.SHORTCUTS` now binds Std_Undo/Std_Redo. Other Ctrl shortcuts (Ctrl+S,
@@ -945,12 +945,12 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 - **Upstream bug (core patch #7):** trimming a line where it crosses a full circle at 0 degrees
   makes a Coincident with the circle's non-existent start point: malformed constraint, invalid
   sketch, error balloons. Python repair `sketch_fix.py` runs after every sketch commit.
-- FreeCAD's polygon constraints (equal + tangent) can lean into a rhombus for even n; SciForge's
+- FreeCAD's polygon constraints (equal + tangent) can lean into a rhombus for even n; Fission 180's
   polygons use equal sides + corners on a construction circle (`sketch_polygon.py`), checked
   for n = 3..12 at many rotations, 4 DoF like Fusion.
 - FreeCAD topological naming: a sketch's projected *vertical* edge of a part loses its reference
   after the base sketch's dimension changes (horizontal/top-face edges survive). Not fixable in
-  SciForge Python; known gap.
+  Fission 180 Python; known gap.
 - `addRectangularArray(ids, vec, clone, rows, cols, constr, perpscale)`: rows go along `vec`,
   columns along `vec` turned -90 degrees and scaled, so a +Y second direction needs a negative
   `perpscale`.
@@ -959,7 +959,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   succession on the 3D view merge (one click per scenario step); a Coin search path dies with
   its action (keep node + parent, never the path: SIGSEGV otherwise).
 - **Sketch inference in Python (2026-10-12, `sketch_infer.py`)**: FreeCAD snaps in C++ from
-  the mouse pixel, but SciForge's filter on the 3D view's drawing area runs first: it can
+  the mouse pixel, but Fission 180's filter on the 3D view's drawing area runs first: it can
   swallow a mouse event and `sendEvent` a copy with another position, and FreeCAD's own
   tool then lands exactly on that pixel (probe: created point = pixel's sketch point to
   1e-7 mm). Pixel -> sketch point the way FreeCAD does it: coin = (x * ratio,
@@ -971,7 +971,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     (`ViewProviderSketch::mouseButtonPressed` uses the picked point): with Snap off a Ctrl
     click still landed on the end point; shrinking the pick radius for that click fixes it.
   - Autoconstraints off during a click that *finishes* a line also drops the constraints
-    of its start (they are generated at the end): SciForge turns it back on in the
+    of its start (they are generated at the end): Fission 180 turns it back on in the
     synchronous commit signal of "Add sketch line" (before "Add Auto-Constraints").
   - FreeCAD 1.1 Python: `sketch.moveGeometry(geo, pos, Vector, False)` (no `movePoint`);
     `sketch.GeometryCount` is cheap (`len(sketch.Geometry)` copies every curve).
@@ -1013,7 +1013,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   again; the next Single Hole removes such orphan sketches inside its own undo step.
 - Single Hole helper sketches are listed in the browser's Sketches folder as "Hole N Sketch"
   (hidden); double-clicking one, or timeline "Edit Profile Sketch" on the hole, opens the Hole
-  dialog (`SciForgeType = "HoleSketch"` + `hole_ui.EDITORS`).
+  dialog (`Fission180Type = "HoleSketch"` + `hole_ui.EDITORS`).
 - **Extrude/Press Pull QA findings (branch `sf/extrude_presspull-qa`)**, rules for every dialog:
   - FreeCAD's selection takes the left-button *release* and stops it there
     (`SoFCUnifiedSelection` sets handled): a `view.addEventCallback` never sees the release of
@@ -1028,7 +1028,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     that blocked every later command. `preview.UndoCancels(panel)` handles all of these (and
     other designs' clicks are filtered out of picks). Use it in every feature dialog.
   - FreeCAD's Pad/Pocket silently ignore a taper up to a face and a Pad's up-to-last: the
-    SciForge extrude feature (`ExtrudeFeature`, property `Operation`) builds those.
+    Fission 180 extrude feature (`ExtrudeFeature`, property `Operation`) builds those.
   - OpenCASCADE cannot offset a whole sphere ("no closed bounds"): Press Pull builds the shell.
   - `doc.commitTransaction()`/`abortTransaction()` leave the step name opened by
     `doc.openTransaction(name)` pending when nothing changed: the next change anywhere (even
@@ -1056,7 +1056,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   now hidden, the action triggered, then closed. Trap for everything: a singleShot to a
   bound method of a Qt object is cancelled when that object is deleted.
 - **A scenario that fails to import kept FreeCAD open for the runner's 15-minute timeout.**
-  run_tests.sh now starts scenarios through `SciForgeTests/gui/scenario_launcher.py`, which
+  run_tests.sh now starts scenarios through `Fission180Tests/gui/scenario_launcher.py`, which
   writes a failed result ("the scenario file loads") and quits. Scenarios import QtTest
   from `PySide6` (FreeCAD's `PySide` shim has no QtTest).
 - **FreeCAD 1.1 floats the Tasks panel over the 3D view (its "overlay") with title bars of
@@ -1100,7 +1100,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   the sketch are suppressed, deleted or added. Session log "Sketch on a reshaped face".
 - Open question for Luca: a Single Hole's hidden helper sketch is listed in the browser as
   "Hole 1 Sketch" (double-click opens the hole); Fusion lists no sketch for a single hole.
-- `tools/sciforge/make_icons.py` empties the icon folder before writing: the hand-drawn
+- `tools/fission180/make_icons.py` empties the icon folder before writing: the hand-drawn
   `palette_check.svg` (check-box tick) would have been deleted; it is now in its `RAW` table.
   - Scenario traps: in the iso view a point behind a wall or right behind an arrow is not
     clickable (compute what is in front); the disc at the bottom of a hole is only visible
@@ -1114,7 +1114,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   own direction (origin axis = +X/+Y/+Z, edge = its curve direction, construction line =
   start -> end), Reversed flips it. `Midplane` splits the whole angle; `TwoAngles` turns
   Angle one way and Angle2 the other and **silently gives a wrong solid when the two add up
-  to more than 360** (SciForge refuses that in the dialog). `Groove` with `UpToFace` returns
+  to more than 360** (Fission 180 refuses that in the dialog). `Groove` with `UpToFace` returns
   an **empty solid without any error** (volume 0, both directions), so Fusion's Type "To"
   does not use UpToFace: the hidden `revolve.RevolveTo` helper measures the angle from the
   profile to the object on every recompute and the revolve's Angle / Reversed follow it by
@@ -1150,7 +1150,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   Profiles/edges from another body go through a hidden SubShapeBinder; a construction line,
   construction axis or sketch axis of another body (no shape to bind) through
   `revolve.AxisLink` (a hidden Part2DObjectPython with a global link that rebuilds the line
-  every recompute, so the revolve follows edits). Helpers carry `SciForgeTimeline = False`.
+  every recompute, so the revolve follows edits). Helpers carry `Fission180Timeline = False`.
 - FreeCAD hides the previous tip when a feature is added and shows it again only when the
   feature is deleted with its own command: after removing/moving a preview feature from
   Python, show the body's Tip again (`revolve._show_tip`), or the body looks empty.
@@ -1162,17 +1162,17 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   messages sit aside until the menu opens (`aboutToShow`), and items compute their text per
   column. `sketch_input.notifications()` now handles all four; steps can declare expected
   messages (`step.notes_ok`), `QUIET` lists harmless ones ("Autoconstraints cause redundancy").
-- FreeCAD's balloons are off while SciForge is on (`MaxOpenNotifications` 0). Messages still
-  go to its list and the Report view; SciForge says what matters via `commands.tell`.
+- FreeCAD's balloons are off while Fission 180 is on (`MaxOpenNotifications` 0). Messages still
+  go to its list and the Report view; Fission 180 says what matters via `commands.tell`.
   **Trap: never set `NonIntrusiveNotificationsEnabled` to False**: FreeCAD then shows its user
   warnings ("Wrong selection"...) as *blocking message boxes* (`Gui/Notifications.h`); it hung
-  sketch_qa. SciForge sets it True.
+  sketch_qa. Fission 180 sets it True.
 - **Trap (keys): a real keyboard sends keys to the focus widget, not to the GL drawing area.**
   That is `Gui::View3DInventorViewer` (the GL widget's parent; `h.press` sends to the GL widget
   and the key bubbles up to it), or, while a drawing tool runs, FreeCAD's on-screen value field
   (`Gui::QuantitySpinBox`, a child of the MDI view). FreeCAD's `DrawSketchKeyboardManager`
   keeps digits, Enter, Esc... in that field (for 2 s after a digit or Enter) and passes other
-  keys to the viewer. SciForge's sketch keys sit on the viewer (`_KeyFilter`) and on each value
+  keys to the viewer. Fission 180's sketch keys sit on the viewer (`_KeyFilter`) and on each value
   field when it gets the focus (`SketchSession._focus_changed`): Enter there sends FreeCAD's own
   Ctrl+Enter (accept all fields), Esc stops the tool, a tool letter switches tools unless a
   value was typed into that field (then letters are a unit, "12 mm"). Tests that mean "the
@@ -1184,8 +1184,8 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 - Sketcher_LeaveSketch records its recompute as a separate undo step ("Sketch recompute"):
   `sketch_mode._merge_recompute_step` undoes/redoes it together with the step before it.
 - A dimension added on an already-set size stays *driving* in FreeCAD (sketch over-constrained,
-  red). `RedundantConstraints`/`ConflictingConstraints` are 1-based; SciForge makes it driven.
-- FreeCAD's polygon tool puts a typed size on the LAST curve as a Radius: SciForge's
+  red). `RedundantConstraints`/`ConflictingConstraints` are 1-based; Fission 180 makes it driven.
+- FreeCAD's polygon tool puts a typed size on the LAST curve as a Radius: Fission 180's
   circumscribed polygon now ends with the circle touching the edges (`circle_indices()`).
 - New-style Sketcher tools take typed values (on-screen fields) but the line tool draws one
   line per two clicks; `sketch_line.LineChain` clicks the end of each new line for the user
@@ -1255,7 +1255,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     misses that line (`timeline_input.MORE_ERRORS` catches it).
   - A right-click on a timeline step/browser row selected it, and a command waiting for picks
     (Fillet takes whole features) used it. Right-clicks no longer pick while a command is open.
-  - SciForge helpers (objects with `SciForgeRole`, or `SciForgeTimeline = False`) are not
+  - Fission 180 helpers (objects with `Fission180Role`, or `Fission180Timeline = False`) are not
     timeline steps; extrude.py's profile binders lacked the flag and showed as steps.
   - Test input: release a drag with `QTest.mouseRelease` (through the window); a release
     sent with `sendEvent` left the button "down" and the next click went to the dragged widget.
@@ -1265,7 +1265,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     `timeline_rolled_cut` (fails without the fix, checked).
 - **Shell / Draft / Scale findings (branch `sf/shell_draft`)**:
   - FreeCAD's `PartDesign::Thickness` with no faces just copies the part (it cannot hollow a
-    closed body) and has one thickness (no Both): SciForge's `ShellFeature` does those
+    closed body) and has one thickness (no Both): Fission 180's `ShellFeature` does those
     (offset inward + cut; two thick solids fused). Join "Intersection" = Fusion's sharp
     corners, "Arc" = rounded.
   - **OpenCASCADE's thick solid gives wrong parts without complaint** when the wall is too
@@ -1281,7 +1281,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     does it but turns faces into NURBS: exact (ellipse error 1e-15), yet FreeCAD's volume of
     curved NURBS faces is ~1 % off. A sketch still attaches to a flat NURBS face.
   - FreeCAD's naming loses a Pad's corner vertex when the Pad's length changes (the link
-    becomes `?Vertex6`, "missing element reference" in the log); SciForge uses the same
+    becomes `?Vertex6`, "missing element reference" in the log); Fission 180 uses the same
     number then (`scale.plain_name`).
   - **A selection gate also filters `Gui.Selection.addSelection` from code**: a dialog that
     re-selects its own picks must allow them in its gate, or (pickpanel) read back what was
@@ -1296,7 +1296,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 - **Shell / Draft / Scale QA findings (2026-10-11, branch `sf/shell_draft-qa`)**:
   - **FreeCAD's element names are what keeps a later step on its face.** A sketch on a face,
     a Press Pull, a fillet name the faces of the step before them; FreeCAD 1.1 finds them
-    again through "mapped" names built from each step's history. SciForge's Python features
+    again through "mapped" names built from each step's history. Fission 180's Python features
     must keep those names stable or every later step breaks on an edit:
     - Two shapes made from the same solid and joined (Shell Both: inside and outside
       walls; hollow Both: two offsets) both have tag 0, so the fuse tells their faces apart
@@ -1307,7 +1307,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
       uniform `scale()` names them differently: switching or editing lost the faces.
       `scale._keep_names` copies the part's own `ElementMap` and `Tag` (same topology,
       same order) in both cases.
-    - Swapping FreeCAD's Thickness for SciForge's shell (Inside to Both) makes new names
+    - Swapping FreeCAD's Thickness for Fission 180's shell (Inside to Both) makes new names
       anyway (the outside walls are new faces). Repointing the dependents must happen
       *after* the new feature has computed (else FreeCAD stores a stale shadow name:
       "subshape not found Shell001.Face11"), and with the same face found by geometry.
@@ -1339,9 +1339,9 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     "0" the arrow vanished and never came back. Arrows now follow the direction only.
 
   - FreeCAD's attacher cannot express most Fusion constructions (angle about an edge, tangent
-    at a clicked spot, a fraction along a curve). SciForge attaches those datums to a hidden
-    helper in the body (`construct.ConstructionFrame`, `SciForgeTimeline = False`,
-    `SciForgeRole`) that works out the exact frame on every recompute; Offset Plane of a face
+    at a clicked spot, a fraction along a curve). Fission 180 attaches those datums to a hidden
+    helper in the body (`construct.ConstructionFrame`, `Fission180Timeline = False`,
+    `Fission180Role`) that works out the exact frame on every recompute; Offset Plane of a face
     of the same body stays FreeCAD's own FlatFace + offset (its distance is an expression).
   - `PropertyLinkSubList` groups consecutive picks on the same object into one entry with
     several sub-names: read it back with `construct.expand()` or picks get lost.
@@ -1352,7 +1352,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   - Datum planes are big and in front: a scenario that clicks a face behind one hides it with
     the browser eye first (that is what a person would do too). In CONSTRUCT dialogs the
     datums the blue box cannot take let clicks through (see Inspect QA findings).
-  - Section Analysis cuts with a Coin clip plane (`SciForgeSectionClip`) inserted first in the
+  - Section Analysis cuts with a Coin clip plane (`Fission180SectionClip`) inserted first in the
     view root of each solid step of a body (not the body's own root: that cut its sketches
     and construction planes too), found again on every refresh (never keep a pointer); cut
     faces are `shape.common(big face)`, drawn by the analysis' own view provider.
@@ -1365,8 +1365,8 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     which counts the object's label a second time in the document's unique-label registry
     (`DocumentObject::onChanged` with a stale `oldLabel`). After the object is deleted or
     its preview cancelled, the label stays "taken" and FreeCAD renames the next object
-    (a cancelled Section1 made the next one "Section3"). SciForge's analyses answer
-    `allowDuplicateLabel` with yes only while SciForge sets the label it worked out
+    (a cancelled Section1 made the next one "Section3"). Fission 180's analyses answer
+    `allowDuplicateLabel` with yes only while Fission 180 sets the label it worked out
     (`labels.set_exact`); datums take the next free number (`labels.set_free`). Other
     features with Python view providers (Press Pull, Shell, Scale ...) have the same leak.
   - Run `black` only on your own files: a reformatted shared file broke another agent's text
@@ -1383,7 +1383,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
       an Enter the formula is taken and OK runs. Other dialogs still need two Enters (shared
       `taskui.DistanceField`; owner: taskui).
     - Fusion picks through what the active selection box cannot take. Origin squares / axes
-      drawn by SciForge used to yield to anything under the mouse; they now yield only to
+      drawn by Fission 180 used to yield to anything under the mouse; they now yield only to
       something the box accepts (`_takes_under`), and construction planes / axes / points the
       box cannot take are made unpickable while it waits (`ConstructPanel._pick_through`, a
       `pickpanel.Looks` put back when the box changes or the dialog closes).
@@ -1442,14 +1442,14 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 
 - **Body tools findings (branch `sf/bodies`)**:
   - FreeCAD's `PartDesign::Boolean` adopts its tool bodies as children (GeoFeatureGroup): they
-    then move with the target body and their parent is no longer the document. SciForge's
+    then move with the target body and their parent is no longer the document. Fission 180's
     Combine is its own `PartDesign::FeaturePython` (`combine.CombineFeature`) that links each
     tool body's end step (`PropertyLinkListGlobal`), so the timeline, edits and undo work.
   - A step that "uses up" bodies (Combine without Keep Tools) registers in
     `bodies.CONSUMERS`; `bodies_gui.Watch` hides/shows bodies only on a *change* of that state
     (after recompute, undo/redo, delete), so a body the user shows on purpose stays shown.
     Body-tool dialogs pause it (`bodies.pause`) while they show the bodies they work on.
-  - Deleting a step (SciForge's Delete): steps that used its edges/faces are re-pointed at the
+  - Deleting a step (Fission 180's Delete): steps that used its edges/faces are re-pointed at the
     same edges/faces of the step before it (`delete._relink_to_base`, matched by geometry),
     so a fillet survives deleting the boss under it. The timeline's own Delete does not do
     this yet (timeline owner: `delete.delete_steps` can be called without a transaction).
@@ -1465,18 +1465,18 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     material weighs 1 kg/m^3 (Fusion starts in Steel: `material.effective` counts Default as
     Steel); Brass and GrayCastIron have no density in FreeCAD's library (not offered).
     Setting `ViewObject.ShapeAppearance` on a body copies it to every feature, but a feature
-    added later starts grey: SciForge stores looks on the body (JSON, undoable) and puts
+    added later starts grey: Fission 180 stores looks on the body (JSON, undoable) and puts
     them on every step after each recompute (`appearance.sync`, cached by shape hash).
   - FreeCAD's `Document.openTransaction` commits any open transaction (no nesting): a command
     that must be one undo step cannot call `timeline_ops.delete` (it opens its own).
   - Requests for other owners: browser (show a body's physical material, hide used-up
     bodies), inspect (mass from `bodies.mass(body)`), timeline (a kind "delete_face" with
-    the delete icon for `SciForge::DeleteFace`; steps outside bodies such as a Move copy never
+    the delete icon for `Fission180::DeleteFace`; steps outside bodies such as a Move copy never
     roll back with the marker).
     surroundings, an explicit start point on a path. The timeline module has no entry for
-    `SciForge::PatternOnPath` (generic icon, title "Pattern On Path"): timeline owner, add a
+    `Fission180::PatternOnPath` (generic icon, title "Pattern On Path"): timeline owner, add a
     kind `"pattern_path": ("Pattern on Path", "pattern_rect")` to `KINDS` and map
-    `"PatternOnPath"` to it in `KIND_BY_SCIFORGE_TYPE`.
+    `"PatternOnPath"` to it in `KIND_BY_FISSION180_TYPE`.
 - **Fillet / Chamfer QA findings (branch `sf/fillet-qa`)**:
   - **Trap: FreeCAD's number box reads a bare number in the unit it shows.** Below 0.1 mm
     `Gui::QuantitySpinBox` shows micrometres; after a drag down to 0.01 mm ("10.00 µm") a
@@ -1537,7 +1537,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     the same support and mode. The XZ origin plane's normal is -Y; a box's top-face frame
     starts at that face's corner, not at the body origin.
   - Helper objects (coil section, pipe path and section) are `Part::Part2DObjectPython` in the
-    body, marked `SciForgeRole` + `SciForgeTimeline = False` so the timeline skips them;
+    body, marked `Fission180Role` + `Fission180Timeline = False` so the timeline skips them;
     `primitives.drop_orphans` removes helpers whose step was deleted (when a dialog opens).
   - Mouse placing on a plane: measure what one pixel is *on the plane* and round clicks to
     nice steps of about 6 pixels (`primitives_core.nice_floor`); within 10 px snap to the
@@ -1559,7 +1559,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     message): it makes each wire of the section its own shell; on a closed path both shells
     are already closed, each becomes a solid and the inner one vanishes into the outer
     (`FeaturePipe.cpp`, "shells are already closed"). A hollow pipe round a closed path is
-    SciForge's own `PipeFeature` (it now does Join / Cut / New Body as well as Intersect;
+    Fission 180's own `PipeFeature` (it now does Join / Cut / New Body as well as Intersect;
     property `Operation`), and a pipe that is one stays one (no step swaps).
   - **FreeCAD's helix always widens away from its section**: a negative `Angle` (or a
     negative `Growth`) gives exactly the mirror image, the same as `Reversed`. A coil that
@@ -1613,7 +1613,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     `dialog_input.type_into` (types, then Tab) for formulas.
   - FreeCAD's Hole has no "up to face" depth. Extents To is now a hidden
     `Part::Part2DObjectPython` in the body just before the hole (`hole.HoleToDistance`,
-    role `HoleTo`, `SciForgeTimeline = False`): it measures the depth from the hole's start
+    role `HoleTo`, `Fission180Timeline = False`): it measures the depth from the hole's start
     to the target on every recompute and the hole's Depth is the expression
     `<helper>.Distance`. Removed with the hole (`hole.remove`, timeline Delete via
     `_helpers_of`); an orphan is dropped by the next hole. Typed formulas never touch Depth
@@ -1676,14 +1676,14 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     edge ("?Edge3", "A curve picked from Extrude is gone") and a Press Pull on a face of the
     sweep lost its face (nested hashed names no longer match). Not reproducible headless
     without the GUI's own steps. Fix: `curves.remember(feature, props)` stores where each
-    picked part element is after every good compute (hidden `SciForgeLinkMemory`, an
+    picked part element is after every good compute (hidden `Fission180LinkMemory`, an
     output property) and `curves.refind` points a lost link at the element found again
-    there (same curve / surface kind, facing the same way, nearest). Used by SciForge's
+    there (same curve / surface kind, facing the same way, nearest). Used by Fission 180's
     sweep and loft and by Press Pull (two lines in `presspull.py`). Part edges / faces are
-    therefore always built with SciForge's sweep / loft (FreeCAD's Pipe / Loft just fail).
+    therefore always built with Fission 180's sweep / loft (FreeCAD's Pipe / Loft just fail).
     Other features that link part elements (Extrude To Object, fillets after an edit...)
     may need the same: worth checking in their QA.
-  - Rebuilding a step as the other kind of feature (FreeCAD Pipe <-> SciForge sweep) used
+  - Rebuilding a step as the other kind of feature (FreeCAD Pipe <-> Fission 180 sweep) used
     to be refused when a later step used it ("Sweep is used by Sketch002"). Now
     `curves.relink_users(old, new)` moves every link (each face / edge found again by
     `follow.find`) after the new step computed, before the old one is removed.
@@ -1707,7 +1707,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     web poked out of walls thinner than that (Depth mode; To Next was clipped). The band's
     two sides are now carried exactly to the wall.
   - Fusion makes a new body for a sweep / loft that does not touch the part: the automatic
-    operation is now New Body there (SciForge's Extrude still says "separate solids").
+    operation is now New Body there (Fission 180's Extrude still says "separate solids").
   - Scenario traps: a Create Sketch click on an origin square with a face of the part
     behind it goes to the face (`sweep_loft_qa_part` clicks XZ left of the cylinder); in
     the XZ sketch of a cylinder a circle can be drawn inside the part (clicks land on the
@@ -1715,7 +1715,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 - **Patterns QA findings (branch `sf/patterns-qa`, break-and-fix pass)**:
   - **Trap: rebuilding a step as a new object silently drops every link to it.** A pattern
     edit that needs the other kind of feature (Suppression, a Quantity formula, Faces, a
-    fillet among the objects) replaced FreeCAD's LinearPattern with SciForge's feature; a
+    fillet among the objects) replaced FreeCAD's LinearPattern with Fission 180's feature; a
     sketch on its top face, a fillet on its edges or a Press Pull of its face lost their
     reference without a message. `pattern.relink_dependents(old, new)` moves every link first,
     each face/edge/vertex found again by place (`pattern.twin_element`). Any feature that
@@ -1724,7 +1724,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     when none of their originals is left (`FeatureTransformed.cpp`, `originals.empty()`): after
     the patterned hole was deleted the copies stayed and everything after the pattern froze.
     `pattern.OrphanWatch` (an App observer, `slotRecomputedObject`) passes the base shape
-    through and sets the timeline warning (`SciForgeWarning`). Worth reporting upstream.
+    through and sets the timeline warning (`Fission180Warning`). Worth reporting upstream.
   - FreeCAD's pattern features repeat their originals in list (= click) order: a boss picked
     after the hole in it filled the copied hole. Originals are now sorted in timeline order.
   - Fusion has no active body: a pattern dialog started while a second body was active
@@ -1736,7 +1736,7 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
     for other dialogs** (owners of `taskui.ArrowDragger` / `extrude_ui.AngleDragger`): the
     taper handle has the same flat band, and every dialog that picks faces should ignore the
     release after a press on a handle.
-  - OpenCASCADE's Python exceptions print as "<unknown exception data>"; SciForge's pattern
+  - OpenCASCADE's Python exceptions print as "<unknown exception data>"; Fission 180's pattern
     feature now raises sentences (`pattern.kernel_message`).
   - Not patterns' (seen during QA, sf/patterns base): an Extrude to a New Body from a sketch
     on another body's face shows a step "ExtrudeNNN profile" in the timeline (extrude /
@@ -1767,12 +1767,12 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
   - OpenCASCADE gives a full circle one vertex (its seam) and a cylinder face a seam line:
     neither is a corner a person sees (`move_ui._corners`), a click there must snap to the
     centre.
-  - FreeCAD 1.1 element maps survive SciForge's Python features: a sketch on a face of a
+  - FreeCAD 1.1 element maps survive Fission 180's Python features: a sketch on a face of a
     Combine / Move / Split result stays on that face when an earlier step changes (tested
     headless: face index changed, the sketch followed). Limit: a face a Join merged
     (refine, ";RFI" in its name) is named differently once the Combine is switched to Cut;
     a Press Pull on it then fails with "select the face again" (FreeCAD's own Boolean
-    loses it the same way). Fixing it would need SciForge's own face names for Combine
+    loses it the same way). Fixing it would need Fission 180's own face names for Combine
     results (faces lying on a target face named after it).
 
 ## Questions waiting for Luca
@@ -1781,8 +1781,8 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 (See outline section 12. Also:)
 
 - **Patch 0.1.0-beta.3.2.1 guesses (2026-11-02), check in your Fusion:** (a) several sketch
-  fillets made together: are they kept Equal (SciForge: one Radius dimension, the rest Equal)?
-  (b) Align onto an origin / construction plane: does the part keep its side (SciForge) or go
+  fillets made together: are they kept Equal (Fission 180: one Radius dimension, the rest Equal)?
+  (b) Align onto an origin / construction plane: does the part keep its side (Fission 180) or go
   to the plane's other side? (c) Offset: does a click on a picked curve drop it, are Chain
   Selection and Direction remembered, does O again end Offset without making it? Offset's
   "Two Sides" (a distance per side) is not built yet. (d) A row selected in the 3D view or
@@ -1794,10 +1794,10 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 
 - Merge `sf/home-cloud-ai` (Home, places, AI connector, chat panel: M0-M4) into `develop`?
   The brief says to ask after M3; not merged without your OK.
-- M5 (signing in to Dropbox / Google Drive / OneDrive from inside SciForge) needs your app
+- M5 (signing in to Dropbox / Google Drive / OneDrive from inside Fission 180) needs your app
   registrations (brief section 3.5).
 
-- Primitives (`docs/sciforge/parity/primitives.md`): which defaults does your Fusion show for
+- Primitives (`docs/fission180/parity/primitives.md`): which defaults does your Fusion show for
   Torus Position, Coil Rotation (Clockwise?) and Section Position, and is Section Size of a
   square/triangle section the circle round it or its side?
 - The browser lists a Single Hole's own sketch ("Hole 1 Sketch") under the body. Fusion
@@ -1818,22 +1818,22 @@ Plan `docs/sciforge/plan-beta3.md`; briefs `docs/sciforge/dev/briefs/beta3-*.md`
 
 ### Session log: Sketch fixes list, patch 0.1.0-beta.3.2.1 (`develop`, 2026-11-02)
 
-Luca's file "sciforge sketch fixes" (9 items, 5 screenshots: Fusion's OFFSET dialog, a corner
-hovered with Fusion's sketch Fillet, a Fusion line with its boxes, SciForge's browser with a
+Luca's file "fission180 sketch fixes" (9 items, 5 screenshots: Fusion's OFFSET dialog, a corner
+hovered with Fusion's sketch Fillet, a Fusion line with its boxes, Fission 180's browser with a
 "Body" during Create Sketch, his split/aligned block with raised text). Items 1, 2, 3, 5, 6 done
 in this session; 4 (Offset), 7 + 8 (browser) and 9 (Align) by three agents in their own git
 worktrees, cherry-picked onto develop and retested on the merged tree. How each works, with
-sources: `docs/sciforge/parity/sketch.md` ("Luca's sketch fixes", "Sketch Offset with Fusion's
+sources: `docs/fission180/parity/sketch.md` ("Luca's sketch fixes", "Sketch Offset with Fusion's
 OFFSET panel"), `timeline-browser.md`, `bodies.md`, `direct-modify.md` (A12, A13).
 
-- **1 Arrow keys.** SciForge's own tools' value boxes (`sketch_draw.Boxes`) never take the
+- **1 Arrow keys.** Fission 180's own tools' value boxes (`sketch_draw.Boxes`) never take the
   keyboard (keys come from the 3D view) and had no caret: Left / Right went on to FreeCAD's
   navigation, which pans with the arrow keys. `ValueBox` draws a caret (`cursorRect`, read-only
   QLineEdit); Left/Right/Home/End/Backspace/Delete edit at it; Up/Down kept off the view while
   typing. FreeCAD's own fields (Line, Rectangle) and the dimension box were already right.
   Scenario `sketch_value_box_keys`.
 - **2 Tool switching.** `sketch_tools_ui._SketchCommand` and `sketch_pick_ui` stopped only
-  SciForge's tool: FreeCAD's Rectangle went on taking the clicks (reproduced: two clicks after
+  Fission 180's tool: FreeCAD's Rectangle went on taking the clicks (reproduced: two clicks after
   Mirror drew a rectangle). `SketchSession.give_way()` ends either (Sketcher_StopOperation,
   selection kept). Scenario `sketch_tool_switch`.
 - **3 Fillet.** `sketch_fillet_tool.SketchFillet` rewritten: hover a corner = both curves lit +
@@ -1867,7 +1867,7 @@ OFFSET panel"), `timeline-browser.md`, `bodies.md`, `direct-modify.md` (A12, A13
   axes as To are endless and two-sided (`align_core.landing`). Scenario `modify_align_split`,
   golden `direct_align_split_onto_plane`.
 - Tests: unit 2809 OK; the 64 existing sketch scenarios swept on a snapshot of the module
-  (`run_tests.sh` symlinks the live module: copy `tools/sciforge` + `src/Mod/SciForge` to a
+  (`run_tests.sh` symlinks the live module: copy `tools/fission180` + `src/Mod/Fission180` to a
   scratch folder and run from there to keep editing meanwhile); the agents ran their areas'
   scenarios (browser: 158, align: 21, offset: 6, 3 of 3 under `--stress`).
 - Open (Known issues / later): `versions.summary` still counts an empty body ("Bodies 1" for
@@ -1878,12 +1878,12 @@ OFFSET panel"), `timeline-browser.md`, `bodies.md`, `direct-modify.md` (A12, A13
 
 ### Session log: GUI test rework (`sf/gui-tests-rework`, 2026-10-29)
 
-Luca's brief (a claude.ai doc, "SciForge GUI tests: rework brief for Claude Code"): make the
+Luca's brief (a claude.ai doc, "Fission 180 GUI tests: rework brief for Claude Code"): make the
 GUI scenarios trustworthy, paced by the app's state instead of fixed waits; done = five green
 full runs in a row on one commit, no helper that clicks or types on a timer, failures that name
 the step and the state, Luca never asking again for a test fixed because CI was slow. Work on a
 branch off develop (a patch release was going out from develop). How it all works now:
-`docs/sciforge/dev/gui-tests.md` (rules, API, converting, proving, facts found).
+`docs/fission180/dev/gui-tests.md` (rules, API, converting, proving, facts found).
 
 - Steps 1-8 of the brief's plan are in (see the status block at the top). Commits on the
   branch: c02de905 (harness, runner, fresh profiles, gui_env, stress/repeat), a3b5f921 (input
@@ -1902,7 +1902,7 @@ branch off develop (a patch release was going out from develop). How it all work
 - "A real bug still fails" checked with throwaway breakages (not pushed): Duplicate With Joints
   doing nothing failed vex_duplicate in 35 s with "Waited for Duplicate With Joints is open (done
   of a_open)" and stopped (27 steps not run); a command hanging in a question box was ended by
-  the watchdog (SCIFORGE_STEP_LIMIT_S=20 for the check) naming the step and the dialog.
+  the watchdog (FISSION180_STEP_LIMIT_S=20 for the check) naming the step and the dialog.
 - Lessons: never edit run_tests.sh while it runs (bash reads it as it goes: a "syntax error"
   at the end); `pkill -f <pattern>` kills the shell running it when the pattern is in its own
   command line (use the PIDs); no `git stash` games with a dirty tree (a conflict in harness.py
@@ -2004,14 +2004,14 @@ branch off develop (a patch release was going out from develop). How it all work
   sandbox: HTTP 403, like branch deletes): Luca pushed `sciforge-v0.1.0-beta.3.2` on 76eaf22a
   himself** (Git Bash, a blob-less shallow clone of Release: `git clone --depth 1
   --filter=blob:none --no-checkout --branch Release <url>`, tag, push; he also deleted the
-  proof branches). **PUBLISHED 2026-11-02 02:43 UTC: SciForge 0.1.0-beta.3.2** (pre-release),
-  https://github.com/Luca0422git/SciForge-Parametric-Design/releases/tag/sciforge-v0.1.0-beta.3.2,
+  proof branches). **PUBLISHED 2026-11-02 02:43 UTC: Fission 180 0.1.0-beta.3.2** (pre-release),
+  https://github.com/Luca0422git/Fission-180/releases/tag/sciforge-v0.1.0-beta.3.2,
   build #17 (core id 97ee6139a1). Assets: installer .exe 509 MB, portable .7z 430 MB, AppImage
-  827 MB, quick-update zip 8 MB, sciforge-release.json, SHA256SUMS.txt; every SHA256SUMS line
-  and sciforge-release.json's sha256 match GitHub's own asset digests; notes = the CHANGELOG
+  827 MB, quick-update zip 8 MB, fission180-release.json, SHA256SUMS.txt; every SHA256SUMS line
+  and fission180-release.json's sha256 match GitHub's own asset digests; notes = the CHANGELOG
   section. Build #17 green to the end: all 9 GUI scenario parts passed on the published
   AppImage. Still to do (small, next release): `make_release_files.DEFAULT_REPO` is still
-  `Luca0422git/SciForge`, so a full build's `notes_url` uses the old repo name (works through
+  `Luca0422git/Fission-180`, so a full build's `notes_url` uses the old repo name (works through
   GitHub's rename redirect; the patch workflow passes the new name), see "Repo name" above.
 - **Evening of 2026-10-30.** Luca: "fix the packaging with the PNG icon and the linux stuff. and
   then lets build". Core patch #20 (97ee6139): create_bundle.sh puts the installed 256 px PNG
@@ -2041,7 +2041,7 @@ develop: "you do it" (release them as patch 3.1.1).
   scenario `joints_ok_during_preview`. (After it, tests run #296 crashed once in
   `sim_qa_results_close`, see Known issues; #297 on `ba0377bd` green, the patch released.)
   **0.1.0-beta.3.1.2 (2026-10-28, prepared):** the installer fix above (Luca: every update to a new
-  full build said "Failed to remove" and left no SciForge). VERSION, `_FALLBACK_VERSION`, CHANGELOG.
+  full build said "Failed to remove" and left no Fission 180). VERSION, `_FALLBACK_VERSION`, CHANGELOG.
   Status: [x] prepared [x] trial patch release with the Windows installer test green (dry run #8
   on `13287b61`: A over a running connector, B a file held open (stopped, 32905 of 32905 files
   untouched), C uninstall in place: all pass) [x] tests green (#300) [x] published (Luca: "publish
@@ -2049,7 +2049,7 @@ develop: "you do it" (release them as patch 3.1.1).
   again; Release and the tag there; six files).
 
 - After 3.1.1 (03:28 UTC): Luca's screenshot of the installer's "Failed to remove" (every update to a
-  new full build left no SciForge; he suspected the Claude connector, rightly): installer fix, core id
+  new full build left no Fission 180; he suspected the Claude connector, rightly): installer fix, core id
   without the installer scripts, Windows test `test_installer.ps1`, patch 0.1.0-beta.3.1.2 prepared.
   Dry run #7 on Windows: A (over a running connector) and B (a file held open: stopped, old
   untouched, 32905 of 32905 files) pass; C (uninstall in place, `_?=`) refused because the
@@ -2091,13 +2091,13 @@ session, released), then "put the vex stuff in beta 3 ... one shot for beta 3". 
 as the step files work and we are able to import large amounts of items into an assembly";
 "when i say align, i mean align ... center points on squares and such".
 
-How it was built (plan `docs/sciforge/plan-beta3.md`, briefs `docs/sciforge/dev/briefs/beta3-*.md`):
+How it was built (plan `docs/fission180/plan-beta3.md`, briefs `docs/fission180/dev/briefs/beta3-*.md`):
 the spine and scaffold first on a local `beta3` branch (ribbon tabs, workspace switch, module
 contracts, icons), then six builders in git worktrees (`/home/user/wt/<name>`, branches
 `sf/<name>`): sim-core, sim-ui, sim-results, at-recognize, at-tools, vex; then independent QA
 passes (sim-engine-qa, autotimeline-qa, vex-qa, sim-qa), two user journeys (journey-vex,
 journey-rebuild) and one check of a beta-2 leftover (undo-leftover). Each wrote a session log
-`docs/sciforge/sessions/beta3-<name>.md`. Integration: merge into `beta3`, regenerate
+`docs/fission180/sessions/beta3-<name>.md`. Integration: merge into `beta3`, regenerate
 (`make_ai_docs.py`, `parity.py`, `make_icons.py`), unit + key scenarios, then
 `git push origin beta3:develop` (always a fast-forward).
 
@@ -2110,7 +2110,7 @@ What integration found (beyond the builders' own tests):
   `reuse=False`.
 - 560+ GUI scenarios ran past 80 min in six CI parts: nine parts now (tests and build); in
   CI #283 they took 42-57 min (two more only because of the hang below), of 90 allowed.
-- New CI job "tests (Windows simulation)" (`tools/sciforge/windows_sim.sh`): the hand
+- New CI job "tests (Windows simulation)" (`tools/fission180/windows_sim.sh`): the hand
   calculations on the official FreeCAD for Windows. Its first run: 337 of 339 passed; two
   small cantilevers stopped in CalculiX without a reason. The engine now solves such a stop
   again with SOLVER=SPOOLES (the solver of every Linux accuracy run) and logs CalculiX's exit
@@ -2120,13 +2120,13 @@ What integration found (beyond the builders' own tests):
   re-ran lost test runs. Keep reports in the scratchpad and /home/user/fc.
 
 Release: nothing compiled changed since 0.1.0-beta.2 (core_id unchanged), so beta 3 can go out
-with Actions > SciForge patch release (notes start "Built on 0.1.0-beta.2's program", a new
+with Actions > Fission 180 patch release (notes start "Built on 0.1.0-beta.2's program", a new
 wording for a non-patch number) or with a full build (tag). Luca decides.
 
 More integration finds after the first push:
 - A closed design's waiting dialog (Extrude, Hole, Fillet, Offset waiting for a pick) left
   FreeCAD's application-wide undo step open: the next design's edits went into it
-  (`sciforge/undo_leftover.py`, one watch for every dialog; scenario
+  (`fission180/undo_leftover.py`, one watch for every dialog; scenario
   `dialog_closed_design_undo`, 241 checks; branch `sf/undo-leftover`).
 - The rebuild journey (`sf/journey-rebuild`, four journey scenarios) found that a rebuilt part
   was not really parametric (a thicker plate buried its pocket and holes): sketches of the
@@ -2152,13 +2152,13 @@ More integration finds after the first push:
   speed and the Selectable switch need compiled changes (questions for Luca).
 - Lesson (CI #281 red): anything that changes what a tool answers (a new material in
   `material.LIBRARY` changes list_materials) needs the docs examples recorded again:
-  `SCIFORGE_DOCS_RECORD=1` with `SciForgeTests/headless/docs_runner.py` (in FreeCAD), then
-  `tools/sciforge/make_ai_docs.py`. The unit tests do not catch it; `--only headless` does.
+  `FISSION180_DOCS_RECORD=1` with `Fission180Tests/headless/docs_runner.py` (in FreeCAD), then
+  `tools/fission180/make_ai_docs.py`. The unit tests do not catch it; `--only headless` does.
 - CI #283 red, about 40 scenarios in two parts: `journey_vex` and `journey_vex_sim` hung in
   the Insert STEP file dialog (the test typed the parts folder into the name box and the box's
   completer took the Enter on a busy runner; a "file not found" box then waited) until the
   900 s kill, and the killed FreeCAD's recovery copy stayed in the shared test profile: every
-  later scenario's SciForge offered it back. The test now sets the dialog's folder and closes a dialog still
+  later scenario's Fission 180 offered it back. The test now sets the dialog's folder and closes a dialog still
   open after 20 s (the step fails instead of hanging); `run_tests.sh` moves recovery copies
   away with the crash marker after a scenario that did not end cleanly. Lesson: when many
   scenarios fail in one CI part, look for the first one that was killed or crashed; the rest
@@ -2168,14 +2168,14 @@ More integration finds after the first push:
   violation in ccx 2.22's default solver); every check passed. If it gets frequent, solve with
   SPOOLES first on Windows (Linux uses it anyway).
 - Published 0.1.0-beta.3 by the patch release workflow (trial #4 green first; it also checked
-  that SciForge's own Windows bundle ships ccx.exe and gmsh.exe: `create_bundle.sh` copies them
-  under `set -e`, and the Linux trial ran the 371 simulation checks on SciForge's AppImage).
+  that Fission 180's own Windows bundle ships ccx.exe and gmsh.exe: `create_bundle.sh` copies them
+  under `set -e`, and the Linux trial ran the 371 simulation checks on Fission 180's AppImage).
   The notes' first line says "if you have 0.1.0-beta.2.2 or a later patch": beta.2 / 2.1 users
   get Update now too (same core); `make_release_files.patch_note` could name the oldest
   release with that core (not done: it would have cost another test run).
 - Selectable/Unselectable, the "needs C++" note from the VEX builder was wrong. A body's own
   Selectable off: a script in plain FreeCAD 1.1.4 could no longer pick a body in an App::Part,
-  but inside SciForge (real clicks) the body in a component stayed pickable while a root body
+  but inside Fission 180 (real clicks) the body in a component stayed pickable while a root body
   did not (why the two differ was not found). The body's steps carry their own SoPickStyle
   (SHAPE) below the body's; switching every PartDesign::Feature's view too works in both
   (experiments not kept). Pick resolution: `getViewProviderByPathFromHead`,
@@ -2207,7 +2207,7 @@ More integration finds after the first push:
 
 ### Session log: Patch 0.1.0-beta.2.2 (`develop`, 2026-10-26)
 
-Brief `docs/sciforge/dev/briefs/patch-beta2.2.md` (four items, SciForge files only).
+Brief `docs/fission180/dev/briefs/patch-beta2.2.md` (four items, Fission 180 files only).
 
 - **1. Joint delete.** Not reproduced as described: deleting a Revolute joint (bodies at the
   root, one filleted, at 0 and 90) from the browser right-click, the Delete key on the row, the
@@ -2253,7 +2253,7 @@ Brief `docs/sciforge/dev/briefs/patch-beta2.2.md` (four items, SciForge files on
   patch release run 40402286290 started with the GitHub tools (ref Release, publish true):
   prepare 1 min, Linux AppImage + tests 15 min, Windows portable + installer + golden 22 min,
   publish 2 min. Base = 0.1.0-beta.2.1 (same core fd4a01850d). Assets: installer 494 MB, .7z
-  421 MB, AppImage 826 MB, quick update 7 MB, sciforge-release.json, SHA256SUMS. The notes say
+  421 MB, AppImage 826 MB, quick update 7 MB, fission180-release.json, SHA256SUMS. The notes say
   "A patch release" once now.
 - Release: VERSION / `_FALLBACK_VERSION` 0.1.0-beta.2.2, CHANGELOG (### Fixed + ### Improved;
   no intro line: the brief asked for one, but patch-release.md says the generated notes already
@@ -2273,7 +2273,7 @@ to split them. No code changed this session: the spec, this file and a brief.
   the spec, stress-only sim is fine".
 - **The split** (Decisions log, 2026-10-26): patch 0.1.0-beta.2.2 = joint-delete bug, drag a
   joint to set limits, hover ghost of hidden bodies, diagonal Fillet / Chamfer arrows, built by
-  a separate patch session from `docs/sciforge/dev/briefs/patch-beta2.2.md` (Luca's words, what
+  a separate patch session from `docs/fission180/dev/briefs/patch-beta2.2.md` (Luca's words, what
   was read, suspects, what to build for each). Beta 3 = Auto Timeline + Static Stress (the
   "Beta 3" block under Phase 1). The spec: outline 7.18 added, sections 0, 7.10, 8 and Phase 3
   changed; `make_ai_docs.py` re-run for the AI docs' copy.
@@ -2310,17 +2310,17 @@ need a way to quick patch the software ... there has to be a quick update withou
 zip". The in-app half existed (Update now: same core id -> the module zip, `install_update.ps1`,
 restart; `update_core.plan`); what was missing was publishing a release without the build.
 
-- `.github/workflows/sciforge-patch-release.yml` (workflow_dispatch, always on `develop`'s newest
+- `.github/workflows/fission180-patch-release.yml` (workflow_dispatch, always on `develop`'s newest
   commit; a push to develop touching its files runs a trial). Jobs: prepare (VERSION/tag, core id,
   `patch_release.py` picks the base = newest release with the same core and all four files and
-  refuses a version already released or not newer; CHANGELOG section; "SciForge tests" green on
+  refuses a version already released or not newer; CHANGELOG section; "Fission 180 tests" green on
   the sha; `Release` is an ancestor; the quick update with `--core`), windows (base portable .7z
   -> `repack_module.sh portable` -> `make_installer.sh` as in scenario-debug -> windows_golden on
   it), linux (base AppImage -> `repack_module.sh appimage` with appimagetool,
   APPIMAGE_EXTRACT_AND_RUN -> `run_tests.sh --only base` on it), release (make_release_files
   `--require-all --patch-of`, `gh release create --target sha`, then Release moved with the git
   refs API, force=false). Workflow-token tags start no other workflow (no full build).
-- `patch_release.py` + `SciForgeTests/unit/test_patch_release.py` (base choice, short core ids,
+- `patch_release.py` + `Fission180Tests/unit/test_patch_release.py` (base choice, short core ids,
   drafts, names `_v<base>-` -> `_v<new>-`, two-page `gh api --paginate` output, trial mode);
   `make_release_files.py --patch-of` ("**A patch release.**" first in the notes, unit test).
 - The first patch: `0.1.0-beta.2.1` (VERSION, `_FALLBACK_VERSION`, README, known-issues title,
@@ -2334,11 +2334,11 @@ restart; `update_core.plan`); what was missing was publishing a release without 
 - **0.1.0-beta.2.1 published 2026-10-24 17:18 UTC** (Luca: "publish the patch"): CI #270 green on
   1a511933; Release fast-forwarded fe50c786..1a511933 by this session; the workflow started with
   the GitHub tools (run 40113941643, 21 minutes). Release page: prerelease, installer, .7z,
-  AppImage, quick update, sciforge-release.json (core fd4a01850d = beta.2's, so Update now from
+  AppImage, quick update, fission180-release.json (core fd4a01850d = beta.2's, so Update now from
   beta.2 is the 7 MB module), SHA256SUMS. Small thing for next time: the notes say "A patch
   release" twice (the generated first line and the CHANGELOG section's own intro): a patch's
-  CHANGELOG section needs only its "### Fixed" list (docs/sciforge/patch-release.md says so). Docs for Luca:
-  `docs/sciforge/patch-release.md`; CLAUDE.md has the rule.
+  CHANGELOG section needs only its "### Fixed" list (docs/fission180/patch-release.md says so). Docs for Luca:
+  `docs/fission180/patch-release.md`; CLAUDE.md has the rule.
 
 ### Session log: Sketch on a reshaped face (`develop`, 2026-10-23, after the beta.2 release)
 
@@ -2358,7 +2358,7 @@ and offset from the face.
   P12/P13 (the face's own boss circle became a third From Sketch hole).
 - **Fix:** the sketch still hangs on the earliest step; only its projected face is the face
   as it is now (`create_sketch`: `_earliest(..., same_outline=True)` for `auto_project`, which
-  keeps the clicked point in `SciForgeAutoProjectedAt`, sketch coordinates, hidden).
+  keeps the clicked point in `Fission180AutoProjectedAt`, sketch coordinates, hidden).
   - FreeCAD finding (headless, `suppress_exp*.py`): a projection from a later step breaks for
     good when a step at or before it is suppressed: the mapped element name (";#23:1;:M;FLT;...")
     is not found, FreeCAD drops the link (`ExternalGeometry` becomes []), keeps frozen copies,
@@ -2400,13 +2400,13 @@ and offset from the face.
   Draft / fillet, outline = the face's, on the face; a line on two projected corners; Suppress
   the fillet (timeline menu): sketch on, outline 40 x 30, the line went with the corners;
   Unsuppress: 34 x 24, line back; Delete the fillet: 40 x 30; Ctrl+Z: 34 x 24.
-- **Luca on release speed** ("4 hours to have a build ready is abismal"): a fix in SciForge's
+- **Luca on release speed** ("4 hours to have a build ready is abismal"): a fix in Fission 180's
   Python never needs the full build (no core change since 0.1.0-beta: Update now is the 7 MB
   module). Proposed to him: a "patch release" workflow that, when `core_id` matches the latest
-  release, runs the tests and publishes only the quick update + `sciforge-release.json` (and
+  release, runs the tests and publishes only the quick update + `fission180-release.json` (and
   repacks the portable/AppImage with the new module) in minutes; and batching fixes. Not built:
   waiting for his answer. Meanwhile every CI run on `develop` has the `quick-update` artifact
-  (docs/sciforge/quick-update.md).
+  (docs/fission180/quick-update.md).
 
 ### Session log: Merge for 0.1.0-beta.2 (`develop`, 2026-10-23)
 
@@ -2436,13 +2436,13 @@ The session was started on `Release`.
   `browser_opacity_hover` passes.
 
 #### Version 0.1.0-beta.2 (295348f2)
-- `src/Mod/SciForge/VERSION` and `_FALLBACK_VERSION`; CHANGELOG section (release notes come
+- `src/Mod/Fission180/VERSION` and `_FALLBACK_VERSION`; CHANGELOG section (release notes come
   from it: `make_release_files.changelog_section` finds it); README badge, tabs, what works;
   known-issues (sheet metal / plastic no longer "not built"; the AI gap).
 - Scenarios with the old number written in: `version_label` reads the VERSION file;
   `update_check` keeps pretending to be a 0.1.0-beta install (its fake releases beta.2 ...
   beta.10 are "newer"), but P13 ("Updated to X") is about the running version, so it uses
-  `sciforge.__version__`.
+  `fission180.__version__`.
 - No compiled-part change since 0.1.0-beta (`core_id.sh` paths untouched): Update now from
   0.1.0-beta is a module-only update.
 
@@ -2457,11 +2457,11 @@ The session was started on `Release`.
 #### CI: 6 scenario parts, and the crash marker a scenario leaves (3e56b3f1)
 - **The 90-minute limit**: develop alone (481 scenarios in 4 parts) took 83-91 minutes a
   part; part 1 was cancelled at the limit in both run #258 and run #259 (the rest of #259
-  green). The merge makes 519. `sciforge-tests.yml` and the build's scenario jobs now use 6
-  parts (`--shard K/6`; artifacts `sciforge-test-output-scenarios-1..6`), the debug workflow's
+  green). The merge makes 519. `fission180-tests.yml` and the build's scenario jobs now use 6
+  parts (`--shard K/6`; artifacts `fission180-test-output-scenarios-1..6`), the debug workflow's
   default is 1/6.
 - **welcome_line's "no crash line" (run #258)**: some earlier scenario of that part left
-  SciForge's crash marker (`<profile>/SciForge/crash/running-<id>.json`; the harness quits
+  Fission 180's crash marker (`<profile>/Fission180/crash/running-<id>.json`; the harness quits
   Qt normally, so a marker left means FreeCAD crashed while closing). `run_tests.sh` now
   checks after each scenario: a marker left fails THAT scenario ("FreeCAD did not end
   cleanly"), moves marker + `session-<id>.log` (faulthandler's stack) to
@@ -2529,22 +2529,22 @@ Luca (going to bed): "There are two areas of fusion that we are missing. Sheet m
 plastic ... plan all the features that belong in those tabs, and then build them all. In one
 shot. Both tabs. And ... take a look at the surface tab and make sure everything is fully
 fledged out. Research what fusion has to offer and include it in the plan." 8 hours. The
-breakdown for him: `docs/sciforge/sessions/wave6-overnight.md`.
+breakdown for him: `docs/fission180/sessions/wave6-overnight.md`.
 
 #### How (orchestrator + workflows)
-- Research (4 agents + 2 critics): `docs/sciforge/dev/research/` (fusion-sheet-metal.md,
-  fusion-plastic.md, fusion-surface.md, surface-gaps.md = SciForge's SURFACE tab audited
+- Research (4 agents + 2 critics): `docs/fission180/dev/research/` (fusion-sheet-metal.md,
+  fusion-plastic.md, fusion-surface.md, surface-gaps.md = Fission 180's SURFACE tab audited
   with file:line, integration-map.md = how tabs / body kinds / steps / icons / tests plug
   in). **WebFetch cannot reach any host from the sandbox and the WebSearch budget is about
   200 searches per turn shared by all agents**: facts come from search excerpts and from the
   Fusion API stubs (`adsk/fusion.py` on PyPI). Menu order is mostly G.
-- Plan `docs/sciforge/plan-sheet-metal-plastic-surface.md`; briefs `dev/briefs/wave6-common.md`
+- Plan `docs/fission180/plan-sheet-metal-plastic-surface.md`; briefs `dev/briefs/wave6-common.md`
   + one per builder. Scaffold first (on develop): the two tabs in `ribbon_config.py` with
   every new command `None` + `# owner:` comments, the SURFACE tab's full Fusion menus +
   ASSEMBLE, `_same(group, label)` (a tab repeating SOLID entries uses the same dicts),
   contracts `sheetmetal_core.py` / `sheetmetal.py` and `plastic_core.py` / `plastic.py`,
   empty `*_ops.py` / `*_schema.py` per builder (imported by core.py / schema.py), and
-  `make_icons.py` now runs every `tools/sciforge/icons_<area>.py` in its namespace (no more
+  `make_icons.py` now runs every `tools/fission180/icons_<area>.py` in its namespace (no more
   merge conflicts on the icon file).
 - Seven builders in worktrees (sm-forming, sm-flat, sm-more, plastic-1, plastic-2,
   surface-3, surface-4), each followed by an independent QA agent on `sf/<area>-qa`; then
@@ -2555,7 +2555,7 @@ breakdown for him: `docs/sciforge/sessions/wave6-overnight.md`.
   running run: merge into a local integration worktree, push only at chosen points.
 
 #### Built (details, sources and gaps in the parity docs; per-area session logs in
-`docs/sciforge/sessions/<area>.md`)
+`docs/fission180/sessions/<area>.md`)
 - **SHEET METAL** (`parity/sheet-metal.md`, `sheet-metal-flat.md`, `sheet-metal-more.md`):
   rules (dialog, library, In This Design, Thickness expressions, Sheet Metal component type,
   browser Document Settings row), Flange (base / contour / edge with Height Datum, Bend
@@ -2567,7 +2567,7 @@ breakdown for him: `docs/sciforge/sessions/wave6-overnight.md`.
   Table / Bend Note.
 - **PLASTIC** (`parity/plastic.md`, `plastic-2.md`): Assign / Manage Plastic Rules (per
   component; 16-rule library incl. FDM PLA / PETG; material assigned; user library in prefs
-  `Mod/SciForge/Plastic`), rule defaults + links in Shell / Draft / Rib / Web / thin Extrude
+  `Mod/Fission180/Plastic`), rule defaults + links in Shell / Draft / Rib / Web / thin Extrude
   (`plastic.apply_defaults` / `remember_links` / `follow`; nothing changes without a rule),
   Boss (+ screws as a component), Rest, Rule Fillet, Snap Fit, Lip, Design Advice.
 - **SURFACE** (`parity/surface.md`, `surface-modify.md`): surface-3's options (Offset Type,
@@ -2621,7 +2621,7 @@ breakdown for him: `docs/sciforge/sessions/wave6-overnight.md`.
 - PartDesign passes a *suppressed* FeaturePython step's base through as a solid: a
   suppressed surface step leaves its body empty (fixed for surface-4 steps; still open for
   the older surface.py steps).
-- PartDesign Thickness with Join=Intersection (SciForge's Shell Sharp) returns a half pipe
+- PartDesign Thickness with Join=Intersection (Fission 180's Shell Sharp) returns a half pipe
   unshelled but "valid" with no error (found by plastic-1; the dialog now refuses it, see
   the follow-up fixes).
 
@@ -2637,7 +2637,7 @@ breakdown for him: `docs/sciforge/sessions/wave6-overnight.md`.
   under load, also on develop before wave 6.
 
 #### Results
-- GitHub "SciForge tests" run #258 on `39ec051` (everything but the three follow-up fixes):
+- GitHub "Fission 180 tests" run #258 on `39ec051` (everything but the three follow-up fixes):
   Windows golden, update script and quick update green; scenario shards 1, 2 and 4 green
   (every new sheet metal, plastic, surface and journey scenario in them passed); **red** on
   three things, two fixed before the final push: (1) base: `test_plastic2_core`'s two
@@ -2647,11 +2647,11 @@ breakdown for him: `docs/sciforge/sessions/wave6-overnight.md`.
   the Distance the click produced); (3) shard 3: **`welcome_line` "no crash line next to it"
   failed: a FreeCAD crash log was left in the shard's shared profile by an earlier scenario
   of that shard (all of them reported PASS). Not investigated yet: next session, read the
-  crash log in the artifact `sciforge-test-output-scenarios-3` of run #258 and find which
+  crash log in the artifact `fission180-test-output-scenarios-3` of run #258 and find which
   scenario crashed FreeCAD (probably at exit).**
 - The final push (`develop`, after this log) starts a new run that includes the follow-up
   fixes; check it first thing next session.
-- Quick update for Luca: `SciForge-quick-update-aee067d.zip` (make_quick_update.sh +
+- Quick update for Luca: `Fission180-quick-update-aee067d.zip` (make_quick_update.sh +
   WHATS_NEW.txt), sent with the morning report; product code locally tested (unit 1995,
   golden 587, the 9 journeys, the fixed areas' scenarios).
 
@@ -2661,9 +2661,9 @@ Luca: "In the Home Screen, clicking on a file should give you the option to dele
 in the data panel".
 
 - One shared action, `versions_ui.delete_design(path, root, parent)`: a question
-  (`SciForgeDeleteQuestion`, buttons "Move to Trash" `SciForgeDeleteYes` / Cancel, Cancel the
+  (`Fission180DeleteQuestion`, buttons "Move to Trash" `Fission180DeleteYes` / Cancel, Cancel the
   default) saying where it goes; then `versions.trash_design` into the place's
-  `.sciforge-trash` (never deleted for good; safer than the Windows Recycle Bin, which deletes
+  `.fission180-trash` (never deleted for good; safer than the Windows Recycle Bin, which deletes
   files on network drives for good). An open design is closed first (`close_without_asking`;
   the question says so and that unsaved changes are lost), except a hidden one an open
   design's link still uses; open designs that insert it are named; `home_ui.forget_file`
@@ -2703,7 +2703,7 @@ Control", `parity/timeline-browser.md` "The 3D view's hover lights the browser r
   than 0.5 s to list is left alone), Enter / F2 / Delete / Backspace.
 - **Drag into a design = copy**: `DataPanelList` starts its own QDrag (press on a design
   card + startDragDistance; Qt's item dragging is off) carrying file URLs + MIME
-  `application/x-sciforge-design`, CopyAction only (a file manager must never *move* a
+  `application/x-fission180-design`, CopyAction only (a file manager must never *move* a
   design out). `DropSession` installs an application-wide event filter for the drag: a 3D
   view (`view_document`) or the browser (`drop_target`; a component row = into it) accepts,
   everything else refuses, so **FreeCAD's own drop handling (it merges a dropped .FCStd into
@@ -2715,7 +2715,7 @@ Control", `parity/timeline-browser.md` "The 3D view's hover lights the browser r
   card menu ("Insert a Copy into Current Design") and the details' Insert.
 - **Opacity Control**: browser menu entry after Show/Hide for body / mesh_body / component
   (`browser_core.MENUS`), submenu 100..20 % + Custom Opacity... (`opacity_ui`, slider with
-  live preview, OK = one undo step, Cancel = old look). Stored as `SciForgeOpacity` on the
+  live preview, OK = one undo step, Cancel = old look). Stored as `Fission180Opacity` on the
   object (added *before* the transaction, so undo gives 100 % back instead of removing the
   property); shown body x components (multiplied), over an appearance's own transparency;
   `opacity.apply` sets Transparency on the body's VP and every PartDesign step's VP, run from
@@ -2755,7 +2755,7 @@ Control", `parity/timeline-browser.md` "The 3D view's hover lights the browser r
   old `versions_data_panel`, `polish2_data_panel`, `exchange2_link`, `exchange2_step_open`,
   `timeline_browser`, `timeline_browser_2`, `timeline_browser_qa`, `bodies_combine`,
   `components_basic`, `components2_move`, `components2_copy`. The full sweep runs on GitHub.
-- Quick update for Luca: `SciForge-quick-update-5e4cb76.zip` (make_quick_update.sh + a
+- Quick update for Luca: `Fission180-quick-update-5e4cb76.zip` (make_quick_update.sh + a
   WHATS_NEW.txt in plain words).
 
 #### Open
@@ -2773,16 +2773,16 @@ Three causes in the tests, and one small real bug (last bullet):
   saves it (`MainWindow/Geometry`, `Maximized`) and every later scenario of the shard got a
   838 x 470 3D view (normal 1538 x 769). run_tests.sh now resets those keys with
   MainWindowState before each scenario; the scenario puts the window back by hand.
-- **Relative `--freecad`** (CI passes `.sciforge-cache/freecad`): the unit tests that start
+- **Relative `--freecad`** (CI passes `.fission180-cache/freecad`): the unit tests that start
   FreeCAD run from the module folder, so the path pointed nowhere. Made absolute.
 - **Docs example get_drawing#1**: the title block's DrawnBy is the login name (root here,
   runner on CI); masked like dates.
-- **Real bug, sciforge-cli only**: `tools` and `docs` lost a short answer whenever stdout was
+- **Real bug, fission180-cli only**: `tools` and `docs` lost a short answer whenever stdout was
   a pipe (a script or an AI app reading it): the CLI ends with os._exit, which does not flush.
   Hidden here because this sandbox sets PYTHONUNBUFFERED=1; reproduced as user `runner` with
   `env -i`. Fixed (flush before os._exit); the unit test now strips PYTHONUNBUFFERED. The
   FreeCAD-backed commands (unbuffered stream) and the MCP server (flush per message) were
-  never affected; the SciForge app itself does not use this code. run_tests.sh now prints
+  never affected; the Fission 180 app itself does not use this code. run_tests.sh now prints
   failing unit tests into the CI log (CI showed only the last 3 lines).
 - **To reproduce CI here**: a user `runner`, `env -i` (no PYTHONUNBUFFERED), python3.12, and
   pwsh (PowerShell for Linux, from its GitHub release) on PATH: same 11 skips as CI.
@@ -2822,13 +2822,13 @@ sandbox timings (software OpenGL) - tests prove correctness only.
 ### Session log: Eight features from the CADCraft study (branch `experimental`, 2026-10-21/22)
 
 Luca asked to study github.com/storytold/cadcraft (an AutoCAD-like 2D app in Rust, MIT/Apache)
-and draft ideas (docs/sciforge/dev/cadcraft-lessons.md), then approved all of them plus one of
+and draft ideas (docs/fission180/dev/cadcraft-lessons.md), then approved all of them plus one of
 his own ("limit edits to stop at that limit"), "in one go", with ultracode (multi-agent
 workflows). Built by 9 agents in separate git worktrees (branches wf/*), merged on a local
 `integration` branch, then 10 adversarial reviewers + 10 fixers (78 findings, all reproduced
 and fixed with regression tests; branches fix/*), then the full suite. Two machine restarts cut
 agents off; the workflow was made restart-proof (fixed worktrees, WIP commits). Each agent's
-detailed notes: docs/sciforge/sessions/2026-10-21-*.md (build) and 2026-10-22-*.md (fixes,
+detailed notes: docs/fission180/sessions/2026-10-21-*.md (build) and 2026-10-22-*.md (fixes,
 integration). Summary:
 
 - **Values stop at the limit** (value_limits.py): Fillet (all kinds), Chamfer (Distance-and-
@@ -2847,25 +2847,25 @@ integration). Summary:
   format does not keep (counted from the design, verified by round trips: e.g. STEP colours
   only with the window open, IGES loses names, 3MF reader ignores the unit); imports say what
   did not come in. Also in the AI export/import tools and the CLI.
-- **AI** (sciforge/ai/catalog, executor.py, actions/, headless.py, cli.py, docs_core.py,
+- **AI** (fission180/ai/catalog, executor.py, actions/, headless.py, cli.py, docs_core.py,
   render_core.py): one catalogue of 117 tools feeding MCP, bridge, chat and CLI (the original
   16 unchanged); checking tools inspect_design / query_geometry / check_design / render (also
   headless: own software renderer) / diff_design; MCP resources + prompts; honest retries;
-  `tools/sciforge/sciforge-cli` (info, convert, run, check, render, tools, docs, mcp
-  --headless). AI docs in src/Mod/SciForge/docs/ai (handbook, selectors cookbook, 12 tested
+  `tools/fission180/fission180-cli` (info, convert, run, check, render, tools, docs, mcp
+  --headless). AI docs in src/Mod/Fission180/docs/ai (handbook, selectors cookbook, 12 tested
   recipes, a generated page per tool with recorded examples, golden-model index, copy of the
   user docs) via docs_search / docs_read / examples_search and MCP resources; regenerate with
-  `python3 tools/sciforge/make_ai_docs.py` (a unit test fails when stale). Tests: headless
+  `python3 tools/fission180/make_ai_docs.py` (a unit test fails when stale). Tests: headless
   runner calls every tool; docs_runner runs every documented call; agent end-to-end over MCP.
-- **Parity script**: tools/sciforge/parity.py + data/fusion-menus.txt (631 Fusion names from
-  memory, 125 marked "?", Luca can correct) -> docs/sciforge/parity-checklist.md: 457 / 631
+- **Parity script**: tools/fission180/parity.py + data/fusion-menus.txt (631 Fusion names from
+  memory, 125 marked "?", Luca can correct) -> docs/fission180/parity-checklist.md: 457 / 631
   (72%; 84% without the areas Luca left out). core-workflows.md (6 daily workflows with
   evidence); remaining-gaps.md is the one ranked work list (G-xx).
 - **Speed with big designs**: doc_epoch.py (timeline/browser re-read only after changes: idle
   cost 251 -> 38 ms/s), undo_fast.py (Undo/Redo without rebuild when FreeCAD restored the right
   shapes: 15-19 s -> 0.7-1.7 s on a 1716-face part; drawings and other dependents without a
   Shape are refreshed), refind cache (31 s -> <1 s), timeline button reuse, perf_big_model
-  scenario, perf_guard.py (warns at >2x baseline; SCIFORGE_PERF_STRICT=1 fails).
+  scenario, perf_guard.py (warns at >2x baseline; FISSION180_PERF_STRICT=1 fails).
 - **Drawing PDFs** (drawing_pdf_*.py): same page pixel for pixel, plus 6 switchable layers,
   searchable text for everything TechDraw draws as shapes (title block, parts list), links,
   metadata; PDF/A gets no layers.
@@ -2894,7 +2894,7 @@ around." (after "make things run fast and smooth").
   left the step selected whole, and FreeCAD turns a click on a whole-selected object into its
   parent (the body), so the first face click in the edit picked the body
   (`taskui._unselect_whole`).
-- Benchmark `SciForgeTests/gui/scenarios/perf_benchmark.py` (run alone:
+- Benchmark `Fission180Tests/gui/scenarios/perf_benchmark.py` (run alone:
   `run_tests.sh --scenario perf_benchmark`): writes perf-report.md/json with open / change /
   finish times and cProfile tops. Per change, before -> after: Press Pull 267 -> ~160 ms,
   Fillet 218 -> ~160, Chamfer 216 -> ~160. Fixes: Press Pull read `face.Surface` thousands of
@@ -2904,8 +2904,8 @@ around." (after "make things run fast and smooth").
   per preview (`shape_checks.is_valid` remembers it); blend recomputes honour held steps,
   Fillet's OK rebuilds them and repairs later blends.
 - Found, not changed: entering a sketch costs ~200 ms switching to the Sketcher workbench and
-  back (ViewProviderSketch's EditingWorkbench); SciForge's sketch mode hangs on that switch
-  (`shell.on_workbench`), so changing it is a bigger job. Timeline marker: SciForge's own work
+  back (ViewProviderSketch's EditingWorkbench); Fission 180's sketch mode hangs on that switch
+  (`shell.on_workbench`), so changing it is a bigger job. Timeline marker: Fission 180's own work
   ~40 ms, the rest is drawing under xvfb. Edits opened by double-click in the 3D view do not
   roll back (they nearly always open the last step).
 - Fixed: warnings "profile shading" / "sketch text" when a design closed with a sketch drawn.
@@ -2913,7 +2913,7 @@ around." (after "make things run fast and smooth").
 
 ### Session log: Draft of curved faces (branch `experimental`, 2026-10-20)
 
-Luca: "some of the workflows that id regularly do on fusion dont exactly work on SciForge. one of
+Luca: "some of the workflows that id regularly do on fusion dont exactly work on Fission 180. one of
 them is the draft tool. I cant seem to select curved faces ... New branch time. Call it
 experimental ... our first order of bisness is getting the draft tool to fusions standards".
 Then, asked by the session: Fusion's Draft "accepts freeform stuff. just confirmed it myself".
@@ -2921,10 +2921,10 @@ Then, asked by the session: Fusion's Draft "accepts freeform stuff. just confirm
 
 - Cause: `drafting.why_not` (the dialog's selection gate) refused every face but planes and
   round faces about the pull direction, because FreeCAD's Draft cannot tilt the others.
-- Built `sciforge/draft_walls.py`: SciForge's own draft of walls (see the findings). Wired in
+- Built `fission180/draft_walls.py`: Fission 180's own draft of walls (see the findings). Wired in
   `drafting._scratch` (FreeCAD's Draft for the faces it can do, draft_walls for the rest and
   the walls touching them); `why_not` takes any wall; `needs_own_feature` /
-  `needs_engine` make such a step SciForge's `DraftFeature` (edits switch kinds both ways).
+  `needs_engine` make such a step Fission 180's `DraftFeature` (edits switch kinds both ways).
 - Golden format: sketch curves `ellipse`, `spline_loop`, `segments`; `"volume_by": "mesh"`;
   selector type `extrusion` and filter `along` (also in the AI tools' schema and help);
   `sf_draft_edit` uses `drafting.update` (a step may have to change kind).
@@ -2955,33 +2955,33 @@ FreeCAD's root SECURITY.md, PRIVACY_POLICY.md, CONTRIBUTING.md (core patch #17;
 CODE_OF_CONDUCT.md is still FreeCAD's).
 
 #### R1: GitHub page and docs
-- README.md is SciForge's (FreeCAD's moved to README.FreeCAD.md), five screenshots from the
-  real window (`tools/sciforge/screenshots.sh`, scenario `readme_shots`; the 3D view renders
-  under xvfb; FreeCAD's OverlayRight frame is hidden for two shots), `docs/sciforge/smartscreen.md`
+- README.md is Fission 180's (FreeCAD's moved to README.FreeCAD.md), five screenshots from the
+  real window (`tools/fission180/screenshots.sh`, scenario `readme_shots`; the 3D view renders
+  under xvfb; FreeCAD's OverlayRight frame is hidden for two shots), `docs/fission180/smartscreen.md`
   (README carries the same text between `smartscreen:begin/end` markers; a test keeps them equal;
   the release-notes generator uses the file), `known-issues.md`, `privacy.md` (checked against the
   code), `CHANGELOG.md` (headings exactly `## <version>`), issue forms `bug_report.yml` (ids
   what_happened, expected, steps, diagnostics, version, system, extra) and `idea.yml`,
-  `tools/sciforge/check_links.py` + `test_docs_links.py`.
+  `tools/fission180/check_links.py` + `test_docs_links.py`.
 - Open: OpenGL: FreeCAD's source says "2.0 or above" (the brief said 3.3, wiki unreachable), the
-  README says 2.0; disk "about 3 GB" is the stock AppImage's size, not measured for SciForge;
+  README says 2.0; disk "about 3 GB" is the stock AppImage's size, not measured for Fission 180;
   README names the Linux key-storage fallback. Labels `idea` and `beta` do not exist on GitHub yet.
 
 #### R2: crash log + Report a Problem; R4: welcome line
 - `crashlog.py` / `crashlog_core.py` (started from InitGui.py): faulthandler + excepthooks into
-  `<user data>/SciForge/crash/session-*.log`, marker `running-<id>.json` removed on a clean exit
+  `<user data>/Fission180/crash/session-*.log`, marker `running-<id>.json` removed on a clean exit
   (`aboutToQuit`, `atexit`); a marker whose pid is gone = the last session did not end cleanly
   (decided by the marker alone). Home lines in `home_notices_ui.py` / `notices_core.py` (7-line
-  hook in home_ui): "SciForge closed unexpectedly last time. [Report it] [Dismiss]" and the
+  hook in home_ui): "Fission 180 closed unexpectedly last time. [Report it] [Dismiss]" and the
   welcome line (pref `WelcomeShown`; [Cheat sheet] opens the module's copy in a window,
-  [Open an example] copies the Pi 5 case to `<user data>/SciForge/examples/`, [Report a problem]).
+  [Open an example] copies the Pi 5 case to `<user data>/Fission180/examples/`, [Report a problem]).
   The module now ships `docs/cheat-sheet.md` and `examples/pi5-case/pi5_case.FCStd` (copies of
-  `docs/sciforge/...`; `test_notices_core` fails if they drift: copy the file over).
+  `docs/fission180/...`; `test_notices_core` fails if they drift: copy the file over).
 - `report_core.py` (redaction of home folders, user name, API keys; report layout; GitHub
   address under 7000 characters, field ids = `report_core.FIELD_ID`, must match bug_report.yml)
   + `report_ui.py` (dialog with preview; Open on GitHub, Save report..., Copy; the whole report
   is always also copied). Entries: app menu > Help > Report a Problem..., UTILITIES, command
-  `SciForge_ReportProblem`. Seams: `report_ui.OPEN_URL`, `SAVE_PICKER`, `IDENTITY`.
+  `Fission180_ReportProblem`. Seams: `report_ui.OPEN_URL`, `SAVE_PICKER`, `IDENTITY`.
 - Lessons: a wrong style-sheet selector made the Home lines grey while widget checks were green:
   check pixels on `QScreen.grabWindow` (again); a scenario step named `..._error` fails itself
   (the harness greps step names for "error"); `harness.prepare` marks the welcome as shown.
@@ -2993,53 +2993,53 @@ CODE_OF_CONDUCT.md is still FreeCAD's).
   sha256, download, safe unzip), `update_ui.py` (worker thread + 50 ms timer, daily limit,
   Help > Check for Updates, download dialog with Cancel, unsaved-designs question through the
   normal close, refuses while a command dialog is open; seams `HAND_OVER`, `QUIT`, `OPEN_URL`,
-  `LAYOUT`, `INSTALLED`, `API_BASE` / env `SCIFORGE_UPDATE_API`), `home_update_ui.py` ("X is
+  `LAYOUT`, `INSTALLED`, `API_BASE` / env `FISSION180_UPDATE_API`), `home_update_ui.py` ("X is
   available" / "Updated to X"), Preferences > General > Updates (check at start; Stable only /
-  Betas too), Diagnostics "Update core" line. `run_tests.sh` exports `SCIFORGE_NO_INTERNET=1`
+  Betas too), Diagnostics "Update core" line. `run_tests.sh` exports `FISSION180_NO_INTERNET=1`
   (update_core refuses non-local addresses). FreeCAD leaves SIGPIPE at default on Linux: a write
   to a closed socket killed it; update_ui ignores SIGPIPE.
 - `install_update.ps1`: `-WaitPid -Restart -Quiet -RunInstaller -NoDialog` (interactive mode
   unchanged; on failure the backup is put back and one message box names the log).
-- CI: `tools/sciforge/make_quick_update.sh` (reproducible zip; `--core` writes the core id),
+- CI: `tools/fission180/make_quick_update.sh` (reproducible zip; `--core` writes the core id),
   `write_build_info.sh`, `core_id.sh` (core id = last commit touching src minus the module,
   cMake, CMakeLists, CMakePresets, package, pixi files; fails on a shallow clone),
-  `make_release_files.py` (notes + `sciforge-release.json` + `SHA256SUMS.txt`),
-  `sciforge-build.yml` (`core` job, `release` job: `contents: write` on that job only; only a
-  tag publishes; the tag must equal `src/Mod/SciForge/VERSION`; a manual run on a branch is a
-  dry run that prints the notes and uploads `release-files-<tag>`), `sciforge-tests.yml`
+  `make_release_files.py` (notes + `fission180-release.json` + `SHA256SUMS.txt`),
+  `fission180-build.yml` (`core` job, `release` job: `contents: write` on that job only; only a
+  tag publishes; the tag must equal `src/Mod/Fission180/VERSION`; a manual run on a branch is a
+  dry run that prints the notes and uploads `release-files-<tag>`), `fission180-tests.yml`
   (Windows "update script" job, uses `test_update_script.ps1`). A quick update from a test run
   has core "" = unknown, so Update now falls back to the full installer there.
 - Limit: a module update does not change the compiled version (splash/About) until the next full
   build.
 - Not verified: Windows PowerShell 5.1 (the CI job has never run), the UAC path, the NSIS
-  installer over an existing install (settings in `%APPDATA%\SciForge` must survive), a real
+  installer over an existing install (settings in `%APPDATA%\Fission180` must survive), a real
   quit, the new CI steps (the first dry run shows them), the real GitHub API.
-- **Trying Update now without publishing** (Luca): run "SciForge build" on a branch (publish off)
+- **Trying Update now without publishing** (Luca): run "Fission 180 build" on a branch (publish off)
   for build 1 and install it; run again with `VERSION` = `0.1.0-beta.2` for build 2, download its
   `release-files-sciforge-v0.1.0-beta.2` artifact into e.g. `C:\fake` (plus the installer for the
-  installer path); start `"C:\Program Files\SciForge\bin\python.exe" fake_release_server.py
-  C:\fake`; in another PowerShell `$env:SCIFORGE_UPDATE_API="http://127.0.0.1:8765"` then start
-  `SciForge.exe`; Help > Check for Updates > Update now. Backups: `...\SciForge\SciForge-backups\<date>`;
-  on failure send `%APPDATA%\SciForge\SciForge\updates\<version>\module\install_update.log`.
+  installer path); start `"C:\Program Files\Fission180\bin\python.exe" fake_release_server.py
+  C:\fake`; in another PowerShell `$env:FISSION180_UPDATE_API="http://127.0.0.1:8765"` then start
+  `Fission180.exe`; Help > Check for Updates > Update now. Backups: `...\Fission180\Fission180-backups\<date>`;
+  on failure send `%APPDATA%\Fission180\Fission180\updates\<version>\module\install_update.log`.
 
 #### Release dry runs (2026-10-20/21): what they found
-- **PUBLISHED 2026-10-21 22:14 UTC: SciForge 0.1.0-beta** (pre-release), https://github.com/Luca0422git/SciForge-Parametric-Design/releases/tag/sciforge-v0.1.0-beta, tag on 07841c68 (core id fd4a01850d), from run #11 attempt 2 (re-run of the failed Windows job; in it "Compile cache statistics" took 1 s and the pixi post step passed). Assets: installer .exe 501 MB, portable .7z 425 MB, AppImage 824 MB, quick-update zip, sciforge-release.json, SHA256SUMS.txt; every SHA256SUMS line matches GitHub's own asset digest. Notes = CHANGELOG + smartscreen text + checksums. Cause of attempt 1's red: "Compile cache statistics" (`pixi exec --spec ccache`) hung to its 5-minute timeout and left a pixi.exe running, so setup-pixi's post-cleanup could not delete it (EPERM); develop has `post-cleanup: false`. Tested with the debug workflow's `rerun-test` job: a re-run may upload an artifact name the first attempt used (both stay; `gh run download` takes the newest).
+- **PUBLISHED 2026-10-21 22:14 UTC: Fission 180 0.1.0-beta** (pre-release), https://github.com/Luca0422git/Fission-180/releases/tag/sciforge-v0.1.0-beta, tag on 07841c68 (core id fd4a01850d), from run #11 attempt 2 (re-run of the failed Windows job; in it "Compile cache statistics" took 1 s and the pixi post step passed). Assets: installer .exe 501 MB, portable .7z 425 MB, AppImage 824 MB, quick-update zip, fission180-release.json, SHA256SUMS.txt; every SHA256SUMS line matches GitHub's own asset digest. Notes = CHANGELOG + smartscreen text + checksums. Cause of attempt 1's red: "Compile cache statistics" (`pixi exec --spec ccache`) hung to its 5-minute timeout and left a pixi.exe running, so setup-pixi's post-cleanup could not delete it (EPERM); develop has `post-cleanup: false`. Tested with the debug workflow's `rerun-test` job: a re-run may upload an artifact name the first attempt used (both stay; `gh run download` takes the newest).
 - Still open after the release: move `Release` to 07841c68 (Luca: a cloud session gets 403), GitHub Discussions on, labels `idea` and `beta`; not verified: Windows install over an existing install, "Update now" end to end on Windows.
-- **Tag run #11 (sciforge-v0.1.0-beta on 07841c68)**: the installer fix worked (Package green, installer + portable uploaded, Windows golden 441 pass, Linux green), but the Windows job turned red in setup-pixi's post step: `EPERM: operation not permitted, unlink C:\Users\runneradmin\.pixi\bin\pixi.exe` (a pixi process still holding it), so the release job was skipped. Fixes on develop: `post-cleanup: false` for setup-pixi (checked in setup-pixi's source at the pinned commit: with it the post step does nothing) and `overwrite: true` on the three SciForge-* artifact uploads (a re-run of a failed job uploads again under the same name). A re-run (attempt 2) of run #11 was started but cannot be trusted (same tag = no fix; same artifact names); the tag goes onto develop with both fixes instead.
-- **Tag run #10 (sciforge-v0.1.0-beta on 8e5aef6, 2026-10-21): Windows installer FAILED**, release skipped. makensis cannot open paths past 260 characters; since the repo is named `SciForge-Parametric-Design` the checkout is `D:\a\SciForge-Parametric-Design\SciForge-Parametric-Design` (34 characters more than run #7's `D:\a\SciForge\SciForge`) and a debugpy `.pyc` reached 277. Luca keeps the repo name. Fix fd4a0185: `package/rattler-build/windows/make_installer.sh` (split from create_bundle.sh) `subst`s the bundle folder to a free drive letter (S:..Y:) for makensis. Verified in ~13 min by the scenario-debug workflow's new `installer` job (run 39617079192: run #7's portable files under the release's folder name, in the long checkout path; installer 501 MB built from S:). Linux in run #10 was green. The tag must be moved to a develop commit with the fix (Luca's step: a cloud session cannot push tags).
+- **Tag run #11 (sciforge-v0.1.0-beta on 07841c68)**: the installer fix worked (Package green, installer + portable uploaded, Windows golden 441 pass, Linux green), but the Windows job turned red in setup-pixi's post step: `EPERM: operation not permitted, unlink C:\Users\runneradmin\.pixi\bin\pixi.exe` (a pixi process still holding it), so the release job was skipped. Fixes on develop: `post-cleanup: false` for setup-pixi (checked in setup-pixi's source at the pinned commit: with it the post step does nothing) and `overwrite: true` on the three Fission180-* artifact uploads (a re-run of a failed job uploads again under the same name). A re-run (attempt 2) of run #11 was started but cannot be trusted (same tag = no fix; same artifact names); the tag goes onto develop with both fixes instead.
+- **Tag run #10 (sciforge-v0.1.0-beta on 8e5aef6, 2026-10-21): Windows installer FAILED**, release skipped. makensis cannot open paths past 260 characters; since the repo is named `Fission-180` the checkout is `D:\a\Fission-180\Fission-180` (34 characters more than run #7's `D:\a\Fission180\Fission180`) and a debugpy `.pyc` reached 277. Luca keeps the repo name. Fix fd4a0185: `package/rattler-build/windows/make_installer.sh` (split from create_bundle.sh) `subst`s the bundle folder to a free drive letter (S:..Y:) for makensis. Verified in ~13 min by the scenario-debug workflow's new `installer` job (run 39617079192: run #7's portable files under the release's folder name, in the long checkout path; installer 501 MB built from S:). Linux in run #10 was green. The tag must be moved to a develop commit with the fix (Luca's step: a cloud session cannot push tags).
 - Build run #7 (both platforms, develop ae1d376): Windows installer (501 MB) + portable build were made and passed the Windows golden test; the Linux build compiled in ~2h, packaged, passed smoke/journey/restart, but FAILED its unit tests (two tests assumed a source tree: `test_the_core_id_defaults_to_unknown` with a real core id, `test_the_install_rules_carry_both_folders` needs CMakeLists.txt): fixed (bb8fb08). The release job needs ALL build jobs green (no `if: always()`), so it was skipped.
-- All 4 scenario shards of that run failed in seconds: the Linux artifact held `appimagetool-x86_64.AppImage` next to the SciForge AppImage and the shards' `find built -name '*.AppImage' | head -1` picked the tool ("Error: no such file or directory: freecad"). Also `make_release_files.find_assets` would have stopped with "two files for the appimage". Fixed (fe29cd6): upload only `SciForge_*.AppImage`, `find ... 'SciForge_*.AppImage'`, `classify` requires the name to start with SciForge. Found with `sciforge-scenario-debug.yml` (runs scenarios on an earlier build's AppImage: `run_id` input; a manual run of a NEW workflow file needs it on the default branch, so it also runs on a push of its own file; remove that push trigger when no longer needed).
+- All 4 scenario shards of that run failed in seconds: the Linux artifact held `appimagetool-x86_64.AppImage` next to the Fission 180 AppImage and the shards' `find built -name '*.AppImage' | head -1` picked the tool ("Error: no such file or directory: freecad"). Also `make_release_files.find_assets` would have stopped with "two files for the appimage". Fixed (fe29cd6): upload only `Fission180_*.AppImage`, `find ... 'Fission180_*.AppImage'`, `classify` requires the name to start with Fission 180. Found with `fission180-scenario-debug.yml` (runs scenarios on an earlier build's AppImage: `run_id` input; a manual run of a NEW workflow file needs it on the default branch, so it also runs on a push of its own file; remove that push trigger when no longer needed).
 - Sandbox cannot download Actions artifacts (blob.core.windows.net is blocked by the proxy) but `gh run download` finds them; use workflow logs (mcp github get_job_logs) instead.
 
-- Run #9 (linux only, fe29cd6): compile 1h40, Linux unit tests FAILED again on the ubuntu-22.04 runner: `test_secrets_store.FileFallback.test_auto_on_linux` (a keyring module without a keyring service: the key was not saved). Real bug, fixed in `secrets_store.Store.store` (Linux keyring/secretstorage backends fall back to the private file, warning stays truthful; test added). Found with the debug workflow's `unit` job (runs the unit tests like the build's Linux test step, prints failing tests). The debug workflow's `release-dry` job ran the release job's steps on run #7's Windows+Linux files: notes, `sciforge-release.json`, `SHA256SUMS.txt` and the attach list are right (core id e32ed0e90b = the R0 commit).
-- GitHub's run URLs now show the repo as `SciForge-Parametric-Design` (renamed by Luca?); URLs in code/docs still say `Luca0422git/SciForge` (GitHub redirects).
+- Run #9 (linux only, fe29cd6): compile 1h40, Linux unit tests FAILED again on the ubuntu-22.04 runner: `test_secrets_store.FileFallback.test_auto_on_linux` (a keyring module without a keyring service: the key was not saved). Real bug, fixed in `secrets_store.Store.store` (Linux keyring/secretstorage backends fall back to the private file, warning stays truthful; test added). Found with the debug workflow's `unit` job (runs the unit tests like the build's Linux test step, prints failing tests). The debug workflow's `release-dry` job ran the release job's steps on run #7's Windows+Linux files: notes, `fission180-release.json`, `SHA256SUMS.txt` and the attach list are right (core id e32ed0e90b = the R0 commit).
+- GitHub's run URLs now show the repo as `Fission-180` (renamed by Luca?); URLs in code/docs still say `Luca0422git/Fission-180` (GitHub redirects).
 
 #### Update icon in the top bar (Luca's request, same day)
 - Luca: "check for updates on start and show an update icon ... in the top right like fusion".
   The check at start already existed (default on). New: `ribbon_ui` `update_icon` (object name
-  `SciForgeUpdateIcon`, icon `update_available`, left of the search button), shown while
+  `Fission180UpdateIcon`, icon `update_available`, left of the search button), shown while
   `update_ui.pending()` (a newer release is known and the channel takes it; unlike `available()` it
-  ignores Home's Later, so it stays until SciForge is updated); click = menu "SciForge X is
+  ignores Home's Later, so it stays until Fission 180 is updated); click = menu "Fission 180 X is
   available" / Update now / What's new; `update_ui._changed()` refreshes it. Scenario
   `update_check` P16 (150 checks; looked at the screenshot: the blue arrow sits top right).
 
@@ -3050,36 +3050,36 @@ CODE_OF_CONDUCT.md is still FreeCAD's).
 
 ### Session log: 0.1.0-beta, R0 groundwork (`develop`, 2026-10-20)
 
-Brief `docs/sciforge/dev/briefs/beta-release.md`, milestone R0.
+Brief `docs/fission180/dev/briefs/beta-release.md`, milestone R0.
 
 #### Built
-- **One version file**: `src/Mod/SciForge/VERSION` (`0.1.0-beta`). `sciforge.__version__` reads it
+- **One version file**: `src/Mod/Fission180/VERSION` (`0.1.0-beta`). `fission180.__version__` reads it
   (literal fallback `_FALLBACK_VERSION`; a unit test checks both agree). The module's CMake
   installs it (`check_install.sh` passes, 1571 files). The old internal "0.2.0" is gone (only a
   test fixture used it).
-- **`sciforge/version_core.py`** (pure): `parse` (semver order: `0.1.0-beta < beta.2 < beta.10 <
-  rc.1 < 0.1.0 < 0.1.1-beta`; accepts `v` and `sciforge-v`), `newer(candidate, current)`,
+- **`fission180/version_core.py`** (pure): `parse` (semver order: `0.1.0-beta < beta.2 < beta.10 <
+  rc.1 < 0.1.0 < 0.1.1-beta`; accepts `v` and `fission180-v`), `newer(candidate, current)`,
   `is_prerelease`, `canonical`, `tag_for`; junk gives None/False, never raises.
-  `SciForgeTests/unit/test_version_core.py`.
+  `Fission180Tests/unit/test_version_core.py`.
 - **C++ / installer** (core patch #15; only takes effect in a full build, NOT compiled in the
   sandbox: the CMake lines and the .rc template were run on their own, the C++ edits are
-  one-liners): CMake reads `VERSION` -> `SCIFORGE_VERSION` (+ `_MAJOR/_MINOR/_PATCH`) ->
-  `add_compile_definitions` in `src/Main` -> `Config()["SciForgeVersion"]` in all three
+  one-liners): CMake reads `VERSION` -> `FISSION180_VERSION` (+ `_MAJOR/_MINOR/_PATCH`) ->
+  `add_compile_definitions` in `src/Main` -> `Config()["Fission180Version"]` in all three
   programs, `SplashInfoVersion` (the splash paints "0.1.0-beta"), About shows "0.1.0-beta
   (based on FreeCAD 1.1.4)", the Windows version resource, and the installer (`APP_VERSION`,
-  uninstall `DisplayVersion`, via `write_version_nsh.py` which asks `SciForgeCmd` for
-  `SciForgeVersion`). `FreeCAD.Version()` stays 1.1.4.
-  **Installer registry key changes**: it follows SciForge's numbers now (`SciForge010`, was
-  `SciForge114`), so Luca's test install of the earlier build is a separate entry (uninstall
+  uninstall `DisplayVersion`, via `write_version_nsh.py` which asks `Fission180Cmd` for
+  `Fission180Version`). `FreeCAD.Version()` stays 1.1.4.
+  **Installer registry key changes**: it follows Fission 180's numbers now (`Fission180010`, was
+  `Fission180114`), so Luca's test install of the earlier build is a separate entry (uninstall
   it first). 0.1.0-beta.2 will use the same key (same major.minor.patch), so it installs over
   0.1.0-beta; the installer's "already installed" question appears then (R3 must test it).
-- **Quiet beta label**: Home's heading line has a small dim "SciForge 0.1.0-beta" next to
-  "Home" (`#SciForgeHomeVersion`, the theme's dim text colour like the folder paths); Diagnostics'
+- **Quiet beta label**: Home's heading line has a small dim "Fission 180 0.1.0-beta" next to
+  "Home" (`#Fission180HomeVersion`, the theme's dim text colour like the folder paths); Diagnostics'
   first line; no banner, title bar untouched. Scenario `version_label` (checks the colour on the
   real screen grab; `QWidget.grab()` paints without style sheets, do not use it for colours).
 - `.github` clean-up (patch #16): FUNDING.yml, BACKPORT_REQUEST.yml, labels.yml deleted, PR
   template replaced, `ISSUE_TEMPLATE/config.yml` no longer points at FreeCAD's forum
-  (`PROBLEM_REPORT.yml` stays until R1 replaces it with the SciForge forms).
+  (`PROBLEM_REPORT.yml` stays until R1 replaces it with the Fission 180 forms).
 
 #### Tested
 - unit: 1619 tests OK; `version_label` scenario passes on real FreeCAD 1.1.4.
@@ -3101,16 +3101,16 @@ with his OK ("good. its fixed. now merge").
   designs saved elsewhere are listed "another folder"; a Preferences button.
 - AI panel (`ai_panel_ui.py`, right dock): UTILITIES > AI (icon `ai_panel`) and File > AI
   Panel open/close it; title bar with a clear X (`panel_close`); "AI control" switch (=
-  Preferences > AI, Home's switch follows); Your AIs list with SciForge's own lettered
+  Preferences > AI, Home's switch follows); Your AIs list with Fission 180's own lettered
   badges (never company logos), room for several; tabs Chat and Activity.
 - Light look: Preferences > General > Look (dark default, light like Fusion's default).
-  `theme.DARK/LIGHT`, `translate()` swaps SciForge's own style sheets (a hook on
-  setStyleSheet keeps the original in the property `sciforgeQss`), light icon copies
+  `theme.DARK/LIGHT`, `translate()` swaps Fission 180's own style sheets (a hook on
+  setStyleSheet keeps the original in the property `fission180Qss`), light icon copies
   (`icons-light`), 3D view and sketch colours; switching is live (`theme.set_theme`).
 - FreeCAD Tools (`freecad_tools_ui.py`): UTILITIES > FreeCAD Tools and the app menu list
   FreeCAD's workbenches; choosing one switches to FreeCAD's own interface with a "Back to
-  SciForge" bar on top; designs stay open.
-- Installer: `install_update.ps1` offers to stop SciForge's own python.exe (the AI
+  Fission 180" bar on top; designs stay open.
+- Installer: `install_update.ps1` offers to stop Fission 180's own python.exe (the AI
   connector Claude Desktop starts) that blocked the update.
 
 #### Found on Luca's Windows (and fixed)
@@ -3118,7 +3118,7 @@ with his OK ("good. its fixed. now merge").
   in his Documents folder (Google Drive backup) Windows refuses every rename, for good.
   `versions_ui` probes each folder once (`_renames_refused`), saves directly there
   (FreeCAD's `BackupPolicy` off for that save only) and finishes a left temp file by a copy
-  (`versions.finish_save`); Home finishes leftovers it finds (`.sciforge/unfinished-saves`
+  (`versions.finish_save`); Home finishes leftovers it finds (`.fission180/unfinished-saves`
   keeps older ones). Scenario `unfinished_save`.
 - **Dark panels light grey** (the sketch palette, also marking menu, measure, text): my light
   look's swap back to dark (`TO_DARK`) mapped the light marker colour, #3b4453, which is also
@@ -3135,7 +3135,7 @@ with his OK ("good. its fixed. now merge").
 #### Merge with develop
 - Conflicts: brief and MEMORY (both kept), `prefs_core` / `misc_preferences` (pages AI and
   3D Print), `golden/builder.py`: develop's `golden/hardware_ops.py` moved to
-  `sciforge/ai/ops/hardware_ops.py` (imports `.core`), registered at the end of `core.py`.
+  `fission180/ai/ops/hardware_ops.py` (imports `.core`), registered at the end of `core.py`.
 - Sandbox lesson: never edit module files while a sweep runs (a false failure followed).
 - After the merge (develop = b41940db, fast-forwarded): base all passed; this branch's
   scenarios, develop's new ones and 15 component scenarios pass. Fixed on the way:
@@ -3157,7 +3157,7 @@ with his OK ("good. its fixed. now merge").
   #197, on the rerun and locally).
 
 #### Open
-- FreeCAD's OverlayRight frame outline shows while a right-side SciForge dock is there
+- FreeCAD's OverlayRight frame outline shows while a right-side Fission 180 dock is there
   (FreeCAD's overlay style sheet).
 - M5 (sign-in clouds) and M6 (ChatGPT connector) not started; answers in the chat are not
   streamed.
@@ -3195,7 +3195,7 @@ by the time I wake up". M2 and M3 built; the brief says: after M3, ask Luca to m
 
 #### M2 places (phase A: the cloud apps' sync folders)
 - `locations_core.py` (pure, 21 tests), `locations_ui.py`, Home / Data Panel / Save dialog.
-  Spec and sources: `docs/sciforge/parity/cloud.md` (search summaries only: vendors' pages
+  Spec and sources: `docs/fission180/parity/cloud.md` (search summaries only: vendors' pages
   blocked in the sandbox; "To check on a real PC" list there).
 - Traps: OneDrive conflict names are "Name-COMPUTER" and computer names hold hyphens
   (DESKTOP-AB12C): split at every hyphen, and only believe a computer-like name in a OneDrive
@@ -3208,23 +3208,23 @@ by the time I wake up". M2 and M3 built; the brief says: after M3, ask Luca to m
 
 #### M3 AI connector
 - Pure parts (a helper agent, reviewed): `ai/tools_core.py` (16 tools, schemas, validate,
-  to_steps into the golden step language, titles), `ai/mcp_core.py` + `ai/sciforge_mcp.py`
+  to_steps into the golden step language, titles), `ai/mcp_core.py` + `ai/fission180_mcp.py`
   (stdio MCP server, stdlib only, no FreeCAD), `ai/bridge_core.py`, `ai/installers.py`
   (Claude Desktop / Gemini CLI settings with backup, .mcpb, command lines), 75 unit tests.
 - Mine: `ai/bridge.py` (127.0.0.1 + key, calls queued to the GUI thread by a 50 ms timer, one
   transaction per call "AI: ...", consent question per session, busy refusal, overwrite
   question), `ai_ui.py` (Add an AI, AI activity dock, Undo last AI step, Stop), Home's AI
   column, Preferences > AI (`allow_ai`, off), `core.Builder.attach(doc, body)` (+ `learn()`:
-  existing objects by Name and Label). Spec: `docs/sciforge/parity/ai.md`.
+  existing objects by Name and Label). Spec: `docs/fission180/parity/ai.md`.
 - **Trap: SIGPIPE.** FreeCAD's embedded Python does not ignore SIGPIPE (ordinary Python
   does): writing to a closed pipe or socket killed FreeCAD (exit 141, empty log). The bridge
   ignores it when it starts (`_ignore_broken_pipes`); a scenario writing to a subprocess must
   too.
 - **Trap: the AppImage's PYTHONHOME** (its own 3.11) breaks any other Python started from
-  SciForge: `ai_ui.server_env()` drops it; `python_exe()` never names a Python inside an
+  Fission 180: `ai_ui.server_env()` drops it; `python_exe()` never names a Python inside an
   AppImage mount (its path changes at every start).
 - Scenario `ai_bridge` (43 checks): the real MCP server as a subprocess, spoken to from a
-  thread (SciForge answers on the GUI thread that also runs the steps); the consent box is
+  thread (Fission 180 answers on the GUI thread that also runs the steps); the consent box is
   clicked. A sketch opened with setEdit adds an undo entry of its own: "Undo last AI step"
   then rightly refuses (the newest step is not the AI's); the busy test uses a plain task
   dialog instead.
@@ -3242,18 +3242,18 @@ Luca: "lets start with M1. Make the home screen default every time" (brief secti
 open point: answered, always).
 
 #### Built
-- `sciforge/home_core.py` (pure, `test_home_core.py` 16 tests): recent list in
-  `<user data>/SciForge/home/recent.json` (cap 50, pinned first and never dropped, FreeCAD's
+- `fission180/home_core.py` (pure, `test_home_core.py` 16 tests): recent list in
+  `<user data>/Fission180/home/recent.json` (cap 50, pinned first and never dropped, FreeCAD's
   MRU merged once, `location_id` + `rel` per place for M2's clouds), online-only Windows
   attributes (never read for a picture), thumbnail cache `home/thumbs/<key>-<stamp>.png`
   (one per save, old ones removed), `VersionCounter` (one `git log` per listing, kept 5 s;
   without it `versions.version_count` counts only plain-store copies: no badge for git
   designs), `age_text`, `subtitle`.
-- `sciforge/home_ui.py`: the Home tab is a plain `QWidget` in a `QMdiSubWindow` (FreeCAD
+- `fission180/home_ui.py`: the Home tab is a plain `QWidget` in a `QMdiSubWindow` (FreeCAD
   supports non-MDIView sub-windows, MainWindow.cpp "the plot widget": activating it leaves
   FreeCAD's active 3D view as it was), so it is a document tab like FreeCAD's Start page.
   Places (Recent, This computer), New design (`App.newDocument("Untitled")` +
-  `commands.ensure_body`), Open... (`SciForge_Open`), search, recovery banner
+  `commands.ensure_body`), Open... (`Fission180_Open`), search, recovery banner
   (`versions_ui.recovery().leftovers()`, re-read every 3 s while shown), tiles read on a
   daemon worker thread (file work only; answers polled by a 50 ms QTimer). Right-click menu
   per the parity doc. `_Watch` document observer: opened (a moment after
@@ -3264,9 +3264,9 @@ open point: answered, always).
   it), `shell.enable/disable` -> `home_ui.enable/disable` (off: Home tab closed);
   `ribbon_config.QUICK_ACCESS` Home first (Fusion: far left, before the Data Panel),
   `FILE_MENU` Home on top; `prefs_core` option `show_home` (General > Startup,
-  `Mod/SciForge/ShowHomeAtStart`, default on); icons `qa_home`, `recent`.
+  `Mod/Fission180/ShowHomeAtStart`, default on); icons `qa_home`, `recent`.
 - Research: Fusion's Home (April / May / July 2026 updates) via search summaries only (the
-  sandbox cannot open autodesk.com): sources and guesses in `docs/sciforge/parity/home.md`.
+  sandbox cannot open autodesk.com): sources and guesses in `docs/fission180/parity/home.md`.
   Re-check them in a browser when possible.
 
 #### Tests
@@ -3283,37 +3283,37 @@ open point: answered, always).
 
 #### Next
 - M2 places (clouds, NAS): `home_core` already keeps `location_id` / `rel`; `home_ui.places()`
-  and `PLACE_NAMES` are where new places plug in; sidecar pictures `.sciforge/thumbs/`.
+  and `PLACE_NAMES` are where new places plug in; sidecar pictures `.fission180/thumbs/`.
 - Not built in M1: sort / list view / details panel, the AI column (M3).
 
 ### Session log: Home, cloud and AI, M0 groundwork (branch `sf/home-cloud-ai`, 2026-10-19)
 
-Brief: `docs/sciforge/dev/briefs/home-cloud-ai.md`. This branch only (Luca: work and push
+Brief: `docs/fission180/dev/briefs/home-cloud-ai.md`. This branch only (Luca: work and push
 only on `sf/home-cloud-ai`; it merges into `develop` after M1-M3). M0 = move the golden
 builder's step code into product code, golden models still green.
 
 #### Done
-- `SciForgeTests/golden/builder.py`, `selectors.py` and all 18 `*_ops.py` moved (git mv,
-  history kept) to `src/Mod/SciForge/sciforge/ai/ops/` (`builder.py` became `core.py`).
+- `Fission180Tests/golden/builder.py`, `selectors.py` and all 18 `*_ops.py` moved (git mv,
+  history kept) to `src/Mod/Fission180/fission180/ai/ops/` (`builder.py` became `core.py`).
   Product code there; the golden models now prove the code the AI tools will run.
 - Moved *all* the step files, not only the AI's first tool set: they import each other
   (`core.op_extrude` uses `sweep_loft_ops.curves_of` and `extrude_bodies_ops`,
   `revolve_ops` uses `inspect_ops._ref`, `gear_ops` uses `primitive_ops`), so a partial move
   would have split one web of code across product and tests.
-- What only tests need stays in `SciForgeTests/golden/`: `builder.py` is now
+- What only tests need stays in `Fission180Tests/golden/`: `builder.py` is now
   `class Builder(core.Builder)` plus the test setups `reopen` and `age`; the new
   `checks.py` holds the 11 measuring checks (`expect_bodies`, `reopen_check`,
   `expect_move_refused`, `construct/measure/section/com/interference/blend_radius_expect`,
   `expect_component`, `expect_radius`), cut out unchanged.
 - Kept in product: `measure_bodies` / `measure_components` and the `shape()` overrides
   (which bodies "the design" is): body-tool steps set them, and `get_design` can use them.
-- `sciforge/ai/__init__.py` and `ops/__init__.py` import nothing: `sciforge.ai` must load
-  outside FreeCAD for the MCP server (M3). Import `sciforge.ai.ops.core` inside FreeCAD.
-- Install rules (`src/Mod/SciForge/CMakeLists.txt`): the package glob is now recursive and
-  the install is `INSTALL(DIRECTORY sciforge ...)` so sub-folders keep their place
-  (`INSTALL(FILES)` would have flattened `ai/ops/core.py` into `sciforge/`).
+- `fission180/ai/__init__.py` and `ops/__init__.py` import nothing: `fission180.ai` must load
+  outside FreeCAD for the MCP server (M3). Import `fission180.ai.ops.core` inside FreeCAD.
+- Install rules (`src/Mod/Fission180/CMakeLists.txt`): the package glob is now recursive and
+  the install is `INSTALL(DIRECTORY fission180 ...)` so sub-folders keep their place
+  (`INSTALL(FILES)` would have flattened `ai/ops/core.py` into `fission180/`).
   `check_install.sh`: all 1491 files installed. The quick update copies folders already.
-- New unit test `test_ai_ops_layout.py`: product code never imports `SciForgeTests`, the two
+- New unit test `test_ai_ops_layout.py`: product code never imports `Fission180Tests`, the two
   `__init__` files import nothing, every `*_ops.py` is registered by `core.py`, no
   `*_expect` check in product code.
 - Docs: golden README ("Where the code is"), `dev/feature-guide.md` (where a new op goes),
@@ -3326,7 +3326,7 @@ builder's step code into product code, golden models still green.
   models. Unit: 1353 OK. Scenario `extrude_multibody_edit` (imports the golden builder): pass.
 
 #### Next (M1, Home screen)
-- `sciforge/recent.py` already exists: read it before writing `home_core.py`.
+- `fission180/recent.py` already exists: read it before writing `home_core.py`.
 - `core.Builder.__init__` always adds a new Body: the AI tools (M3) need a way to work on an
   existing design (an existing body, its step ids from labels).
 - Black 26 locally reformats 4 moved files (`inspect_ops`, `primitive_ops`, `shell_draft_ops`,
@@ -3346,7 +3346,7 @@ builder's step code into product code, golden models still green.
   `plane_input.click_square / click_on_plane`.
 - Merged into develop: Send to Slicer (sf/slicer), hardware library (sf/hardware), drag
   arrows (sf/arrows), each with its own session entry above. Home screen / BYOCloud / AI
-  connectors: brief `docs/sciforge/dev/briefs/home-cloud-ai.md`, worked on by another
+  connectors: brief `docs/fission180/dev/briefs/home-cloud-ai.md`, worked on by another
   session on branch `sf/home-cloud-ai`.
 - CI #161, #172, #174 (everything else green; all test timing, plus one real glitch):
   - revolve_axes: the squares' 250 ms timer moved them between aiming and clicking after
@@ -3369,8 +3369,8 @@ builder's step code into product code, golden models still green.
   (matches your own shell); detached runs end with a done-file; any push to develop
   cancels the CI run in progress (concurrency group), so batch pushes.
 - Quick update sent to Luca: build afe1f789 (CI #175 green), WHATS_NEW items 36-43.
-- Zip: `scratchpad/mkzip.sh <commit>` layout = quick-update/{SciForge, install_update.*,
-  README.md (docs/sciforge/quick-update.md), WHATS_NEW.txt}, build_info stamped.
+- Zip: `scratchpad/mkzip.sh <commit>` layout = quick-update/{Fission 180, install_update.*,
+  README.md (docs/fission180/quick-update.md), WHATS_NEW.txt}, build_info stamped.
 - Open for Luca: which slicer he uses (did it open with the part); heat-set insert sizes
   and brand, magnet sizes; arrow look (flip for minus, hover colour).
 
@@ -3398,8 +3398,8 @@ builder's step code into product code, golden models still green.
 - INSERT > Hardware...: ISO screws (socket, button, countersunk), nuts, washers, heat-set
   inserts and round magnets as their own components, with the matching hole (clearance +
   counterbore / countersink, insert hole, magnet pocket) as one undo step; editable from the
-  timeline. Full notes: `docs/sciforge/sessions/hardware.md`; spec, sources and guesses:
-  `docs/sciforge/parity/hardware.md`.
+  timeline. Full notes: `docs/fission180/sessions/hardware.md`; spec, sources and guesses:
+  `docs/fission180/parity/hardware.md`.
 - Open: Luca to confirm the heat-set insert sizes (a Guess set M2-M5) and magnet sizes.
 
 ### 2026-10-18: Send to Slicer (branch `sf/slicer`, merged into develop 2026-10-19)
@@ -3408,7 +3408,7 @@ builder's step code into product code, golden models still green.
   Preparation Type Manufacturing / Export / Print Utility; Print Utility = an Application
   drop-down of the utilities Fusion found, or Custom (point at the program). Forums: a slicer
   already open sometimes got nothing (FUS-171507); Custom with the .exe or a shortcut works.
-  Sources and the Fusion / SciForge table: `docs/sciforge/parity/insert-export.md` (3D Print).
+  Sources and the Fusion / Fission 180 table: `docs/fission180/parity/insert-export.md` (3D Print).
 - Built: `slicer_core.py` (no Qt / FreeCAD: finds PrusaSlicer, Bambu Studio, OrcaSlicer,
   UltiMaker Cura in Program Files / %LOCALAPPDATA%\Programs, on the PATH, Flatpak,
   AppImages, /Applications; the Send to list; the command line incl. .lnk / .app; units;
@@ -3432,7 +3432,7 @@ builder's step code into product code, golden models still green.
 ### Session log: Luca's improvement list (branch `develop`, 2026-10-16/17)
 
 Luca tested the CI #131 quick update and sent IMPROVEMENTS_AND_STUFF_TO_FIX.txt: 18 fixes, then
-3 additions (text on a face, start in SciForge, a gear tool). Plan:
+3 additions (text on a face, start in Fission 180, a gear tool). Plan:
 /root/.claude/plans/fancy-hugging-horizon.md (F1-F18, A1-A3). His answers: gears = spur +
 internal + rack; angle snap = always on at 0/45/90..., Ctrl = free.
 
@@ -3443,30 +3443,30 @@ internal + rack; angle snap = always on at 0/45/90..., Ctrl = free.
   limit (`hole.on_freeform_face`); closing a drawing no longer crashes (`drawing_ui`
   `_CloseWatch` / `_DocWatch`, shiboken validity checks). Scenarios construct_live,
   limits_notes, drawing_close.
-- F5-F10 (builder sf/sketch-3): see `docs/sciforge/sessions/sketch-3.md`. Auto project of the
+- F5-F10 (builder sf/sketch-3): see `docs/fission180/sessions/sketch-3.md`. Auto project of the
   face's edges (Preferences > Design > Sketch, default on; the face's own area stays the face,
-  hidden property `SciForgeAutoProjected`), one snapping engine (`sketch_infer_core.snap_points`,
+  hidden property `Fission180AutoProjected`), one snapping engine (`sketch_infer_core.snap_points`,
   SnapPixels 8), 45-degree line snaps, glyphs at the cursor, profiles against projected edges,
   z-fighting offsets. Root cause of "slightly off the corner": FreeCAD's PickRadius counts device
   pixels (3.3 logical px at 150 %).
-- F11-F14 (builder sf/view-3): see `docs/sciforge/sessions/view-3.md`. Origin planes
+- F11-F14 (builder sf/view-3): see `docs/fission180/sessions/view-3.md`. Origin planes
   red/green/blue, labelled, 0.6 x the parts (`origin_look.py`); angle snap + protractor
   (`angle_snap_core.py`, `protractor.py`) on every turn handle; Align snap dots; Body priority
-  hover inside tools. Scenario clicks on squares go through `SciForgeTests/gui/plane_input.py`.
+  hover inside tools. Scenario clicks on squares go through `Fission180Tests/gui/plane_input.py`.
 - F16-F18 (me): Change Keyboard Shortcut / Pin to Toolbar ("..." on every drop-down row,
   `command_options.py`, `shortcuts_core.py`, `ribbon_pins.py`), Preferences > Keyboard
   Shortcuts, Reset All Toolbar Customization; document tabs at the top (`doc_tabs.py` mirrors
   FreeCAD's hidden MDI tab bar, found by its name "mdiAreaTabBar").
 - A1 SOLID > CREATE > Text (`text_ui.FaceTextCommand`, `sketch_ui.start(then=...)`); A2 start
-  in SciForge (`start_in.py`, from InitGui; Preferences > General > Start in SciForge); A3 Gear
-  (builder sf/gear-1, `gear_core.py` / `gear.py` / `gear_ui.py`, `docs/sciforge/sessions/gear.md`).
+  in Fission 180 (`start_in.py`, from InitGui; Preferences > General > Start in Fission 180); A3 Gear
+  (builder sf/gear-1, `gear_core.py` / `gear.py` / `gear_ui.py`, `docs/fission180/sessions/gear.md`).
 - Merge fixes (me): PlanePicker keeps view-3's face rule (`_not_behind`) and the CI #141 edge
   rule (`_on_square` or `_face_in_front`); Revolve takes a part edge a few px from the press as
   the axis (`_edge_near`, Auto project put an area beside the edge).
 
 #### FreeCAD facts learned
 - FreeCAD runs every InitGui.py, then reads General/AutoloadModule (StartupProcess.cpp), then
-  restores the window layout; switching SciForge on before the window is shown: nothing counts
+  restores the window layout; switching Fission 180 on before the window is shown: nothing counts
   as visible (use `isHidden`), and FreeCAD sizes its right overlay panel from the window's
   minimum size and keeps it for good (`BaseApp/MainWindow/DockWindows/OverlayRight` Width;
   setting Width alone makes FreeCAD read an unset `Widgets` as "", set "Tasks," too).
@@ -3474,7 +3474,7 @@ internal + rack; angle snap = always on at 0/45/90..., Ctrl = free.
 - `findChildren(QTabBar, "", FindDirectChildrenOnly)` finds nothing in this PySide; use the name.
 
 #### CI #141-#144 and the lesson (Luca was right to be angry)
-Red runs #141-#143 were mostly the tests, not SciForge: the Fillet dialog sat ~10 px from the
+Red runs #141-#143 were mostly the tests, not Fission 180: the Fillet dialog sat ~10 px from the
 7th edge of inspect_analysis_curvature (wider on GitHub's fonts: the test now pans its part
 away); a harness change of mine (pan when a dialog is near, skip "covered" pixels) broke
 sweep_loft_qa_web and pi5_case; pi5_case clicked four hole points in one step (now one per
@@ -3482,8 +3482,8 @@ step, each checked). One real regression: my Pi 5 plane rule blocked XZ behind a
 (sweep_loft_loft). Rules from this: never push before the whole set of affected scenarios has
 finished locally; bisect a CI failure to a commit before changing anything; a fix to the test
 harness changes every scenario, so prefer a fix in the one scenario; Luca's updates are not
-held back by test robustness work (build the zip directly: `git archive HEAD src/Mod/SciForge`
-+ build_info.py + tools/sciforge/install_update.* + docs/sciforge/quick-update.md as README).
+held back by test robustness work (build the zip directly: `git archive HEAD src/Mod/Fission180`
++ build_info.py + tools/fission180/install_update.* + docs/fission180/quick-update.md as README).
 
 #### Integration (2026-10-17 night): what the full local runs found
 Two full local runs (374 scenarios, 3 shards) of develop + sketch-3 + view-3 + start-1 + gear.
@@ -3493,9 +3493,9 @@ Every failure was bisected before a change; the builders fixed their own (sf/fix
   Path / Sweep took the face's projected edges (Auto project) with the drawn curves; origin
   squares in front of a face stole its click (view-3: faces take the click again, XZ/YZ stick
   out beside the part); Revolve's edge-on angle drag stuck at the snap angle; a fresh profile's
-  first start lost SciForge's look (the theme pack's MainWindow and Themes groups made FreeCAD
-  reload its stylesheet over SciForge's: only its colours are applied now, once, mark
-  `Mod/SciForge/FirstStartThemeApplied`); Loft's Rails box takes the edge within 6 px of a click
+  first start lost Fission 180's look (the theme pack's MainWindow and Themes groups made FreeCAD
+  reload its stylesheet over Fission 180's: only its colours are applied now, once, mark
+  `Mod/Fission180/FirstStartThemeApplied`); Loft's Rails box takes the edge within 6 px of a click
   on a face (an edge lying on another body's face never won the pick).
 - Test assumptions: the document tabs at the top make the 3D view 13 px shorter (769 tall):
   the sketch grid snap took an "about 8" click to 10 (sweep_loft_qa_loft: Ctrl); the taper
@@ -3509,7 +3509,7 @@ Every failure was bisected before a change; the builders fixed their own (sf/fix
 
 #### After the update (2026-10-17 evening)
 - Luca's second start showed only the browser: FreeCAD restores the window layout saved at
-  the last close after SciForge is on, and it had the ribbon and timeline hidden.
+  the last close after Fission 180 is on, and it had the ribbon and timeline hidden.
   shell.startup shows them again; base test restart_gui.py (two starts, one profile) guards
   it. Scenarios never see this: each starts without a saved layout.
 - CI #145/#148 red, reproduced locally only with GitHub's conditions: its fonts (hide Inter
@@ -3557,7 +3557,7 @@ Every failure was bisected before a change; the builders fixed their own (sf/fix
 
 ### Session log: Raspberry Pi 5 case from scratch (branch `develop`, 2026-10-16)
 
-Luca: "to test how well SciForge works, make a Raspberry Pi 5 case from scratch. maybe do
+Luca: "to test how well Fission 180 works, make a Raspberry Pi 5 case from scratch. maybe do
 some research to find all the dimensions and specs." Also: the work branch is `develop`, no
 screen recordings, no `.f3d` (Decisions log).
 
@@ -3583,7 +3583,7 @@ opening for it).
   the design's volume) and one STL per body. Every volume is worked out by hand (Pappus for
   the lid's rounded outline). 120 checks, PASS.
 
-#### SciForge bugs it found (fixed)
+#### Fission 180 bugs it found (fixed)
 
 1. **Create Sketch on a narrow face took an origin plane behind it** (`sketch_ui.PlanePicker`):
    only a face under the mouse hid the origin squares; an edge did not, so a click on the
@@ -3598,7 +3598,7 @@ opening for it).
 3. **A click on a short edge selected nothing in Fillet** (`selection_ui._click`): FreeCAD's
    click pick prefers the corner at the end of a 2 mm edge, the Fillet's gate refuses
    corners, FreeCAD selects nothing. Now when an open command's gate refuses the nearest
-   pick, or the click made no selection event at all, SciForge selects the first thing
+   pick, or the click made no selection event at all, Fission 180 selects the first thing
    under the pointer the command takes (an edge first for a refused corner). Applies to
    every dialog with a gate (Shell, Hole, Draft, Measure, Section, Construct, Joints...).
 
@@ -3612,7 +3612,7 @@ opening for it).
 
 Relaunch of the wave 5 sketch-2 builder (the first one stopped at the usage limit before it
 committed anything). Started from 2273d4e0ab (Luca's four fixes merged). Spec, sources and
-gaps: `docs/sciforge/parity/sketch.md`, section "Sketch, part 2" at the top and Known gaps;
+gaps: `docs/fission180/parity/sketch.md`, section "Sketch, part 2" at the top and Known gaps;
 `parity/selection.md` (sketch boxes, chains, planes); `parity/text-emboss.md` (T17). No
 FreeCAD core file changed (no full build needed).
 
@@ -3621,20 +3621,20 @@ FreeCAD core file changed (no full build needed).
 - **Chain selection in a sketch** (`sketch_select.py`, rule `sketch_select_core.py`): a
   double-click on a curve (no tool running) selects the curves joined to it end to end, of
   its line type; a circle alone. FreeCAD's own double-click wire selection never fired under
-  SciForge (checked with real double-clicks), so SciForge finds the curve itself and swallows
+  Fission 180 (checked with real double-clicks), so Fission 180 finds the curve itself and swallows
   the double-click and its release (FreeCAD toggled the clicked curve off).
 - **Box selection in a sketch with Fusion's modifiers**: FreeCAD's sketch box already does
   window / crossing by direction but always added; a plain box now replaces (the selection is
   cleared before FreeCAD sees the release), Shift adds, Ctrl toggles (put aside, toggled
   after FreeCAD's box).
 - **Sketch Fillet** (`sketch_fillet_tool.py`, `sketch_fillet_core.py`, `sketch_fillet_ui.py`):
-  SciForge's own tool on the sketch handler for lines, arcs and circles in any pair (a corner
+  Fission 180's own tool on the sketch handler for lines, arcs and circles in any pair (a corner
   point or two curves), pointer or typed radius, FreeCAD's `SketchObject.fillet` makes it, a
   Radius dimension, refusals with the reason. SKETCH > MODIFY > Fillet runs it; FreeCAD's
   fillet tool (which never saw a click on CI, #123-#126) stays the fallback.
   `modeling2_sketch` now uses it (its CI fallback is gone).
 - **Chamfer between a line and an arc** (`sketch_chamfer_core.line_arc_*`,
-  `sketch_chamfer_tool._build_arc`): corner point or the two curves, all three types; SciForge
+  `sketch_chamfer_tool._build_arc`): corner point or the two curves, all three types; Fission 180
   goes further than Fusion (Autodesk documents line-line only).
 - **Text frame resized by a corner drag** (`text_ui.TextLayer`, `text_core.resized_frame`).
 - **Box selection of planes, axes and points** (`selection_ui._work_elements`,
@@ -3657,7 +3657,7 @@ FreeCAD core file changed (no full build needed).
 - `QTest.mouseDClick` (Qt 6) sends press, release, double-click and **no release** after the
   double-click; a real mouse sends one. Scenarios add the release (`sketch2_select.dclick_at`);
   without it FreeCAD's sketch stays in its rubber-band state and the next tool's clicks were
-  lost. SciForge also resets its "swallow the release" flag on the next press.
+  lost. Fission 180 also resets its "swallow the release" flag on the next press.
 - FreeCAD 1.1.4's sketch box (`ViewProviderSketch::doBoxSelection`) is window from left to
   right and touch (crossing) from right to left, and only adds to the selection.
 - FreeCAD draws an origin plane as a square in the plane's first quadrant, set off from the
@@ -3674,7 +3674,7 @@ FreeCAD core file changed (no full build needed).
   `getConstruction` is False for a point that was construction).
 - `Sketch.ExternalGeometry` is read-only from Python; there is no call to re-point one
   external reference in place.
-- **TNP limit (stock FreeCAD 1.1.4, reproduced headless without SciForge)**: a pad of a
+- **TNP limit (stock FreeCAD 1.1.4, reproduced headless without Fission 180)**: a pad of a
   rectangle whose width dimension changes loses the external references to its vertical
   edges and corners on the moved side ("missing element reference ... ?Edge2", "Failed to
   project external geometry"); the projected curve stays where it was. Its top and bottom
@@ -3689,7 +3689,7 @@ FreeCAD core file changed (no full build needed).
 New scenarios (real FreeCAD 1.1.4, real input, one at a time), final run: `sketch2_select`
 82 checks, `sketch2_fillet` 151, `sketch2_text_frame` 70, `sketch2_box_planes` 43,
 `sketch2_project` 95, `sketch2_3d` 175, `sketch2_palette` 64, all PASS. Updated:
-`modeling2_sketch` (131) and `sketch_qa` G (460): SKETCH > MODIFY > Fillet is SciForge's
+`modeling2_sketch` (131) and `sketch_qa` G (460): SKETCH > MODIFY > Fillet is Fission 180's
 tool now, so the arc comes after the radius is typed (Fusion's order), not at the corner
 click. Unit tests: `test_sketch_select_core.py`,
 `test_sketch_fillet_core.py`, `test_sketch3d_core.py`, `test_sketch_chamfer_core.LineAndArc`,
@@ -3820,7 +3820,7 @@ expected failures `plate_hole_grid` (older) and `sf_loft_merge_slot_volume`, smo
 - A loft along a centerline makes 2 side faces for a circle (a seam), not 1.
 - `App.Units.Quantity("0.75 * 2")` evaluates arithmetic, so `parameters.is_plain_number`
   treats a sum as a number: only a formula with a parameter name becomes an expression (in
-  every SciForge dialog). Scenarios that test a formula must use a user parameter.
+  every Fission 180 dialog). Scenarios that test a formula must use a user parameter.
 - `freecadcmd file.py` drops into the interactive console after the file; use
   `freecadcmd -c "exec(open('file.py').read())" < /dev/null`.
 - Scenario design: the iso view looks from (+1, -1, +1), so a plane whose normal is square to
@@ -3850,8 +3850,8 @@ expected failures `plate_hole_grid` (older) and `sf_loft_merge_slot_volume`, smo
 
 ### 2026-10-16: Import and export, part 2 (branch `sf/exchange-2`, wave 5)
 
-Brief: `docs/sciforge/dev/briefs/exchange-2.md`. Spec, sources and gaps:
-`docs/sciforge/parity/insert-export.md`, "Part 2" (also notes in `parity/versions.md` and
+Brief: `docs/fission180/dev/briefs/exchange-2.md`. Spec, sources and gaps:
+`docs/fission180/parity/insert-export.md`, "Part 2" (also notes in `parity/versions.md` and
 `parity/components.md`). No FreeCAD core change (no full build needed).
 
 #### What was built
@@ -3860,14 +3860,14 @@ Brief: `docs/sciforge/dev/briefs/exchange-2.md`. Spec, sources and gaps:
   own reader (`Import.insert(..., useLinkGroup=True, merge=False, mode=0)`) runs in a hidden
   throw-away document; its tree (App::LinkGroup = assembly, Part::Feature = part, App::Link =
   a repeated occurrence) becomes plain nodes with the solids in the file's coordinates and
-  the colours Import.insert returns; then SciForge makes a component per product (named
+  the colours Import.insert returns; then Fission 180 makes a component per product (named
   after it, nested, its placement), a body per solid (Body1, Body2 ...; its base
   Part::Feature inside the component for FreeCAD's link scope) and, for a repeated part,
   a linked instance (`instances.make_instance`, "Wheel:2"). An assembly holding a part of
-  its own name keeps that part's solids as its own bodies (how FreeCAD and SciForge write a
+  its own name keeps that part's solids as its own bodies (how FreeCAD and Fission 180 write a
   component's bodies). IGES (no structure) gives bodies; a faces-only IGES is sewn into
   solids (open shells become surface bodies). SAT / SMT / F3D are refused with the reason.
-- **File > Open** (`SciForge_Open`, Ctrl+O through `config.PREFERRED`, the application menu
+- **File > Open** (`Fission180_Open`, Ctrl+O through `config.PREFERRED`, the application menu
   and quick-access Open): designs as before (`versions_ui.open_design`), a STEP / IGES file
   as a new unsaved design named after the file, the file's top product being the design.
 - **Insert STEP** (`exchange_ui.insert_cad_file`, INSERT > Insert STEP, also IGES): the file
@@ -3926,7 +3926,7 @@ Brief: `docs/sciforge/dev/briefs/exchange-2.md`. Spec, sources and gaps:
   `EnterFinishes` presses OK: Fusion's Enter in a value box finishes the command too.
 - A scale arrow lying on the picture's edge took presses for the picture / sketch under
   it; it now sits just outside the edge.
-- Black on `sciforge/*.py` reformats dozens of other areas' files: run it on your own files
+- Black on `fission180/*.py` reformats dozens of other areas' files: run it on your own files
   only.
 
 #### Tests (real FreeCAD 1.1.4, one at a time, final runs on 7969ba9bf6)
@@ -3964,13 +3964,13 @@ Brief: `docs/sciforge/dev/briefs/exchange-2.md`. Spec, sources and gaps:
 - DXF Z Angle direction and canvas Z Angle direction are guesses (counter-clockwise).
 - The decal keeps its own manipulator (its scale arrow has no value box); not touched, so
   `fixdecal_*` stay as they are.
-- `docs/sciforge/dev/remaining-gaps.md` still lists the insert-export gaps fixed here (not
+- `docs/fission180/dev/remaining-gaps.md` still lists the insert-export gaps fixed here (not
   edited: a shared survey).
 
 
 ### Session log: Polish, part 2 (branch `sf/polish-2`, wave 5, 2026-10-16)
 
-Brief: `docs/sciforge/dev/briefs/polish-2.md` (+ `common.md`). Relaunch: the first polish-2
+Brief: `docs/fission180/dev/briefs/polish-2.md` (+ `common.md`). Relaunch: the first polish-2
 builder was stopped by the usage limit before committing; this run started from 2273d4e0ab
 (Luca's four bug fixes merged). Specs with sources (Autodesk / Forum / Guess) and gaps:
 `parity/extrude-presspull.md` (value boxes, top section), `parity/sketch.md` (the floating
@@ -4004,12 +4004,12 @@ build needed.
    with the marker inside. A group holding the marker stays open (Collapse greyed, a click
    says why); the group menu has Roll History Marker Here. Esc drops a folder drag.
 4. **Versions**: Milestones (Save dialog box; Version History column, Mark / Remove,
-   Milestones only; Data Panel > Milestones; git tags `sciforge-milestone-<commit>`, plain
+   Milestones only; Data Panel > Milestones; git tags `fission180-milestone-<commit>`, plain
    `index.json`). Automatic version on close (Preferences > General, on by default like
    Fusion) and the Close dialog (Save with a description / Don't Save / Cancel; a design never
    saved goes through the Save dialog; quitting asks about each changed design). Data Panel
    Move... / Copy... (folder list + New Folder): a moved design keeps its versions (git mv +
-   a "[SciForge] moved" commit that `GitStore._log` follows back; plain version folders
+   a "[Fission 180] moved" commit that `GitStore._log` follows back; plain version folders
    move along) and its own links / Derives plus the project designs that insert or derive it
    are rewritten to the new place (`versions.retarget_xml`); a copy is a separate design at
    v1. Rename now keeps git versions and the users' links too. The Out-of-Date button in the
@@ -4037,7 +4037,7 @@ build needed.
   once (checked on a hidden document loaded for links): Get Latest of an inserted design.
 - `git log --follow` follows copies, not only renames (git's rename following turns on
   find-copies-harder): a copied design with the same content would have taken the
-  original's versions. SciForge follows only its own move commits (`GitStore._moved_from`).
+  original's versions. Fission 180 follows only its own move commits (`GitStore._moved_from`).
 - FreeCAD's floating Tasks panel (`Gui::OverlayTabWidget`) lies over the 3D view: children of
   the GL widget under it (value boxes) are hidden, and a click there goes to the panel.
 - Enter in a value box takes the value and finishes the command (OK); Tab or a click
@@ -4089,18 +4089,18 @@ regression run; the scenarios it had not reached were run again afterwards.)
   Copy... cover designs); Fusion's per-reference Get Latest Version (Get Latest takes all).
 - FreeCAD's own Close All Documents still asks FreeCAD's question (its Save makes a version
   all the same).
-- A check for SciForge's own fixed-step sketch tools (they end after their last click).
+- A check for Fission 180's own fixed-step sketch tools (they end after their last click).
 - Dropping a step into a group by dragging stays possible (Fusion has none) and groups do not
   nest.
-- Derive: sheet-metal flat patterns and feature parameters "From Components" (SciForge has
-  neither); Fusion picks a reference's version from the Data Panel, SciForge in the dialog.
+- Derive: sheet-metal flat patterns and feature parameters "From Components" (Fission 180 has
+  neither); Fusion picks a reference's version from the Data Panel, Fission 180 in the dialog.
 - Floating dialogs and document tabs at the top stay out of this wave (brief).
 
 
 ### Session log: mesh and inspect part 2 (branch `sf/mesh-inspect-2`, 2026-10-16)
 
-Brief: `docs/sciforge/dev/briefs/mesh-inspect-2.md`. Spec with sources (Autodesk / Forum /
-Guess per row) and gaps: the "Wave 5" sections at the top of `docs/sciforge/parity/mesh.md`,
+Brief: `docs/fission180/dev/briefs/mesh-inspect-2.md`. Spec with sources (Autodesk / Forum /
+Guess per row) and gaps: the "Wave 5" sections at the top of `docs/fission180/parity/mesh.md`,
 `parity/inspect.md` and `parity/inspect-analysis.md`. No FreeCAD core file was changed.
 
 #### What was built
@@ -4129,7 +4129,7 @@ Guess per row) and gaps: the "Wave 5" sections at the top of `docs/sciforge/pari
 - **Mesh steps roll back with the history marker**: every MESH step (Insert Mesh,
   Tessellate, Repair, Smooth ... Direct Edit) is a root step that `rolls`
   (`timeline_ops.rolls_back`); `timeline_ops.follow_mesh_steps` marks the steps after the
-  marker `SciForgeRolledBack` (headless too), hides them and their pieces, and
+  marker `Fission180RolledBack` (headless too), hides them and their pieces, and
   `bodies.sync_consumed` shows the step before. A design of mesh bodies only can have its
   marker moved (`timeline_core.marker_for_slot` returns the note alone). A mesh step made
   while the marker is rolled back goes in at the marker (`place_root_step`), and the body's
@@ -4254,7 +4254,7 @@ B1-B10, with sources):
 - `timeline_ops.recompute` resolves before recomputing and `settle` after every recompute
   (a step added at the marker before the pattern, a step deleted, the pattern dragged);
   `step_order(doc)` is the timeline's merge without reading problems (cheap).
-- The step rolls back with the history marker (`SciForgeRolls`, like a component pattern):
+- The step rolls back with the history marker (`Fission180Rolls`, like a component pattern):
   while the marker stands before it its copies are hidden (`_follow_root_steps`), they do not
   take new work (`commands.not_made_yet`), and a body freed by a rolled-back Combine stays
   hidden while the marker hides it (`bodies.sync_consumed`).
@@ -4304,9 +4304,9 @@ B1-B10, with sources):
 - The "marker stands before a non-solid step" note lives in `doc.Meta`, which FreeCAD's undo
   does not restore: Undo of such a marker roll leaves the marker after that step (general;
   listed in the parity doc).
-- A `PartDesign::Pad` made by a plain script (no SciForge metadata) opened from the timeline
+- A `PartDesign::Pad` made by a plain script (no Fission 180 metadata) opened from the timeline
   did not take a new distance on OK in the scenario (seen once with the first fixture; the
-  fixture is now made with `extrude.make`, as SciForge's own Extrude is). Not investigated.
+  fixture is now made with `extrude.make`, as Fission 180's own Extrude is). Not investigated.
 
 #### Tests
 
@@ -4386,7 +4386,7 @@ damaged; what Luca saw is the drawing. A moved part had a second, real fault (be
   the timeline: the step before it (Fusion rolls back to the sketch); FreeCAD's own "Hide
   dependent" still hides the steps that use the sketch.
 - `hole.earliest_face` / `earliest_edge` stop at a step that moves the whole solid
-  (`hole.moves_solid`: SciForgeType MoveCopy, Align, Scale) and never leave the body.
+  (`hole.moves_solid`: Fission180Type MoveCopy, Align, Scale) and never leave the body.
 - `_earliest` itself is kept: the hole QA's rule (a sketch on a face the first extrude made
   survives suppressing an unrelated later step) still holds and is checked again
   (`sketch_earliest_face`, `fixsketch_fillet` E, `fixsketch_hole` D).
@@ -4405,7 +4405,7 @@ damaged; what Luca saw is the drawing. A moved part had a second, real fault (be
   clicks use sketch coordinates ending in 0, 3, 5 or 7 (`fixsketch_steps.circle`).
 - `ShowSupport` is a property of each sketch's view provider, set from the parameter
   `Mod/Sketcher/General/ShowSupport` only when the view provider is made: a saved file keeps
-  its own value, so a parameter alone would not cover older designs. SciForge sets it off on
+  its own value, so a parameter alone would not cover older designs. Fission 180 sets it off on
   each sketch it opens (saved with the file) and corrects the drawing afterwards in any case.
 - A suppress or unsuppress is an undo step: a scenario that undoes a boss must do it before
   suppressing anything.
@@ -4432,14 +4432,14 @@ the `extrude_*` that sketch on faces or edit sketches (`extrude_review_fixes`,
 - Only the sketch's own body is rolled back in the drawing while an older sketch is edited;
   Fusion also rolls back the other bodies' later steps. The history marker itself never
   moves while a sketch is open (as before).
-- Suppressing a Move (or Press Pull) step takes a sketch on its face along (SciForge's
+- Suppressing a Move (or Press Pull) step takes a sketch on its face along (Fission 180's
   suppress rule); in Fusion such a sketch would probably stay on the face. Unchanged.
 
 
 ### 2026-10-16: Decals stay on their faces (branch `sf/fix-decal`)
 
 Luca's report: "decals dont follow their faces when moved". Spec, sources and gaps:
-`docs/sciforge/parity/misc.md`, Decal, "Following the face". No core patch (no full build
+`docs/fission180/parity/misc.md`, Decal, "Following the face". No core patch (no full build
 needed).
 
 #### Reproduced (real clicks, before the fix)
@@ -4459,7 +4459,7 @@ flat face under it"). It never knew how its face had moved: a Move/Copy step (wh
 the body's solid), a joint or Component Drag (which move a root body by its Placement, with
 no recompute at all), a body put into another component (the decal stayed in the old one
 and was drawn in the old component's frame), a cylinder made thicker. FreeCAD's own face
-naming (toponaming) does not help: SciForge's Python steps (Move, Press Pull) drop the element
+naming (toponaming) does not help: Fission 180's Python steps (Move, Press Pull) drop the element
 map, a link to "Face6" becomes "?Face6" (probed).
 
 #### The fix
@@ -4535,7 +4535,7 @@ transform in the scene graph, and how far it lies from the body's faces):
 - `fixdecal_joints` (88): a decal on a root body; the joint made (the body flips onto the
   other), Drive Joints (live, OK), undo / redo, Component Drag along the joint, undo.
 - `fixdecal_reopen` (75): moved, saved, reopened (drawn in place, nothing to recompute),
-  moved again after reopening, undo / redo; a design saved by the earlier SciForge (no face
+  moved again after reopening, undo / redo; a design saved by the earlier Fission 180 (no face
   remembered) brought up to date and followed.
 - `misc_decal` (54) still passes; all seven pass in one profile.
 
@@ -4551,7 +4551,7 @@ removed, copies of an instance and of a circular component pattern in a turned c
 
 #### FreeCAD facts and traps found
 
-- FreeCAD's toponaming does not survive SciForge's Python features: a `PropertyLinkSub` to a
+- FreeCAD's toponaming does not survive Fission 180's Python features: a `PropertyLinkSub` to a
   body's "Face6" becomes "?Face6" after a Move step (element map lost), though the face
   keeps its index. PartDesign's own Pad keeps it.
 - A rigid move of a shape (`transformShape`, a placement) keeps every surface's (u, v)
@@ -4576,7 +4576,7 @@ removed, copies of an instance and of a circular component pattern in a turned c
 
 - A component's copies (instances) show its decals, but the browser lists the decal under
   the original only.
-- Fusion keeps its own face names; SciForge follows what it remembers of the face's shape
+- Fusion keeps its own face names; Fission 180 follows what it remembers of the face's shape
   and place, so a face rebuilt so that it both changes shape and moves in one step may not
   be found (the step goes red; Edit Decal > Select Face puts it back).
 
@@ -4606,18 +4606,18 @@ height as that face".
 
 #### What was built
 
-1. `sciforge/extrude_to_face_core.py` (new, Qt-free, 24 unit tests in
-   `SciForgeTests/unit/test_extrude_to_face_core.py`): which targets give a height (a flat
+1. `fission180/extrude_to_face_core.py` (new, Qt-free, 24 unit tests in
+   `Fission180Tests/unit/test_extrude_to_face_core.py`): which targets give a height (a flat
    face parallel to the profile, a vertex, a parallel plane), which run along the extrusion
    (refused), which are To Object (curved, tilted); the side of Two Sides; Symmetric half /
    whole; the dialog's words ("Up to the face: 12.5 mm", "Side Two up to the point: 10 mm",
    "Ends on the curved face (To Object)") and the refusals.
-2. `sciforge/extrude_to_face.py` (new): what a click or the mouse points at, in design
+2. `fission180/extrude_to_face.py` (new): what a click or the mouse points at, in design
    coordinates (`target`, `hits_at` through `view.getObjectsInfo`, the front-most spot,
    corners first), a face of the part found again by the clicked point after the preview
    merged with it (`base_face_at`), the blue snap mark (`SnapHighlight`, node
-   `SciForgeSnapTarget`).
-3. `sciforge/extrude_ui.py`: with a profile picked, a click on a face out of the profile's
+   `Fission180SnapTarget`).
+3. `fission180/extrude_ui.py`: with a profile picked, a click on a face out of the profile's
    plane goes to `_end_at` (distance, To Object or a refusal); a face in the profile's plane,
    the preview's own end and an empty Profiles box work as before. A mouse-position filter
    on the view; `_dragged` / `_dragged2` snap while the arrow is held (`_drag_snap`: a press
@@ -4625,7 +4625,7 @@ height as that face".
    ZERO_HINT now says a face can be clicked. A coplanar face clicked after a Join preview
    changed it is found again by the click point (before: "That face belongs to this extrude
    itself.").
-4. `sciforge/extrude.py`: **To Object on a curved face of another body is SciForge's own
+4. `fission180/extrude.py`: **To Object on a curved face of another body is Fission 180's own
    extrude feature** (`curved_face`, `curved_elsewhere`, used by `_structure`). FreeCAD's Pad
    "up to face" on a curved face of another body ended in the wrong place (golden
    `extrude_to_cylinder_face`: 22494 mm^3 through the cylinder instead of 4753). A curved
@@ -4716,8 +4716,8 @@ Started from `7282c76096`. No FreeCAD core file changed (no full build needed).
    hiding paused while a Join preview merges; a step moved to another body goes in after
    that body's older sketches (`insert_point`, also for Extrude).
 4. **Sweep values take formulas** (Distance, Distance Two, Taper, Twist): expressions on
-   SciForge's sweep, listed under the fields; `curve_pick.RatioBox(formulas=True)` +
-   `RatioField` adapter for `preview.FormulaInput`; a formula forces SciForge's own sweep.
+   Fission 180's sweep, listed under the fields; `curve_pick.RatioBox(formulas=True)` +
+   `RatioField` adapter for `preview.FormulaInput`; a formula forces Fission 180's own sweep.
 5. **Sketch Chamfer** (`sketch_chamfer_core.py` Qt-free + unit tests,
    `sketch_chamfer_tool.py` on `sketch_draw.DrawTool`, `sketch_chamfer_ui.py`; ribbon
    SKETCH > MODIFY > Chamfer now runs it): Equal distance / Distance and angle / Two
@@ -4774,7 +4774,7 @@ files installed.
 - `bodies.sync_consumed` hides a body a Join preview merges, from under the next click;
   dialogs pause it while they preview a merge (Extrude did; Revolve, Sweep and Loft now too).
 - PySide6: `QWidget.isVisibleTo(x)` needs a QWidget (a task Panel is not one).
-- `SCIFORGE_GOLDEN_FILTER=sf_sweep` runs only the goldens whose name contains the text.
+- `FISSION180_GOLDEN_FILTER=sf_sweep` runs only the goldens whose name contains the text.
 
 #### Gaps (with the reason)
 
@@ -4799,11 +4799,11 @@ files installed.
 Written by the drawings-2 builder (wave 4) instead of a MEMORY.md entry (every branch
 editing MEMORY.md conflicts at the merge). Merge this into MEMORY.md's session log when
 the branch is merged. The behaviour spec with its sources and the gaps are in
-`docs/sciforge/parity/drawings.md` (part 2 rows 26-50, the gaps table, the facts list).
+`docs/fission180/parity/drawings.md` (part 2 rows 26-50, the gaps table, the facts list).
 
 #### Built
 
-All in `src/Mod/SciForge/sciforge/`, no FreeCAD core change:
+All in `src/Mod/Fission180/fission180/`, no FreeCAD core change:
 
 - **Dimension dialog** (double-click a dimension, or DIMENSIONS > Edit Dimension):
   override, text before / after, symbol buttons, precision, Tolerance None / Symmetric /
@@ -4876,7 +4876,7 @@ scenarios pass unchanged.
   one (0.02 mm apart on an R8 fillet): `drawing.centre_of` computes TechDraw's.
 - `makeCosmeticVertex` / `makeCosmeticLine` take y-up points; `formatGeometricEdge(i,
   style, weight, colour, visible)` hides a geometry edge by index (indices change on
-  every recompute: SciForge matches the edges by geometry and works the list out again
+  every recompute: Fission 180 matches the edges by geometry and works the list out again
   after every change).
 - `DrawViewSection` cuts its parent view's shape (`getShapeToCut` takes the BaseView's
   `getSourceShape()`), never its own `Source`: the first Section Depth (a trimmed copy as
@@ -4922,8 +4922,8 @@ To be folded into MEMORY.md's Session log at the merge (this branch does not edi
   Features): Optimized (Fusion's default), Identical, Adjust. Optimized and Identical are
   FreeCAD's pattern of the feature (same result). Adjust runs every extrude among the
   originals again at each copy (`pattern_adjust.py`: the profile moved, the same extent; an
-  extrude To Object ends on the object where the copy lands; SciForge's Extrude and FreeCAD's
-  Pad / Pocket); other features stay identical. Built by SciForge's `PatternFeature` (property
+  extrude To Object ends on the object where the copy lands; Fission 180's Extrude and FreeCAD's
+  Pad / Pocket); other features stay identical. Built by Fission 180's `PatternFeature` (property
   `ComputeOption`); native patterns keep the choice in their meta.
 - **Pattern on Path Start Point** (0..1 along the path; the field shows where it starts by
   itself until a value is typed; property `StartPoint`, -1 = nearest the objects). A sketch's
@@ -4933,14 +4933,14 @@ To be folded into MEMORY.md's Session log at the merge (this branch does not edi
   each of them (a hidden `PatternFollower` per other body).
 - **Draft**: Type Fixed Plane / Parting Line; Draft Sides One Side / Two Side / Symmetric
   (Angle 1, Angle 2) for both types; Parting Tool box (plane, flat face, edges, sketch
-  curves); Fix Parting Line (Move Parting Line listed, greyed with the reason). SciForge's
+  curves); Fix Parting Line (Move Parting Line listed, greyed with the reason). Fission 180's
   `DraftFeature` splits the faces at the line and tilts each group of pieces with FreeCAD's own
   Draft run in a hidden throw-away document. One Draft over faces of several bodies.
 - **Shell, Draft, Scale over several bodies in one step**: the step lives in the first body;
   every other body gets a hidden follower step (`modify_bodies.py`: `ShellFollower`,
   `DraftFollower`, `ScaleFollower`, `PatternFollower`, role `ModifyFollower`, linked by
   `Source`). The timeline's roll back, suppress, move and delete take them along
-  (`timeline_ops.FOLLOWER_ROLES`); SciForge's Delete and the orphan cleanup know them.
+  (`timeline_ops.FOLLOWER_ROLES`); Fission 180's Delete and the orphan cleanup know them.
 - **Scale of sketches**: a sketch's browser row (or the sketch selected before Scale) in the
   Entities box; uniform only (Non Uniform refused with the reason); the curves and their
   driving dimensions are scaled (a dimension that follows a parameter keeps its value, the
@@ -4987,7 +4987,7 @@ To be folded into MEMORY.md's Session log at the merge (this branch does not edi
   input unchanged on a part with a narrow slot open at its side where the Arc join works;
   1 mm walls on a 2 mm rib fail in both.
 - The timeline's Delete (`timeline_ops._helpers_of`) took every unused "helper" in a deleted
-  step's OutList: a follower is a helper (it has a SciForgeRole), so deleting a step whose
+  step's OutList: a follower is a helper (it has a Fission180Role), so deleting a step whose
   BaseFeature was a follower deleted the follower too. Followers now only go with their lead.
 - Black adds a blank line after the module docstring of the older files; it was removed again
   so the diff stays small.
@@ -4997,7 +4997,7 @@ To be folded into MEMORY.md's Session log at the merge (this branch does not edi
 #### Shared files touched (one or two lines each)
 
 `timeline_ops.py` (FOLLOWER_ROLES += "ModifyFollower"; followers are not unused helpers),
-`timeline_core.py` (KIND_BY_SCIFORGE_TYPE MoveFace, SketchScale), `delete.py` (modify
+`timeline_core.py` (KIND_BY_FISSION180_TYPE MoveFace, SketchScale), `delete.py` (modify
 followers deleted with their lead, orphans cleaned up), `bodies_gui.py` (modify followers in
 the lead/follower lists; MoveFace icon), `shelling.py` (followers moved when a shell is
 rebuilt; the sharp-shell message), `pickpanel.py` (members: other bodies of a step),
@@ -5030,7 +5030,7 @@ the 11 `extrude_presspull_*`, `direct_commands`, `direct_step_box`, `direct_base
 xfail `plate_hole_grid`, smoke, journey).
 
 Golden models `golden/models/modify2_*.json` (24, analytic numbers). Unit tests
-`SciForgeTests/unit/test_modify2_schema.py` (the golden steps' schema).
+`Fission180Tests/unit/test_modify2_schema.py` (the golden steps' schema).
 
 #### Not built (and why)
 
@@ -5053,8 +5053,8 @@ Golden models `golden/models/modify2_*.json` (24, analytic numbers). Unit tests
 
 ### Session log: components part 2 (branch `sf/components-2`, 2026-10-14)
 
-Brief: `docs/sciforge/dev/briefs/components-2.md`. Spec with sources and gaps:
-`docs/sciforge/parity/components.md` (section "Part 2"), plus rows in `parity/bodies.md`
+Brief: `docs/fission180/dev/briefs/components-2.md`. Spec with sources and gaps:
+`docs/fission180/parity/components.md` (section "Part 2"), plus rows in `parity/bodies.md`
 (Combine New Component, Split Body with several tools, Move Object Components, Set Pivot) and
 `parity/patterns.md` (Pattern Type Components).
 
@@ -5171,7 +5171,7 @@ selection_filters 58, viewcube_menu 21. `--only base`: 919 unit tests OK, golden
 
 ### 2026-10-14: Joints, part 2: drag, motion, positions (branch `sf/joints-2`, wave 4)
 
-Spec, sources and gaps: `docs/sciforge/parity/joints.md` (sections "Dragging components",
+Spec, sources and gaps: `docs/fission180/parity/joints.md` (sections "Dragging components",
 "Position modes", "Motion Link", "Contact Sets", "Motion Study", "Nested components", the
 Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
 
@@ -5205,7 +5205,7 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
   `follow_links`): two joints, a value each (angle / distance, a Rotate / Slide choice for a
   joint with both), Reverse, Animate; both ways; a timeline step and a row in the Joints
   folder; deleted with either joint. Turning joints now count whole turns
-  (`SciForgeAngle`, kept in captured positions too): a pinion driven to 360 reads 360.
+  (`Fission180Angle`, kept in captured positions too): a pinion driven to 360 reads 360.
 - **Contact Sets** (`ContactSetPanel`, `joints.contact_pairs`, `overlapping`): Disable
   Contact / Enable Contact Sets / Enable All Contact (ticked entries of ASSEMBLE, saved with
   the design), New Contact Set (Contacts folder in the browser); a drag and Drive Joints stop
@@ -5221,7 +5221,7 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
 - **No automatic ground**: `ensure_ground` is gone (Joint, As-built Joint, Rigid Group).
   Hidden `AutoGround` helpers hold each free group of jointed parts (by component 2 of its
   oldest joint) only inside `joints.solve`. FreeCAD's own solve on recompute is off while
-  SciForge is on (`theme.VIEWER_SETTINGS`), and `joints_ui.Watch` solves after a recompute
+  Fission 180 is on (`theme.VIEWER_SETTINGS`), and `joints_ui.Watch` solves after a recompute
   when a joint is no longer satisfied.
 - Fixed on the way: a Slider whose Slide axis is X (or Y) when it is first aligned was
   turned over and broken (the heading was kept about the motion axis instead of the face
@@ -5256,7 +5256,7 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
   references, so every placement change of a jointed part ends in a solve on the next
   recompute.
 - `preDrag` / `doDragStep` / `postDrag` (FreeCAD's own drag solver) are C++ only, not in
-  `AssemblyObjectPy`: SciForge's drag is Python (drive the joint, then solve).
+  `AssemblyObjectPy`: Fission 180's drag is Python (drive the joint, then solve).
 - `view.getObjectsInfo(pixel)` lists everything under the pointer (a joint's glyph first):
   used to grab the component under it.
 - Under xvfb (no window manager) the main window is not active again after a modal
@@ -5272,7 +5272,7 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
 #### Gaps (what Fusion does that was not built, why)
 
 - Fusion's drag solver pulls a whole mechanism toward the pointer through several joints;
-  SciForge drives the first joint with a motion on the way to the ground (FreeCAD's drag
+  Fission 180 drives the first joint with a motion on the way to the ground (FreeCAD's drag
   solver is not reachable from Python).
 - Contact does not stop Animate Joint or a motion study's playback (drags and Drive Joints
   only); contact is coarse (solids' common volume).
@@ -5280,7 +5280,7 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
   are guesses; contact sets are not in the timeline (guess).
 - Between Two Faces takes the two faces and the snap on one body.
 - The POSITION panel still lives in the ASSEMBLE menu; Fusion's prompt says Continue where
-  SciForge says Revert / Cancel; the Component Drag tick shows in every design (Fusion: direct
+  Fission 180 says Revert / Cancel; the Component Drag tick shows in every design (Fusion: direct
   designs).
 - Lock Motion, Animate Joint Relationships: not built.
 
@@ -5293,10 +5293,10 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
   (Contacts folder), `motion_study` (Motion Studies folder at the top); joint rows renamable.
 - `timeline_core.py`: kind `motion_link`. `bodies_gui.py`: three step icons.
 - `ribbon_config.py`: ASSEMBLE Motion Link, contact entries, Motion Study; SELECT Component
-  Drag (one entry each). `tools/sciforge/make_icons.py`: icons motion_link, contact_set,
+  Drag (one entry each). `tools/fission180/make_icons.py`: icons motion_link, contact_set,
   motion_study, component_drag.
-- `SciForgeTests/gui/harness.py`: `prepare()` resets Component Drag.
-- `SciForgeTests/gui/scenarios/selection_filters.py`: the "ticked mode" check leaves the
+- `Fission180Tests/gui/harness.py`: `prepare()` resets Component Drag.
+- `Fission180Tests/gui/scenarios/selection_filters.py`: the "ticked mode" check leaves the
   Component Drag tick out.
 - components-2 builds the Move dialog: a component moved there is a moved position for
   Capture Position / Revert too (`joints.remember_places(doc, parts)` before moving keeps
@@ -5304,7 +5304,7 @@ Ground paragraph, Known gaps, Tests). No core patch (no full build needed).
 
 ### 2026-10-14: Fillet and Chamfer, part 2 (branch `sf/fillet-2`, wave 4)
 
-The full behaviour spec with sources is at the top of `docs/sciforge/parity/fillet.md`.
+The full behaviour spec with sources is at the top of `docs/fission180/parity/fillet.md`.
 
 #### What was built
 
@@ -5332,17 +5332,17 @@ The full behaviour spec with sources is at the top of `docs/sciforge/parity/fill
    width or whose walls are too low are refused with the reason.
 6. **Chamfer sets** (Equal / Two Distances / Distance and Angle, Flip, per row); Corner Type
    Miter / Blend and fillet Setback / G2 greyed with the kernel reason.
-7. SciForge's own step `PartDesign::FeaturePython` (SciForgeType `FilletSets` /
-   `ChamferSets`, `sciforge/fillet_sets.py`) for everything a FreeCAD Fillet / Chamfer cannot
+7. Fission 180's own step `PartDesign::FeaturePython` (Fission180Type `FilletSets` /
+   `ChamferSets`, `fission180/fillet_sets.py`) for everything a FreeCAD Fillet / Chamfer cannot
    hold; a one-set constant fillet stays FreeCAD's (Press Pull and the parameters table keep
-   working). The dialog turns FreeCAD's step into SciForge's the moment an option needs it,
-   in the same timeline place and inside its undo step (a SciForge step made simple again
-   stays SciForge's); later steps stay on their edges (`blend.References` now also tracks SciForge's
+   working). The dialog turns FreeCAD's step into Fission 180's the moment an option needs it,
+   in the same timeline place and inside its undo step (a Fission 180 step made simple again
+   stays Fission 180's); later steps stay on their edges (`blend.References` now also tracks Fission 180's
    step's `Picks`). Each set's size is a property (`Size1`, `SizeB1`, `Angle1`...) so formulas
    drive it; the parameters table lists the ones in use.
-8. **Press Pull** (Q) on a round of SciForge's step edits the size of the set that made it
+8. **Press Pull** (Q) on a round of Fission 180's step edits the size of the set that made it
    (Constant, Chord Length, Rule); a variable round or a full round is pushed like any face.
-9. Maths in `sciforge/fillet_core.py` (no FreeCAD): chord ↔ radius, the variable law and how
+9. Maths in `fission180/fillet_core.py` (no FreeCAD): chord ↔ radius, the variable law and how
    a chain is cut at its points, rounds / fillets, Distance and Angle as two distances,
    full round radius, the settings (JSON on the step). 23 unit tests.
 
@@ -5351,7 +5351,7 @@ The full behaviour spec with sources is at the top of `docs/sciforge/parity/fill
 - FreeCAD's Python `Shape.makeFillet(r1, r2, edges)` gives every edge the same radii; a
   radius per edge (one `BRepFilletAPI_MakeFillet` run, so corners where sets meet blend
   properly) is only reachable through a `Part::Fillet` feature (`Edges = [(index, r1, r2)]`;
-  `Part::Chamfer` likewise). SciForge runs one in a hidden throw-away document
+  `Part::Chamfer` likewise). Fission 180 runs one in a hidden throw-away document
   (`App.newDocument(name, label, True, True)`), opened and closed per compute (~20 ms); a
   hidden temp document does not even become the active one.
 - **A document made and closed while a dialog's transaction is open ends that transaction**
@@ -5392,20 +5392,20 @@ The full behaviour spec with sources is at the top of `docs/sciforge/parity/fill
 
 #### Small changes in other areas (for the merger)
 
-- `timeline_core.KIND_BY_SCIFORGE_TYPE` and `bodies_gui.ICONS`: `FilletSets` / `ChamferSets`.
-- `parameters.SCIFORGE_PROPS`: the set sizes of SciForge's fillet / chamfer step.
-- `blend.References`: also SciForge's step (`Picks`).
-- `presspull_core.owning_fillet(body, face, sciforge=False)` (the dialog passes True) and
-  `presspull_ui._start_blend_edit(blend, face)`: Press Pull on a round of SciForge's step.
+- `timeline_core.KIND_BY_FISSION180_TYPE` and `bodies_gui.ICONS`: `FilletSets` / `ChamferSets`.
+- `parameters.FISSION180_PROPS`: the set sizes of Fission 180's fillet / chamfer step.
+- `blend.References`: also Fission 180's step (`Picks`).
+- `presspull_core.owning_fillet(body, face, fission180=False)` (the dialog passes True) and
+  `presspull_ui._start_blend_edit(blend, face)`: Press Pull on a round of Fission 180's step.
 - Golden: `golden/fillet2_ops.py` (ops `fillet_sets`, `rule_fillet`, `full_round`,
   `blend_radius_expect`), `schema.py` (a new `validate` wrapper at the end: mind the merge
   trap in MEMORY's handoff), `builder.py` (one import line; `press_pull` with `fillet_face`
-  also edits a set of SciForge's step).
+  also edits a set of Fission 180's step).
 
 #### Tests (final runs at the end of this file)
 
 All runs on real FreeCAD 1.1.4 under xvfb, one scenario at a time
-(`tools/sciforge/run_tests.sh --scenario NAME`).
+(`tools/fission180/run_tests.sh --scenario NAME`).
 
 | Run | Result |
 |---|---|
@@ -5469,10 +5469,10 @@ To be copied into MEMORY.md by whoever merges (this branch does not edit MEMORY.
    into a distance, a length into a count) in every field fed by `preview.FormulaInput`
    (`extrude.check_kind`). Scenario `gaps_formula_units`.
 7. **Picked edges / faces / corners kept** when FreeCAD loses their names (`picks.py`,
-   memory `SciForgePicks` saved in the file; fixed in the same recompute, before the step
+   memory `Fission180Picks` saved in the file; fixed in the same recompute, before the step
    runs). Goldens `picks_fillet_chamfer_kept_after_reopen`, `picks_shell_kept_on_taper`
    (new golden ops `reopen`, `age`); scenario `gaps_picks_kept`.
-8. **Coils and pipes of an older SciForge rebuilt on opening** with a log line
+8. **Coils and pipes of an older Fission 180 rebuilt on opening** with a log line
    (`upgrade.py`). Goldens `sf_coil_old_narrow_upgraded`, `sf_pipe_old_upgraded`; scenario
    `gaps_old_coil`.
 9. **Parity gaps reviewed**: stale entries removed or corrected (extrude's binder in the
@@ -5513,7 +5513,7 @@ To be copied into MEMORY.md by whoever merges (this branch does not edit MEMORY.
   kind is not taken for the old one (the step goes red, like Fusion asks to repair); a
   Draft of a tapered extrude's side face stays red (FreeCAD's Draft refuses B-spline faces).
   FreeCAD's "missing element reference" line still appears in the Report view (printed
-  before SciForge can act).
+  before Fission 180 can act).
 - Formula units: Fillet / Chamfer already refused; fields that take no formulas at all
   (Move, Loft end values, Sweep's distance ratios) still take plain numbers only.
 - Combine "New Component", Pattern Type Components: not built (components are new; the
@@ -5563,10 +5563,10 @@ log and status when the branch is merged.
 
 #### Built
 
-Fusion's DRAWING workspace on FreeCAD's TechDraw, all in `src/Mod/SciForge/sciforge/`:
+Fusion's DRAWING workspace on FreeCAD's TechDraw, all in `src/Mod/Fission180/fission180/`:
 
-- `drawing_core.py` (no FreeCAD, no Qt; unit tests `SciForgeTests/unit/test_drawing_core.py`,
-  41 tests): ISO / ASME sheets and scales, SciForge's own title-block template (SVG with
+- `drawing_core.py` (no FreeCAD, no Qt; unit tests `Fission180Tests/unit/test_drawing_core.py`,
+  41 tests): ISO / ASME sheets and scales, Fission 180's own title-block template (SVG with
   FreeCAD editable texts) and its primitives for the DXF, projection (first / third angle,
   8 directions), section-line maths, dimension inference (the one Dimension command),
   dimension formats (diameter sign, R, mm / inch), parts-list rows and table, balloon
@@ -5581,13 +5581,13 @@ Fusion's DRAWING workspace on FreeCAD's TechDraw, all in `src/Mod/SciForge/scifo
   millimetres), preview outlines, 15 dialogs and 22 commands.
 - DRAWING contextual tab and New Drawing in the application menu (`ribbon_config.py`, own
   lines only), workspace button (`ribbon_ui.py`: Design / Drawing > From Design or a
-  drawing), `shell.py` (enable / disable hooks), `theme.py` (TechDraw keeps SciForge's
+  drawing), `shell.py` (enable / disable hooks), `theme.py` (TechDraw keeps Fission 180's
   window; white sheet), browser Drawings folder (open, rename, delete), icons `dw_*`.
 
 Scenarios (all passing, check counts in the branch report): `drawing_new`,
 `drawing_views`, `drawing_section`, `drawing_detail`, `drawing_dimensions`,
 `drawing_annotations`, `drawing_export`, `drawing_update`, `drawing_reopen`,
-`drawing_assembly`. Parity spec with sources: `docs/sciforge/parity/drawings.md`.
+`drawing_assembly`. Parity spec with sources: `docs/fission180/parity/drawings.md`.
 No FreeCAD core patch.
 
 #### FreeCAD facts and traps found
@@ -5595,10 +5595,10 @@ No FreeCAD core patch.
 - TechDraw's hidden-line computation runs in a thread in the GUI: edges appear after a
   moment; anything that needs them (picking, extents) waits or retries.
 - `DrawPage.addView` centres the view: set X / Y after adding. `DrawProjGroup` items came
-  out unparented at (0, 0) and could crash: SciForge uses plain `DrawViewPart` views and
+  out unparented at (0, 0) and could crash: Fission 180 uses plain `DrawViewPart` views and
   keeps them aligned (`keep_aligned`).
 - Section views: `Direction == SectionNormal`, both set before `addView`; the origin on
-  the cut line; type `CutView` (a `SciForgeType` "Section" put them into the browser's
+  the cut line; type `CutView` (a `Fission180Type` "Section" put them into the browser's
   Analysis folder). Hatch: FreeCAD's default hatch colours are green with zero alpha
   (0x00FF0000): set `GeomHatchColor` / `HatchColor` on the view object. The light theme's
   `TechDraw/Colors/PageColor` and `FaceColor` are grey and go into the PDF.
@@ -5642,7 +5642,7 @@ multi-segment sections (TechDraw `DrawComplexSection`), automatic centre marks, 
 
 ### 2026-10-14: Derive, Decal, Preferences, Scripts, Materials, Compute All (branch `sf/misc`)
 Outline 7.1, 7.6, 7.12, 7.17. Spec, sources (each row marked Autodesk / Forum / Guess) and gaps:
-`docs/sciforge/parity/misc.md`. No change to FreeCAD's own code (no core patch, no full build
+`docs/fission180/parity/misc.md`. No change to FreeCAD's own code (no core patch, no full build
 needed).
 
 #### What was built
@@ -5670,7 +5670,7 @@ needed).
   texture just above the face.
 - **Preferences** (`prefs_core.py`, `preferences_ui.py`): Fusion's window (pages, Restore
   Defaults, OK / Cancel / Apply). Honoured: language (restart), Fusion / SolidWorks mouse
-  presets, reverse zoom, orbit type, recovery interval and SciForge's file settings, design
+  presets, reverse zoom, orbit type, recovery interval and Fission 180's file settings, design
   history of new designs, sketch guides, scripts / add-ins folders and editor, default physical
   material, anti-aliasing / transparency / frame rate, precision, default units of new designs,
   the Add-on Manager's proxy. Greyed with the reason: Inventor / Tinkercad / Alias / PowerMill
@@ -5679,7 +5679,7 @@ needed).
   (`preferences_ui.reset_for_tests`).
 - **Scripts and Add-Ins** (`scripts_core.py`, `scripts_ui.py`, Shift+S): one list, Run / Stop,
   Create (templates), Edit (the chosen editor or FreeCAD's), + (copy a script in), Open File
-  Location, Run on Startup (at SciForge's start), Get Add-Ons (FreeCAD's Add-on Manager).
+  Location, Run on Startup (at Fission 180's start), Get Add-Ons (FreeCAD's Add-on Manager).
 - **Compute All** (`compute_core.py`, `compute_ui.py`, Ctrl+B): everything recomputed quietly,
   a status-bar message, a summary window listing the steps that failed / warn with Find in
   Timeline (a note when all computed).
@@ -5709,7 +5709,7 @@ viewer_settings_restart 9.
 - A wheel event *sent* to the 3D view's QOpenGLWidget does nothing: a real one goes on to the
   `Gui::View3DInventorViewer` parent, so a test must send it there.
 - The harness fails on any Report line with "error", "failed", "invalid"... including
-  SciForge's own *informational* lines: Compute All's summary says "could not be computed",
+  Fission 180's own *informational* lines: Compute All's summary says "could not be computed",
   a script's own failure is logged as "stopped (see Scripts and Add-Ins)" with the details in
   Diagnostics (an exception name like ZeroDivisionError contains "error").
 - PartDesign's base feature drops its base shape's Placement: bake it into the geometry
@@ -5719,14 +5719,14 @@ viewer_settings_restart 9.
   `setPropertyStatus(name, ["NoModify"])` keeps a note from starring the design; properties set
   in `slotStartSaveDocument` are saved in that file.
 - Materials: `inheritMaterial(uuid)` + `addPhysicalModel(<Density model>)` +
-  `setPhysicalValue("Density", "1.27 g/cm^3")` + `save("User", mat, "SciForge/<name>.FCMat",
+  `setPhysicalValue("Density", "1.27 g/cm^3")` + `save("User", mat, "Fission180/<name>.FCMat",
   saveAsCopy=True)` makes a user material; the MaterialManager keeps deleted ones in its cache
   (refresh() does not drop them); a design whose user material is missing loads FreeCAD's
   Default and prints "Material not found".
 - A Coin texture from a picture: QImage -> RGBA8888 -> mirrored vertically ->
   `SoSFImage.setValue(SbVec2s(w, h), 4, bytes)`; the 3D view does render under xvfb now (the
   screenshots show the decals).
-- The quick-access Menu has SciForge's "File" first and FreeCAD's "&File" later: a test must
+- The quick-access Menu has Fission 180's "File" first and FreeCAD's "&File" later: a test must
   take the first match.
 - A plain QDialog that closes leaves no active window without a window manager: every key was
   dead until `versions_ui._refocus_main()` ran (all new windows call it when they close).
@@ -5760,8 +5760,8 @@ CONSTRUCT > User Coordinate System still runs FreeCAD's dialog (no Fusion source
   yellow only from a forum answer), the navigation bar menus (six visual styles, Theme
   environment, Ground Plane Offset, Object Visibility from the API, Camera with Perspective
   with Ortho Faces, Grid and Snaps from forum posts, Single / Multiple Views and Shift+!).
-  Specs with sources and gaps: `docs/sciforge/parity/inspect-analysis.md` (new) and the
-  Navigation bar section of `docs/sciforge/parity/ui-shell.md`.
+  Specs with sources and gaps: `docs/fission180/parity/inspect-analysis.md` (new) and the
+  Navigation bar section of `docs/fission180/parity/ui-shell.md`.
 - Built: `analysis_core.py` (maths, no Qt), `surface_analysis.py` (analysis objects),
   `surface_analysis_ui.py` (seven commands, one dialog, Coin overlays, camera timer for the
   stripes), `component_colors_ui.py` (Shift+N); `nav_core.py` (maths, no Qt),
@@ -5800,7 +5800,7 @@ FreeCAD facts and traps found:
 - FreeCAD's "Hidden Line" draw style shows every triangle's edges: a hidden-line look is
   "Flat Lines" plus faces filled with the background colour.
 - `Gui.Document.createView("Gui::View3DInventor")` makes a second full view (own camera,
-  own NaviCube / SciForge ViewCube); tiling the MDI area's sub-windows frameless gives the
+  own NaviCube / Fission 180 ViewCube); tiling the MDI area's sub-windows frameless gives the
   panes; `setViewMode(TabbedView)` gives the tabs back.
 - No pivy field sensors were needed: a 90 ms QTimer comparing the camera is cheap and never
   fires inside Coin's traversal.
@@ -5879,7 +5879,7 @@ inspect_section; orbit_ui is untouched by this branch.
 - Open (see the parity doc's gaps): Extrude From Object / All, Revolve To, Sweep rail and
   taper, Loft rails / end conditions, Patch per-edge continuity and Tangency Weight, Extend
   Align Edges, Offset corner type. For the merge: add `Replace Face` / `Split Face`
-  (`SciForge_ReplaceFace`, `SciForge_SplitFace`, from the direct-modeling branch) to
+  (`Fission180_ReplaceFace`, `Fission180_SplitFace`, from the direct-modeling branch) to
   `ribbon_config.SURFACE_MODIFY`.
 
 ### 2026-10-14: The MESH tab (branch `sf/mesh`)
@@ -5896,33 +5896,33 @@ Generate Face Groups, Tessellate, Create Mesh Section Sketch. Every one is a dia
 Fusion's rows and defaults, a timeline step (editable, one undo step), and says in the dialog
 why it cannot be done. The browser flags a mesh body that is not closed or is inside out
 (right-click > Repair). 3D Print, Export and Export Everything take mesh bodies. Spec:
-`docs/sciforge/parity/mesh.md`.
+`docs/fission180/parity/mesh.md`.
 
-Code: `src/Mod/SciForge/sciforge/mesh_core.py` (pure, `SciForgeTests/unit/test_mesh_core.py`,
+Code: `src/Mod/Fission180/fission180/mesh_core.py` (pure, `Fission180Tests/unit/test_mesh_core.py`,
 50 tests), `mesh.py`, `mesh_ui.py`, `mesh_cut_ui.py`, `mesh_pick_ui.py`; shared files touched:
 `timeline_core.py`, `timeline_ops.py`, `browser_core.py`, `browser_ui.py`, `insert.py`,
 `export.py`, `export_ui.py`, `bodies.py` (`leave_used_up` clears the active body when a
 mesh step used it up; `clear_active_body`), `commands.py` (`find_body` skips used-up bodies),
-`ribbon_config.py` (MESH groups only), `tools/sciforge/make_icons.py` (14 icons). No FreeCAD
+`ribbon_config.py` (MESH groups only), `tools/fission180/make_icons.py` (14 icons). No FreeCAD
 core change.
 
-Scenarios (`SciForgeTests/gui/scenarios/`): `mesh_repair`, `mesh_plane_cut`,
+Scenarios (`Fission180Tests/gui/scenarios/`): `mesh_repair`, `mesh_plane_cut`,
 `mesh_reduce_remesh`, `mesh_separate_combine`, `mesh_tessellate_groups`, `mesh_edit_reopen`,
-`mesh_erase_section`, `mesh_print`; helpers in `SciForgeTests/gui/mesh_steps.py` (the test
+`mesh_erase_section`, `mesh_print`; helpers in `Fission180Tests/gui/mesh_steps.py` (the test
 STLs are written by the scenarios: a broken box, a sphere, two boxes in one file, an
 inside-out box, a flat sheet).
 
 #### How a mesh body keeps its history
 
-Every MESH step is a `Mesh::FeaturePython` (proxy `sciforge.mesh.MeshStep`, view provider
-`sciforge.mesh.MeshStepView`: both class paths are saved in files, keep them) with `Source` =
+Every MESH step is a `Mesh::FeaturePython` (proxy `fission180.mesh.MeshStep`, view provider
+`fission180.mesh.MeshStepView`: both class paths are saved in files, keep them) with `Source` =
 the step before. The newest step is the body; the earlier ones are "used up"
 (`bodies.CONSUMERS`), so they are hidden and not listed. All of them carry the body's name
-(the timeline shows the step's own name through `SciForgeStepLabel`). Separate and Split Body
+(the timeline shows the step's own name through `Fission180StepLabel`). Separate and Split Body
 make `MeshPiece` objects (role `MeshPiece`, `Source` = the step, `Index`); the timeline lists
 the step, Delete takes the pieces with it (`timeline_ops.GOES_WITH_STEP`). A step whose dialog
 has Preview off is "held" (`mesh.HOLD`) and passes its body through. `execute` never raises:
-a `MeshError` passes the body through and sets `SciForgeWarning` (the timeline warning; the
+a `MeshError` passes the body through and sets `Fission180Warning` (the timeline warning; the
 dialog shows it and refuses OK). Deleting a step from the middle: a document observer
 (`mesh._ChainWatch.slotDeletedObject`) points the next step at the step before, inside the
 delete's own undo step (skipped while undoing / restoring).
@@ -5938,7 +5938,7 @@ delete's own undo step (skipped while undoing / restoring).
 - `Mesh.optimizeTopology()` ran the sandbox out of memory (killed): never call it.
 - `Mesh.crossSections` **doubles** the section where the plane runs through a ring of corners
   (a sphere cut exactly at a row of its points came out twice as long) and gives the diagonals
-  of faces lying in the plane: SciForge has its own section (`core.plane_section_segments` +
+  of faces lying in the plane: Fission 180 has its own section (`core.plane_section_segments` +
   `chain_segments`).
 - `Mesh.offset()` moves points along their normals: a hollowed box gets walls thinner than
   asked at the corners. `core.offset_points` moves each point so every face around it moves
@@ -5970,7 +5970,7 @@ delete's own undo step (skipped while undoing / restoring).
 #### Test traps
 
 - Scenario step names must not contain "error", "failed" or "invalid" (the harness reads them
-  as failures); every `[SciForge]` warning in the Report view fails a scenario, so export only
+  as failures); every `[Fission 180]` warning in the Report view fails a scenario, so export only
   closed meshes in scenarios (an open one warns "not watertight").
 - In the sandbox, a command naming the FreeCAD folder by a path ending in `/fc` is refused:
   use the `appimage` symlink path. Probes: `appimage/squashfs-root/AppRun freecadcmd script.py`.
@@ -5994,14 +5994,14 @@ Python).
 
 - Everything is on `sf/direct` (not pushed, not merged). No FreeCAD core file changed (no
   entry in `core-patches.md`). Behaviour spec with sources at the top of
-  `docs/sciforge/parity/direct-modify.md`; what SciForge does and the known gaps at its end.
+  `docs/fission180/parity/direct-modify.md`; what Fission 180 does and the known gaps at its end.
 - **The model** (explained there): bodies stay PartDesign Bodies in both modes. A body without
   history is one frozen step (`PartDesign::FeatureBase`) fed by a hidden plain `Part::Feature`
   "base shape" that lives in the body's component. A design without history bakes every
   command at OK inside the command's own undo step (`direct.takes_commit` from
   `preview.end_transaction`, `taskui._end_transaction`, `delete.run`); a FreeCAD command
   that commits by itself is baked as its own undo step (`direct_ui.DocWatch`). The setting is
-  a hidden `App::FeaturePython` "SciForgeDesign" (undoable, unlike `Document.Meta`).
+  a hidden `App::FeaturePython` "Fission180Design" (undoable, unlike `Document.Meta`).
 - **Built**: Capture Design History on/off (the design's browser menu and the timeline's
   settings menu; a question first; the timeline hides; Undo / Redo; save / reopen); Create
   Base Feature + Finish Base Feature (a bar over the view, also in SOLID > CREATE); editing a
@@ -6067,7 +6067,7 @@ Python).
 ### 2026-10-13: Assemble > Joints (branch `sf/joints`)
 - New: `joints_core.py` (pure maths: frames, Fusion's mating / offsets / Angle / Flip folded
   into the stored joint origin, keep-heading, joint value, drive transform, limits, sweep,
-  snaps), `joints.py` (document side, no Qt: the hidden `SciForgeAssembly` root that owns
+  snaps), `joints.py` (document side, no Qt: the hidden `Fission180Assembly` root that owns
   only the joints, `JointProxy` (a subclass of FreeCAD's `JointObject.Joint`), the 7 types
   (Planar = Distance face-face, Pin-Slot = that + a hidden point-in-plane helper), snaps,
   align / solve with a satisfaction check, ground, drive, limits + rest, as-built, rigid
@@ -6088,7 +6088,7 @@ Python).
   85, bodies_qa 312, bodies_qa_2 234, timeline_browser_qa2 245, extrude_multibody 125,
   extrude_multibody_move 48, extrude_multibody_edit 136, extrude_presspull_qa 133; golden
   294 pass + the known xfail `plate_hole_grid`.
-- Spec, contract and gaps: `docs/sciforge/parity/joints.md` (merge notes for the Components
+- Spec, contract and gaps: `docs/fission180/parity/joints.md` (merge notes for the Components
   work at the end of "The component contract").
 - Facts learned:
   - FreeCAD's assembly solver needs a grounded part (`solve()` = -6 without), drops joints
@@ -6115,21 +6115,21 @@ Python).
 
 ### 2026-10-13: The remaining sketch tools and constraints (branch `sf/sketch-tools`)
 Date: 2026-10-13. Feature outline 7.5. The behaviour spec with its sources is in
-`docs/sciforge/parity/sketch.md`, section "The remaining sketch tools and constraints".
+`docs/fission180/parity/sketch.md`, section "The remaining sketch tools and constraints".
 No FreeCAD core file was changed (nothing new in `core-patches.md`).
 
 #### What was built
 
-All in `src/Mod/SciForge/sciforge/`:
+All in `src/Mod/Fission180/fission180/`:
 
-- `sketch_draw.py`: SciForge's own sketch drawing handler (`DrawTool`). The open sketch's
+- `sketch_draw.py`: Fission 180's own sketch drawing handler (`DrawTool`). The open sketch's
   view and key filters (`sketch_mode`) hand it the mouse and keys first. It snaps like
-  FreeCAD's tools and SciForge's inference (points, line middles, curves, guides, grid;
+  FreeCAD's tools and Fission 180's inference (points, line middles, curves, guides, grid;
   Ctrl = free), draws its preview as Coin nodes of its own, shows value boxes beside the
   shape (digits go in, Tab moves on, Enter takes them; typed values become dimensions),
   shows its prompt beside the pointer (`Hint`), makes each shape one undo step and then
   repeats. A FreeCAD tool started meanwhile (its bitmap cursor) ends it.
-- `sketch_draw_core.py` (no FreeCAD, no Qt; `SciForgeTests/unit/test_sketch_draw_core.py`,
+- `sketch_draw_core.py` (no FreeCAD, no Qt; `Fission180Tests/unit/test_sketch_draw_core.py`,
   37 tests): the maths of every new tool.
 - `sketch_build.py` (no Qt): the shapes with their constraints, and Trim / Extend / Break.
 - `sketch_draw_tools.py`: Midpoint Line, 3-Point Rectangle, 2-Point Circle, 2-Tangent
@@ -6142,14 +6142,14 @@ All in `src/Mod/SciForge/sciforge/`:
 - `sketch_project.py` / `sketch_project_tool.py`: Project to Surface (a "Projected
   Curves" object; Closest Point and Along Vector).
 - `sketch_draw_ui.py`: the commands. `ribbon_config.py`: the menu entries (Trim / Extend /
-  Break fall back to FreeCAD's if SciForge's are missing). `config.PREFERRED`: T runs
-  SciForge's Trim, P SciForge's Project. `sketch_marking.py`: Trim in the right-click list.
+  Break fall back to FreeCAD's if Fission 180's are missing). `config.PREFERRED`: T runs
+  Fission 180's Trim, P Fission 180's Project. `sketch_marking.py`: Trim in the right-click list.
 - `sketch_mode.py`: the tool hooks; Fit Point / Control Point Spline: Enter and OK make
   the spline, Esc cancels it, the spline is one undo step.
 
-Scenarios (`SciForgeTests/gui/scenarios/sketch_tools_*.py`, helpers in
-`SciForgeTests/gui/sketch_tools_steps.py`): draw, circles, slots, modify, constraints,
-audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on SciForge's slot.
+Scenarios (`Fission180Tests/gui/scenarios/sketch_tools_*.py`, helpers in
+`Fission180Tests/gui/sketch_tools_steps.py`): draw, circles, slots, modify, constraints,
+audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on Fission 180's slot.
 
 #### FreeCAD facts and traps found
 
@@ -6157,7 +6157,7 @@ audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on SciForge'
   step the B-spline tool opens in `activated()` as soon as the tool has started. The
   poles / knots clicked afterwards are in **no** undo step: Esc could not take them back,
   and a Ctrl+Z after a finished spline undid the step *before* it (in a test: a whole
-  rectangle). SciForge calls `App.setActiveTransaction("Add Sketch B-Spline")` at the
+  rectangle). Fission 180 calls `App.setActiveTransaction("Add Sketch B-Spline")` at the
   click (`SketchSession.open_spline_step`); the spline tool's own `commitCommand` then
   commits it.
 - FreeCAD's spline tool makes the spline on **Esc** or its right click (`quit()` with 2+
@@ -6171,7 +6171,7 @@ audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on SciForge'
 - In the sketch editor `EdgeN` counts construction curves (Edge3 = geometry 2); the
   sketch's `Shape` leaves construction curves out, so `Shape.getElement("Edge3")` can be
   another curve. `sketch_project.sketch_edge_name` maps by geometry. The shape is only
-  current after a recompute (SciForge's tools, like FreeCAD's polygon, do not recompute).
+  current after a recompute (Fission 180's tools, like FreeCAD's polygon, do not recompute).
 - A Python `addGeometry` with no transaction open is in no undo step; Ctrl+Z then undoes
   the step before. Tests must open one (`doc.openTransaction`).
 - `App.getActiveTransaction()` is the application-level step; `openTransaction` while
@@ -6180,7 +6180,7 @@ audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on SciForge'
   system delivers the move, so a tooltip under the pointer swallows it (the tools' prompt
   is a mouse-transparent label for that reason).
 - An arc slot with a construction centre arc as well is over-constrained for FreeCAD's
-  solver (redundant): SciForge's has none. Breaking a circle by splitting it twice leaves
+  solver (redundant): Fission 180's has none. Breaking a circle by splitting it twice leaves
   a half-redundant centre Coincident: replaced by a join at the seam.
 - Collinear = Tangent between two lines; Concentric = Coincident between the centres
   (pos 3); a point at an arc's middle by Symmetric about a centre line can fall into a
@@ -6200,7 +6200,7 @@ audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on SciForge'
 - Text (another branch) and 3D Sketch.
 - Chamfer's three types and a typed distance (FreeCAD's chamfer is used).
 - Project to Surface: the curves are an object next to the sketch, not in it, and are not
-  listed in SciForge's browser or timeline yet; sketch points cannot be picked (body
+  listed in Fission 180's browser or timeline yet; sketch points cannot be picked (body
   vertices can).
 - Conic: no rho handle on a finished curve; FreeCAD's Weight (rho / (1 - rho)) shows
   instead of rho; the pole circles show while the sketch is open.
@@ -6213,7 +6213,7 @@ audit, project, extrude. `sketch_infer_tools.py` (S: slot) now runs on SciForge'
 
 ### 2026-10-13: Sketch Text and Emboss (branch `sf/text-emboss`)
 Outline 7.5 "text" and 7.6 "Emboss". Both ribbon entries were greyed out; both work now.
-Behaviour spec with sources, what was built and what was not: `docs/sciforge/parity/text-emboss.md`.
+Behaviour spec with sources, what was built and what was not: `docs/fission180/parity/text-emboss.md`.
 
 #### Status
 
@@ -6276,60 +6276,60 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
 - Text On Path: a drag handle along the path (today: alignment and the path itself).
 
 ### 2026-10-13: Branding pass, "making it an app" (branch `sf/app`)
-- Goal (outline 3.2, 7.17; plan item 10): a real SciForge installer and portable build that
+- Goal (outline 3.2, 7.17; plan item 10): a real Fission 180 installer and portable build that
   live next to FreeCAD. Everything is on `sf/app`, not pushed, not merged; no full build run.
-- **Identity (C++, core patches #8, #9).** New `src/Main/SciForgeBranding.h` holds the names;
-  `MainGui.cpp`, `MainCmd.cpp`, `MainPy.cpp` set `ExeName`/`ExeVendor` = SciForge (that is
-  what names the settings folder: `%APPDATA%\SciForge`, `~/.config/SciForge`), the icon,
-  splash and About picture names, `StartWorkbench` = SciForgeWorkbench, the desktop id, and
+- **Identity (C++, core patches #8, #9).** New `src/Main/Fission180Branding.h` holds the names;
+  `MainGui.cpp`, `MainCmd.cpp`, `MainPy.cpp` set `ExeName`/`ExeVendor` = Fission 180 (that is
+  what names the settings folder: `%APPDATA%\Fission180`, `~/.config/Fission180`), the icon,
+  splash and About picture names, `StartWorkbench` = Fission180Workbench, the desktop id, and
   a banner whose first line (shown in Help > About) credits FreeCAD. `src/Main/CMakeLists.txt`
-  builds `SciForge` / `SciForgeCmd` (`SET_BIN_DIR`); the Windows resources carry SciForge's
+  builds `Fission180` / `Fission180Cmd` (`SET_BIN_DIR`); the Windows resources carry Fission 180's
   icon and strings. FreeCAD's `branding.xml` mechanism was not used on purpose (a missing
   file silently turns the build back into "FreeCAD" sharing FreeCAD's settings).
-- **Pictures (#10).** `tools/sciforge/make_app_icons.py` (Pillow, DejaVu fonts) draws an
+- **Pictures (#10).** `tools/fission180/make_app_icons.py` (Pillow, DejaVu fonts) draws an
   original mark, an anvil with a spark on a blue rounded square, once as geometry and writes
-  the SVG, PNGs 16-256, `sciforge.ico` (7 sizes), the splash (568x368 and 2x, wordmark baked
+  the SVG, PNGs 16-256, `fission180.ico` (7 sizes), the splash (568x368 and 2x, wordmark baked
   in, a "Version" caption where FreeCAD paints the number: `SplashInfoPosition` "190,189"
   puts it at x+235, y-7), the About banner, the NSIS header/banner BMPs, and the workbench
   icon (same mark). All compiled into `src/Gui/Icons/resource.qrc`.
-- **Linux (#11).** `src/XDGData/org.sciforge.SciForge.{desktop,metainfo.xml.in,xml}` installed
-  instead of FreeCAD's; hicolor icons under `org.sciforge.SciForge`.
-- **Packaging (#12, #13).** rattler-build scripts copy/name `SciForge*.exe`, `sciforge`,
-  `sciforgecmd`; bundle names `SciForge_<build>-...`; AppRun defaults to sciforge and still
+- **Linux (#11).** `src/XDGData/org.fission180.Fission180.{desktop,metainfo.xml.in,xml}` installed
+  instead of FreeCAD's; hicolor icons under `org.fission180.Fission180`.
+- **Packaging (#12, #13).** rattler-build scripts copy/name `Fission180*.exe`, `fission180`,
+  `fission180cmd`; bundle names `Fission180_<build>-...`; AppRun defaults to fission180 and still
   accepts `freecad`/`freecadcmd`. The NSIS installer (`package/WindowsInstaller`) reads
-  `APP_NAME` from `SciForgeCmd.exe`, installs to `Program Files\SciForge`, own registry keys
-  (`SOFTWARE\SciForge114`, own uninstall entry, `SciForge.Document`), `.FCStd` association
+  `APP_NAME` from `Fission180Cmd.exe`, installs to `Program Files\Fission180`, own registry keys
+  (`SOFTWARE\Fission180114`, own uninstall entry, `Fission180.Document`), `.FCStd` association
   **off by default**, no thumbnail DLL (it registers in System32 and would replace FreeCAD's),
-  English only (the 24 other language files name FreeCAD literally), SciForge's icon and
-  pictures, GitHub links. `sciforge-build.yml`: `MAKE_INSTALLER` on, new artifact
-  `SciForge-Windows-installer-<build>`; BUILD_TAG is `<date>-<sha>` or the tag name.
+  English only (the 24 other language files name FreeCAD literally), Fission 180's icon and
+  pictures, GitHub links. `fission180-build.yml`: `MAKE_INSTALLER` on, new artifact
+  `Fission180-Windows-installer-<build>`; BUILD_TAG is `<date>-<sha>` or the tag name.
 - **Tooling.** `run_tests.sh` and `windows_golden.sh` accept the new and the old program
-  names; `install_update.ps1` finds an installed SciForge through its registry key and
-  offers it (Enter), otherwise the picker; accepts `bin\SciForge.exe` or `bin\FreeCAD.exe`
+  names; `install_update.ps1` finds an installed Fission 180 through its registry key and
+  offers it (Enter), otherwise the picker; accepts `bin\Fission180.exe` or `bin\FreeCAD.exe`
   folders; Diagnostics now prints the program, its folder and the settings folder.
-- **Docs.** `docs/sciforge/cheat-sheet.md` (Fusion keys and mouse to SciForge),
-  compatibility notes in `docs/sciforge/README.md`, `quick-update.md` for both layouts,
-  core-patches rows #8-#13, a SciForge note in `package/WindowsInstaller/README.md`.
+- **Docs.** `docs/fission180/cheat-sheet.md` (Fusion keys and mouse to Fission 180),
+  compatibility notes in `docs/fission180/README.md`, `quick-update.md` for both layouts,
+  core-patches rows #8-#13, a Fission 180 note in `package/WindowsInstaller/README.md`.
 - **Checked here:** 396 unit tests OK (8 new in `test_branding_files.py`: names agree between
   C++ and CMake, every picture exists with the right size and is a Qt resource, the ico has
   its sizes, the installer's icon/BMPs exist with NSIS's sizes, packaging scripts and the
   workflow name the new programs); `check_install.sh` OK (806 files); Diagnostics on the real
   FreeCAD AppImage; a scratch CMake project configured and installed the changed pieces (the
-  rc files resolve every variable, the XDG files and icons install under SciForge's id);
+  rc files resolve every variable, the XDG files and icons install under Fission 180's id);
   bash -n on every shell script; the workflow YAML parses. The images were looked at.
-- **Not checkable here, the next full Windows build must prove:** (1) `SciForgeBranding.h`
-  compiles in the three mains (fmt format string as a macro, `SCIFORGE_BANNER_FORMAT`);
-  (2) `bin\SciForge.exe` / `SciForgeCmd.exe` exist in the bundle and `SciForgeCmd.exe
+- **Not checkable here, the next full Windows build must prove:** (1) `Fission180Branding.h`
+  compiles in the three mains (fmt format string as a macro, `FISSION180_BANNER_FORMAT`);
+  (2) `bin\Fission180.exe` / `Fission180Cmd.exe` exist in the bundle and `Fission180Cmd.exe
   --safe-mode --version` runs (create_bundle's smoke test); (3) the NSIS step: `makensis`
-  finds `SciForgeCmd.exe`, builds `SciForge_<build>-Windows-x86_64-py311-installer.exe`, and
+  finds `Fission180Cmd.exe`, builds `Fission180_<build>-Windows-x86_64-py311-installer.exe`, and
   `!if 0 ... !endif` around the languages compiles; (4) the installer on Luca's PC: installs
-  to `C:\Program Files\SciForge`, Start menu "SciForge", "Installed apps" entry, uninstaller;
+  to `C:\Program Files\Fission180`, Start menu "Fission180", "Installed apps" entry, uninstaller;
   FreeCAD still starts and still owns `.FCStd` afterwards; (5) the first start: window title
-  "SciForge 1.1.4", the anvil icon in the taskbar, the splash with the version next to
-  "Version", Help > About with the banner and FreeCAD credits, SciForge's ribbon from the
-  start (`StartWorkbench`), a fresh `%APPDATA%\SciForge`; (6) the quick update onto the
-  installed SciForge (registry detection, administrator prompt); (7) Linux: the AppImage
-  runs (`AppRun` default), `run_tests.sh --freecad <unpacked>` picks `sciforgecmd`, the
+  "Fission 180 1.1.4", the anvil icon in the taskbar, the splash with the version next to
+  "Version", Help > About with the banner and FreeCAD credits, Fission 180's ribbon from the
+  start (`StartWorkbench`), a fresh `%APPDATA%\Fission180`; (6) the quick update onto the
+  installed Fission 180 (registry detection, administrator prompt); (7) Linux: the AppImage
+  runs (`AppRun` default), `run_tests.sh --freecad <unpacked>` picks `fission180cmd`, the
   desktop icon shows. Known leftovers: the Start page is FreeCAD's (texts and examples);
   FreeCAD's document icon is kept for `.FCStd` files; the Linux thumbnailer entries still
   point at FreeCAD's names (unused by the AppImage); the 16 px icon is a simplified anvil.
@@ -6338,10 +6338,10 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
 - Researched Fusion first (Autodesk's hosts are unreachable from the sandbox: the web
   search summaries of Autodesk's API manual, Learn courses, help "Isolate", Knowledge
   article on dragging bodies, the timeline blog and Community threads are cited at the top
-  of `docs/sciforge/parity/components.md`; the guesses are listed there too).
+  of `docs/fission180/parity/components.md`; the guesses are listed there too).
 - Built: `components_core.py` (pure logic, 24 unit tests), `components.py` (model, no Qt),
   `components_ui.py` (New Component dialog with Name / Parent / From Bodies / Activate,
-  Move to Component dialog, commands `SciForge_NewComponent` (ribbon ASSEMBLE),
+  Move to Component dialog, commands `Fission180_NewComponent` (ribbon ASSEMBLE),
   `_ActivateComponent`, `_Isolate`, `_Unisolate`, `_ComponentsFromBodies`,
   `_MoveToComponent`), the browser's component tree (component rows with their Origin /
   Bodies / Sketches / Construction and nested components, the activate ring at the end of
@@ -6376,7 +6376,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   the latest version", "Open older versions of designs", "View design history", "Recover
   designs", the Data Panel pages; the Fusion blog on version control and the Data Panel;
   forum threads on the recovery interval, the description prompt, Ctrl+Shift+S, the
-  start-up recovery question). Sources and the behaviour tables: `docs/sciforge/parity/
+  start-up recovery question). Sources and the behaviour tables: `docs/fission180/parity/
   versions.md`.
 - Built `versions.py` (no Qt: PlainStore = copies in `<Design>.versions/` with index.json,
   GitStore = commits of the file in the project folder's repository (made on the first
@@ -6386,7 +6386,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   Version History with Open read-only / Promote = Save As Latest / Compare, the recovery
   timer, "Recover unsaved work?" at start, Recover Documents, the Data Panel dock with
   thumbnails and version badges, Insert Design as links, Project and Recovery Settings).
-  Ctrl+S runs `SciForge_Save` (config.PREFERRED), Ctrl+Alt+P the Data Panel, Ctrl+Shift+S a
+  Ctrl+S runs `Fission180_Save` (config.PREFERRED), Ctrl+Alt+P the Data Panel, Ctrl+Shift+S a
   recovery copy; the application menu and UTILITIES hold the file commands; INSERT >
   Insert Component inserts a design. Every finished save (FreeCAD's own too) records a
   version (App document observer).
@@ -6402,11 +6402,11 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   saved"); `checkFileName` appends .FCStd to any other extension (temp copies are
   `<key>.tmp.FCStd`); `Gui.Document.Modified` is settable; FreeCAD 1.1 dispatches command
   shortcuts through `Gui::ShortcutManager` (an application event filter) and a QShortcut
-  bound by SciForge fires only while the main window is the *active window*: after one of
-  SciForge's own QDialogs closed under xvfb (no window manager) every key was dead until a
+  bound by Fission 180 fires only while the main window is the *active window*: after one of
+  Fission 180's own QDialogs closed under xvfb (no window manager) every key was dead until a
   click, so every dialog's `finished` re-activates the main window (`_refocus_main`);
   FreeCAD's own AutoSaver (`Document/AutoSaveEnabled`, 15 min, its own start-up recovery
-  dialog) is switched off while SciForge is on through `theme.keep_and_set` and given back.
+  dialog) is switched off while Fission 180 is on through `theme.keep_and_set` and given back.
   Shell trap: `pkill -f` with a pattern that appears in the shell's own command line kills
   that shell (the output of the whole command is lost).
 - Tests: scenarios `versions_save` (69 checks), `versions_recovery` (55),
@@ -6424,15 +6424,15 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
 - Added outline and prototype verbatim; removed FreeCAD-org automation workflows.
 - Got real FreeCAD 1.1.4 running in the sandbox (headless + GUI via xvfb).
 - Ran the prototype for the first time in real FreeCAD; fixed 2 bugs (see Known issues).
-- Created `src/Mod/SciForge` from the prototype (renamed), wired into CMake.
+- Created `src/Mod/Fission180` from the prototype (renamed), wired into CMake.
 - Built the golden-model harness (schema, selectors, builder, runner) and 32 models;
   found and patched an upstream FreeCAD bug with it.
-- Added GUI smoke test, `tools/sciforge/*.sh`, CI workflows, docs (`docs/sciforge/`).
+- Added GUI smoke test, `tools/fission180/*.sh`, CI workflows, docs (`docs/fission180/`).
 
 ### 2026-10-09: Session 1, part 2 (UI shell)
 - Luca sent 5 screenshots of stock Fusion. Built the Fusion-style shell from them: `ribbon_config.py`
   (data), `ribbon_ui.py`, `theme.py`, `shell.py`, `navbar_ui.py`, new `timeline_ui.py`, icon
-  generator `tools/sciforge/make_icons.py` (131 icons). GUI smoke test now 29 checks incl. sketch
+  generator `tools/fission180/make_icons.py` (131 icons). GUI smoke test now 29 checks incl. sketch
   mode and clean switch-off; unit tests 53 (ribbon data checked against a snapshot of FreeCAD
   1.1.4's command list).
 - Luca was compiling the first Windows build during this; result still unknown.
@@ -6443,7 +6443,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   drag, ViewCube colours, 3D Print. Tests: 77 unit, 43 golden (+3 xfail), 70 GUI checks.
 - Quick-update installer fixes after Luca's reports (closed at once; then "access denied" when
   renaming the old folder). See Known issues.
-- Luca installed manually. Keeping `SciForge.old` inside Mod gave "'SciForgeWorkbench' already
+- Luca installed manually. Keeping `Fission180.old` inside Mod gave "'Fission180Workbench' already
   exists" (FreeCAD loads every Mod folder); told him to move it out. Then: "the icons are awesome,
   it really does feel like fusion". Asked him for the feedback list in Next steps 1.
 
@@ -6454,7 +6454,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   inside the shaded profile) and face extrude, crash-free `ArrowDragger` (QTimer), blue arrow,
   commands finish the open dialog instead of going silent (`commands.finish_open_dialog`),
   `find_body` (reopened files), deferred selection handling, copyable Diagnostics with the last
-  200 SciForge messages. New GUI journey test (25 checks, real clicks/drags) + 2 golden models
+  200 Fission 180 messages. New GUI journey test (25 checks, real clicks/drags) + 2 golden models
   (face extrude join/cut). Tests: 77 unit, 45 golden (+3 xfail), 70 smoke, 25 journey.
 
 ### 2026-10-10: Sketch workspace parity (branch `sf/sketch`)
@@ -6475,10 +6475,10 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   segfault; fixed in Python via `commands.leave_edit` + core patch #6), face normals flipped
   twice (fixed), Ctrl+Z/Y/S/N/O/Del dead because the menu bar is hidden (now bound in
   `config.SHORTCUTS`).
-- Test infrastructure: `SciForgeTests/gui/harness.py` (real clicks/keys/ribbon buttons; ANY
-  Report-view error fails), scenarios in `SciForgeTests/gui/scenarios/` (luca_session,
+- Test infrastructure: `Fission180Tests/gui/harness.py` (real clicks/keys/ribbon buttons; ANY
+  Report-view error fails), scenarios in `Fission180Tests/gui/scenarios/` (luca_session,
   ribbon_sweep = every SOLID/SKETCH command, keys), `run_tests.sh --only scenarios /
-  --scenario NAME`. Rules for feature work: `docs/sciforge/dev/feature-guide.md`.
+  --scenario NAME`. Rules for feature work: `docs/fission180/dev/feature-guide.md`.
 - Parallel feature workflow (12 features, each in its own git worktree, branch `sf/<key>`):
   built and merged: extrude_presspull, sketch, timeline_browser, fillet. The full suite after the
   fillet merge found a reproducible FreeCAD crash (stale Coin node in sketch_mode, see Known
@@ -6486,7 +6486,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   at run #28 (commit 4313045a): that quick update has all four features. Then the org's monthly agent spend limit stopped all other agents.
   NOT built yet: hole (WIP, untested, on branch `sf/hole`), revolve, patterns, shell_draft,
   bodies, inspect, primitives, sweep_loft. The QA ("break and fix") stage ran for none of them.
-  The workflow script and its feature list are in `tools/sciforge/workflows/fusion_features.js`
+  The workflow script and its feature list are in `tools/fission180/workflows/fusion_features.js`
   and `fusion_features_args.json` (set "scratch"; drop the features already merged). In the same
   session it can resume with resumeFromRunId "wf_4a2277cc-81f". (The fillet build agent never
   returned a report; its committed branch was merged as is.)
@@ -6498,7 +6498,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   `hole.py` / `hole_ui.py` (Fusion Hole), `thread.py` / `thread_ui.py` / `thread_core.py`
   (Thread, cosmetic overlay), `thread_tables.py` (ISO / ANSI sizes, checked row by row against
   FreeCAD 1.1.4's Hole), `hole_common.py` (selection boxes, selection gate, undo watch).
-  Ribbon: Thread now runs `SciForge_Thread` (was greyed).
+  Ribbon: Thread now runs `Fission180_Thread` (was greyed).
 - Tests: scenarios `hole`, `hole_sketch`, `hole_tapped`, `hole_thread`, `hole_thread_inside`, `hole_edges`
   (only real input; volumes hand-derived, incl. a slab check of FreeCAD's own modeled tapped
   thread), 16 golden models (`golden/hole_ops.py`: ops hole_at, hole_points, thread), unit
@@ -6520,15 +6520,15 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   double-click on the timeline icon of the step being made printed a ReferenceError
   (one-line guard in `taskui.edit_object`); Press Pull only worked on the active body; a
   ball's face could not be Press Pulled; "To Object" showed a warning while waiting.
-- New Fusion behaviour: taper with To Object / join through All (SciForge's
+- New Fusion behaviour: taper with To Object / join through All (Fission 180's
   `ExtrudeFeature`, property `Operation`); parameters and formulas typed in Extrude and
   Press Pull fields; Enter is OK over the 3D view; clicking the end of a preview drops the
   profile it came from; Symmetric no longer offers To Object. 3 golden models (tapers).
 ### 2026-10-10: Revolve (branch `sf/revolve`)
-- Built Fusion's Revolve (see the Phase 1 checkbox): `sciforge/revolve.py` (Qt-free core, used
-  by the dialog and the golden builder), `sciforge/revolve_ui.py` (dialog, clickable origin
+- Built Fusion's Revolve (see the Phase 1 checkbox): `fission180/revolve.py` (Qt-free core, used
+  by the dialog and the golden builder), `fission180/revolve_ui.py` (dialog, clickable origin
   axes and construction lines, on-top angle handle, editors for Revolution / Groove /
-  SciForge::Revolve). Ribbon: one line removed ("Revolve (Cut)").
+  Fission180::Revolve). Ribbon: one line removed ("Revolve (Cut)").
 - Tests: scenarios `revolve_basic` (nothing selected, Z axis click, Full/Angle, handle drag,
   Symmetric, Two Sides, OK, undo/redo, timeline edit, auto-Cut groove, Cancel, Esc),
   `revolve_axes` (sketch line axis, Join/Intersect/New Body, face + edge selected first,
@@ -6549,7 +6549,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   with Press Pull and sketch edits), `sketch_qa_keys.py` (keys sent where a real keyboard
   sends them). About 30 bugs fixed; the list with how each was found is in the branch's
   commits and `parity/sketch.md`.
-- Biggest finds: every SciForge sketch key only worked in tests (keys went to the GL widget;
+- Biggest finds: every Fission 180 sketch key only worked in tests (keys went to the GL widget;
   a real keyboard sends them to the viewer or FreeCAD's value field, see Known issues);
   `NonIntrusiveNotificationsEnabled` False turned FreeCAD warnings into blocking boxes;
   Up/Down in the dimension box recursed ~1000 deep; the notification check never looked.
@@ -6562,19 +6562,19 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
 
 ### 2026-10-10: Patterns and Mirror (branch `sf/patterns`)
 - New: `pattern_core.py` (where copies go, pure), `pattern.py` (document side: FreeCAD's
-  pattern features with both spacing lists written, symmetric gap walks, SciForge's
+  pattern features with both spacing lists written, symmetric gap walks, Fission 180's
   `PatternFeature` for faces / paths / anything FreeCAD cannot repeat, new-body copies for
   Bodies), `pattern_ui.py` (Rectangular / Circular / Pattern on Path dialogs, origin-axis and
   front-plane pickers, highlight overlay, arrows, angle handle, editors, delete watch for body
   patterns), `mirror_ui.py` (Mirror). Ribbon: Pattern on Path enabled (one line).
 - Later the same day: Suppression (dots on the copies), Quantity from a parameter/formula,
-  SciForge's own extrude / a pattern step as mirror and pattern objects.
+  Fission 180's own extrude / a pattern step as mirror and pattern objects.
 - Tests: scenarios `patterns_rect`, `patterns_circ`, `patterns_mirror`, `patterns_path`,
   `patterns_suppress`, `patterns_params`, `patterns_qa` (real input only); golden ops
   `rectangular_pattern`, `circular_pattern`, `path_pattern`, `fusion_mirror`, `pattern_edit`
   (`golden/pattern_ops.py`) + 19 models;
   unit tests `test_pattern_core.py` (17).
-- Parity doc `docs/sciforge/parity/patterns.md` (assumptions to confirm with Luca, gaps).
+- Parity doc `docs/fission180/parity/patterns.md` (assumptions to confirm with Luca, gaps).
 - Full suite at the end: unit 153 OK; golden 121 pass + 1 xfail (`plate_hole_grid`, needs
   core patch #4); smoke 70/70; journey 25/25; 39 of 40 scenarios PASS in the full run,
   `sketch_draw` failed 3 checks ("circle diameter typed: 8" got r 4.97) while another
@@ -6605,7 +6605,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   modules: `shelling.py` / `shell_ui.py`, `drafting.py` / `draft_ui.py`, `scale.py` /
   `scale_ui.py`, shared dialog base `pickpanel.py` (picking with toggling clicks, see-through
   "before" part + solid preview, Esc/Enter/Ctrl+Z guards, Delete held). Shared edits: one
-  ribbon line (Scale -> `SciForge_Scale`), ribbon_sweep `KNOWN` emptied (Shell fixed),
+  ribbon line (Scale -> `Fission180_Scale`), ribbon_sweep `KNOWN` emptied (Shell fixed),
   append-only golden ops (`schema.py`, one import line in `builder.py`).
 - Tests (only real input): `shell_draft` (nothing selected, picks/drops, typed value, arrow
   drag, Both / Outside / Rounded, too thick + hint, OK, undo/redo, timeline edit to Both,
@@ -6621,8 +6621,8 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   PASS (3847 checks).
 - Gaps: Draft Parting Line / Two Sides / Symmetric (greyed: FreeCAD's Draft cannot split
   faces), Scale of sketches/components, several bodies in one step, Change Parameters does
-  not list SciForge's own Shell (hollow/Both) and Scale values (`parameters.py` knows only
-  Press Pull among SciForge's features). Not checked by Luca yet.
+  not list Fission 180's own Shell (hollow/Both) and Scale values (`parameters.py` knows only
+  Press Pull among Fission 180's features). Not checked by Luca yet.
 
 ### 2026-10-11: Body tools (branch `sf/bodies`)
 - New: `bodies.py` (helpers any multi-body tool can call: `list_bodies`, `new_body`,
@@ -6639,7 +6639,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   in a dialog, save + reopen); golden ops in `golden/bodies_ops.py` (combine, split_body,
   move_bodies, delete_face, delete_bodies, body_tool_edit, measure_bodies) + 24 models
   `bodies_*`; unit tests `test_bodies_schema.py`.
-- Spec and gaps: `docs/sciforge/parity/bodies.md`.
+- Spec and gaps: `docs/fission180/parity/bodies.md`.
 - Full suite at the end (no --only, 2026-10-11, 4 CPUs shared with another agent's GUI
   tests): unit 166 OK; golden 157 pass + 1 xfail (`plate_hole_grid`, needs core patch #4);
   smoke 70/70; journey 25/25; 56 of 56 scenarios PASS (4393 checks; bodies_combine 90,
@@ -6710,13 +6710,13 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   reopen + edit, timeline Delete); golden ops in `golden/primitive_ops.py` + 25 models
   `sf_box_*`, `sf_cylinder_*`, `sf_sphere_*`, `sf_torus_*`, `sf_coil_*`, `sf_pipe_*`
   (hand-derived; Pappus for coils/pipes); unit tests `test_primitives_core.py`.
-- Spec and gaps: `docs/sciforge/parity/primitives.md`. Gaps: New Component, value boxes on
+- Spec and gaps: `docs/fission180/parity/primitives.md`. Gaps: New Component, value boxes on
   the canvas, snapping along edges / midpoints, Fusion defaults to confirm with Luca.
 - Full suite at the end (no --only, 2026-10-11, commit 168c2b7a48): unit 219 OK; golden
   204 pass + 1 xfail (`plate_hole_grid`, needs core patch #4); smoke 70/70; journey 25/25;
   72 of 72 scenarios PASS (6245 checks; primitives_box 78, primitives_shapes 99,
   primitives_coil 70, primitives_pipe 73, primitives_qa 107, ribbon_sweep 106).
-- For every owner: `undo_links.py` is installed when the SciForge commands load and fixes
+- For every owner: `undo_links.py` is installed when the Fission 180 commands load and fixes
   formula links after undo/redo for all features, not only these (see findings).
 
 ### 2026-10-11: Integration of the feature agents (main branch)
@@ -6771,20 +6771,20 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   frames, twist guides), `curve_pick.py` (sketch-area picker, curve highlight, the blue
   distance ball `PathHandle`, value box that takes a decimal comma), `sweep.py` /
   `sweep_ui.py` (Sweep), `loft.py` / `loft_ui.py` (Loft), `rib.py` / `rib_ui.py` (Rib and
-  Web). Commands `SciForge_Sweep`, `SciForge_Loft`, `SciForge_Rib`, `SciForge_Web`. Ribbon:
+  Web). Commands `Fission180_Sweep`, `Fission180_Loft`, `Fission180_Rib`, `Fission180_Web`. Ribbon:
   Rib and Web enabled (two lines in `ribbon_config.py`). No core patch.
 - In plain words: Sweep moves a profile along a path (all of it or part of it, both ways
   when the profile sits inside the path), optionally guided by a rail, tapered or twisted;
   Loft blends profiles in the order you click them, optionally along rails or a
   centerline; Rib fills a corner with a plate drawn as one line; Web makes a grid of plates
   from several lines. FreeCAD's own Pipe / Loft are used when they give Fusion's result,
-  SciForge's own feature otherwise.
+  Fission 180's own feature otherwise.
 - Tests: scenarios `sweep_loft_sweep`, `sweep_loft_sweep_cut`, `sweep_loft_sweep_rail`,
   `sweep_loft_loft`, `sweep_loft_loft_guides`, `sweep_loft_rib`, `sweep_loft_web` (real
   input only); golden ops in `golden/sweep_loft_ops.py` (`sf_curves`, `sf_sweep(_edit)`,
   `sf_loft(_edit)`, `sf_rib(_edit)`) + 35 analytic models; unit tests
   `test_sweep_loft_schema.py`.
-- Spec and gaps: `docs/sciforge/parity/sweep-loft-rib.md` (main gaps: Tangent Edges Merge
+- Spec and gaps: `docs/fission180/parity/sweep-loft-rib.md` (main gaps: Tangent Edges Merge
   because of the B-spline volume trap, Path + Guide Surface, loft end conditions).
 - Full suite at the end (no --only, 2026-10-11): unit 185 OK (194 with the new schema
   tests, run after); golden 216 pass + 1 xfail (`plate_hole_grid`, needs core patch #4);
@@ -6838,8 +6838,8 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   broke the revolve (helper formula left behind); To squares covered the part so its faces
   and corners could not be clicked; all squares stayed shown after a plane was picked.
 - Teammate scenario changed on purpose: `revolve_basic` expects Type Angle / To / Full.
-- Shared files touched: `SciForgeTests/golden/schema.py` (append-only block: sf_revolve
-  takes "to"), `MEMORY.md`. New spec `docs/sciforge/parity/revolve.md`.
+- Shared files touched: `Fission180Tests/golden/schema.py` (append-only block: sf_revolve
+  takes "to"), `MEMORY.md`. New spec `docs/fission180/parity/revolve.md`.
 - Full suite on the branch (no --only, code of commit 52eb1d9d4b, 87 minutes): unit 236 OK,
   golden 219 pass + 1 xfail (plate_hole_grid, core patch #4 not compiled; the golden
   `sf_revolve_to_cut`, added after the run started, passed on its own), smoke 70/70,
@@ -6869,7 +6869,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   Draft's box was "Plane" (spec: Pull Direction) and its arrow could not be clicked to flip
   (Fusion can); the pull arrow covered faces to click; a flip click also picked the face
   behind it; dragged handles did not come back to their limits; Change Parameters did not
-  list SciForge's Shell / Scale values (`parameters.py`, unowned: one dict + one branch).
+  list Fission 180's Shell / Scale values (`parameters.py`, unowned: one dict + one branch).
 - Golden models `sf_shell_both_edit_presspull`, `sf_shell_swap_presspull_follows`,
   `sf_scale_non_uniform_keeps_faces` (all three fail on the base code, checked) and
   `sf_shell_cup`.
@@ -6883,7 +6883,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   eefca10bc0 either).
 - Left for other owners: `construct_ui.py` uses `handles3d` handles inside a PickPanel
   dialog (greedy selection): after a drag the handle stays "held" (task suggested);
-  `presspull.py` stores short face names only (SciForge's dialogs now repair them).
+  `presspull.py` stores short face names only (Fission 180's dialogs now repair them).
 ### 2026-10-11: QA of the body tools (branch `sf/bodies-qa`)
 - Used the six body tools like Luca would (wrong pick order, OK with nothing picked, Esc
   half way, values typed while the preview runs, handles dragged far and negative, edits
@@ -6995,7 +6995,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   finished it: its coil, pipe and part scenarios now run and pass.
 - Fixed (each found by a scenario or a headless probe, each with a golden model or a
   scenario step that fails on the old code): pipe round a sharp corner failed (FreeCAD's
-  "Transformed" corner; now mitred) and SciForge's own sweep silently followed only the
+  "Transformed" corner; now mitred) and Fission 180's own sweep silently followed only the
   first leg; a typed pipe wall was overwritten when a curve was picked or dropped; a
   negative coil Angle built the mirror image below the plane instead of a coil narrowing
   as it rises; a tapered coil on a raised face drifted (FreeCAD's helix); a hollow pipe
@@ -7034,7 +7034,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   after reopen + edit (sweep, loft, Press Pull).
 - Shared files touched (minimal): `commands.py` (tell), `extrude.py` (ensure_regions),
   `profile_pick.py` (Sections), `sketch_ui.py` (datum plane in front), `presspull.py`
-  (refind / remember), scenarios `sweep_loft_loft.py` (face profile now SciForge's loft)
+  (refind / remember), scenarios `sweep_loft_loft.py` (face profile now Fission 180's loft)
   and `bodies_qa_2.py` (path R: the Press Pull now keeps its face, 13500).
 - Full suite once at the end (no --only, 2026-10-12): unit 245 OK; golden 263 pass + 1
   xfail (`plate_hole_grid`, core patch #4); smoke 70/70; journey 25/25; scenarios 116 of
@@ -7052,7 +7052,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   `timeline_ops.used_sketches()` follows the step's helpers; `delete.py` uses it too.
   Scenario steps in `primitives_pipe` and `sweep_loft_sweep`, both failing without the fix
   (checked: the sweep's profile sketch stayed hidden as well).
-- CI: every SciForge tests run since #52 was cancelled at the 90-minute limit (the suite
+- CI: every Fission 180 tests run since #52 was cancelled at the 90-minute limit (the suite
   needs ~2 h on one machine), so no quick update was built after #45. CI now runs 5 parts
   side by side: `--only base` (unit, golden, smoke, journey) and `--only scenarios --shard
   K/4` (`run_tests.sh`); the quick update is packaged by its own job once all pass.
@@ -7075,11 +7075,11 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   everything up to this session.
 - Full build run #2 (Luca, 2026-10-12, 4 hours): both platforms compiled and packaged, then
   its tests failed (Windows golden: 234 errors, 43 pass; Linux: golden and every scenario).
-  Cause: `src/Mod/SciForge/CMakeLists.txt` listed SciForge's modules by hand and still had 35
-  of 116 (`cannot import name 'blend' from 'sciforge'`); the quick update copies the whole
+  Cause: `src/Mod/Fission180/CMakeLists.txt` listed Fission 180's modules by hand and still had 35
+  of 116 (`cannot import name 'blend' from 'fission180'`); the quick update copies the whole
   folder, so only the full build lacked them. The 5 extrude "failed to compute" errors had
   the same cause (reproduced here: the installed copy of the old rules gives the same 234).
-  Fix: the rules glob every module, icon and test file; `tools/sciforge/check_install.sh`
+  Fix: the rules glob every module, icon and test file; `tools/fission180/check_install.sh`
   (runs the real install rules with CMake into a scratch folder and compares) runs on every
   push and first in the build (fails in a minute, not after hours). On the installed copy
   of the new rules: unit OK, golden 276 + 1 xfail, smoke and journey PASS, 6 scenarios PASS.
@@ -7089,7 +7089,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   drag, arrows, hit-test, Home storage; no Qt) + `viewcube_ui.py` (QPainter widget over the
   view); FreeCAD's NaviCube hidden via `VIEWER_SETTINGS` (`ShowNaviCube`). Click a face /
   edge / corner (animated), drag = constrained orbit, face-on triangles (90 degrees) and
-  roll arrows, Home in `doc.Meta["SciForgeHome"]` (saved), right-click menu (Go Home,
+  roll arrows, Home in `doc.Meta["Fission180Home"]` (saved), right-click menu (Go Home,
   Orthographic/Perspective, Set Home: Fit / Fixed Distance, Reset Home), Ctrl+Alt+V,
   X/Y/Z triad. Scenarios `viewcube_click/_drag/_arrows/_home/_menu` (each fails without the
   feature). Open: Fusion checks (arrow set, default Home corner, snap after a drag),
@@ -7097,12 +7097,12 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   watching a view being deleted (traceback on close + open).
 - CI run #70 (ViewCube merge): `viewcube_menu` failed only on GitHub ("FreeCAD's NaviCube is
   back"). Real bug, older than the cube: `theme` kept the user's viewer settings in memory,
-  but FreeCAD saves its preferences on quit, so after quitting with SciForge on, the next
-  session took SciForge's values for the user's and leaving SciForge kept them (no NaviCube,
+  but FreeCAD saves its preferences on quit, so after quitting with Fission 180 on, the next
+  session took Fission 180's values for the user's and leaving Fission 180 kept them (no NaviCube,
   Revit navigation, dark background in Part Design). Each CI part shares one profile, so an
-  earlier scenario had "quit with SciForge on". Fix: the user's values go to
-  `Mod/SciForge/ViewerBackup` (kept until restored); `shell.startup()` (from InitGui) and
-  `on_workbench` restore leftovers when SciForge is off. Scenario `viewer_settings_restart`
+  earlier scenario had "quit with Fission 180 on". Fix: the user's values go to
+  `Mod/Fission180/ViewerBackup` (kept until restored); `shell.startup()` (from InitGui) and
+  `on_workbench` restore leftovers when Fission 180 is off. Scenario `viewer_settings_restart`
   (restart imitated by reloading `theme`) fails without the fix.
 - CI run #72: `sketch_infer` path A failed only on GitHub (the Ctrl line came out level).
   Not the Ctrl code (the end landed exactly on the clicked pixel): the start was clicked
@@ -7126,8 +7126,8 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   `test_wall_tags_fit_windows`. Lesson: any number handed to FreeCAD's C++ must fit 32 bits
   (Windows `long`).
 - Build pipeline after run #3 (Luca: "one single item wasted hours"): (1) the golden models
-  now also run on the official FreeCAD for Windows (`tools/sciforge/windows_golden.sh
-  --stock`), in "SciForge tests" on every push (job "tests (Windows golden models)"; the
+  now also run on the official FreeCAD for Windows (`tools/fission180/windows_golden.sh
+  --stock`), in "Fission 180 tests" on every push (job "tests (Windows golden models)"; the
   quick update waits for it) and in the build as `check-windows` before compiling; (2) the
   build uploads the .7z / AppImage before testing it (a failed test no longer throws away
   the compile; the quick update fixes Python problems on top); (3) the build's concurrency
@@ -7155,7 +7155,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   FREECAD_USE_CCACHE), but the cache died with the machine; the conda Windows preset has PCH
   and PDB off, ccache 4.14.1 caches MSVC; pixi v0.59.0's backend (0.3.5) does not clear the
   environment and its work dir path is stable; only `%ALLUSERSPROFILE%\ccache\ccache.conf`
-  can move ccache's cache_dir on Windows. sciforge-build.yml (Windows only): that config file
+  can move ccache's cache_dir on Windows. fission180-build.yml (Windows only): that config file
   (cache_dir D:/ccache, max_size 4G), actions/cache/restore before compiling (key per run,
   restore-keys per target), save right after compiling with `always()` (a failed test no
   longer loses it), stats before/after via `pixi exec --spec ccache`. Every step
@@ -7165,7 +7165,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   later runs. Also confirmed: no interference between the C++ patches and their Python
   fallbacks (run #3's Linux build passed the trim, pattern and leave-sketch scenarios).
 - Luca's evening report (after the .7z of build run #4: 22:16 UTC, 277 golden PASS on the
-  build, artifact SciForge-Windows-portable-sciforge-20261012-9e775773):
+  build, artifact Fission180-Windows-portable-fission180-20261012-9e775773):
   - R4 sketch right-click showed the part menu: two right-click filters on the 3D view (part
     and sketch); Qt asks the one installed last first, and coming back from another program
     re-installed the part filter in front. `marking_menu._open_for_state` decides at the
@@ -7180,7 +7180,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   - Arrows stuck on the cursor after release: four causes reproduced with real input (FreeCAD
     selection keeps a release over a part; the recompute progress bar filters releases out;
     a double-click's held-back press; a re-clicked stuck Coin dragger keeps the viewer's
-    grab and FreeCAD crashed later). `sciforge/drag_guard.py`: every handle's poll ends a drag
+    grab and FreeCAD crashed later). `fission180/drag_guard.py`: every handle's poll ends a drag
     when Qt says the left button is up (Coin draggers get a release through the viewer's own
     SoHandleEventAction, applied to their sub-graph, never during a recompute) and gives the
     grab back before removal. Scenario `drag_release_lost` (M1, M2c, M4, M8, H2b, H3, P2, E4,
@@ -7241,17 +7241,17 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   the distance, and R8 decides the automatic operation with the preview (60 ms later). Caught
   by CI run #93; the journey now waits for the preview.
 - CI run #95 found (sketch_areas_more, scenarios sharing one profile): FreeCAD saves its
-  preferences when it quits, so everything SciForge changes in them must keep the user's own
+  preferences when it quits, so everything Fission 180 changes in them must keep the user's own
   value in the preferences too, not in memory. sketch_mode's settings (make sketch areas, area
   colour, Esc...) now use `theme.keep_and_set / give_back` (backup group
-  `Mod/SciForge/SketchBackup`, like the viewer's `ViewerBackup`), and FreeCAD's own keys
-  parked by `shortcuts.py` are kept in `Mod/SciForge/ParkedShortcuts` (a shortcut set from
-  Python is saved by FreeCAD: after quitting with SciForge on, L / C / D... were saved empty for
-  good). Both are given back when SciForge goes off and at a start in another workbench.
+  `Mod/Fission180/SketchBackup`, like the viewer's `ViewerBackup`), and FreeCAD's own keys
+  parked by `shortcuts.py` are kept in `Mod/Fission180/ParkedShortcuts` (a shortcut set from
+  Python is saved by FreeCAD: after quitting with Fission 180 on, L / C / D... were saved empty for
+  good). Both are given back when Fission 180 goes off and at a start in another workbench.
   `run_tests.sh --scenario a,b` runs several scenarios in one profile, as CI does: use it to
   reproduce such failures (sketch_areas,sketch_areas_more fails on the old code).
 - Final state: CI run #97 green on 6cda6e43f8 (unit, golden, smoke, journey, all scenario
-  shards, Windows golden); quick update artifact `SciForge-quick-update-6cda6e43f89d9d849ff78b57deb7a3033e7d3ebd`
+  shards, Windows golden); quick update artifact `Fission180-quick-update-6cda6e43f89d9d849ff78b57deb7a3033e7d3ebd`
   for Luca. No Windows full build was started (the compile cache is checked on the next one).
 - Old scenarios that relied on the automatic 10 mm or on a preview right after E were updated
   (extrude_multibody*, sketch_areas*). Unit 330, golden 294 + 1 xfail.
@@ -7264,13 +7264,13 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   Calibrate = two points + a distance, right-click in the Canvases folder), Insert SVG / DXF
   (X/Y/angle/scale/flips, DXF units, layers, one sketch per layer, geometry fixed after OK),
   Save As Mesh / 3D Print (formats, Unit Type, Structure, Refinement presets + options, Send
-  to 3D Print Utility). Spec with sources and gaps: `docs/sciforge/parity/insert-export.md`.
+  to 3D Print Utility). Spec with sources and gaps: `docs/fission180/parity/insert-export.md`.
 - Built in Python on FreeCAD's Mesh, MeshPart, Import/ImportGui, importSVG, importDXF and
   Image::ImagePlane: `insert.py` / `insert_ui.py`, `export.py` / `export_ui.py` (the old
   `make3d*.py` 3D Print replaced), browser (mesh bodies in Bodies, a Canvases folder, Convert
   Mesh / Edit Canvas / Calibrate on right-click), timeline kinds, ribbon wiring (INSERT, MESH,
   UTILITIES > MAKE, the File menu), 5 new icons. Fixtures made by FreeCAD in
-  `SciForgeTests/fixtures/make_fixtures.py` (STL/OBJ/3MF box, cylinder STL, two-part STEP
+  `Fission180Tests/fixtures/make_fixtures.py` (STL/OBJ/3MF box, cylinder STL, two-part STEP
   with colours, SVG, two-layer DXF, an 80 x 40 PNG with two dots 60 px apart).
 - 9 scenarios with real clicks, all green locally: insert_mesh (65), insert_step (22),
   insert_svg (38), insert_dxf (35), insert_canvas (48), export_formats (53), export_print
@@ -7284,7 +7284,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   annoyance; Luca to confirm); canvases stay out of the timeline (assumed); the converted
   mesh body is hidden after Convert Mesh (assumed); Insert STEP is a plain file pick (Fusion
   needs its cloud Data Panel) and makes bodies, components later; Export Everything is
-  SciForge's own (the ownership guarantee), Medium refinement, PNG of the current view.
+  Fission 180's own (the ownership guarantee), Medium refinement, PNG of the current view.
 - Not done (listed in the doc's gaps): manipulators for SVG / DXF / canvas, Convert Mesh
   Organic and surface fitting, Max Edge Length / Aspect Ratio / Preview Mesh in 3D Print,
   IGES / DXF / other export formats, Fusion's exact refinement numbers (from memory).
@@ -7297,9 +7297,9 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   "leave the testing to an overall testing run. I want to try out the features asap".
 - **Orbit** (`sf/orbit`, agent + adversarial review + fix round, merged ba6516af20, CI #100
   green): Orbit drop-down in the navigation bar (Constrained = FreeCAD OrbitStyle 2, Free =
-  Rounded Arcball 4; `Mod/SciForge/OrbitMode`; through `theme.keep_and_set`), middle double-
+  Rounded Arcball 4; `Mod/Fission180/OrbitMode`; through `theme.keep_and_set`), middle double-
   click = Fit, Ctrl+Shift+middle-drag = zoom, Shift+middle click sets an orbit centre (green
-  9 px dot, picture only; SciForge's own camera maths in `orbit.py`, since NavigationStylePy
+  9 px dot, picture only; Fission 180's own camera maths in `orbit.py`, since NavigationStylePy
   has no methods), Set / Reset Orbit Center in the right-click menu. `orbit_ui._ViewFilter`
   holds a middle press back until the mouse moves 4 px. Review findings fixed (25afb323e8):
   the second press of a double-click must never be forwarded once acted on (FreeCAD was left
@@ -7353,8 +7353,8 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
 - **Sketching that feels like Fusion** (`sf/sketch-feel`, 7 commits, merged after its fix
   round): guides in every drawing tool (`sketch_infer.py`, the constraint added in the glued
   step; referenced curves held still with a temporary Block while the shape is made exact),
-  SciForge's level / upright marks, the tangent arc in L (press on the chain's point, drag > 6
-  px, SciForge's own preview; FreeCAD never sees the gesture, its line tool is restarted from
+  Fission 180's level / upright marks, the tangent arc in L (press on the chain's point, drag > 6
+  px, Fission 180's own preview; FreeCAD never sees the gesture, its line tool is restarted from
   the arc's end), fixed geometry green (`sketch_mode.FixedColour` repaints FreeCAD's Coin
   material nodes after each of its recolourings; `CurvesMaterials0/1`, `PointsMaterials_0`),
   SelectionColor / HighlightColor pinned (FreeCAD-wide; `#3b5bdb` is what FreeCAD's own packs
@@ -7366,7 +7366,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   with no move never armed the arc (`infer.last_start` set after the chain click); marks stayed
   on Leave; the synthetic chain click snapped to the edge on a turned plane in a tilted view
   (`_aim_at_vertex` scans the pixels around until FreeCAD preselects a Vertex); the tool kind
-  from `recent.last()` was stale for a tool started outside SciForge (the preview's shape wins).
+  from `recent.last()` was stale for a tool started outside Fission 180 (the preview's shape wins).
   Facts: FreeCAD's new tools act on the press and commit on the release; a zero-length press is
   refused; `Gui.runCommand("Sketcher_CreateLine")` while it runs restarts it;
   `EditCurvesCoordinate` is single precision (identify a vertex with it, never use it as a
@@ -7420,16 +7420,16 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   scratchpad (`old-worktrees/*.diff`), not in the repo. 3 GB freed.
 
 ### 2026-10-13: Selection like Fusion (branch `sf/selection`)
-- Research first (`docs/sciforge/parity/selection.md`, every row with its source): window /
+- Research first (`docs/fission180/parity/selection.md`, every row with its source): window /
   crossing by drag direction, freeform, paint, keys 1 / 2 / 3, Ctrl toggles and Shift adds,
   Select Other on a one-second press (front to back, hover shows), Selection Filters (also
   inside commands), Body / Face / Edge priority presets (the active one again clears),
   Select Through. Built in `selection_core.py` (rules + box maths, 23 unit tests) and
-  `selection_ui.py` (a Qt filter on the 3D view's drawing area; SciForge's own box widget;
+  `selection_ui.py` (a Qt filter on the 3D view's drawing area; Fission 180's own box widget;
   `SelectOtherMenu`; `FilterGate` combined with every dialog's gate by wrapping
-  `Gui.Selection.addSelectionGate` / `removeSelectionGate` while SciForge is on; commands
-  `SciForge_Select*`; the SELECT ribbon menu, with `item(toggle=...)` entries whose tick
-  flips on its own). FreeCAD's own long-press Clarify Selection is off while SciForge is
+  `Gui.Selection.addSelectionGate` / `removeSelectionGate` while Fission 180 is on; commands
+  `Fission180_Select*`; the SELECT ribbon menu, with `item(toggle=...)` entries whose tick
+  flips on its own). FreeCAD's own long-press Clarify Selection is off while Fission 180 is
   on (`theme.VIEWER_SETTINGS`). Five scenarios, 172 checks: `selection_box`,
   `selection_dialogs`, `selection_filters`, `selection_other`, `selection_sketch`.
 - Facts: FreeCAD selects on the left button's **release**, so a box only swallows the
@@ -7468,7 +7468,7 @@ Behaviour spec with sources, what was built and what was not: `docs/sciforge/par
   coincident kept), guide snap + Vertical constraint (XY and XZ sketch), perpendicular
   from and onto a slanted line (exactly 90), level at 3.5 degrees / free at 6.8, parallel
   off/on, a typed length beating a guide, Ctrl+Z / Ctrl+Y. Parity:
-  `docs/sciforge/parity/sketch.md` (new section). About 2 ms per mouse move on a
+  `docs/fission180/parity/sketch.md` (new section). About 2 ms per mouse move on a
   400-curve sketch (box tests before distances; 7.6 ms without them).
 - The first regression run caught 3 failures (grid snap, see Known issues); fixed.
 - Not done / open: guides for rectangle corners, circle centres, arcs (Line only); the
@@ -7531,11 +7531,11 @@ yet received a quick update with wave 5.
    (8 runs) to *any scenario, then exchange2_link, then revolve_qa_to*. Cause: FreeCAD saves the
    main window layout (`User parameter:BaseApp/Preferences/MainWindow` / `MainWindowState`) in
    the shared shard profile; after exchange2_link showed the Data Panel, the layout lists
-   `SciForgeDataPanelDock`, the next session's browser comes out 362 px wide instead of 256, and
+   `Fission180DataPanelDock`, the next session's browser comes out 362 px wide instead of 256, and
    a press on a browser row is not taken by the browser: Qt passes it on to the 3D view's widgets
    (seen with an application event filter installed first: press on the browser viewport, then
    QWidget / QGraphicsView / QMainWindow / QMdiSubWindow; `itemDoubleClicked` never fires).
-   Not explained yet: WHICH code takes the press there (no SciForge filter returns True for it;
+   Not explained yet: WHICH code takes the press there (no Fission 180 filter returns True for it;
    no popup, no mouse grabber). Fix in the test runner: `run_tests.sh` removes
    `MainWindowState` from the profile's user.cfg before each scenario. Fixed on CI.
    **Open product question (for Luca's real use):** could a saved layout with the Data Panel
@@ -7578,14 +7578,14 @@ per merged push).
   value box (Draft's angle disc had none).
 - Box selection judges "visible" along the line of sight with a pixel's slack (sketch curves
   lying on a face; graphics drivers break that depth tie differently).
-- `tools/sciforge/check_install.sh` (run by CI's base job) fails when a file is not installed
-  by `src/Mod/SciForge/CMakeLists.txt`; the test fixtures folder is installed whole.
+- `tools/fission180/check_install.sh` (run by CI's base job) fails when a file is not installed
+  by `src/Mod/Fission180/CMakeLists.txt`; the test fixtures folder is installed whole.
 - Test checks on clicked positions allow a pixel (CI's window differs by one pixel).
 
 **State at 07:25 UTC 2026-10-14:** CI #117 on f6a7318d9d (every builder of the first plan
 merged + the CI #116 fixes) is fully green; its quick update is
-`SciForge-quick-update-f6a7318d9d98fc32fbffbcf77b8a570662a6cf18`. Luca's base install is full
-build #6 (`SciForge-Windows-installer-20261014-63fe08ff`, core patch #14 included); later
+`Fission180-quick-update-f6a7318d9d98fc32fbffbcf77b8a570662a6cf18`. Luca's base install is full
+build #6 (`Fission180-Windows-installer-20261014-63fe08ff`, core patch #14 included); later
 changes are Python only, so that quick update on top of it is the whole product so far.
 
 **CI #116 / gaps-merge lessons (2026-10-14):**
@@ -7633,10 +7633,10 @@ lost picks kept, old coils/pipes upgraded). **Every builder of the plan is merge
 
 **Builders (wave 4, launched 2026-10-14 ~07:00 UTC from 7282c76096):** every area of the
 first plan is merged; the gaps the parity docs still list are surveyed in
-`docs/sciforge/dev/remaining-gaps.md`. Six builders work in worktrees on `sf/drawings-2`,
+`docs/fission180/dev/remaining-gaps.md`. Six builders work in worktrees on `sf/drawings-2`,
 `sf/fillet-2`, `sf/components-2`, `sf/joints-2`, `sf/modeling-2`, `sf/modify-2` (briefs
-`docs/sciforge/dev/briefs/<area>.md` + `common.md`; session logs in
-`docs/sciforge/sessions/<area>.md`). Merge each with the merge routine below as it reports.
+`docs/fission180/dev/briefs/<area>.md` + `common.md`; session logs in
+`docs/fission180/sessions/<area>.md`). Merge each with the merge routine below as it reports.
 Merged: `sf/fillet-2` (7e3976b935: radius sets, Chord Length, Variable, Tangent Chain off,
 Rule Fillet, Full Round, chamfer sets).
 `sf/joints-2` (9dfb2654ee: Component Drag, Capture Position prompt, position modes, Motion
@@ -7655,13 +7655,13 @@ and fastener clearance holes, threads by class, holes on curved faces, Extrude T
 extend + offset, Revolve / Sweep / Loft Objects To Cut, Sweep formulas). **Wave 4 is merged.**
 
 **Builders (wave 5, launched ~10:05 UTC 2026-10-14):** `sf/sketch-2`, `sf/exchange-2`,
-`sf/surface-2`, `sf/polish-2`, `sf/mesh-inspect-2` (briefs in `docs/sciforge/dev/briefs/`).
+`sf/surface-2`, `sf/polish-2`, `sf/mesh-inspect-2` (briefs in `docs/fission180/dev/briefs/`).
 Not in wave 5 (risky, deferred): floating dialogs and document tabs at the top (every scenario
 uses the docked task panel).
 **2026-10-14 ~11:00: the weekly usage limit stopped all five wave 5 builders** (no commits; their
 worktrees are gone). Relaunched 2026-10-16 from the same briefs after Luca's bug fixes merged
 (the `sf/*-2` branches of wave 5 were reset to the new main first). CI #131 on 2273d4e0ab
-(all four bug fixes) is green: quick update `SciForge-quick-update-2273d4e0ab...` sent to Luca.
+(all four bug fixes) is green: quick update `Fission180-quick-update-2273d4e0ab...` sent to Luca.
 **Container restart (2026-10-16 ~04:55 UTC):** it killed every background run, but this time the
 worktrees (commits and uncommitted changes) survived. Resuming each builder with SendMessage to
 its agent id (it keeps its transcript) and telling it which runs were killed worked: the builders
@@ -7679,7 +7679,7 @@ Break Link, Data Panel Upload; trial-merged in a scratch worktree while the poli
 the main one; its only conflict was a table row in `parity/versions.md`). **Cross-builder fix at
 that merge:** polish-2's Data Panel Move / Copy rewrites the references other designs hold
 (`versions.retarget_xml`: XLinks and Derive paths) but did not know exchange-2's
-`SciForgeLinkedFile` (the linked component's file name beside its XLinks); `retarget_xml` now
+`Fission180LinkedFile` (the linked component's file name beside its XLinks); `retarget_xml` now
 rewrites it too (unit test `test_retarget_keeps_an_inserted_designs_file_name`). A second one
 showed in the merge's run: `polish2_data_panel` P3 / P4 failed (0 instead of 1000) because
 polish-2's Out-of-Date button found inserted designs through `App::Link` objects only, and
@@ -7691,13 +7691,13 @@ inserted design is linked), run each one's scenarios on the merge of both.
 twist, surface and solid Loft rails, centerline, end conditions, Tangent Edges Merge; 18 new
 goldens, one an expected failure: `sf_loft_merge_slot_volume`, OpenCASCADE's volume of a merged
 spline side is 5.6 % off; clean merge on top of exchange-2).
-`sf/sketch-2` (double-click chain selection and box modifiers in sketches, SciForge's own sketch
+`sf/sketch-2` (double-click chain selection and box modifiers in sketches, Fission 180's own sketch
 Fillet and the line-arc Chamfer, text frame resized by its corner, box selection of planes and
 axes, 3D Sketch as a "3D Curves" object of the sketch, Projected Curves belonging to the sketch;
 conflicts: `sketch_mode.py` (polish-2's `self.check` and sketch-2's `self.sketch3d` at the same
 two places: keep both) and a row of `parity/sketch.md`). **Wave 5 is merged.**
 **Test runs from several worktrees at once are safe:** `run_tests.sh` makes a throw-away profile
-and links SciForge from its own repo, so a trial merge in a scratch worktree can be tested while
+and links Fission 180 from its own repo, so a trial merge in a scratch worktree can be tested while
 another run uses the main tree. Never merge into the main tree while a test run uses it.
 
 **2026-10-16: Luca's bug list (manual testing of the CI #117 quick update)**, four fix builders in
@@ -7721,7 +7721,7 @@ patterns). Their session logs are in the Session log below.
 (`Sketcher_CreateFillet`) never registers clicks on CI's virtual screen, though it works on a
 local xvfb one; preselecting the two lines makes no fillet in 1.1, and `sketch.fillet()` from
 Python gives a different plate. `modeling2_sketch` now notes this in the log and leaves the
-fillet checks out when no arc appears (8ef819a975). SciForge's own sketch tools compute their
+fillet checks out when no arc appears (8ef819a975). Fission 180's own sketch tools compute their
 picks themselves and work on CI. Do not build a CI check on a FreeCAD-native sketch tool's
 clicks.
 
@@ -7738,7 +7738,7 @@ MEMORY, remove the worktree, report once to Luca.
 
 ## Next steps (in order)
 
-0. **The current plan is `docs/sciforge/plan.md`** (2026-10-12, after the research report
+0. **The current plan is `docs/fission180/plan.md`** (2026-10-12, after the research report
    `reports/Fusion sketching ViewCube and navigation.md`). Done: A (orbit, 2026-10-13), B (the
    Python ViewCube), C (2026-10-13: guides in every tool, marks, the tangent arc, green fixed
    geometry; left: Shift midpoint, the arc's end-angle and slot width guides, Fusion's floating
@@ -7757,11 +7757,11 @@ MEMORY, remove the worktree, report once to Luca.
      Loft switch to New Body (Fusion makes a new body);
    - other features than sweep / loft / Press Pull may lose picked edges / faces after
      save, reopen and edit (the "remember element" fix was made for those three);
-   - the gaps listed at the end of each `docs/sciforge/parity/*.md`.
+   - the gaps listed at the end of each `docs/fission180/parity/*.md`.
 2. Luca installs the newest green quick update (2026-10-13: R1-R8 and the review fixes) and
    checks the Fusion guesses listed in the morning summary (value box place, red colour, Join
    through several bodies, New Body beside a part, which areas a whole sketch gives); ask for
-   the copyable SciForge > Diagnostics text whenever something misbehaves, and the Fusion
+   the copyable Fission 180 > Diagnostics text whenever something misbehaves, and the Fusion
    right-click menu screenshot (slot order). The next Windows build shows whether the compile
    cache works (`ccache --show-stats` in its log: "cacheable calls" > 0, and faster).
 3. Full Windows build: patches #4, #6, #7 compile (run #2/#3, `plate_hole_grid` PASS). Run #3's

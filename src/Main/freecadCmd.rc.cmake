@@ -9,25 +9,25 @@
 //
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-// SCIFORGE: SciForge's own icon and version strings (docs/sciforge/core-patches.md #9)
-IDI_ICON1               ICON    DISCARDABLE     "${SCIFORGE_WIN_ICON}"
+// FISSION180: Fission 180's own icon and version strings (docs/fission180/core-patches.md #9)
+IDI_ICON1               ICON    DISCARDABLE     "${FISSION180_WIN_ICON}"
 
 // File info for the FreeCADCmd.exe
 //
 1 VERSIONINFO
-FILEVERSION ${SCIFORGE_VERSION_MAJOR},${SCIFORGE_VERSION_MINOR},${SCIFORGE_VERSION_PATCH},${PACKAGE_BUILD_VERSION}
+FILEVERSION ${FISSION180_VERSION_MAJOR},${FISSION180_VERSION_MINOR},${FISSION180_VERSION_PATCH},${PACKAGE_BUILD_VERSION}
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
         BLOCK "040904b0" // 409 stands for US English
         BEGIN
-            VALUE "CompanyName", "${SCIFORGE_APP_NAME} contributors"
-            VALUE "FileDescription", "${SCIFORGE_APP_NAME} command line executable (based on ${PROJECT_NAME})"
-            VALUE "InternalName", "${SCIFORGE_APP_NAME}Cmd.exe"
-            VALUE "LegalCopyright", "(C) SciForge contributors; based on FreeCAD, (C) FreeCAD contributors (LGPL-2.1-or-later)"
-            VALUE "OriginalFilename", "${SCIFORGE_APP_NAME}Cmd.exe"
-            VALUE "ProductName", "${SCIFORGE_APP_NAME}"
-            VALUE "ProductVersion", "${SCIFORGE_VERSION}"
+            VALUE "CompanyName", "${FISSION180_APP_NAME} contributors"
+            VALUE "FileDescription", "${FISSION180_APP_NAME} command line executable (based on ${PROJECT_NAME})"
+            VALUE "InternalName", "${FISSION180_APP_NAME}Cmd.exe"
+            VALUE "LegalCopyright", "(C) Fission 180 contributors; based on FreeCAD, (C) FreeCAD contributors (LGPL-2.1-or-later)"
+            VALUE "OriginalFilename", "${FISSION180_APP_NAME}Cmd.exe"
+            VALUE "ProductName", "${FISSION180_APP_NAME}"
+            VALUE "ProductVersion", "${FISSION180_VERSION}"
         END
     END
     BLOCK "VarFileInfo"

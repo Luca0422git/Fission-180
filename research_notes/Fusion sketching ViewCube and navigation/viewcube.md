@@ -10,7 +10,7 @@ Source labels used on every finding:
   Same widget family, but behavior and wording can differ from Fusion. Never assume they match.
 - **[RESEARCH/PATENT]**: the 2008 Autodesk Research paper or the ViewCube patents.
 - **[FORUM]** / **[TUTORIAL]**: Autodesk Community posts, third-party tutorials or blogs.
-- **[LOCAL CODE]**: FreeCAD's own NaviCube source in this repo (useful because SciForge would build on it).
+- **[LOCAL CODE]**: FreeCAD's own NaviCube source in this repo (useful because Fission 180 would build on it).
 - **Recollection (unverified)**: my own memory of Fusion's UI. Always placed under Gaps, never under findings.
 
 ## 1. Shape and look (geometry, regions, labels, colors, transparency, size, position, compass)
@@ -52,9 +52,9 @@ for Fusion could not be confirmed from text sources.
   clamped to 0.05-0.18 (`setChamfer`); 6 main faces, 12 edge faces and 8 corner faces are separate pick
   regions (`PickId::Front` ... `FrontTopRight` ... `RearBottomLeft`); idle opacity `m_InactiveOpacity = 0.5`,
   full opacity while the pointer is inside the widget square; it can draw a coordinate-system triad
-  (`m_ShowCS`, per-axis colors); it can sit in any of the four corners (`moveToCorner`). — [src/Gui/NaviCube.cpp](/home/user/SciForge/src/Gui/NaviCube.cpp) (lines ~180-195, 289-292, 401-415, 721-729, 772)
-- [LOCAL CODE] SciForge's theme already sets a Fusion-like NaviCube: light base color 0xF0F0F0 (alpha 0xE6),
-  dark gray label/emphasis color #4a4f57, blue hover #6fb7f0. — [src/Mod/SciForge/sciforge/theme.py](/home/user/SciForge/src/Mod/SciForge/sciforge/theme.py) (lines 148-162)
+  (`m_ShowCS`, per-axis colors); it can sit in any of the four corners (`moveToCorner`). — [src/Gui/NaviCube.cpp](/home/user/Fission180/src/Gui/NaviCube.cpp) (lines ~180-195, 289-292, 401-415, 721-729, 772)
+- [LOCAL CODE] Fission 180's theme already sets a Fusion-like NaviCube: light base color 0xF0F0F0 (alpha 0xE6),
+  dark gray label/emphasis color #4a4f57, blue hover #6fb7f0. — [src/Mod/Fission180/fission180/theme.py](/home/user/Fission180/src/Mod/Fission180/fission180/theme.py) (lines 148-162)
 
 ### Inferences
 - Region count is settled: 26 click targets (6 + 12 + 8), consistent between the patent and every
@@ -62,10 +62,10 @@ for Fusion could not be confirmed from text sources.
   visual tuning (chamfer size, colors, labels), not new picking logic.
 - "Chamfered edges and corners" is the standard way to give edges and corners a clickable area of their own
   (that is what FreeCAD's NaviCube does with its 0.12 chamfer). Whether Fusion draws visible bevels or uses
-  flat faces with invisible border hot-zones is not confirmed by any text source; for SciForge a small,
+  flat faces with invisible border hot-zones is not confirmed by any text source; for Fission 180 a small,
   subtle chamfer (around FreeCAD's 0.10-0.12) is a safe approximation of "general shape".
 - Since Fusion offers no size/opacity/compass settings, a faithful Fusion clone needs no compass ring and no
-  user-facing size or opacity preference (SciForge may still keep FreeCAD's parameters internally).
+  user-facing size or opacity preference (Fission 180 may still keep FreeCAD's parameters internally).
 
 ### Gaps
 - Exact face, edge and label colors in Fusion, idle opacity value, and bevel proportions: not found in any
@@ -94,7 +94,7 @@ over them; Fusion-specific details (color, cursor shape) were not found in text 
 - [FORUM] Fusion highlights model faces/edges on mouse-over in the canvas as a core behavior (context only;
   these threads do not discuss the ViewCube). — [Turn off part highlighting when mousing over](https://forums.autodesk.com/t5/fusion-design-validate-document/turn-off-part-highlighting-when-mousing-over/td-p/10680760)
 - [LOCAL CODE] FreeCAD's NaviCube highlights the single picked region under the cursor (`setHilite(pickFace(x,y))`)
-  in `m_HiliteColor` (default light blue RGB 170,226,255); highlight is suppressed while dragging. — [src/Gui/NaviCube.cpp](/home/user/SciForge/src/Gui/NaviCube.cpp) (lines 383, 1243-1276)
+  in `m_HiliteColor` (default light blue RGB 170,226,255); highlight is suppressed while dragging. — [src/Gui/NaviCube.cpp](/home/user/Fission180/src/Gui/NaviCube.cpp) (lines 383, 1243-1276)
 
 ### Inferences
 - Fusion behavior is very likely "one region at a time highlighted": hovering a face lights the face, an edge
@@ -127,7 +127,7 @@ two faces; the camera moves with a smooth animated transition. Fusion-specific a
   re-frame the model after a ViewCube click; these are options in those products, not documented for Fusion. — [Maya ViewCube preferences](https://help.autodesk.com/cloudhelp/2016/ENU/Maya/files/GUID-F8DD60C0-A955-4D51-9D3D-9FFE1E8D3D16.htm); [AutoCAD ViewCube Settings dialog](https://help.autodesk.com/cloudhelp/2016/ENU/AutoCAD-Core/files/GUID-78043EE2-114B-4F08-BFD7-7E5E429708A9.htm)
 - [LOCAL CODE] FreeCAD's NaviCube on click of a face/edge/corner calls `setCameraOrientation(...)` (animated via
   FreeCAD's NavigationAnimation); with `m_RotateToNearest = true` it picks the target orientation whose "up"
-  is nearest the current one instead of a fixed up vector. — [src/Gui/NaviCube.cpp](/home/user/SciForge/src/Gui/NaviCube.cpp) (lines 1186-1201)
+  is nearest the current one instead of a fixed up vector. — [src/Gui/NaviCube.cpp](/home/user/Fission180/src/Gui/NaviCube.cpp) (lines 1186-1201)
 
 ### Inferences
 - For edges and corners there is no single obvious "up" direction; keeping world-up (Z in Z-up mode) pointing
@@ -138,7 +138,7 @@ two faces; the camera moves with a smooth animated transition. Fusion-specific a
 
 ### Gaps
 - Animation duration in Fusion: not found anywhere. Recollection (unverified): roughly half a second to one
-  second, ease-in/ease-out. A tunable value in that range is a reasonable SciForge default.
+  second, ease-in/ease-out. A tunable value in that range is a reasonable Fission 180 default.
 - What happens when clicking the face that is already current: not documented for Fusion. Recollection
   (unverified): nothing visible happens (camera is already there). Do not treat as confirmed.
 - Whether a click also re-centers the camera on the model: not confirmed.
@@ -164,7 +164,7 @@ paper; it is not explicitly confirmed for Fusion by any text source found.
 - [LOCAL CODE] FreeCAD's NaviCube has the same kinds of buttons: `ArrowNorth/South/East/West` (step to
   neighbor), `ArrowLeft/ArrowRight` (roll), `DotBackside` (flip 180 degrees to the opposite face) and
   `ViewMenu`. Its step angle is 360 / `NaviStepByTurn` with default 8 (45 degrees), clamped 4-36, so a
-  Fusion-like 90-degree step means `NaviStepByTurn = 4`. — [src/Gui/NaviCube.cpp](/home/user/SciForge/src/Gui/NaviCube.cpp) (lines 113-120, 187, 549-616, 1186-1240)
+  Fusion-like 90-degree step means `NaviStepByTurn = 4`. — [src/Gui/NaviCube.cpp](/home/user/Fission180/src/Gui/NaviCube.cpp) (lines 113-120, 187, 549-616, 1186-1240)
 
 ### Inferences
 - Layout to copy (general shape only): four small flat triangles just outside the middle of each side of the
@@ -172,7 +172,7 @@ paper; it is not explicitly confirmed for Fusion by any text source found.
   cube, one per rotation direction. Each triangle rolls the view 90 degrees to the neighboring face; each curved
   arrow rolls the view 90 degrees about the line of sight. Show them only while a face is viewed straight on.
 - FreeCAD's NaviCube defaults (45-degree steps, a back-side dot, buttons drawn whenever the pointer is near) are
-  not Fusion-like; SciForge should set 90-degree steps and consider hiding the extra back-side dot.
+  not Fusion-like; Fission 180 should set 90-degree steps and consider hiding the extra back-side dot.
 
 ### Gaps
 - Fusion-specific confirmation that the triangles and curved arrows exist and appear only in face-on views:
@@ -196,7 +196,7 @@ FreeCAD's NaviCube does something different on drag (it moves the widget), so th
 - [FORUM] An Autodesk engineer suspected that dragging the view cube triggers a bug where the cube becomes
   unresponsive (not reproducible on demand). Context only. — [view cube becomes deactivated](https://forums.autodesk.com/t5/fusion-support-forum/view-cube-becomes-deactivated/m-p/11730892)
 - [LOCAL CODE] In FreeCAD's NaviCube, a drag on the cube (when `m_Draggable`) moves the widget's position on
-  screen (`m_RelPos`), it does not orbit the camera. — [src/Gui/NaviCube.cpp](/home/user/SciForge/src/Gui/NaviCube.cpp) (lines 1273-1287)
+  screen (`m_RelPos`), it does not orbit the camera. — [src/Gui/NaviCube.cpp](/home/user/Fission180/src/Gui/NaviCube.cpp) (lines 1273-1287)
 
 ### Inferences
 - A Fusion-like drag should orbit the camera around the model like the canvas orbit tool, with world-up kept
@@ -233,7 +233,7 @@ Home is an isometric corner view; which corner depends on the modeling orientati
 - "Fit to View" home: going Home re-fits the whole model in that direction (zoom changes with the model).
   "Fixed Distance" home: going Home restores the saved camera distance/zoom exactly. This reading matches the
   same option names in Inventor/Revit; Fusion's page lists the names but the meaning is inferred.
-- The Home view is per design (stored with the document) in Autodesk products; SciForge should store it in the
+- The Home view is per design (stored with the document) in Autodesk products; Fission 180 should store it in the
   FreeCAD document, not in user preferences.
 - The "Top, Right and Back" claim for Z-up is surprising (most users expect front-right-top). It may describe
   an older Fusion build or a misreading. Verify in current Fusion before copying.
@@ -271,7 +271,7 @@ camera options are shared with the Navigation bar's Display Settings camera cont
 
 ### Inferences
 - "Set current view as Front/Top" changes only how the cube is labeled/oriented relative to the model (and what
-  Front/Top clicks do), not the model geometry. "Reset Front" restores the default mapping. In SciForge this
+  Front/Top clicks do), not the model geometry. "Reset Front" restores the default mapping. In Fission 180 this
   should be a per-document rotation applied to the cube's reference frame.
 - Rough menu order to mirror (from the official list): Go Home / Camera submenu / Set current view as Home
   (two choices) / Reset Home / Set current view as [Face] / Reset [Face]. Use own wording, not Autodesk's.
@@ -314,7 +314,7 @@ XY and Top at XZ. Older tutorials and articles assume Y-up, so sources conflict 
   Top = camera above looking down -Z at XY (X right, +Y up on screen); Bottom = camera below looking up +Z.
 - Y-up mapping: Front = camera on the +Z side looking along -Z at the XY plane (X right, Y up); Top = camera
   above looking down -Y at XZ (X right, -Z up on screen); Right = camera on the +X side looking along -X at YZ.
-- FreeCAD is natively Z-up with the same Front = XZ convention, so SciForge's Z-up default needs no axis remap;
+- FreeCAD is natively Z-up with the same Front = XZ convention, so Fission 180's Z-up default needs no axis remap;
   supporting Y-up would be a cube-frame rotation, like "Set current view as Top".
 - Default Home in Z-up is most likely the front-right-top isometric (camera at +X, -Y, +Z), but see the
   conflicting forum claim in section 6.
@@ -345,10 +345,10 @@ for Fusion; those exist in AutoCAD, Inventor, Maya and 3ds Max.
   — [AutoCAD ViewCube Settings dialog](https://help.autodesk.com/cloudhelp/2016/ENU/AutoCAD-Core/files/GUID-78043EE2-114B-4F08-BFD7-7E5E429708A9.htm); [Inventor ViewCube Options reference](https://help.autodesk.com/cloudhelp/2019/ENU/Inventor-Help/files/GUID-F91783E5-41BC-46BC-B0CF-9D07FE75C574.htm); [Maya ViewCube preferences](https://help.autodesk.com/cloudhelp/2016/ENU/Maya/files/GUID-F8DD60C0-A955-4D51-9D3D-9FFE1E8D3D16.htm); [3ds Max ViewCube panel](https://help.autodesk.com/view/3DSMAX/2024/ENU/?guid=GUID-775D2B7E-3EFB-4769-94F8-0FCA49F2EE6C)
 - [RESEARCH/PATENT] A later Autodesk patent covers a "configurable viewcube controller" (details not read). — [US 9,043,707 Configurable viewcube controller (USPTO PDF)](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/9043707)
 - [LOCAL CODE] FreeCAD NaviCube already has parameters for corner position, offset, chamfer, step-by-turn,
-  rotate-to-nearest, hilite/base/emphasis colors, inactive opacity, label texts and fonts, and show-CS. — [src/Gui/NaviCube.cpp](/home/user/SciForge/src/Gui/NaviCube.cpp) (lines 263-377)
+  rotate-to-nearest, hilite/base/emphasis colors, inactive opacity, label texts and fonts, and show-CS. — [src/Gui/NaviCube.cpp](/home/user/Fission180/src/Gui/NaviCube.cpp) (lines 263-377)
 
 ### Inferences
-- A Fusion-faithful SciForge ViewCube needs only: show/hide toggle with a shortcut, projection choice shared with
+- A Fusion-faithful Fission 180 ViewCube needs only: show/hide toggle with a shortcut, projection choice shared with
   the bottom navigation bar, an "animate view transitions" switch, the per-document Home and face redefinition,
   and the modeling-orientation preference. Everything else can stay as fixed internal defaults.
 

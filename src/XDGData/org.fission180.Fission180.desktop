@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Fission 180
+Comment=Parametric CAD with the Fusion workflow, based on FreeCAD
+GenericName=CAD Application
+Exec=fission180 - --single-instance %F
+Terminal=false
+Type=Application
+Icon=org.fission180.Fission180
+Categories=Graphics;Science;Education;Engineering;
+StartupNotify=true
+StartupWMClass=Fission 180
+MimeType=application/x-extension-fcstd;model/obj;image/vnd.dwg;image/vnd.dxf;model/vnd.collada+xml;application/iges;model/iges;model/step;model/step+zip;model/stl;application/vnd.shp;model/vrml;

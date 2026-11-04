@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""FreeCAD opened in Fission 180 a second time (Luca, 2026-10-17: the second start showed only
+the browser and an empty view). Run twice with one profile by run_tests.sh:
+
+    FISSION180_SMOKE_OUT=/dir FISSION180_RESTART_PHASE=1 FreeCAD restart_gui.py
+    FISSION180_SMOKE_OUT=/dir FISSION180_RESTART_PHASE=2 FreeCAD restart_gui.py
+
+Each start checks that Fission 180's ribbon, document tabs bar and timeline are shown, that
+it opened on its Home tab with the browser closed and its AI column in the look's colour, then closes the window as a person does (FreeCAD saves its window
+layout then), and writes restart-<phase>.json. The first start saves a design and closes
+it; the second start's Home lists it first in Recent.
+"""
+
+import json
+import os
+import time
+
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide import QtWidgets
+
+from Fission180Tests.gui import harness as h
+
+OUT_DIR = os.environ.get("FISSION180_SMOKE_OUT") or App.getUserAppDataDir()
+PHASE = os.environ.get("FISSION180_RESTART_PHASE", "1")
+checks = []
+
+
+def check(name, ok, detail=""):
+    checks.append({"name": name, "ok": bool(ok), "detail": str(detail)})
+    print("[Fission 180] restart %s %s: %s %s" % (PHASE, "PASS" if ok else "FAIL", name, detail))
+
+
+def when_settled(fn, what, limit_s):
+    """fn() once FreeCAD's window is up and the app has settled (the harness's settling: no
+    recompute, no posted work, start-up done); after limit_s (a hang): a failed check naming
+    what kept it busy, then fn() all the same."""
+    calm = h._calm()
+    end = time.monotonic() + limit_s
+
+    def look():
+        main = Gui.getMainWindow()
+        if main is not None and main.isVisible() and calm():
+            fn()
+        elif time.monotonic() > end:
+            check("%s within %d s" % (what, limit_s), False, h.busy())
+            fn()
+        else:
+            h._later(h.POLL_MS, look)
+
+    h._later(0, look)
+
+
+def run():
+    main = Gui.getMainWindow()
+    try:
+        wb = Gui.activeWorkbench()
+        check("opens in Fission 180", wb is not None and wb.name() == "Fission180Workbench", wb)
+        ribbon = main.findChild(QtWidgets.QToolBar, "Fission180RibbonBar")
+        check("the ribbon is shown", ribbon is not None and ribbon.isVisible())
+        tabs = main.findChild(QtWidgets.QTabBar, "Fission180DocumentTabs")
+        check("the document tabs bar exists", tabs is not None)
+        timeline = main.findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
+        check("the timeline is shown", timeline is not None and timeline.isVisible())
+        check("FreeCAD's menu bar is hidden", not main.menuBar().isVisible())
+        from fission180 import home_ui
+
+        check("it opens on the Home tab", home_ui.view() is not None and home_ui.is_active())
+        from fission180 import browser_ui, theme
+
+        dock = browser_ui._state.get("dock")
+        # (Luca, 2026-10-19: the browser was open on Home at start)
+        check("the browser is closed on Home at start", dock is None or not dock.isVisible())
+        page = home_ui.view()
+        side = page.findChild(QtWidgets.QWidget, "Fission180HomeAI") if page else None
+        colour = None
+        if side is not None:
+            image = side.grab().toImage()
+            colour = image.pixelColor(image.width() // 2, 4).name()
+        # (... and Home's AI column white in the dark look on Windows)
+        check("Home's AI column is in the look's colour", colour == theme.CHROME, colour)
+        design = os.path.join(OUT_DIR, "RestartDesign.FCStd")
+        if PHASE == "1":
+            if os.path.exists(design):
+                os.remove(design)
+            doc = App.newDocument("RestartDesign")
+            doc.addObject("PartDesign::Body", "Body")
+            doc.recompute()
+            doc.saveAs(design)
+            App.closeDocument(doc.Name)
+        else:
+            page = home_ui.view()
+            names = (
+                [text.split("\n")[0] for _k, _key, _p, text, _s in page.items("recent")]
+                if page
+                else []
+            )
+            check(
+                "Home lists the design saved at the first start first",
+                names[:1] == ["RestartDesign"],
+                names,
+            )
+        try:
+            main.grab().save(os.path.join(OUT_DIR, "restart-%s.png" % PHASE))
+        except Exception:
+            pass
+    except Exception as exc:
+        check("no exception", False, exc)
+    with open(os.path.join(OUT_DIR, "restart-%s.json" % PHASE), "w") as handle:
+        json.dump({"passed": all(c["ok"] for c in checks), "checks": checks}, handle, indent=2)
+    # (FreeCAD saves the window layout when the window closes)
+    when_settled(main.close, "the app to settle before closing", h.WAIT_S)
+
+
+when_settled(run, "FreeCAD to start", 120)

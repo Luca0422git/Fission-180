@@ -166,9 +166,9 @@ LinearPattern::LinearPattern()
         "The distance between each instance of the pattern in the second direction. "
         "This is only used when the Mode is set to 'Spacing'."
     );
-    // SCIFORGE: was ({}), which picks setValue(double{}) and stores [0.0]: a custom
+    // FISSION180: was ({}), which picks setValue(double{}) and stores [0.0]: a custom
     // 0 mm first gap, so a 2D pattern in Spacing mode stacked its second row on the
-    // first. -1 means "use Offset2", matching Spacings. docs/sciforge/core-patches.md #4
+    // first. -1 means "use Offset2", matching Spacings. docs/fission180/core-patches.md #4
     ADD_PROPERTY_TYPE(
         Spacings2,
         ({-1.0}),

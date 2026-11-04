@@ -1,0 +1,44 @@
+# Deliberate naming differences between Fusion's command names (fusion-menus.txt) and
+# Fission 180's menu labels, read by tools/fission180/parity.py.
+#
+#   Fusion name = Fission 180 name
+#   Fusion name = Fission 180 name | another Fission 180 name      (the first one found counts)
+#   AREA > Panel > Fusion name = Fission 180 name               (only for that place: the left
+#                                                             side is the end of the path)
+#
+# Case, spaces round "/" and a trailing "..." do not matter. Only map a name when Fission 180's
+# entry really is that command (an honest checklist beats a high number); a unit test checks
+# that every line here still matches a Fusion name and a Fission 180 label.
+
+# Browser and timeline: Fission 180's labels for the same entries
+Activate Component = Activate
+Drive Joint = Drive Joints
+BROWSER > Analysis > Edit = Edit Feature
+Do Not Capture Design History = Capture Design History
+FILE MENU > New Drawing > From Design = New Drawing
+
+# Timeline playback buttons (Fission 180's tooltips)
+Move to Beginning = Go to beginning
+Play = Play the history
+Move to End = Go to end
+
+# Ribbon
+# One Fission 180 entry does both of Fusion's (parity/inspect.md: a click on a face uses the
+# clicked spot, a second pick sets the point)
+Axis Perpendicular at Point = Axis Perpendicular to Face at Point
+Revert = Revert Position
+Edit Title Block = Title Block
+Insert Fastener = Hardware
+# Fission 180's sketch Chamfer has Fusion's three chamfer types in one dialog (sf/modeling-2)
+Equal Distance Chamfer = Chamfer
+Distance and Angle Chamfer = Chamfer
+Two Distance Chamfer = Chamfer
+
+# Marking menus
+MARKING MENU > Overflow list > Show/Hide = Hide
+
+# SHEET METAL / PLASTIC (wave 6, parity/sheet-metal*.md, parity/plastic.md)
+# One Flange command: an open profile makes a contour flange (parity/sheet-metal.md)
+Contour Flange = Flange
+Refold Faces = Refold
+PLASTIC > MODIFY > Plastic Rules = Manage Plastic Rules

@@ -34,8 +34,8 @@ These typically need to be modified for each FreeCAD release
 
 #--------------------------------
 # get version info from freecadcmd
-# SCIFORGE: the program is SciForgeCmd.exe; it reports ExeName = SciForge (APP_NAME)
-!system '${FILES_FREECAD}\bin\SciForgeCmd.exe --safe-mode "${__FILEDIR__}\write_version_nsh.py"' = 0
+# FISSION180: the program is Fission180Cmd.exe; it reports ExeName = Fission 180 (APP_NAME)
+!system '${FILES_FREECAD}\bin\Fission180Cmd.exe --safe-mode "${__FILEDIR__}\write_version_nsh.py"' = 0
 !include "${__FILEDIR__}\version.nsh"
 !delfile "${__FILEDIR__}\version.nsh"
 
@@ -44,7 +44,7 @@ These typically need to be modified for each FreeCAD release
 !define APP_EMERGENCY_DOT "" # use "." for an emergency release of FreeCAD otherwise ""
 !define APP_VERSION_BUILD 1 # Start with 1 for the installer releases of each version
 
-# SCIFORGE: SciForge's own version, e.g. "0.1.0-beta" (written by write_version_nsh.py)
+# FISSION180: Fission 180's own version, e.g. "0.1.0-beta" (written by write_version_nsh.py)
 !define APP_VERSION "${APP_VERSION_DISPLAY}" # Version to display
 
 #--------------------------------

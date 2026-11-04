@@ -41,10 +41,10 @@
 #include "TopoShapeFacePy.h"
 
 
-// SCIFORGE: the orders are documented as 0 -> C0, 1 -> G1, 2 -> G2, but a plain cast of 2
+// FISSION180: the orders are documented as 0 -> C0, 1 -> G1, 2 -> G2, but a plain cast of 2
 // gave GeomAbs_C1 (GeomAbs_Shape runs C0, G1, C1, G2, ...), which BRepFill_Filling ignores:
 // a "curvature" patch came out flat. 3 is accepted as G2 too, so a script can tell that
-// this fix is there (SciForge's Patch does; docs/sciforge/core-patches.md #14).
+// this fix is there (Fission 180's Patch does; docs/fission180/core-patches.md #14).
 static bool fillingOrder(int order, GeomAbs_Shape& cont)
 {
     switch (order) {
@@ -323,7 +323,7 @@ PyObject* BRepOffsetAPI_MakeFillingPy::add(PyObject* args, PyObject* kwds)
             }
 
             GeomAbs_Shape cont {};
-            if (!fillingOrder(order, cont)) {  // SCIFORGE: core patch #14 (fillingOrder)
+            if (!fillingOrder(order, cont)) {  // FISSION180: core patch #14 (fillingOrder)
                 PyErr_SetString(
                     PyExc_ReferenceError,
                     "Order must be in the [0, 2] with 0 -> C0, 1 -> G1, 2 -> G2"
@@ -366,7 +366,7 @@ PyObject* BRepOffsetAPI_MakeFillingPy::add(PyObject* args, PyObject* kwds)
             }
 
             GeomAbs_Shape cont {};
-            if (!fillingOrder(order, cont)) {  // SCIFORGE: core patch #14 (fillingOrder)
+            if (!fillingOrder(order, cont)) {  // FISSION180: core patch #14 (fillingOrder)
                 PyErr_SetString(
                     PyExc_ReferenceError,
                     "Order must be in the [0, 2] with 0 -> C0, 1 -> G1, 2 -> G2"
@@ -418,7 +418,7 @@ PyObject* BRepOffsetAPI_MakeFillingPy::add(PyObject* args, PyObject* kwds)
             }
 
             GeomAbs_Shape cont {};
-            if (!fillingOrder(order, cont)) {  // SCIFORGE: core patch #14 (fillingOrder)
+            if (!fillingOrder(order, cont)) {  // FISSION180: core patch #14 (fillingOrder)
                 PyErr_SetString(
                     PyExc_ReferenceError,
                     "Order must be in the [0, 2] with 0 -> C0, 1 -> G1, 2 -> G2"
@@ -461,7 +461,7 @@ PyObject* BRepOffsetAPI_MakeFillingPy::add(PyObject* args, PyObject* kwds)
             }
 
             GeomAbs_Shape cont {};
-            if (!fillingOrder(order, cont)) {  // SCIFORGE: core patch #14 (fillingOrder)
+            if (!fillingOrder(order, cont)) {  // FISSION180: core patch #14 (fillingOrder)
                 PyErr_SetString(
                     PyExc_ReferenceError,
                     "Order must be in the [0, 2] with 0 -> C0, 1 -> G1, 2 -> G2"

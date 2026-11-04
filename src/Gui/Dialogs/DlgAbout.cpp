@@ -229,14 +229,14 @@ void AboutDialog::setupLabels()
     }
 
     QString version = ui->labelBuildVersion->text();
-    // SCIFORGE: SciForge's own version first, then the FreeCAD it is based on (patch #15)
-    QString sciforgeVersion = QString::fromStdString(config["SciForgeVersion"]);
+    // FISSION180: Fission 180's own version first, then the FreeCAD it is based on (patch #15)
+    QString fission180Version = QString::fromStdString(config["Fission180Version"]);
     QString freecadVersion = QStringLiteral("%1.%2.%3%4").arg(major, minor, point, suffix);
     version.replace(
         QStringLiteral("Unknown"),
-        sciforgeVersion.isEmpty()
+        fission180Version.isEmpty()
             ? freecadVersion
-            : QStringLiteral("%1 (based on FreeCAD %2)").arg(sciforgeVersion, freecadVersion)
+            : QStringLiteral("%1 (based on FreeCAD %2)").arg(fission180Version, freecadVersion)
     );
     ui->labelBuildVersion->setText(version);
 

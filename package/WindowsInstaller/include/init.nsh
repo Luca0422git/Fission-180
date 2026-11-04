@@ -91,8 +91,8 @@ Section "!${APP_NAME}" SecCore
  SectionIn RO
 SectionEnd
 
-# SCIFORGE: off by default (/o), so a FreeCAD on the same machine keeps opening .FCStd
-# files unless the user ticks it (docs/sciforge/core-patches.md #13).
+# FISSION180: off by default (/o), so a FreeCAD on the same machine keeps opening .FCStd
+# files unless the user ticks it (docs/fission180/core-patches.md #13).
 Section /o "$(SecFileAssocTitle)" SecFileAssoc
  StrCpy $CreateFileAssociations "true"
 SectionEnd
@@ -184,9 +184,9 @@ Function un.onInit
   Pop $R1
   Pop $R0
 
-  # SCIFORGE: SciForge's AI connector (its own python.exe, kept running by Claude Desktop) is
-  # stopped first, or the uninstall leaves its files behind (docs/sciforge/core-patches.md #19)
-  Call un.SciForgeFolderFree
+  # FISSION180: Fission 180's AI connector (its own python.exe, kept running by Claude Desktop) is
+  # stopped first, or the uninstall leaves its files behind (docs/fission180/core-patches.md #19)
+  Call un.Fission180FolderFree
   Pop $R0
   ${if} $R0 != "ok"
    Abort

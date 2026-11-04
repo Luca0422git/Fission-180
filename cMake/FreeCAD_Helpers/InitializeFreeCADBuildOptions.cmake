@@ -100,27 +100,27 @@ macro(InitializeFreeCADBuildOptions)
     endif(APPLE)
 
     option(BUILD_FEM "Build the FreeCAD FEM module" ON)
-    # SCIFORGE: SciForge's own module (docs/sciforge/core-patches.md #3).
-    option(BUILD_SCIFORGE "Build the SciForge module (Fusion-style interface layer)" ON)
-    # SCIFORGE: the fork's identity for the build system: the program names (src/Main), the
+    # FISSION180: Fission 180's own module (docs/fission180/core-patches.md #3).
+    option(BUILD_FISSION180 "Build the Fission 180 module (Fusion-style interface layer)" ON)
+    # FISSION180: the fork's identity for the build system: the program names (src/Main), the
     # Windows version resource and the Linux desktop entry (src/XDGData, src/Gui). The C++
-    # side keeps the same names in src/Main/SciForgeBranding.h (core-patches.md #8, #9).
-    set(SCIFORGE_APP_NAME "SciForge")
-    set(SCIFORGE_DESKTOP_ID "org.sciforge.SciForge")
-    set(SCIFORGE_URL "https://github.com/Luca0422git/SciForge")
-    # SCIFORGE: the one place SciForge's own version is written, e.g. "0.1.0-beta"
-    # (src/Mod/SciForge/VERSION). The Python side reads the same file; CMake hands it to the
+    # side keeps the same names in src/Main/Fission180Branding.h (core-patches.md #8, #9).
+    set(FISSION180_APP_NAME "Fission180")
+    set(FISSION180_DESKTOP_ID "org.fission180.Fission180")
+    set(FISSION180_URL "https://github.com/Luca0422git/Fission-180")
+    # FISSION180: the one place Fission 180's own version is written, e.g. "0.1.0-beta"
+    # (src/Mod/Fission180/VERSION). The Python side reads the same file; CMake hands it to the
     # programs (src/Main) and the Windows version resource (core-patches.md #15).
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        "${CMAKE_SOURCE_DIR}/src/Mod/SciForge/VERSION")
-    file(STRINGS "${CMAKE_SOURCE_DIR}/src/Mod/SciForge/VERSION" SCIFORGE_VERSION LIMIT_COUNT 1)
-    string(STRIP "${SCIFORGE_VERSION}" SCIFORGE_VERSION)
-    if(NOT SCIFORGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[0-9A-Za-z.]+)?$")
-        message(FATAL_ERROR "src/Mod/SciForge/VERSION must look like 0.1.0 or 0.1.0-beta.2, not '${SCIFORGE_VERSION}'")
+        "${CMAKE_SOURCE_DIR}/src/Mod/Fission180/VERSION")
+    file(STRINGS "${CMAKE_SOURCE_DIR}/src/Mod/Fission180/VERSION" FISSION180_VERSION LIMIT_COUNT 1)
+    string(STRIP "${FISSION180_VERSION}" FISSION180_VERSION)
+    if(NOT FISSION180_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[0-9A-Za-z.]+)?$")
+        message(FATAL_ERROR "src/Mod/Fission180/VERSION must look like 0.1.0 or 0.1.0-beta.2, not '${FISSION180_VERSION}'")
     endif()
-    set(SCIFORGE_VERSION_MAJOR "${CMAKE_MATCH_1}")
-    set(SCIFORGE_VERSION_MINOR "${CMAKE_MATCH_2}")
-    set(SCIFORGE_VERSION_PATCH "${CMAKE_MATCH_3}")
+    set(FISSION180_VERSION_MAJOR "${CMAKE_MATCH_1}")
+    set(FISSION180_VERSION_MINOR "${CMAKE_MATCH_2}")
+    set(FISSION180_VERSION_PATCH "${CMAKE_MATCH_3}")
     option(BUILD_SANDBOX "Build the FreeCAD Sandbox module which is only for testing purposes" OFF)
     option(BUILD_TEMPLATE "Build the FreeCAD template module which is only for testing purposes" OFF)
     option(BUILD_ADDONMGR "Build the FreeCAD addon manager module" ON)

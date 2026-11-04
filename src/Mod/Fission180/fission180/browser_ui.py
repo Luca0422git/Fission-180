@@ -1,0 +1,2455 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""The Fusion-style BROWSER panel on the left (replaces FreeCAD's tree while on).
+
+Each row: expand arrow, eye (show/hide), icon, name. Click selects (also in the
+3D view, and a selection made in the 3D view shows here), double-click edits a
+sketch or construction plane or activates a body, hover lights the object up in
+the 3D view, F2 or a second click on the selected row's name renames (after the
+double-click time, like Fusion and Windows Explorer), Delete deletes, right click
+opens Fusion's menu for that kind of row. A body with nothing solid in it yet is
+not listed (Fusion has no body before the first solid feature). Structure:
+browser_core.py; deleting goes through timeline_ops.py (one undo step, later steps
+kept working where possible).
+"""
+
+import time
+
+import FreeCAD as App
+import FreeCADGui as Gui
+
+from . import _remember, browser_core as core
+from . import commands, components, doc_epoch, hover_ghost, selectable, theme
+from . import timeline_ops as ops
+from . import ui_icon, warn
+from .compat import QtCore, QtGui, QtWidgets
+from .inline_edit import InlineEditor
+
+ROLE_NODE = QtCore.Qt.UserRole
+EYE = 18  # width of the eye area at the start of a row
+RADIO = 14  # the activate mark at the end of a component row (Fusion's radio button)
+META_VIEW = "Fission180.NamedView."
+# Rows that can be dragged onto a component (or the design's row) to move them there, and
+# the rows they can be dropped on.
+DRAGGABLE = ("body", "component")
+# the rows that carry a Selectable/Unselectable switch (selectable.py)
+SELECTABLE_TYPES = core.BODY_TYPES | core.MESH_TYPES | core.COMPONENT_TYPES
+DROP_TARGETS = ("component", "document")
+# The SIMULATION workspace's rows (simulation_browser.py, beta 3) that can be renamed.
+SIM_RENAMABLE = ("sim_study", "sim_item", "sim_document")
+
+
+def _simulation_tree(doc):
+    """The study tree while the design is in the SIMULATION workspace, else None."""
+    try:
+        from . import simulation_ui
+
+        if not simulation_ui.in_workspace(doc):
+            return None
+        from . import simulation_browser
+
+        return simulation_browser.tree(doc)
+    except Exception as exc:
+        warn("simulation browser: %s" % exc)
+        return None
+
+
+def _simulation_call(name, *args):
+    """simulation_browser.<name>(*args), never raising."""
+    try:
+        from . import simulation_browser
+
+        return getattr(simulation_browser, name)(*args)
+    except Exception as exc:
+        warn("simulation browser: %s" % exc)
+        return None
+
+
+def _rename_mesh_body(doc, obj, text):
+    """A mesh body's name is carried by every step of its history (mesh.py): one undo step."""
+    from . import mesh
+
+    doc.openTransaction("Rename %s" % obj.Label)
+    try:
+        mesh.rename_body(obj, text)
+    except Exception as exc:
+        warn("browser rename: %s" % exc)
+    doc.commitTransaction()
+    try:
+        App.closeActiveTransaction()
+    except Exception:
+        pass
+
+
+def _isolated_names(doc):
+    from . import components_ui
+
+    return components_ui.ISOLATED.get(doc.Name if doc else None)
+
+
+def _used_up_bodies(doc):
+    """Bodies a Combine (without Keep Tools) has used up: Fusion takes them out of the
+    browser. While a body-tool dialog is open they stay, so they can be picked here."""
+    try:
+        from . import bodies
+
+        if doc.Name in bodies.PAUSED:
+            return set()
+        return bodies.consumed(doc)
+    except Exception:
+        return set()
+
+
+def _joints():
+    from . import joints
+
+    return joints
+
+
+def _exchange_action(name, arg):
+    """Save As DXF / Save As Mesh / Break Link (exchange_ui), run after the menu closed."""
+    try:
+        from . import exchange_core, exchange_ui
+
+        getattr(exchange_ui, name)(arg)
+    except exchange_core.ExchangeError as exc:
+        commands.tell(str(exc))
+    except Exception as exc:
+        warn("%s: %s" % (name.replace("_", " "), exc))
+
+
+def _flat_pattern_export(obj):
+    """Right-click a Flat Pattern > Export DXF (sheet metal, flatpattern_ui)."""
+    try:
+        from . import flatpattern_ui
+
+        flatpattern_ui.export_dialog(obj)
+    except Exception as exc:
+        warn("flat pattern export: %s" % exc)
+
+
+def _flat_pattern_toggle(obj, prop):
+    try:
+        from . import flatpattern_ui
+
+        flatpattern_ui.toggle(obj, prop)
+    except Exception as exc:
+        warn("flat pattern lines: %s" % exc)
+
+
+def _is_linked(obj):
+    try:
+        from . import design_insert
+
+        return design_insert.is_linked(obj)
+    except Exception:
+        return False
+
+
+# (beta 3 QA) a body being rebuilt: its right-click has the rebuild's own entries instead of
+# Rebuild with Timeline (AI)... (which refused it: "the rebuild of ..."), as the 3D view's has
+REBUILD_ENTRIES = (
+    ("Compare with Reference", "Fission180_CompareReference"),
+    ("Finish Rebuild", "Fission180_FinishRebuild"),
+    ("Stop Rebuild...", "Fission180_StopRebuild"),
+)
+
+
+def _rebuilt_body(obj):
+    """Whether obj is the body a rebuild going on is made in."""
+    try:
+        from . import rebuild
+
+        ref = rebuild.reference_for(obj)
+        return (
+            ref is not None
+            and getattr(ref, "Shown", True)
+            and getattr(ref, "TargetName", "") == obj.Name
+        )
+    except Exception:
+        return False
+
+
+def _settings_rows(doc):
+    """Rows under Document Settings beside Units: the design's active sheet metal rule, once
+    the design uses sheet metal (a click opens Sheet Metal Rules)."""
+    try:
+        from . import sheetmetal
+
+        if sheetmetal.rules_object(doc) is None and not sheetmetal.sheet_metal_bodies(doc):
+            return ()
+        name = sheetmetal.active_rule_name(doc, components.active_component(doc))
+        return (
+            (
+                "settings:sheet_metal",
+                "Sheet Metal Rule: %s" % name,
+                "sm_rules",
+                "sheet_metal_rule",
+                "Click to open Sheet Metal Rules",
+            ),
+        )
+    except Exception:
+        return ()
+
+
+def _plastic_rows(doc):
+    """Rows under Document Settings: the plastic rule of the active component, once the
+    design uses plastic rules (a click opens Assign Plastic Rule). plastic-1, wave 6."""
+    try:
+        from . import plastic
+
+        if plastic.rules_object(doc) is None:
+            return ()
+        component = components.active_component(doc)
+        name = plastic.assigned_rule_name(doc, component) or "none"
+        return (
+            (
+                "settings:plastic",
+                "Plastic Rule: %s" % name,
+                "pl_assign",
+                "plastic_rule",
+                "The active component's plastic rule. Click to assign one",
+            ),
+        )
+    except Exception:
+        return ()
+
+
+def _empty_body(body):
+    """A body with nothing solid in it yet (bodies.is_empty: the one Create Sketch makes
+    for a new design's first sketch): Fusion lists no body until the first solid feature.
+    The body a rebuild is made in stays listed from the start (its right-click holds the
+    rebuild's own entries, REBUILD_ENTRIES)."""
+    try:
+        from . import bodies
+
+        return bodies.is_empty(body) and not _rebuilt_body(body)
+    except Exception:
+        return False
+
+
+def _is_surface_body(body):
+    try:
+        from . import surface
+
+        return surface.is_surface_body(body)
+    except Exception:
+        return False
+
+
+def _grounded_names(doc):
+    try:
+        return {g.ObjectToGround.Name for g in _joints().grounds(doc) if g.ObjectToGround}
+    except Exception:
+        return set()
+
+
+def _joint_row(row, obj):
+    """What the browser's Joints / Joint Origins folders need to know about a joint."""
+    kind = row.get("fission180_type") or ""
+    if kind not in core.JOINT_TYPES and kind != "JointOrigin":
+        return
+    try:
+        joints = _joints()
+        if kind in ("Joint", "AsBuiltJoint"):
+            row["joint_type"] = joints.fusion_type(obj)
+            row["describe"] = joints.describe(obj)
+        if ops.is_suppressed(obj):
+            row["suppressed"] = True
+        else:
+            problem, reason = ops.problem(obj)
+            if problem:
+                row[problem] = reason
+    except Exception:
+        pass
+
+
+def _objects(doc):
+    rows = []
+    used_up = _used_up_bodies(doc)
+    grounded = _grounded_names(doc)
+    marker_hidden = _marker_hidden(doc)
+    origins = _origin_index(doc)  # (vex: each Origin looked at once, not per plane)
+    for obj in doc.Objects:
+        if obj.Name in used_up:
+            continue
+        try:
+            if _never_a_row(obj, origins):
+                continue
+            if marker_hidden and _in_hidden(obj, marker_hidden):
+                continue  # a component made after the history marker does not exist yet
+            if obj.TypeId in ORIGIN_FEATURE_TYPES:
+                rows.append(_origin_row(obj, origins))  # (thousands in a robot: the short way)
+                continue
+            parent = obj.getParentGeoFeatureGroup()
+            visible = obj.ViewObject.Visibility if obj.ViewObject is not None else None
+            if visible is not None and getattr(obj, "Role", None) in core.ORIGIN_ROLES:
+                visible = _origin_visible(obj)
+            container = components.container_of(obj)
+            row = {
+                "name": obj.Name,
+                "label": obj.Label,
+                "type_id": obj.TypeId,
+                "visible": visible,
+                "body": (
+                    parent.Name
+                    if parent is not None and parent.TypeId == "PartDesign::Body"
+                    else None
+                ),
+                "role": getattr(obj, "Role", None),
+                "fission180_type": getattr(obj, "Fission180Type", ""),
+                # The component the row is in (None: the root); a component's own row
+                # carries its parent component, like any other member.
+                "component": container.Name if container is not None else None,
+                "grounded": obj.Name in grounded,
+            }
+            if obj.TypeId in SELECTABLE_TYPES:  # Selectable/Unselectable (selectable.py)
+                row["selectable"] = selectable.get(obj)
+            _joint_row(row, obj)
+            if row["fission180_type"] == "FlatPattern":  # sheet metal: the flat's size
+                try:
+                    row["describe"] = "Flat %.2f x %.2f mm, %d bend(s)" % (
+                        obj.FlatLength.Value,
+                        obj.FlatWidth.Value,
+                        obj.BendCount,
+                    )
+                except Exception:
+                    pass
+            try:
+                from . import sketch_companions
+
+                sketch = sketch_companions.owner(obj)
+                if sketch is not None:  # listed under its sketch (Project to Surface, 3D)
+                    row["owner_sketch"] = sketch.Name
+            except Exception:
+                pass
+            if obj.TypeId in core.MESH_TYPES:
+                note = _mesh_note(obj)  # Fusion's warning beside a mesh body that is not closed
+                if note:
+                    row[note[0]] = note[1]
+            if obj.TypeId in core.BODY_TYPES and _empty_body(obj):
+                row["empty"] = True  # nothing solid yet: no row (Fusion, browser_core)
+            if obj.TypeId in core.BODY_TYPES and _is_surface_body(obj):
+                row["surface"] = True  # the surface icon (surface.py)
+            if obj.TypeId in core.BODY_TYPES and getattr(obj, "Fission180SheetMetalRule", ""):
+                row["sheet_metal"] = obj.Fission180SheetMetalRule  # bent-sheet icon (sheetmetal.py)
+            if getattr(obj, "Fission180ComponentKind", "") == "SheetMetal":
+                row["sheet_metal_component"] = True  # Type Sheet Metal (sheetmetal_component)
+            if obj.TypeId == "Sketcher::SketchObject":
+                from . import sketch_explain
+
+                row["locked"] = sketch_explain.fully_constrained(obj)  # read, not solved
+            if obj.TypeId in core.SKETCH_TYPES or obj.TypeId in core.CONSTRUCTION_TYPES:
+                if ops.is_suppressed(obj):
+                    row["suppressed"] = True  # off, not broken: greyed, like Fusion
+                else:
+                    kind, reason = ops.problem(obj)
+                    if kind:
+                        row[kind] = reason
+            rows.append(row)
+        except Exception:
+            continue
+    _timeline_names(doc, rows)
+    _instance_names(doc, rows)
+    return rows
+
+
+ORIGIN_FEATURE_TYPES = ("App::Origin", "App::Line", "App::Plane", "App::Point")
+# The timer's read of the design waits this many times as long as the last read took: on a
+# design whose read takes a second (a VEX robot of 300 parts) dragging or driving a joint is
+# not stopped by a read every half second; small designs (a read of 30 ms) are read as often
+# as before. Commands still refresh the browser at once (refresh()).
+POLL_PAUSE = 4.0
+
+
+def _never_a_row(obj, origins=None):
+    """Objects the browser never lists, passed over before their row is read (speed: a VEX
+    robot of 300 parts has 6000 objects, most of them its occurrences' origins and copy
+    steps; browser_core drops these rows anyway): a body's first step (FeatureBase), an
+    occurrence's copy step, the origin planes / axes of a body inside a component (the
+    component's own origin is listed, the root's shows a body's). `origins`:
+    _origin_index (the answer for origin planes without asking FreeCAD for each)."""
+    tid = obj.TypeId
+    if tid == "PartDesign::FeatureBase":
+        return True
+    if tid == "Part::FeaturePython":
+        return getattr(obj, "Fission180Type", "") == "InstanceCopy"
+    if tid in ORIGIN_FEATURE_TYPES:
+        known = origins.get(obj.Name) if origins else None
+        if known is not None:
+            return known[3]
+        owner = obj.getParentGeoFeatureGroup()
+        return (
+            owner is not None
+            and owner.TypeId == "PartDesign::Body"
+            and owner.getParentGeoFeatureGroup() is not None
+        )
+    return False
+
+
+def _row_data(node):
+    """What a row's item keeps of its node: all but its children (the child items hold
+    those). Qt copies an item's data in and out on every read, and the design's row held the
+    whole tree: a robot's 3300 rows spent 0.25 s a refresh on that (speed, beta 3). What needs
+    the children asks _with_children."""
+    return {k: v for k, v in node.items() if k != "children"}
+
+
+def _with_children(tree, node):
+    """A row's node as the tree holds it, with its children (its item keeps none)."""
+    if node is None or "children" in node:
+        return node
+    found = core.find(tree, node.get("key")) if tree is not None else None
+    return found if found is not None else dict(node, children=[])
+
+
+def _origin_index(doc):
+    """{an Origin's or its plane / axis / point's name: (the Origin, the Origin's parent, the
+    component it is in, never a row)}, worked out once per Origin for _never_a_row and
+    _origin_row (a robot of 300 parts has 600 Origins and 4200 planes, axes and points)."""
+    index = {}
+    try:
+        origins = doc.findObjects("App::Origin")
+    except Exception:
+        return index
+    for origin in origins:
+        try:
+            parent = origin.getParentGeoFeatureGroup()
+            container = parent
+            while container is not None and container.TypeId != "App::Part":
+                container = container.getParentGeoFeatureGroup()
+            # a body's origin inside a component: not listed (the component's own is)
+            hidden = (
+                parent is not None
+                and parent.TypeId == "PartDesign::Body"
+                and parent.getParentGeoFeatureGroup() is not None
+            )
+            known = (origin, parent, container, hidden)
+            index[origin.Name] = known
+            for feature in origin.OriginFeatures:
+                index[feature.Name] = known
+        except Exception:
+            continue
+    return index
+
+
+def _origin_row(obj, origins=None):
+    """The row of an origin plane / axis / point (or of the Origin): what _objects reads for
+    any object, without the questions that never apply to one (joints, sketches, meshes,
+    sheet metal...): a robot of 300 parts lists 2400 of them. `origins`: _origin_index."""
+    known = origins.get(obj.Name) if origins else None
+    vobj = obj.ViewObject
+    visible = vobj.Visibility if vobj is not None else None
+    role = getattr(obj, "Role", None)
+    if known is not None:
+        origin, parent, container, _hidden = known
+        if visible is not None and role in core.ORIGIN_ROLES:
+            shown = origin.ViewObject
+            visible = bool(visible and (shown is None or shown.Visibility))
+    else:
+        parent = obj.getParentGeoFeatureGroup()
+        if visible is not None and role in core.ORIGIN_ROLES:
+            visible = _origin_visible(obj)
+        container = parent
+        while container is not None and container.TypeId != "App::Part":
+            container = container.getParentGeoFeatureGroup()
+    return {
+        "name": obj.Name,
+        "label": obj.Label,
+        "type_id": obj.TypeId,
+        "visible": visible,
+        "body": (
+            parent.Name if parent is not None and parent.TypeId == "PartDesign::Body" else None
+        ),
+        "role": role,
+        "fission180_type": getattr(obj, "Fission180Type", ""),
+        "component": container.Name if container is not None else None,
+        "grounded": False,
+    }
+
+
+def _component_rename(obj, text):
+    """Renaming an occurrence renames the component (Fusion: all its occurrences take the
+    new name); the ":n" after the name is the occurrence number, not part of the name."""
+    from . import components_core
+
+    base, number = components_core.split_instance_label(text)
+    try:
+        from . import instances
+
+        if number is not None and (instances.is_instance(obj) or instances.has_instances(obj)):
+            text = base
+        if instances.is_instance(obj):
+            source = instances.source_of(obj)
+            if source is not None:
+                return source, text
+    except Exception:
+        pass
+    return obj, text
+
+
+def _marker_hidden(doc):
+    """Components the history marker hides (made after it): timeline_ops.hide_by_marker; and
+    mesh steps after it (timeline_ops.follow_mesh_steps): their body is listed as it was."""
+    return {
+        o.Name
+        for o in doc.Objects
+        if (o.TypeId == "App::Part" and getattr(o, ops.ROLLED_HIDDEN, False))
+        or getattr(o, ops.ROLLED_BACK, False)
+    }
+
+
+def _in_hidden(obj, hidden):
+    if obj.Name in hidden:
+        return True
+    try:
+        return any(c.Name in hidden for c in components.ancestors(obj))
+    except Exception:
+        return False
+
+
+def _instance_names(doc, rows):
+    """Fusion names every occurrence "<component>:<n>": once a component has instances
+    (Paste, a pattern of components) its own row reads "<name>:1"; the instances carry
+    their number in their own name."""
+    try:
+        from . import instances
+    except Exception:
+        return
+    # one pass over the occurrences (not one per component: hundreds of occurrences)
+    named = set()
+    for part in doc.Objects:
+        try:
+            if part.TypeId != "App::Part" or not instances.is_instance(part):
+                continue
+            # copies the history marker hides do not exist at the marker (a pattern after it)
+            if ops.hidden_by_marker(part):
+                continue
+            source = instances.source_of(part)
+            if source is not None:
+                named.add(source.Name)
+        except Exception:
+            continue
+    for row in rows:
+        if row["type_id"] != "App::Part" or row["name"] not in named:
+            continue
+        obj = doc.getObject(row["name"])
+        try:
+            if obj is None or instances.is_instance(obj):
+                continue
+            row["display"] = "%s:1" % obj.Label
+        except Exception:
+            continue
+
+
+def _history_command(doc):
+    try:
+        from . import direct
+
+        if doc is not None and direct.is_direct(doc):
+            return "Fission180_CaptureDesignHistory"
+    except Exception:
+        pass
+    return "Fission180_DoNotCaptureDesignHistory"
+
+
+def _history_label(doc):
+    try:
+        from . import direct, direct_core
+
+        return direct_core.history_menu_label(not direct.is_direct(doc))
+    except Exception:
+        return "Do Not Capture Design History"
+
+
+def _can_remove(doc):
+    try:
+        from . import direct
+
+        return doc is not None and not direct.is_direct(doc)
+    except Exception:
+        return True
+
+
+def _run_command(name):
+    try:
+        Gui.runCommand(name)
+    except Exception as exc:
+        warn("%s failed: %s" % (name, exc))
+
+
+def _mesh_note(obj):
+    try:
+        from . import mesh
+
+        return mesh.browser_note(obj)
+    except Exception:
+        return None
+
+
+def _timeline_names(doc, rows):
+    """Sketches and construction are called what the timeline calls them ("Sketch 2",
+    "Plane 1"), like Fusion, where both show one name; FreeCAD's labels ("Sketch001") are
+    kept for looking rows up."""
+    try:
+        kinds = core.SKETCH_TYPES | core.CONSTRUCTION_TYPES
+        names = ops.display_names(doc, [o for o in doc.Objects if o.TypeId in kinds])
+        for row in rows:
+            if row["name"] in names:
+                row["display"] = names[row["name"]]
+    except Exception as exc:
+        _remember("info", "browser: FreeCAD's names shown: %s" % exc)
+
+
+def _origin_of(feature):
+    for parent in feature.InList:
+        if parent.TypeId == "App::Origin":
+            return parent
+    return None
+
+
+def _origin_visible(feature):
+    """What you see: an origin plane shows only if it and its Origin are both on."""
+    origin = _origin_of(feature)
+    shown = feature.ViewObject.Visibility
+    if origin is not None and origin.ViewObject is not None:
+        shown = shown and origin.ViewObject.Visibility
+    return bool(shown)
+
+
+def _show_origin_feature(feature, visible, only=False):
+    """Show/hide one origin plane/axis. FreeCAD shows them through their Origin, which
+    shows all of them: turning one on alone turns the others off first."""
+    origin = _origin_of(feature)
+    if visible and origin is not None and origin.ViewObject is not None:
+        if not origin.ViewObject.Visibility:
+            if only:
+                for other in origin.OriginFeatures:
+                    if other is not feature and other.ViewObject is not None:
+                        other.ViewObject.Visibility = False
+            origin.ViewObject.Visibility = True
+    feature.ViewObject.Visibility = visible
+    if not visible and origin is not None and origin.ViewObject is not None:
+        if not any(f.ViewObject.Visibility for f in origin.OriginFeatures if f.ViewObject):
+            origin.ViewObject.Visibility = False
+
+
+def units(doc):
+    """Fusion's short unit name for the document ("mm")."""
+    try:
+        schema = doc.getEnumerationsOfProperty("UnitSystem").index(doc.UnitSystem)
+    except Exception:
+        try:
+            schema = App.Units.getSchema()
+        except Exception:
+            return "mm"
+    return core.unit_label(schema) or "mm"
+
+
+def saved_views(doc):
+    try:
+        meta = doc.Meta
+    except Exception:
+        return []
+    return sorted(k[len(META_VIEW) :] for k in meta if k.startswith(META_VIEW))
+
+
+def _edit_object(obj):
+    from . import taskui
+
+    try:
+        body = ops.body_of(obj)
+        if body is not None:
+            components.activate_body(body)  # and its component
+    except Exception:
+        pass
+    taskui.edit_object(obj)
+
+
+def _open_drawing(page):
+    from . import drawing_ui
+
+    drawing_ui.open_drawing(page)
+
+
+def _delete_drawings(doc, names):
+    """Delete whole drawings (their views, dimensions and sheet), one undo step."""
+    from . import drawing, drawing_sheets, drawing_ui
+
+    tab = drawing_ui.active_tab()
+    # every sheet of each drawing (drawing_sheets.py)
+    pages = []
+    for name in names:
+        page = doc.getObject(name)
+        if page is not None:
+            for sheet in drawing_sheets.sheets(page):
+                if sheet.Name not in pages:
+                    pages.append(sheet.Name)
+    for name in pages:
+        page = doc.getObject(name)
+        if page is not None:
+            drawing_ui.close_tab(page)
+    doc.openTransaction("Delete Drawing")
+    try:
+        for name in pages:
+            page = doc.getObject(name)
+            if page is not None:
+                drawing.delete_drawing(page)
+    except Exception as exc:
+        warn("browser delete: %s" % exc)
+    doc.commitTransaction()
+    try:
+        App.closeActiveTransaction()
+    except Exception:
+        pass
+    doc.recompute()
+    drawing_ui.restore_tab(tab)
+
+
+def _joint_action(name, obj):
+    """A joint entry of the right-click menu (joints_ui does the work)."""
+    from . import joints_ui
+
+    getattr(joints_ui, name)(obj)
+
+
+def _follow_active(doc):
+    """Fusion's Active Component Visibility: what lies outside the active component is drawn
+    see-through (component_look.py), following the active component as it changes."""
+    try:
+        from . import component_look
+
+        component_look.update(doc)
+    except Exception as exc:
+        _remember("info", "component look: %s" % exc)
+
+
+def _can_paste(doc, new):
+    try:
+        from . import clipboard_ui
+
+        return clipboard_ui.has_components(doc) if new else clipboard_ui.has_anything(doc)
+    except Exception:
+        return False
+
+
+def _clipboard_action(name, node, obj, selected_nodes, tree):
+    """Copy / Paste / Paste New from the right-click menu (clipboard_ui does the work):
+    Copy takes the selected rows; Paste goes into the row's component (the design's row:
+    the root)."""
+    from . import clipboard_ui
+
+    if name == "copy":
+        picked = [tree._object(n) for n in selected_nodes if n["kind"] in ("body", "component")]
+        picked = [o for o in picked if o is not None] or ([obj] if obj is not None else [])
+        clipboard_ui.copy(picked)
+        return
+    into = obj if node["kind"] == "component" else None
+    if node["kind"] == "body" and obj is not None:
+        into = components.container_of(obj)
+    clipboard_ui.paste(into=into, new=name == "paste_new")
+
+
+def _double_click_ms():
+    """The system's double-click time (Windows: 500 ms unless changed; Qt's default 400)."""
+    try:
+        return int(QtGui.QGuiApplication.styleHints().mouseDoubleClickInterval())
+    except Exception:
+        return 400
+
+
+def _command_running():
+    """A command's dialog is open or something is being edited (a sketch)."""
+    try:
+        if Gui.Control.activeDialog():
+            return True
+        gdoc = Gui.ActiveDocument
+        return gdoc is not None and gdoc.getInEdit() is not None
+    except Exception:
+        return False
+
+
+def _later(fn, *args):
+    def run():
+        try:
+            fn(*args)
+        except ops.TimelineError as exc:
+            commands.tell(str(exc))
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    QtCore.QTimer.singleShot(0, run)
+
+
+class _RowDelegate(QtWidgets.QStyledItemDelegate):
+    """Draws the eye between the expand arrow and the icon, like Fusion, and turns a
+    click on it into show/hide."""
+
+    def __init__(self, tree):
+        super().__init__(tree)
+        self.tree = tree
+
+    def _node(self, index):
+        return index.data(ROLE_NODE) if index.column() == 1 else None
+
+    def eye_rect(self, rect):
+        return QtCore.QRect(rect.left() + 1, rect.top() + (rect.height() - 16) // 2, 16, 16)
+
+    @staticmethod
+    def has_radio(node):
+        """Component rows and the design's row carry Fusion's activate mark."""
+        return node is not None and node["kind"] in ("component", "document")
+
+    def radio_rect(self, rect):
+        """The activate mark: a ring at the end of the row, filled for the active one
+        (Autodesk's API help: "the radio button to the right of a component node")."""
+        return QtCore.QRect(
+            rect.right() - RADIO - 6, rect.top() + (rect.height() - RADIO) // 2, RADIO, RADIO
+        )
+
+    def paint(self, painter, option, index):
+        node = self._node(index)
+        if node is None:
+            return super().paint(painter, option, index)
+        if node["visible"] is not None:
+            icon = ui_icon("eye" if node["visible"] else "eye_off")
+            mode = QtGui.QIcon.Normal if node["visible"] else QtGui.QIcon.Disabled
+            icon.paint(painter, self.eye_rect(option.rect), QtCore.Qt.AlignCenter, mode)
+        if node["key"] == self.tree._view_hover:
+            # The mouse is over this body (or what it holds) in the 3D view (Fusion lights
+            # the browser row of what the mouse is over).
+            painter.save()
+            try:
+                color = QtGui.QColor(theme.ACCENT or "#3fa9f5")
+                color.setAlpha(70)
+                painter.fillRect(option.rect, color)
+            finally:
+                painter.restore()
+        radio = self.has_radio(node)
+        shifted = QtWidgets.QStyleOptionViewItem(option)
+        shifted.rect = option.rect.adjusted(EYE + 2, 0, -(RADIO + 10) if radio else 0, 0)
+        if node["status"] == "error":
+            shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#ff8a80"))
+        elif node["status"] == "warning":
+            shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#f2c440"))
+        elif node["status"] == "suppressed":
+            shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#8a94a6"))
+            font = QtGui.QFont(shifted.font)
+            font.setStrikeOut(True)
+            shifted.font = font
+        super().paint(painter, shifted, index)
+        if node.get("locked"):
+            self._padlock(painter, shifted, index)
+        if node.get("unselectable"):
+            self._no_pick(painter, shifted, index)
+        if radio or node["key"] == self.tree._drop_key:
+            painter.save()
+            try:
+                painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+                if radio:
+                    ring = self.radio_rect(option.rect).adjusted(2, 2, -2, -2)
+                    pen = QtGui.QPen(QtGui.QColor("#4da3ff" if node["active"] else "#9aa4b5"))
+                    pen.setWidthF(1.4)
+                    painter.setPen(pen)
+                    painter.setBrush(
+                        QtGui.QBrush(QtGui.QColor("#4da3ff"))
+                        if node["active"]
+                        else QtCore.Qt.NoBrush
+                    )
+                    painter.drawEllipse(ring)
+                if node["key"] == self.tree._drop_key:
+                    # A dragged body or component is over this row: it can be dropped here.
+                    pen = QtGui.QPen(QtGui.QColor("#4da3ff"))
+                    pen.setWidthF(1.5)
+                    painter.setPen(pen)
+                    painter.setBrush(QtCore.Qt.NoBrush)
+                    painter.drawRoundedRect(option.rect.adjusted(1, 1, -2, -2), 3, 3)
+            finally:
+                painter.restore()
+
+    def _padlock(self, painter, option, index):
+        """Fusion's padlock over the bottom corner of a fully constrained sketch's icon."""
+        try:
+            opt = QtWidgets.QStyleOptionViewItem(option)
+            self.initStyleOption(opt, index)
+            style = self.tree.style()
+            icon = style.subElementRect(QtWidgets.QStyle.SE_ItemViewItemDecoration, opt, self.tree)
+            if icon.width() <= 0:
+                return
+            size = max(8, icon.width() * 5 // 8)
+            from . import sketch_explain
+
+            sketch_explain.paint_padlock(
+                painter,
+                QtCore.QRect(icon.right() - size + 3, icon.bottom() - size + 3, size, size),
+            )
+        except Exception:
+            pass
+
+    def _no_pick(self, painter, option, index):
+        """Selectable/Unselectable: a small red no-entry mark over the bottom corner of an
+        unselectable body's or component's icon (drawn here, like Fusion's browser shows one)."""
+        try:
+            opt = QtWidgets.QStyleOptionViewItem(option)
+            self.initStyleOption(opt, index)
+            style = self.tree.style()
+            icon = style.subElementRect(QtWidgets.QStyle.SE_ItemViewItemDecoration, opt, self.tree)
+            if icon.width() <= 0:
+                return
+            size = max(8, icon.width() * 5 // 8)
+            box = QtCore.QRectF(
+                icon.right() - size + 3.5, icon.bottom() - size + 3.5, size - 1, size - 1
+            )
+            painter.save()
+            try:
+                painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+                painter.setBrush(QtGui.QColor("#1e2430"))
+                pen = QtGui.QPen(QtGui.QColor("#ff5a52"))
+                pen.setWidthF(max(1.4, size / 7.0))
+                painter.setPen(pen)
+                painter.drawEllipse(box)
+                inset = box.width() * 0.22
+                painter.drawLine(
+                    QtCore.QPointF(box.left() + inset, box.bottom() - inset),
+                    QtCore.QPointF(box.right() - inset, box.top() + inset),
+                )
+            finally:
+                painter.restore()
+        except Exception:
+            pass
+
+    def sizeHint(self, option, index):
+        size = super().sizeHint(option, index)
+        return QtCore.QSize(size.width() + EYE + 2 + RADIO + 10, max(size.height(), 24))
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect.adjusted(EYE + 22, 0, 0, 0))
+
+    def editorEvent(self, event, model, option, index):
+        node = self._node(index)
+        if node is None:
+            return False
+        if event.type() not in (
+            QtCore.QEvent.MouseButtonPress,
+            QtCore.QEvent.MouseButtonRelease,
+            QtCore.QEvent.MouseButtonDblClick,
+        ):
+            return False
+        pos = event.position().toPoint()
+        if node["visible"] is not None and self.eye_rect(option.rect).contains(pos):
+            if event.type() == QtCore.QEvent.MouseButtonRelease:
+                key = node["key"]
+                QtCore.QTimer.singleShot(0, lambda: self.tree.toggle_eye(key))
+            return True
+        if self.has_radio(node) and self.radio_rect(option.rect).contains(pos):
+            if event.type() == QtCore.QEvent.MouseButtonRelease:
+                key = node["key"]
+                QtCore.QTimer.singleShot(0, lambda: self.tree.activate_key(key))
+            return True
+        return False
+
+
+class BrowserWidget(QtWidgets.QTreeWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("Fission180Browser")
+        self.setColumnCount(2)
+        self.setHeaderHidden(True)
+        self.setTreePosition(1)
+        self.setColumnHidden(0, True)  # the eye is drawn in the row (see _RowDelegate)
+        self.setIndentation(14)
+        self.setIconSize(QtCore.QSize(16, 16))
+        self.setMouseTracking(True)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        # A design dragged from the Data Panel can be dropped here (onto a component row:
+        # into that component); data_panel_ui's drag watch takes those drops, the tree's own
+        # drop handling never runs (its rows move by the mouse handling below).
+        self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
+        self.header().setStretchLastSection(True)
+        self.delegate = _RowDelegate(self)
+        self.setItemDelegateForColumn(1, self.delegate)
+        self._sig = None
+        self._building = False
+        self._syncing = False
+        self._tree = None
+        self._expanded = {
+            "document",
+            "bodies",
+            "sketches",
+            "settings",
+            "construction",
+            "canvases",
+            "decals",
+            "joints",  # new joints show at once
+            "joint_origins",
+            "contacts",
+            "motion_studies",
+            "drawings",
+        }
+        # Component rows and their Bodies / Sketches folders start open (keys are made per
+        # component); this remembers the ones the user closed.
+        self._collapsed = set()
+        self._doc = None
+        self._renaming = None
+        self._hover = None
+        self._view_hover = None  # row lit by a hover in the 3D view (its key)
+        self._hover_due = False
+        self._rows = {}  # key -> item, rebuilt with the tree
+        self._handlers = {}
+        self._busy = 0
+        self._press = None  # (row key, pos) of a left press on a draggable row
+        self._dragging = False
+        self._drop_key = None  # row under a dragged body / component
+        # A second click on the name of the selected row renames it (Fusion, Windows
+        # Explorer), once the double-click time has passed without a double-click.
+        self._click = None  # (row key, pos, is a second click) of a plain left press
+        self._last_click = None  # key of the row the last plain click selected
+        self._slow_key = None  # the row whose rename waits for the double-click time
+        self._slow_timer = QtCore.QTimer(self)
+        self._slow_timer.setSingleShot(True)
+        self._slow_timer.timeout.connect(self._slow_rename)
+        self.itemClicked.connect(self._clicked)
+        self.itemDoubleClicked.connect(self._double_clicked)
+        self.itemEntered.connect(self._entered)
+        self.itemSelectionChanged.connect(self._selection_changed)
+        self.itemExpanded.connect(lambda i: self._opened(i.data(1, ROLE_NODE)["key"]))
+        self.itemCollapsed.connect(lambda i: self._closed(i.data(1, ROLE_NODE)["key"]))
+        self.customContextMenuRequested.connect(self._menu)
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(500)
+        self._timer.timeout.connect(self._poll)
+        self._gate = doc_epoch.Gate()  # the poll reads the design only after a change
+        self._observer = None
+        self._read_cost = 0.0  # how long the last read took (s), and when it ended
+        self._read_end = 0.0
+
+    def start(self):
+        doc_epoch.install()
+        self.refresh()
+        self._timer.start()
+        if self._observer is None:
+            widget = self
+
+            class Observer:
+                """3D view selection -> browser (deferred: no work inside FreeCAD's
+                selection handling)."""
+
+                def _later(self, *args):
+                    QtCore.QTimer.singleShot(30, widget._sync_selection)
+
+                def _hover(self, *args):
+                    widget._hover_soon()
+
+                addSelection = removeSelection = setSelection = clearSelection = _later
+                setPreselection = removePreselection = _hover
+
+            self._observer = Observer()
+            try:
+                Gui.Selection.addObserver(self._observer)
+            except Exception as exc:
+                warn("browser selection sync unavailable: %s" % exc)
+
+    def stop(self):
+        hover_ghost.hide()
+        self._slow_stop()
+        self._timer.stop()
+        if self._observer is not None:
+            try:
+                Gui.Selection.removeObserver(self._observer)
+            except Exception:
+                pass
+            self._observer = None
+
+    # -- building ------------------------------------------------------------------
+    def _opened(self, key):
+        self._expanded.add(key)
+        self._collapsed.discard(key)
+
+    def _closed(self, key):
+        self._expanded.discard(key)
+        self._collapsed.add(key)
+
+    def _starts_open(self, key):
+        if key in self._expanded:
+            return True
+        if key in self._collapsed:
+            return False
+        if key.startswith("sim_"):  # SIMULATION workspace (simulation_browser)
+            return _simulation_call("starts_open", key) is True
+        return key.startswith(("component:", "bodies:", "sketches:", "decals:"))
+
+    def tree(self):
+        doc = App.ActiveDocument
+        self._doc = doc
+        if doc is None:
+            return core._node("document", "(no design open)", "document", "document")
+        sim = _simulation_tree(doc)  # SIMULATION workspace: the study tree (beta 3, sim-ui)
+        if sim is not None:
+            return sim
+        body = commands.active_body()
+        component = components.active_component(doc)
+        return core.build(
+            doc.Label,
+            _objects(doc),
+            units(doc),
+            body.Name if body is not None else None,
+            saved_views(doc),
+            active_component=component.Name if component is not None else None,
+            settings_extra=_settings_rows(doc) + _plastic_rows(doc),
+        )
+
+    def _poll(self):
+        """The timer's tick: reads the design only when something may have changed since
+        the last read (doc_epoch: on a design of 160 objects the read took 55 ms every
+        500 ms while nothing happened)."""
+        try:
+            if doc_epoch.busy():
+                return  # a long recompute runs the timers from inside it: read it once done
+            key = doc_epoch.key()
+            if key is not None and not self._gate.ready(key):
+                self._sync_selection()
+                return
+            if time.monotonic() - self._read_end < POLL_PAUSE * self._read_cost:
+                return  # a big design (a robot: a read takes a second): not on every tick
+            self.refresh()
+        except Exception as exc:
+            _remember("info", "browser poll: %s" % exc)
+
+    def refresh(self, force=False):
+        if self._busy:
+            return
+        try:
+            if self._renaming is not None:
+                return  # do not rebuild under the user's typing
+            key = doc_epoch.key()  # (before reading: a change during the read is read again)
+            started = time.monotonic()
+            tree = self.tree()
+            _follow_active(self._doc)
+            sig = core.signature(tree)
+            if key is not None:
+                self._gate.done(key)
+            if sig != self._sig or force:
+                self._sig = sig
+                self._tree = tree
+                self._rebuild(tree)
+            self._sync_selection()
+            self._read_end = time.monotonic()
+            self._read_cost = self._read_end - started
+        except Exception as exc:
+            _remember("info", "browser refresh skipped: %s" % exc)
+
+    def _rebuild(self, tree):
+        # the design changed: a hovered row's ghost would show it as it was
+        hover_ghost.hide()
+        self._hover = None
+        self._building = True
+        selected = {i.data(1, ROLE_NODE)["key"] for i in self.selectedItems()}
+        try:
+            self.clear()
+            self._rows = {}
+            self._add(None, tree)
+            for item in self._items():
+                if item.data(1, ROLE_NODE)["key"] in selected:
+                    item.setSelected(True)
+        finally:
+            self._building = False
+        self._hover_soon()  # a row the hover lit may be under another folder now
+
+    def _add(self, parent, node):
+        item = QtWidgets.QTreeWidgetItem(parent if parent is not None else self)
+        item.setData(1, ROLE_NODE, _row_data(node))  # (vex: without its children)
+        self._rows[node["key"]] = item
+        item.setIcon(1, ui_icon(node["icon"]))
+        item.setText(1, node["label"])
+        if node["active"]:
+            font = item.font(1)
+            font.setBold(True)
+            item.setFont(1, font)
+            if node["kind"] == "body":
+                item.setText(1, node["label"] + "  ●")
+            # A component's mark is the filled ring at the end of its row (the delegate).
+        tips = [node["tip"]] if node["tip"] else []
+        if node.get("locked"):
+            tips.append("Fully constrained: nothing in it can move")
+        if node.get("unselectable"):
+            tips.append("Unselectable: it cannot be picked in the canvas (right-click to change)")
+        if node["visible"] is not None:
+            tips.append("Click the eye to show or hide")
+        if node["kind"] in ("component", "document") and not node["active"]:
+            tips.append("Click the ring at the end of the row to activate")
+        if tips:
+            item.setToolTip(1, "\n".join(tips))
+        for child in node["children"]:
+            self._add(item, child)
+        if self._starts_open(node["key"]):  # (vex: a new item is closed already)
+            item.setExpanded(True)
+        return item
+
+    def _items(self):
+        it = QtWidgets.QTreeWidgetItemIterator(self)
+        while it.value():
+            yield it.value()
+            it += 1
+
+    def item_for(self, key):
+        for item in self._items():
+            if item.data(1, ROLE_NODE)["key"] == key:
+                return item
+        return None
+
+    def labels(self):
+        return [i.text(1) for i in self._items()]
+
+    def row(self, label):
+        """The row whose name is ``label``: the name it shows or FreeCAD's label (tests
+        and Find)."""
+        for item in self._items():
+            node = item.data(1, ROLE_NODE)
+            if label in (node["label"], item.text(1), node.get("object_label")):
+                return item
+        return None
+
+    def eye_point(self, item):
+        """Viewport point of a row's eye (for a click)."""
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        return self.delegate.eye_rect(rect).center()
+
+    def label_point(self, item):
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        return QtCore.QPoint(rect.left() + EYE + 30, rect.center().y())
+
+    def radio_point(self, item):
+        """Viewport point of a component row's activate ring (for a click)."""
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        return self.delegate.radio_rect(rect).center()
+
+    # -- drag a body or component onto a component -----------------------------------
+    def _node_at(self, pos):
+        item = self.itemAt(pos)
+        return (item, item.data(1, ROLE_NODE)) if item is not None else (None, None)
+
+    def mousePressEvent(self, event):
+        self._press = None
+        try:
+            self._slow_stop()  # any press ends a rename a second click had started
+            self._note_press(event)
+            if event.button() == QtCore.Qt.LeftButton:
+                pos = event.position().toPoint()
+                item, node = self._node_at(pos)
+                if node is not None and node["kind"] in DRAGGABLE:
+                    rect = self.visualItemRect(item)
+                    if not self.delegate.eye_rect(rect).contains(pos):
+                        self._press = (node["key"], pos)
+        except Exception as exc:
+            warn("browser: %s" % exc)
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        # a double-click keeps doing its own thing (edit a sketch, activate a body): the
+        # rename its first click may have started is dropped, and its last release is no
+        # click of its own
+        try:
+            self._slow_stop()
+            self._click = None
+            self._last_click = None
+        except Exception as exc:
+            warn("browser: %s" % exc)
+        super().mouseDoubleClickEvent(event)
+
+    def mouseMoveEvent(self, event):
+        try:
+            if self._press is not None and event.buttons() & QtCore.Qt.LeftButton:
+                pos = event.position().toPoint()
+                if self._dragging or (pos - self._press[1]).manhattanLength() > 12:
+                    self._dragging = True
+                    _item, node = self._node_at(pos)
+                    key = node["key"] if node is not None and node["kind"] in DROP_TARGETS else None
+                    if key == self._press[0]:
+                        key = None
+                    if key != self._drop_key:
+                        self._drop_key = key
+                        self.viewport().update()
+                    return  # a dragged row does not stretch the selection
+        except Exception as exc:
+            warn("browser: %s" % exc)
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        dragging, press, key = self._dragging, self._press, self._drop_key
+        self._dragging, self._press, self._drop_key = False, None, None
+        click, self._click = self._click, None
+        if dragging:
+            self._last_click = None  # a drag is no click
+            self.viewport().update()
+            try:
+                moving = [i.data(1, ROLE_NODE) for i in self.selectedItems()]
+                moving = [n for n in moving if n["kind"] in DRAGGABLE]
+                pressed = core.find(self._tree, press[0]) if self._tree is not None else None
+                if pressed is not None and pressed["key"] not in [n["key"] for n in moving]:
+                    moving = [pressed]
+                target = core.find(self._tree, key) if key and self._tree is not None else None
+                if target is not None and moving:
+                    _later(self.move_to, moving, target)
+            except Exception as exc:
+                warn("browser drag: %s" % exc)
+            return
+        super().mouseReleaseEvent(event)
+        try:
+            self._note_release(click, event)
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    # -- a second click on the selected row's name renames it --------------------------------
+    def _on_name(self, item, node, pos):
+        """Whether a viewport point is on a row's name: not on its expand arrow, eye, icon or
+        activate ring (a click there does what it always did)."""
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        if not rect.contains(pos) or pos.x() < rect.left() + EYE + 22:  # (where the field opens)
+            return False
+        if self.delegate.has_radio(node) and pos.x() >= self.delegate.radio_rect(rect).left() - 2:
+            return False
+        return True
+
+    def _selected_keys(self):
+        return [(i.data(1, ROLE_NODE) or {}).get("key") for i in self.selectedItems()]
+
+    def _note_press(self, event):
+        """A plain left press on a row's name is a click to look at on its release; any
+        other press (right button, Ctrl or Shift, the eye, a double-click's) is no click,
+        so the click after it is a first click again."""
+        self._click = None
+        plain = (
+            event.type() == QtCore.QEvent.MouseButtonPress
+            and event.button() == QtCore.Qt.LeftButton
+            and event.modifiers() == QtCore.Qt.NoModifier
+        )
+        pos = event.position().toPoint()
+        item, node = self._node_at(pos) if plain else (None, None)
+        if node is None or not self._on_name(item, node, pos):
+            self._last_click = None
+            return
+        again = core.second_click(
+            node["key"],
+            node["kind"],
+            self._last_click,
+            self._selected_keys(),
+            True,
+            self.RENAMABLE + SIM_RENAMABLE,
+        )
+        self._click = (node["key"], pos, again)
+
+    def _note_release(self, click, event):
+        """The release of a plain click on a row: that row is the last click (if it is the only
+        one selected now); a second click on it starts the rename, after the double-click time
+        (like Qt's own SelectedClicked: a double-click arriving first drops it)."""
+        self._last_click = None
+        if click is None or event.button() != QtCore.Qt.LeftButton:
+            return
+        key, at, again = click
+        pos = event.position().toPoint()
+        _item, node = self._node_at(pos)
+        if node is None or node["key"] != key:
+            return
+        if (pos - at).manhattanLength() >= QtWidgets.QApplication.startDragDistance():
+            return  # the mouse moved away: a drag, not a click
+        if self._selected_keys() != [key]:
+            return
+        self._last_click = key
+        if again:
+            self._slow_key = key
+            self._slow_timer.start(_double_click_ms())
+
+    def _slow_stop(self):
+        self._slow_key = None
+        self._slow_timer.stop()
+
+    def _slow_rename(self):
+        """The double-click time after a second click has passed: rename the row in place
+        (Rename's own code), unless something else happened meanwhile."""
+        key, self._slow_key = self._slow_key, None
+        try:
+            if key is None or self._renaming is not None or self._busy or self._doc is None:
+                return
+            if not self.isVisible() or _command_running():
+                return  # a click on a row while a command is open is a pick for it (Fusion)
+            item = self.item_for(key)
+            if item is None or self._selected_keys() != [key]:
+                return  # the row went, or something else got selected meanwhile
+            self.rename(item)
+        except Exception as exc:
+            warn("browser rename: %s" % exc)
+
+    def move_to(self, nodes, target_node):
+        """Move bodies / components into the component of ``target_node`` (the design's
+        row: the root). Fusion: drag a body onto a component in the browser."""
+        from . import components_ui
+
+        doc = self._doc
+        if doc is None or not commands.finish_open_dialog():
+            return
+        target = self._object(target_node) if target_node["kind"] == "component" else None
+        objs = [self._object(n) for n in nodes if n["kind"] in DRAGGABLE]
+        components_ui.move_objects(doc, [o for o in objs if o is not None], target)
+        self.refresh(force=True)
+
+    # -- selection: browser <-> 3D view ----------------------------------------------
+    def _sync_selection(self):
+        if self._building or self._syncing:
+            return
+        try:
+            names = set()
+            for sel in Gui.Selection.getSelectionEx():
+                if sel.SubElementNames and any(sel.SubElementNames):
+                    continue  # a face or edge: Fusion does not light up the browser
+                names.add(sel.ObjectName)
+        except Exception:
+            return
+        # SIMULATION workspace: a constraint's or load's row selects the faces it is on, not an
+        # object; its row stays selected while the view's selection is just what the selected
+        # rows lit up (several rows picked with Ctrl stay picked for Delete)
+        sim_rows = [
+            item.data(1, ROLE_NODE)
+            for item in self.selectedItems()
+            if (item.data(1, ROLE_NODE) or {}).get("kind") == "sim_item"
+        ]
+        keep = (_simulation_call("keep_selected", self._doc, sim_rows) or set()) if sim_rows else ()
+        self._syncing = True
+        self.blockSignals(True)
+        changed = False
+        try:
+            for item in self._items():
+                node = item.data(1, ROLE_NODE)
+                want = node["object"] in names and node["kind"] not in ("view", "saved_view")
+                if node["kind"] == "sim_item":
+                    want = node["key"] in keep
+                if item.isSelected() != want:
+                    item.setSelected(want)
+                    changed = True
+        finally:
+            self.blockSignals(False)
+            self._syncing = False
+        if changed:
+            # selected from elsewhere (the 3D view, the timeline): the next click on a row
+            # is a first click, it selects (it does not rename)
+            self._last_click = None
+
+    def _selection_changed(self):
+        """Rows picked in the browser are selected in the 3D view too."""
+        if self._building or self._syncing or self._doc is None:
+            return
+        if self._last_click is not None and self._selected_keys() != [self._last_click]:
+            self._last_click = None  # (keys, Ctrl+A ...): the next click is a first click
+        self._syncing = True
+        try:
+            Gui.Selection.clearSelection()
+            for item in self.selectedItems():
+                node = item.data(1, ROLE_NODE)
+                if str(node["kind"]).startswith("sim_"):  # SIMULATION workspace
+                    for obj, subs in _simulation_call("selection", self._doc, node) or []:
+                        if subs:
+                            Gui.Selection.addSelection(obj, subs)
+                        else:
+                            Gui.Selection.addSelection(self._doc.Name, obj.Name)
+                    continue
+                if node["kind"] == "drawing":
+                    # (not in the 3D view; FreeCAD would bring the drawing's tab to the
+                    # front when it is selected, even for a right-click > Delete)
+                    continue
+                obj = self._object(node)
+                if obj is not None:
+                    Gui.Selection.addSelection(self._doc.Name, obj.Name)
+        except Exception as exc:
+            warn("browser: %s" % exc)
+        finally:
+            self._syncing = False
+
+    def _entered(self, item, column):
+        """Hover: light the object up in the 3D view, like Fusion; a hidden body, component
+        or mesh body shows as a faint ghost (hover_ghost)."""
+        try:
+            obj = self._object(item.data(1, ROLE_NODE))
+            if obj is self._hover:
+                return
+            Gui.Selection.clearPreselection()
+            self._hover = obj
+            node = item.data(1, ROLE_NODE)
+            if str(node["kind"]).startswith("sim_"):  # SIMULATION workspace: the item's face
+                target = _simulation_call("hover", self._doc, node)
+                if target:
+                    Gui.Selection.setPreselection(*target)
+                return
+            if obj is not None and obj.ViewObject is not None and obj.ViewObject.Visibility:
+                Gui.Selection.setPreselection(obj, "")
+            hover_ghost.show(obj)
+        except Exception:
+            pass
+
+    # -- hover in the 3D view -> the row lights up ----------------------------------------
+    def _hover_soon(self):
+        """FreeCAD's preselection changed: look at it a moment later (never inside its
+        handling; a quick mouse sweep over many faces is looked at once)."""
+        if self._hover_due:
+            return
+        self._hover_due = True
+        QtCore.QTimer.singleShot(30, self._sync_hover)
+
+    def hover_chain(self):
+        """Names of what the mouse is over in the 3D view, outermost first, a step's body
+        after the step (browser_core.hover_row)."""
+        pre = Gui.Selection.getPreselection()
+        root = getattr(pre, "Object", None)
+        if root is None or self._doc is None or root.Document.Name != self._doc.Name:
+            return []
+        names = list(getattr(pre, "SubElementNames", []) or [])
+        sub = names[0] if names else ""
+        objects = [root]
+        if sub:
+            try:
+                objects = list(root.getSubObjectList(sub)) or [root]
+            except Exception:
+                objects = [root]
+        from . import bodies
+
+        chain = []
+        for obj in objects:
+            chain.append(obj.Name)
+            body = bodies.body_of(obj)
+            if body is not None and body is not obj:
+                chain.append(body.Name)
+        return chain
+
+    def _sync_hover(self):
+        self._hover_due = False
+        try:
+            key = None
+            if self._tree is not None and self.isVisible():
+                key = core.hover_row(self._tree, self.hover_chain())
+                if key is not None:
+                    key = core.shown_row(self._tree, key, self._row_open)
+        except Exception:
+            key = None  # the object went (deleted, undone) between the hover and now
+        if key != self._view_hover:
+            self._view_hover = key
+            self.viewport().update()
+
+    def _row_open(self, key):
+        item = self._rows.get(key)
+        return item is None or item.isExpanded()
+
+    def view_hover(self):
+        """Key of the row the 3D view's hover lights, or None (tests)."""
+        return self._view_hover
+
+    def leaveEvent(self, event):
+        hover_ghost.hide()
+        if self._hover is not None:
+            self._hover = None
+            try:
+                Gui.Selection.clearPreselection()
+            except Exception:
+                pass
+        super().leaveEvent(event)
+
+    # -- actions -------------------------------------------------------------------
+    def _object(self, node):
+        if node is None or node["kind"] in ("view", "saved_view"):
+            return None
+        return self._doc.getObject(node["object"]) if self._doc and node["object"] else None
+
+    def _set_visible(self, node, visible):
+        node = _with_children(self._tree, node)  # (vex: a row's item keeps no children)
+        targets = [n for n in core.walk(node) if n["object"] and n["visible"] is not None]
+        if node["kind"] == "component":
+            targets = self._component_eye(node, targets, visible)
+        for n in targets:
+            obj = self._doc.getObject(n["object"]) if self._doc else None
+            if obj is None or obj.ViewObject is None:
+                continue
+            if n["kind"] == "origin":
+                _show_origin_feature(obj, visible, only=node["kind"] == "origin")
+            else:
+                obj.ViewObject.Visibility = visible
+        self._refresh_soon()
+
+    # what a component hid with its eye, to show again: {(document, component): {names}}
+    _eye_memory = {}
+
+    def _component_eye(self, node, targets, visible):
+        """Fusion: a component's eye hides the component and shows it again as it was; what
+        is inside keeps its own eyes. Showing every row under it turned on its origin planes
+        and the sketches its extrudes had hidden (they then took the clicks in the view)."""
+        key = (self._doc.Name if self._doc is not None else "", node["object"])
+        if not visible:
+            type(self)._eye_memory[key] = {n["object"] for n in targets if n["visible"]}
+            return targets
+        shown = type(self)._eye_memory.pop(key, None)
+        if shown is None:  # hidden some other way (or before a reopen): not the extras
+            hidden = ("origin", "sketch", "sketch_curves", "construction")
+            return [n for n in targets if n is node or n["kind"] not in hidden]
+        return [n for n in targets if n is node or n["object"] in shown]
+
+    def _rename_key(self, key):
+        item = self.item_for(key)
+        if item is not None:
+            self.rename(item)
+
+    def toggle_eye(self, key):
+        try:
+            node = core.find(self._tree, key) if self._tree is not None else None
+            if node is not None and node["visible"] is not None:
+                self._set_visible(node, not node["visible"])
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    def _clicked(self, item, column):
+        node = item.data(1, ROLE_NODE)
+        hover_ghost.hide()  # the click acts on the row: the ghost has done its job
+        self._hover = None
+        try:
+            if column == 0 and node["visible"] is not None:
+                self._set_visible(node, not node["visible"])
+                return
+            if node["kind"] == "view":
+                Gui.runCommand(node["object"])
+            elif node["kind"] == "saved_view":
+                self._go_to_view(node["object"])
+            elif node["kind"] == "units":
+                _later(open_units_panel)
+            elif node["kind"] == "sheet_metal_rule":
+                _later(lambda: Gui.runCommand("Fission180_SheetMetalRules"))
+            elif node["kind"] == "plastic_rule":
+                _later(lambda: Gui.runCommand("Fission180_AssignPlasticRule"))
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    def _double_clicked(self, item, column):
+        node = item.data(1, ROLE_NODE)
+        try:
+            if str(node["kind"]).startswith("sim_"):  # SIMULATION workspace (simulation_browser)
+                _simulation_call("double_clicked", self, node)
+                return
+            obj = self._object(node)
+            if node["kind"] == "body" and obj is not None:
+                self._activate(obj)
+            elif node["kind"] == "component" and obj is not None:
+                self.activate_component(obj)
+            elif node["kind"] == "document" and self._doc is not None:
+                self.activate_component(None)
+            elif node["kind"] == "drawing" and obj is not None:
+                _later(_open_drawing, obj)  # Fusion: open the drawing (its own tab)
+            elif (
+                node["kind"]
+                in (
+                    "sketch",
+                    "construction",
+                    "analysis",
+                    "mesh_body",
+                    "canvas",
+                    "decal",
+                    "flat_pattern",
+                )
+                and obj is not None
+            ):
+                _later(_edit_object, obj)  # Fusion: double-click a section to edit it
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    def _activate(self, body):
+        if not commands.finish_open_dialog():  # a command keeps the body it started in
+            return
+        components.activate_body(body)  # and its component
+        self._refresh_soon()
+
+    def activate_component(self, component):
+        """Make a component (None: the root) the active one: new work goes there."""
+        if not commands.finish_open_dialog():  # a command keeps the component it started in
+            return
+        source = components.editable(component) if component is not None else None
+        if source is not None and source is not component:
+            commands.tell(
+                "%s is an instance of %s: %s is activated, and what you change shows in "
+                "every instance." % (component.Label, source.Label, source.Label)
+            )
+        components.set_active(component, self._doc)
+        self._refresh_soon()
+
+    def activate_key(self, key):
+        """The activate ring of a row was clicked."""
+        try:
+            node = core.find(self._tree, key) if self._tree is not None else None
+            if node is None:
+                return
+            if node["kind"] == "document":
+                self.activate_component(None)
+            elif node["kind"] == "component":
+                obj = self._object(node)
+                if obj is not None:
+                    self.activate_component(obj)
+        except Exception as exc:
+            warn("browser: %s" % exc)
+
+    def keyPressEvent(self, event):
+        try:
+            self._slow_stop()  # a key after a second click: the key wins (F2, Delete...)
+            item = self.currentItem()
+            node = item.data(1, ROLE_NODE) if item is not None else None
+            if node is not None and event.key() == QtCore.Qt.Key_F2:
+                self.rename(item)
+                return
+            if node is not None and event.key() in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
+                nodes = [i.data(1, ROLE_NODE) for i in self.selectedItems()] or [node]
+                _later(self.delete, nodes)
+                return
+        except Exception as exc:
+            warn("browser: %s" % exc)
+            return
+        super().keyPressEvent(event)
+
+    def event(self, event):
+        if event.type() == QtCore.QEvent.ShortcutOverride and event.key() in (
+            QtCore.Qt.Key_Delete,
+            QtCore.Qt.Key_Backspace,
+            QtCore.Qt.Key_F2,
+        ):
+            event.accept()
+            return True
+        return super().event(event)
+
+    RENAMABLE = (
+        "body",
+        "component",
+        "sketch",
+        "construction",
+        "analysis",
+        "saved_view",
+        "document",
+        "mesh_body",
+        "canvas",
+        "decal",
+        "drawing",
+        "joint",
+        "rigid_group",
+        "motion_link",
+        "contact_set",
+        "motion_study",
+        "flat_pattern",
+    )
+    OBJECT_KINDS = (
+        "body",
+        "component",
+        "sketch",
+        "construction",
+        "analysis",
+        "mesh_body",
+        "canvas",
+        "decal",
+        "joint",
+        "rigid_group",
+        "joint_origin",
+        "drawing",
+        "motion_link",
+        "contact_set",
+        "motion_study",
+        "flat_pattern",
+    )
+
+    def rename(self, item):
+        """The name becomes editable in place (Enter keeps it, Esc cancels)."""
+        node = item.data(1, ROLE_NODE)
+        self._slow_stop()  # (F2 or the menu after a second click: one field)
+        if node["kind"] not in self.RENAMABLE + SIM_RENAMABLE:
+            return
+        if node["kind"] not in ("document", "saved_view") and not commands.finish_open_dialog():
+            return  # a rename is an undo step: never inside a command's own step
+        self._cancel_rename()
+        rect = self.visualRect(self.indexFromItem(item, 1)).adjusted(EYE + 22, 0, 0, 0)
+        rect.setWidth(max(rect.width(), 120))
+        key = node["key"]
+        self._renaming = InlineEditor(
+            self.viewport(), rect, node["label"], lambda text: self._renamed(key, text)
+        )
+
+    def _renamed(self, key, text):
+        self._renaming = None
+        node = core.find(self._tree, key) if self._tree is not None else None
+        text = (text or "").strip()
+        if node is None or not text:
+            self._refresh_soon()
+            return
+        try:
+            if str(node["kind"]).startswith("sim_"):  # SIMULATION workspace
+                _simulation_call("rename", self, node, text)
+            elif node["kind"] == "document" and self._doc is not None:
+                self._doc.Label = text
+            elif node["kind"] == "saved_view":
+                self._rename_view(node["object"], text)
+            elif node["kind"] == "mesh_body":
+                obj = self._object(node)
+                if obj is not None and text != obj.Label:
+                    _rename_mesh_body(self._doc, obj, text)
+            else:
+                obj = self._object(node)
+                if obj is not None and node["kind"] == "component":
+                    obj, text = _component_rename(obj, text)
+                if obj is not None and text not in (obj.Label, node["label"]):
+                    ops.rename(self._doc, obj.Name, text)
+        except Exception as exc:
+            warn("browser rename: %s" % exc)
+        self._refresh_soon()
+
+    def _cancel_rename(self):
+        if self._renaming is not None:
+            editor, self._renaming = self._renaming, None
+            editor.on_commit = lambda _t: None
+            editor.cancel()
+
+    def _refresh_soon(self):
+        """Rebuild after the current click/key has been handled (rows stay valid)."""
+        QtCore.QTimer.singleShot(0, lambda: self.refresh(force=True))
+
+    def delete(self, nodes):
+        doc = self._doc
+        sim = [n for n in nodes if str(n["kind"]).startswith("sim_")]
+        if sim:  # SIMULATION workspace: studies, constraints, loads (simulation_browser)
+            _simulation_call("delete", self, sim)
+            self.refresh(force=True)
+            return
+        if doc is None or not commands.finish_open_dialog():
+            return
+        step_kinds = (
+            "sketch",
+            "construction",
+            "analysis",
+            "joint",
+            "rigid_group",
+            "joint_origin",
+            "decal",
+            "motion_link",
+        )
+        steps = [n["object"] for n in nodes if n["kind"] in step_kinds]
+        body_names = [n["object"] for n in nodes if n["kind"] == "body"]
+        part_names = [n["object"] for n in nodes if n["kind"] == "component"]
+        views = [n["object"] for n in nodes if n["kind"] == "saved_view"]
+        plain = [
+            n["object"]
+            for n in nodes
+            if n["kind"]
+            in (
+                "mesh_body",
+                "canvas",
+                "contact_set",
+                "motion_study",
+                "sketch_curves",
+                "flat_pattern",
+            )
+        ]
+        drawings = [n["object"] for n in nodes if n["kind"] == "drawing"]
+        Gui.Selection.clearSelection()
+        if steps:
+            ops.delete(doc, [s for s in steps if doc.getObject(s) is not None])
+        if body_names:
+            ops.delete_bodies(doc, [b for b in body_names if doc.getObject(b) is not None])
+        if part_names:
+            from . import components_ui
+
+            parts = [doc.getObject(n) for n in part_names]
+            components_ui.delete_components(doc, [p for p in parts if p is not None])
+        if plain:
+            self._delete_plain(doc, plain)
+        for name in views:
+            self._delete_view(name)
+        if drawings:
+            _delete_drawings(doc, drawings)
+        self.refresh(force=True)
+
+    def _delete_plain(self, doc, names):
+        """Delete mesh bodies (with the MESH steps that made only them) and canvases, one
+        undo step."""
+        doc.openTransaction("Delete")
+        try:
+            from . import mesh
+
+            for name in names:
+                obj = doc.getObject(name)
+                if obj is None:
+                    continue
+                if mesh.is_mesh(obj):
+                    mesh.delete_body(obj)
+                else:
+                    doc.removeObject(name)
+        except Exception as exc:
+            warn("browser delete: %s" % exc)
+        doc.commitTransaction()
+        try:
+            App.closeActiveTransaction()
+        except Exception:
+            pass
+        doc.recompute()
+
+    def _run_with(self, obj, command):
+        """Run a command on a browser row's object (it is selected first, as a click does)."""
+        if obj is None or not commands.finish_open_dialog():
+            return
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(obj.Document.Name, obj.Name)
+        Gui.runCommand(command)
+
+    # -- named views ----------------------------------------------------------------
+    def new_named_view(self):
+        doc = self._doc
+        if doc is None:
+            return None
+        existing = set(saved_views(doc))
+        n = 1
+        while "Named View %d" % n in existing:
+            n += 1
+        name = "Named View %d" % n
+        meta = dict(doc.Meta)
+        meta[META_VIEW + name] = Gui.ActiveDocument.ActiveView.getCamera()
+        doc.Meta = meta
+        self._expanded.add("views")
+        self.refresh(force=True)
+        return name
+
+    def _go_to_view(self, name):
+        camera = self._doc.Meta.get(META_VIEW + name) if self._doc else None
+        if camera:
+            Gui.ActiveDocument.ActiveView.setCamera(camera)
+
+    def _rename_view(self, old, new):
+        if not new or new == old or self._doc is None:
+            return
+        meta = dict(self._doc.Meta)
+        if META_VIEW + old in meta and META_VIEW + new not in meta:
+            meta[META_VIEW + new] = meta.pop(META_VIEW + old)
+            self._doc.Meta = meta
+
+    def _delete_view(self, name):
+        meta = dict(self._doc.Meta)
+        if meta.pop(META_VIEW + name, None) is not None:
+            self._doc.Meta = meta
+
+    # -- context menu ----------------------------------------------------------------
+    def _menu(self, pos):
+        self._slow_stop()
+        self._last_click = None
+        item = self.itemAt(pos)
+        if item is None:
+            return
+        # A right-click is not a pick for a command waiting for picks: the row is
+        # marked here only, the command ends when a menu entry runs.
+        quiet = bool(Gui.Control.activeDialog())
+        if quiet:
+            self.blockSignals(True)
+        try:
+            if not item.isSelected():
+                self.clearSelection()
+                item.setSelected(True)
+            self.setCurrentItem(item)
+        finally:
+            if quiet:
+                self.blockSignals(False)
+        menu = self.build_menu(item)
+        if menu is None:
+            return
+        self._busy += 1  # no rebuild under an open menu
+        try:
+            chosen = menu.exec_(self.viewport().mapToGlobal(pos))
+        finally:
+            self._busy -= 1
+        action = self._handlers.get(chosen) if chosen is not None else None
+        self._handlers = {}
+        if action is not None:
+            _later(action)
+
+    def build_menu(self, item):
+        node = item.data(1, ROLE_NODE)
+        if str(node["kind"]).startswith("sim_"):  # SIMULATION workspace (simulation_browser)
+            return _simulation_call("build_menu", self, item, node)
+        obj = self._object(node)
+        menu = QtWidgets.QMenu(self)
+        menu.setObjectName("Fission180BrowserMenu")
+        self._handlers = {}
+        doc = self._doc
+        selected_nodes = [i.data(1, ROLE_NODE) for i in self.selectedItems()]
+        selected_bodies = [self._object(n) for n in selected_nodes if n["kind"] == "body"]
+        selected_bodies = [b for b in selected_bodies if b is not None] or (
+            [obj] if node["kind"] == "body" and obj is not None else []
+        )
+        handlers = {
+            "Show/Hide": lambda: self._set_visible(node, not node["visible"]),
+            "Selectable/Unselectable": lambda: self._toggle_selectable(obj, selected_nodes),
+            "Rename": lambda key=node["key"]: self._rename_key(key),
+            "Delete": lambda: self.delete([node]),
+            "Edit Sketch": lambda: _edit_object(obj),
+            "Edit Feature": lambda: _edit_object(obj),
+            "Activate Body": lambda: self._activate(obj),
+            "Activate": lambda: self.activate_component(
+                obj if node["kind"] == "component" else None
+            ),
+            "New Component": lambda: self._new_component(
+                obj if node["kind"] == "component" else None
+            ),
+            "Create Components from Bodies": lambda: self._components_from_bodies(selected_bodies),
+            "Isolate": lambda: self._isolate(obj),
+            "Find in Window": lambda: self._find_in_window(obj),
+            "Find in Timeline": lambda: self._find_in_timeline(node),
+            "Look At": lambda: self._look_at(obj),
+            "Create Sketch": lambda: self._create_sketch(obj),
+            "Change Active Units": open_units_panel,
+            "Sheet Metal Rules": lambda: Gui.runCommand("Fission180_SheetMetalRules"),
+            "Assign Plastic Rule": lambda: Gui.runCommand("Fission180_AssignPlasticRule"),
+            "Manage Plastic Rules": lambda: Gui.runCommand("Fission180_ManagePlasticRules"),
+            "New Named View": self.new_named_view,
+            "Go to View": lambda: (
+                Gui.runCommand(node["object"])
+                if node["kind"] == "view"
+                else self._go_to_view(node["object"])
+            ),
+            "Capture Design History": lambda: _run_command(_history_command(doc)),
+            "Remove": lambda: self._remove(node, obj),
+            "Show All Bodies": lambda: self._show_all("body", True),
+            "Show All Sketches": lambda: self._show_all("sketch", True),
+            "Hide All Sketches": lambda: self._show_all("sketch", False),
+            "Convert Mesh": lambda: self._run_with(obj, "Fission180_ConvertMesh"),
+            "Rebuild with Timeline (AI)...": lambda: self._run_with(
+                obj, "Fission180_RebuildWithTimeline"
+            ),
+            "Repair": lambda: self._run_with(obj, "Fission180_MeshRepair"),
+            "Edit Canvas": lambda: _edit_object(obj),
+            "Edit Decal": lambda: _edit_object(obj),
+            "Calibrate": lambda: self._run_with(obj, "Fission180_CalibrateCanvas"),
+            "Ground": lambda: _joint_action("toggle_ground", obj),
+            "Edit Joint": lambda: _edit_object(obj),
+            "Edit Rigid Group": lambda: _edit_object(obj),
+            "Edit Joint Origin": lambda: _edit_object(obj),
+            "Edit Motion Link": lambda: _edit_object(obj),
+            "Edit Contact Set": lambda: _edit_object(obj),
+            "Edit Motion Study": lambda: _edit_object(obj),
+            "Edit Joint Limits": lambda: _joint_action("edit_joint_limits", obj),
+            "Drive Joints": lambda: _joint_action("drive", obj),
+            "Animate Joint": lambda: _joint_action("animate", obj),
+            "Suppress": lambda: self._toggle_suppress(obj),
+            "Open Drawing": lambda: _open_drawing(obj),
+            "Copy": lambda: _clipboard_action("copy", node, obj, selected_nodes, self),
+            "Paste": lambda: _clipboard_action("paste", node, obj, selected_nodes, self),
+            "Paste New": lambda: _clipboard_action("paste_new", node, obj, selected_nodes, self),
+            "Save As DXF": lambda: _exchange_action("save_as_dxf", (obj, "")),
+            "Save As Mesh": lambda: _exchange_action("save_as_mesh", obj),
+            "Break Link": lambda: _exchange_action("break_link", obj),
+            "Edit Flat Pattern": lambda: _edit_object(obj),
+            "Export DXF": lambda: _flat_pattern_export(obj),
+            "Show/Hide Bend Lines": lambda: _flat_pattern_toggle(obj, "ShowBendLines"),
+            "Show/Hide Bend Extents": lambda: _flat_pattern_toggle(obj, "ShowBendExtents"),
+        }
+        isolated = _isolated_names(doc)
+        if node["kind"] in ("body", "component") and isolated:
+            handlers["Isolate"] = lambda: self._unisolate()
+        entries = core.menu_for(node)
+        if node["visible"] is None and "Show/Hide" in entries:
+            entries.remove("Show/Hide")
+        if node["kind"] in self.OBJECT_KINDS and obj is None:
+            return None
+        if node["kind"] == "document" and not components.list_components(doc):
+            # Without components the design's row is not a component to activate.
+            entries = [e for e in entries if e != "Activate"]
+        added = False
+        for entry in entries:
+            if entry == "-":
+                if added:
+                    menu.addSeparator()
+                continue
+            text = entry
+            if entry == "Show/Hide":
+                text = "Hide" if node["visible"] else "Show"
+            if entry == "Capture Design History":
+                text = _history_label(doc)
+            if entry == "Remove" and not _can_remove(doc):
+                continue  # a design without history deletes instead (Fusion)
+            if entry == "Isolate" and isolated:
+                text = "Exit Isolate"
+            if entry == "Ground":
+                text = "Unground" if node.get("grounded") else "Ground"
+            if entry == "Suppress":
+                text = "Unsuppress" if node.get("status") == "suppressed" else "Suppress"
+            if entry in ("Activate Body", "Activate") and node["active"]:
+                continue
+            if entry in ("Paste", "Paste New") and not _can_paste(doc, entry == "Paste New"):
+                continue  # nothing copied (Paste New: no component copied)
+            if entry == "Rebuild with Timeline (AI)..." and obj is not None and _rebuilt_body(obj):
+                for text, command in REBUILD_ENTRIES:
+                    action = menu.addAction(text)
+                    self._handlers[action] = lambda c=command: self._run_with(obj, c)
+                added = True
+                continue
+            if entry == "Break Link" and not _is_linked(obj):
+                continue  # only a component inserted from another design
+            if entry == "Move to Component":
+                if self._move_menu(menu, node, obj):
+                    added = True
+                continue
+            if entry == "Opacity Control":
+                if self._opacity_menu(menu, node, obj, selected_nodes):
+                    added = True
+                continue
+            action = (
+                menu.addAction(ui_icon("delete"), text)
+                if entry == "Delete"
+                else menu.addAction(text)
+            )
+            self._handlers[action] = handlers.get(entry)
+            if entry.startswith("Edit ") and entry != "Edit Joint Limits":
+                font = action.font()
+                font.setBold(True)
+                action.setFont(font)
+            added = True
+        return menu if added else None
+
+    def _toggle_suppress(self, obj):
+        if obj is None or self._doc is None or not commands.finish_open_dialog():
+            return
+        try:
+            ops.toggle_suppress(self._doc, obj.Name)
+        except Exception as exc:
+            commands.tell(str(exc))
+        self.refresh(force=True)
+
+    def _remove(self, node, obj):
+        """Remove (Fusion): the body or component is gone from this point of the timeline
+        on; the selected bodies and components are removed together."""
+        targets = [self._object(n) for n in self._selected_draggable()] or [obj]
+        targets = [t for t in targets if t is not None]
+        if not targets:
+            return
+        try:
+            from . import remove_ui
+
+            remove_ui.remove_now(targets)
+        except Exception as exc:
+            warn("Remove failed: %s" % exc)
+
+    def _move_menu(self, menu, node, obj):
+        """ "Move to Component" with one entry per component a row can go into (and the
+        root). Fusion moves bodies by dragging them in the browser; Fission 180 has both."""
+        if obj is None or self._doc is None:
+            return False
+        moving = [self._object(n) for n in self._selected_draggable()] or [obj]
+        moving = [o for o in moving if o is not None]
+        targets = components.move_targets(self._doc, moving)
+        if not targets:
+            return False
+        sub = menu.addMenu("Move to Component")
+        sub.setObjectName("Fission180MoveToMenu")
+        for label, target in targets:
+            action = sub.addAction(label)
+            self._handlers[action] = lambda t=target, m=list(moving): self._move_objects(m, t)
+        return True
+
+    def _toggle_selectable(self, obj, selected_nodes):
+        """Fusion's Selectable/Unselectable: the row's object, or every selected body / mesh
+        body / component when the row is one of them, turned the other way."""
+        if obj is None or not commands.finish_open_dialog():
+            return
+        kinds = ("body", "mesh_body", "component")
+        targets = [self._object(n) for n in selected_nodes if n["kind"] in kinds]
+        targets = [t for t in targets if t is not None]
+        if obj not in targets:
+            targets = [obj]
+        try:
+            changed = selectable.toggle([obj] + [t for t in targets if t is not obj])
+            if changed:
+                on = selectable.get(changed[0])
+                commands.tell(
+                    "%s %s."
+                    % (
+                        ", ".join(o.Label for o in changed),
+                        "can be picked again" if on else "cannot be picked in the canvas now",
+                    )
+                )
+        except Exception as exc:
+            warn("selectable: %s" % exc)
+            commands.tell("Selectable could not be changed: %s" % exc)
+        self.refresh(force=True)
+
+    def _opacity_menu(self, menu, node, obj, selected_nodes):
+        """Fusion's Opacity Control: the row's object, or every selected body / mesh body /
+        component when the row is one of them (opacity_ui builds the submenu)."""
+        if obj is None:
+            return False
+        from . import opacity_ui
+
+        kinds = ("body", "mesh_body", "component")
+        targets = [self._object(n) for n in selected_nodes if n["kind"] in kinds]
+        targets = [t for t in targets if t is not None]
+        if obj not in targets:
+            targets = [obj]
+        return opacity_ui.add_menu(menu, targets, self._handlers) is not None
+
+    def _selected_draggable(self):
+        return [
+            i.data(1, ROLE_NODE)
+            for i in self.selectedItems()
+            if i.data(1, ROLE_NODE)["kind"] in DRAGGABLE
+        ]
+
+    def _move_objects(self, objs, target):
+        from . import components_ui
+
+        if self._doc is None or not commands.finish_open_dialog():
+            return
+        components_ui.move_objects(self._doc, objs, target)
+        self.refresh(force=True)
+
+    def _new_component(self, parent):
+        """New Component from a row's menu: inside that component (the design's row: at the
+        root), whatever is active."""
+        from . import components_ui
+
+        components_ui.open_new_component(parent, use_active=False)
+
+    def _components_from_bodies(self, bodies):
+        from . import components_ui
+
+        if self._doc is None or not commands.finish_open_dialog():
+            return
+        components_ui.create_from_bodies(self._doc, bodies)
+        self.refresh(force=True)
+
+    def _isolate(self, obj):
+        from . import components_ui
+
+        components_ui.isolate(obj)
+        self.refresh(force=True)
+
+    def _unisolate(self):
+        from . import components_ui
+
+        components_ui.unisolate(self._doc)
+        self.refresh(force=True)
+
+    def _show_all(self, kind, visible):
+        from . import components_ui
+
+        types = core.BODY_TYPES if kind == "body" else core.SKETCH_TYPES
+        for obj in self._doc.Objects:
+            if obj.TypeId in types and obj.ViewObject is not None:
+                obj.ViewObject.Visibility = visible
+        if kind == "body":
+            components_ui.ISOLATED.pop(self._doc.Name, None)
+        self.refresh(force=True)
+
+    def _find_in_window(self, obj):
+        if not commands.finish_open_dialog():  # the selection it makes is not a pick
+            return
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(obj.Document.Name, obj.Name)
+        Gui.SendMsgToActiveView("ViewSelection")
+
+    def _find_in_timeline(self, node):
+        from . import timeline_ui
+
+        if node["kind"] in ("body", "component"):
+            target = self._object(node)
+            if node["kind"] == "body":
+                names = [o.Name for o, b in ops.steps(self._doc) if b is target]
+            else:  # the component's own step and every step inside it
+                names = [
+                    o.Name
+                    for o, b in ops.steps(self._doc)
+                    if o is target or components.is_inside(b if b is not None else o, target)
+                ]
+            w = timeline_ui.widget()
+            if w is not None and names:
+                w.refresh()
+                w.select(names)
+            return
+        timeline_ui.find(node["object"])
+
+    def _look_at(self, sketch):
+        view = Gui.ActiveDocument.ActiveView
+        view.setCameraOrientation(sketch.getGlobalPlacement().Rotation)
+        if sketch.ViewObject is not None and sketch.ViewObject.Visibility:
+            self._find_in_window(sketch)
+        else:
+            view.fitAll()
+
+    def _create_sketch(self, plane):
+        if not commands.finish_open_dialog():
+            return
+        body = ops.body_of(plane)
+        if body is not None:
+            components.activate_body(body)
+        else:
+            # A component's own origin plane: the sketch goes into that component (its
+            # preferred body, or a new one), on the body's plane of the same role.
+            owner = components.origin_owner(plane)
+            if components.is_component(owner):
+                components.set_active(owner, self._doc)
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(plane.Document.Name, plane.Name)
+        Gui.runCommand("Fission180_NewSketch")
+
+    # -- find ------------------------------------------------------------------------
+    def find(self, name):
+        """Show and select the row of an object (Find in Browser from the timeline)."""
+        self.refresh(force=True)
+        if self._doc is None or self._tree is None:
+            return False
+        obj = self._doc.getObject(name)
+        body = ops.body_of(obj) if obj is not None else None
+        key = core.node_for_object(self._tree, name, body.Name if body is not None else None)
+        if key is None:
+            return False
+        for folder in core.path_to(self._tree, key) or []:
+            self._expanded.add(folder)
+        self.refresh(force=True)
+        item = self.item_for(key)
+        if item is None:
+            return False
+        self.clearSelection()
+        item.setSelected(True)
+        self.setCurrentItem(item)
+        self.scrollToItem(item)
+        return True
+
+
+# -- Change Active Units (Document Settings > Units) -------------------------------------
+class UnitsPanel:
+    """Fusion's small 'Change Active Units' dialog, as a task panel."""
+
+    last = None
+
+    def __init__(self, doc):
+        from . import taskui
+
+        UnitsPanel.last = self
+        self.doc = doc
+        self._closed = False
+        self.form = QtWidgets.QWidget()
+        self.form.setWindowTitle("Change Active Units")
+        self.form.setWindowIcon(ui_icon("units"))
+        layout = QtWidgets.QFormLayout(self.form)
+        self.combo = QtWidgets.QComboBox()
+        self.combo.setObjectName("Fission180UnitType")
+        current = units(doc)
+        for short, long, _index in core.UNITS:
+            self.combo.addItem(long, short)
+        self.combo.setCurrentIndex([u[0] for u in core.UNITS].index(current))
+        layout.addRow("Unit Type", self.combo)
+        self.default = QtWidgets.QCheckBox("Set as Default")
+        self.default.setObjectName("Fission180UnitDefault")
+        layout.addRow(self.default)
+        taskui.set_current(self)
+
+    def getStandardButtons(self):
+        buttons = QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        return getattr(buttons, "value", buttons)
+
+    def accept(self):
+        try:
+            short = self.combo.currentData()
+            schema = [u[2] for u in core.UNITS if u[0] == short][0]
+            set_units(self.doc, schema, self.default.isChecked())
+        except Exception as exc:
+            warn("units: %s" % exc)
+        return self._close()
+
+    def reject(self):
+        return self._close()
+
+    def finish(self):
+        self.accept()
+
+    def _close(self):
+        from . import taskui
+
+        self._closed = True
+        if taskui._OPEN["dialog"] is self:
+            taskui._OPEN["dialog"] = None
+        Gui.Control.closeDialog()
+        w = widget()
+        if w is not None:
+            w.refresh(force=True)
+        return True
+
+
+def set_units(doc, schema, as_default=False):
+    """Units of a design (FreeCAD keeps them per document since 1.0)."""
+    names = doc.getEnumerationsOfProperty("UnitSystem")
+    doc.UnitSystem = names[schema]
+    App.Units.setSchema(schema)
+    if as_default:
+        App.ParamGet("User parameter:BaseApp/Preferences/Units").SetInt("UserSchema", schema)
+    try:
+        Gui.updateGui()
+    except Exception:
+        pass
+
+
+def open_units_panel():
+    doc = App.ActiveDocument
+    if doc is None or not commands.finish_open_dialog():
+        return None
+    panel = UnitsPanel(doc)
+    Gui.Control.showDialog(panel)
+    return panel
+
+
+_state = {"widget": None, "dock": None, "original": None, "title": None}
+
+
+def show():
+    """Put the browser inside FreeCAD's "Model" dock in place of its tree. The dock
+    itself stays visible, so FreeCAD never saves it as hidden."""
+    main = Gui.getMainWindow()
+    dock = main.findChild(QtWidgets.QDockWidget, "Model")
+    if _state["widget"] is None:
+        _state["widget"] = BrowserWidget()
+    if dock is None:  # unusual layout: fall back to a dock of our own
+        dock = QtWidgets.QDockWidget("BROWSER", main)
+        dock.setObjectName("Fission180BrowserDock")
+        main.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
+    if dock.widget() is not _state["widget"]:
+        _state["original"] = dock.widget()
+        _state["title"] = dock.windowTitle()
+        if _state["original"] is not None:
+            _state["original"].hide()
+        dock.setWidget(_state["widget"])
+    _state["dock"] = dock
+    dock.setWindowTitle("BROWSER")
+    dock.show()
+    _state["widget"].show()
+    _state["widget"].start()
+
+
+def hide():
+    """Give FreeCAD its tree back."""
+    widget, dock = _state["widget"], _state["dock"]
+    if widget is None or dock is None:
+        return
+    widget.stop()
+    if dock.widget() is widget:
+        dock.setWidget(_state["original"])
+        widget.setParent(None)
+        if _state["original"] is not None:
+            _state["original"].show()
+        if _state["title"]:
+            dock.setWindowTitle(_state["title"])
+    _state["dock"] = None
+
+
+def widget():
+    return _state["widget"]
+
+
+def find(name):
+    w = widget()
+    if w is None:
+        return False
+    try:
+        return w.find(name)
+    except Exception as exc:
+        warn("browser: %s" % exc)
+        return False

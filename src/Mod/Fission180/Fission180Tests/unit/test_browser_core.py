@@ -1,0 +1,433 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""The Fusion-style browser's structure. Runs without FreeCAD."""
+
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from fission180 import browser_core as core  # noqa: E402
+
+
+def obj(name, type_id, visible=True, body=None, role=None, label=None, **extra):
+    row = {
+        "name": name,
+        "label": label or name,
+        "type_id": type_id,
+        "visible": visible,
+        "body": body,
+        "role": role,
+    }
+    row.update(extra)
+    return row
+
+
+OBJECTS = [
+    obj("Body", "PartDesign::Body"),
+    obj("Origin", "App::Origin", body="Body"),
+    obj("XY_Plane", "App::Plane", False, "Body", "XY_Plane"),
+    obj("X_Axis", "App::Line", False, "Body", "X_Axis"),
+    obj("Origin001", "App::Point", False, "Body", "Origin"),
+    obj("Sketch", "Sketcher::SketchObject", False, "Body"),
+    obj("Pad", "PartDesign::Pad", True, "Body"),
+    obj("DatumPlane", "PartDesign::Plane", True, "Body"),
+]
+
+
+class BrowserTests(unittest.TestCase):
+    def tree(self, objects=OBJECTS, **kw):
+        return core.build("Design", objects, active_body="Body", **kw)
+
+    def labels(self, node):
+        return [c["label"] for c in node["children"]]
+
+    def folder(self, tree, label):
+        return [c for c in tree["children"] if c["label"] == label][0]
+
+    def test_fusion_top_level_order(self):
+        self.assertEqual(
+            self.labels(self.tree()),
+            ["Document Settings", "Named Views", "Origin", "Bodies", "Sketches", "Construction"],
+        )
+
+    def test_sketch_curves_are_listed_under_their_sketch(self):
+        objects = OBJECTS + [
+            obj(
+                "Curves3D",
+                "Part::FeaturePython",
+                True,
+                None,
+                label="3D Curves",
+                fission180_type="Sketch3DCurves",
+                owner_sketch="Sketch",
+            ),
+            obj(
+                "ProjectedCurves",
+                "Part::FeaturePython",
+                True,
+                None,
+                label="Projected Curves",
+                fission180_type="ProjectedCurves",
+                owner_sketch="Sketch",
+            ),
+        ]
+        sketches = self.folder(self.tree(objects), "Sketches")
+        self.assertEqual(self.labels(sketches), ["Sketch"])
+        sketch = sketches["children"][0]
+        self.assertEqual(self.labels(sketch), ["3D Curves", "Projected Curves"])
+        icons = [c["icon"] for c in sketch["children"]]
+        self.assertEqual(icons, ["sk_spline", "sk_project"])
+        self.assertEqual(sketch["children"][0]["kind"], "sketch_curves")
+
+    def test_sketch_curves_without_their_sketch_still_show(self):
+        objects = [
+            obj(
+                "Curves3D",
+                "Part::FeaturePython",
+                True,
+                None,
+                label="3D Curves",
+                fission180_type="Sketch3DCurves",
+                owner_sketch="Elsewhere",
+            ),
+        ]
+        sketches = self.folder(self.tree(objects), "Sketches")
+        self.assertEqual(self.labels(sketches), ["3D Curves"])
+
+    def test_features_are_not_listed(self):
+        names = [n["object"] for n in core.walk(self.tree())]
+        self.assertNotIn("Pad", names, "features belong to the timeline, not the browser")
+
+    def test_active_body_marked(self):
+        body = self.folder(self.tree(), "Bodies")["children"][0]
+        self.assertTrue(body["active"])
+        self.assertEqual(body["label"], "Body")  # the mark is drawn, not part of the name
+        other = core.build(
+            "Design", OBJECTS + [obj("Body001", "PartDesign::Body")], active_body="Body"
+        )
+        bodies = self.folder(other, "Bodies")["children"]
+        self.assertEqual([b["active"] for b in bodies], [True, False])
+
+    def test_timeline_names(self):
+        """Fusion's browser and timeline show one name: "Sketch 2", not "Sketch001"."""
+        objects = [o for o in OBJECTS if o["name"] != "Sketch"] + [
+            obj("Sketch001", "Sketcher::SketchObject", body="Body", display="Sketch 2")
+        ]
+        sketch = self.folder(self.tree(objects), "Sketches")["children"][0]
+        self.assertEqual(sketch["label"], "Sketch 2")
+        self.assertEqual(sketch["object_label"], "Sketch001")
+        plane = self.folder(self.tree(), "Construction")["children"][0]
+        self.assertEqual(plane["label"], "DatumPlane")  # no timeline name: the label
+
+    def test_origin_in_fusion_order(self):
+        self.assertEqual(self.labels(self.folder(self.tree(), "Origin")), ["O", "X", "XY"])
+
+    def test_one_origin_without_an_active_body(self):
+        """A reopened file with two bodies has no active body yet: still one origin."""
+        second = [
+            obj("Body001", "PartDesign::Body"),
+            obj("XY_Plane001", "App::Plane", False, "Body001", "XY_Plane"),
+            obj("X_Axis001", "App::Line", False, "Body001", "X_Axis"),
+            obj("Origin003", "App::Point", False, "Body001", "Origin"),
+        ]
+        tree = core.build("Design", OBJECTS + second)
+        origin = self.folder(tree, "Origin")["children"]
+        self.assertEqual([n["label"] for n in origin], ["O", "X", "XY"])
+        self.assertEqual({n["object"] for n in origin}, {"Origin001", "X_Axis", "XY_Plane"})
+        # The active body's origin when there is one.
+        tree = core.build("Design", OBJECTS + second, active_body="Body001")
+        origin = self.folder(tree, "Origin")["children"]
+        self.assertEqual({n["object"] for n in origin}, {"Origin003", "X_Axis001", "XY_Plane001"})
+
+    def test_suppressed_is_greyed_not_a_problem(self):
+        rows = [dict(o) for o in OBJECTS]
+        rows[5]["suppressed"] = True
+        sketch = self.folder(self.tree(rows), "Sketches")["children"][0]
+        self.assertEqual(sketch["status"], "suppressed")
+        self.assertIn("Suppressed", sketch["tip"])
+
+    def test_folder_eye_follows_children(self):
+        tree = self.tree()
+        self.assertFalse(self.folder(tree, "Sketches")["visible"])  # the only sketch is hidden
+        self.assertTrue(self.folder(tree, "Bodies")["visible"])
+
+    def test_units_shown(self):
+        settings = self.tree(units="in")["children"][0]
+        self.assertEqual(settings["children"][0]["label"], "Units: in")
+        self.assertEqual(core.unit_label(0), "mm")
+        self.assertEqual(core.unit_label(3), "in")
+        self.assertIsNone(core.unit_label(8))
+
+    class UnitDoc:
+        """A design with only FreeCAD's unit systems (its UnitSystem enumeration)."""
+
+        def __init__(self, system):
+            self.UnitSystem = system
+
+        def getEnumerationsOfProperty(self, name):
+            return [
+                "Standard (mm, kg, s, degree)",
+                "MKS (m, kg, s, degree)",
+                "US customary (in, lb)",
+                "Imperial decimal (in, lb)",
+                "Building Euro (cm, m², m³)",
+                "Building US (ft-in, sqft, cft)",
+                "Metric small parts & CNC (mm, mm/min)",
+                "Imperial for Civil Eng (ft, ft/s)",
+                "FEM (mm, N, s)",
+                "Meter decimal (m, m², m³)",
+            ]
+
+    def test_plain_number_in_design_units(self):
+        """Fusion: a plain number typed in a dialog is in the design's units (beta 3 VEX QA:
+        an inch design read "-1.5" as -1.5 mm)."""
+        Doc = self.UnitDoc
+        names = Doc("").getEnumerationsOfProperty("UnitSystem")
+        self.assertEqual(core.doc_length_unit(Doc(names[0])), "mm")
+        self.assertEqual(core.doc_length_unit(Doc(names[3])), "in")
+        self.assertEqual(core.doc_length_unit(Doc(names[4])), "cm")
+        self.assertEqual(core.doc_length_unit(Doc(names[7])), "ft")
+        self.assertEqual(core.doc_length_unit(Doc(names[8])), "mm")  # not one of Fusion's
+        self.assertEqual(core.doc_length_unit(None), "mm")
+        self.assertAlmostEqual(core.plain_length(-1.5, Doc(names[3])), -38.1)
+        self.assertAlmostEqual(core.plain_length(2, Doc(names[9])), 2000.0)
+        self.assertAlmostEqual(core.plain_length(20, Doc(names[0])), 20.0)
+
+    def test_length_text_in_design_units(self):
+        """A sketch's value boxes show a length in the design's units, like Fusion (beta 3
+        VEX QA: an inch design's boxes showed millimetres); mm designs as before."""
+        Doc = self.UnitDoc
+        names = Doc("").getEnumerationsOfProperty("UnitSystem")
+        inch, mm, cm = Doc(names[3]), Doc(names[0]), Doc(names[4])
+        self.assertEqual(core.length_text(25.4, inch), "1 in")
+        self.assertEqual(core.length_text(0.182 * 25.4, inch), "0.182 in")
+        self.assertEqual(core.length_text(12.5, mm), "12.5 mm")
+        self.assertEqual(core.length_text(30.0, mm), "30 mm")
+        self.assertEqual(core.length_text(-0.001, mm), "0 mm")
+        self.assertEqual(core.length_text(25.0, cm), "2.5 cm")
+        self.assertEqual(core.length_text(1000.0, Doc(names[9])), "1 m")
+        self.assertEqual(core.length_text(19.05, None), "19.05 mm")
+        self.assertEqual(core.length_text(25.4 / 3, inch, digits=6), "0.333333 in")
+
+    def test_named_views_with_saved_ones(self):
+        views = self.folder(self.tree(views=["Corner"]), "Named Views")
+        self.assertEqual(self.labels(views), ["TOP", "FRONT", "RIGHT", "HOME", "Corner"])
+        self.assertEqual(views["children"][-1]["kind"], "saved_view")
+
+    def test_empty_document(self):
+        self.assertEqual(self.labels(core.build("Empty", [])), ["Document Settings", "Named Views"])
+
+    def test_analysis_folder_once_there_is_one(self):
+        rows = OBJECTS + [obj("Section", "App::FeaturePython", fission180_type="SectionAnalysis")]
+        labels = self.labels(self.tree(rows))
+        self.assertEqual(labels[2], "Analysis")
+
+    def test_analysis_menu_edits(self):
+        """Fusion: an analysis in the browser is edited from its menu (and double-click)."""
+        node = {"kind": "analysis", "visible": True}
+        self.assertEqual(core.menu_for(node)[0], "Edit Feature")
+
+    def test_problems_shown(self):
+        rows = [dict(o) for o in OBJECTS]
+        rows[5]["warning"] = "Lost its plane"
+        sketch = self.folder(self.tree(rows), "Sketches")["children"][0]
+        self.assertEqual(sketch["status"], "warning")
+        self.assertEqual(sketch["tip"], "Lost its plane")
+
+    def test_signature_changes_with_visibility(self):
+        a = core.signature(self.tree())
+        changed = [dict(o) for o in OBJECTS]
+        changed[5]["visible"] = True
+        b = core.signature(core.build("Design", changed, active_body="Body"))
+        self.assertNotEqual(a, b)
+
+    def test_find_helpers(self):
+        tree = self.tree()
+        self.assertEqual(core.node_for_object(tree, "Sketch"), "sketch:Sketch")
+        # A feature is found through its body.
+        self.assertEqual(core.node_for_object(tree, "Pad", "Body"), "body:Body")
+        self.assertEqual(core.path_to(tree, "sketch:Sketch"), ["document", "sketches"])
+
+    def test_menus_like_fusion(self):
+        tree = self.tree()
+        body = self.folder(tree, "Bodies")["children"][0]
+        self.assertIn("Find in Timeline", core.menu_for(body))
+        self.assertIn("Delete", core.menu_for(body))
+        sketch = self.folder(tree, "Sketches")["children"][0]
+        self.assertEqual(core.menu_for(sketch)[0], "Edit Sketch")
+        plane = self.folder(tree, "Origin")["children"][2]
+        self.assertNotIn("Delete", core.menu_for(plane))
+
+
+class HoverTests(unittest.TestCase):
+    """A hover in the 3D view lights the browser row of what is under the mouse."""
+
+    OBJECTS = [
+        obj("Part", "App::Part", label="Arm"),
+        obj("Body", "PartDesign::Body", component="Part"),
+        obj("Pad", "PartDesign::Pad", True, "Body", component="Part"),
+        obj("Sketch", "Sketcher::SketchObject", False, "Body", component="Part"),
+        obj("Body001", "PartDesign::Body"),
+    ]
+
+    def tree(self):
+        return core.build("Design", self.OBJECTS, active_body="Body001")
+
+    def test_the_body_wins_over_its_component(self):
+        # a face of Pad in Body in the component Part (browser_ui adds Pad's body after it)
+        key = core.hover_row(self.tree(), ["Part", "Body", "Pad", "Body"])
+        self.assertEqual(key, "body:Body")
+
+    def test_a_sketch_lights_its_own_row(self):
+        self.assertEqual(core.hover_row(self.tree(), ["Part", "Body", "Sketch"]), "sketch:Sketch")
+
+    def test_a_component_alone(self):
+        self.assertEqual(core.hover_row(self.tree(), ["Part"]), "component:Part")
+
+    def test_nothing_known(self):
+        self.assertIsNone(core.hover_row(self.tree(), []))
+        self.assertIsNone(core.hover_row(self.tree(), ["Pad"]))
+
+    def test_a_closed_folder_shows_it(self):
+        tree = self.tree()
+        everything_open = core.shown_row(tree, "body:Body", lambda key: True)
+        self.assertEqual(everything_open, "body:Body")
+        closed = {"bodies:Part"}
+        self.assertEqual(
+            core.shown_row(tree, "body:Body", lambda key: key not in closed), "bodies:Part"
+        )
+        closed = {"component:Part", "bodies:Part"}
+        self.assertEqual(
+            core.shown_row(tree, "body:Body", lambda key: key not in closed), "component:Part"
+        )
+        self.assertIsNone(core.shown_row(tree, "body:Nothing", lambda key: True))
+
+    def test_opacity_control_on_bodies_and_components(self):
+        tree = self.tree()
+        self.assertIn("Opacity Control", core.menu_for(core.find(tree, "body:Body")))
+        self.assertIn("Opacity Control", core.menu_for(core.find(tree, "component:Part")))
+        self.assertNotIn("Opacity Control", core.menu_for(core.find(tree, "sketch:Sketch")))
+
+    def test_selectable_unselectable_on_bodies_and_components(self):
+        tree = self.tree()
+        for key in ("body:Body", "component:Part"):
+            menu = core.menu_for(core.find(tree, key))
+            self.assertIn("Selectable/Unselectable", menu)
+            self.assertEqual(menu.index("Selectable/Unselectable"), menu.index("Show/Hide") + 1)
+        self.assertNotIn("Selectable/Unselectable", core.menu_for(core.find(tree, "sketch:Sketch")))
+
+    def test_an_unselectable_row_carries_its_mark(self):
+        objects = [
+            obj("Part", "App::Part", label="Frame", selectable=False),
+            obj("Body", "PartDesign::Body", component="Part", selectable=True),
+            obj("Body001", "PartDesign::Body", selectable=False),
+            obj("Body002", "PartDesign::Body"),
+        ]
+        tree = core.build("Design", objects, active_body="Body002")
+        self.assertTrue(core.find(tree, "component:Part")["unselectable"])
+        # the mark is on what was switched: a body in it keeps its own (Fusion)
+        self.assertFalse(core.find(tree, "body:Body")["unselectable"])
+        self.assertTrue(core.find(tree, "body:Body001")["unselectable"])
+        self.assertFalse(core.find(tree, "body:Body002")["unselectable"])
+        changed = [dict(o) for o in objects]
+        changed[2]["selectable"] = True
+        after = core.build("Design", changed, active_body="Body002")
+        self.assertNotEqual(core.signature(tree), core.signature(after))  # the row is redrawn
+
+
+class EmptyBodyTests(unittest.TestCase):
+    """Luca: "when making a sketch, a body appears in the browser. but there are no bodies?"
+    Fusion has no body until the first solid feature (Extrude's New Body); the body Fission 180
+    makes to hold a new design's first sketch (browser_ui: "empty") is not listed."""
+
+    SKETCH_ONLY = [
+        obj("Body", "PartDesign::Body", empty=True),
+        obj("Origin", "App::Origin", body="Body"),
+        obj("XY_Plane", "App::Plane", False, "Body", "XY_Plane"),
+        obj("X_Axis", "App::Line", False, "Body", "X_Axis"),
+        obj("Sketch", "Sketcher::SketchObject", True, "Body", display="Sketch 1"),
+    ]
+
+    def labels(self, node):
+        return [c["label"] for c in node["children"]]
+
+    def test_a_new_design_with_a_sketch_lists_no_body(self):
+        tree = core.build("Design", self.SKETCH_ONLY, active_body="Body")
+        self.assertEqual(
+            self.labels(tree), ["Document Settings", "Named Views", "Origin", "Sketches"]
+        )
+        self.assertIsNone(core.find(tree, "body:Body"))
+        # the design's Origin is still the (unlisted) body's
+        self.assertEqual(self.labels(core.find(tree, "origin")), ["X", "XY"])
+        self.assertEqual(self.labels(core.find(tree, "sketches")), ["Sketch 1"])
+
+    def test_the_first_solid_feature_lists_it(self):
+        made = [dict(o) for o in self.SKETCH_ONLY] + [obj("Pad", "PartDesign::Pad", True, "Body")]
+        made[0].pop("empty")
+        tree = core.build("Design", made, active_body="Body")
+        self.assertEqual(self.labels(core.find(tree, "bodies")), ["Body"])
+        self.assertTrue(core.find(tree, "body:Body")["active"])
+
+    def test_only_the_empty_one_is_left_out(self):
+        objects = self.SKETCH_ONLY + [
+            obj("Body001", "PartDesign::Body", False),  # hidden, but it has a solid: listed
+            obj("Body002", "PartDesign::Body", surface=True),  # a surface body: listed
+        ]
+        tree = core.build("Design", objects, active_body="Body")
+        self.assertEqual(self.labels(core.find(tree, "bodies")), ["Body001", "Body002"])
+
+    def test_in_a_component(self):
+        objects = [
+            obj("Part", "App::Part", label="Bracket"),
+            obj("Body", "PartDesign::Body", component="Part", empty=True),
+            obj("Sketch", "Sketcher::SketchObject", True, "Body", component="Part"),
+        ]
+        tree = core.build("Design", objects, active_component="Part")
+        part = core.find(tree, "component:Part")
+        self.assertEqual(self.labels(part), ["Sketches"])  # no Bodies folder
+        # the sketch is still found and lit (Find in Browser, the 3D view's hover)
+        self.assertEqual(core.node_for_object(tree, "Sketch", "Body"), "sketch:Sketch")
+        self.assertEqual(core.hover_row(tree, ["Part", "Body", "Sketch", "Body"]), "sketch:Sketch")
+
+
+class SecondClickTests(unittest.TestCase):
+    """A second click on the selected row's name renames it (Fusion, Windows Explorer)."""
+
+    KINDS = ("body", "sketch", "component")
+
+    def test_the_second_click_on_the_same_row(self):
+        self.assertTrue(
+            core.second_click("body:Body", "body", "body:Body", ["body:Body"], True, self.KINDS)
+        )
+
+    def test_a_first_click_only_selects(self):
+        # the row was not clicked before (selected from the 3D view, or another row was)
+        self.assertFalse(
+            core.second_click("body:Body", "body", None, ["body:Body"], True, self.KINDS)
+        )
+        self.assertFalse(
+            core.second_click("body:Body", "body", "sketch:S", ["body:Body"], True, self.KINDS)
+        )
+
+    def test_not_on_the_eye_or_icon(self):
+        self.assertFalse(
+            core.second_click("body:Body", "body", "body:Body", ["body:Body"], False, self.KINDS)
+        )
+
+    def test_not_with_more_rows_selected(self):
+        self.assertFalse(
+            core.second_click(
+                "body:Body", "body", "body:Body", ["body:Body", "body:B2"], True, self.KINDS
+            )
+        )
+
+    def test_not_a_row_that_has_no_name_of_its_own(self):
+        self.assertFalse(
+            core.second_click("origin:XY", "origin", "origin:XY", ["origin:XY"], True, self.KINDS)
+        )
+        self.assertFalse(core.second_click(None, "body", None, [], True, self.KINDS))
+
+
+if __name__ == "__main__":
+    unittest.main()

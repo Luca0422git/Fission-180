@@ -25,7 +25,7 @@ Fusion encodes state in color. Under-constrained normal geometry is solid blue, 
 - **Selected profiles**: a user said selected and unselected profiles are hard to tell apart (accessibility complaint). Colors live in theme XML files and are not exposed as a preference. [Forum] — [Highlight color when selecting sketch profiles](https://forums.autodesk.com/t5/fusion-design-validate-document/highlight-color-when-selecting-sketch-profiles/m-p/6873109)
 
 ### Inferences
-- The color scheme implies the solver reports a per-entity "degrees of freedom remaining" state (blue = free, black = fully defined) plus a per-sketch "fully defined" flag that drives the browser lock badge. SciForge's sketcher solver (FreeCAD Sketcher already reports DOF) can map onto this directly.
+- The color scheme implies the solver reports a per-entity "degrees of freedom remaining" state (blue = free, black = fully defined) plus a per-sketch "fully defined" flag that drives the browser lock badge. Fission 180's sketcher solver (FreeCAD Sketcher already reports DOF) can map onto this directly.
 - Fixed (green) overrides the constrained/unconstrained colors. Projected (purple) is a separate category that shows whatever the constraint status.
 - Recollection, unverified in this session: sketch points (line endpoints, arc centers) draw as small dots in the same color as their state (blue or black). Selected curves draw in a brighter/lighter highlight color than the blue preselection. Treat these as unconfirmed.
 
@@ -57,7 +57,7 @@ Constraints draw as small icon glyphs next to the geometry they apply to. The "S
 - Paired constraints (parallel, equal, tangent) probably show a glyph on each participating entity, and hovering one highlights both. This is common practice but was not confirmed in sources found here.
 
 ### Gaps
-- Exact glyph shapes and colors, and whether glyphs change color when hovered or selected. No source described them, and SciForge must design its own icons anyway.
+- Exact glyph shapes and colors, and whether glyphs change color when hovered or selected. No source described them, and Fission 180 must design its own icons anyway.
 - Whether the Show Constraints display behavior changed in 2023 to 2026 releases. No release note found.
 - What exactly happens when a new constraint conflicts with existing ones (message text, whether it is refused). Not found.
 
@@ -77,7 +77,7 @@ After the first click of a line, two small input boxes follow the cursor: length
 
 ### Inferences
 - The HUD boxes probably accept the same grammar as the dimension box (units like "10 mm" or "1 in", arithmetic, parameter names), since both create the same dimension objects. Not confirmed for the HUD specifically.
-- Model for SciForge: each tool exposes an ordered list of HUD fields (Line: length, angle; 2-point rectangle: width, height; center-diameter circle: diameter; polygon: size and side count). Each field has three states: following the cursor, typed but not locked, and locked (Tab). Only locked or typed fields create driving dimensions when the entity is committed. Fields left alone create no dimension.
+- Model for Fission 180: each tool exposes an ordered list of HUD fields (Line: length, angle; 2-point rectangle: width, height; center-diameter circle: diameter; polygon: size and side count). Each field has three states: following the cursor, typed but not locked, and locked (Tab). Only locked or typed fields create driving dimensions when the entity is committed. Fields left alone create no dimension.
 - Recollection, unverified: the center-diameter circle shows one diameter box. Arcs show radius and sweep-angle boxes. Slot shows length and width boxes.
 
 ### Gaps
@@ -166,7 +166,7 @@ Fusion's Create menu offers several variants of each primitive: 3 rectangle, 5 c
 
 ### Inferences
 - Trim's "delete the whole curve if there is no intersection" rule plus drag-to-trim is cheap to copy and gives a strong Fusion feel.
-- Every derived tool (Mirror, Offset, patterns, Project) leaves a persistent, editable relationship (a symmetry constraint, an offset glyph, a pattern constraint, a projection link) rather than plain copies. SciForge should model these as constraints or links, not one-shot geometry.
+- Every derived tool (Mirror, Offset, patterns, Project) leaves a persistent, editable relationship (a symmetry constraint, an offset glyph, a pattern constraint, a projection link) rather than plain copies. Fission 180 should model these as constraints or links, not one-shot geometry.
 
 ### Gaps
 - Sketch Fillet details (pick two curves or a corner point, radius box, whether repeated fillets get equal constraints): not found in this session.
@@ -191,7 +191,7 @@ Press D, pick one entity or two, move the mouse to choose the dimension type and
 - Autodesk recommends applying constraints before dimensioning. [Official blog] — [How to Create Dimensions in Sketches](https://www.autodesk.com/products/fusion-360/blog/dimensions-in-sketches-fusion/)
 
 ### Inferences
-- Dimension names (d1, d2, …) become user-editable model parameters (implied by "reference an existing dimension" and the Parameters dialog mention). SciForge already has a Change Parameters dialog, so sketch dimensions should register there.
+- Dimension names (d1, d2, …) become user-editable model parameters (implied by "reference an existing dimension" and the Parameters dialog mention). Fission 180 already has a Change Parameters dialog, so sketch dimensions should register there.
 - The driven-dimension prompt is a good pattern to copy: never refuse a dimension, offer to make it a reference instead.
 
 ### Gaps
@@ -218,7 +218,7 @@ The Sketch Palette is a floating panel that appears while a sketch is active. It
 
 ### Inferences
 - Likely defaults (recollection, unverified): Sketch Grid on, Snap on, Slice off, Show Profile on, Show Points on, Show Dimensions on, Show Constraints on, Show Projected Geometries on, 3D Sketch off.
-- The palette's top area changes per tool (for example, circle type while the Circle tool runs), so it doubles as the tool-options panel. SciForge can reuse its task-panel area for the same purpose.
+- The palette's top area changes per tool (for example, circle type while the Circle tool runs), so it doubles as the tool-options panel. Fission 180 can reuse its task-panel area for the same purpose.
 
 ### Gaps
 - Official default states for each checkbox: not found.
@@ -278,7 +278,7 @@ Official default keys: L Line, R 2-Point Rectangle, C Center Diameter Circle, D 
 
 ### Inferences
 - E (Extrude) works while a sketch is active and implicitly finishes the sketch. This matches typical Fusion workflow but was not confirmed in a source here.
-- Keys SciForge should bind inside its sketch mode at minimum: L, R, C, D, X, T, O, P, plus Esc (cancel tool) and Delete (delete selected geometry, constraint or dimension).
+- Keys Fission 180 should bind inside its sketch mode at minimum: L, R, C, D, X, T, O, P, plus Esc (cancel tool) and Delete (delete selected geometry, constraint or dimension).
 
 ### Gaps
 - Official sketch-specific default shortcuts beyond those listed (Fillet, Mirror, Arc, Spline, Point, Polygon have none by default, as far as I recall; unconfirmed).

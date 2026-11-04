@@ -1,10 +1,10 @@
-<!-- SCIFORGE: FreeCAD's original README, moved here from README.md (docs/sciforge/core-patches.md #5)
-     so that SciForge's own README can be the project's front page. Kept unchanged below this
+<!-- FISSION180: FreeCAD's original README, moved here from README.md (docs/fission180/core-patches.md #5)
+     so that Fission 180's own README can be the project's front page. Kept unchanged below this
      note for credit and for merging upstream releases. -->
-> **This is FreeCAD's own README**, kept here to credit the project SciForge is based on.
-> SciForge is not FreeCAD and is not endorsed by the FreeCAD project. SciForge's README is
+> **This is FreeCAD's own README**, kept here to credit the project Fission 180 is based on.
+> Fission 180 is not FreeCAD and is not endorsed by the FreeCAD project. Fission 180's README is
 > [README.md](README.md). Links below that start with `/` or point to FreeCAD's website, forum
-> and bug tracker are FreeCAD's, not SciForge's.
+> and bug tracker are FreeCAD's, not Fission 180's.
 
 <a href="https://freecad.org"><img src="/src/Gui/Icons/freecad.svg" height="100px" width="100px"></a>
 

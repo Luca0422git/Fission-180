@@ -30,10 +30,10 @@ if(BUILD_HELP)
   add_subdirectory(Help)
 endif(BUILD_HELP)
 
-# SCIFORGE: SciForge's own module (docs/sciforge/core-patches.md #3).
-if(BUILD_SCIFORGE)
-  add_subdirectory(SciForge)
-endif(BUILD_SCIFORGE)
+# FISSION180: Fission 180's own module (docs/fission180/core-patches.md #3).
+if(BUILD_FISSION180)
+  add_subdirectory(Fission180)
+endif(BUILD_FISSION180)
 
 if(BUILD_IDF)
   add_subdirectory(Idf)

@@ -10,7 +10,7 @@ Var FileAssociation
 
 # ----------------------------------
 
-Section "un.${APP_NAME}" un.SecUnProgramFiles # SCIFORGE
+Section "un.${APP_NAME}" un.SecUnProgramFiles # FISSION180
 
   SectionIn RO
 
@@ -18,7 +18,7 @@ Section "un.${APP_NAME}" un.SecUnProgramFiles # SCIFORGE
   ReadRegStr $0 SHCTX "${APP_UNINST_KEY}" "StartMenu"
   RMDir /r "$0"
   # delete desktop icon
-  Delete "$DESKTOP\${APP_NAME}.lnk" # SCIFORGE: "SciForge.lnk"
+  Delete "$DESKTOP\${APP_NAME}.lnk" # FISSION180: "Fission180.lnk"
 
   # remove file extension .FCStd
   ReadRegStr $R0 SHCTX "Software\Classes\${APP_EXT}" ""
@@ -41,7 +41,7 @@ Section "un.${APP_NAME}" un.SecUnProgramFiles # SCIFORGE
 
   ${if} $MultiUser.Privileges == "Admin"
    DeleteRegKey HKCR "${APP_REGNAME_DOC}"
-   # SCIFORGE: FreeCAD's thumbnail DLL was never installed by SciForge, so it is not
+   # FISSION180: FreeCAD's thumbnail DLL was never installed by Fission 180, so it is not
    # unregistered here either (that would break a FreeCAD installation's previews)
   ${endif}
 

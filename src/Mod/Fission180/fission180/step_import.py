@@ -1,0 +1,466 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""STEP and IGES files with their structure, without Qt (File > Open, Insert STEP): every
+product of the file becomes a component, nested as in the file, named after it, with its
+solids as bodies and its colours; a part used twice comes in once and the other occurrences
+are linked copies of it (instances.py). The rules are in exchange_core.py, the spec in
+docs/fission180/parity/insert-export.md ("Part 2").
+
+How the file is read: FreeCAD's own reader (Import.insert with link groups, the reader of
+FreeCAD 1.x that keeps assemblies) runs in a hidden throw-away document; every node of what
+it builds (App::LinkGroup = an assembly, Part::Feature = a part, App::Link = a repeated
+occurrence) is turned into a plain node with its solids in the file's coordinates; then the
+throw-away document is closed and Fission 180's components and bodies are made from the nodes.
+"""
+
+import FreeCAD as App
+
+from . import bodies, components, insert, instances, log, warn
+from . import exchange_core as core
+
+UNIT_TYPES = ("App::LinkGroup", "App::Part", "App::Link")
+SKIP_TYPES = ("App::Origin", "App::Line", "App::Plane", "App::Point")
+SOURCE = "SourceFile"
+# on the component an Insert STEP made: the file and its size / digest when it was read, so
+# a second insert of the same file is another occurrence of it (Fusion: another instance of
+# the same component), not a second copy of its solids
+FILE_PROP = "Fission180SourceFile"
+STAMP_PROP = "Fission180SourceStamp"
+
+
+class Made:
+    """What one import made: the file's component (Insert), every component, the copies
+    (instances) and the bodies, in the order they were made."""
+
+    def __init__(self):
+        self.top = None
+        self.components = []
+        self.instances = []
+        self.bodies = []
+        self.built = {}  # file key -> component
+        self.notes = {}  # what the file had that did not come in (export_report.cad_items)
+        self.occurrence = False  # the file was in the design already: `top` is an instance
+        self.path = ""
+        self.name = ""
+        self.finished = False
+
+
+# -- reading -----------------------------------------------------------------------------------
+def read_tree(path, notes=None):
+    """The file's top nodes (exchange_core.node), with each part's solids in the file's
+    coordinates as (shape, [colours], surface?) and each node's placement in the file.
+    `notes` (a dict): filled with what does not come in (loose faces and curves, faces
+    sewn into surface bodies, shapes with errors) for export_report.cad_items."""
+    import os
+
+    import Import
+
+    if not path or not os.path.isfile(path):
+        raise core.ExchangeError("The file was not found: %s" % (path or "(no file)"))
+    if core.file_kind(path) not in ("step", "iges"):
+        raise core.ExchangeError("Choose a STEP (.step, .stp) or IGES (.iges, .igs) file.")
+    doc, active = insert._temp_document()
+    try:
+        try:
+            found = Import.insert(
+                path, doc.Name, importHidden=False, merge=False, useLinkGroup=True, mode=0
+            )
+        except Exception as exc:
+            raise core.ExchangeError("The file could not be read: %s" % exc)
+        doc.recompute()
+        colours = {}
+        for feature, values in found or []:
+            try:
+                colours[feature.Name] = [tuple(float(c) for c in v[:3]) for v in values]
+            except Exception:
+                pass
+        units = [o for o in doc.Objects if o.TypeId not in SKIP_TYPES]
+        names = {o.Name for o in units}
+        tops = [o for o in units if not any(p.Name in names for p in o.InList if p is not o)]
+        nodes = [_walk(top, top, "", colours, notes) for top in tops]
+        nodes = [n for n in nodes if n is not None]
+        if not nodes:
+            raise core.ExchangeError("Nothing could be read from the file.")
+        if not any(_has_pieces(n) for n in nodes):
+            raise core.ExchangeError(
+                "The file holds no solid or surface body (lines and points are not taken)."
+            )
+        return nodes
+    finally:
+        insert._close_temp(doc, active)
+
+
+def _has_pieces(n):
+    return bool(n["pieces"]) or any(_has_pieces(c) for c in n["children"])
+
+
+def _place(top, sub):
+    """The placement of the node at `sub` under `top`, in the file's coordinates."""
+    if not sub:
+        return App.Placement(top.Placement)
+    try:
+        found = top.getSubObject(sub, retType=2)
+        return App.Placement(found[1])
+    except Exception:
+        return App.Placement()
+
+
+def _children_of(obj):
+    if obj.TypeId == "App::LinkGroup":
+        return list(obj.ElementList)
+    if obj.TypeId == "App::Part":
+        return [c for c in obj.Group if c.TypeId not in SKIP_TYPES]
+    return []
+
+
+def _walk(top, obj, sub, colours, notes=None):
+    """A node for `obj`, reached from `top` by the sub-object path `sub`."""
+    link = None
+    target = obj
+    if obj.TypeId == "App::Link":
+        try:
+            target = obj.getLinkedObject(True)
+        except Exception:
+            target = obj.LinkedObject
+        if target is None or target is obj:
+            return None
+        link = target.Name
+    place = _place(top, sub)
+    kids = _children_of(target)
+    if kids or target.TypeId in ("App::LinkGroup", "App::Part"):
+        children = []
+        for child in kids:
+            n = _walk(top, child, sub + child.Name + ".", colours, notes)
+            if n is not None:
+                children.append(n)
+        return core.node(
+            obj.Label, core.ASSEMBLY, key=target.Name, link=link, children=children, place=place
+        )
+    shape = _shape(top, sub)
+    if shape is None:
+        return None
+    pieces = _pieces(shape, colours.get(target.Name, []))
+    if notes is not None and link is None:  # a repeated occurrence was counted once
+        from . import export_report
+
+        export_report.shape_notes(shape, notes)
+        export_report.piece_notes(pieces, notes)
+    return core.node(
+        obj.Label,
+        core.PART,
+        key=target.Name,
+        link=link,
+        pieces=pieces,
+        place=place,
+    )
+
+
+def _shape(top, sub):
+    import Part
+
+    try:
+        shape = Part.getShape(top, sub) if sub else Part.getShape(top)
+    except Exception:
+        return None
+    if shape is None or shape.isNull():
+        return None
+    return shape
+
+
+def _pieces(shape, colours):
+    """[(shape, colours, surface)] of a part: its solids; a file of faces only (IGES often
+    is) is sewn: closed shells become solids, open ones surface bodies."""
+    import Part
+
+    found = list(shape.Solids)
+    surface = False
+    if not found and shape.Faces:
+        sewn = Part.makeCompound([f.copy() for f in shape.Faces])
+        try:
+            sewn.sewShape()
+        except Exception as exc:
+            warn("import: faces not sewn (%s)" % exc)
+        shells = list(sewn.Shells) or [Part.Shell(list(sewn.Faces))]
+        for shell in shells:
+            try:
+                if shell.isClosed():
+                    solid = Part.Solid(shell)
+                    if solid.Volume < 0:
+                        solid.reverse()
+                    found.append(solid)
+                    continue
+            except Exception:
+                pass
+            found.append(shell)
+            surface = True
+    pieces = []
+    total = sum(len(p.Faces) for p in found)
+    start = 0
+    for piece in found:
+        count = len(piece.Faces)
+        if colours and len(colours) == total:
+            mine = colours[start : start + count]
+        else:
+            mine = colours[:1]
+        start += count
+        pieces.append((piece, mine, surface and not piece.Solids))
+    return pieces
+
+
+# -- building ----------------------------------------------------------------------------------
+_STAMPS = {}  # (path, size, date) -> stamp: a file is read once while it does not change
+
+
+def file_stamp(path):
+    """What tells one version of a file from another: its size and a digest of its bytes
+    ("" when the file cannot be read). Not its date: the same bytes copied again (a
+    teammate's copy of the parts folder, a git checkout, a download over the old file) are
+    the same part, while a real change of the file is another (beta 3 QA)."""
+    import hashlib
+    import os
+
+    try:
+        st = os.stat(path)
+        key = (os.path.normcase(os.path.abspath(path)), st.st_size, st.st_mtime_ns)
+        stamp = _STAMPS.get(key)
+        if stamp is None:
+            digest = hashlib.sha1()
+            with open(path, "rb") as handle:
+                for block in iter(lambda: handle.read(1 << 20), b""):
+                    digest.update(block)
+            stamp = "%d:%s" % (st.st_size, digest.hexdigest()[:20])
+            if len(_STAMPS) > 512:
+                _STAMPS.clear()
+            _STAMPS[key] = stamp
+        return stamp
+    except OSError:
+        return ""
+
+
+def _same_file(a, b):
+    import os
+
+    try:
+        return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+    except Exception:
+        return a == b
+
+
+def inserted_from(doc, path):
+    """The component a STEP / IGES file was inserted as earlier in this design (the same
+    path and bytes: the file did not change since), or None."""
+    stamp = file_stamp(path)
+    if not stamp:
+        return None
+    for comp in components.list_components(doc):
+        try:
+            if instances.is_instance(comp):
+                continue
+            source = getattr(comp, FILE_PROP, "") or ""
+            if source and _same_file(source, path) and getattr(comp, STAMP_PROP, "") == stamp:
+                return comp
+        except Exception:
+            continue
+    return None
+
+
+def _remember_file(comp, path):
+    bodies.add_prop(comp, "App::PropertyString", FILE_PROP, "Insert", "The file it came from")
+    bodies.add_prop(comp, "App::PropertyString", STAMP_PROP, "Insert", "Its size and digest")
+    setattr(comp, FILE_PROP, path)
+    setattr(comp, STAMP_PROP, file_stamp(path))
+
+
+def read(path):
+    """The file read ahead of an insert (FreeCAD's reader works in a throw-away document,
+    and making and closing a document in the middle of the insert's undo step cut that step
+    short when the insert did not come from a command: the Data Panel's menu). Returns
+    (tops, notes) for import_file's `tree`."""
+    notes = {}
+    return read_tree(path, notes), notes
+
+
+def import_file(
+    doc, path, mode=core.OPEN, parent=None, label=None, reuse=True, tree=None, finish=True
+):
+    """Bring a STEP / IGES file into `doc` with its structure. mode OPEN: the file's top
+    product is the design (File > Open into a new design); INSERT: the whole file becomes
+    one component (named `label`, else after the file) inside `parent` (None: the root);
+    a file this design already holds (inserted before, unchanged since) comes in as another
+    occurrence of that component ("Screw:2", linked: Fusion's second insert of a design),
+    unless `reuse` is False. `tree`: the file as read() gave it (else it is read here).
+    `finish` False: no recompute and no colours yet (several files in one go: the caller
+    recomputes once, then calls finish_made for each). No undo step of its own (the
+    caller's). Returns a Made."""
+    made = Made()
+    if mode == core.INSERT and reuse and label is None:
+        source = inserted_from(doc, path)
+        if source is not None:
+            try:
+                at = components._container_placement(parent)  # where a fresh one lands
+                inst = instances.make_instance(source, parent, placement=at)
+                made.top = inst
+                made.instances.append(inst)
+                made.occurrence = True
+                made.path = path
+                if finish:
+                    doc.recompute()
+                log("inserted %s again: another occurrence, %s" % (source.Label, inst.Label))
+                return made
+            except Exception as exc:
+                warn("insert: %s comes in as its own copy (%s)" % (core.base_name(path), exc))
+    if tree is not None:
+        tops, made.notes = tree
+    else:
+        tops = read_tree(path, made.notes)
+    name = label or core.base_name(path)
+    level = core.plan(tops, mode, name)
+    container = parent
+    if level["component"]:
+        container = components.new_component(doc, _component_label(doc, name), parent)
+        made.top = container
+        made.components.append(container)
+        _remember_file(container, path)
+    origin = components._container_placement(container)
+    top = level["top"]
+    at_root = container is None
+    part_name = level["part_name"] if at_root else (top and top["name"])
+    _bodies(doc, container, level["pieces"], App.Placement(), at_root, part_name, made)
+    for child in level["children"]:
+        _component(doc, child, container, App.Placement(), origin, made)
+    made.path = path
+    made.name = name
+    if finish:
+        doc.recompute()
+        finish_made(made)
+    log(
+        "%s %s"
+        % (
+            "opened" if mode == core.OPEN else "inserted",
+            core.describe(
+                len(made.components) - (1 if made.top is not None else 0),
+                len(made.instances),
+                len(made.bodies),
+                name,
+            ),
+        )
+    )
+    return made
+
+
+def finish_made(made):
+    """What an import does once its bodies have their shapes (after a recompute): the
+    steps' marks and source file, the colours. Done once per Made."""
+    if made.finished or made.occurrence:
+        made.finished = True
+        return
+    made.finished = True
+    _finish_bodies(made, made.path)
+
+
+def _component_label(doc, name):
+    labels = {c.Label for c in components.list_components(doc)}
+    label, n = name, 1
+    while label in labels:
+        n += 1
+        label = "%s (%d)" % (name, n)
+    return label
+
+
+def _component(doc, n, container, parent_place, origin, made):
+    """One node as a component in `container`; parent_place: the container's placement in
+    the file; origin: the level's placement in the design (for copies)."""
+    key = n.get("link")
+    if key and key in made.built:
+        source = made.built[key]
+        wanted = origin.multiply(n["place"])
+        try:
+            made.instances.append(instances.make_instance(source, container, placement=wanted))
+            return
+        except Exception as exc:
+            warn("import: %s made as its own component (%s)" % (n["name"], exc))
+    comp = components.new_component(doc, n["name"] or "Component", container)
+    comp.Placement = parent_place.inverse().multiply(n["place"])
+    made.components.append(comp)
+    for k in (n.get("key"), n.get("folded")):
+        if k and k not in made.built:
+            made.built[k] = comp
+    _bodies(doc, comp, n["pieces"], n["place"], False, n["name"], made)
+    for child in n["children"]:
+        _component(doc, child, comp, n["place"], origin, made)
+
+
+def _bodies(doc, container, pieces, frame, at_root, part_name, made):
+    """A body per piece in `container`, its shape moved from the file's coordinates into
+    the container's (`frame`: the container's placement in the file)."""
+    labels = core.body_labels(len(pieces), at_root, part_name)
+    taken = set()
+    inverse = frame.inverse().toMatrix()
+    for (shape, colours, surface), label in zip(pieces, labels):
+        if frame.isIdentity() and shape.Placement.isIdentity():
+            local = shape  # (read from a document that is closed now: nothing else holds it)
+        else:
+            local = bodies.baked(shape)
+            if not frame.isIdentity():
+                local.transformShape(inverse, True)
+        if at_root:
+            label = insert._unique_label(doc, label, taken)
+        body = components.new_body_in(doc, container, label)
+        base = doc.addObject("Part::Feature", "ImportedShape")
+        base.Label = body.Label + " (imported)"
+        _hide(base)  # hidden before the first recompute: never drawn (its body is)
+        base.Shape = local
+        if container is not None:
+            container.addObject(base)  # FreeCAD's link scope: the base sits in the component
+        body.BaseFeature = base
+        made.bodies.append((body, colours, base))
+
+
+def _hide(obj):
+    """Hide a helper at once: FreeCAD does not work out the triangles of a hidden object, so
+    an imported part is not drawn twice (its base and its body) while it comes in."""
+    try:
+        if App.GuiUp and obj.ViewObject is not None:
+            obj.ViewObject.Visibility = False
+    except Exception:
+        pass
+
+
+def _finish_bodies(made, path):
+    for body, colours, base in made.bodies:
+        tip = body.Tip
+        if tip is not None:
+            bodies.mark(tip, insert.TYPE_STEP)
+            bodies.add_prop(tip, "App::PropertyString", SOURCE, "Insert", "The file it came from")
+            setattr(tip, SOURCE, path)
+        insert._colour_body(body, colours)
+        try:
+            if base.ViewObject is not None:
+                base.ViewObject.Visibility = False
+        except Exception:
+            pass
+    made.bodies = [b for b, _c, _base in made.bodies]
+    # The copies were made before their source bodies had their colours.
+    try:
+        from . import appearance
+
+        for inst in made.instances:
+            for feature, copy in instances.copy_features(inst):
+                source = getattr(feature, "Source", None)
+                if source is not None and copy is not None:
+                    appearance.copy_body_appearance(source, copy)
+    except Exception as exc:
+        warn("import: the copies' colours were not copied (%s)" % exc)
+
+
+def apply_looks(made):
+    """The bodies' appearance on screen (GUI), copies included."""
+    try:
+        from . import appearance
+
+        for body in made.bodies:
+            appearance.apply(body)
+        for inst in made.instances:
+            for body in components.bodies_in(inst.Document, inst, recursive=True):
+                appearance.apply(body)
+    except Exception as exc:
+        warn("import: looks not applied (%s)" % exc)

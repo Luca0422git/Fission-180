@@ -1,0 +1,246 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""Runs the golden models in real FreeCAD and writes a report.
+
+Run headless (this is what CI and tools/fission180/run_tests.sh do):
+
+    freecadcmd -c "from Fission180Tests.golden import runner; runner.main()"
+
+Environment variables:
+    FISSION180_GOLDEN_OUT     folder for golden-report.json / .md (default: user data dir)
+    FISSION180_GOLDEN_FILTER  only run models whose id contains this text
+
+A model passes when every expected measurement matches. Models with an
+"xfail" field document a known gap (e.g. a kernel limitation): they are
+reported as XFAIL while they fail and as XPASS (attention!) when they start
+passing, and neither fails the run.
+
+Models with an "upstream_bug" field hit a bug in stock FreeCAD that Fission 180
+fixes in its fork. Run against stock FreeCAD they behave like "xfail"; run in
+a Fission 180 build they must pass like any other model.
+"""
+import glob
+import json
+import os
+import platform
+import time
+import traceback
+
+from . import schema
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(HERE, "models")
+DEFAULT_REL_TOL = 1e-6
+MESH_DEFLECTION = 0.002  # mm, for "volume_by": "mesh" (about 1e-5 of the volume)
+DEFAULT_ABS_TOL = 1e-4
+
+
+def load_models(folder=MODELS_DIR, text_filter=""):
+    models = []
+    for path in sorted(glob.glob(os.path.join(folder, "*.json"))):
+        with open(path, "r", encoding="utf-8") as handle:
+            model = json.load(handle)
+        schema.validate(model)
+        expected_id = os.path.splitext(os.path.basename(path))[0]
+        if model["id"] != expected_id:
+            raise schema.ModelError("%s: id %r must match the file name" % (path, model["id"]))
+        if text_filter and text_filter not in model["id"]:
+            continue
+        models.append(model)
+    return models
+
+
+def measure(shape, expect=None):
+    """The numbers compared with a model's expectations. "volume_by": "mesh" measures the
+    volume on a fine triangle mesh instead of OpenCASCADE's own integration, which is up to
+    about 1 % off on B-spline faces (drafted free-form walls, lofts)."""
+    try:
+        box = shape.optimalBoundingBox(False, False)
+    except Exception:
+        box = shape.BoundBox
+    volume = shape.Volume
+    if (expect or {}).get("volume_by") == "mesh":
+        import Mesh
+
+        volume = Mesh.Mesh(shape.tessellate(MESH_DEFLECTION)).Volume
+    return {
+        "volume": volume,
+        "area": shape.Area,
+        "bbox": [box.XMin, box.YMin, box.ZMin, box.XMax, box.YMax, box.ZMax],
+        "faces": len(shape.Faces),
+        "edges": len(shape.Edges),
+        "solids": len(shape.Solids),
+        "valid": shape.isValid(),
+    }
+
+
+def compare(expect, got):
+    """List of human-readable mismatches (empty list = match)."""
+    rel = expect.get("rel_tol", DEFAULT_REL_TOL)
+    absolute = expect.get("abs_tol", DEFAULT_ABS_TOL)
+    problems = []
+    for key in ("volume", "area"):
+        if key in expect:
+            want, have = expect[key], got[key]
+            if abs(have - want) > max(rel * abs(want), absolute):
+                problems.append(
+                    "%s: expected %.6g, got %.6g (%+.4f%%)"
+                    % (key, want, have, 100.0 * (have - want) / want)
+                )
+    if "bbox" in expect:
+        diffs = [abs(a - b) for a, b in zip(expect["bbox"], got["bbox"])]
+        if max(diffs) > absolute:
+            problems.append(
+                "bbox: expected %s, got %s" % (expect["bbox"], [round(v, 6) for v in got["bbox"]])
+            )
+    for key in ("faces", "edges", "solids"):
+        if key in expect and expect[key] != got[key]:
+            problems.append("%s: expected %d, got %d" % (key, expect[key], got[key]))
+    if expect.get("valid", True) and not got["valid"]:
+        problems.append("shape is not a valid solid (BRepCheck failed)")
+    return problems
+
+
+def is_fission180_build():
+    """True when Fission 180 is built into this FreeCAD (not added as a user add-on)."""
+    import FreeCAD as App
+
+    return os.path.isdir(os.path.join(App.getHomePath(), "Mod", "Fission180"))
+
+
+def run_model(model, fission180_build=False):
+    import FreeCAD as App
+
+    from .builder import Builder
+
+    result = {
+        "id": model["id"],
+        "title": model["title"],
+        "tags": model.get("tags", []),
+        "status": "error",
+        "problems": [],
+        "steps": [],
+    }
+    doc = App.newDocument("golden_" + model["id"])
+    names = [doc.Name]  # a "reopen" step opens the saved file as another document
+    start = time.time()
+    builder = None
+    try:
+        builder = Builder(doc)
+        for index, step in enumerate(model["steps"]):
+            t0 = time.time()
+            if step["op"] == "check":
+                got = measure(builder.shape(), step["expect"])
+                problems = compare(step["expect"], got)
+                result["problems"].extend("after step %d: %s" % (index, p) for p in problems)
+            else:
+                builder.run(step)
+            result["steps"].append(
+                {"op": step["op"], "id": step.get("id"), "seconds": round(time.time() - t0, 4)}
+            )
+        got = measure(builder.shape(), model["expect"])
+        result["measured"] = got
+        result["problems"].extend(compare(model["expect"], got))
+        result["status"] = "pass" if not result["problems"] else "fail"
+    except Exception as exc:
+        result["problems"].append("%s: %s" % (type(exc).__name__, exc))
+        result["traceback"] = traceback.format_exc()
+        result["status"] = "error"
+    finally:
+        result["seconds"] = round(time.time() - start, 3)
+        try:
+            names.append(builder.doc.Name)
+        except Exception:
+            pass
+        for name in set(names):
+            if name in App.listDocuments():
+                App.closeDocument(name)
+
+    reason = model.get("xfail")
+    if not reason and model.get("upstream_bug") and not fission180_build:
+        reason = "stock FreeCAD bug, fixed in Fission 180: " + model["upstream_bug"]
+    if reason:
+        result["xfail_reason"] = reason
+        result["status"] = "xpass" if result["status"] == "pass" else "xfail"
+    return result
+
+
+def summarize(results):
+    counts = {}
+    for r in results:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    return counts
+
+
+def markdown(report):
+    icons = {
+        "pass": "PASS",
+        "fail": "**FAIL**",
+        "error": "**ERROR**",
+        "xfail": "xfail",
+        "xpass": "**XPASS**",
+    }
+    lines = [
+        "# Golden-model report",
+        "",
+        "%s %s, %s. %s"
+        % (
+            "Fission 180 build of FreeCAD" if report["fission180_build"] else "Stock FreeCAD",
+            report["freecad"],
+            report["platform"],
+            ", ".join("%s: %d" % kv for kv in sorted(report["summary"].items())),
+        ),
+        "",
+        "| Model | Result | Time (s) | Details |",
+        "|---|---|---|---|",
+    ]
+    for r in report["results"]:
+        detail = "; ".join(r["problems"]) or ""
+        if r.get("xfail_reason"):
+            detail = ("known gap: %s. " % r["xfail_reason"]) + detail
+        lines.append(
+            "| `%s` %s | %s | %.2f | %s |"
+            % (r["id"], r["title"], icons[r["status"]], r["seconds"], detail.replace("|", "/"))
+        )
+    return "\n".join(lines) + "\n"
+
+
+def main():
+    import FreeCAD as App
+
+    out_dir = os.environ.get("FISSION180_GOLDEN_OUT") or App.getUserAppDataDir()
+    os.makedirs(out_dir, exist_ok=True)
+    fission180_build = is_fission180_build()
+    report = {
+        "freecad": ".".join(App.Version()[:3]),
+        "platform": platform.platform(),
+        "fission180_build": fission180_build,
+        "results": [],
+    }
+    try:
+        models = load_models(text_filter=os.environ.get("FISSION180_GOLDEN_FILTER", ""))
+    except Exception as exc:
+        report["results"].append(
+            {
+                "id": "model-files",
+                "title": "loading model files",
+                "status": "error",
+                "problems": [str(exc)],
+                "seconds": 0.0,
+            }
+        )
+        models = []
+    for model in models:
+        result = run_model(model, fission180_build)
+        report["results"].append(result)
+        App.Console.PrintMessage(
+            "[Fission 180] golden %-6s %s %s\n"
+            % (result["status"].upper(), model["id"], "; ".join(result["problems"]))
+        )
+    report["summary"] = summarize(report["results"])
+    report["passed"] = all(r["status"] in ("pass", "xfail", "xpass") for r in report["results"])
+    with open(os.path.join(out_dir, "golden-report.json"), "w", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2)
+    with open(os.path.join(out_dir, "golden-report.md"), "w", encoding="utf-8") as handle:
+        handle.write(markdown(report))
+    App.Console.PrintMessage("[Fission 180] golden summary: %s\n" % report["summary"])
+    return report
