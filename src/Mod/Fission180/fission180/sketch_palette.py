@@ -70,6 +70,10 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         title.setProperty("role", "title")
         outer.addWidget(title)
 
+        # Fusion's Feature Options: the running tool's types (rectangle, circle...)
+        self.features = FeatureOptions(session, self)
+        outer.addWidget(self.features)
+
         self.section = QtWidgets.QToolButton()
         self.section.setProperty("role", "section")
         self.section.setText("▾ Options")
@@ -201,7 +205,11 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
     def _refresh_mode(self):
         """Show whether new curves are drawn as construction (X with nothing selected
         switches that on: without this it was invisible until the next curve came out
-        orange and made no profile)."""
+        orange and made no profile); and the running tool's Feature Options."""
+        try:
+            self.features.refresh()
+        except Exception as exc:
+            warn("sketch palette: feature options: %s" % exc)
         if not getattr(self, "_freedom_off", False):
             try:
                 self._refresh_freedom()
@@ -285,6 +293,118 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
             self.deleteLater()
         except Exception:
             pass
+
+
+class FeatureOptions(QtWidgets.QWidget):
+    """Fusion's Feature Options in the Sketch Palette: while a rectangle, circle, arc,
+    polygon, slot or spline tool runs, its types as buttons (the current one lit); a click
+    switches to that type, the tool goes on (sketch_feature_options.py). Hidden while no
+    such tool runs."""
+
+    def __init__(self, session, palette):
+        super().__init__(palette)
+        from . import ribbon_config, sketch_feature_options
+
+        self.session = session
+        self.palette = palette
+        self.setObjectName("Fission180PaletteFeatures")
+        self.families = sketch_feature_options.families(ribbon_config.SKETCH_CREATE["items"])
+        self.family = None
+        self.buttons = {}
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 2)
+        layout.setSpacing(2)
+        self.header = QtWidgets.QLabel("▾ Feature Options")
+        self.header.setObjectName("Fission180PaletteFeaturesTitle")
+        self.header.setStyleSheet("font-weight: bold; padding: 4px 6px;")
+        layout.addWidget(self.header)
+        self.kind = QtWidgets.QLabel("")
+        self.kind.setObjectName("Fission180PaletteFeaturesKind")
+        self.kind.setStyleSheet("padding: 0 10px; color: #c9d1dc;")
+        layout.addWidget(self.kind)
+        self.grid_host = QtWidgets.QWidget()
+        self.grid = QtWidgets.QGridLayout(self.grid_host)
+        self.grid.setContentsMargins(10, 0, 10, 4)
+        self.grid.setSpacing(4)
+        layout.addWidget(self.grid_host)
+        self.hide()
+
+    def running(self):
+        """(family, current type) of the tool that runs, or (None, None)."""
+        from . import recent, sketch_feature_options
+
+        session = self.session
+        if session.closed or not session.tool_running():
+            return None, None
+        names = [recent.running_tool()]
+        tool = session.tool
+        if tool is not None and tool.active:
+            names.insert(0, getattr(tool, "command", None))
+        return sketch_feature_options.running(self.families, names)
+
+    def refresh(self):
+        family, current = self.running()
+        if family is None:
+            if self.isVisible():
+                self.hide()
+            self.family = None
+            return
+        if family != self.family:
+            self._build(family)
+        for label, button in self.buttons.items():
+            if button.isChecked() != (label == current):
+                button.setChecked(label == current)
+        if not self.isVisible():
+            self.show()
+
+    def _build(self, family):
+        while self.grid.count():
+            item = self.grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.buttons = {}
+        self.family = family
+        self.kind.setText("%s type" % family)
+        for n, (label, command, short) in enumerate(self.families.get(family, [])):
+            button = QtWidgets.QToolButton()
+            button.setObjectName("Fission180Feature_" + label.replace(" ", "_"))
+            button.setProperty("role", "option")
+            button.setText(short)
+            button.setToolTip("Draw a %s (the tool goes on)" % label)
+            button.setCheckable(True)
+            button.setFocusPolicy(QtCore.Qt.NoFocus)
+            button.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
+            button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            button.clicked.connect(lambda _=False, l=label, c=command: self._switch(l, c))
+            self.grid.addWidget(button, n // 2, n % 2)
+            self.buttons[label] = button
+
+    def _switch(self, label, command):
+        """Another type: the tool running ends and that type's tool starts."""
+
+        def go():
+            try:
+                from . import ribbon_ui
+
+                family, current = self.running()
+                if current == label:
+                    return
+                resolved = ribbon_ui.resolve(command, set(Gui.listCommands()))
+                if resolved is None:
+                    warn("sketch palette: %s is not available" % label)
+                    return
+                self.session.give_way()  # the running tool ends (FreeCAD's or Fission 180's)
+                ribbon_ui.run(resolved, label)
+                from . import log
+
+                log("sketch palette: Feature Options: %s" % label)
+            except Exception as exc:
+                warn("sketch palette: %s: %s" % (label, exc))
+
+        QtCore.QTimer.singleShot(0, go)
+        self.palette._view_focus()
 
 
 class _PanelKeys(QtCore.QObject):

@@ -119,9 +119,8 @@ def b_second():
 
 def b_check():
     h.check("B two clicks drew no rectangle", count() == s["n"], count() - s["n"])
-    from fission180 import sketch_pick_ui
-
-    h.check("B Mirror is waiting for its picks", sketch_pick_ui._state["waiter"] is not None)
+    # Mirror runs (its MIRROR panel: sketch_mirror_tool) and took the clicks as picks
+    h.check("B Mirror is waiting for its picks", st.tool_title() == "Mirror", st.tool_title())
     stop()
 
 

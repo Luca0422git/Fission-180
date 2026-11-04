@@ -553,6 +553,13 @@ AUTO_STEP = "Add Auto-Constraints"
 _merging = {"busy": False}
 
 
+def _count_splines(sketch):
+    try:
+        return sum(1 for g in sketch.Geometry if g.TypeId == "Part::GeomBSplineCurve")
+    except Exception:
+        return 0
+
+
 def _glued_next(doc):
     """The first step of the redo list goes with the step before it (the newest of the
     undo list)."""
@@ -1267,16 +1274,51 @@ class SketchSession:
         log("sketch: the running tool ended for the next command")
 
     def _spline_tool(self):
-        """FreeCAD's spline tool is drawing (Fusion's Fit Point / Control Point Spline)."""
+        """FreeCAD's spline tool is drawing (Fusion's Fit Point / Control Point Spline).
+
+        A FreeCAD tool runs (its cursor is on the view) and it is the spline tool: the
+        spline command was the last one started (past Finish Sketch, recorded before it
+        runs), or FreeCAD's tool panel shows the spline tool's parameters (a spline
+        started some other way: command search, FreeCAD's own toolbar or menu...)."""
         from . import recent
 
-        # (past Finish Sketch: it is recorded before it runs, and keeps the spline)
-        if recent.running_tool() not in SPLINE_COMMANDS:
-            return False
         try:
-            return self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
+            if self.gl is None or self.gl.cursor().shape() == QtCore.Qt.ArrowCursor:
+                return False
         except Exception:
             return False
+        if recent.running_tool() in SPLINE_COMMANDS:
+            return True
+        return self._spline_panel_shown()
+
+    def _spline_panel_shown(self):
+        """FreeCAD's tool panel (TaskSketcherTool, shown only while a tool with parameters
+        runs) has the spline tool's header ("B-Spline Parameters")."""
+        try:
+            panel = getattr(self, "_tool_panel", None)
+            if panel is None or not _is_valid(panel):
+                panel = None
+                main = Gui.getMainWindow()
+                for widget in main.findChildren(QtWidgets.QWidget):
+                    if widget.metaObject().className() == "SketcherGui::TaskSketcherTool":
+                        panel = widget
+                        break
+                self._tool_panel = panel
+            if panel is None or panel.isHidden():
+                return False
+            for child in panel.findChildren(QtWidgets.QWidget):
+                text = child.property("text")
+                if isinstance(text, str) and "spline" in text.lower():
+                    return True
+        except Exception as exc:
+            warn("spline: %s" % exc)
+        return False
+
+    def _spline_points(self):
+        """The loose points of the spline being drawn (sketch_spline.pending)."""
+        from . import sketch_spline
+
+        return sketch_spline.points_of(self.sketch, getattr(self, "_spline_from", None))
 
     def projection_refused(self, pos):
         """FreeCAD's Project tool (P) runs and the press at widget pixel `pos` is on a
@@ -1333,19 +1375,32 @@ class SketchSession:
         land outside any undo step (Esc could not take them back, and Ctrl+Z after the
         spline undid the step before it). Fission 180 opens the step again at the click."""
         try:
-            if self._spline_tool() and App.getActiveTransaction() is None:
+            if not self._spline_tool():
+                return
+            # the first click of a spline: its points are the curves added from here on
+            if getattr(self, "_spline_from", None) is None or not self._spline_points():
+                self._spline_from = len(self.sketch.Geometry)
+            if App.getActiveTransaction() is None:
                 App.setActiveTransaction(SPLINE_STEP)
         except Exception as exc:
             warn("spline: %s" % exc)
 
     def _commit_spline(self):
-        """Fusion's Enter / OK on a spline being drawn: the spline is made from the points
-        clicked so far. FreeCAD's spline tool makes it on Esc (or its right click), which
-        Fission 180 otherwise takes for "cancel": that Esc is handed to FreeCAD directly."""
+        """Fusion's Enter / OK / green check on a spline being drawn: the spline is made
+        from the points clicked so far. FreeCAD's spline tool makes it on Esc (or its right
+        click), which Fission 180 otherwise takes for "cancel": that Esc is handed to
+        FreeCAD directly. Then it is checked: when no spline came of it, Fission 180 makes
+        it from the points (sketch_spline.make_from_points) and FreeCAD's tool is stopped
+        (its points are gone). Returns "freecad", "own" or None (nothing to make)."""
+        from . import sketch_spline
+
         gl = self.gl
         if gl is None or not _is_valid(gl):
-            return
-        before = len(self.sketch.Geometry)
+            return None
+        sketch = self.sketch
+        points = self._spline_points()
+        splines = _count_splines(sketch)
+        before = len(sketch.Geometry)
         self.keys.pass_escape = True
         try:
             gl.setFocus()
@@ -1354,10 +1409,60 @@ class SketchSession:
                 QtWidgets.QApplication.sendEvent(gl, event)
         finally:
             self.keys.pass_escape = False
-        log(
-            "spline: made from the points clicked (%d curve(s) added)"
-            % (len(self.sketch.Geometry) - before)
-        )
+        made = None
+        if _count_splines(sketch) <= splines:
+            # (a spline made a moment later must not be made twice: what is queued runs first)
+            QtWidgets.QApplication.processEvents()
+        if _count_splines(sketch) > splines:
+            made = "freecad"
+            log("spline: made from the points clicked (%d curve(s) added)" % (len(sketch.Geometry) - before))
+        else:
+            left = self._spline_points() or points
+            if len(left) >= 2:
+                made = self._own_spline(left)
+            elif left:
+                log("spline: only one point clicked: nothing to make")
+        self._spline_from = None
+        return made
+
+    def _own_spline(self, points):
+        """FreeCAD's tool did not make the spline: Fission 180 makes it from the points,
+        in the spline's undo step, and stops FreeCAD's tool (it still held those points)."""
+        from . import sketch_spline
+
+        doc = self.doc
+        sketch = self.sketch
+        start = getattr(self, "_spline_from", None)
+        made = sketch_spline.plan(sketch, points)  # before the tool stops (it may drop them)
+        if made is None:
+            return None
+        try:
+            Gui.runCommand("Sketcher_StopOperation")
+        except Exception as exc:
+            warn("spline: %s" % exc)
+        try:
+            still = sketch_spline.points_of(sketch, start) if start is not None else []
+            still = [i for i in still if i in points] or (
+                points if len(sketch.Geometry) == made["count"] else []
+            )
+            active = App.getActiveTransaction()
+            name = active[0] if isinstance(active, (tuple, list)) else active
+            mine = name != SPLINE_STEP
+            if mine:
+                doc.openTransaction(SPLINE_STEP)
+            new = sketch_spline.build(sketch, made, remove=still)
+            if mine:
+                doc.commitTransaction()
+            else:
+                App.closeActiveTransaction(False)  # the step the points are in, with the spline
+        except Exception as exc:
+            warn("spline: could not make it from the points: %s" % exc)
+            try:
+                doc.abortTransaction()
+            except Exception:
+                pass
+            return None
+        return "own" if new is not None else None
 
     def _drop_spline(self, cancelled=True):
         """Fusion's Esc on a spline being drawn cancels that spline: the undo step that
@@ -1372,8 +1477,24 @@ class SketchSession:
                 self.sketch.solve()
                 if cancelled:
                     log("spline: the spline being drawn was cancelled")
+            if cancelled:
+                # points that were not in that step (its first click was not seen): they
+                # go too; Fusion leaves nothing behind
+                from . import sketch_spline
+
+                left = self._spline_points()
+                if left:
+                    doc = self.doc
+                    doc.openTransaction("Cancel Spline")
+                    try:
+                        sketch_spline.remove_points(self.sketch, left)
+                    except Exception:
+                        doc.abortTransaction()
+                        raise
+                    doc.commitTransaction()
         except Exception as exc:
             warn("spline: %s" % exc)
+        self._spline_from = None
 
     def enter_finishes_tool(self):
         """Fusion: Enter while a tool runs and nothing was typed for the shape completes

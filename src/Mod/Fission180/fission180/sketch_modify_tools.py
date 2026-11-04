@@ -31,12 +31,17 @@ class _CurveTool(draw.DrawTool):
 
     def own_curve(self, snap):
         """The sketch's own curve under the pointer (not the axes or projected edges:
-        those cannot be changed), or None."""
+        those cannot be changed; not a helper of another curve, such as a spline's control
+        circles: build.internal_geometry), or None."""
         geo = self.geometry()
         tol = draw.pick_pixels() * self._px()
+        cached = getattr(self, "_helpers", None)  # (kept with the geometry: every move)
+        if cached is None or cached[0] is not geo:
+            cached = self._helpers = (geo, build.internal_geometry(self.sketch))
+        helpers = cached[1]  # a spline's control circles...
         best = None
         for index, curve in geo.hits:
-            if index < 0 or not icore.near_curve(snap.raw, curve, tol):
+            if index < 0 or index in helpers or not icore.near_curve(snap.raw, curve, tol):
                 continue
             d = icore.curve_distance(snap.raw, curve)
             if best is None or d < best[1]:
@@ -164,7 +169,7 @@ class Trim(_CurveTool):
             tried.add(mark)
             before = self.sketch.Geometry[geo]
             count = self.sketch.GeometryCount
-            self.sketch.trim(geo, App.Vector(p.X, p.Y, 0))
+            trim_piece(self.sketch, geo, (p.X, p.Y))
             self._geometry = None
             if self.sketch.GeometryCount != count or not _same_curve(before, self.sketch, geo):
                 done += 1
@@ -191,9 +196,7 @@ class Trim(_CurveTool):
         point = press_snap.raw
 
         def work():
-            import FreeCAD as App
-
-            self.sketch.trim(geo, App.Vector(point[0], point[1], 0))
+            trim_piece(self.sketch, geo, point)
             return True
 
         self._edit("Trim", work)
@@ -305,6 +308,47 @@ class Break(_CurveTool):
         if not self._edit("Break", work):
             self.say("Break: nothing crosses this curve here, so there is nowhere to break it.")
         self.preview.clear()
+
+
+def trim_piece(sketch, geo, point):
+    """Trim the piece of curve `geo` at `point` as the preview shows it (sketch_build.piece:
+    between the nearest real curves on each side). FreeCAD's own trim also stops at the
+    helper curves of other curves (a spline's control circles: sketch_build.
+    internal_geometry), which left bits at a rectangle's corners under a spline (Luca,
+    2026-11-04); what of the curve is left inside the piece after it is taken away too."""
+    import FreeCAD as App
+
+    g = sketch.Geometry[geo]
+    piece = None
+    try:
+        piece = build.piece(sketch, geo, point)
+    except Exception:
+        piece = None
+    carrier = g.copy()
+    sketch.trim(geo, App.Vector(point[0], point[1], 0))
+    if piece is None or piece[2]:
+        return  # a whole closed curve, or a piece of one: FreeCAD's trim is the piece
+    t0, t1 = piece[0], piece[1]
+    helpers = build.internal_geometry(sketch)
+    left = []
+    for index, other in enumerate(sketch.Geometry):
+        if index in helpers or other.TypeId != g.TypeId:
+            continue
+        try:
+            a = other.value(other.FirstParameter)
+            b = other.value(other.LastParameter)
+            ta, tb = carrier.parameter(a), carrier.parameter(b)
+            on = (carrier.value(ta) - a).Length < 1e-7 and (carrier.value(tb) - b).Length < 1e-7
+            mid = other.value((other.FirstParameter + other.LastParameter) / 2.0)
+            tm = carrier.parameter(mid)
+            on = on and (carrier.value(tm) - mid).Length < 1e-7
+        except Exception:
+            continue
+        if on and t0 - 1e-9 <= min(ta, tb) and max(ta, tb) <= t1 + 1e-9:
+            left.append(index)
+    if left:
+        sketch.delGeometries(left)
+        log("Trim: %d bit(s) left by FreeCAD's trim inside the piece removed" % len(left))
 
 
 def _same_curve(before, sketch, geo):

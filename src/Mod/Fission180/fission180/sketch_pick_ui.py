@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"""Sketch commands that work on curves you pick first: Mirror, Circular Pattern,
-Rectangular Pattern, Sketch Scale, Move/Copy.
+"""Sketch commands that work on curves you pick first: Circular Pattern, Rectangular
+Pattern, Sketch Scale, Move/Copy. (Mirror has Fusion's MIRROR panel: sketch_mirror_tool.py.)
 
 FreeCAD's versions do nothing when nothing is selected, and its Rectangular Pattern
 opens a pop-up asking for rows and columns. Like in Fusion, the command now starts
@@ -133,13 +133,6 @@ def _select(sketch, ids):
     Gui.Selection.clearSelection()
     for index in ids:
         Gui.Selection.addSelection(sketch.Document.Name, sketch.Name, "Edge%d" % (index + 1))
-
-
-class SketchMirror(_PickCommand):
-    title = "Mirror"
-    tip = "Mirror curves: click them, Enter, then click the mirror line"
-    icon = "sk_mirror"
-    freecad = "Sketcher_Symmetry"
 
 
 class SketchCircularPattern(_PickCommand):
@@ -343,7 +336,6 @@ def close_box(accept=False):
 
 
 COMMANDS = {
-    "Fission180_SketchMirror": SketchMirror,
     "Fission180_SketchCircularPattern": SketchCircularPattern,
     "Fission180_SketchRectangularPattern": SketchRectangularPattern,
     "Fission180_SketchScale": SketchScale,

@@ -37,6 +37,16 @@ def score(query, entry):
         if part is None:
             return None
         total += part
+    # the whole phrase as the user typed it, in the name they see: first (Luca, 2026-11-04:
+    # "Control Point Spline" ran FreeCAD's "Toggle B-Spline Control Point Weight")
+    label = entry.get("text", "").lower()
+    phrase = " ".join(tokens)
+    if label == phrase:
+        total += 400
+    elif phrase in label:
+        total += 200
+    if entry.get("ribbon"):
+        total += 30  # a Fission 180 menu entry before a FreeCAD command of the same words
     return total
 
 

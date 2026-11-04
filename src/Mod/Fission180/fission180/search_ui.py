@@ -2,7 +2,7 @@
 
 import FreeCADGui as Gui
 
-from . import search_core
+from . import search_core, warn
 from .compat import QtCore, QtWidgets
 
 
@@ -23,8 +23,35 @@ def _fission180_keys():
         return {}
 
 
+def _ribbon_entries(available):
+    """Fission 180's menu entries under the names its menus show (Fusion's: "Control Point
+    Spline", not FreeCAD's "B-spline by control points"), each with the command it runs."""
+    from . import ribbon_config as cfg
+    from .ribbon_ui import resolve
+
+    out, seen = [], set()
+    try:
+        for tab in cfg.TABS:
+            for group in tab["groups"]:
+                for item in cfg.iter_items(group["items"]):
+                    resolved = resolve(item.get("command"), available)
+                    if resolved is None or resolved[0] == "__menu__" or resolved[1] is not None:
+                        continue
+                    key = (item["label"], resolved[0])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    out.append(
+                        {"name": resolved[0], "text": item["label"], "shortcut": item.get("key") or "", "ribbon": True}
+                    )
+    except Exception as exc:
+        warn("search: menu entries: %s" % exc)
+    return out
+
+
 def _build_entries():
-    entries = []
+    available = set(Gui.listCommands())
+    entries = _ribbon_entries(available)
     ours = _fission180_keys()
     for name in Gui.listCommands():
         text, shortcut = name, ""
@@ -94,6 +121,14 @@ class CommandSearchDialog(QtWidgets.QDialog):
     def _run_item(self, item):
         name = item.data(QtCore.Qt.UserRole)
         self.close()
+        try:
+            from . import recent
+
+            # as the ribbon, the menus and the keys do: Repeat, and the sketch knows which
+            # tool runs (a spline started here was lost on OK: Luca, 2026-11-04)
+            recent.record(name, item.text())
+        except Exception as exc:
+            warn("search: %s" % exc)
         # Run after the popup has closed so commands that open dialogs work.
         QtCore.QTimer.singleShot(0, lambda: Gui.runCommand(name))
 

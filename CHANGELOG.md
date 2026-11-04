@@ -8,6 +8,38 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.2
+
+### Fixed
+
+- **A spline could still vanish and leave its points behind.** 0.1.0-beta.3.3.1 fixed Finish
+  Sketch, but Fission 180 still worked out "a spline is being drawn" from the last menu
+  command. A spline started any other way (from the command search, FreeCAD's own menus),
+  or right after the Line tool, was not recognised: the green check then ended the old line
+  instead and the spline was thrown away. Fission 180 now also reads FreeCAD's own spline
+  panel, the green check always belongs to the spline being drawn, and after every finish
+  it checks that the spline really exists. If FreeCAD did not make it, Fission 180 makes it
+  from the points you clicked, with its ends joined where you clicked them. Esc cancels a
+  spline and now takes all of its points with it, so no dots are ever left behind.
+- **Trim left pieces of a line at the corners under a spline.** A spline's control points
+  have small helper circles; Trim stopped where they crossed the line, so the ends of a
+  rectangle's top stayed behind. Trim (and Extend, Break) now ignore a spline's helpers: the
+  piece that lights up is the piece that goes.
+- **Command search ran the wrong command.** Typing "Control Point Spline" ran a FreeCAD
+  command named "Toggle B-Spline Control Point Weight". The search now knows every tool by
+  the name in Fission 180's menus, and the name you typed in full comes first.
+
+### Changed
+
+- **Mirror has Fusion's MIRROR panel.** Pick the Objects (click the curves), click Mirror
+  Line's Select and the line (a line, a construction line, an axis or a projected line); the
+  copies show where they will be; OK. The copies stay symmetric to the originals (move an
+  original and its copy follows), and one Ctrl+Z takes the mirror back. Curves selected before
+  Mirror are taken as the Objects.
+- **Feature Options in the Sketch Palette.** While a rectangle, circle, arc, polygon, slot or
+  spline tool runs, the palette lists its types (for example 2-Point, 3-Point and Center
+  Rectangle); a click switches to that type and you go on drawing, as in Fusion.
+
 ## 0.1.0-beta.3.3.1
 
 ### Fixed

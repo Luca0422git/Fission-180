@@ -188,7 +188,15 @@ def mirror_pick():
 
 
 def mirror_enter():
-    h.press(QtCore.Qt.Key_Return)
+    # Fusion's MIRROR panel (sketch_mirror_tool): Mirror Line's Select, then the line
+    from PySide import QtWidgets
+    from PySide6 import QtTest
+
+    button = Gui.getMainWindow().findChild(QtWidgets.QPushButton, "Fission180MirrorLine")
+    if h.check("the MIRROR panel has Mirror Line", button is not None and button.isVisible()):
+        h.pointer_to(button, button.rect().center())
+        QtTest.QTest.mouseClick(button, QtCore.Qt.LeftButton)
+        QtWidgets.QApplication.processEvents()
 
 
 def mirror_line():
@@ -199,7 +207,8 @@ def mirror_line():
 
 
 def mirrored():
-    h.press(QtCore.Qt.Key_Escape)
+    h.press(QtCore.Qt.Key_Return)  # OK
+    h.settle("the mirror")
     sk = s["sk"]
     target = V(2 * 30 - s["c0"].x, s["c0"].y, 0)
     hit = [c for _, c in si.circles(sk) if (c.Center - target).Length < 1e-6]

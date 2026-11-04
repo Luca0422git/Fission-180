@@ -4,6 +4,20 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-04 (night): patch 0.1.0-beta.3.3.2, Luca's second round, on `develop`** (Luca on
+3.3.1: "CLAUDE WHAT IS THIS SHIT ... the spline still disapears when i click the checkmark. AND
+the orange dots are still there ... only the middle portion of the line was getting deleted
+... mirror is just wrong. it should have a dialog box", then "sketch objects and shapes ...
+should have their own dialoge box that lets you change how you draw that tool"; newest
+session log "Second round"). Status: [x] spline: detection from FreeCAD's spline panel too,
+the check prefers the spline, verify + Fission 180 makes it from the points, Esc removes
+them [x] Trim / Extend / Break ignore spline helper circles; the trim matches the preview
+[x] command search: menu names, full phrase first [x] Mirror: Fusion's MIRROR panel
+[x] Sketch Palette Feature Options (rectangle, circle, arc, polygon, slot, spline types)
+[x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.2, CHANGELOG [x] tested on the released
+Fission 180 AppImage (see the session log) [ ] "Fission 180 tests" green on develop
+[ ] **Luca: Actions > Fission 180 patch release** (module files only).
+
 **2026-11-04 (later): patch 0.1.0-beta.3.3.1, Luca's polish list, on `develop`** (Luca: "its
 inconsisencies like these that is keeping Fission from being put into peoples hands ... fix
 them and do a patch release please"; newest session log "Polish list"). Status: [x] spline
@@ -1876,6 +1890,59 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Second round, patch 0.1.0-beta.3.3.2 (`develop`, 2026-11-04 night)
+
+Luca on 3.3.1 (two screenshots: Trim's red piece stopping short of a rectangle's corner
+under a control-point spline; orange fit points left over a rectangle) was right: the
+3.3.1 spline fix only covered Finish Sketch, and its tests ran on stock FreeCAD with the
+menus only. Lesson: **reproduce on the released program and with the user's own steps**.
+
+- **Testing on the real program**: download the release's AppImage (checksum from the
+  notes), `--appimage-extract` into `.fission180-cache/fission180-app/`; `run_tests.sh
+  --freecad .fission180-cache/fission180-app` uses its built-in module. To test new code on
+  it, replace `squashfs-root/usr/Mod/Fission180` with a symlink to a snapshot of the module
+  and park the original OUTSIDE `usr/Mod` (FreeCAD loads every folder under Mod: a parked
+  `Mod/Fission180.released` loaded too, "'Fission180Workbench' already exists", and the old
+  code ran). The released module is parked at `.fission180-cache/fission180-app/
+  Fission180.released`.
+- **Spline**: on the released program, Luca's rectangle + spline + check passed; the losing
+  paths were found in the code: `_spline_tool()` relied on `recent` (the command search did
+  not record; FreeCAD's own menus do not), and the floating check took the Line chain's
+  anchor first (a Line left on before the spline: its click ran `break_chain`, which stopped
+  FreeCAD's spline tool). Now: FreeCAD's TaskSketcherTool header ("B-Spline Parameters",
+  shown only while that tool runs) counts too; the check prefers the spline;
+  `_commit_spline` verifies a new BSpline came of the Esc (after processEvents), else
+  `sketch_spline.plan` (read before StopOperation) + `build` make it from the loose points
+  with the end joins (fit: interpolate; poles: buildFromPoles, degree <= 3), the tool is
+  restarted for the check; `_spline_from` (curve count at the first click) lets Esc remove a
+  cancelled spline's points even outside SPLINE_STEP. Search records. Scenario
+  `sketch_spline_luca` (211 checks on the real program: A-E Luca's steps, C trim, F search,
+  F2 FreeCAD's tool started directly, G FreeCAD forced not to make it, H Esc).
+- **Trim**: `sketch_build.intersections` cut at a control-point spline's pole circles
+  (construction, InternalAlignment); and the click used FreeCAD's `sketch.trim` (which
+  also cuts there) while the preview used ours. `internal_geometry` excluded from cutters
+  and targets (Trim, Extend, Break); `trim_piece` removes what FreeCAD's trim left inside the
+  previewed piece. Reproduced on the released program: 1 mm stayed at each corner.
+- **Search**: "Control Point Spline" ranked FreeCAD's `Sketcher_BSplinePoleWeight` ("Toggle
+  B-Spline Control Point Weight") first: entries were FreeCAD's menu texts only. Ribbon
+  labels are entries now (`ribbon: True`), full phrase +400 / +200, ribbon +30.
+- **Mirror**: `sketch_mirror_tool.py` (DrawTool + MirrorPanel, like Offset),
+  `sketch_mirror_core.py` (reflect, FreeCAD's addSymmetryConstraints pairs; the Python
+  `addSymmetric` cannot ask for them), `sketch_mirror_ui.py` (the command; removed from
+  `sketch_pick_ui`). Scenarios `sketch_mirror_dialog`; `sketch_pattern` and
+  `sketch_tool_switch` updated to the panel.
+- **Feature Options**: Fusion's Sketch Palette section (Autodesk "Create rectangles": switch
+  types while the tool is active), `sketch_feature_options.py` from the CREATE submenus,
+  `sketch_palette.FeatureOptions` (refreshed by the palette's 0.3 s timer). Scenario
+  `sketch_feature_options`.
+- Tests: unit 2873 OK; on the released Fission 180 AppImage with the new module:
+  sketch_spline_luca 211, sketch_mirror_dialog 131, sketch_feature_options 60,
+  sketch_right_angle_marks 90, sketch_spline_ok 233, sketch_tool_cursor 150,
+  sketch_pattern 102, sketch_tool_switch 17 (all PASS); on stock FreeCAD 1.1.4:
+  polish2_sketch_check, sketch2_3d, sketch2_palette, sketch_modify, sketch_offset_dialog,
+  sketch_polygon, sketch_tools_circles / _draw / _modify / _slots (all PASS);
+  check_waits 0 / 0.
 
 ### Session log: Polish list, patch 0.1.0-beta.3.3.1 (`develop`, 2026-11-04)
 

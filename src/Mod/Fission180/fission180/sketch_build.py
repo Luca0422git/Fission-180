@@ -346,13 +346,31 @@ def conic_weight_constraint(sketch, geo):
 
 
 # -- the curves a click can hit; intersections ---------------------------------------------
+def internal_geometry(sketch):
+    """The curves FreeCAD keeps as helpers of another curve (InternalAlignment): a
+    spline's control-point circles and knot points, an ellipse's axes and foci. Fusion's
+    splines and ellipses have no such curves: they never cut, stop or get trimmed (Luca,
+    2026-11-04: Trim left pieces of a rectangle's top at its corners, where the circles
+    round a spline's end control points cross it)."""
+    out = set()
+    for c in sketch.Constraints:
+        try:
+            if c.Type == "InternalAlignment" and c.First >= 0:
+                out.add(c.First)
+        except Exception:
+            continue
+    return out
+
+
 def curves(sketch, external=True):
-    """[(geo, Part geometry)] of the sketch's curves (no points); with `external` also
-    projected / included edges (negative indices from -3; FreeCAD's axes -1 / -2 are
-    left out: Fusion trims at drawn and projected curves, not at the origin axes)."""
+    """[(geo, Part geometry)] of the sketch's curves (no points, no helpers of other
+    curves: internal_geometry); with `external` also projected / included edges
+    (negative indices from -3; FreeCAD's axes -1 / -2 are left out: Fusion trims at drawn
+    and projected curves, not at the origin axes)."""
     out = []
+    helpers = internal_geometry(sketch)
     for i, g in enumerate(sketch.Geometry):
-        if g.TypeId != "Part::GeomPoint":
+        if g.TypeId != "Part::GeomPoint" and i not in helpers:
             out.append((i, g))
     if external:
         try:

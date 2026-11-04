@@ -49,6 +49,21 @@ note says "30 mm does not fit: limited to 17.11 mm" (typed) or "Largest that fit
 on the used-up side is a reference (the side fixes it). Scenarios `modeling2_sketch` (2),
 `sketch2_fillet` (B).
 
+## Luca's second round (patch 0.1.0-beta.3.3.2, `develop`, 2026-11-04)
+
+Source: Luca on 0.1.0-beta.3.3.1, two screenshots (Trim on a rectangle's top under a
+control-point spline: the red piece stops short of the corner; fit points left in orange
+over a rectangle). Everything below was reproduced or checked on the released Fission 180
+AppImage itself (not only on stock FreeCAD), scenario `sketch_spline_luca`.
+
+| Fusion (source) | Fission 180 before | Fission 180 now |
+|---|---|---|
+| The spline being drawn is made by the green check / OK / Finish Sketch, however it was started | "A spline is being drawn" came from the last recorded command: the command search did not record, FreeCAD's own menus do not; then the green check belonged to the Line chain left on from before (its click ended the "chain", the spline went) and Finish Sketch dropped it; fit points stayed. Not reproduced on Linux with the menus: the state that loses it is how the tool was started | `_spline_tool()` also reads FreeCAD's tool panel (TaskSketcherTool shown, header "B-Spline ..."); the check prefers the spline over a Line chain; `_commit_spline` checks a spline came of FreeCAD's Esc, else `sketch_spline.plan/build` make it from the loose points (fit points: interpolated; control circles: their poles), ends re-joined, the points removed, FreeCAD's tool stopped and restarted; Esc removes the points of a cancelled spline even when they were outside its undo step (`_spline_from`: the curve count at its first click). Search records what it runs. Unit `test_sketch_spline`; scenario `sketch_spline_luca` F, F2, G, H |
+| Trim removes the piece between real curves (Autodesk "Trim or extend sketch geometry") | Pieces were cut at every curve, a spline's control-point circles too (FreeCAD's construction helpers: Fusion's spline has none): 1 mm of the rectangle's top stayed at each corner; the preview (Fission 180's) and the trim (FreeCAD's `trim`) also disagreed | `sketch_build.internal_geometry` (InternalAlignment helpers) are neither cutters nor targets for Trim, Extend, Break; `trim_piece` removes what FreeCAD's trim left inside the previewed piece. `sketch_spline_luca` C |
+| Command search finds a tool by its menu name | Only FreeCAD's command names: "Control Point Spline" ran "Toggle B-Spline Control Point Weight" | Fission 180's menu entries are listed by their labels; a full-phrase match ranks first (`search_core.score`). Unit `test_search_core` |
+| Sketch Mirror: the MIRROR panel, Objects then Mirror Line, OK; Symmetry constraints (Autodesk "Mirror sketch geometry") | Click curves, Enter, then FreeCAD's Symmetry tool for the line, no panel | `sketch_mirror_tool.py` (panel, picks, preview, OK / Enter / Cancel / Esc); `SketchObject.addSymmetric`, copied constraints other than Coincident / InternalAlignment dropped, Symmetric / Equal ties as FreeCAD's own `addSymmetryConstraints` pairs (`sketch_mirror_core.ties`, unit tested), redundant ones left out. Preselected curves = Objects, Mirror Line active (**Guess**). Scenario `sketch_mirror_dialog` |
+| Sketch Palette Feature Options: switch rectangle / circle (arc, polygon, slot, spline) types while the tool runs (Autodesk "Create rectangles", "Create circles", Sketch Palette reference) | None | `sketch_palette.FeatureOptions` from the SKETCH > CREATE submenus (`sketch_feature_options`, unit tested): the types as buttons, the current one lit, a click ends the running tool and starts that type. Fusion's own type icons are not copied: the type names are shown. Scenario `sketch_feature_options` |
+
 ## Luca's polish list (patch 0.1.0-beta.3.3.1, `develop`, 2026-11-04)
 
 Source: Luca's message of 2026-11-04 with a screenshot of Fission 180 (a control-point spline

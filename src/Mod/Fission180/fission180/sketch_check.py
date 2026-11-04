@@ -17,6 +17,8 @@ on it goes to the check, not to the sketch underneath.
 
 import time
 
+import FreeCADGui as Gui
+
 from . import log, warn
 from .compat import QtCore, QtGui, QtWidgets
 
@@ -154,12 +156,14 @@ class FloatingCheck:
             return None, None
         if session.tool is not None and session.tool.active:
             return None, None  # Fission 180's own tools have their own steps and boxes
-        at = self._line_anchor()
-        if at is not None:
-            return "line", at
+        # a spline being drawn first: a Line chain left on before the spline tool started
+        # must not take the check (its click ended the "chain" and lost the spline)
         at = self._spline_anchor()
         if at is not None:
             return "spline", at
+        at = self._line_anchor()
+        if at is not None:
+            return "line", at
         return None, None
 
     def update(self):
@@ -210,10 +214,20 @@ class FloatingCheck:
                 if session.line.break_chain():
                     log("sketch: green check: line chain finished")
             elif kind == "spline":
-                session._commit_spline()
+                from . import recent
+                from .sketch_mode import SPLINE_COMMANDS
+
+                command = recent.running_tool()
+                made = session._commit_spline()
                 session._drop_spline(cancelled=False)
                 self._spline_presses = 0
-                log("sketch: green check: spline finished")
+                if made == "own":
+                    # Fission 180 made it and stopped FreeCAD's tool: on again (Fusion's
+                    # check keeps the tool on for the next spline)
+                    if command not in SPLINE_COMMANDS:
+                        command = "Sketcher_CreateBSplineByInterpolation"
+                    Gui.runCommand(command)
+                log("sketch: green check: spline finished (%s)" % (made or "nothing to make"))
         except Exception as exc:
             warn("sketch check: %s" % exc)
         finally:
