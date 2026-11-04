@@ -10,7 +10,7 @@ Var FileAssociation
 
 # ----------------------------------
 
-Section "un.${APP_NAME}" un.SecUnProgramFiles # FISSION180
+Section "un.${APP_DISPLAY_NAME}" un.SecUnProgramFiles # FISSION180
 
   SectionIn RO
 
@@ -18,7 +18,7 @@ Section "un.${APP_NAME}" un.SecUnProgramFiles # FISSION180
   ReadRegStr $0 SHCTX "${APP_UNINST_KEY}" "StartMenu"
   RMDir /r "$0"
   # delete desktop icon
-  Delete "$DESKTOP\${APP_NAME}.lnk" # FISSION180: "Fission180.lnk"
+  Delete "$DESKTOP\${APP_DISPLAY_NAME}.lnk" # FISSION180: "Fission180.lnk"
 
   # remove file extension .FCStd
   ReadRegStr $R0 SHCTX "Software\Classes\${APP_EXT}" ""

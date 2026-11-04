@@ -87,7 +87,7 @@ FunctionEnd
 #--------------------------------
 # visible installer sections
 
-Section "!${APP_NAME}" SecCore
+Section "!${APP_DISPLAY_NAME}" SecCore
  SectionIn RO
 SectionEnd
 
@@ -117,7 +117,7 @@ Function .onInit
   # qt6.8 has windows 10 1809 as minimum version, which is build 17763
   # build number details at https://learn.microsoft.com/en-us/windows/release-health/release-information
   ${ifnot} ${AtLeastBuild} 17763
-    MessageBox MB_OK|MB_ICONSTOP "${APP_NAME} ${APP_VERSION} requires Windows 10 or newer." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "${APP_DISPLAY_NAME} ${APP_VERSION} requires Windows 10 or newer." /SD IDOK
     Quit
   ${endif}
 

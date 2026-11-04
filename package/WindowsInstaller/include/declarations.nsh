@@ -20,21 +20,24 @@ Configuration and variables of FreeCAD installer
 !define APP_SERIES_KEY "${APP_VERSION_MAJOR}${APP_VERSION_MINOR}${APP_VERSION_PATCH}${APP_VERSION_EMERGENCY}"
 !define APP_SERIES_KEY2 "${APP_VERSION_MAJOR}.${APP_VERSION_MINOR}.${APP_VERSION_PATCH}${APP_EMERGENCY_DOT}${APP_VERSION_EMERGENCY}"
 # FISSION180: Fission 180's installer (docs/fission180/core-patches.md #13). APP_NAME is read from
-# the program itself ("ExeName" = Fission 180, version.nsh), so every key below is Fission 180's
+# the program itself ("ExeName" = Fission180, version.nsh), so every key below is Fission 180's
 # own: SOFTWARE\Fission180114, Uninstall\Fission180114, the Fission180.Document class and the
 # settings folder %APPDATA%\Fission180. A FreeCAD on the same machine is never touched.
+# The name people read (installer, Start menu, desktop, Settings > Apps); APP_NAME, the program's
+# file name (Fission180), names the files, folders and registry keys.
+!define APP_DISPLAY_NAME "Fission 180"
 !define APP_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\${APP_NAME}.exe"
 !define APP_DIR "${APP_NAME}" # FISSION180: "Program Files\Fission180" (FreeCAD: "FreeCAD 1.1")
 # Fixme: FC should use different preferences folder for every release
 !define APP_DIR_USERDATA ${APP_NAME}
 #!define APP_DIR_USERDATA "${APP_NAME}${APP_VERSION_MAJOR}.${APP_VERSION_MINOR}"
-!define APP_SHORTCUT_INFO "${APP_NAME} - Parametric CAD with the Fusion workflow" # FISSION180
-!define APP_INFO "Install/Uninstall ${APP_NAME}"
+!define APP_SHORTCUT_INFO "${APP_DISPLAY_NAME} - Parametric CAD with the Fusion workflow" # FISSION180
+!define APP_INFO "Install/Uninstall ${APP_DISPLAY_NAME}"
 !define APP_WEBPAGE "https://github.com/Luca0422git/Fission-180" # FISSION180
-!define APP_WEBPAGE_INFO "${APP_NAME} on GitHub" # FISSION180
+!define APP_WEBPAGE_INFO "${APP_DISPLAY_NAME} on GitHub" # FISSION180
 !define APP_WIKI "https://github.com/Luca0422git/Fission-180/issues" # FISSION180
-!define APP_WIKI_INFO "Report a ${APP_NAME} problem" # FISSION180
-!define APP_COPYRIGHT "${APP_NAME} © 2026 ${APP_NAME} contributors, based on FreeCAD © 2001-${COPYRIGHT_YEAR} by the FreeCAD Team" # FISSION180
+!define APP_WIKI_INFO "Report a ${APP_DISPLAY_NAME} problem" # FISSION180
+!define APP_COPYRIGHT "${APP_DISPLAY_NAME} © 2026 ${APP_DISPLAY_NAME} contributors, based on FreeCAD © 2001-${COPYRIGHT_YEAR} by the FreeCAD Team" # FISSION180
 
 !define APP_RUN "bin\${APP_NAME}.exe"
 !define BIN_FREECAD "${APP_NAME}.exe"

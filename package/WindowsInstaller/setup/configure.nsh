@@ -24,21 +24,21 @@ Section -InstallData
    StrCpy $StartmenuFolder "${APP_DIR}"
   ${endif}
   CreateDirectory "$SMPROGRAMS\$StartmenuFolder"
-  CreateShortCut "$SMPROGRAMS\$StartmenuFolder\${APP_NAME}.lnk" "$INSTDIR\${APP_RUN}" "" "$INSTDIR\${APP_RUN}" "" "" "" "${APP_SHORTCUT_INFO}"
+  CreateShortCut "$SMPROGRAMS\$StartmenuFolder\${APP_DISPLAY_NAME}.lnk" "$INSTDIR\${APP_RUN}" "" "$INSTDIR\${APP_RUN}" "" "" "" "${APP_SHORTCUT_INFO}"
   # Link to website and Wiki
   WriteINIStr "$SMPROGRAMS\$StartmenuFolder\${APP_WEBPAGE_INFO}.url" "InternetShortcut" "URL" "${APP_WEBPAGE}"
   WriteINIStr "$SMPROGRAMS\$StartmenuFolder\${APP_WIKI_INFO}.url" "InternetShortcut" "URL" "${APP_WIKI}"
   # create desktop icon
   ${if} $CreateDesktopIcon == "true"
    SetOutPath "$INSTDIR\bin"
-   CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_RUN}" "" "$INSTDIR\${APP_RUN}" "" "" "" "${APP_SHORTCUT_INFO}" # FISSION180: "Fission180.lnk"
+   CreateShortCut "$DESKTOP\${APP_DISPLAY_NAME}.lnk" "$INSTDIR\${APP_RUN}" "" "$INSTDIR\${APP_RUN}" "" "" "" "${APP_SHORTCUT_INFO}" # FISSION180: "Fission180.lnk"
   ${endif}
 
   # Uninstaller information
   ${If} $MultiUser.InstallMode == "CurrentUser"
-    WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayName" "${APP_NAME} ${APP_VERSION} $(TEXT_INSTALL_CURRENTUSER)"
+    WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayName" "${APP_DISPLAY_NAME} ${APP_VERSION} $(TEXT_INSTALL_CURRENTUSER)"
   ${Else}
-    WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayName" "${APP_NAME} ${APP_VERSION}"
+    WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayName" "${APP_DISPLAY_NAME} ${APP_VERSION}"
   ${EndIf}
 
   WriteRegStr SHCTX ${APP_UNINST_KEY} "UninstallString" '"$INSTDIR\${SETUP_UNINSTALLER}"'
@@ -47,7 +47,7 @@ Section -InstallData
   WriteRegStr SHCTX ${APP_UNINST_KEY} "DisplayIcon" "$INSTDIR\${APP_RUN}"
   WriteRegStr SHCTX ${APP_UNINST_KEY} "URLUpdateInfo" "${APP_WEBPAGE}"
   WriteRegStr SHCTX ${APP_UNINST_KEY} "URLInfoAbout" "${APP_WEBPAGE}" # FISSION180
-  WriteRegStr SHCTX ${APP_UNINST_KEY} "Publisher" "${APP_NAME} contributors" # FISSION180
+  WriteRegStr SHCTX ${APP_UNINST_KEY} "Publisher" "${APP_DISPLAY_NAME} contributors" # FISSION180
   WriteRegStr SHCTX ${APP_UNINST_KEY} "HelpLink" "${APP_WIKI}" # FISSION180
   WriteRegDWORD SHCTX ${APP_UNINST_KEY} "NoModify" 0x00000001
   WriteRegDWORD SHCTX ${APP_UNINST_KEY} "NoRepair" 0x00000001
@@ -76,7 +76,7 @@ Section -Configure
 
   ${if} $CreateFileAssociations == "true"
    WriteRegStr SHCTX "${APP_DIR_REGKEY}" "" "$INSTDIR\${APP_RUN}"
-   WriteRegStr SHCTX "Software\Classes\${APP_REGNAME_DOC}" "" "${APP_NAME} Document"
+   WriteRegStr SHCTX "Software\Classes\${APP_REGNAME_DOC}" "" "${APP_DISPLAY_NAME} Document"
    WriteRegStr SHCTX "Software\Classes\${APP_REGNAME_DOC}\DefaultIcon" "" "$INSTDIR\${APP_RUN},0"
    WriteRegStr SHCTX "Software\Classes\${APP_REGNAME_DOC}\Shell\open\command" "" '"$INSTDIR\${APP_RUN}" --single-instance "%1"'
    # we need to update also the automatically created entry about the FreeCAD.exe

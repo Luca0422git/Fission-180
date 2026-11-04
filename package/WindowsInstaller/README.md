@@ -2,7 +2,7 @@
 
 FISSION180: this folder builds the **Fission180** installer (docs/fission180/core-patches.md #13).
 The scripts take the program's name from the program itself (`Settings.nsh` runs
-`Fission180Cmd.exe`, which reports `ExeName` = Fission 180), so the install folder
+`Fission180Cmd.exe`, which reports `ExeName` = Fission180), so the install folder
 (`Program Files\Fission180`), the registry keys (`SOFTWARE\Fission180114`, the uninstall entry),
 the `Fission180.Document` class and the settings folder (`%APPDATA%\Fission180`) are Fission 180's own:
 a FreeCAD installed on the same machine is not touched. Differences from FreeCAD's installer:

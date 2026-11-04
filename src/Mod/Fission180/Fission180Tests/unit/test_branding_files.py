@@ -89,7 +89,10 @@ class BrandingFilesTest(unittest.TestCase):
         desktop = _read("src", "XDGData", desktop_id + ".desktop")
         self.assertIn("Icon=%s\n" % desktop_id, desktop)
         self.assertIn("Exec=fission180 ", desktop)
-        self.assertIn("StartupWMClass=Fission 180", desktop)
+        # Qt's window class is the application name: the display name (MainGui.cpp sets it)
+        self.assertEqual(_define(self.header, "FISSION180_DISPLAY_NAME"), "Fission 180")
+        self.assertIn("StartupWMClass=Fission 180\n", desktop)
+        self.assertIn("Name=Fission 180\n", desktop)
         self.assertIn(
             desktop_id + ".desktop", _read("package", "rattler-build", "linux", "create_bundle.sh")
         )
@@ -107,6 +110,7 @@ class BrandingFilesTest(unittest.TestCase):
             ("AboutImage", "FISSION180_ABOUT_IMAGE"),
             ("StartWorkbench", "FISSION180_START_WORKBENCH"),
             ("DesktopFileName", "FISSION180_DESKTOP_ID"),
+            ("Application", "FISSION180_DISPLAY_NAME"),
         ):
             self.assertIn('Config()["%s"] = %s;' % (key, macro), gui, key)
         self.assertEqual(_define(self.header, "FISSION180_START_WORKBENCH"), "Fission180Workbench")

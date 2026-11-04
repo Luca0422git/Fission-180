@@ -1,1 +1,12 @@
-# Fission 180: non-GUI init. Nothing to do here; everything lives in InitGui.py.
+# Fission 180: non-GUI init. FreeCAD runs it before InitGui.py, also without a window
+# (FreeCADCmd). It brings over what the program saved under its old name, SciForge, before a
+# design can open or a setting is read: the old designs' step names, then (once) the
+# settings and the user files. See fission180/legacy.py. Never stops FreeCAD's start.
+try:
+    from fission180 import legacy as _legacy
+
+    _legacy.at_start()
+except Exception as _exc:
+    import FreeCAD
+
+    FreeCAD.Console.PrintWarning("[Fission 180] names saved by SciForge: %s\n" % _exc)

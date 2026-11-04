@@ -34,7 +34,7 @@ These typically need to be modified for each FreeCAD release
 
 #--------------------------------
 # get version info from freecadcmd
-# FISSION180: the program is Fission180Cmd.exe; it reports ExeName = Fission 180 (APP_NAME)
+# FISSION180: the program is Fission180Cmd.exe; it reports ExeName = Fission180 (APP_NAME)
 !system '${FILES_FREECAD}\bin\Fission180Cmd.exe --safe-mode "${__FILEDIR__}\write_version_nsh.py"' = 0
 !include "${__FILEDIR__}\version.nsh"
 !delfile "${__FILEDIR__}\version.nsh"

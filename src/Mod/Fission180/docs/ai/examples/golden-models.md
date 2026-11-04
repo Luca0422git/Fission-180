@@ -361,6 +361,7 @@ Each model is listed under its first tag; its other tags follow it.
 - `pattern_circ_symmetric_holes`: Disc r40x10, a hole r4 at (30, 0) patterned Symmetric, 2 per side over 60 degrees [circular, symmetric, fusion-dialog]
 - `pattern_edit_keeps_later_fillet`: A hole pattern, a fillet on the patterned part's edge, then one copy suppressed [rectangular, edit, suppression, fillet, fusion-dialog]
 - `pattern_edit_quantity_fusion`: Hole pattern edited in the dialog from 3 over 20 mm to 5 over 40 mm [rectangular, edit, fusion-dialog]
+- `pattern_fission180_extrude`: A tapered column (Fission 180's own extrude: taper to a face) repeated along X [rectangular, features, fusion-dialog]
 - `pattern_path_bosses`: Box 40x30x10, a boss r2x4 repeated 4 times over 30 mm of a sketch line [path, fusion-dialog]
 - `pattern_path_circle_turned`: A 4x2 boss repeated 4 times round a circle path, Orientation Path Direction [path, orientation, fusion-dialog]
 - `pattern_quantity_parameter`: A row of holes whose Quantity is a parameter n; n changed from 3 to 5 [rectangular, parameter, fusion-dialog]
@@ -368,7 +369,6 @@ Each model is listed under its first tag; its other tags follow it.
 - `pattern_rect_hole_grid_fusion`: Plate 60x40x5, a 3x2 Rectangular Pattern of a hole (Fusion dialog, Extent) [rectangular, fusion-dialog]
 - `pattern_rect_suppressed`: Plate 60x40x5, a 3x2 hole pattern with the middle copy of the back row suppressed [rectangular, suppression, fusion-dialog]
 - `pattern_rect_symmetric_bosses`: Plate 60x40x5 centred, a boss r3x4 patterned symmetric 3x2 per side (15 bosses) [rectangular, symmetric, fusion-dialog]
-- `pattern_fission180_extrude`: A tapered column (Fission 180's own extrude: taper to a face) repeated along X [rectangular, features, fusion-dialog]
 - `pattern_symmetric_parameter`: A tab patterned Symmetric with Spacing = gap; gap changed from 20 to 30 [rectangular, symmetric, parameter, fusion-dialog]
 - `plate_hole_grid`: Plate 60x40x5 with a 3x2 rectangular pattern of holes [rectangular]
 

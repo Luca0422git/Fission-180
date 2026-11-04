@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# FISSION180: the programs are called Fission 180 and Fission180Cmd (FISSION180_APP_NAME from
+# FISSION180: the programs are called Fission180 and Fission180Cmd (FISSION180_APP_NAME from
 # InitializeFreeCADBuildOptions.cmake) and carry Fission 180's icon and version strings; the
 # CMake targets keep FreeCAD's names (docs/fission180/core-patches.md #9).
 set(FISSION180_WIN_ICON "fission180.ico")

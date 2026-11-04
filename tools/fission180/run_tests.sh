@@ -96,7 +96,7 @@ if [ -x "${FREECAD_DIR}/squashfs-root/AppRun" ]; then
     if [ -d "${FREECAD_DIR}/squashfs-root/usr/Mod/Fission180" ]; then ADDON=0; else ADDON=1; fi
 elif ls "${FREECAD_DIR}"/bin/{Fission180Cmd,fission180cmd,FreeCADCmd,freecadcmd} >/dev/null 2>&1; then
     FC_CMD=("$(ls "${FREECAD_DIR}"/bin/{Fission180Cmd,fission180cmd,FreeCADCmd,freecadcmd} 2>/dev/null | head -1)")
-    FC_GUI=("$(ls "${FREECAD_DIR}"/bin/{Fission 180,fission180,FreeCAD,freecad} 2>/dev/null | head -1)")
+    FC_GUI=("$(ls "${FREECAD_DIR}"/bin/{Fission180,fission180,FreeCAD,freecad} 2>/dev/null | head -1)")
     ADDON=0
 else
     FC_CMD=()

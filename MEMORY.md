@@ -6279,7 +6279,7 @@ Behaviour spec with sources, what was built and what was not: `docs/fission180/p
 - Goal (outline 3.2, 7.17; plan item 10): a real Fission 180 installer and portable build that
   live next to FreeCAD. Everything is on `sf/app`, not pushed, not merged; no full build run.
 - **Identity (C++, core patches #8, #9).** New `src/Main/Fission180Branding.h` holds the names;
-  `MainGui.cpp`, `MainCmd.cpp`, `MainPy.cpp` set `ExeName`/`ExeVendor` = Fission 180 (that is
+  `MainGui.cpp`, `MainCmd.cpp`, `MainPy.cpp` set `ExeName`/`ExeVendor` = Fission180 (that is
   what names the settings folder: `%APPDATA%\Fission180`, `~/.config/Fission180`), the icon,
   splash and About picture names, `StartWorkbench` = Fission180Workbench, the desktop id, and
   a banner whose first line (shown in Help > About) credits FreeCAD. `src/Main/CMakeLists.txt`

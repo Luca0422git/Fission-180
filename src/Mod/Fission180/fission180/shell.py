@@ -118,6 +118,8 @@ def startup():
         _connect()
         # a design closed under one of its dialogs leaves no undo step open (undo_leftover)
         _safely(lambda: __import__("fission180.undo_leftover").undo_leftover.install())
+        # an AI app set up for SciForge (the old name) is set up for Fission 180 (legacy.py)
+        _safely(lambda: __import__("fission180.legacy").legacy.repoint_ai_apps())
         workbench = Gui.activeWorkbench()
         name = workbench.name() if workbench is not None else ""
         if _state["on"] and config.USE_RIBBON:

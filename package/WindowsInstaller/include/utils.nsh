@@ -368,7 +368,7 @@ Function ${UN}Fission180FolderFree
     ${If} $R0 == "connector"
       StrCpy $R0 "python.exe (Fission 180's AI connector: quit Claude Desktop from its icon by the clock, or close Gemini CLI or Claude Code)"
     ${EndIf}
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Still running from '$INSTDIR': $R0.$\r$\n$\r$\nClose it (save your work first), then click Retry.$\r$\n$\r$\nNothing has been changed yet: the ${APP_NAME} you have still works." /SD IDCANCEL IDRETRY retry
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Still running from '$INSTDIR': $R0.$\r$\n$\r$\nClose it (save your work first), then click Retry.$\r$\n$\r$\nNothing has been changed yet: the ${APP_DISPLAY_NAME} you have still works." /SD IDCANCEL IDRETRY retry
     StrCpy $R0 "stop"
     Goto done
   ${EndIf}
@@ -408,7 +408,7 @@ Function Fission180ReplaceInstDir
   ClearErrors
   Rename "$INSTDIR" "$R1"
   ${If} ${Errors}
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "A file in '$INSTDIR' is still open (an Explorer window or a command prompt in that folder, a program started from it, or a virus scan), so Windows does not let the old ${APP_NAME} be replaced.$\r$\n$\r$\nClose it, then click Retry.$\r$\n$\r$\nNothing has been changed yet: the ${APP_NAME} you have still works." /SD IDCANCEL IDRETRY retry
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "A file in '$INSTDIR' is still open (an Explorer window or a command prompt in that folder, a program started from it, or a virus scan), so Windows does not let the old ${APP_DISPLAY_NAME} be replaced.$\r$\n$\r$\nClose it, then click Retry.$\r$\n$\r$\nNothing has been changed yet: the ${APP_DISPLAY_NAME} you have still works." /SD IDCANCEL IDRETRY retry
     Pop $R1
     Pop $R0
     Abort
@@ -419,6 +419,62 @@ Function Fission180ReplaceInstDir
   ${If} ${Errors}
     DetailPrint "Some files of the old version stay in '$R1' (in use); the next update removes them."
   ${EndIf}
+  Pop $R1
+  Pop $R0
+FunctionEnd
+
+# FISSION180: the program was called SciForge until 0.1.0-beta.3.2.1 and was installed as a
+# program of its own (Program Files\SciForge, its Start menu entry, Settings > Apps). Installing
+# Fission 180 removes it with SciForge's own uninstaller, silently, so the computer does not
+# keep two of them. That uninstaller removes the program only: its "user preferences" part is
+# off unless ticked, so %APPDATA%\SciForge stays, and Fission 180 copies those settings and files
+# at its first start (src/Mod/Fission180/fission180/legacy.py). Called once Fission 180's own
+# files are in place; a SciForge that is still open is left installed if the person says so.
+!define OLD_UNINSTALL_KEYS "Software\Microsoft\Windows\CurrentVersion\Uninstall"
+Function Fission180RemoveSciForge
+  Push $R0
+  Push $R1
+  Push $R2
+  Push $R3
+  Push $R4
+  StrCpy $R0 0
+  ${Do}
+    EnumRegKey $R1 SHCTX "${OLD_UNINSTALL_KEYS}" $R0
+    ${If} $R1 == ""
+      ${Break}
+    ${EndIf}
+    StrCpy $R2 $R1 8
+    ${If} $R2 != "SciForge" # (SciForge114 and the like)
+      IntOp $R0 $R0 + 1
+      ${Continue}
+    ${EndIf}
+    ReadRegStr $R2 SHCTX "${OLD_UNINSTALL_KEYS}\$R1" "UninstallString"
+    ${TrimQuotes} $R2 $R2
+    ReadRegStr $R3 SHCTX "SOFTWARE\$R1" "" # SciForge's folder
+    ${FindProc} $R4 "SciForge.exe"
+    ${If} $R4 == "0"
+      MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "SciForge (Fission 180's old name) is still open, so it cannot be removed.$\r$\n$\r$\nClose it, then click OK. Cancel keeps SciForge installed next to Fission 180 (you can uninstall it later in Settings > Apps)." /SD IDCANCEL IDOK sciforge_closed
+      IntOp $R0 $R0 + 1
+      ${Continue}
+      sciforge_closed:
+    ${EndIf}
+    ${DetailPrintToBoth} "Removing SciForge, Fission 180's old name ('$R3'); its settings stay"
+    ${If} ${FileExists} "$R2"
+    ${AndIf} $R3 != ""
+      ExecWait '"$R2" /S _?=$R3'
+      RMDir /r "$R3" # (an uninstaller run in place leaves itself behind)
+    ${Else} # (a broken install without its uninstaller: only the entries are left)
+      DeleteRegKey SHCTX "${OLD_UNINSTALL_KEYS}\$R1"
+      DeleteRegKey SHCTX "SOFTWARE\$R1"
+    ${EndIf}
+    ReadRegStr $R2 SHCTX "${OLD_UNINSTALL_KEYS}\$R1" "UninstallString"
+    ${If} $R2 != "" # (still there: not removed, go on with the next entry)
+      IntOp $R0 $R0 + 1
+    ${EndIf}
+  ${Loop}
+  Pop $R4
+  Pop $R3
+  Pop $R2
   Pop $R1
   Pop $R0
 FunctionEnd

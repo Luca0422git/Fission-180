@@ -27,6 +27,11 @@ the timeline, the navigation bar, `S` for command search and Fusion's keys and m
 there. It is built on [FreeCAD](https://www.freecad.org), which does the heavy geometry work, and
 adds its own interface and tools on top.
 
+> **New name.** Fission 180 was called **SciForge** until November 2026; the releases up to
+> 0.1.0-beta.3.2.1 still carry that name. If you have SciForge, download Fission 180 from the
+> [Releases](https://github.com/Luca0422git/Fission-180/releases) page and install it: it replaces
+> SciForge, and your designs, settings, places and AI keys come with it.
+
 **This is a beta (0.1.0-beta.3).** Every feature is tested automatically by driving the real
 program with clicks and keys, but Fission 180 has had little use by anyone except the person
 building it, so expect rough edges. Save often, and read the

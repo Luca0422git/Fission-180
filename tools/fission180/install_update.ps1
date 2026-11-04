@@ -352,6 +352,21 @@ try {
     $removed = Remove-Leftovers $source $current
     Write-Host "[Fission 180] $copied files installed, $removed old files removed"
 
+    # The module's old name: a Mod\SciForge left next to Mod\Fission180 would load as well (two
+    # workbenches). It goes into the backups folder (src/Mod/Fission180/fission180/legacy.py).
+    $oldModule = Join-Path $mod "SciForge"
+    if (Test-Path -LiteralPath $oldModule) {
+        $backups = Join-Path $Target "Fission180-backups"
+        if (-not (Test-Path -LiteralPath $backups)) { New-Item -ItemType Directory -Path $backups -Force | Out-Null }
+        $oldDest = Join-Path $backups ("SciForge-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+        try {
+            Move-Item -LiteralPath $oldModule -Destination $oldDest -Force
+            Write-Host "[Fission 180] the old SciForge module moved to $oldDest"
+        } catch {
+            Write-Host "[Fission 180] could not move the old SciForge module ($($_.Exception.Message)): delete $oldModule by hand"
+        }
+    }
+
     $info = Join-Path $current "fission180\build_info.py"
     if (Test-Path $info) { Get-Content $info | Select-String "COMMIT|DATE" | ForEach-Object { Write-Host "[Fission 180] $_" } }
     if ($Restart -and -not $Elevated) {

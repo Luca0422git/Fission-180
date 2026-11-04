@@ -5,6 +5,25 @@ its own section of this file (the release notes are made from it), so every rele
 section here whose heading is exactly its version number, like `## 0.1.0-beta` below. Known
 problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.md).
 
+Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
+releases published under the old name (their tags are `sciforge-v...`).
+
+## Unreleased
+
+### The new name: Fission 180
+
+- **SciForge is now Fission 180.** The program, its window title, About box, splash screen,
+  icon, menus, messages, installer, Start menu entry and this GitHub page all carry the new
+  name, and it has a new logo: a circle splitting in two, with the spark of the split.
+- **Nothing of yours is lost.** Designs saved by SciForge open as before (the names SciForge
+  saved inside them are renamed when they open; saving writes the new ones). At the first start
+  Fission 180 brings over SciForge's settings, shortcuts, Home list, places, AI keys, drawing
+  templates and your own materials, and an AI app you connected to SciForge is connected to
+  Fission 180 instead.
+- **The installer replaces SciForge**: it removes an installed SciForge (only the program, never
+  your settings or designs), so you do not end up with two of them.
+- The repository moves to `github.com/Luca0422git/Fission-180`; the old addresses keep working.
+
 ## 0.1.0-beta.3.2.1
 
 ### Fixed

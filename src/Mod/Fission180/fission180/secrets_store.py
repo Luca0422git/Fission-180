@@ -29,6 +29,10 @@ import subprocess
 import sys
 
 SERVICE = "Fission180"
+# The program was called SciForge until 0.1.0-beta.3.2.1 and kept keys under that name.
+# Reading falls back to it, so a key saved before the rename keeps working; storing always
+# uses the new name and removing a key removes both.
+OLD_SERVICE = "SciForge"
 FILE_NAME = "secrets.json"
 DPAPI_FILE_NAME = "secrets.dpapi.json"
 FILE_WARNING = (
@@ -36,7 +40,8 @@ FILE_WARNING = (
     "computer."
 )
 _NAME = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
-_ENTROPY = b"Fission 180 secrets v1"
+_ENTROPY = b"Fission180 secrets v1"
+_OLD_ENTROPY = b"SciForge secrets v1"  # (Windows keys saved before the rename)
 
 
 def _default_log(line):
@@ -176,8 +181,14 @@ class Dpapi:
         return self._take(out)
 
     def unprotect(self, blob):
+        try:
+            return self._unprotect(blob, _ENTROPY)
+        except OSError:
+            return self._unprotect(blob, _OLD_ENTROPY)  # saved before the rename
+
+    def _unprotect(self, blob, entropy_bytes):
         data_in, _keep = self._blob(blob)
-        entropy, _keep2 = self._blob(_ENTROPY)
+        entropy, _keep2 = self._blob(entropy_bytes)
         out = DATA_BLOB()
         ok = self.crypt32.CryptUnprotectData(
             ctypes.byref(data_in),
@@ -254,12 +265,14 @@ class KeychainBackend:
         return True
 
     def read(self, name):
-        done = self._security("find-generic-password", "-s", SERVICE, "-a", name, "-w")
-        if done is None or done.returncode != 0:
-            return None
-        return done.stdout.rstrip("\n")
+        for service in (SERVICE, OLD_SERVICE):
+            done = self._security("find-generic-password", "-s", service, "-a", name, "-w")
+            if done is not None and done.returncode == 0:
+                return done.stdout.rstrip("\n")
+        return None
 
     def delete(self, name):
+        self._security("delete-generic-password", "-s", OLD_SERVICE, "-a", name)
         done = self._security("delete-generic-password", "-s", SERVICE, "-a", name)
         return done is not None and done.returncode in (0, 44)  # 44: there was none
 
@@ -284,16 +297,21 @@ class KeyringBackend:
             return False
 
     def read(self, name):
-        try:
-            return self.keyring.get_password(SERVICE, name)
-        except Exception:
-            return None
+        for service in (SERVICE, OLD_SERVICE):
+            try:
+                value = self.keyring.get_password(service, name)
+            except Exception:
+                value = None
+            if value is not None:
+                return value
+        return None
 
     def delete(self, name):
-        try:
-            self.keyring.delete_password(SERVICE, name)
-        except Exception:
-            pass  # there was none, or the keyring is locked
+        for service in (SERVICE, OLD_SERVICE):
+            try:
+                self.keyring.delete_password(service, name)
+            except Exception:
+                pass  # there was none, or the keyring is locked
         return True
 
 
@@ -312,8 +330,8 @@ class SecretStorageBackend:
             collection.unlock()
         return collection
 
-    def _attributes(self, name):
-        return {"application": SERVICE, "name": name}
+    def _attributes(self, name, service=SERVICE):
+        return {"application": service, "name": name}
 
     def store(self, name, value):
         try:
@@ -329,19 +347,21 @@ class SecretStorageBackend:
             return False
 
     def read(self, name):
-        try:
-            for item in self._collection().search_items(self._attributes(name)):
-                return item.get_secret().decode("utf-8")
-        except Exception:
-            pass
+        for service in (SERVICE, OLD_SERVICE):
+            try:
+                for item in self._collection().search_items(self._attributes(name, service)):
+                    return item.get_secret().decode("utf-8")
+            except Exception:
+                pass
         return None
 
     def delete(self, name):
-        try:
-            for item in self._collection().search_items(self._attributes(name)):
-                item.delete()
-        except Exception:
-            pass
+        for service in (SERVICE, OLD_SERVICE):
+            try:
+                for item in self._collection().search_items(self._attributes(name, service)):
+                    item.delete()
+            except Exception:
+                pass
         return True
 
 

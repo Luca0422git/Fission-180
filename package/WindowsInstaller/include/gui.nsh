@@ -9,7 +9,7 @@ Installer user interface settings
 #--------------------------------
 # General
 
-Name "${APP_NAME} ${APP_VERSION}"
+Name "${APP_DISPLAY_NAME} ${APP_VERSION}"
 BrandingText " "
 
 #--------------------------------
@@ -52,7 +52,7 @@ BrandingText " "
 
 # Specify where to install program shortcuts.
 !define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "Start Menu Folder"
-!define MUI_STARTMENUPAGE_DEFAULTFOLDER "${APP_DIR}"
+!define MUI_STARTMENUPAGE_DEFAULTFOLDER "${APP_DISPLAY_NAME}"
 !insertmacro MUI_PAGE_STARTMENU ${APP_NAME} $StartmenuFolder
 
 # Watch the components being installed.
@@ -86,10 +86,10 @@ BrandingText " "
 # Version information
 
 VIProductVersion "${APP_VERSION_NUMBER}"
-VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "${APP_NAME}"
+VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "${APP_DISPLAY_NAME}"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductVersion" "${APP_DIR}.${APP_VERSION_PATCH}"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "FileDescription" "${APP_INFO}"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" "${APP_COPYRIGHT}"
-VIAddVersionKey /LANG=${LANG_ENGLISH} "CompanyName" "${APP_NAME} contributors" # FISSION180
+VIAddVersionKey /LANG=${LANG_ENGLISH} "CompanyName" "${APP_DISPLAY_NAME} contributors" # FISSION180
 VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalTrademarks" ""

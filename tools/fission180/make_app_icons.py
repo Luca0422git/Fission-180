@@ -5,8 +5,9 @@
     python3 tools/fission180/make_app_icons.py            # writes the files listed below
     python3 tools/fission180/make_app_icons.py --out DIR  # writes everything into DIR instead
 
-The mark is original artwork: an anvil (the forge) with a spark, in white and amber on a
-blue rounded square. It is defined once, as geometry in a 64 x 64 design space, and drawn
+The mark is original artwork: a round nucleus split in two (fission), its halves drawn
+apart with the amber spark of the split between them, in white and amber on a blue rounded
+square. It is defined once, as geometry in a 64 x 64 design space, and drawn
 from that geometry both as SVG (text) and as supersampled bitmaps (Pillow), so every
 format shows the same picture. Nothing is traced from FreeCAD's or Autodesk's artwork.
 
@@ -46,48 +47,53 @@ WHITE = (255, 255, 255)
 AMBER = (255, 179, 71)  # the spark
 AMBER_LIGHT = (255, 217, 122)
 INSET, RADIUS = 2.0, 14.0  # rounded square
-# The anvil: a flat top with a horn to the left, a waist, and a wide foot.
-ANVIL = [
-    (13, 23),
-    (53, 23),
-    (53, 33),
-    (41, 33),
-    (41, 42),
-    (47, 42),
-    (50, 52),
-    (14, 52),
-    (17, 42),
-    (23, 42),
-    (23, 33),
-    (13, 33),
-    (5, 28),
-]
-STAR_CENTER, STAR_OUTER, STAR_INNER = (46.0, 13.0), 6.0, 2.2
-DOTS = [((56.0, 9.0), 1.6), ((37.0, 10.0), 1.3)]
-# At 24 px and below the thin top and the tiny dots blur away: a bolder anvil, one star.
-ANVIL_SMALL = [
-    (12, 20),
-    (54, 20),
-    (54, 34),
-    (42, 34),
-    (42, 42),
-    (48, 42),
-    (51, 54),
-    (13, 54),
-    (16, 42),
-    (22, 42),
-    (22, 34),
-    (12, 34),
-    (4, 27),
-]
-STAR_SMALL_CENTER, STAR_SMALL_OUTER, STAR_SMALL_INNER = (45.0, 12.0), 7.5, 2.8
+# The mark: a round nucleus split in two, the halves drawn apart along a slanted line, with
+# the amber spark of the split between them and two particles flying off (the "fission").
+import math  # noqa: E402
+
+CENTER = (32.0, 33.0)
+TILT = -32.0  # degrees: the split line leans like a forward slash
+
+
+def _rotate(points, center=CENTER, degrees=TILT):
+    a = math.radians(degrees)
+    cx, cy = center
+    out = []
+    for x, y in points:
+        dx, dy = x - cx, y - cy
+        out.append((cx + dx * math.cos(a) - dy * math.sin(a), cy + dx * math.sin(a) + dy * math.cos(a)))
+    return out
+
+
+def half_disc(side, radius, gap, segments=48):
+    """One half of the split nucleus (side -1: left, +1: right) as a polygon, its flat edge
+    `gap` / 2 away from the centre line, before the tilt."""
+    cx, cy = CENTER
+    edge = cx + side * gap / 2.0
+    points = []
+    for i in range(segments + 1):
+        angle = math.radians(-90 + i * 180.0 / segments)
+        # (a right half runs from the top over the right side to the bottom; a left one mirrored)
+        x = edge + side * radius * math.cos(angle)
+        y = cy + radius * math.sin(angle)
+        points.append((x, y))
+    return _rotate(points)
+
+
+HALF_RADIUS, HALF_GAP = 15.0, 9.0
+HALVES = [half_disc(-1, HALF_RADIUS, HALF_GAP), half_disc(1, HALF_RADIUS, HALF_GAP)]
+STAR_CENTER, STAR_OUTER, STAR_INNER = CENTER, 8.5, 2.6
+DOTS = [((52.5, 11.5), 2.2), ((11.5, 54.5), 1.8)]
+# At 24 px and below the gap and the dots blur away: bigger halves, a wider gap, one spark.
+HALVES_SMALL = [half_disc(-1, 17.0, 11.0), half_disc(1, 17.0, 11.0)]
+STAR_SMALL_CENTER, STAR_SMALL_OUTER, STAR_SMALL_INNER = CENTER, 10.0, 3.2
 SMALL_ICON = 24
 
 # ---- colours of the larger pictures (Fission 180's dark theme) -----------------------------
 DARK = (22, 28, 38)
 DARK_BAND = (29, 37, 51)
 TEXT = (255, 255, 255)
-TEXT_ACCENT = (143, 208, 255)  # "Forge" in the wordmark, also SplashTextColor
+TEXT_ACCENT = (143, 208, 255)  # "180" in the wordmark, also SplashTextColor
 TEXT_SOFT = (207, 216, 227)
 TEXT_DIM = (140, 151, 166)
 
@@ -126,7 +132,8 @@ def svg_text():
 
     lines = [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">',
-        "  <!-- Fission 180 application icon: an anvil with a spark. Original artwork, generated",
+        "  <!-- Fission 180 application icon: a nucleus splitting in two, with the spark of the",
+        "       split. Original artwork, generated",
         "       by tools/fission180/make_app_icons.py (LGPL-2.1-or-later). -->",
         "  <defs>",
         '    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">',
@@ -136,10 +143,13 @@ def svg_text():
         "  </defs>",
         '  <rect x="%g" y="%g" width="%g" height="%g" rx="%g" fill="url(#bg)"/>'
         % (INSET, INSET, 64 - 2 * INSET, 64 - 2 * INSET, RADIUS),
-        '  <polygon points="%s" fill="%s"/>' % (pts(ANVIL), rgb(WHITE)),
-        '  <polygon points="%s" fill="%s"/>'
-        % (pts(star_points(STAR_CENTER, STAR_OUTER, STAR_INNER)), rgb(AMBER)),
     ]
+    for half in HALVES:
+        lines.append('  <polygon points="%s" fill="%s"/>' % (pts(half), rgb(WHITE)))
+    lines.append(
+        '  <polygon points="%s" fill="%s"/>'
+        % (pts(star_points(STAR_CENTER, STAR_OUTER, STAR_INNER)), rgb(AMBER))
+    )
     for (cx, cy), r in DOTS:
         lines.append('  <circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx, cy, r, rgb(AMBER_LIGHT)))
     lines.append("</svg>")
@@ -180,11 +190,13 @@ def render_mark(size, background=True):
         image = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     if size <= SMALL_ICON:
-        draw.polygon(scale(ANVIL_SMALL), fill=WHITE + (255,))
+        for half in HALVES_SMALL:
+            draw.polygon(scale(half), fill=WHITE + (255,))
         star = star_points(STAR_SMALL_CENTER, STAR_SMALL_OUTER, STAR_SMALL_INNER)
         draw.polygon(scale(star), fill=AMBER + (255,))
     else:
-        draw.polygon(scale(ANVIL), fill=WHITE + (255,))
+        for half in HALVES:
+            draw.polygon(scale(half), fill=WHITE + (255,))
         star = star_points(STAR_CENTER, STAR_OUTER, STAR_INNER)
         draw.polygon(scale(star), fill=AMBER + (255,))
         for (cx, cy), r in DOTS:
@@ -203,13 +215,24 @@ def font(path, size):
     return ImageFont.truetype(path, size)
 
 
+WORD, NUMBER = "Fission", " 180"
+
+
+def wordmark_size(width, largest):
+    """The largest font size up to `largest` whose wordmark fits in `width` pixels."""
+    size = largest
+    while size > 8 and font(FONT_BOLD, size).getlength(WORD + NUMBER) > width:
+        size -= 1
+    return size
+
+
 def wordmark(draw, x, y, size):
-    """'Sci' in white, 'Forge' in light blue. Returns the x where the text ends."""
+    """'Fission' in white, '180' in light blue. Returns the x where the text ends."""
     f = font(FONT_BOLD, size)
-    draw.text((x, y), "Sci", font=f, fill=TEXT)
-    x += f.getlength("Sci")
-    draw.text((x, y), "Forge", font=f, fill=TEXT_ACCENT)
-    return x + f.getlength("Forge")
+    draw.text((x, y), WORD, font=f, fill=TEXT)
+    x += f.getlength(WORD)
+    draw.text((x, y), NUMBER, font=f, fill=TEXT_ACCENT)
+    return x + f.getlength(NUMBER)
 
 
 def render_splash(scale=1):
@@ -224,7 +247,8 @@ def render_splash(scale=1):
     draw.rectangle([0, 318 * scale, w, 320 * scale], fill=BG_BOTTOM + (255,))
     image.alpha_composite(render_mark(130 * scale), (36 * scale, 95 * scale))
     x = SPLASH_TEXT_X * scale
-    wordmark(draw, x, 90 * scale, 60 * scale)
+    size = wordmark_size((568 - SPLASH_TEXT_X - 22) * scale, 60 * scale)
+    wordmark(draw, x, (150 * scale) - size, size)
     caption = font(FONT_REGULAR, 12 * scale)
     draw.text(
         ((SPLASH_TEXT_X + 235 - 6) * scale, (SPLASH_INFO_Y - 7) * scale),
@@ -245,7 +269,8 @@ def render_about():
     image = Image.new("RGBA", (w, h), DARK + (255,))
     draw = ImageDraw.Draw(image)
     image.alpha_composite(render_mark(120), (24, 34))
-    wordmark(draw, 168, 40, 48)
+    size = wordmark_size(552 - 168 - 16, 48)
+    wordmark(draw, 168, 96 - size, size)
     draw.text((171, 112), SUBTITLE, font=font(FONT_REGULAR, 16), fill=TEXT_SOFT)
     draw.text((171, 140), BASED_ON, font=font(FONT_REGULAR, 12), fill=TEXT_DIM)
     draw.text((171, 158), REPO_URL, font=font(FONT_REGULAR, 12), fill=TEXT_DIM)
@@ -257,7 +282,8 @@ def render_nsis_header():
     image = Image.new("RGBA", (150, 57), DARK + (255,))
     draw = ImageDraw.Draw(image)
     image.alpha_composite(render_mark(44), (6, 6))
-    wordmark(draw, 54, 19, 17)
+    size = wordmark_size(150 - 54 - 4, 17)
+    wordmark(draw, 54, 36 - size, size)
     return image
 
 
@@ -267,9 +293,9 @@ def render_nsis_banner():
     image = _gradient(w, h, DARK_BAND, DARK)
     draw = ImageDraw.Draw(image)
     image.alpha_composite(render_mark(96), (34, 40))
-    f = font(FONT_BOLD, 26)
-    width = f.getlength("Fission180")
-    wordmark(draw, (w - width) / 2, 150, 26)
+    size = wordmark_size(w - 14, 26)
+    width = font(FONT_BOLD, size).getlength(WORD + NUMBER)
+    wordmark(draw, (w - width) / 2, 176 - size, size)
     f = font(FONT_REGULAR, 12)
     for i, line in enumerate(["Parametric CAD with", "the Fusion workflow"]):
         draw.text(((w - f.getlength(line)) / 2, 192 + 18 * i), line, font=f, fill=TEXT_SOFT)

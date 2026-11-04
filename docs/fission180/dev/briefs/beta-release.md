@@ -452,3 +452,35 @@ does not show it; the links call their seams.
       tag pushed, release published as prerelease, link sent.
 - [ ] MEMORY.md session log written (what was built, what was learned, what is next), and
       `docs/fission180/parity/*` untouched unless behaviour changed.
+
+## 7. The first release after the rename to Fission 180 (2026-11-04)
+
+The project was SciForge until 0.1.0-beta.3.2.1; everything is Fission 180 now (MEMORY.md,
+session log "Rename to Fission 180"). What the first Fission 180 release needs, in order:
+
+1. **Luca renames the repository** (GitHub > the repository > Settings > General > Repository
+   name: `Fission-180`) before anything is released. Every link, the update check
+   (`update_core.REPO`) and the program's About link already say `Luca0422git/Fission-180`; until
+   the rename they lead nowhere. GitHub redirects the old names (`SciForge`,
+   `SciForge-Parametric-Design`) for good, as long as no new repository takes one of them.
+2. **A full build, not a patch release.** The program itself changed (its file names, settings
+   folder, title, pictures, installer: core patch #21), so the core id is new and the patch
+   release workflow refuses, as it should. Version: the next number Luca picks (for example
+   `0.1.0-beta.4`) in `src/Mod/Fission180/VERSION`, `_FALLBACK_VERSION` and a CHANGELOG section
+   with that heading (the "Unreleased" section becomes it). The tag is `fission180-v<version>`.
+3. **Installed SciForge betas do not see it by themselves.** Their Update button keeps only
+   releases whose tag starts with `sciforge-v` and reads `sciforge-release.json`. Two ways:
+   * tell the testers to download Fission 180 once (the README says so), or
+   * a **bridge release**: after `fission180-v<version>` is published, a second, pre-release
+     GitHub release tagged `sciforge-v<version>` with the same installer, portable and AppImage
+     files plus a copy of `fission180-release.json` named `sciforge-release.json`. The old Update
+     button finds it, sees another core, downloads the Fission 180 installer and runs it; Linux
+     opens the release page. Its notes: "SciForge is now Fission 180". Luca decides; it is a
+     manual release (or a small workflow input) and nothing has been built for it yet.
+4. **What the Fission 180 installer does on a tester's computer:** it installs into
+   `Program Files\Fission180` (Start menu and desktop: "Fission 180"), then removes an installed
+   SciForge with SciForge's own uninstaller, silently (`Fission180RemoveSciForge`, core patch
+   #21). The settings in `%APPDATA%\SciForge` stay; at the first start Fission 180 copies them,
+   the Home list, places, AI keys and user materials (`fission180/legacy.py`), opens SciForge's
+   designs (renaming their saved names when opened; saving writes the new ones) and re-points an
+   AI app set up for SciForge.

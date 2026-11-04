@@ -96,6 +96,19 @@ class QuietUpdate(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(backups, stamp, "fission180", "old_only.py")))
         self.assertTrue(self.wait_for_marker(), "Fission 180 was not started again")
 
+    def test_the_old_sciforge_module_leaves_mod(self):
+        # The module's name before the rename: left in Mod it would load as a second workbench.
+        old = os.path.join(self.fake, "Mod", "SciForge")
+        write(os.path.join(old, "InitGui.py"), "the old name's init\n")
+        code, out, _seconds = self.run_script("-Target", self.fake, "-Quiet", "-NoDialog")
+        self.assertEqual(code, 0, out)
+        self.assertFalse(os.path.exists(old), out)
+        self.assertIn("the old SciForge module moved to", out)
+        backups = os.path.join(self.fake, "Fission180-backups")
+        (moved,) = [n for n in os.listdir(backups) if n.startswith("SciForge-")]
+        self.assertEqual(read(os.path.join(backups, moved, "InitGui.py")), "the old name's init\n")
+        self.assertEqual(read(os.path.join(self.mod, "InitGui.py")), "new init\n")
+
     def test_without_restart_nothing_is_started(self):
         code, out, _seconds = self.run_script("-Target", self.fake, "-Quiet", "-NoDialog")
         self.assertEqual(code, 0, out)

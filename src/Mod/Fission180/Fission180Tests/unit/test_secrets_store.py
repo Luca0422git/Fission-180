@@ -204,7 +204,7 @@ class Dpapi(TempFolder):
         blob = base64.b64decode(json.loads(text)["secrets"]["ai.anthropic"])
         self.assertTrue(blob.startswith(b"DPAPI"))
         self.assertEqual(s.read("ai.anthropic"), VALUE)
-        self.assertEqual(set(self.crypt32.entropies), {b"Fission 180 secrets v1"})
+        self.assertEqual(set(self.crypt32.entropies), {b"Fission180 secrets v1"})
         self.assertEqual(self.crypt32.descriptions, ["Fission180"])
         freed = {ctypes.addressof(b) for b in self.crypt32.buffers}
         self.assertEqual(set(self.kernel32.freed), freed)  # every answer buffer is freed

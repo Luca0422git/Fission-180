@@ -190,6 +190,8 @@ int main(int argc, char** argv)
     // settings folder, so Fission 180 and FreeCAD live side by side (patch #8).
     App::Application::Config()["ExeName"] = FISSION180_EXE_NAME;
     App::Application::Config()["ExeVendor"] = FISSION180_VENDOR;
+    // FISSION180: the name in the title bar, About and dialogs ("Fission 180", with a space).
+    App::Application::Config()["Application"] = FISSION180_DISPLAY_NAME;
     App::Application::Config()["Fission180Version"] = FISSION180_VERSION;
     App::Application::Config()["AppDataSkipVendor"] = "true";
     App::Application::Config()["MaintainerUrl"] = FISSION180_URL;

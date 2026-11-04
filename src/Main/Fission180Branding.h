@@ -27,6 +27,10 @@
 #endif
 
 #define FISSION180_EXE_NAME "Fission180"
+// The name people read (title bar, About, dialogs): FreeCAD shows Config()["Application"]
+// where it would show ExeName (Gui/Application.cpp, setApplicationName). ExeName keeps no
+// space: it names the program files, the settings folder and the registry keys.
+#define FISSION180_DISPLAY_NAME "Fission 180"
 #define FISSION180_VENDOR "Fission180"
 #define FISSION180_URL "https://github.com/Luca0422git/Fission-180"
 #define FISSION180_DESKTOP_ID "org.fission180.Fission180"

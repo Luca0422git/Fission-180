@@ -73,4 +73,7 @@ Section -ProgramFiles SecProgramFiles
   DetailPrint "Writing uninstaller to '$INSTDIR'"
   WriteUninstaller "$INSTDIR\${SETUP_UNINSTALLER}"
 
+  # FISSION180: an installed SciForge (the old name) goes, its settings stay (include/utils.nsh)
+  Call Fission180RemoveSciForge
+
 SectionEnd

@@ -29,3 +29,8 @@ Rules that are easy to forget:
 - Real FreeCAD can run in the sandbox: `tools/fission180/get_freecad.sh` then
   `tools/fission180/run_tests.sh` (unit tests, golden models, GUI smoke test under xvfb).
 - Copy Fusion's behavior, never its assets, wording or code.
+- The project was called **SciForge** until 0.1.0-beta.3.2.1 (renamed 2026-11-04). People see
+  "Fission 180"; code and files say `Fission180` / `fission180`. The old name stays only where
+  old designs, settings, keys and installs are read: `fission180/legacy.py`,
+  `secrets_store.OLD_SERVICE`, the installer's `Fission180RemoveSciForge`, the tags of releases
+  published as SciForge (`sciforge-v...`) and `Fission180Tests/fixtures/before_rename/`. Keep them.
