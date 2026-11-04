@@ -232,9 +232,9 @@ class Designs(unittest.TestCase):
         self.assertFalse(legacy.saved_by_sciforge(os.path.join(folder, "missing.FCStd")))
         self.assertFalse(legacy.saved_by_sciforge(""))
         fixture = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures", "before_rename"
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures"
         )
-        for name in ("box.FCStd", "lip_and_groove.FCStd"):
+        for name in ("before_rename_box.FCStd", "before_rename_lip_and_groove.FCStd"):
             self.assertTrue(legacy.saved_by_sciforge(os.path.join(fixture, name)), name)
 
 

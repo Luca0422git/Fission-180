@@ -33,4 +33,4 @@ Rules that are easy to forget:
   "Fission 180"; code and files say `Fission180` / `fission180`. The old name stays only where
   old designs, settings, keys and installs are read: `fission180/legacy.py`,
   `secrets_store.OLD_SERVICE`, the installer's `Fission180RemoveSciForge`, the tags of releases
-  published as SciForge (`sciforge-v...`) and `Fission180Tests/fixtures/before_rename/`. Keep them.
+  published as SciForge (`sciforge-v...`) and `Fission180Tests/fixtures/before_rename_*.FCStd`. Keep them.

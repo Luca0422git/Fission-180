@@ -15,7 +15,7 @@ this file was written as SciForge and was renamed by script; the tags of release
 SciForge keep their real names (`sciforge-v0.1.0-beta` ... `sciforge-v0.1.0-beta.3.2.1`).
 What still says SciForge, on purpose (old designs, settings, keys and installs keep working):
 `fission180/legacy.py`, `secrets_store.OLD_SERVICE`, the installer's `Fission180RemoveSciForge`,
-`Fission180Tests/fixtures/before_rename/`. The shorthand `sf_` (golden ids, AI step names) was
+`Fission180Tests/fixtures/before_rename_*.FCStd`. The shorthand `sf_` (golden ids, AI step names) was
 left: it is not the name and the AI tools' names are an interface. Status: [x] rename by script
 (52c3997a) [x] carry-over of designs / settings / files / keys / AI apps / installs (9c7dea3e)
 [x] new mark and pictures, README screenshots [x] local tests [ ] CI green on develop
@@ -211,7 +211,7 @@ Quick updates come from green "Fission 180 tests" runs on `develop`.
 | SURFACE part 3/4 (tool options; SOLID modify tools on surface bodies, Merge) | `fission180/surface*.py`, `surfmod*.py`; specs `parity/surface.md`, `parity/surface-modify.md` |
 | Fusion research with sources (wave 6), integration map for new tabs/body kinds | `docs/fission180/dev/research/` |
 | Every change to FreeCAD's own code (tagged `FISSION180:`) | `docs/fission180/core-patches.md` |
-| What SciForge (the old name) saved: old designs, settings, files, keys, AI apps | `src/Mod/Fission180/fission180/legacy.py` (run first by `Init.py`), tests `test_legacy*.py`, fixtures `Fission180Tests/fixtures/before_rename/` |
+| What SciForge (the old name) saved: old designs, settings, files, keys, AI apps | `src/Mod/Fission180/fission180/legacy.py` (run first by `Init.py`), tests `test_legacy*.py`, fixtures `Fission180Tests/fixtures/before_rename_*.FCStd` |
 | CI workflows (Fission 180's own) | `.github/workflows/fission180-*.yml` |
 | Tooling scripts for CI / local runs | `tools/fission180/` |
 | Original "Forge" v0.1 prototype, kept verbatim for history | `prototype/forge-freecad/` |

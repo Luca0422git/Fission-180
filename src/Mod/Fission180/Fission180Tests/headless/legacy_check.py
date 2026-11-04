@@ -3,7 +3,7 @@
 run in real FreeCAD without a window, with the Fission 180 module installed (its Init.py
 puts fission180/legacy.py in place). Fission180Tests/unit/test_legacy_freecad.py runs it.
 
-The two designs in fixtures/before_rename were saved by SciForge 0.1.0-beta.3.2.1 from the
+The two designs fixtures/before_rename_*.FCStd were saved by SciForge 0.1.0-beta.3.2.1 from the
 golden models plastic2_lip_and_groove (steps of SciForge's own: their Python classes were
 saved as "sciforge.<module>.<Class>") and box_basic (a body only: nothing of SciForge's own
 code runs while it opens), each with a named view in the design's Meta. For each design:
@@ -18,10 +18,10 @@ import tempfile
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FIXTURES = os.path.join(os.path.dirname(HERE), "fixtures", "before_rename")
+FIXTURES = os.path.join(os.path.dirname(HERE), "fixtures")
 DESIGNS = {  # file: (volume, (object, its Fission180Type after opening) or None)
-    "lip_and_groove.FCStd": (11900.0, ("l1", "Lip")),
-    "box.FCStd": (8000.0, None),
+    "before_rename_lip_and_groove.FCStd": (11900.0, ("l1", "Lip")),
+    "before_rename_box.FCStd": (8000.0, None),
 }
 OLD = ("SciForge", "sciforge")
 
