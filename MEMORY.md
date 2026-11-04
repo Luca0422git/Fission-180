@@ -29,9 +29,13 @@ Claude extension no longer connects; the "sciforge" entry of Claude Desktop / Ge
 still switched to "fission180" at the first start), version **0.1.0-beta.3.3**, no bridge
 release [x] `Release` fast-forwarded to the tested commit (`eae078aa..e2025ef4`, 2026-11-04 06:0x UTC;
 "Fission 180 tests" #4 green on `e2025ef4`, all 14 jobs) [x] Luca renamed the repository to
-`Luca0422git/Fission-180` (GitHub answers with that name since about 05:19 UTC) [ ] **Luca: push the
-tag `fission180-v0.1.0-beta.3.3` on `e2025ef4`** (Codespace on Release; a cloud session cannot push
-tags), which starts the full build that publishes it (~4 h). Newest session log "Rename to Fission 180".
+`Luca0422git/Fission-180` (GitHub answers with that name since about 05:19 UTC) [x] Luca pushed the tag
+`fission180-v0.1.0-beta.3.3` (Git Bash, shallow clone of Release) [x] **PUBLISHED 2026-11-04 18:24 UTC**
+(pre-release): "Fission 180 build" #1 on `e2025ef4`, green end to end (Linux compile 1 h 56 min,
+Windows 2 h 38 min: the renamed files missed the compile cache; the installer test and all 9
+scenario parts on the built AppImage green). Files: installer 510 MB, portable 430 MB, AppImage
+827 MB, quick update 8 MB, fission180-release.json, SHA256SUMS.txt (the notes' checksums = the
+assets' digests). Next: Luca installs it over his SciForge (the installer removes it). Newest session log "Rename to Fission 180".
 
 **2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "fission180 sketch fixes" list (9 items), on
 `develop`.** All nine fixed, each with a scenario that fails on the old code (newest session
