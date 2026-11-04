@@ -21,15 +21,17 @@ left: it is not the name and the AI tools' names are an interface. Status: [x] r
 [x] new mark and pictures, README screenshots [x] local tests [x] CI green on develop
 ("Fission 180 tests" #2 on fe126f48, all 14 jobs; the first run failed only check_install:
 the fixture designs were in a sub-folder)
-[ ] **Luca renames the repository** (Settings > General > Repository name: `Fission-180`)
+[x] Luca renamed the repository (`Fission-180`)
 [ ] Luca: the repository's About box (description, website, topics) and, if wanted, the titles of
 the old releases [x] Luca: "im the only one with sciforge right now. so change the ai connector
 too. and push to release": the AI connector's SciForge compatibility removed (an old SciForge
 Claude extension no longer connects; the "sciforge" entry of Claude Desktop / Gemini CLI is
 still switched to "fission180" at the first start), version **0.1.0-beta.3.3**, no bridge
-release [ ] `Release` fast-forwarded to the tested commit (RELEASE_STATUS) [ ] **Luca: rename the
-repository, then push the tag `fission180-v0.1.0-beta.3.3`** (Codespace), which starts the
-full build that publishes it. Newest session log "Rename to Fission 180".
+release [x] `Release` fast-forwarded to the tested commit (`eae078aa..e2025ef4`, 2026-11-04 06:0x UTC;
+"Fission 180 tests" #4 green on `e2025ef4`, all 14 jobs) [x] Luca renamed the repository to
+`Luca0422git/Fission-180` (GitHub answers with that name since about 05:19 UTC) [ ] **Luca: push the
+tag `fission180-v0.1.0-beta.3.3` on `e2025ef4`** (Codespace on Release; a cloud session cannot push
+tags), which starts the full build that publishes it (~4 h). Newest session log "Rename to Fission 180".
 
 **2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "fission180 sketch fixes" list (9 items), on
 `develop`.** All nine fixed, each with a scenario that fails on the old code (newest session
