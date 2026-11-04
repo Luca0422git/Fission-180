@@ -29,7 +29,7 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from .. import commands, legacy, log, warn
+from .. import commands, log, warn
 from ..compat import QtCore, QtWidgets
 from . import bridge_core, catalog, executor
 
@@ -107,8 +107,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             status, reason = bridge_core.check_request(
                 "POST",
                 self.path,
-                self.headers.get(bridge_core.KEY_HEADER)
-                or self.headers.get(legacy.OLD_KEY_HEADER),  # (a SciForge Claude extension)
+                self.headers.get(bridge_core.KEY_HEADER),
                 _state["key"],
                 self.headers.get("Origin"),
                 length,
@@ -168,17 +167,9 @@ def start():
     )
     _state["thread"].start()
     _state["file"] = bridge_core.bridge_path(App.getUserAppDataDir())
-    info = bridge_core.bridge_info(server.server_address[1], _state["key"])
-    bridge_core.write_bridge_file(_state["file"], info)
-    # A Claude extension made by SciForge (the old name) carries its own copy of the old MCP
-    # server, which looks in <user data>/SciForge/ai: it finds this program there too.
-    _state["old_files"] = []
-    try:
-        for path in legacy.old_bridge_files(App.getUserAppDataDir()):
-            bridge_core.write_bridge_file(path, info)
-            _state["old_files"].append(path)
-    except Exception as exc:
-        warn("AI bridge (SciForge's place): %s" % exc)
+    bridge_core.write_bridge_file(
+        _state["file"], bridge_core.bridge_info(server.server_address[1], _state["key"])
+    )
     if _state["timer"] is None:
         _state["timer"] = QtCore.QTimer()
         _state["timer"].setInterval(50)
@@ -198,8 +189,6 @@ def stop():
     except Exception as exc:
         warn("AI bridge: %s" % exc)
     bridge_core.remove_bridge_file(_state["file"], os.getpid())
-    for path in _state.get("old_files") or []:
-        bridge_core.remove_bridge_file(path, os.getpid())
     while True:  # calls still waiting: answered, not left hanging
         try:
             job = _state["jobs"].get_nowait()

@@ -8,7 +8,7 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
-## Unreleased
+## 0.1.0-beta.3.3
 
 ### The new name: Fission 180
 
@@ -18,8 +18,10 @@ releases published under the old name (their tags are `sciforge-v...`).
 - **Nothing of yours is lost.** Designs saved by SciForge open as before (the names SciForge
   saved inside them are renamed when they open; saving writes the new ones). At the first start
   Fission 180 brings over SciForge's settings, shortcuts, Home list, places, AI keys, drawing
-  templates and your own materials, and an AI app you connected to SciForge is connected to
-  Fission 180 instead.
+  templates and your own materials, and an AI app you connected to SciForge (Claude Desktop,
+  Gemini CLI) is connected to Fission 180 instead. The AI connector is Fission 180's own now: a
+  Claude Desktop extension made by SciForge no longer connects, so remove it in Claude
+  (Settings > Extensions) and add Fission 180's from Preferences > AI.
 - **The installer replaces SciForge**: it removes an installed SciForge (only the program, never
   your settings or designs), so you do not end up with two of them.
 - The repository moves to `github.com/Luca0422git/Fission-180`; the old addresses keep working.

@@ -20,14 +20,16 @@ settings and files made by SciForge keep working without anyone doing anything:
     preferences are filled from the old folder's user.cfg once, and the old user files
     (macros, materials, Home, places, AI keys, drawing templates ...) are copied over. Nothing
     of the old folder is changed or deleted.
-  * AI apps: an AI app set up for SciForge (Claude Desktop, Gemini CLI) is pointed at
-    Fission 180's MCP server; a SciForge Claude extension (.mcpb, a frozen copy of the old
-    server) still finds Fission 180, which also writes the bridge file where the old server
-    looks and accepts its key header.
+  * AI apps: an AI app set up for SciForge (its MCP server entry "sciforge" in Claude
+    Desktop or Gemini CLI) is set up for Fission 180 instead ("fission180"). The AI connector
+    itself has nothing of the old name (Luca, 2026-11-04: he was SciForge's only user): a
+    Claude extension made by SciForge stops working and is replaced with Preferences > AI >
+    Claude Desktop extension.
 
 Everything is logged with the [Fission 180] prefix and nothing here raises. The pure parts
 (names, values, paths) are unit tested in Fission180Tests/unit/test_legacy.py; the FreeCAD parts
-by the GUI scenario legacy_design.py with a design saved by SciForge 0.1.0-beta.3.2.1.
+by Fission180Tests/headless/legacy_check.py (test_legacy_freecad.py) with two designs saved by
+SciForge 0.1.0-beta.3.2.1.
 """
 
 import importlib
@@ -44,7 +46,6 @@ OLD_LOW = "sciforge"
 NEW = "Fission180"
 NEW_LOW = "fission180"
 DISPLAY = "Fission 180"
-OLD_KEY_HEADER = "X-SciForge-Key"  # the AI bridge's key header before the rename
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180"
 SETTINGS_DONE = "SettingsFromSciForge"  # (bool in PREFS) preferences renamed / imported
@@ -517,17 +518,3 @@ def repoint_ai_apps():
                 _log("AI: %s now starts Fission 180's MCP server (it was SciForge's)" % path)
     except Exception as exc:
         _warn("AI apps set up for SciForge: %s" % exc)
-
-
-def old_bridge_files(data):
-    """Where a SciForge Claude extension (a frozen copy of the old MCP server) looks for the
-    running program: <user data>/SciForge/ai/bridge.json, in this user data folder and the
-    old program's. Only folders that exist (the person used SciForge's AI connector)."""
-    from .ai import bridge_core
-
-    found = []
-    for base in [b for b in (data, old_path(data)) if b]:
-        folder = os.path.join(base, OLD, "ai")
-        if os.path.isdir(folder):
-            found.append(os.path.join(folder, bridge_core.BRIDGE_FILE))
-    return found

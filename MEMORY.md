@@ -23,9 +23,13 @@ left: it is not the name and the AI tools' names are an interface. Status: [x] r
 the fixture designs were in a sub-folder)
 [ ] **Luca renames the repository** (Settings > General > Repository name: `Fission-180`)
 [ ] Luca: the repository's About box (description, website, topics) and, if wanted, the titles of
-the old releases [ ] first Fission 180 release = a full build (core patch #21), version Luca's
-pick; a "bridge" release for installed SciForge betas is his decision (beta-release.md section
-7). Newest session log "Rename to Fission 180".
+the old releases [x] Luca: "im the only one with sciforge right now. so change the ai connector
+too. and push to release": the AI connector's SciForge compatibility removed (an old SciForge
+Claude extension no longer connects; the "sciforge" entry of Claude Desktop / Gemini CLI is
+still switched to "fission180" at the first start), version **0.1.0-beta.3.3**, no bridge
+release [ ] `Release` fast-forwarded to the tested commit (RELEASE_STATUS) [ ] **Luca: rename the
+repository, then push the tag `fission180-v0.1.0-beta.3.3`** (Codespace), which starts the
+full build that publishes it. Newest session log "Rename to Fission 180".
 
 **2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "fission180 sketch fixes" list (9 items), on
 `develop`.** All nine fixed, each with a scenario that fails on the old code (newest session
@@ -1894,9 +1898,9 @@ Asked once (AskUserQuestion): shown name **Fission 180**, code name **Fission180
     (macros ...). Nothing old is deleted.
   * API keys: `secrets_store` reads the old service name and DPAPI entropy as a fallback.
   * AI: Claude Desktop / Gemini CLI entries named `sciforge` re-pointed at Fission 180's server
-    (at GUI start, `shell.startup`); the bridge also writes `<data>/SciForge/ai/bridge.json` when
-    that folder exists and accepts `X-SciForge-Key` (an old .mcpb extension carries the old
-    server).
+    (at GUI start, `shell.startup`). (At first the bridge also wrote `<data>/SciForge/ai/bridge.json`
+    and accepted `X-SciForge-Key` for an old .mcpb extension; removed the same day: Luca was
+    SciForge's only user, "change the ai connector too".)
 - **The program** (core patch #21): `FISSION180_DISPLAY_NAME` "Fission 180" into
   `Config()["Application"]`: FreeCAD then makes it `QApplication::applicationName` (title bar,
   About, dialogs); ExeName stays `Fission180` (files, settings folder, registry). The

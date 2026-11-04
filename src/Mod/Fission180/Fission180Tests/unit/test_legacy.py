@@ -292,16 +292,6 @@ class UserFiles(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(new, "Material", "SciForge")))
         self.assertEqual(self.read("Fission180", "v1-1", "user.cfg"), "<new/>")  # (never replaced)
 
-    def test_old_bridge_files_only_where_the_old_ai_folder_is(self):
-        data = os.path.join(self.root, "Fission180", "v1-1")
-        os.makedirs(data)
-        self.assertEqual(legacy.old_bridge_files(data), [])
-        os.makedirs(os.path.join(self.root, "SciForge", "v1-1", "SciForge", "ai"))
-        self.assertEqual(
-            legacy.old_bridge_files(data),
-            [os.path.join(self.root, "SciForge", "v1-1", "SciForge", "ai", "bridge.json")],
-        )
-
 
 class EntropyCrypt32:
     """crypt32 stand-in whose blobs open only with the entropy they were made with."""

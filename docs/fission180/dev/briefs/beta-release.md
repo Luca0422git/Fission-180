@@ -465,18 +465,13 @@ session log "Rename to Fission 180"). What the first Fission 180 release needs, 
    `SciForge-Parametric-Design`) for good, as long as no new repository takes one of them.
 2. **A full build, not a patch release.** The program itself changed (its file names, settings
    folder, title, pictures, installer: core patch #21), so the core id is new and the patch
-   release workflow refuses, as it should. Version: the next number Luca picks (for example
-   `0.1.0-beta.4`) in `src/Mod/Fission180/VERSION`, `_FALLBACK_VERSION` and a CHANGELOG section
-   with that heading (the "Unreleased" section becomes it). The tag is `fission180-v<version>`.
-3. **Installed SciForge betas do not see it by themselves.** Their Update button keeps only
-   releases whose tag starts with `sciforge-v` and reads `sciforge-release.json`. Two ways:
-   * tell the testers to download Fission 180 once (the README says so), or
-   * a **bridge release**: after `fission180-v<version>` is published, a second, pre-release
-     GitHub release tagged `sciforge-v<version>` with the same installer, portable and AppImage
-     files plus a copy of `fission180-release.json` named `sciforge-release.json`. The old Update
-     button finds it, sees another core, downloads the Fission 180 installer and runs it; Linux
-     opens the release page. Its notes: "SciForge is now Fission 180". Luca decides; it is a
-     manual release (or a small workflow input) and nothing has been built for it yet.
+   release workflow refuses, as it should. Version **0.1.0-beta.3.3** (VERSION,
+   `_FALLBACK_VERSION`, its CHANGELOG section; full builds so far: 3.1, 3.2). The tag is
+   `fission180-v0.1.0-beta.3.3`, pushed by Luca once `Release` is on the tested commit.
+3. **Installed SciForge betas do not see it by themselves**: their Update button keeps only
+   releases whose tag starts with `sciforge-v`. Luca was SciForge's only user (2026-11-04), so
+   he downloads the Fission 180 installer once and no "bridge" release (a copy published
+   under a `sciforge-v` tag) is made.
 4. **What the Fission 180 installer does on a tester's computer:** it installs into
    `Program Files\Fission180` (Start menu and desktop: "Fission 180"), then removes an installed
    SciForge with SciForge's own uninstaller, silently (`Fission180RemoveSciForge`, core patch
