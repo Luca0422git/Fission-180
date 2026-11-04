@@ -1921,7 +1921,9 @@ Asked once (AskUserQuestion): shown name **Fission 180**, code name **Fission180
   (plate_hole_grid, sf_loft_merge_slot_volume), headless AI tools 339 calls 0 failed, docs
   examples 157 / 0 failed, AI agent 81 / 0, Auto Timeline rebuild 153 / 0, MCP 15 / 0,
   recognition 71 / 0, simulation 141 / 0 and 230 / 0, GUI smoke, journey and restart all PASS.
-  Scenarios run by hand: readme_shots and SCENARIOS_RESULT.
+  Scenarios run by hand, all PASS: readme_shots, ai_bridge, ai_docs_gui, ai_panel, cloud_place,
+  crash_notice, fixpattern_old_file (an older design file), freecad_tools, home_screen,
+  look_light, misc_preferences, report_problem, update_check (151 checks), versions_recovery.
 - Installer: `makensis` (Ubuntu's NSIS 3.09) compiles the script before and after the change
   with stand-in files (lowercase copies of the language files, `LogSet` removed: Linux NSIS has
   no logging build); no new warnings. The PowerShell tests (`test_install_update_ps1.py`, with a
