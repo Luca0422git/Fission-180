@@ -185,7 +185,10 @@ def migrate_once(obj):
         if doc is None or doc.Name in _DONE:
             return
         _DONE.add(doc.Name)
-        migrate_document(doc)
+        # (the classes stay hooked for the session: a design Fission 180 saved is not searched)
+        path = getattr(doc, "FileName", "")
+        if not path or saved_by_sciforge(path):
+            migrate_document(doc)
     except Exception as exc:
         _warn("old SciForge names: %s" % exc)
 

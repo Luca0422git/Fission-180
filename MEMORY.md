@@ -1916,8 +1916,12 @@ Asked once (AskUserQuestion): shown name **Fission 180**, code name **Fission180
   `test_legacy_freecad.py` (run_tests.sh passes FISSION180_FC_CMD).
 - Settings carry-over in both setups (the same folder; a new `Fission180` folder next to a
   `SciForge` one): 15/15 checks, a second start does nothing.
-- `test_legacy.py` (rules, alias, hook, files, old keys) and the whole unit suite; golden,
-  headless AI tools, simulation, GUI smoke / journey / restart: see the results line below.
+- `run_tests.sh --only base`: unit 2829 tests OK (with `test_legacy.py`: rules, alias, hook,
+  files, old keys; and `test_legacy_freecad.py`), golden 619 pass + the 2 known xfail
+  (plate_hole_grid, sf_loft_merge_slot_volume), headless AI tools 339 calls 0 failed, docs
+  examples 157 / 0 failed, AI agent 81 / 0, Auto Timeline rebuild 153 / 0, MCP 15 / 0,
+  recognition 71 / 0, simulation 141 / 0 and 230 / 0, GUI smoke, journey and restart all PASS.
+  Scenarios run by hand: readme_shots and SCENARIOS_RESULT.
 - Installer: `makensis` (Ubuntu's NSIS 3.09) compiles the script before and after the change
   with stand-in files (lowercase copies of the language files, `LogSet` removed: Linux NSIS has
   no logging build); no new warnings. The PowerShell tests (`test_install_update_ps1.py`, with a
