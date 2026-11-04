@@ -11,8 +11,10 @@ kept by Finish Sketch (the green check; it vanished and left its poles) + one Ct
 spline [x] 90 degree corner marks [x] picture pointers for Fission 180's own sketch tools
 [x] window title "Fission 180" (no "1.1.4") [x] VERSION / `_FALLBACK_VERSION`
 0.1.0-beta.3.3.1, CHANGELOG [x] local tests: unit 2849 OK (after `make_ai_docs.py` for the
-parity doc), the 5 new scenarios and 16 touched sketch scenarios pass [ ] "Fission 180
-tests" green on develop [ ] **Luca: Actions > Fission 180 patch release** (module files only).
+parity doc), the 5 new scenarios and 16 touched sketch scenarios pass [x] "Fission 180
+tests" #9 green on `b7607a2b` (all 14 jobs, 2026-11-04 20:39 UTC) [ ] **Luca: Actions > Fission 180
+patch release** (module files only; this MEMORY note was held back so the release could run on
+`b7607a2b` at once: any push to develop needs its own green run first).
 
 **2026-11-04: SciForge is now Fission 180** (Luca: "Sciforge Parametric Design just doesnt hit
 right ... change it to Fission 180 ... change everything on the GitHub", then "the installer, the
