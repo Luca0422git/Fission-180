@@ -18,7 +18,9 @@ What still says SciForge, on purpose (old designs, settings, keys and installs k
 `Fission180Tests/fixtures/before_rename_*.FCStd`. The shorthand `sf_` (golden ids, AI step names) was
 left: it is not the name and the AI tools' names are an interface. Status: [x] rename by script
 (52c3997a) [x] carry-over of designs / settings / files / keys / AI apps / installs (9c7dea3e)
-[x] new mark and pictures, README screenshots [x] local tests [ ] CI green on develop
+[x] new mark and pictures, README screenshots [x] local tests [x] CI green on develop
+("Fission 180 tests" #2 on fe126f48, all 14 jobs; the first run failed only check_install:
+the fixture designs were in a sub-folder)
 [ ] **Luca renames the repository** (Settings > General > Repository name: `Fission-180`)
 [ ] Luca: the repository's About box (description, website, topics) and, if wanted, the titles of
 the old releases [ ] first Fission 180 release = a full build (core patch #21), version Luca's
@@ -1931,7 +1933,7 @@ Asked once (AskUserQuestion): shown name **Fission 180**, code name **Fission180
 
 #### Open
 
-- CI on develop; Luca's GitHub clicks (repository name; the About box: description, website,
+- Luca's GitHub clicks (repository name; the About box: description, website,
   topics; the titles of the old releases if he wants). The default branch is `Release`, so the
   front page shows the new README only once a Fission 180 release moves `Release` (or Luca makes
   `develop` the default for a while). The first Fission 180 release: a full build; a bridge
