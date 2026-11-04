@@ -146,7 +146,10 @@ def cross_cursor():
 
     sess = sketch_mode.current()
     widget = sess.viewer if sess is not None and sess.viewer is not None else h.gl_widget()
-    return widget.cursor().shape() == QtCore.Qt.CrossCursor
+    from fission180 import sketch_cursor
+
+    # Fission 180's own tool's pointer: the crosshair with its picture (sketch_cursor.py)
+    return sketch_cursor.is_own(widget.cursor())
 
 
 def new_geometry(before):

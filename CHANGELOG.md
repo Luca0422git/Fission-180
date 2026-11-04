@@ -8,6 +8,33 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.1
+
+### Fixed
+
+- **Finish Sketch threw away a spline you were still drawing.** If you clicked the points of a
+  spline and then pressed the green Finish Sketch check (in the ribbon, the right-click menu or
+  the Sketch Palette), the spline vanished and its points were left behind in the sketch. Only
+  Enter made it. Finish Sketch now works like OK: the spline is made from the points you
+  clicked, then the sketch closes. The same goes for the other tools that can be finished (a
+  conic, an Offset with curves picked, a 3D spline).
+- **Undoing a spline took two presses of Ctrl+Z.** The first one only took back how its ends
+  were joined to other points; the spline stayed. One Ctrl+Z now takes the whole spline back
+  (and Ctrl+Y brings it back whole).
+- **No 90 degree mark where sketch lines meet at a right angle.** Where two lines meet at 90
+  degrees and the sketch keeps it so (an upright line on a level one, or lines made
+  perpendicular), a small square corner mark now shows at the corner, also where a line ends on
+  the middle of another (a T). It stays the same size when you zoom and hides with **Show
+  Constraints** in the Sketch Palette.
+- **Fission 180's own sketch tools had no picture beside the pointer.** Trim (the scissors),
+  Extend, Break, Fillet, Chamfer, Offset, 2-Point Circle, the tangent circles, Tangent Arc,
+  Midpoint Line, 3-Point Rectangle, Edge Polygon, the slots, Conic Curve, Project to Surface,
+  Collinear, Concentric, Midpoint, Curvature and the 3D Sketch tools only showed a plain cross.
+  They now show the crosshair with the tool's own picture, like the other sketch tools.
+- **The window title said "Fission 180 1.1.4".** 1.1.4 is the version of FreeCAD that Fission 180
+  is built on, not Fission 180's. The title now says just **Fission 180** (with the design's
+  name in front when one is open); Fission 180's own version is on the Home tab.
+
 ## 0.1.0-beta.3.3
 
 ### The new name: Fission 180

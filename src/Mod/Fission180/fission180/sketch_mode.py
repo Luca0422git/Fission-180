@@ -544,12 +544,24 @@ RECOMPUTE_STEP = "Sketch recompute"
 # (sketch_infer.py: Fusion adds them with the line itself).
 INFER_STEP = "Inferred Constraints"
 GLUED_STEPS = (RECOMPUTE_STEP, INFER_STEP)
+# FreeCAD's spline tool records the constraints of the spline's ends (on the points it was
+# clicked on) as a step of its own after the spline ("Add Auto-Constraints"): one Ctrl+Z
+# took only those back and left the spline (Fusion: one Ctrl+Z, the spline is gone). That
+# step goes with the spline step before it. (After FreeCAD's line the same step is still
+# its own: the Line tool's two steps are a known difference, parity/sketch.md.)
+AUTO_STEP = "Add Auto-Constraints"
 _merging = {"busy": False}
 
 
 def _glued_next(doc):
-    """The first step of the redo list goes with the step before it."""
-    return bool(doc.RedoNames) and doc.RedoNames[0] in GLUED_STEPS
+    """The first step of the redo list goes with the step before it (the newest of the
+    undo list)."""
+    if not doc.RedoNames:
+        return False
+    following = doc.RedoNames[0]
+    if following in GLUED_STEPS:
+        return True
+    return following == AUTO_STEP and bool(doc.UndoNames) and doc.UndoNames[0] == SPLINE_STEP
 
 
 def _merge_recompute_step(doc, undo):
@@ -812,6 +824,14 @@ class SketchSession:
         ensure_areas(sketch)  # an older sketch: its areas can be clicked after Finish Sketch
         self.display = DisplayOptions(self)
         self.fixed = FixedColour(self)
+        self.right_angles = None  # the 90 degree marks at corners (sketch_right_angles.py)
+        try:
+            from .sketch_right_angles import RightAngleMarks
+
+            self.right_angles = RightAngleMarks(self)
+            self.right_angles.visible = option("constraints")
+        except Exception as exc:
+            warn("right-angle marks: %s" % exc)
         self.polygon = PolygonPreview(self)
         from .sketch_line import LineChain
 
@@ -893,6 +913,8 @@ class SketchSession:
             self.fixed.apply()
         except Exception as exc:
             warn("sketch display: %s" % exc)
+        if self.right_angles is not None:
+            self.right_angles.update()
 
     def settled(self, kind, count):
         """A sketch operation was committed, aborted or undone (called by FreeCAD's
@@ -1079,6 +1101,8 @@ class SketchSession:
                     self.areas.clear()  # hidden profiles cannot stay picked
             elif name in ("points", "dimensions", "constraints", "projected"):
                 self.display.apply()
+                if name == "constraints" and self.right_angles is not None:
+                    self.right_angles.set_visible(value)
         except Exception as exc:
             warn("sketch palette %s: %s" % (name, exc))
 
@@ -1246,8 +1270,8 @@ class SketchSession:
         """FreeCAD's spline tool is drawing (Fusion's Fit Point / Control Point Spline)."""
         from . import recent
 
-        last = recent.last()
-        if last is None or last[0] not in SPLINE_COMMANDS:
+        # (past Finish Sketch: it is recorded before it runs, and keeps the spline)
+        if recent.running_tool() not in SPLINE_COMMANDS:
             return False
         try:
             return self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
@@ -1634,6 +1658,7 @@ class SketchSession:
         self.close_editor(commit=True)
         remove_stray_editors(self.gl)
         parts = [self.polygon, self.areas, self.shading, self.display, self.fixed, self.check]
+        parts.append(self.right_angles)
         if self.sketch3d is not None:
             parts.append(self.sketch3d)
         for part in parts:
@@ -2920,6 +2945,14 @@ def finish_sketch():
     if session is not None:
         session.close_editor(commit=True)
         session.polygon.stop()
+        # Fusion: Finish Sketch is OK for the tool that runs: a spline being drawn is made
+        # (Luca, 2026-11-04: it vanished and left its points behind; only Enter made it),
+        # a conic waiting for its rho, an Offset with curves picked...
+        try:
+            if session.tool_running() or (session.tool is not None and session.tool.active):
+                session.finish_tool()
+        except Exception as exc:
+            warn("finish sketch: %s" % exc)
     try:
         from . import sketch_pick_ui
 

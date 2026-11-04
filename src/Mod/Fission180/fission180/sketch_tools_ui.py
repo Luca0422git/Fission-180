@@ -29,6 +29,7 @@ class _SketchCommand:
     title = ""
     tip = ""
     icon = ""
+    gives_way = True  # the running tool ends before this command (another tool replaces it)
 
     def GetResources(self):
         res = {"MenuText": self.title, "ToolTip": self.tip}
@@ -42,7 +43,7 @@ class _SketchCommand:
     def Activated(self):
         try:
             session = sketch_mode.current()
-            if session is not None:
+            if session is not None and self.gives_way:
                 session.give_way()  # the running tool ends, Fission 180's or FreeCAD's
             self.run()
         except Exception as exc:
@@ -56,6 +57,9 @@ class FinishSketch(_SketchCommand):
     title = "Finish Sketch"
     tip = "Close the sketch and go back to the 3D model (also with a drawing tool running)"
     icon = "finish_sketch"
+    # finish_sketch ends the running tool itself, as OK: give_way would drop a spline
+    # being drawn (Luca, 2026-11-04: it vanished and left its points behind)
+    gives_way = False
 
     def run(self):
         if not sketch_mode.finish_sketch():

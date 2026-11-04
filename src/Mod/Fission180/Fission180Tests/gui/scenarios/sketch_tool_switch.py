@@ -51,11 +51,14 @@ def count():
 
 def freecad_tool():
     """FreeCAD's drawing cursor is on the view (its tool runs)."""
+    from fission180 import sketch_cursor
+
     sess = st.session()
-    return sess is not None and sess.gl.cursor().shape() not in (
-        QtCore.Qt.ArrowCursor,
-        QtCore.Qt.CrossCursor,
-    )
+    if sess is None:
+        return False
+    cursor = sess.gl.cursor()
+    # neither the idle arrow nor a Fission 180 tool's own pointer (sketch_cursor.py)
+    return cursor.shape() != QtCore.Qt.ArrowCursor and not sketch_cursor.is_own(cursor)
 
 
 def rectangle():

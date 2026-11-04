@@ -3,6 +3,11 @@
 for Fusion's "Repeat <command>"."""
 
 _last = {"name": None, "index": None, "label": None}
+_history = []  # the names of the last few commands run, newest last (also unrepeatable ones)
+HISTORY = 4
+# Commands that end the running tool themselves and keep what it drew (Finish Sketch is
+# OK for a spline being drawn): the tool running is still the one before them.
+PASSING = {"Fission180_FinishSketch"}
 
 # Commands that make no sense to repeat.
 NOT_REPEATABLE = {
@@ -31,8 +36,21 @@ NOT_REPEATABLE = {
 
 
 def record(name, label, index=None):
+    if name:
+        _history.append(name)
+        del _history[:-HISTORY]
     if name and name not in NOT_REPEATABLE:
         _last.update(name=name, index=index, label=label)
+
+
+def running_tool():
+    """The name of the command whose tool may still be running: the last one run (as
+    last()), past the PASSING ones (Finish Sketch, clicked while a spline is drawn, is
+    recorded before it runs), or None."""
+    for name in reversed(_history):
+        if name not in PASSING and name not in NOT_REPEATABLE:
+            return name
+    return None
 
 
 def last():

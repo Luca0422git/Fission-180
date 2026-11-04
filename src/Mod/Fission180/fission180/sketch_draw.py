@@ -934,23 +934,49 @@ class DrawTool:
         session = self.session
         return session.viewer if session.viewer is not None else session.gl
 
+    def _own_cursor(self, widget):
+        """This tool's pointer: the crosshair with its picture (sketch_cursor.py)."""
+        from . import sketch_cursor
+
+        ratio = widget.devicePixelRatioF()
+        held = getattr(self, "_cursor_held", None)  # (set on every mouse move: kept)
+        if held is None or held[0] != ratio:
+            held = self._cursor_held = (ratio, sketch_cursor.cursor_for(self.command, widget))
+        return held[1]
+
     def _set_cursor(self):
         widget = self._cursor_widget()
         try:
-            if widget is not None and widget.cursor().shape() != CROSS:
-                widget.setCursor(QtGui.QCursor(CROSS))
+            if widget is None:
+                return
+            cursor = self._own_cursor(widget)
+            current = widget.cursor()
+            if (
+                current.shape() != cursor.shape()
+                or current.pixmap().cacheKey() != cursor.pixmap().cacheKey()
+            ):
+                widget.setCursor(cursor)
         except Exception:
-            pass
+            try:
+                if widget is not None and widget.cursor().shape() != CROSS:
+                    widget.setCursor(QtGui.QCursor(CROSS))
+            except Exception:
+                pass
 
     def _taken_over(self):
         """A FreeCAD tool started while this one ran (L, C, D... go straight to FreeCAD's
         tools): its own picture cursor is on the view. (Panning and orbiting show
         FreeCAD's picture cursors too, but only while a mouse button is held.)"""
+        from . import sketch_cursor
+
         widget = self._cursor_widget()
         try:
             if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
                 return False
-            return widget is not None and widget.cursor().shape() == QtCore.Qt.BitmapCursor
+            if widget is None:
+                return False
+            cursor = widget.cursor()
+            return cursor.shape() == QtCore.Qt.BitmapCursor and not sketch_cursor.is_own(cursor)
         except Exception:
             return False
 
@@ -987,9 +1013,10 @@ class DrawTool:
             self.hint = None
         widget = self._cursor_widget()
         try:
+            from . import sketch_cursor
             from .sketch_mode import _is_valid
 
-            if widget is not None and _is_valid(widget) and widget.cursor().shape() == CROSS:
+            if widget is not None and _is_valid(widget) and sketch_cursor.is_own(widget.cursor()):
                 widget.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
         except Exception:
             pass

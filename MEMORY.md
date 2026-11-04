@@ -4,6 +4,16 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-04 (later): patch 0.1.0-beta.3.3.1, Luca's polish list, on `develop`** (Luca: "its
+inconsisencies like these that is keeping Fission from being put into peoples hands ... fix
+them and do a patch release please"; newest session log "Polish list"). Status: [x] spline
+kept by Finish Sketch (the green check; it vanished and left its poles) + one Ctrl+Z per
+spline [x] 90 degree corner marks [x] picture pointers for Fission 180's own sketch tools
+[x] window title "Fission 180" (no "1.1.4") [x] VERSION / `_FALLBACK_VERSION`
+0.1.0-beta.3.3.1, CHANGELOG [x] local tests: unit 2849 OK (after `make_ai_docs.py` for the
+parity doc), the 5 new scenarios and 16 touched sketch scenarios pass [ ] "Fission 180
+tests" green on develop [ ] **Luca: Actions > Fission 180 patch release** (module files only).
+
 **2026-11-04: SciForge is now Fission 180** (Luca: "Sciforge Parametric Design just doesnt hit
 right ... change it to Fission 180 ... change everything on the GitHub", then "the installer, the
 titles, EVERYTHING", "code too"). People see **Fission 180**; code, files, folders, tags say
@@ -1817,6 +1827,12 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 (See outline section 12. Also:)
 
+- **Patch 0.1.0-beta.3.3.1 guesses (2026-11-04), check in your Fusion:** (a) a Line chain
+  that turns 90 degrees: does Fusion give the second line Perpendicular (its glyph at the
+  corner) or Vertical / Horizontal? Fission 180 keeps Vertical / Horizontal and now draws its
+  own square corner mark wherever 90 degrees is held. (b) Does Fusion's Esc while a spline is
+  drawn make the spline from the points so far, or drop it (Fission 180: drops it; Enter, OK,
+  the green check and Finish Sketch make it)?
 - **Patch 0.1.0-beta.3.2.1 guesses (2026-11-02), check in your Fusion:** (a) several sketch
   fillets made together: are they kept Equal (Fission 180: one Radius dimension, the rest Equal)?
   (b) Align onto an origin / construction plane: does the part keep its side (Fission 180) or go
@@ -1852,6 +1868,59 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Polish list, patch 0.1.0-beta.3.3.1 (`develop`, 2026-11-04)
+
+Luca's message (one screenshot: a control-point spline over a profile, a line drawn down at
+90 degrees onto the bottom line with no mark at the corner) plus, mid-session, the window
+title ("shows 1.1.4 ... just show Fission 180"). How each works, with the Fusion source:
+`docs/fission180/parity/sketch.md` "Luca's polish list".
+
+- **Spline gone after "OK".** Reproduced only with **Finish Sketch** (the ribbon's big green
+  check, also the palette's and the marking menu's): the floating green check, the marking
+  menu's OK, Enter and a closing click all made the spline (scenario `sketch_spline_ok` A - F,
+  in a straight view; in the iso view the clicks missed the line ends by 0.1 mm). Two causes:
+  `_SketchCommand.Activated` ran `give_way()` first (drops a half-drawn spline, as Esc), and
+  `_spline_tool()` read `recent.last()`, which was already Finish Sketch (ribbon_ui records a
+  command before it runs). Fix: `FinishSketch.gives_way = False`, `finish_sketch` calls
+  `finish_tool()` when a tool runs (Fission 180's own tools: `on_finish`), and
+  `recent.running_tool()` (a 4-name history) looks past `recent.PASSING` (Finish Sketch).
+  Before: 4 loose pole circles, no spline (G fails twice on the old code).
+- **Two Ctrl+Z per spline**: FreeCAD's "Add Auto-Constraints" (the ends' coincidences) after
+  "Add Sketch B-Spline". `sketch_mode._glued_next` glues that step to a spline step before it
+  (`AUTO_STEP`); FreeCAD's Line keeps its two steps (unchanged, known).
+- **90 degree marks**: `sketch_right_angles.py` (pure `corners()` / `directions()`, unit
+  `test_sketch_right_angles`; `RightAngleMarks` in the session, refreshed in `_refreshed`,
+  camera polled every 120 ms while marks show, Show Constraints hides them). Counts
+  Perpendicular between lines, Horizontal + Vertical, and lines held on a sketch axis (a line
+  from the origin along X gets its ends on the axis, no Horizontal: the first GUI run found
+  no mark for that reason). Constraints unchanged on purpose: swapping FreeCAD's corner
+  Coincident for an endpoint-to-endpoint Perpendicular (FreeCAD's glyph at the corner) would
+  hide the corner from `getCoincidenceGroups` (fillet, trim, chains). Scenario
+  `sketch_right_angle_marks`.
+- **Pointer pictures**: `sketch_cursor.py` (FreeCAD's 32 x 32 layout, crosshair at 8, 8 in
+  View/CursorCrosshairColor, the ribbon picture bottom right with a shadow). `DrawTool` sets
+  it (`_own_cursor`, cached per tool), `_taken_over` / `stop` use `sketch_cursor.is_own`
+  (picture cache keys) instead of "BitmapCursor = FreeCAD's" / "CrossCursor = ours"; test
+  helpers `sketch_tools_steps.cross_cursor` and `sketch_tool_switch.freecad_tool` updated.
+  `shell.theme_changed` clears the cache. Scenario `sketch_tool_cursor`.
+- **Window title**: `window_title.py`, only in the Fission 180 program (Config Application
+  "Fission 180" / ExeName Fission180): General/ShowVersionInTitle off at each start (FreeCAD's
+  MainWindow::setWindowTitle reads it each time; not in FreeCAD's Preferences) and the title
+  already on the window written once without the version. Unit `test_window_title`. Not
+  testable on stock FreeCAD (its window says FreeCAD): check on the patched program.
+- Tests: unit 2849 OK (`test_ai_docs_contract` needed `tools/fission180/make_ai_docs.py`
+  after the parity doc edit: docs/ai copies docs/fission180). New scenarios, all passing on
+  stock FreeCAD 1.1.4 under xvfb: `sketch_spline_ok` (233 checks; G failed twice before the
+  fix), `sketch_right_angle_marks` (90), `sketch_tool_cursor` (150), `window_title` (10).
+  Touched scenarios swept on a snapshot of the module, all PASS: sketch_tools_draw,
+  _modify, _circles, _constraints, _slots, _audit, sketch_fillet_corners,
+  sketch_offset_dialog, sketch_menu_switch, sketch_tool_switch, polish2_sketch_check,
+  sketch2_3d, sketch2_palette, sketch_colours, sketch_glyphs, sketch_infer, sketch_snap_dot.
+  `check_waits`: 0 / 0. Run scenarios from a copy (`cp -r src/Mod/Fission180
+  tools/fission180` to a scratch folder, `--freecad` pointing at the cache) to keep editing.
+- A spline drawn in the iso view (`h.fit()`) missed the L's ends by 0.1 mm (no snap):
+  scenarios that click onto points should look straight at the sketch (`h.fit(iso=False)`).
 
 ### Session log: Rename to Fission 180 (`develop`, 2026-11-04)
 

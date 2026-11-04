@@ -120,6 +120,8 @@ def startup():
         _safely(lambda: __import__("fission180.undo_leftover").undo_leftover.install())
         # an AI app set up for SciForge (the old name) is set up for Fission 180 (legacy.py)
         _safely(lambda: __import__("fission180.legacy").legacy.repoint_ai_apps())
+        # the title says "Fission 180", not FreeCAD's version (window_title.py)
+        _safely(lambda: __import__("fission180.window_title").window_title.apply())
         workbench = Gui.activeWorkbench()
         name = workbench.name() if workbench is not None else ""
         if _state["on"] and config.USE_RIBBON:
@@ -175,6 +177,8 @@ def theme_changed():
             pass
     _safely(lambda: __import__("fission180.timeline_ui").timeline_ui.widget().refresh(force=True))
     _safely(lambda: __import__("fission180.browser_ui").browser_ui.widget().refresh(force=True))
+    # the sketch tools' pointers carry their ribbon picture: drawn again in the new look
+    _safely(lambda: __import__("fission180.sketch_cursor").sketch_cursor.forget())
 
 
 def _set_sketch_mode(on):
