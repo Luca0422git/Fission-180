@@ -12,9 +12,15 @@ spline [x] 90 degree corner marks [x] picture pointers for Fission 180's own ske
 [x] window title "Fission 180" (no "1.1.4") [x] VERSION / `_FALLBACK_VERSION`
 0.1.0-beta.3.3.1, CHANGELOG [x] local tests: unit 2849 OK (after `make_ai_docs.py` for the
 parity doc), the 5 new scenarios and 16 touched sketch scenarios pass [x] "Fission 180
-tests" #9 green on `b7607a2b` (all 14 jobs, 2026-11-04 20:39 UTC) [ ] **Luca: Actions > Fission 180
-patch release** (module files only; this MEMORY note was held back so the release could run on
-`b7607a2b` at once: any push to develop needs its own green run first).
+tests" #9 green on `b7607a2b` (all 14 jobs, 2026-11-04 20:39 UTC) [x] **PUBLISHED 2026-11-04 21:49 UTC**
+by Luca's patch release run #2 (prepare, windows with the installer tests and golden models,
+linux with unit / golden / smoke / journey, release: all green); Release and the tag
+`fission180-v0.1.0-beta.3.3.1` on `b7607a2b`; six files: installer 495 MB, portable 422 MB,
+AppImage 827 MB, quick update 8 MB, fission180-release.json, SHA256SUMS.txt (the notes'
+checksums = GitHub's asset digests). This MEMORY note was held on the session branch
+`claude/dazzling-babbage-z1jcox` until the release ran (any push to develop needs its own green
+tests run before a patch release takes it). Next: Luca checks the window title on his install
+and answers the two Fusion questions under "Questions waiting for Luca".
 
 **2026-11-04: SciForge is now Fission 180** (Luca: "Sciforge Parametric Design just doesnt hit
 right ... change it to Fission 180 ... change everything on the GitHub", then "the installer, the
