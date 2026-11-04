@@ -1936,6 +1936,14 @@ menus only. Lesson: **reproduce on the released program and with the user's own 
   types while the tool is active), `sketch_feature_options.py` from the CREATE submenus,
   `sketch_palette.FeatureOptions` (refreshed by the palette's 0.3 s timer). Scenario
   `sketch_feature_options`.
+- CI #13 on d95efc13: 13 of 14 green; scenarios 7/9 failed `sketch_spline_luca` C on the
+  official FreeCAD only: "Sketcher constraint number 57 is malformed!" from FreeCAD's own
+  trim where the top line crosses a pole circle at its 0 degree point (the upstream bug of
+  core patch #7; the Fission 180 program has the fix, sketch_fix repairs it on the official
+  FreeCAD). The step allows that message when the program is not Fission 180
+  (`c_click.notes_ok`) and checks no malformed constraint is left and the sketch solves.
+  CI #12 (MEMORY-only, the released code): `vex_shaft` FLAKY (0.016 degrees off after OK,
+  passed on the retry): an old race, not this patch; known issue to look at.
 - Tests: unit 2873 OK; on the released Fission 180 AppImage with the new module:
   sketch_spline_luca 211, sketch_mirror_dialog 131, sketch_feature_options 60,
   sketch_right_angle_marks 90, sketch_spline_ok 233, sketch_tool_cursor 150,

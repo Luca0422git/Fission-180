@@ -216,11 +216,22 @@ def c_click():
     si.click(V(30, 10, 0))
 
 
+# The rectangle's top crosses the circles round the spline's end control points at their 0
+# degree point: FreeCAD 1.1.4 then makes a malformed constraint in its trim and says so
+# (core patch #7 fixes it in the Fission 180 program; on the official FreeCAD the Python
+# repair, sketch_fix, puts it right after the trim: checked in c_trimmed).
+if App.ConfigGet("Application") != "Fission 180":
+    c_click.notes_ok = ("malformed",)
+
+
 def c_trimmed():
     h.settle("the trim")
     h.shot("C-after-trim")
     left = top_pieces()
     h.check("C: the whole top line went, nothing left at the corners", left == [], left)
+    sk = s["sk"]
+    h.check("C: no malformed constraint is left", not list(sk.MalformedConstraints), list(sk.MalformedConstraints))
+    h.check("C: the sketch solves", sk.solve() == 0, sk.solve())
     h.check("C: the splines are still there", len(splines()) == 2, len(splines()))
     si.key(QtCore.Qt.Key_Escape)
 
