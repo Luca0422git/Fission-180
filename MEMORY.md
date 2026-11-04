@@ -4,6 +4,27 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-04: SciForge is now Fission 180** (Luca: "Sciforge Parametric Design just doesnt hit
+right ... change it to Fission 180 ... change everything on the GitHub", then "the installer, the
+titles, EVERYTHING", "code too"). People see **Fission 180**; code, files, folders, tags say
+`Fission180` / `fission180` / `FISSION180` (`src/Mod/Fission180`, package `fission180`,
+`Fission180Tests`, `docs/fission180`, `tools/fission180`, `fission180-*.yml`, tag
+`fission180-v<version>`, log prefix `[Fission 180]`, patch tag `FISSION180:`); links point at
+`github.com/Luca0422git/Fission-180` (Luca's three answers, AskUserQuestion). Everything older in
+this file was written as SciForge and was renamed by script; the tags of releases published as
+SciForge keep their real names (`sciforge-v0.1.0-beta` ... `sciforge-v0.1.0-beta.3.2.1`).
+What still says SciForge, on purpose (old designs, settings, keys and installs keep working):
+`fission180/legacy.py`, `secrets_store.OLD_SERVICE`, the installer's `Fission180RemoveSciForge`,
+`Fission180Tests/fixtures/before_rename/`. The shorthand `sf_` (golden ids, AI step names) was
+left: it is not the name and the AI tools' names are an interface. Status: [x] rename by script
+(52c3997a) [x] carry-over of designs / settings / files / keys / AI apps / installs (9c7dea3e)
+[x] new mark and pictures, README screenshots [x] local tests [ ] CI green on develop
+[ ] **Luca renames the repository** (Settings > General > Repository name: `Fission-180`)
+[ ] Luca: the repository's About box (description, website, topics) and, if wanted, the titles of
+the old releases [ ] first Fission 180 release = a full build (core patch #21), version Luca's
+pick; a "bridge" release for installed SciForge betas is his decision (beta-release.md section
+7). Newest session log "Rename to Fission 180".
+
 **2026-11-02: patch 0.1.0-beta.3.2.1, Luca's "fission180 sketch fixes" list (9 items), on
 `develop`.** All nine fixed, each with a scenario that fails on the old code (newest session
 log "Sketch fixes list"). VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.2.1, CHANGELOG section
@@ -190,6 +211,7 @@ Quick updates come from green "Fission 180 tests" runs on `develop`.
 | SURFACE part 3/4 (tool options; SOLID modify tools on surface bodies, Merge) | `fission180/surface*.py`, `surfmod*.py`; specs `parity/surface.md`, `parity/surface-modify.md` |
 | Fusion research with sources (wave 6), integration map for new tabs/body kinds | `docs/fission180/dev/research/` |
 | Every change to FreeCAD's own code (tagged `FISSION180:`) | `docs/fission180/core-patches.md` |
+| What SciForge (the old name) saved: old designs, settings, files, keys, AI apps | `src/Mod/Fission180/fission180/legacy.py` (run first by `Init.py`), tests `test_legacy*.py`, fixtures `Fission180Tests/fixtures/before_rename/` |
 | CI workflows (Fission 180's own) | `.github/workflows/fission180-*.yml` |
 | Tooling scripts for CI / local runs | `tools/fission180/` |
 | Original "Forge" v0.1 prototype, kept verbatim for history | `prototype/forge-freecad/` |
@@ -200,7 +222,9 @@ Quick updates come from green "Fission 180 tests" runs on `develop`.
 - **Fork base:** FreeCAD tag `1.1.4` (commit `4fd3bf320d`), full upstream history kept so future
   FreeCAD releases can be merged (`git remote add upstream https://github.com/FreeCAD/FreeCAD.git`,
   then `git fetch upstream refs/tags/1.1.X:refs/tags/1.1.X` and merge the tag).
-- **Repo:** `github.com/Luca0422git/Fission-180`, **public** since 2026-10-10 (was private). Standard
+- **Repo:** `github.com/Luca0422git/Fission-180` (the name since the rename of 2026-11-04, once
+  Luca renames it on GitHub; before: `SciForge-Parametric-Design`, first `SciForge`; GitHub
+  redirects the old names), **public** since 2026-10-10 (was private). Standard
   GitHub Actions runners are free for public repos, so pushing and full builds cost nothing; full
   C++ builds still take hours, so they run when started by hand (Actions tab → "Fission 180 build" →
   Run workflow) or by a `fission180-v*` tag. Tests run on every push (~20 min).
@@ -274,6 +298,7 @@ Quick updates come from green "Fission 180 tests" runs on `develop`.
   Autodesk's closed format (reverse engineering it is forbidden, outline 2.5). STEP open /
   insert already exists (exchange-2); it brings the shapes, not the timeline. Outline 12 Q6
   closed.
+| 2026-11-04 | **Renamed SciForge -> Fission 180** everywhere: shown name "Fission 180", code name `Fission180`/`fission180`, repo `Luca0422git/Fission-180`, new logo (a nucleus splitting in two). Old designs, settings, keys, AI apps and installs carry over by themselves (`fission180/legacy.py`, installer removes SciForge) | Luca: "change everything ... the installer, the titles, EVERYTHING ... code too" |
 | 2026-10-28 | The core id no longer counts `package/WindowsInstaller` (`tools/fission180/core_id.sh`, its unit test, brief beta-release.md) | The installer's scripts change how the program is put on a computer, not the program; counting them would have refused every patch release until the next full build after the installer fix (core patch #19). A patch release makes its installer from its own commit's scripts, so new downloads and Update now from an older core get the fix at once. The value for today's develop stays `5bde6726` |
 
 ## Status by phase (outline section 10)
@@ -1815,6 +1840,99 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Rename to Fission 180 (`develop`, 2026-11-04)
+
+Luca: "Sciforge Parametric Design just doesnt hit right. I have decided to change the name ...
+Fission 180. your job is to change everything on the GitHub", then "make sure that everything in
+the app is also changed. the installer, the titles, EVERYTHING" and "code too. Its Fission now".
+Asked once (AskUserQuestion): shown name **Fission 180**, code name **Fission180**, repository
+**Fission-180**. Started from develop `faf2974e` (0.1.0-beta.3.2.1 published).
+
+#### How
+
+- **The rename (52c3997a)**: one script (in the session scratchpad, not the repo) over every
+  tracked file: `SciForge` next to a letter, digit or `_` -> `Fission180` (`Fission180Type`,
+  `Fission180_Extrude`, `Fission180Tests`); `sciforge` -> `fission180`; `SCIFORGE` ->
+  `FISSION180`; a bare `SciForge` -> `Fission180` in a path, file name, `::` type, `.`/`-` name
+  or a quoted name, else **Fission 180** (prose, UI text, the `[Fission 180]` log prefix); the
+  repository slugs -> `Luca0422git/Fission-180`. In Markdown the tags of the 11 releases
+  published as SciForge (`sciforge-v0.1.0-beta` ... `.3.2.1`) and an old file name were kept.
+  2798 paths moved, 1835 files edited. Then by hand: the workbench MenuText and top menu, panel
+  titles, an undo name, the AI app listing and MCP title are the display name; a brace list in
+  run_tests.sh; `FORGE_MENU` -> `MAIN_MENU`; tests whose text positions or heading slugs moved
+  (a heading "Fission 180" slugs to `fission-180`); the problem report's key redaction no longer
+  takes `Fission180_CommandSearch` for a key (the "180" of the name is not a digit run).
+- **Carry-over of what SciForge saved (9c7dea3e)**, all in `fission180/legacy.py`, run first by
+  `Init.py` (also headless):
+  * old designs: FreeCAD saves Python steps as `sciforge.<module>.<Class>`; a meta-path finder
+    answers `sciforge.*` with the `fission180` modules (FreeCAD's FEM does the same,
+    `femtools/migrate_app.py`; `import sciforge` at start so `isAllowedModule` in
+    App/PropertyPythonObject.cpp passes). Each class handed out through the alias gets an
+    `onDocumentRestored` that renames the whole design first (once per opening). Renaming:
+    `obj.renameProperty` (FreeCAD 1.1; the same Property object, so FreeCAD's restore loop is
+    safe), `setGroupOfProperty`, `setDocumentationOfProperty` (tooltips said "What SciForge made
+    this for"), `doc.Meta` keys (`SciForge.NamedView.*`, `SciForge.MarkerBefore`,
+    `SciForgeHome`), view properties too. A design with no SciForge step (bodies only):
+    **Python document observers have no restore slot**; FreeCAD calls `setActiveDocument`
+    (with its signal) right after `openDocuments` restored everything, so
+    `slotActivateDocument` renames every design opened since (after a look into the file's XML
+    for "SciForge", so designs Fission 180 saved cost nothing).
+  * settings: the whole `User parameter:BaseApp` tree once: groups and entries named after
+    SciForge renamed (Mod/SciForge, `SciForge_*` shortcuts, Workbench/SciForgeWorkbench), name
+    values renamed (AutoloadModule), paths and sentences left alone. The compiled program's new
+    settings folder (`old_path`: each folder `Fission180` -> `SciForge`) is filled from the old
+    user.cfg with `ParamGet("User parameter:BaseApp").Manager().Insert(path)`
+    (`ParamGet("User parameter:")` is refused: "Empty group name"). Flags
+    `Mod/Fission180/SettingsFromSciForge`, `FilesFromSciForge`. (FreeCAD quirk: `HasGroup` of a
+    group just renamed with `RenameGroup` still says True; `GetGroups` and the saved user.cfg
+    are right.)
+  * user files: `<data>/SciForge` -> `<data>/Fission180` and `Material/SciForge` copied (missing
+    files only, `updates` left out); with the compiled program everything of the old folder
+    (macros ...). Nothing old is deleted.
+  * API keys: `secrets_store` reads the old service name and DPAPI entropy as a fallback.
+  * AI: Claude Desktop / Gemini CLI entries named `sciforge` re-pointed at Fission 180's server
+    (at GUI start, `shell.startup`); the bridge also writes `<data>/SciForge/ai/bridge.json` when
+    that folder exists and accepts `X-SciForge-Key` (an old .mcpb extension carries the old
+    server).
+- **The program** (core patch #21): `FISSION180_DISPLAY_NAME` "Fission 180" into
+  `Config()["Application"]`: FreeCAD then makes it `QApplication::applicationName` (title bar,
+  About, dialogs); ExeName stays `Fission180` (files, settings folder, registry). The
+  installer's visible text uses `APP_DISPLAY_NAME` (title, Start menu folder and shortcut,
+  desktop, Settings > Apps, the English messages); `Fission180RemoveSciForge` runs an installed
+  SciForge's uninstaller silently once Fission 180's files are in (its preferences section is
+  `/o`, so `%APPDATA%\SciForge` stays). `install_update.ps1` moves a leftover `Mod\SciForge`
+  into the backups.
+- **Pictures**: `make_app_icons.py` draws a new original mark (a round nucleus split in two along
+  a slanted line, the amber spark between, two particles flying off) and the wordmark "Fission"
+  + "180" (sized to fit); every icon, splash, About and installer picture regenerated. README
+  screenshots re-made with `tools/fission180/screenshots.sh` (scenario readme_shots PASS).
+
+#### Tested (local, official FreeCAD 1.1.4)
+
+- 80 golden designs built and saved with the **old** module (a copy of `faf2974e`), opened with
+  the new one: 80/80 renamed, 80/80 rebuild (every step touched) to the same volumes, 80/80
+  saved again without "SciForge" / "sciforge". Two kept as fixtures; `legacy_check.py` +
+  `test_legacy_freecad.py` (run_tests.sh passes FISSION180_FC_CMD).
+- Settings carry-over in both setups (the same folder; a new `Fission180` folder next to a
+  `SciForge` one): 15/15 checks, a second start does nothing.
+- `test_legacy.py` (rules, alias, hook, files, old keys) and the whole unit suite; golden,
+  headless AI tools, simulation, GUI smoke / journey / restart: see the results line below.
+- Installer: `makensis` (Ubuntu's NSIS 3.09) compiles the script before and after the change
+  with stand-in files (lowercase copies of the language files, `LogSet` removed: Linux NSIS has
+  no logging build); no new warnings. The PowerShell tests (`test_install_update_ps1.py`, with a
+  new case for the old module) need pwsh: CI only (downloading pwsh here was not allowed).
+
+#### Open
+
+- CI on develop; Luca's GitHub clicks (repository name; the About box: description, website,
+  topics; the titles of the old releases if he wants). The default branch is `Release`, so the
+  front page shows the new README only once a Fission 180 release moves `Release` (or Luca makes
+  `develop` the default for a while). The first Fission 180 release: a full build; a bridge
+  release for installed SciForge betas or not (beta-release.md section 7).
+- Not renamed on purpose: the `sf_` shorthand, old branch names (`sf/...`, `claude/...`), the
+  `sciforge-v...` tags and the titles of past releases (GitHub history), the
+  `prototype/forge-freecad/` copy.
 
 ### Session log: Sketch fixes list, patch 0.1.0-beta.3.2.1 (`develop`, 2026-11-02)
 

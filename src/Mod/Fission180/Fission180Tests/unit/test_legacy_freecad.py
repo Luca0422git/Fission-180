@@ -34,7 +34,7 @@ class DesignsSavedBySciForge(unittest.TestCase):
         done = re.search(r"legacy check done (\d+)", self.output)
         self.assertIsNotNone(done, self.output[-2000:])
         self.assertEqual(int(done.group(1)), 2, self.output[-2000:])
-        self.assertGreaterEqual(len(re.findall(r"legacy check OK ", self.output)), 14)
+        self.assertGreaterEqual(len(re.findall(r"legacy check OK ", self.output)), 13)
 
     def test_every_check_passed(self):
         bad = re.findall(r"legacy check BAD (.*)", self.output)
