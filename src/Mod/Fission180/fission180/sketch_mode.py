@@ -1248,7 +1248,7 @@ class SketchSession:
             sketch_pick_ui.stop_waiting()
         except Exception as exc:
             warn("sketch tool: %s" % exc)
-        if not self.tool_running():
+        if not self.tool_running() and not self._spline_in_progress():
             return
         kept = []
         try:
@@ -1257,7 +1257,7 @@ class SketchSession:
                     kept.append((sel.DocumentName, sel.ObjectName, name))
         except Exception:
             kept = []
-        spline = self._spline_tool()
+        spline = self.spline_drawn()
         try:
             Gui.runCommand("Sketcher_StopOperation")  # quits FreeCAD's tool
         except Exception as exc:
@@ -1319,6 +1319,62 @@ class SketchSession:
         from . import sketch_spline
 
         return sketch_spline.points_of(self.sketch, getattr(self, "_spline_from", None))
+
+    def _spline_in_progress(self):
+        """A spline's first click was seen (`_spline_from`) and its points are still loose
+        in the sketch: it is being drawn, whatever the cursor or the last command say now
+        (Luca, 2026-11-05, on Windows: OK in the right-click menu lost the spline and left
+        its points; the green check vanished when the pointer went onto it)."""
+        try:
+            return getattr(self, "_spline_from", None) is not None and bool(self._spline_points())
+        except Exception:
+            return False
+
+    def rescue_spline(self):
+        """Safety net, from the green check's timer (every 100 ms): FreeCAD's spline tool
+        is gone (no tool cursor on the view, no spline panel) for 3 ticks running, but the
+        points of a spline drawn with it are still loose: the tool ended some way that did
+        not make the spline. Fission 180 makes it from them (one point: it goes), so no
+        orange points are ever left behind."""
+        try:
+            if self.closed or getattr(self, "_spline_from", None) is None:
+                return
+            if QtWidgets.QApplication.activePopupWidget() is not None:
+                return  # the right-click menu is open: OK or Cancel is coming
+            if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
+                return
+            cursor_on = self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
+            if cursor_on or self._spline_panel_shown() or (self.tool is not None and self.tool.active):
+                self._orphan_ticks = 0
+                return
+            points = self._spline_points()
+            if not points:
+                self._spline_from = None
+                self._orphan_ticks = 0
+                return
+            self._orphan_ticks = getattr(self, "_orphan_ticks", 0) + 1
+            if self._orphan_ticks < 3:
+                return
+            self._orphan_ticks = 0
+            if len(points) >= 2:
+                made = self._own_spline(points)
+                log("spline: its tool ended without making it: made from its points (%s)" % made)
+            else:
+                from . import sketch_spline
+
+                doc = self.doc
+                doc.openTransaction("Cancel Spline")
+                sketch_spline.remove_points(self.sketch, points)
+                doc.commitTransaction()
+            self._spline_from = None
+        except Exception as exc:
+            warn("spline: %s" % exc)
+            self._spline_from = None
+
+    def spline_drawn(self):
+        """A spline is being drawn with FreeCAD's spline tool: the tool is recognised, or
+        the points of its first clicks are there (the sure sign)."""
+        return self._spline_in_progress() or self._spline_tool()
 
     def projection_refused(self, pos):
         """FreeCAD's Project tool (P) runs and the press at widget pixel `pos` is on a
@@ -1530,7 +1586,7 @@ class SketchSession:
         except Exception:
             pass
         _state["polygon"] = None if not self.polygon.active else _state["polygon"]
-        spline = self._spline_tool()
+        spline = self.spline_drawn()
         if spline:
             try:
                 self._commit_spline()
@@ -1564,7 +1620,7 @@ class SketchSession:
         except Exception:
             pass
         _state["polygon"] = None if not self.polygon.active else _state["polygon"]
-        spline = self._spline_tool()
+        spline = self.spline_drawn()
         try:
             Gui.runCommand("Sketcher_StopOperation")  # quits the tool, clears the selection
         except Exception:
@@ -3070,7 +3126,11 @@ def finish_sketch():
         # (Luca, 2026-11-04: it vanished and left its points behind; only Enter made it),
         # a conic waiting for its rho, an Offset with curves picked...
         try:
-            if session.tool_running() or (session.tool is not None and session.tool.active):
+            if (
+                session.tool_running()
+                or (session.tool is not None and session.tool.active)
+                or session.spline_drawn()
+            ):
                 session.finish_tool()
         except Exception as exc:
             warn("finish sketch: %s" % exc)

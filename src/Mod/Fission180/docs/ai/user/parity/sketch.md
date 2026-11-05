@@ -49,6 +49,22 @@ note says "30 mm does not fit: limited to 17.11 mm" (typed) or "Largest that fit
 on the used-up side is a reference (the side fixes it). Scenarios `modeling2_sketch` (2),
 `sketch2_fillet` (B).
 
+## Luca's third round (patch 0.1.0-beta.3.3.3, `develop`, 2026-11-05)
+
+Source: Luca on 0.1.0-beta.3.3.2 (Windows): OK in the right-click menu still lost the spline
+and left its orange points; the green check vanished when the pointer went onto it (only
+after that did OK work); no box selection in Mirror; Select in the toolbar closed the sketch;
+"make some unique icons for the different sketch tools".
+
+| Fusion (source) | Fission 180 before | Fission 180 now |
+|---|---|---|
+| OK in the marking menu, the check, Enter and Finish Sketch make the spline being drawn | "A spline is being drawn" was asked again at OK time from signs that can change meanwhile (the 3D view's cursor, the last recorded command, FreeCAD's tool panel); when one said no, the tool was ended as a cancel and the points stayed | `_spline_from` (the curve count at the spline's first click) and its loose points are the sure sign (`SketchSession.spline_drawn`); every exit (finish_tool, give_way, escape, Finish Sketch) uses it. Safety net `rescue_spline` (the check's 100 ms timer): no spline tool, no panel, no own tool for 3 ticks while its points are loose: the spline is made from them (one point: removed). Scenario `sketch_spline_luca` K (the tool forced unrecognised), L (FreeCAD's tool stopped behind Fission 180's back) |
+| The check stays by the last point until clicked | Its place came from counted presses while the spline tool was recognised | Anchored on the spline's last loose point in the sketch. Scenario `sketch_spline_luca` J (pointer resting on it for 5 ticks) |
+| A three-point fit spline's points are its own | FreeCAD 1.1.4 ties the middle point of a three-point spline with PointOnObject (no knot there), not InternalAlignment: it counted as loose (and could be taken into the next spline) | `sketch_spline.on_a_spline`; unit `test_sketch_spline` |
+| Box selection: left to right takes what is fully inside, right to left what the box touches (Autodesk "Select objects") | The Mirror tool took the mouse: dragging did nothing | `sketch_mirror_core.boxed` (screen pixels, unit tested) with `sketch_select_core.box_plan` (Shift adds, Ctrl toggles); a dashed box shows. Scenario `sketch_mirror_dialog` H |
+| Select ends the running command, the sketch stays open | Select closed the open dialog the way Finish does: the sketch was left | In a sketch, Select ends the tool and any pick in wait only. Scenario `sketch_mirror_dialog` I |
+| Each tool type has its own icon | One icon per family | 22 original icons (`tools/fission180/icons_sketch_types.py`): the shape and, in blue, the points clicked; used in the ribbon, menus, marking menu and Feature Options (now icon and name). Fusion's icons are not copied |
+
 ## Luca's second round (patch 0.1.0-beta.3.3.2, `develop`, 2026-11-04)
 
 Source: Luca on 0.1.0-beta.3.3.1, two screenshots (Trim on a rectangle's top under a

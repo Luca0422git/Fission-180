@@ -27,7 +27,8 @@ def _names(command):
 
 
 def families(create_items):
-    """{family: [(label, command, short label)]} from the CREATE group's items."""
+    """{family: [(label, command, short label, icon)]} from the CREATE group's items (each
+    type has its own icon: tools/fission180/icons_sketch_types.py)."""
     out = {}
     for entry in create_items:
         if not isinstance(entry, dict) or entry.get("label") not in FAMILIES or "submenu" not in entry:
@@ -37,7 +38,7 @@ def families(create_items):
         for item in entry["submenu"]:
             if not isinstance(item, dict) or not item.get("command"):
                 continue
-            members.append((item["label"], item["command"], short(item["label"], family)))
+            members.append((item["label"], item["command"], short(item["label"], family), item.get("icon")))
         if members:
             out[family] = members
     return out
@@ -57,7 +58,7 @@ def running(families_, names):
     180's own tool's command)."""
     wanted = [n for n in names if n]
     for family, members in families_.items():
-        for label, command, _short in members:
+        for label, command, _short, _icon in members:
             if any(n in _names(command) for n in wanted):
                 return family, label
     return None, None

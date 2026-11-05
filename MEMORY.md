@@ -4,6 +4,21 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-05: patch 0.1.0-beta.3.3.3, Luca's third round, on `develop`** (Luca on 3.3.2, on
+Windows: "clicking ok in the radial menu STILL doesnt work ... the green checkmark next to the
+spline disapears from just hovering over it ... it still leaves orange dots ... there is no
+way to select a whole sketch while in the mirror tool ... i clicked the select tool in the
+toolbar and it took me back to the solid tab and closed my sketch", then "make some unique
+icons for the different sketch tools"; newest session log "Third round"). Status: [x] spline:
+remembered from its first click (`_spline_from` + its loose points) for every exit, the check
+anchored on its last point, safety net `rescue_spline` [x] a 3-point spline's middle point
+(PointOnObject) is the spline's [x] Mirror box selection (window / crossing) [x] Select in a
+sketch ends the tool only [x] 22 icons, one per sketch tool type (ribbon, menus, marking
+menu, Feature Options) [x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.3, CHANGELOG, parity,
+AI docs [x] tested on stock FreeCAD and the Fission 180 AppImage (session log)
+[ ] "Fission 180 tests" green on develop (**tell Luca as soon as it is: he asked**)
+[ ] **Luca: Actions > Fission 180 patch release**.
+
 **2026-11-04 (night): patch 0.1.0-beta.3.3.2, Luca's second round, on `develop`** (Luca on
 3.3.1: "CLAUDE WHAT IS THIS SHIT ... the spline still disapears when i click the checkmark. AND
 the orange dots are still there ... only the middle portion of the line was getting deleted
@@ -15,8 +30,9 @@ them [x] Trim / Extend / Break ignore spline helper circles; the trim matches th
 [x] command search: menu names, full phrase first [x] Mirror: Fusion's MIRROR panel
 [x] Sketch Palette Feature Options (rectangle, circle, arc, polygon, slot, spline types)
 [x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.2, CHANGELOG [x] tested on the released
-Fission 180 AppImage (see the session log) [ ] "Fission 180 tests" green on develop
-[ ] **Luca: Actions > Fission 180 patch release** (module files only).
+Fission 180 AppImage (see the session log) [x] "Fission 180 tests" #14 green on develop
+[x] **PUBLISHED 2026-11-05 00:58 UTC** by Luca's patch release (tag
+`fission180-v0.1.0-beta.3.3.2` on `64beb9a8`; he installed it: "update passed").
 
 **2026-11-04 (later): patch 0.1.0-beta.3.3.1, Luca's polish list, on `develop`** (Luca: "its
 inconsisencies like these that is keeping Fission from being put into peoples hands ... fix
@@ -1890,6 +1906,52 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Third round, patch 0.1.0-beta.3.3.3 (`develop`, 2026-11-05)
+
+Luca on 3.3.2 (Windows). Not reproducible here (Linux, xvfb): every signal Fission 180 used
+for "a spline is being drawn" at OK time (the 3D view's cursor, `recent.running_tool()`,
+FreeCAD's TaskSketcherTool header) can change between the clicks and OK; when one said no,
+`finish_tool` ended the tool as a cancel. Fix by design rather than by guessing the signal:
+
+- **Spline state from the first click**: `open_spline_step` sets `_spline_from` (curve count)
+  at the first press while the spline tool is recognised; `_spline_in_progress()` = that and
+  loose points since it; `spline_drawn()` = in progress or recognised. Used by finish_tool,
+  give_way (early return only when neither a tool runs nor a spline is in progress), escape,
+  finish_sketch, `sketch_draw.run`. The check (`sketch_check._spline_anchor`) sits by the
+  last loose point (`_point_pixel`: GeomPoint X/Y or circle Center). **Safety net**
+  `rescue_spline` (from the check's 100 ms timer): no popup, no button held, arrow cursor, no
+  spline panel, no own tool, 3 ticks running, points loose: made from them (`_own_spline`),
+  one point removed.
+- **FreeCAD 1.1.4 fact**: with exactly 3 fit points the handler ties the middle point with
+  `PointOnObject` (OCCT's interpolation of 3 points has no knot there: `isBetweenC0Points`),
+  the ends with InternalAlignment. `sketch_spline.on_a_spline` keeps it out of `pending`
+  (else it was counted loose and taken into the next spline). Found by a debug dump in a
+  throwaway scenario (`DBG geo/con` lines).
+- **Mirror box**: the DrawTool takes the mouse, so FreeCAD's own box never starts; the tool
+  draws its own (`pressed` on empty space with Objects active, `dragged` past 4 px shows the
+  dashed box, `released` picks). `sketch_mirror_core.boxed` (screen pixels: window = all
+  points inside, crossing = a point inside or a segment crossing an edge; off-view points
+  are outside) + `sketch_select_core.box_plan` for Shift / Ctrl.
+- **Select**: `selection_ui.SelectCommand.run` called `commands.finish_open_dialog()`,
+  which leaves an open sketch; in a sketch it now calls `finish_tool()` and
+  `sketch_pick_ui.stop_waiting()` only.
+- **Icons**: `tools/fission180/icons_sketch_types.py` (22: sk_line_mid, sk_rect_2pt/3pt/center,
+  sk_circle_center/2pt/3pt/2tan/3tan, sk_arc_3pt/center/tangent, sk_poly_circ/insc/edge,
+  sk_slot_cc/overall/cp/arc3/arccp, sk_spline_fit/ctrl); dashed helpers in GUIDE #9aa4b2
+  (reads on both themes; the light copy only re-inks STROKE). `make_icons.py`'s bounds parser
+  has no "S" path command (use "C"). Feature Options entries are (label, command, short,
+  icon) now and show icon + name.
+- Tests: unit 2879 OK; check_waits 0 / 0; stock FreeCAD 1.1.4: sketch_spline_luca 246
+  (J hover, K OK blind, L safety net: "the safety net made the spline"), sketch_spline_ok
+  233, sketch_mirror_dialog 155 (H box, I Select), sketch_feature_options 60, sketch_draw
+  134, marking_menu_command 31, sketch_tools_circles 120, sketch_tools_slots 97 (all PASS).
+  On the Fission 180 AppImage (3.3.1's program, this module symlinked in): sketch_spline_luca
+  246, sketch_spline_ok 233, sketch_mirror_dialog 155, sketch_feature_options 60 (icons
+  seen in its screenshot), marking_menu_command 31, sketch_tool_switch 17, sketch_pattern
+  102, sketch_tools_draw 151 (all PASS).
+- Lesson (Luca, 3.3.2): "would have been good to know" — the send_later check-in never
+  fired. Watch CI in the session and tell him the moment it is green.
 
 ### Session log: Second round, patch 0.1.0-beta.3.3.2 (`develop`, 2026-11-04 night)
 

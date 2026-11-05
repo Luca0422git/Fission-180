@@ -86,3 +86,50 @@ def copied_constraints(before, after_types, new_ids):
         if first in new or second in new:
             out.append(index)
     return out
+
+
+# -- box selection (Fusion: left to right takes what is fully inside, right to left what the
+# box touches); in screen pixels, so it is the box the user sees -----------------------------
+def _inside(p, box):
+    x0, y0, x1, y1 = box
+    return x0 <= p[0] <= x1 and y0 <= p[1] <= y1
+
+
+def _segments_cross(a, b, c, d):
+    def orient(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    o1, o2, o3, o4 = orient(a, b, c), orient(a, b, d), orient(c, d, a), orient(c, d, b)
+    return (o1 > 0) != (o2 > 0) and (o3 > 0) != (o4 > 0)
+
+
+def boxed(polylines, start, end):
+    """The keys of the polylines {key: [screen points]} the box from `start` to `end` (screen
+    pixels) takes: dragged left to right (window) the ones fully inside, right to left
+    (crossing) the ones it touches. A point off the view (None) is outside."""
+    box = (min(start[0], end[0]), min(start[1], end[1]), max(start[0], end[0]), max(start[1], end[1]))
+    window = end[0] >= start[0]
+    x0, y0, x1, y1 = box
+    edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]
+    out = []
+    for key, points in polylines.items():
+        if not points:
+            continue
+        if window:
+            if all(p is not None and _inside(p, box) for p in points):
+                out.append(key)
+            continue
+        seen = [p for p in points if p is not None]
+        if any(_inside(p, box) for p in seen):
+            out.append(key)
+            continue
+        hit = False
+        for a, b in zip(points, points[1:]):
+            if a is None or b is None:
+                continue
+            if any(_segments_cross(a, b, c, d) for c, d in edges):
+                hit = True
+                break
+        if hit:
+            out.append(key)
+    return out

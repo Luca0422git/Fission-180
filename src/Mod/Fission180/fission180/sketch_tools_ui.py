@@ -110,7 +110,7 @@ class PolygonCircumscribed(_Polygon):
         "Polygon around a circle: click the centre, then the middle of an edge. "
         "6 sides; change the number in the panel on the right or with U / J"
     )
-    icon = "sk_polygon"
+    icon = "sk_poly_circ"
     circumscribed = True
 
 
@@ -120,7 +120,7 @@ class PolygonInscribed(_Polygon):
         "Polygon inside a circle: click the centre, then a corner. "
         "6 sides; change the number in the panel on the right or with U / J"
     )
-    icon = "sk_polygon"
+    icon = "sk_poly_insc"
     circumscribed = False
 
 

@@ -13,7 +13,7 @@ Geometries, 3D Sketch. Options are remembered between sessions (sketch_mode.opti
 import FreeCADGui as Gui
 
 from . import sketch_mode, theme, ui_icon, ui_icon_path, warn
-from .compat import QtCore, QtWidgets
+from .compat import QtCore, QtGui, QtWidgets
 
 ROWS = [
     ("grid", "Sketch Grid", "Show the grid on the sketch plane"),
@@ -367,7 +367,7 @@ class FeatureOptions(QtWidgets.QWidget):
         self.buttons = {}
         self.family = family
         self.kind.setText("%s type" % family)
-        for n, (label, command, short) in enumerate(self.families.get(family, [])):
+        for n, (label, command, short, icon) in enumerate(self.families.get(family, [])):
             button = QtWidgets.QToolButton()
             button.setObjectName("Fission180Feature_" + label.replace(" ", "_"))
             button.setProperty("role", "option")
@@ -375,7 +375,15 @@ class FeatureOptions(QtWidgets.QWidget):
             button.setToolTip("Draw a %s (the tool goes on)" % label)
             button.setCheckable(True)
             button.setFocusPolicy(QtCore.Qt.NoFocus)
-            button.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
+            style = QtCore.Qt.ToolButtonTextOnly
+            if icon:
+                try:
+                    button.setIcon(QtGui.QIcon(ui_icon_path(icon)))
+                    button.setIconSize(QtCore.QSize(22, 22))
+                    style = QtCore.Qt.ToolButtonTextBesideIcon
+                except Exception as exc:
+                    warn("sketch palette: icon %s: %s" % (icon, exc))
+            button.setToolButtonStyle(style)
             button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
             button.clicked.connect(lambda _=False, l=label, c=command: self._switch(l, c))
             self.grid.addWidget(button, n // 2, n % 2)

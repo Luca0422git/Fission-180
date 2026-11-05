@@ -8,6 +8,37 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.3
+
+### Fixed
+
+- **OK in the right-click menu still lost a spline and left its orange points.** Fission 180
+  decided "a spline is being drawn" from signs that can change while you draw (the mouse
+  pointer's shape, the last command, FreeCAD's panel). When one of them said "no" at the
+  moment you pressed OK, the spline was thrown away. Fission 180 now remembers the spline
+  from your first click, as long as its points are in the sketch: OK in the right-click
+  menu, the green check, Enter and Finish Sketch all make it, whatever else changed. And if
+  FreeCAD's spline tool ever stops without making the spline, Fission 180 makes it from your
+  points a moment later, so no loose points are left behind.
+- **The green check beside a spline vanished when the pointer went onto it.** It is now
+  placed by the spline's last point in the sketch, so it stays there until you click it.
+- **A spline through three points looked like it left a dot behind.** With exactly three
+  points, FreeCAD ties the middle one to the curve in a different way; Fission 180 now knows
+  that point belongs to the spline (before, it could even be taken into the next spline).
+- **Select in the toolbar closed the sketch.** Clicking Select while a sketch tool (Mirror,
+  for example) was running left the sketch and went back to the SOLID tab. It now only ends
+  the tool; the sketch stays open.
+
+### Changed
+
+- **Box selection in Mirror.** With Objects active, drag a box over the curves: left to right
+  takes the curves fully inside the box, right to left takes every curve the box touches (as
+  in Fusion). Shift adds to what is picked, Ctrl toggles.
+- **Each sketch tool has its own icon.** Every way of drawing a rectangle, circle, arc,
+  polygon, slot, spline and line has its own picture in the ribbon, the menus, the
+  right-click menu and the Sketch Palette's Feature Options: the shape, with the points you
+  click shown in blue.
+
 ## 0.1.0-beta.3.3.2
 
 ### Fixed

@@ -10,7 +10,10 @@ pick the line, OK. The copies are tied to the originals by Symmetry constraints.
 
 Here:
 - Objects is active first: clicks on the sketch's curves pick them (a click on a picked one
-  drops it; yellow = picked, the curve under the pointer lights up). Curves selected before
+  drops it; yellow = picked, the curve under the pointer lights up). A box dragged from empty
+  space picks many (Luca, 2026-11-05: "there is no way to select a whole sketch while in the
+  mirror tool"): left to right what is fully inside, right to left what it touches; Shift
+  adds, Ctrl toggles, as the sketch's own box. Curves selected before
   the command are the Objects, and Mirror Line is then active (Guess: one click less;
   Fusion's order otherwise).
 - Mirror Line's Select (in the panel) makes it active: a click on a line of the sketch
@@ -217,13 +220,83 @@ class SketchMirror(draw.DrawTool):
             self.hover = hit
             self._show()
 
+    BOX_PIXELS = 4  # a drag further than this from a press on empty space is a box
+
     def pressed(self, snap, view):
         self._press_hit = self._at(snap.raw)
+        self._box = None
+        if self.field == OBJECTS and self._press_hit is None and self.press_pos is not None:
+            # a press on empty space: a box may follow (Fusion's window / crossing)
+            self._box = {"start": (self.press_pos.x(), self.press_pos.y()), "end": None, "view": view}
 
     def dragged(self, snap, view):
+        box = getattr(self, "_box", None)
+        if box is not None and view is not None and self.drag_pixels > self.BOX_PIXELS:
+            end = _widget_pos(view)
+            box["end"], box["view"] = end, view
+            self._show_box(box)
+            return
         self.moved(snap)
 
+    def _show_box(self, box):
+        """The box being dragged, dashed (as on the part)."""
+        view = box["view"]
+        (x0, y0), (x1, y1) = box["start"], box["end"]
+        corners = []
+        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)):
+            p = view._to_sketch(view._coin(x, y))
+            if p is None:
+                return
+            corners.append(p)
+        try:
+            self.preview.show(
+                curves=self.mirrored(),
+                picked=[p for p in (draw.curve_points(self.sketch, g) for g in self.objects) if p],
+                guides=[corners],
+            )
+        except Exception as exc:
+            warn("Mirror: %s" % exc)
+
+    def _box_pick(self, box):
+        """The curves the box takes (sketch_mirror_core.boxed), with Fusion's keys: plain
+        replaces the Objects, Shift adds, Ctrl toggles (sketch_select_core.box_plan)."""
+        from . import sketch_select_core
+
+        view = box["view"]
+        helpers = self._helpers()
+        polylines = {}
+        for geo, _curve in self.geometry().hits:
+            if geo < 0 or geo in helpers:
+                continue
+            pts = draw.curve_points(self.sketch, geo)
+            pixels = []
+            for p in pts:
+                at = view.pixel_for(p)
+                pixels.append((at.x(), at.y()) if at is not None else None)
+            polylines[geo] = pixels
+        taken = [g for g in core.boxed(polylines, box["start"], box["end"]) if g != self.mirror_line]
+        mods = QtWidgets.QApplication.keyboardModifiers()
+        plan = sketch_select_core.box_plan(
+            bool(mods & QtCore.Qt.ShiftModifier), bool(mods & QtCore.Qt.ControlModifier)
+        )
+        if plan == "replace":
+            self.objects = taken
+        elif plan == "add":
+            self.objects = self.objects + [g for g in taken if g not in self.objects]
+        else:
+            self.objects = sketch_select_core.toggled(self.objects, taken)
+        log("Mirror: the box took %d curve(s) (%s)" % (len(taken), plan))
+        self._changed()
+
     def released(self, press_snap, snap, moved):
+        box, self._box = getattr(self, "_box", None), None
+        if box is not None and box.get("end") is not None:
+            self._press_hit = None
+            try:
+                self._box_pick(box)
+            except Exception as exc:
+                warn("Mirror: %s" % exc)
+            return
         hit = getattr(self, "_press_hit", None)
         self._press_hit = None
         if hit is None:
@@ -391,6 +464,11 @@ class SketchMirror(draw.DrawTool):
              "made": list(self.made)}
         )
         return out
+
+
+def _widget_pos(view):
+    """The widget pixel of the event a _ViewMap was made for."""
+    return (view.coin[0] / view.ratio, view.height - 1 - view.coin[1] / view.ratio)
 
 
 def _marker(g):

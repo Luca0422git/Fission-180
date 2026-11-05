@@ -50,59 +50,59 @@ def _command(tool, icon, tip):
 COMMANDS = {
     "Fission180_SketchMidpointLine": _command(
         tools.MidpointLine,
-        "sk_line",
+        "sk_line_mid",
         "A line drawn out both ways from its middle: click the middle, then an end "
         "(or type the length and angle)",
     ),
     "Fission180_SketchRectangle3Point": _command(
         tools.ThreePointRectangle,
-        "sk_rectangle",
+        "sk_rect_3pt",
         "A rectangle at any angle: click two corners (one side), then the width (or type "
         "the length, angle and width)",
     ),
     "Fission180_SketchCircle2Point": _command(
         tools.TwoPointCircle,
-        "sk_circle",
+        "sk_circle_2pt",
         "A circle across two points: click both ends of the diameter",
     ),
     "Fission180_SketchCircle2Tangent": _command(
         tools.TwoTangentCircle,
-        "sk_circle",
+        "sk_circle_2tan",
         "A circle touching two lines: click the lines, then the side (or type the radius)",
     ),
     "Fission180_SketchCircle3Tangent": _command(
         tools.ThreeTangentCircle,
-        "sk_circle",
+        "sk_circle_3tan",
         "A circle touching three lines: click them, then click near the circle you want",
     ),
     "Fission180_SketchTangentArc": _command(
         tools.TangentArc,
-        "sk_arc",
+        "sk_arc_tangent",
         "An arc that continues a line or arc smoothly: click its end, then the arc's end",
     ),
     "Fission180_SketchPolygonEdge": _command(
         tools.EdgePolygon,
-        "sk_polygon",
+        "sk_poly_edge",
         "A polygon from one edge: click the edge's two ends, then the side it goes to",
     ),
     "Fission180_SketchSlotCenter": _command(
         tools.CenterToCenterSlot,
-        "sk_slot",
+        "sk_slot_cc",
         "A slot from the centres of its ends: click both centres, then the width",
     ),
     "Fission180_SketchSlotOverall": _command(
         tools.OverallSlot,
-        "sk_slot",
+        "sk_slot_overall",
         "A slot from its overall length: click both ends, then the width",
     ),
     "Fission180_SketchSlotCenterPoint": _command(
         tools.CenterPointSlot,
-        "sk_slot",
+        "sk_slot_cp",
         "A slot around its middle: click the middle, then one end's centre, then the width",
     ),
     "Fission180_SketchSlotArc3Point": _command(
         tools.ThreePointArcSlot,
-        "sk_slot",
+        "sk_slot_arc3",
         "A curved slot: click both end centres, a point on its centre arc, then the width",
     ),
     "Fission180_SketchConic": _command(

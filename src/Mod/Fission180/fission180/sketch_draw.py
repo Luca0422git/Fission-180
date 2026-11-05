@@ -1615,7 +1615,7 @@ def run(tool_class, *args):
     selection = selected_elements(sketch)
     try:
         if session.tool_running():
-            spline = session._spline_tool()
+            spline = session.spline_drawn()
             Gui.runCommand("Sketcher_StopOperation")
             if spline:
                 session._drop_spline()  # a half-drawn spline goes, as with Esc

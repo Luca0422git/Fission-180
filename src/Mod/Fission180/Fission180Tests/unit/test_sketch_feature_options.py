@@ -25,6 +25,12 @@ class Families(unittest.TestCase):
         self.assertEqual(fo.short("Fit Point Spline", "Spline"), "Fit Point")
         self.assertEqual(fo.short("Edge Polygon", "Polygon"), "Edge")
 
+    def test_each_type_has_its_own_icon(self):
+        icons = [m[3] for members in self.f.values() for m in members]
+        self.assertTrue(all(icons), icons)
+        self.assertEqual(len(icons), len(set(icons)), icons)
+        self.assertEqual(self.f["Rectangle"][2][3], "sk_rect_center")
+
     def test_running_tool(self):
         self.assertEqual(fo.running(self.f, ["Sketcher_CreateRectangle_Center"]), ("Rectangle", "Center Rectangle"))
         # Fission 180's own 3-point rectangle (its DrawTool's command)

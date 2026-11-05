@@ -29,6 +29,12 @@ G  FreeCAD's spline tool does not make the spline on Fission 180's Esc (forced h
    180 makes it from the points itself, ends joined to the corners, the tool stays on, one
    Ctrl+Z takes it back.
 H  Esc while a spline is drawn: it is cancelled and none of its points stay.
+J  The pointer resting on the green check (no click): the check stays, nothing is made;
+   then a click makes the spline (Luca, 2026-11-05: it vanished when he went onto it).
+K  OK in the right-click menu while Fission 180 no longer recognises the spline tool
+   (forced: Luca's Windows): the spline is made from its points, none are left.
+L  FreeCAD's spline tool stopped behind Fission 180's back: the safety net makes the
+   spline from its points.
 """
 
 import FreeCAD as App
@@ -60,9 +66,16 @@ def splines():
 
 
 def loose():
-    """Construction points / circles that belong to no spline (FreeCAD's internal alignment)."""
+    """Construction points / circles that belong to no spline (FreeCAD's internal alignment;
+    a three-point spline's middle point is PointOnObject on it)."""
     sk = s["sk"]
     aligned = {c.First for c in sk.Constraints if c.Type == "InternalAlignment"}
+    aligned |= {
+        c.First
+        for c in sk.Constraints
+        if c.Type == "PointOnObject" and 0 <= c.Second < len(sk.Geometry)
+        and sk.Geometry[c.Second].TypeId == "Part::GeomBSplineCurve"
+    }
     return [
         (i, g.TypeId)
         for i, g in enumerate(sk.Geometry)
@@ -238,6 +251,105 @@ def c_trimmed():
 
 def finish_sketch():
     click_big("Finish Sketch")
+
+
+# -- J, K, L: Luca on 0.1.0-beta.3.3.2 (Windows): OK in the right-click menu still lost the
+# spline and left its points; the green check vanished when the pointer went onto it -------
+def session():
+    from fission180 import sketch_mode
+
+    return sketch_mode.current()
+
+
+def spline_clicks(points):
+    def clicks():
+        s["before"] = len(splines())
+        s["geo_before"] = len(s["sk"].Geometry)
+        click_big("Fit Point Spline")
+        h.settle("the spline tool")
+        for p in points:
+            si.click(p)
+
+    return clicks
+
+
+J_POINTS = [V(-60, 20, 0), V(-50, 35, 0), V(-35, 28, 0)]
+K_POINTS = [V(-60, -40, 0), V(-50, -25, 0), V(-35, -32, 0), V(-25, -45, 0)]
+L_POINTS = [V(70, 20, 0), V(80, 35, 0), V(95, 25, 0)]
+
+
+def j_hover():
+    h.wait_for(lambda: check_button() is not None, "the green check")
+    button = check_button()
+    h.pointer_to(button, button.rect().center())  # onto it, no click
+    QtWidgets.QApplication.processEvents()
+    h.settle("the pointer resting on the check")
+    from fission180 import sketch_check
+
+    # a few of the check's own ticks with the pointer on it
+    ticks = {"n": 0}
+    timer = QtCore.QTimer()
+    timer.setInterval(sketch_check.POLL_MS)
+    timer.timeout.connect(lambda: ticks.__setitem__("n", ticks["n"] + 1))
+    timer.start()
+    h.wait_for(lambda: ticks["n"] >= 5, "five ticks of the check's timer")
+    timer.stop()
+
+
+def j_still_there():
+    h.check("J: the check stays while the pointer is on it", check_button() is not None)
+    h.check("J: hovering made nothing", len(splines()) == s["before"], len(splines()))
+    real_click(check_button())
+
+
+def j_made():
+    h.settle("the spline")
+    h.check("J: the click on the check made the spline", len(splines()) == s["before"] + 1)
+    h.check("J: no loose points or circles left", not loose(), loose())
+    si.key(QtCore.Qt.Key_Escape)
+
+
+def k_menu_ok_blind():
+    # as on Luca's Windows: at the moment of OK, Fission 180 no longer recognises the
+    # spline tool (the cursor / last-command signals): forced here
+    se = session()
+    s["real_tool"] = se._spline_tool
+    se._spline_tool = lambda: False
+    right_click_empty()
+
+
+def right_click_empty():
+    h.click(V(-80, -60, 0), button=QtCore.Qt.RightButton)
+
+
+def k_ok():
+    try:
+        si.marking_choose("OK")
+        h.settle("OK")
+    finally:
+        session()._spline_tool = s["real_tool"]
+
+
+def k_made():
+    h.check("K: OK in the right-click menu made the spline", len(splines()) == s["before"] + 1,
+            [g.TypeId for g in s["sk"].Geometry])
+    h.check("K: no loose points or circles left", not loose(), loose())
+
+
+def l_kill():
+    # FreeCAD's tool ends behind Fission 180's back (no OK, no Esc of ours)
+    Gui.runCommand("Sketcher_StopOperation")
+
+
+def l_rescued():
+    # (FreeCAD's stop may also drop the undo step its points are in: then they are gone,
+    # which is clean too; when they stay, the safety net makes the spline from them)
+    h.wait_for(lambda: not loose(), "no loose points to be left (the safety net)")
+    made = len(splines()) == s["before"] + 1
+    print("[Fission 180] L: %s" % ("the safety net made the spline" if made else "FreeCAD dropped the points"), flush=True)
+    h.check("L: no loose points or circles left", not loose(), loose())
+    h.check("L: the spline was made, or nothing of it is left",
+            made or len(s["sk"].Geometry) == s["geo_before"], (len(splines()), s["before"]))
 
 
 # -- F: Line on, then a spline from the command search ------------------------------------
@@ -448,6 +560,9 @@ STEPS = (
     + [f2_line, f2_l1, f2_l2, f2_start, f2_clicks, f2_check, f2_made]
     + [g_begin, g_clicks, g_forced, g_made, g_undo, g_undone]
     + [h_begin, h_clicks, h_esc, h_none_left]
+    + [spline_clicks(J_POINTS), j_hover, j_still_there, j_made]
+    + [spline_clicks(K_POINTS), k_menu_ok_blind, k_ok, k_made]
+    + [spline_clicks(L_POINTS), l_kill, l_rescued]
     + [finish_sketch, end]
 )
 

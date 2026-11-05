@@ -14,6 +14,10 @@ E  Ctrl+Z takes the mirror back in one press.
 F  A circle selected before Mirror: it is the Objects, Mirror Line is active; a click on a
    construction line and Enter make the copy (Equal and Symmetric about that line).
 G  Esc while picking: nothing is made, the panel goes.
+H  A box from empty space picks many (Luca, 2026-11-05: "no way to select a whole sketch
+   while in the mirror tool"): left to right what is fully inside, right to left what it
+   touches.
+I  Select in the ribbon ends Mirror and the sketch stays open (it closed the sketch).
 """
 
 import FreeCAD as App
@@ -325,6 +329,54 @@ def g_nothing():
     h.check("G: the panel went", panel() is None)
 
 
+# -- H: a box picks many -----------------------------------------------------------------------
+def h_mirror():
+    si.menu_item("CREATE", "Mirror")
+
+
+def h_window():
+    from Fission180Tests.gui import selection_input as sel
+
+    h.wait_for(lambda: panel() is not None, "the MIRROR panel")
+    sel.box_around([V(10, 0, 0), V(30, 0, 0), V(30, 20, 0)], margin=14)
+
+
+def h_window_took():
+    h.check("H: a box from left to right takes the L's two lines (fully inside)",
+            sorted(tool().objects) == [0, 1], tool().objects)
+    h.check("H: the panel says 2 selected", widget("Fission180MirrorObjects").text() == "2 selected")
+
+
+def h_crossing():
+    from Fission180Tests.gui import selection_input as sel
+
+    sel.box_at(V(30, 10, 0), half=8, crossing=True)
+
+
+def h_crossing_took():
+    h.check("H: a small box from right to left takes only the line it touches",
+            tool().objects == [1], tool().objects)
+    si.key(QtCore.Qt.Key_Escape)
+    h.settle("Esc")
+    h.check("H: Esc: the panel went", panel() is None)
+
+
+# -- I: Select in the ribbon keeps the sketch open -------------------------------------------
+def i_mirror():
+    si.menu_item("CREATE", "Mirror")
+
+
+def i_select():
+    h.wait_for(lambda: panel() is not None, "the MIRROR panel")
+    h.ribbon("Select")
+
+
+def i_still_in_sketch():
+    h.settle("Select")
+    h.check("I: Select ended Mirror", panel() is None and st.tool_title() is None, st.tool_title())
+    h.check("I: the sketch is still open (Select does not leave it)", h.in_sketch() is not None)
+
+
 def finish():
     h.ribbon("Finish Sketch")
 
@@ -344,6 +396,8 @@ STEPS = [
     f_circle, f_c1, f_c2, f_x, f_cline, f_cl1, f_cl2, f_cl_done, f_select_circle, f_mirror,
     f_ready, f_pick_line, f_enter, f_made,
     g_mirror, g_pick, g_esc, g_nothing,
+    h_mirror, h_window, h_window_took, h_crossing, h_crossing_took,
+    i_mirror, i_select, i_still_in_sketch,
     finish, end,
 ]
 

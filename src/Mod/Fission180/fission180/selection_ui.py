@@ -2206,6 +2206,24 @@ class SelectCommand(_Command):
     def run(self):
         from . import commands
 
+        try:
+            from . import sketch_mode
+
+            session = sketch_mode.current()
+            if session is not None and not session.closed and sketch_mode.editing_sketch() is not None:
+                # In a sketch Fusion's Select ends the sketch tool that runs (what it drew
+                # stays) and the sketch stays open. (It closed the sketch and went back to
+                # the SOLID tab: Luca, 2026-11-05.)
+                session.finish_tool()
+                try:
+                    from . import sketch_pick_ui
+
+                    sketch_pick_ui.stop_waiting()
+                except Exception:
+                    pass
+                return
+        except Exception as exc:
+            warn("Select: %s" % exc)
         commands.finish_open_dialog()  # Fusion: the Select tool ends the running command
 
 

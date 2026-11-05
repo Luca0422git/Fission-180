@@ -14,7 +14,8 @@ spline is cancelled (Esc, another tool), its loose points go (remove_points).
 
 Which points are the spline's: the construction points / circles added since the spline's
 first click (`start`, the sketch's curve count then) that nothing aligns to a curve yet
-(no InternalAlignment), in the order they were clicked. Without that count (the first click
+(no InternalAlignment, and not a three-point spline's middle point: on_a_spline), in the
+order they were clicked. Without that count (the first click
 was not seen) only FreeCAD's control-point signature is trusted: a run of loose
 construction circles at the end of the sketch, the first with a Weight constraint and the
 others Equal to it (FreeCAD's tool makes them so), never a user's own construction points.
@@ -25,6 +26,7 @@ Pure functions first (no FreeCAD: unit tested), then the parts that change the s
 from . import log, warn
 
 POINT, CIRCLE = "Part::GeomPoint", "Part::GeomCircle"
+BSPLINE = "Part::GeomBSplineCurve"
 START, END, MID = 1, 2, 3  # FreeCAD's PointPos
 
 
@@ -38,10 +40,11 @@ def pending(geometry, aligned, start=None, constraints=()):
     constraints  [(type, first, first_pos, second, second_pos)] (for the signature check)
     """
     if start is not None:
+        held = aligned | on_a_spline(geometry, constraints)
         out = []
         for i in range(max(0, start), len(geometry)):
             kind, construction = geometry[i]
-            if construction and kind in (POINT, CIRCLE) and i not in aligned:
+            if construction and kind in (POINT, CIRCLE) and i not in held:
                 out.append(i)
         return out
     # no first click seen: only FreeCAD's control circles (Weight on the first, Equal to it)
@@ -61,6 +64,19 @@ def pending(geometry, aligned, start=None, constraints=()):
     if not weighted or any(i not in equal for i in run[1:]):
         return []
     return run
+
+
+def on_a_spline(geometry, constraints):
+    """Construction points a spline holds without an InternalAlignment: with exactly three
+    fit points FreeCAD's tool ties the middle one to the curve with PointOnObject (the
+    curve it makes has no knot there). It is the spline's own fit point, not a loose one."""
+    out = set()
+    for kind_c, first, _fpos, second, _spos in constraints:
+        if kind_c != "PointOnObject" or not (0 <= first < len(geometry)) or not (0 <= second < len(geometry)):
+            continue
+        if geometry[first][0] == POINT and geometry[second][0] == BSPLINE:
+            out.add(first)
+    return out
 
 
 def kind_of(geometry, points):

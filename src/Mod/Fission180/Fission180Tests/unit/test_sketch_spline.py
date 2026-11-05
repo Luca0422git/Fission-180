@@ -28,6 +28,17 @@ class Pending(unittest.TestCase):
     def test_points_a_curve_already_owns_are_not_loose(self):
         self.assertEqual(sp.pending(self.GEO, {6}, start=5), [5, 7])
 
+    def test_a_three_point_splines_middle_point_is_the_splines(self):
+        # FreeCAD 1.1: with three fit points the middle one is PointOnObject on the curve
+        # (no knot there), the ends InternalAlignment (seen in a run on FreeCAD 1.1.4)
+        geo = [(LINE, False)] * 4 + [(P, True)] * 3 + [(sp.BSPLINE, False)]
+        cons = [("InternalAlignment", 4, 1, 7, 0), ("PointOnObject", 5, 1, 7, 0), ("InternalAlignment", 6, 1, 7, 0)]
+        self.assertEqual(sp.pending(geo, {4, 6}, start=4, constraints=cons), [])
+
+    def test_a_point_on_a_line_is_still_loose(self):
+        geo = [(LINE, False)] * 4 + [(P, True)]
+        self.assertEqual(sp.pending(geo, set(), start=4, constraints=[("PointOnObject", 4, 1, 0, 0)]), [4])
+
     def test_without_the_first_click_loose_points_are_not_guessed(self):
         self.assertEqual(sp.pending(self.GEO, set(), start=None), [])
 

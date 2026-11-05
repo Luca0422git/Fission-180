@@ -30,9 +30,9 @@ RING = [
     item("Line", "Fission180_SketchLine", "sk_line", "L"),
     item("Undo", "Std_Undo", "qa_undo", "Ctrl+Z"),
     item("Finish Sketch", "Fission180_FinishSketch", "finish_sketch"),
-    item("Center Diameter Circle", "Sketcher_CreateCircle", "sk_circle", "C"),
+    item("Center Diameter Circle", "Sketcher_CreateCircle", "sk_circle_center", "C"),
     item("Sketch Dimension", "Sketcher_Dimension", "sk_dimension", "D"),
-    item("2-Point Rectangle", "Sketcher_CreateRectangle", "sk_rectangle", "R"),
+    item("2-Point Rectangle", "Sketcher_CreateRectangle", "sk_rect_2pt", "R"),
 ]
 
 LIST = [

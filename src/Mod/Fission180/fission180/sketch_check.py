@@ -139,15 +139,40 @@ class FloatingCheck:
         return line._pixel(line.current)
 
     def _spline_anchor(self):
-        """The last point clicked of a spline being drawn, once it has two."""
+        """The last point placed of a spline being drawn, once it has two: from the
+        spline's own points in the sketch (they say it is being drawn even when the pointer
+        is on the check: Luca, 2026-11-05, the check vanished when he went onto it), else
+        from the presses counted while the spline tool runs."""
         session = self.session
-        running = bool(session._spline_tool())
+        try:
+            points = session._spline_points() if session._spline_in_progress() else []
+        except Exception:
+            points = []
+        if len(points) >= 2:
+            at = self._point_pixel(points[-1])
+            if at is not None:
+                self._spline_on = True
+                return at
+        running = bool(session.spline_drawn())
         if running != self._spline_on:
             self._spline_on = running
             self._spline_presses = 0
         if not running or self._spline_presses < 2 or self._last_press is None:
             return None
         return QtCore.QPointF(self._last_press[0])
+
+    def _point_pixel(self, geo):
+        """The widget pixel of a spline's point (a fit point, or a control circle's
+        centre), or None."""
+        try:
+            import FreeCAD as App
+
+            sketch = self.session.sketch
+            g = sketch.Geometry[geo]
+            where = App.Vector(g.X, g.Y, 0) if g.TypeId == "Part::GeomPoint" else App.Vector(g.Center)
+            return self.session.line._pixel(where)
+        except Exception:
+            return None
 
     def wanted(self):
         """(kind, pixel) the check belongs to now, or (None, None)."""
@@ -167,6 +192,10 @@ class FloatingCheck:
         return None, None
 
     def update(self):
+        try:
+            self.session.rescue_spline()  # a spline whose tool ended without making it
+        except Exception as exc:
+            warn("sketch check: %s" % exc)
         button = self.button
         if button is None:
             return

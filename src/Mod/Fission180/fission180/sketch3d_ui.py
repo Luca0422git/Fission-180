@@ -929,7 +929,7 @@ class FitSplineCommand:
             "MenuText": "Fit Point Spline",
             "ToolTip": "A smooth curve through the points you click (in 3D while 3D Sketch "
             "is on in the palette); Enter makes it",
-            "Pixmap": ui_icon_path("sk_spline"),
+            "Pixmap": ui_icon_path("sk_spline_fit"),
         }
 
     def IsActive(self):
