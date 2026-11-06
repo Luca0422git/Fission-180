@@ -479,7 +479,19 @@ def pointer_to(widget, pos, fresh=False):
 def _pointer_step(widget, pos):
     target = widget.mapToGlobal(pos)
     now = QtGui.QCursor.pos()
-    if now == target or _pointer.last == target:
+    try:
+        fractional = not float(widget.devicePixelRatioF()).is_integer()
+    except Exception:
+        fractional = False
+
+    def at(p):  # (a fractional scale rounds: a pixel off is the same screen pixel)
+        if p is None:
+            return False
+        if not fractional:
+            return p == target
+        return abs(p.x() - target.x()) <= 1 and abs(p.y() - target.y()) <= 1
+
+    if at(now) or at(_pointer.last):
         # A pointer sent to where it already is makes no move at all; and Qt folds moves told
         # together into the last one and drops it when that is where it last saw the pointer
         # (sketch_infer_tools: the scenario's own move one pixel off, then this one: nothing

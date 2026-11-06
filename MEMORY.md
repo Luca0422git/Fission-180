@@ -1972,10 +1972,10 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   person set QT_SCALE_FACTOR; Preferences > General > Appearance, restart=True. Checked on the
   AppImage: 75 -> devicePixelRatio 0.75, none -> 1.0. The GUI harness pins QT_SCALE_FACTOR=1
   (gui_env.sh), so it never changes the tests; at 0.75 the harness's pointer check was 1 px off
-  (Qt rounds): `_warp` now allows 1 px at a fractional ratio (exact at 1). RESULTS_AT_75
+  (Qt rounds): `_warp` allows 1 px and `_pointer_step` treats "within a pixel" as "there" (then a 2-px nudge first) at a fractional ratio only (exact at 1). With gui_env's QT_SCALE_FACTOR=0.75 (a scratch copy): ribbon_luca_linux 60 and sketch_trim_after_spline 122 PASS on the AppImage (screenshots: the whole window at three quarters).
 - Tests: unit 2896 OK; AppImage with the new AppRun: ribbon_luca_linux (A outline, B narrow +
   every tab at full width, C unpin Shell, D real right-click, E Interface size), ribbon_customize
-  57, ribbon_sweep 222, home_screen 71, doc_tabs_top 17, sketch_trim_after_spline 122,
+  57, ribbon_sweep 222, home_screen 71, doc_tabs_top 17, sketch_trim_after_spline 122, misc_preferences 84 (stock FreeCAD),
   sketch_spline_luca 246, sketch_feature_options 60, sketch_mirror_dialog 155,
   marking_menu_command 31 (all PASS).
 
