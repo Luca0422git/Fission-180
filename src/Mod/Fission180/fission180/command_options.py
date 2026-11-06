@@ -256,13 +256,10 @@ def options_menu(parent, entry, context=None):
     if context is not None:
         tab_id, group_id, built_in = context
         store = ribbon_pins.load()
-        if label in built_in:
-            pin = menu.addAction("Pin to Toolbar")
-            pin.setEnabled(False)
-            pin.setToolTip("Already on the toolbar")
-        elif ribbon_pins.is_pinned(store, tab_id, group_id, label):
+        # any command can come off the toolbar, the group's own icons too (Luca, 2026-11-06)
+        if ribbon_pins.is_pinned(store, tab_id, group_id, label, built_in):
             menu.addAction("Unpin from Toolbar").triggered.connect(
-                lambda: set_pinned(tab_id, group_id, label, False)
+                lambda: set_pinned(tab_id, group_id, label, False, built_in)
             )
         else:
             menu.addAction("Pin to Toolbar").triggered.connect(
@@ -283,7 +280,7 @@ def set_pinned(tab_id, group_id, label, on, built_in=()):
         if on:
             store = ribbon_pins.pin(store, tab_id, group_id, label, built_in)
         else:
-            store = ribbon_pins.unpin(store, tab_id, group_id, label)
+            store = ribbon_pins.unpin(store, tab_id, group_id, label, built_in)
         ribbon_pins.save(store)
         log("%s %s %s/%s" % ("pinned" if on else "unpinned", label, tab_id, group_id))
     except Exception as exc:
@@ -298,7 +295,7 @@ def reset_all_toolbar(parent=None):
         answer = QtWidgets.QMessageBox.question(
             parent or Gui.getMainWindow(),
             "Reset All Toolbar Customization",
-            "Take every pinned command off the toolbar?",
+            "Put the toolbar back as it came: every group's own commands, nothing pinned?",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No,
         )

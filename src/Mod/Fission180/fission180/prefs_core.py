@@ -9,7 +9,7 @@ ribbon entries): Fusion's window shows them, and a person looking for one learns
 nothing here. Sources: docs/fission180/parity/misc.md.
 """
 
-from . import __version__ as _version, update_core as _update_core
+from . import __version__ as _version, interface_scale as _interface_scale, update_core as _update_core
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
 FISSION180 = "User parameter:BaseApp/Preferences/Mod/Fission180"
@@ -195,6 +195,19 @@ OPTIONS = [
         "default. The window changes at once; a few icons of FreeCAD's own menus change at "
         "the next start.",
         apply="theme",
+    ),
+    _option(
+        "interface_size",
+        "general",
+        "Interface size",
+        "choice",
+        "100",
+        (FISSION180, "String", "InterfaceSize"),
+        group="Appearance",
+        choices=[(value, label, True, "") for value, label in _interface_scale.CHOICES],
+        tip="The toolbar, panels, text and icons smaller (more room for the 3D view) or bigger, "
+        "on top of the system's own display scaling. Shows when Fission 180 starts again.",
+        restart=True,
     ),
     _option(
         "mouse_preset",

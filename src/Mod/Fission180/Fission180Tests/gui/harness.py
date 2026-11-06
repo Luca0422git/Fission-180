@@ -484,7 +484,12 @@ def _pointer_step(widget, pos):
         # together into the last one and drops it when that is where it last saw the pointer
         # (sketch_infer_tools: the scenario's own move one pixel off, then this one: nothing
         # came). So first a neighbouring pixel, seen by Qt.
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        # (at a fractional scale one pixel can round to the same screen pixel: two then)
+        try:
+            step = 1 if float(widget.devicePixelRatioF()).is_integer() else 2
+        except Exception:
+            step = 1
+        for dx, dy in ((step, 0), (-step, 0), (0, step), (0, -step)):
             aside = QtCore.QPoint(target.x() + dx, target.y() + dy)
             if aside != now and aside != _pointer.last:
                 _warp(aside, widget)
@@ -508,12 +513,24 @@ def _warp(target, widget):
         except RuntimeError:
             return True
 
+    # At a fractional scale (Preferences > Interface size, e.g. 75 %) Qt reports the pointer
+    # in its own pixels, rounded: one pixel off is the same place. At scale 1 (CI): exact.
+    try:
+        ratio = float(widget.devicePixelRatioF())
+    except Exception:
+        ratio = 1.0
+    slack = 0 if ratio.is_integer() else 1
+
+    def seen():
+        last = _pointer.last
+        return last is not None and abs(last.x() - target.x()) <= slack and abs(last.y() - target.y()) <= slack
+
     try:
         wait_for(
-            lambda: _pointer.last == target or gone(),
+            lambda: seen() or gone(),
             "Qt to see the pointer at %d, %d (%s)" % (target.x(), target.y(), name),
         )
-        if _pointer.last != target and gone():
+        if not seen() and gone():
             check("%s still open when the pointer came to it" % name, False, seen_now())
             close_modals()
             state["stop"] = state.get("stop") or "%s closed under the pointer" % name

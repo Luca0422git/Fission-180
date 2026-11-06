@@ -10,3 +10,14 @@ except Exception as _exc:
     import FreeCAD
 
     FreeCAD.Console.PrintWarning("[Fission 180] names saved by SciForge: %s\n" % _exc)
+
+# The interface size chosen in Preferences (General > Appearance): Qt takes it only before the
+# window is made, which is now (fission180/interface_scale.py).
+try:
+    from fission180 import interface_scale as _interface_scale
+
+    _interface_scale.at_start()
+except Exception as _exc:
+    import FreeCAD
+
+    FreeCAD.Console.PrintWarning("[Fission 180] interface size: %s\n" % _exc)

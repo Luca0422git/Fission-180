@@ -108,11 +108,30 @@ class _MenuOptions(QtCore.QObject):
             elif kind == QtCore.QEvent.Leave:
                 if not self.button.underMouse():
                     self.button.hide()
+            elif kind in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease) and (
+                event.button() == QtCore.Qt.RightButton
+            ):
+                # Right-click on a command: its options (as the three dots), never the command
+                # itself: Qt's menu runs a command on a right release too, and its
+                # context-menu event comes before (Linux: on the press) or after (Windows: on
+                # the release) that release (Luca, 2026-11-06: "i cant right click on the
+                # tools in the dropdown to pin them")
+                pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                action = self.menu.actionAt(pos)
+                if action in self.entries:
+                    if kind == QtCore.QEvent.MouseButtonPress:
+                        self._right_down = True
+                    else:
+                        self._right_down = False
+                        self._open_once(action, self.menu.mapToGlobal(pos))
+                    return True
             elif kind == QtCore.QEvent.ContextMenu:
                 action = self.menu.actionAt(event.pos())
                 if action in self.entries:
-                    self.current = action
-                    self.open_options(self.menu.mapToGlobal(event.pos()))
+                    # by the mouse: the right button's release opens them (once); by the
+                    # keyboard's menu key or anything else: now
+                    if not getattr(self, "_right_down", False):
+                        self._open_once(action, self.menu.mapToGlobal(event.pos()))
                     return True
         except Exception as exc:
             warn("menu options: %s" % exc)
@@ -130,6 +149,18 @@ class _MenuOptions(QtCore.QObject):
         self.button.move(rect.right() - size - 2, rect.top() + (rect.height() - size) // 2)
         self.button.show()
         self.button.raise_()
+
+    def _open_once(self, action, at):
+        """The options of `action`, once per right-click (its release and its context-menu
+        event both ask)."""
+        import time
+
+        now = time.monotonic()
+        if now - getattr(self, "_opened_at", 0.0) < 0.5:
+            return
+        self._opened_at = now
+        self.current = action
+        QtCore.QTimer.singleShot(0, lambda: _safely(self.open_options, at))
 
     def _button_clicked(self):
         self.open_options(self.button.mapToGlobal(QtCore.QPoint(self.button.width(), 0)))
@@ -256,19 +287,17 @@ class GroupWidget(QtWidgets.QWidget):
             self.row.removeWidget(button)
             button.deleteLater()
         self.buttons = []
-        labels = list(self.group["big"])
-        pinned = []
+        own = list(self.group["big"])
+        labels = list(own)
         try:
             from . import ribbon_pins
 
-            pinned = [
-                x
-                for x in ribbon_pins.pinned(ribbon_pins.load(), self.tab_id, self.group["id"])
-                if x not in labels
-            ]
+            # the group's own icons (but those taken off), then the pinned ones
+            labels = ribbon_pins.shown(ribbon_pins.load(), self.tab_id, self.group["id"], own)
         except Exception as exc:
             warn("ribbon pins: %s" % exc)
-        for label in labels + pinned:
+        pinned = [x for x in labels if x not in own]
+        for label in labels:
             entry = cfg.find(self.group, label)
             if entry is None:
                 if label not in pinned:
@@ -283,6 +312,26 @@ class GroupWidget(QtWidgets.QWidget):
         self.menu = build_menu(self, self.group["items"], self.available, self.context())
         if old is not None:
             old.deleteLater()
+
+    def widths(self):
+        """The group's width (pixels) with 0, 1, 2 ... of its big icons showing (never
+        narrower than its name): for ribbon_fit."""
+        margins = 4 + 4 + 2 + 2  # its row's and its own
+        label = self.label.sizeHint().width() + 4
+        spacing = self.row.spacing()
+        out = []
+        for n in range(len(self.buttons) + 1):
+            icons = n * (BIG + 12) + max(0, n - 1) * spacing
+            out.append(max(icons + margins, label))
+        return out
+
+    def show_first(self, count):
+        """Only the first `count` big icons show (the window is narrow); every command stays
+        in the group's drop-down."""
+        for i, button in enumerate(self.buttons):
+            want = i < count
+            if button.isVisibleTo(self) != want:
+                button.setVisible(want)
 
     def _options(self, button, entry):
         from . import command_options
@@ -366,6 +415,7 @@ class RibbonWidget(QtWidgets.QWidget):
         tabs_row.setSpacing(0)
         self.tab_buttons = {}
         self.group_widgets = []
+        self.page_groups = {}  # tab id -> its GroupWidgets, in order (_fit)
         self.pages = QtWidgets.QStackedWidget()
         self.page_index = {}
         for tab in cfg.TABS:
@@ -385,6 +435,7 @@ class RibbonWidget(QtWidgets.QWidget):
                     row.addWidget(_separator())
                 widget = GroupWidget(grp, available, tab_id=tab["id"])
                 self.group_widgets.append(widget)
+                self.page_groups.setdefault(tab["id"], []).append(widget)
                 row.addWidget(widget)
             row.addStretch(1)
             self.page_index[tab["id"]] = self.pages.addWidget(page)
@@ -393,6 +444,8 @@ class RibbonWidget(QtWidgets.QWidget):
         # Let the ribbon clip instead of forcing the window wider (Fusion clips too).
         self.pages.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
         self.pages.setMinimumWidth(0)
+        # ... and each group shows as many of its icons as fit (ribbon_fit)
+        self.pages.installEventFilter(self)
         right.addWidget(self.pages)
         body.addLayout(right, 1)
         outer.addWidget(self.command_area)
@@ -627,6 +680,38 @@ class RibbonWidget(QtWidgets.QWidget):
                 widget.refresh()
             except Exception as exc:
                 warn("ribbon group %s: %s" % (widget.group.get("title"), exc))
+        self._fit()
+
+    def eventFilter(self, obj, event):
+        try:
+            if obj is self.pages and event.type() == QtCore.QEvent.Resize:
+                self._fit()
+        except Exception as exc:
+            warn("ribbon fit: %s" % exc)
+        return False
+
+    def _fit(self):
+        """Each group of the tab in front shows as many of its big icons as the ribbon has
+        room for; the rest come off from the end of the fullest groups first (Fusion's
+        toolbar on a narrow window; Luca, 2026-11-06: "the tools are bunched up")."""
+        try:
+            from . import ribbon_fit
+
+            groups = self.page_groups.get(self.current_tab(), [])
+            if not groups:
+                return
+            room = self.pages.width()
+            if room <= 0:
+                return  # not laid out yet: the first resize fits it
+            # separators (1 px) and the page row's spacing (6 px) between groups and separators
+            fixed = (len(groups) - 1) * 1 + (2 * len(groups) - 2) * 6
+            counts = ribbon_fit.fit([g.widths() for g in groups], room, fixed)
+            for widget, count in zip(groups, counts):
+                widget.show_first(count)
+        except RuntimeError:
+            pass
+        except Exception as exc:
+            warn("ribbon fit: %s" % exc)
 
     def contextMenuEvent(self, event):
         """Right-click on the ribbon (not on a command): Reset All Toolbar Customization."""
@@ -647,6 +732,7 @@ class RibbonWidget(QtWidgets.QWidget):
         for tid, button in self.tab_buttons.items():
             button.setChecked(tid == tab_id)
         self.pages.setCurrentIndex(self.page_index[tab_id])
+        self._fit()
         if user and tab_id not in CONTEXTUAL:
             self._user_tab = tab_id
 

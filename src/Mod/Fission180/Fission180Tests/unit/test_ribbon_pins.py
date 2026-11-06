@@ -35,6 +35,30 @@ class Pins(unittest.TestCase):
         s = pins.unpin(s, "solid", "create", "Pipe")
         self.assertEqual(s, {})
 
+    def test_a_groups_own_icon_can_be_taken_off_and_back(self):
+        # Luca, 2026-11-06: "there is no way of unpinning already pinned tools"
+        own = ("Fillet", "Trim", "Offset", "Extend")
+        s = pins.unpin({}, "sketch", "modify", "Trim", built_in=own)
+        self.assertEqual(pins.shown(s, "sketch", "modify", own), ["Fillet", "Offset", "Extend"])
+        self.assertFalse(pins.is_pinned(s, "sketch", "modify", "Trim", own))
+        s = pins.pin(s, "sketch", "modify", "Trim", built_in=own)
+        self.assertEqual(pins.shown(s, "sketch", "modify", own), list(own))
+        self.assertEqual(s, {})
+
+    def test_as_many_or_as_few_as_wanted(self):
+        own = ("Extrude", "Revolve")
+        s = pins.unpin({}, "solid", "create", "Extrude", built_in=own)
+        s = pins.unpin(s, "solid", "create", "Revolve", built_in=own)
+        self.assertEqual(pins.shown(s, "solid", "create", own), [])
+        for label in ("Coil", "Pipe", "Rib", "Web", "Emboss"):
+            s = pins.pin(s, "solid", "create", label, built_in=own)
+        self.assertEqual(pins.shown(s, "solid", "create", own), ["Coil", "Pipe", "Rib", "Web", "Emboss"])
+
+    def test_pins_saved_before_keep_working(self):
+        # the store of 0.1.0-beta.3.3.4 and before: only pinned extras
+        s = {"solid/create": ["Coil"]}
+        self.assertEqual(pins.shown(s, "solid", "create", ("Extrude",)), ["Extrude", "Coil"])
+
     def test_inputs_not_changed(self):
         s = pins.pin({}, "solid", "create", "Coil")
         before = {k: list(v) for k, v in s.items()}

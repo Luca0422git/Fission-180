@@ -8,6 +8,37 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.5
+
+### Fixed
+
+- **Linux: Fission 180 did not start on up-to-date systems** ("Could not initialize GLX", then
+  it closed). The AppImage carried an old copy of a small graphics library (libdrm) that hid
+  the newer one your system's graphics driver needs (seen on CachyOS with an AMD Radeon 680M).
+  The AppImage now uses your system's copy. Linux users: download the new AppImage and replace
+  the old file.
+- **A thin line stayed on the 3D view where a dialog had been** (most visible on Linux). It
+  was the frame of FreeCAD's empty Tasks area; it has no frame now.
+
+### Changed
+
+- **The toolbar fits narrow windows.** When the window is too narrow for every big icon, each
+  group shows as many as fit, taking icons off the fullest groups first; nothing overlaps any
+  more. Every command stays in its group's drop-down menu, and the icons come back as the
+  window grows.
+- **Any command can be taken off the toolbar.** A group's own icons can now be unpinned too
+  (Unpin from Toolbar in its three-dot menu, or right-click its icon), and as many commands
+  as you like can be pinned. Reset All Toolbar Customization (right-click the toolbar) puts
+  everything back as it came.
+- **Right-click a command in a drop-down menu** to get its options (Pin to Toolbar or Unpin,
+  Change Keyboard Shortcut), the same as its three dots. It no longer runs the command.
+
+### New
+
+- **Interface size** (Preferences > General > Appearance): make the whole window (toolbar,
+  panels, text, icons) smaller, for more room for the 3D view, or bigger: 75 % to 150 %, on top
+  of your system's own display scaling. It shows the next time Fission 180 starts.
+
 ## 0.1.0-beta.3.3.4
 
 ### Fixed

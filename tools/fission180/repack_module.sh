@@ -79,6 +79,15 @@ case "${MODE}" in
         (cd "${work}" && "${ARCHIVE}" --appimage-extract >/dev/null)
         [ -x "${work}/squashfs-root/AppRun" ] || fail "${ARCHIVE} did not unpack (no AppRun)"
         replace_module "${work}/squashfs-root"
+        # the start script too (it is no compiled program: package/rattler-build/linux/AppDir/
+        # AppRun, e.g. the system's libdrm first, reaches a patch release this way)
+        here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        apprun="${here}/../../package/rattler-build/linux/AppDir/AppRun"
+        if [ -f "${apprun}" ]; then
+            cp "${apprun}" "${work}/squashfs-root/AppRun"
+            chmod 755 "${work}/squashfs-root/AppRun"
+            echo "[Fission 180] AppRun from ${apprun}"
+        fi
         # appimagetool's continuous build (2026-10-29, build 333) refuses an AppDir with files
         # other users cannot read ("has mode 0700": 3330 folders of the bundled conda
         # environment): everything readable, and folders and programs usable, by all users

@@ -21,8 +21,12 @@ fi
 # is put on a computer, not the program, and a patch release makes its installer from the scripts
 # of its own commit (fission180-patch-release.yml); counting them would refuse every patch release
 # until the next full build (2026-10-28, core-patches.md #19).
+# The AppImage's start script (package/rattler-build/linux/AppDir/AppRun) likewise: a shell
+# script, not compiled; a patch release puts the one of its own commit into the AppImage
+# (repack_module.sh). (2026-11-06: the system's libdrm first, for Luca's CachyOS.)
 id="$(git log -1 --format=%h "${commit}" -- src ':!src/Mod/Fission180' \
-    cMake CMakeLists.txt CMakePresets.json package ':!package/WindowsInstaller' pixi.toml pixi.lock)"
+    cMake CMakeLists.txt CMakePresets.json package ':!package/WindowsInstaller' \
+    ':!package/rattler-build/linux/AppDir/AppRun' pixi.toml pixi.lock)"
 if [ -z "${id}" ]; then
     echo "core_id.sh: no commit found for the compiled part" >&2
     exit 1

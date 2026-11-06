@@ -12,6 +12,29 @@ export FONTCONFIG_PATH=/etc/fonts
 # Fix: Use X to run on Wayland
 export QT_QPA_PLATFORM=xcb
 
+# FISSION180: the graphics driver (Mesa, NVIDIA) always comes from the system, so its libdrm
+# must too: the bundled (conda) libdrm is older than a rolling distribution's Mesa needs, and
+# being loaded first it hid the system's (CachyOS, Mesa 26.2: "undefined symbol:
+# amdgpu_va_manager_query_sw_info", no OpenGL, the program aborted: "Could not initialize
+# GLX"). The system's libdrm libraries go first when they are there (64-bit folders only:
+# Fedora's /usr/lib holds 32-bit ones). FISSION180_BUNDLED_LIBDRM=1 keeps the bundled ones.
+# (docs/fission180/core-patches.md #12)
+if [ "${FISSION180_BUNDLED_LIBDRM:-0}" != 1 ]; then
+    FISSION180_PRELOAD=""
+    for lib in libdrm.so.2 libdrm_amdgpu.so.1 libdrm_radeon.so.1 libdrm_intel.so.1 libdrm_nouveau.so.2; do
+        for dir in /usr/lib64 /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib; do
+            if [ -e "$dir/$lib" ]; then
+                FISSION180_PRELOAD="${FISSION180_PRELOAD:+$FISSION180_PRELOAD:}$dir/$lib"
+                break
+            fi
+        done
+    done
+    if [ -n "$FISSION180_PRELOAD" ]; then
+        export LD_PRELOAD="${FISSION180_PRELOAD}${LD_PRELOAD:+:$LD_PRELOAD}"
+    fi
+    unset FISSION180_PRELOAD
+fi
+
 # Show packages info if DEBUG env variable is set
 if [ "$DEBUG" = 1 ]; then
     cat ${HERE}/packages.txt

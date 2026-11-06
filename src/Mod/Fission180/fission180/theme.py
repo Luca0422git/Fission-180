@@ -332,6 +332,10 @@ QGroupBox {{ border: 1px solid {line}; margin-top: 8px; padding-top: 6px; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 6px; padding: 0 3px; }}
 
 /* FreeCAD task panels (command dialogs, the sketch's side panel) */
+/* The Tasks area's own scroll box: no frame. FreeCAD keeps the empty Tasks area over the 3D
+   view after a dialog closes, and its 1-pixel frame stayed there as a thin outline (Luca,
+   2026-11-06, on Linux); Fission 180's dialogs have frames of their own. */
+Gui--TaskView--TaskView > QScrollArea {{ border: none; background: transparent; }}
 QSint--ActionPanel, QSint--ActionPanel QScrollArea, QSint--ActionPanel QScrollArea > QWidget > QWidget {{
     background: {chrome}; }}
 QSint--ActionGroup {{ background: {chrome}; }}

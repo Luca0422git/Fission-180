@@ -4,6 +4,18 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-06 (later): patch 0.1.0-beta.3.3.5, Luca on Linux, on `develop`** (Luca installed
+3.3.4 on CachyOS, KDE Plasma Wayland, AMD Radeon 680M: the AppImage aborted, "Could not
+initialize GLX"; once in: "a line where the main dialogue box appears", "the toolbar doesnt
+scale very well with smaller screens", "no way of unpinning already pinned tools", "i cant right
+click on the tools in the dropdown", then "GUI scale. in the settings"; newest session log
+"Linux"). Status: [x] AppRun puts the system's libdrm first (+ repack copies AppRun, core_id
+leaves AppRun out) [x] no frame on the Tasks area [x] ribbon fits narrow windows (ribbon_fit)
+[x] any command unpinnable (ribbon_pins #off) [x] right-click in drop-downs = options
+[x] Interface size (Preferences > General > Appearance; Init.py sets QT_SCALE_FACTOR)
+[x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.5, CHANGELOG, core-patches #12, AI docs
+[ ] "Fission 180 tests" green [ ] **Luca: patch release** (Linux: download the new AppImage).
+
 **2026-11-06: patch 0.1.0-beta.3.3.4, Luca's fourth round, on `develop`** (Luca on 3.3.3:
 "when i cut the top of the rectangle with the spline connected to it, the angles of the
 spline changed slightly ... IT HAS TO BE ACCURATE", "when i click the green checkmark ... it
@@ -14,7 +26,7 @@ snapping (inference kind "spline", exact points, end ties) [x] Feature Options b
 [x] tools stop FreeCAD's spline tool when its panel shows (the check-then-Trim report was not
 reproduced: button, T and right-click menu all start Trim) [x] VERSION / `_FALLBACK_VERSION`
 0.1.0-beta.3.3.4, CHANGELOG, parity, AI docs [x] tests on the AppImage and stock FreeCAD (session log)
-[ ] "Fission 180 tests" green on develop (**tell Luca at once**) [ ] **Luca: patch release**.
+[x] "Fission 180 tests" #16 green on `b4cc6b68` (Luca told at once) [x] **PUBLISHED 2026-11-06 02:32 UTC** (tag `fission180-v0.1.0-beta.3.3.4`; Luca: "the update worked").
 
 **2026-11-05: patch 0.1.0-beta.3.3.3, Luca's third round, on `develop`** (Luca on 3.3.2, on
 Windows: "clicking ok in the radial menu STILL doesnt work ... the green checkmark next to the
@@ -1918,6 +1930,54 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Linux, patch 0.1.0-beta.3.3.5 (`develop`, 2026-11-06)
+
+- **AppImage on CachyOS (Mesa 26.2.6, AMD 680M, Wayland session -> XWayland: AppRun forces
+  xcb)**: "Could not initialize GLX". `LD_DEBUG=libs` (Luca ran it) showed
+  `/usr/lib/libgallium-26.2.6-arch3.1.so: undefined symbol: amdgpu_va_manager_query_sw_info`:
+  the bundled conda libdrm_amdgpu 2.4.125 (loaded first) is older than the system Mesa needs.
+  Not the cause: the bundled glvnd libGL/libGLX (preloading the system's did nothing), the C++
+  runtime (bundled libstdc++ GLIBCXX_3.4.34 = GCC 15.2), EGL (`QT_XCB_GL_INTEGRATION=xcb_egl`
+  failed the same way). Fix (Luca confirmed by hand): `LD_PRELOAD` of the system's
+  libdrm*.so in AppRun (64-bit folders, /usr/lib64 before /usr/lib: Fedora's /usr/lib is 32-bit;
+  `FISSION180_BUNDLED_LIBDRM=1` keeps the bundled ones). Only libva/ffmpeg and Qt's eglfs-kms
+  link libdrm in the bundle. A patch release did not carry AppRun (repack keeps the old
+  AppImage's): `repack_module.sh` now copies `package/rattler-build/linux/AppDir/AppRun` in, and
+  `core_id.sh` leaves that file out of the core id (like package/WindowsInstaller), else a
+  patch release would demand the 4-hour build. Install guide for Linux given to Luca in chat
+  (~/Applications/Fission180.AppImage, .desktop file, icon via --appimage-extract).
+- **The line**: after a dialog (the sketch palette) closes, FreeCAD 1.1.4 keeps the right-hand
+  Tasks overlay (Gui::OverlayTabWidget#OverlayRight) shown with the empty TaskView; its
+  QScrollArea's 1-px frame stayed as an outline (probe scenario listed the widgets at the
+  edge). Note: FreeCAD 1.1.4 asks for overlay style sheets that are not installed ("overlay:
+  Light Theme + Dark Background.qss": the file NAME ends up as the overlay's style sheet). Fix:
+  theme QSS `Gui--TaskView--TaskView > QScrollArea { border: none; }`.
+- **Ribbon on narrow windows**: groups overlapped (pages are QSizePolicy.Ignored; fixed-size
+  buttons squeezed). `ribbon_fit.fit` (pure, unit tested) takes icons off the fullest group
+  (rightmost on ties) until the page fits; `GroupWidget.widths/show_first`,
+  `RibbonWidget._fit` on the pages' Resize, select_tab and refresh_customization. At 1920 px
+  (CI) every tab still shows every icon (scenario checks).
+- **Pins**: store `slot#off` = the group's own icons taken off; `shown()` = own minus off, then
+  pinned; old stores keep working. Options menu: Unpin for any shown command; Reset asks "Put
+  the toolbar back as it came".
+- **Right-click in drop-downs**: Qt's QMenu runs a command on a right release; its
+  QContextMenuEvent comes on the press (X11) or after the release (Windows). `_MenuOptions`
+  swallows right press/release over a command and opens the options once (`_open_once`, 0.5 s),
+  a context event without a right press (keyboard menu key, the old test's synthetic event)
+  opens them too.
+- **Interface size** (Luca's idea mid-round): `interface_scale.at_start()` from Init.py (module
+  Init.py runs inside App::Application::init, before Gui::Application::runApplication makes the
+  QApplication) sets `QT_SCALE_FACTOR` from Mod/Fission180/InterfaceSize (75-150 %), unless the
+  person set QT_SCALE_FACTOR; Preferences > General > Appearance, restart=True. Checked on the
+  AppImage: 75 -> devicePixelRatio 0.75, none -> 1.0. The GUI harness pins QT_SCALE_FACTOR=1
+  (gui_env.sh), so it never changes the tests; at 0.75 the harness's pointer check was 1 px off
+  (Qt rounds): `_warp` now allows 1 px at a fractional ratio (exact at 1). RESULTS_AT_75
+- Tests: unit 2896 OK; AppImage with the new AppRun: ribbon_luca_linux (A outline, B narrow +
+  every tab at full width, C unpin Shell, D real right-click, E Interface size), ribbon_customize
+  57, ribbon_sweep 222, home_screen 71, doc_tabs_top 17, sketch_trim_after_spline 122,
+  sketch_spline_luca 246, sketch_feature_options 60, sketch_mirror_dialog 155,
+  marking_menu_command 31 (all PASS).
 
 ### Session log: Fourth round, patch 0.1.0-beta.3.3.4 (`develop`, 2026-11-06)
 
