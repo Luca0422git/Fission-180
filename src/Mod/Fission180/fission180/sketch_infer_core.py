@@ -56,6 +56,13 @@ TOOLS = {
     "Sketcher_CreateHeptagon": "polygon",
     "Sketcher_CreateOctagon": "polygon",
     "Sketcher_CreateRegularPolygon": "polygon",
+    # FreeCAD's spline tools: each click places a point (Luca, 2026-11-05: "spline just
+    # does not snap. all the other tools do")
+    "Sketcher_CreateBSpline": "spline",
+    "Sketcher_CreateBSplineByInterpolation": "spline",
+    "Sketcher_CreatePeriodicBSpline": "spline",
+    "Sketcher_CreatePeriodicBSplineByInterpolation": "spline",
+    "Sketcher_CompCreateBSpline": "spline",
 }
 # clicked points per shape: line start/end; rectangle two corners (or centre + corner);
 # circle centre + rim point (or three rim points); arc centre + start (its end is on the
@@ -71,6 +78,7 @@ POINTS = {
     "arc3": 3,
     "slot": 2,
     "polygon": 2,
+    "spline": 10**6,  # as many points as are clicked, each snapped like any other
 }
 # shapes whose second point is the end of a direction from the first (level / upright /
 # perpendicular apply, and the constraint goes on a line of the shape)
@@ -1203,6 +1211,8 @@ def tool_kind(recorded, polylines):
     FreeCAD's own toolbar): then what the preview shows. No preview: the record."""
     if recorded is None:
         return None
+    if recorded == "spline":
+        return recorded  # its preview (a curve through the points) looks like anything
     shown = preview_kind(polylines)
     if shown is None or shown in PREVIEWS.get(recorded, ()):
         return recorded

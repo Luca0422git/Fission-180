@@ -47,6 +47,23 @@ note says "30 mm does not fit: limited to 17.11 mm" (typed) or "Largest that fit
 on the used-up side is a reference (the side fixes it). Scenarios `modeling2_sketch` (2),
 `sketch2_fillet` (B).
 
+## Luca's fourth round (patch 0.1.0-beta.3.3.4, `develop`, 2026-11-06)
+
+Source: Luca on 0.1.0-beta.3.3.3 (four screenshots: Trim on a rectangle's top under a
+control-point spline that ends on the line 15 mm short of the corner; after the trim the
+line's new end sits left of the spline's end, the spline's last segment at another angle):
+"THIS IS SUPPOSED TO BE CAD. IT HAS TO BE ACCURATE"; the check then Trim; "spline just does
+not snap"; the Feature Options' selected type was orange. Scenario
+`sketch_trim_after_spline` (his steps, on the Fission 180 AppImage), headless
+`trim_accuracy_check` (unit `test_trim_accuracy_freecad`).
+
+| Fusion (source) | Fission 180 before | Fission 180 now |
+|---|---|---|
+| Trim removes the piece between the crossing curves and moves nothing else (Autodesk "Trim or extend sketch geometry") | FreeCAD's `trim` stops at every curve, a spline's control-point circles too: the line was cut at the end pole's circle (x = 44 for a spline ending at 45) and its new end tied PointOnObject to that circle; the solve then moved the spline (reproduced headless on the AppImage) | Lines, arcs, circles: `sketch_modify_tools._trim_exact` splits at the piece's exact ends with FreeCAD's `split` (exact, its constraint transfer), deletes the piece (FreeCAD's delete keeps corners joined), joins each end left to the crossing curve: Coincident on that curve's end when it ends there (`cut_at`), else PointOnObject, the stale PointOnObject dropped. Other curves: FreeCAD's trim + leftovers. Every trim: `snapshot` / `moved_curves` (by geometry tag; a spline's knot points FreeCAD makes anew are matched by place) to 1e-6 mm, else `TrimRefused` (the undo step is aborted, a note says so). 40 headless checks: spline ending on the line, corner to corner, fit spline, circle between lines, dimensioned line |
+| Spline points snap like every sketch point (ends, midpoints, centres, intersections, inference lines) | FreeCAD's spline tools were not in `sketch_infer_core.TOOLS`: no Fission 180 snap, dot or guide; only FreeCAD's 5-pixel pick | Kind "spline" (every click a point, no direction); a spline started another way is told by FreeCAD's spline panel; after each click the point / control circle centre is moved exactly onto the snap (`_spline_exact`, in the spline's undo step; no constraint of ours then: FreeCAD adds its own at the end, two would be redundant); once the spline exists its ends that snapped onto something get the right tie (`_spline_ties`: Coincident on a point, FreeCAD's PointOnObject on a line through it dropped; checked, redundant ones not added). A spline's control circles are no snap target for any tool (their quadrants and crossings mean nothing; a fit point snapped onto one broke FreeCAD's next spline) |
+| Fusion's palette colours: blue for the current choice | The selected type was orange (#f5a142) | The theme's blue (#3fa9f5) |
+| Any tool replaces the running one | Not reproduced (the ribbon button, T and the right-click menu start Trim after the check, with FreeCAD's tool making the spline and with Fission 180 making it) | `sketch_draw.run` and `give_way` also stop FreeCAD's tool when its spline panel shows (its pointer may not be on the view) |
+
 ## Luca's third round (patch 0.1.0-beta.3.3.3, `develop`, 2026-11-05)
 
 Source: Luca on 0.1.0-beta.3.3.2 (Windows): OK in the right-click menu still lost the spline

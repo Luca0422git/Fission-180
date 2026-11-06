@@ -30,6 +30,7 @@ changed from Qt timers (never from pivy callbacks).
 """
 
 import math
+import time
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -1248,7 +1249,7 @@ class SketchSession:
             sketch_pick_ui.stop_waiting()
         except Exception as exc:
             warn("sketch tool: %s" % exc)
-        if not self.tool_running() and not self._spline_in_progress():
+        if not self.tool_running() and not self._spline_in_progress() and not self._spline_panel_shown():
             return
         kept = []
         try:
@@ -1298,6 +1299,10 @@ class SketchSession:
             panel = getattr(self, "_tool_panel", None)
             if panel is None or not _is_valid(panel):
                 panel = None
+                now = time.time()
+                if now - getattr(self, "_tool_panel_looked", 0.0) < 0.5:
+                    return False  # (looked a moment ago: not on every mouse move)
+                self._tool_panel_looked = now
                 main = Gui.getMainWindow()
                 for widget in main.findChildren(QtWidgets.QWidget):
                     if widget.metaObject().className() == "SketcherGui::TaskSketcherTool":

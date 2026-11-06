@@ -40,8 +40,8 @@ STYLE = """
 #Fission180SketchPalette QToolButton[role="option"] { background: #4a5568; border: 1px solid #56606f;
     border-radius: 2px; padding: 2px; }
 #Fission180SketchPalette QToolButton[role="option"]:hover { background: #56647a; }
-#Fission180SketchPalette QToolButton[role="option"]:checked { background: #f5a142;
-    border: 1px solid #ffc27a; }
+#Fission180SketchPalette QToolButton[role="option"]:checked { background: #3fa9f5;
+    border: 1px solid #8ccbf8; color: #ffffff; }
 #Fission180SketchPalette QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #8a94a3;
     border-radius: 2px; background: #2b313b; }
 #Fission180SketchPalette QCheckBox::indicator:hover { border-color: #3fa9f5; }

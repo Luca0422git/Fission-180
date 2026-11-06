@@ -243,6 +243,8 @@ class Inference:
             self._forward(obj, event, pos, free, nogrid)
         except Exception as exc:
             warn("sketch inference: %s" % exc)
+        if self.kind == "spline" and event.type() == QtCore.QEvent.MouseButtonRelease:
+            QtCore.QTimer.singleShot(0, self._spline_exact)
         if result is not None and event.type() == QtCore.QEvent.MouseMove:
             try:
                 self._check_preview(result, px)
@@ -343,8 +345,17 @@ class Inference:
         from . import recent
 
         last = recent.last()
-        if last is not None:
-            return core.TOOLS.get(last[0])
+        kind = core.TOOLS.get(last[0]) if last is not None else None
+        if kind is None:
+            try:
+                # a spline started some other way (the command search, FreeCAD's own
+                # menus): FreeCAD's spline panel says it is drawing
+                if self.session._spline_panel_shown():
+                    return "spline"
+            except Exception:
+                pass
+        if kind is not None or last is not None:
+            return kind
         return "line" if self.session.line.active else None
 
     def _polylines(self):
@@ -481,7 +492,22 @@ class Inference:
         curves = [("line", (0.0, 0.0), (1.0, 0.0)), ("line", (0.0, 0.0), (0.0, 1.0))]
         curve_geos = [-1, -2]  # the sketch curve of each entry of `curves` (the axes)
         lines = []
+        # a spline's control-point circles (FreeCAD's helpers, InternalAlignment) are no
+        # curves to snap to: their rims, quadrants and crossings mean nothing (Fusion's
+        # spline has none); a point snapped onto one broke FreeCAD's next spline
+        helpers = set()
+        for c in sketch.Constraints:
+            try:
+                if c.Type == "InternalAlignment" and c.First >= 0:
+                    helpers.add(c.First)
+            except Exception:
+                continue
+        helper_circles = {
+            i for i in helpers if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
+        }
         for i, geo in enumerate(sketch.Geometry):
+            if i in helper_circles:
+                continue
             try:
                 construction = bool(sketch.getConstruction(i))
             except Exception:
@@ -500,7 +526,8 @@ class Inference:
         self._cache = (verts, curves, lines, keyed)
         items = [("point", -1, (0.0, 0.0))]  # the origin (FreeCAD's point -1, 1)
         for i, geo in enumerate(sketch.Geometry):
-            items.append(describe(i, geo))
+            if i not in helper_circles:
+                items.append(describe(i, geo))
         for k, geo in enumerate(external):
             items.append(describe(-3 - k, geo))
         self._items = [item for item in items if item is not None]
@@ -528,7 +555,13 @@ class Inference:
         if step == 0:
             self.current = {"points": []}
             self.placed = []
-        if step is not None:
+        if self.kind == "spline":
+            # FreeCAD adds the point (or control circle) at the click and makes the curve
+            # only at the end: the point is made exact right after the click instead
+            if result is not None and not ctrl:
+                self._spline_pending = (result, self.session.sketch.GeometryCount, px)
+                QtCore.QTimer.singleShot(0, self._spline_exact)
+        elif step is not None:
             self.current["points"].append((result, px))
         point = None
         if result is not None:
@@ -597,6 +630,50 @@ class Inference:
                 snap.SetBool("SnapToGrid", True)
             if saved.get("auto") and not sketch_vp.Autoconstraints:
                 sketch_vp.Autoconstraints = True
+
+    def _spline_exact(self):
+        """The spline point just placed (FreeCAD's construction point, or the centre of
+        its control circle) goes exactly where it snapped (the pixel FreeCAD got is about
+        0.1 mm coarse). Only moved: FreeCAD ties it itself to the point or curve it lit up
+        under that pixel, when it makes the spline (a tie of ours too would be the same
+        constraint twice: "Unexpected Redundancy/Conflicting constraint"). In the
+        spline's own undo step (sketch_mode.open_spline_step). Runs after the press and
+        after the release (the point is added by one of them)."""
+        pending = getattr(self, "_spline_pending", None)
+        if pending is None:
+            return
+        session = self.session
+        try:
+            if session.closed:
+                self._spline_pending = None
+                return
+            result, before, px = pending
+            sketch = session.sketch
+            count = sketch.GeometryCount
+            if count <= before:
+                return  # not added yet (the release adds it): tried again then
+            self._spline_pending = None
+            i = count - 1
+            g = sketch.Geometry[i]
+            if not sketch.getConstruction(i) or g.TypeId not in ("Part::GeomPoint", "Part::GeomCircle"):
+                return
+            pos = 1 if g.TypeId == "Part::GeomPoint" else 3
+            at = (g.X, g.Y) if pos == 1 else (g.Center.x, g.Center.y)
+            target = result.point
+            if px and core.dist(at, target) > 3.0 * px:
+                return  # FreeCAD put it somewhere else (its own snap): left as it is
+            if core.dist(at, target) > 1e-9:
+                sketch.moveGeometry(i, pos, App.Vector(target[0], target[1], 0), False)
+                sketch.solve()
+            if result.snap is not None:
+                # remembered for the spline's ends once it is made (_spline_ties)
+                snaps = getattr(self, "_spline_snaps", None) or []
+                snaps.append((target, result.snap))
+                self._spline_snaps = snaps[-200:]
+            self.invalidate()
+        except Exception as exc:
+            self._spline_pending = None
+            warn("sketch inference: spline point: %s" % exc)
 
     # -- after a click -----------------------------------------------------------------
     def commit_signal(self, kind):
@@ -719,11 +796,62 @@ class Inference:
                 for i in new:
                     for pos in VERTEX_POSITIONS.get(geos[i].TypeId, ()):
                         self.tool_points.append((i, pos))
+            if getattr(self, "_spline_snaps", None):
+                self._spline_ties(new, geos)
             if not pending:
                 return
             self._apply_shape(new, geos, pending[-1])
         except Exception as exc:
             warn("sketch inference: %s" % exc)
+
+    def _spline_ties(self, new, geos):
+        """A spline was made (by FreeCAD's tool, or by Fission 180 from its points:
+        sketch_spline.build): each end of it that was snapped onto something is joined to
+        it as the other tools' points are (_snap_constraints): onto a sketch point,
+        Coincident (FreeCAD may have put a PointOnObject on a line through the point
+        instead, or nothing); onto a line's middle, Symmetric; onto a curve, PointOnObject.
+        Glued to the spline's undo step (INFER_STEP)."""
+        spline = None
+        for i in reversed(new):
+            if geos[i].TypeId == "Part::GeomBSplineCurve":
+                spline = i
+                break
+        if spline is None:
+            return
+        snaps, self._spline_snaps = self._spline_snaps, []
+        g = geos[spline]
+        constraints, drops = [], set()
+        sketch = self.session.sketch
+        # the spline's own helpers at its ends (its first / last control circle's centre,
+        # its end knot points): FreeCAD joins those to what was clicked
+        ends_of = {}
+        for c in sketch.Constraints:
+            if c.Type != "InternalAlignment" or c.Second != spline or c.First < 0:
+                continue
+            h = geos[c.First]
+            key = (c.First, 3) if h.TypeId == "Part::GeomCircle" else (c.First, 1)
+            at = _xy(h.Center) if h.TypeId == "Part::GeomCircle" else (h.X, h.Y)
+            ends_of.setdefault(at, []).append(key)
+        for pos, p in ((1, g.StartPoint), (2, g.EndPoint)):
+            end = (p.x, p.y)
+            for target, snap in reversed(snaps):
+                if core.dist(end, target) > 1e-6:
+                    continue
+                keys = [(spline, pos)] + [
+                    k for at, ks in ends_of.items() if core.dist(at, end) < 1e-6 for k in ks
+                ]
+                results = [self._snap_constraints(k, snap, new) for k in keys]
+                if any(not add and not drop for add, drop in results):
+                    break  # joined there already (by FreeCAD, often through a helper)
+                add, drop = results[0]
+                constraints += [c for c in add if c is not None]
+                drops |= drop
+                break
+        if not constraints and not drops:
+            return
+        names = self._transaction(INFER_STEP, [], constraints, (), drops)
+        if names:
+            log("sketch: %s added to the spline's ends (snapped)" % ", ".join(names))
 
     def _repair_self_joins(self, sketch):
         """A Coincident between two points of the same curve (FreeCAD's line tool after

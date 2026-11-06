@@ -8,6 +8,26 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.4
+
+### Fixed
+
+- **Trim moved a spline.** When a spline ended on a line (not on its corner) and you trimmed
+  that line, FreeCAD cut the line where the spline's hidden control-point circle crossed it,
+  not at the spline's end, and tied what was left of the line to that circle, so the spline's
+  end shifted. Trim now cuts lines, arcs and circles exactly where the curves crossing them
+  are, joins what is left to them (to the spline's end itself when it ends there), and after
+  every trim checks that nothing else in the sketch moved, even by a millionth of a
+  millimetre. If something would move, the trim is not done and a note says so.
+- **Spline points did not snap.** The spline tools now snap like the other tools: to ends,
+  middles, centres, quadrants and crossings, to the grid and to the dashed alignment guides,
+  with the snap dot. The point goes exactly there, and the spline's ends are joined to the
+  point they snapped to.
+- **The selected type in Feature Options was orange.** It is the theme's blue now.
+- **Trim after the spline's green check.** Starting a tool after a spline now always stops
+  FreeCAD's spline tool first, even when its pointer is not on the view. (Trim started from
+  the ribbon, with T and from the right-click menu after the check in every test here.)
+
 ## 0.1.0-beta.3.3.3
 
 ### Fixed

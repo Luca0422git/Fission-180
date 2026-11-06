@@ -455,6 +455,16 @@ class OtherTools(unittest.TestCase):
         self.assertEqual(core.tool_kind("arc", circle), "arc")  # an arc starts as a circle
         self.assertEqual(core.tool_kind("polygon", self.RECT), "polygon")  # four sides
         self.assertIsNone(core.tool_kind(None, self.RECT))  # an unknown tool stays unknown
+        # a spline's preview is a curve through its points: it can look like anything
+        self.assertEqual(core.tool_kind("spline", self.RECT), "spline")
+        self.assertEqual(core.tool_kind("spline", [[(0, 0), (1, 1)]]), "spline")
+
+    def test_the_spline_tools_snap(self):
+        # Luca, 2026-11-05: "spline just does not snap. all the other tools do"
+        for name in ("Sketcher_CreateBSpline", "Sketcher_CreateBSplineByInterpolation"):
+            self.assertEqual(core.TOOLS[name], "spline")
+        self.assertGreater(core.POINTS["spline"], 100)  # every click is a point
+        self.assertNotIn("spline", core.DIRECTION)  # no level / upright for a curve
 
     def test_the_preview_point_that_follows_the_pointer(self):
         self.assertEqual(

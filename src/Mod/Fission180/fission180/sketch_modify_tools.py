@@ -94,6 +94,7 @@ class Trim(_CurveTool):
         self.drag_from = None  # sketch point the drag's path continues from
         self.drag_trimmed = 0
         self.drag_open = False
+        self.drag_refused = False  # a drag taken back: its release is not a click
 
     def prompt(self):
         return "click the piece of a curve to remove, or press and drag across several."
@@ -117,6 +118,7 @@ class Trim(_CurveTool):
         self.drag_from = snap.raw
         self.drag_trimmed = 0
         self.drag_open = False
+        self.drag_refused = False
 
     def dragged(self, snap, view):
         """Press and drag: every piece the pointer's path crosses goes (Fusion)."""
@@ -134,6 +136,20 @@ class Trim(_CurveTool):
         self.drag_from = end
         try:
             self.drag_trimmed += self._trim_crossed(start, end)
+        except TrimRefused as exc:
+            # the whole drag is taken back: nothing it did stays (one undo step)
+            self.doc.abortTransaction()
+            self._applying = False
+            self.drag_open = False
+            self.drag_trimmed = 0
+            self.drag_from = None
+            self.drag_refused = True
+            self._geometry = None
+            self.sketch.solve()
+            self.preview.clear()
+            self.say("Trim: %s." % exc)
+            warn("Trim: %s" % exc)
+            return
         except Exception as exc:
             warn("Trim: %s" % exc)
         self.preview.show(guides=[[start, end]])
@@ -176,6 +192,9 @@ class Trim(_CurveTool):
         return done
 
     def released(self, press_snap, snap, moved):
+        if self.drag_refused:
+            self.drag_refused = False
+            return
         if self.drag_open:
             self.drag_open = False
             self._applying = False
@@ -194,12 +213,19 @@ class Trim(_CurveTool):
             self.say("Trim: click on a curve.")
             return
         point = press_snap.raw
+        refused = []
 
         def work():
-            trim_piece(self.sketch, geo, point)
+            try:
+                trim_piece(self.sketch, geo, point)
+            except TrimRefused as exc:
+                refused.append(str(exc))
+                raise
             return True
 
         self._edit("Trim", work)
+        if refused:
+            self.say("Trim: %s." % refused[0])
         self.preview.clear()
 
     def stop(self):
@@ -310,20 +336,250 @@ class Break(_CurveTool):
         self.preview.clear()
 
 
+# -- Trim, exactly ------------------------------------------------------------------------------
+# Luca, 2026-11-05: "when i cut the top of the rectangle with the spline connected to it, the
+# angles of the spline changed slightly on the right ... IT HAS TO BE ACCURATE". FreeCAD's own
+# trim cut the line where a spline's control-point circle crossed it (not at the spline's
+# end) and tied what was left of the line to that circle. Lines, arcs and circles are now
+# cut with FreeCAD's split at the exact points where real curves cross them, the piece goes,
+# and each end left there is joined to the curve that crosses it (Coincident on that curve's
+# end when it ends there, else PointOnObject). And every Trim is checked: if any other curve
+# moved by more than EXACT, nothing is changed (TrimRefused).
+EXACT = 1e-6  # mm
+SPLIT_TYPES = ("Part::GeomLineSegment", "Part::GeomArcOfCircle", "Part::GeomCircle")
+START, END = 1, 2
+
+
+class TrimRefused(Exception):
+    """The trim would have moved other curves: it is not done."""
+
+
+def _signature(g):
+    """Numbers that fix a curve's place and shape (for "did it move")."""
+    if g.TypeId == "Part::GeomPoint":
+        return [(g.X, g.Y)]
+    out = []
+    if hasattr(g, "getPoles"):
+        out += [(p.x, p.y) for p in g.getPoles()]
+        try:
+            out += [(w, 0.0) for w in g.getWeights()]
+        except Exception:
+            pass
+    if hasattr(g, "Center"):
+        out.append((g.Center.x, g.Center.y))
+    for name in ("Radius", "MajorRadius", "MinorRadius"):
+        if hasattr(g, name):
+            out.append((getattr(g, name), 0.0))
+    try:
+        a, b = g.FirstParameter, g.LastParameter
+        for k in range(5):
+            v = g.value(a + (b - a) * k / 4.0)
+            out.append((v.x, v.y))
+    except Exception:
+        pass
+    return out
+
+
+def snapshot(sketch, skip=()):
+    """{tag: (type, signature)} of the sketch's curves but `skip` (FreeCAD keeps a curve's
+    tag when other curves are added, split or deleted; a spline's knot points it may make
+    anew: moved_curves finds those by place)."""
+    out = {}
+    for i, g in enumerate(sketch.Geometry):
+        if i not in skip:
+            out[g.Tag] = (g.TypeId, _signature(g))
+    return out
+
+
+def _same(sig, new, tol):
+    return len(new) == len(sig) and all(
+        abs(a[0] - b[0]) <= tol and abs(a[1] - b[1]) <= tol for a, b in zip(sig, new)
+    )
+
+
+def moved_curves(sketch, before, tol=EXACT):
+    """How many of the curves in `before` (snapshot) are no longer exactly where they were
+    (moved, changed or gone). A curve FreeCAD made anew (a new tag) counts as the same
+    when one of the same type is exactly where it was."""
+    now = {g.Tag: g for g in sketch.Geometry}
+    fresh = [g for tag, g in now.items() if tag not in before]
+    count = 0
+    for tag, (kind, sig) in before.items():
+        g = now.get(tag)
+        if g is not None:
+            if not _same(sig, _signature(g), tol):
+                count += 1
+            continue
+        match = None
+        for k, other in enumerate(fresh):
+            if other.TypeId == kind and _same(sig, _signature(other), tol):
+                match = k
+                break
+        if match is None:
+            count += 1
+        else:
+            fresh.pop(match)
+    return count
+
+
+def _ends(g):
+    """[(pos, point)] of a curve's own ends (none for a closed curve)."""
+    if build._is_closed(g) or not hasattr(g, "StartPoint"):
+        return []
+    return [(START, g.StartPoint), (END, g.EndPoint)]
+
+
+def _on(g, p, tol):
+    try:
+        return (g.value(g.parameter(p)) - p).Length < tol
+    except Exception:
+        return False
+
+
+def cut_at(sketch, geo, carrier, t):
+    """Where the cut at parameter t of curve `geo` is, exactly, and how the end left there
+    joins the curve that crosses it: (point, (other, other_pos) or None). When the crossing
+    curve ends there (a spline ending on a line), the cut is at that end itself and the join
+    is Coincident (other_pos START or END); else PointOnObject on it (other_pos 0)."""
+    p = carrier.value(t)
+    on_curve = None
+    for other, g in build.curves(sketch):
+        if other == geo:
+            continue
+        for pos, q in _ends(g):
+            if (q - p).Length < 1e-6 and _on(carrier, q, 1e-6):
+                return q, (other, pos)
+        if on_curve is None and _on(g, p, 1e-6):
+            on_curve = (other, 0)
+    return p, on_curve
+
+
+def _join(sketch, geo, pos, join):
+    """The end (geo, pos) left by a cut, joined to the curve that crosses there."""
+    import Sketcher
+
+    if join is None:
+        return
+    other, other_pos = join
+    cons = list(sketch.Constraints)
+    if other_pos:
+        for c in cons:
+            if c.Type == "Coincident" and (
+                (c.First, int(c.FirstPos), c.Second, int(c.SecondPos)) in (
+                    (geo, pos, other, other_pos), (other, other_pos, geo, pos))
+            ):
+                return  # joined already
+        # the other curve's end lying on this piece: the Coincident says it (no redundancy)
+        stale = [
+            k for k, c in enumerate(cons)
+            if c.Type == "PointOnObject" and c.First == other and int(c.FirstPos) == other_pos
+            and c.Second == geo
+        ]
+        for k in sorted(stale, reverse=True):
+            sketch.delConstraint(k)
+        sketch.addConstraint(Sketcher.Constraint("Coincident", geo, pos, other, other_pos))
+    else:
+        for c in cons:
+            if c.Type == "PointOnObject" and c.First == geo and int(c.FirstPos) == pos and c.Second == other:
+                return
+        sketch.addConstraint(Sketcher.Constraint("PointOnObject", geo, pos, other))
+
+
+def _index_of(sketch, tag):
+    for i, g in enumerate(sketch.Geometry):
+        if g.Tag == tag:
+            return i
+    return None
+
+
+def _trim_exact(sketch, geo, g, found):
+    """Remove the piece found = (t0, t1, closed) of line / arc / circle `geo` with FreeCAD's
+    split at its exact ends; join what is left to the curves crossing there."""
+    t0, t1, closed = found
+    p0, j0 = cut_at(sketch, geo, g, t0)
+    p1, j1 = cut_at(sketch, geo, g, t1)
+
+    def tag_of_join(join):
+        if join is None or join[0] < 0:
+            return join
+        return ("tag", sketch.Geometry[join[0]].Tag, join[1])
+
+    j0, j1 = tag_of_join(j0), tag_of_join(j1)
+
+    head = tail = None  # (tag, pos) of the ends left at p0 / p1
+    if closed:
+        # a full circle: split at p0 makes one arc from p0 round to p0; split at p1 then
+        # gives [p0, p1] (the piece, at `geo`) and [p1, p0] (kept)
+        sketch.split(geo, p0)
+        sketch.split(geo, p1)
+        rest = sketch.GeometryCount - 1
+        piece = geo
+        tail = (sketch.Geometry[rest].Tag, START)
+        head = (sketch.Geometry[rest].Tag, END)
+    else:
+        first, last = g.FirstParameter, g.LastParameter
+        c0 = t0 > first + 1e-9
+        c1 = t1 < last - 1e-9
+        if not c0 and not c1:
+            sketch.delGeometries([geo])
+            return
+        if c1:
+            sketch.split(geo, p1)  # geo = [first, p1], the new last curve = [p1, last]
+            tail = (sketch.Geometry[sketch.GeometryCount - 1].Tag, START)
+        if c0:
+            sketch.split(geo, p0)  # geo = [first, p0], the new last curve = [p0, ...]
+            piece = sketch.GeometryCount - 1
+            head = (sketch.Geometry[geo].Tag, END)
+        else:
+            piece = geo
+    sketch.delGeometries([piece])
+
+    def resolve(join):
+        if join is None or join[0] != "tag":
+            return join
+        at = _index_of(sketch, join[1])
+        return None if at is None else (at, join[2])
+
+    for end, join in ((head, j0), (tail, j1)):
+        if end is None:
+            continue
+        at = _index_of(sketch, end[0])
+        if at is not None:
+            _join(sketch, at, end[1], resolve(join))
+
+
 def trim_piece(sketch, geo, point):
     """Trim the piece of curve `geo` at `point` as the preview shows it (sketch_build.piece:
-    between the nearest real curves on each side). FreeCAD's own trim also stops at the
-    helper curves of other curves (a spline's control circles: sketch_build.
-    internal_geometry), which left bits at a rectangle's corners under a spline (Luca,
-    2026-11-04); what of the curve is left inside the piece after it is taken away too."""
-    import FreeCAD as App
-
+    between the nearest real curves on each side; a spline's control circles and other
+    helpers never cut: sketch_build.internal_geometry). Lines, arcs and circles are cut
+    exactly (_trim_exact); other curves by FreeCAD's trim, then what of the curve is left
+    inside the piece goes too. Raises TrimRefused when another curve would move: the
+    caller aborts its undo step, so nothing is changed."""
     g = sketch.Geometry[geo]
+    before = snapshot(sketch, skip={geo})
     piece = None
     try:
         piece = build.piece(sketch, geo, point)
     except Exception:
         piece = None
+    if g.TypeId in SPLIT_TYPES and piece is not None:
+        _trim_exact(sketch, geo, g, piece)
+    else:
+        _trim_freecad(sketch, geo, g, point, piece)
+    sketch.solve()
+    moved = moved_curves(sketch, before)
+    if moved:
+        raise TrimRefused(
+            "this piece cannot be removed without moving %d other curve(s); nothing was changed"
+            % moved
+        )
+
+
+def _trim_freecad(sketch, geo, g, point, piece):
+    """FreeCAD's own trim (ellipses, splines...; a whole circle nothing crosses twice),
+    then the bits it left inside the piece (it also stops at helper curves) go."""
+    import FreeCAD as App
+
     carrier = g.copy()
     sketch.trim(geo, App.Vector(point[0], point[1], 0))
     if piece is None or piece[2]:

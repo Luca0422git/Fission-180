@@ -73,6 +73,10 @@ IGNORED_ERRORS = (
     # cannot)
     re.compile(r"<WireJoiner>"),
     re.compile(r"Failed to make face for sketch"),
+    # FreeCAD 1.1.4's SnapManager (snapToObject) reports a projection it cannot make, then
+    # snaps nowhere and goes on: the pointer on the centre of a tiny circle it has lit up
+    # (a spline's control circle). Only this report line; the steps check the result.
+    re.compile(r"<Exception> Geometry\.cpp\(\d+\): GeomAPI_ProjectPointOnCurve::LowerDistanceParameter$"),
     # the harness's own progress line (a step called g1_error is not an error)
     re.compile(r"\[Fission 180\] [\w.-]+ step: \w+ \([\d.]+ s\)"),
 )

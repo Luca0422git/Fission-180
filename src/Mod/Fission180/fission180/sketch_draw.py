@@ -1614,7 +1614,10 @@ def run(tool_class, *args):
         pass
     selection = selected_elements(sketch)
     try:
-        if session.tool_running():
+        # FreeCAD's spline tool goes on after a spline is made (for the next one); its
+        # panel tells it still runs even when its pointer is not on the view (Luca,
+        # 2026-11-05: after the spline's green check Trim would not start)
+        if session.tool_running() or session._spline_panel_shown():
             spline = session.spline_drawn()
             Gui.runCommand("Sketcher_StopOperation")
             if spline:
