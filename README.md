@@ -204,8 +204,13 @@ Updating yourself works too: download the newest installer from the
 [Releases page](https://github.com/Luca0422git/Fission-180/releases) and run it over the old one (your
 settings are in `%APPDATA%\Fission180` and your designs where you saved them, not in the program
 folder), or use the small module-only update described in
-[docs/fission180/quick-update.md](docs/fission180/quick-update.md). On Linux, download the new
-AppImage and replace the old file.
+[docs/fission180/quick-update.md](docs/fission180/quick-update.md).
+
+On Linux, **Update now** replaces the AppImage itself (from 0.1.0-beta.3.3.6 on): the new one
+comes down next to it, is checked, takes its place under the same name when Fission 180 closes,
+and starts. Keep the AppImage in a folder of your own (such as `~/Applications`) so Fission 180
+may change it. By hand: download the new AppImage, make it executable and put it in place of
+the old file.
 
 ## Reporting problems and ideas
 

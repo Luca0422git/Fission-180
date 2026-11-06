@@ -44,8 +44,10 @@ Untick **publish** for a trial run: everything is built and checked, nothing is 
 
 - **Windows, installed or portable:** Update now (Help > Check for Updates, or the update icon
   at the top right). A few MB, about a minute.
-- **Linux AppImage:** an AppImage cannot replace itself; download the new one from the Releases
-  page.
+- **Linux AppImage:** Update now too (from 0.1.0-beta.3.3.6 on): the whole AppImage comes down
+  (a few hundred MB), is checked, and replaces the old file when Fission 180 closes; Fission 180
+  starts again. An AppImage older than 0.1.0-beta.3.3.6, or one in a folder Fission 180 cannot
+  change, opens the Releases page instead: download the new one there.
 - **New people:** the downloads on the patch's page already contain the fix.
 
 ## The first time

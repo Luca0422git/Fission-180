@@ -32,6 +32,7 @@ Test seams (a scenario sets them; never the real internet, never a real quit):
 
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -497,7 +498,7 @@ def install_now():
         if plan["kind"] == "browser":
             _state["answer"] = _box(
                 "Update now",
-                "%s\n\nFission180 %s: the release page has the files." % (plan["reason"], release["version"]),
+                "%s\n\nFission 180 %s: the release page has the files." % (plan["reason"], release["version"]),
                 [("Open the release page", lambda: _open_url(plan["page"])), ("Close", None)],
                 "Fission180UpdateAnswer",
             )
@@ -519,8 +520,26 @@ def _start_download(plan, release):
     if _state["download"] is not None:
         return
     version = release["version"]
-    folder = core.updates_dir(_user_data(), version)
-    dest = os.path.join(folder, plan["asset"])
+    if plan["kind"] == "appimage":
+        # beside the running AppImage: putting it in place is then one rename
+        target = layout().get("target", "")
+        dest = core.appimage_download_path(target)
+        try:
+            free = shutil.disk_usage(os.path.dirname(target)).free
+        except Exception:
+            free = None
+        need = int(plan.get("size") or 0) + 64 * 1024 * 1024
+        if free is not None and plan.get("size") and free < need:
+            _tell(
+                "Update now",
+                "There is not enough free space beside the AppImage for the new one (%s needed, "
+                "%s free). Make some room, then click Update now again. Nothing was changed."
+                % (core.format_size(need), core.format_size(free)),
+            )
+            return
+    else:
+        folder = core.updates_dir(_user_data(), version)
+        dest = os.path.join(folder, plan["asset"])
     shared = {"done": 0, "total": plan.get("size", 0), "cancel": False, "result": None}
     _state["download"] = shared
     _state["dialog"] = _DownloadDialog(plan, version)
@@ -607,6 +626,15 @@ def _hand_over(plan, path, version):
         return
     where = layout()
     script = ""
+    env = None
+    if plan["kind"] == "appimage":
+        target = where.get("target", "")
+        if not target or os.path.dirname(target) != os.path.dirname(path):
+            raise ValueError("the new AppImage is not beside the running one")
+        argv = core.appimage_handover_argv(os.getpid(), path, target)
+        env = core.restart_environment(os.environ)
+        _hand_over_run(plan, path, version, argv, env)
+        return
     if plan["kind"] == "module":
         module = os.path.join(os.path.dirname(path), "module")
         core.safe_extract(path, module)
@@ -618,9 +646,15 @@ def _hand_over(plan, path, version):
     argv = core.handover_argv(
         plan["kind"], os.getpid(), target=where.get("home", ""), script=script, installer=path
     )
+    _hand_over_run(plan, path, version, argv, env)
+
+
+def _hand_over_run(plan, path, version, argv, env):
+    """Start the helper that carries on after Fission 180 quits, then quit (FreeCAD asks
+    about unsaved designs). Cancel there: the helper is stopped, nothing changes."""
     _set("String", "UpdateJustInstalled", version)
     try:
-        proc = (HAND_OVER or _start_detached)(argv)
+        proc = HAND_OVER(argv) if HAND_OVER is not None else _start_detached(argv, env)
     except Exception:
         _set("String", "UpdateJustInstalled", "")
         raise
@@ -635,19 +669,31 @@ def _hand_over(plan, path, version):
             except Exception:
                 pass
         _state["proc"] = None
+        if plan["kind"] == "appimage":
+            core._remove(path)  # (the new AppImage beside the old one: a large file)
         log("update: stopped, Fission 180 stays open")
         _tell("Update now", "The update was stopped, Fission 180 stays open. Nothing was changed.")
 
 
-def _start_detached(argv):
-    """The helper outlives Fission 180: its own process group, no console window (Windows)."""
-    flags = 0
+def _start_detached(argv, env=None):
+    """The helper outlives Fission 180: its own process group, no console window (Windows);
+    its own session (Linux: it is not ended with Fission 180's)."""
     if sys.platform.startswith("win"):
         flags = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
+        return subprocess.Popen(
+            argv,
+            creationflags=flags,
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     return subprocess.Popen(
         argv,
-        creationflags=flags,
+        start_new_session=True,
         close_fds=True,
+        env=env,
+        cwd=os.path.expanduser("~"),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -684,7 +730,13 @@ class _DownloadDialog(QtWidgets.QDialog):
         self.status = QtWidgets.QLabel("Starting...")
         self.status.setObjectName("Fission180UpdateStatus")
         column.addWidget(self.status)
-        if plan["kind"] == "installer":
+        if plan["kind"] == "appimage":
+            note = QtWidgets.QLabel(
+                "The download is checked against its checksum, then Fission 180 closes (it asks "
+                "about unsaved designs), puts the new AppImage in place of this one and starts "
+                "again. Your menu entry and shortcuts keep working."
+            )
+        elif plan["kind"] == "installer":
             note = QtWidgets.QLabel(
                 "When the installer opens, Windows may say \"Windows protected your PC\" "
                 "(Fission 180 is not signed with a paid certificate). Click More info, then Run "

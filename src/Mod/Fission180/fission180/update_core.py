@@ -8,7 +8,9 @@ What it does (brief docs/fission180/dev/briefs/beta-release.md, R3):
     (Stable only / Betas too), through version_core (the one place that orders versions),
   * reads the release's ``fission180-release.json`` (core id, file names, SHA-256 hashes),
   * decides how to install it (plan): the small module update when the compiled part
-    (the "core") is the same, the full installer otherwise, the browser on Linux,
+    (the "core") is the same, the full installer otherwise; on Linux the new AppImage in
+    place of the running one (Luca, 2026-11-06: "theres got to be a better way ... i dont
+    think i would be very happy with having to open the terminal every time"),
   * downloads a file and checks its SHA-256.
 
 Every network call has a timeout and runs on a worker thread (update_ui); the base address
@@ -322,10 +324,14 @@ def check(installed_version, channel, get=None):
 
 
 # -- how to install ------------------------------------------------------------------------
-def detect_layout(platform_name, home, environ=None, exists=os.path.exists):
+def detect_layout(platform_name, home, environ=None, exists=os.path.exists, writable=None):
     """What kind of Fission 180 this is: {"os": "windows" | "linux" | "other", "kind":
     "installed" | "portable" | "appimage" | "linux" | "other", "home": folder}.
-    ``home`` is the program's folder (App.getHomePath())."""
+    ``home`` is the program's folder (App.getHomePath()). An AppImage also has "target"
+    (the AppImage file, $APPIMAGE) and "writable" (its folder can be written: writable(folder),
+    os.access by default)."""
+    if writable is None:
+        writable = lambda folder: os.access(folder, os.W_OK)  # noqa: E731
     environ = os.environ if environ is None else environ
     name = str(platform_name or "").lower()
     home = str(home or "")
@@ -337,7 +343,18 @@ def detect_layout(platform_name, home, environ=None, exists=os.path.exists):
         under = any(p and home.lower().replace("/", "\\").startswith(p.lower()) for p in program_files)
         return {"os": "windows", "kind": "installed" if under else "portable", "home": home}
     if name.startswith("linux"):
-        return {"os": "linux", "kind": "appimage" if environ.get("APPIMAGE") else "linux", "home": home}
+        appimage = environ.get("APPIMAGE") or ""
+        if appimage:
+            folder = os.path.dirname(appimage)
+            return {
+                "os": "linux",
+                "kind": "appimage",
+                "home": home,
+                "target": appimage,
+                # the new AppImage is put in place of this one: its folder must be ours
+                "writable": bool(writable(folder)) if writable is not None else True,
+            }
+        return {"os": "linux", "kind": "linux", "home": home}
     return {"os": "other", "kind": "other", "home": home}
 
 
@@ -350,8 +367,11 @@ def plan(installed, release, layout):
       module     the small download that replaces Mod\\Fission180 (same core, Windows installed
                  or portable build);
       installer  the full installer (a different core, or no module file);
-      browser    nothing is installed from here (Linux, no verifiable file): the release
-                 page opens."""
+      appimage   the new AppImage, put in place of the running one (same path: menu entries
+                 and shortcuts keep working), then Fission 180 starts again (Linux);
+      browser    nothing is installed from here (no verifiable file, a Linux build that is
+                 no AppImage, an AppImage in a folder that is not ours): the release page
+                 opens."""
     page = (release.get("manifest") or {}).get("notes_url") or release.get("page") or releases_page()
     out = {"kind": "browser", "asset": "", "url": "", "sha256": "", "size": 0, "page": page, "reason": ""}
     manifest = release.get("manifest")
@@ -370,12 +390,29 @@ def plan(installed, release, layout):
         return None
 
     if layout.get("os") != "windows":
-        if layout.get("kind") == "appimage":
-            out["reason"] = (
-                "The AppImage cannot replace itself: download the new AppImage and replace the old one."
-            )
-        else:
+        if layout.get("kind") != "appimage":
             out["reason"] = "Download the new version from the release page."
+            return out
+        if manifest is None:
+            out["reason"] = "This release has no checksum file, so it is not installed from here."
+            return out
+        if not layout.get("writable", True):
+            folder = os.path.dirname(layout.get("target", "")) or "its folder"
+            out["reason"] = (
+                "Fission 180 cannot change %s (no permission there). Move the AppImage into a "
+                "folder of your own, such as ~/Applications, and Update now works from then on."
+                % folder
+            )
+            return out
+        found = pick("appimage")
+        if found:
+            out.update(
+                found,
+                kind="appimage",
+                reason="The new AppImage is put in place of this one, then Fission 180 starts again.",
+            )
+            return out
+        out["reason"] = "This release has no AppImage, so it is not installed from here."
         return out
     if manifest is None:
         out["reason"] = "This release has no checksum file, so it is not installed from here."
@@ -526,6 +563,67 @@ def handover_argv(kind, pid, target="", script="", installer=""):
         "Start-Process -FilePath %s" % (int(pid), _ps_quote(installer))
     )
     return common + ["-Command", command]
+
+
+def appimage_download_path(target):
+    """Where the new AppImage comes down: beside the running one, hidden (same folder, so
+    putting it in place is one rename, never a copy of the whole file)."""
+    folder, name = os.path.split(target)
+    return os.path.join(folder, "." + name + ".update")
+
+
+# The helper that carries on after Fission 180 quits (Linux AppImage): it waits for the old
+# process to end (15 minutes at most), puts the new AppImage in place of the old one (a
+# rename: the running program keeps reading the old file until it has ended) and starts it.
+# The paths are arguments, never part of the script: nothing in them is ever run.
+APPIMAGE_HANDOVER = (
+    'pid="$1"; new="$2"; target="$3"; n=0; '
+    'while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 3000 ]; do sleep 0.3; n=$((n+1)); done; '
+    'chmod 755 "$new" && mv -f "$new" "$target" && exec "$target"'
+)
+
+
+def appimage_handover_argv(pid, new, target):
+    """The command that replaces the AppImage after Fission 180 quits and starts it again."""
+    return ["/bin/sh", "-c", APPIMAGE_HANDOVER, "fission180-update", str(int(pid)), new, target]
+
+
+# What the AppImage's runtime and its AppRun set for this run (they point into this run's
+# mount, which goes when it ends); the new AppImage sets them again for itself.
+_RUN_ONLY = (
+    "APPDIR", "APPIMAGE", "ARGV0", "OWD", "PREFIX", "PYTHONHOME", "PYTHONPATH",
+    "PATH_TO_FREECAD_LIBDIR", "SSL_CERT_FILE", "GIT_SSL_CAINFO",
+)  # fmt: skip
+
+
+def restart_environment(environ):
+    """The environment for the Fission 180 started after an update: this one, without what the
+    AppImage's runtime and AppRun set for this run, without the libdrm preload AppRun adds
+    (it adds it again), and without the interface size Fission 180 itself set (Init.py:
+    interface_scale; the new run reads the setting again)."""
+    env = dict(environ)
+    mount = env.get("APPDIR", "")
+    prefix = env.get("PREFIX", "").rstrip("/")
+    if not mount and prefix.endswith("/usr") and len(prefix) > 4:
+        mount = prefix[:-4]  # (AppRun's own PREFIX=<the AppImage's folder>/usr, when no runtime set APPDIR)
+    for name in _RUN_ONLY:
+        env.pop(name, None)
+    if mount:
+        for name in [k for k, v in env.items() if mount in v]:
+            parts = env[name].split(":")
+            kept = [part for part in parts if mount not in part]
+            if len(parts) > 1 and kept:  # a list (PATH, XDG_DATA_DIRS): only this run's entries go
+                env[name] = ":".join(kept)
+            else:
+                env.pop(name, None)
+    preload = [p for p in env.get("LD_PRELOAD", "").split(":") if p and "/libdrm" not in p]
+    if preload:
+        env["LD_PRELOAD"] = ":".join(preload)
+    else:
+        env.pop("LD_PRELOAD", None)
+    if env.pop("FISSION180_SET_QT_SCALE", None):
+        env.pop("QT_SCALE_FACTOR", None)
+    return env
 
 
 # -- when ----------------------------------------------------------------------------------

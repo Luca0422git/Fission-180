@@ -29,7 +29,10 @@ P10 A different core (the program itself changed): the full installer; the dialo
 P11 A command still open: Update now says to finish it first and downloads nothing.
 P12 Cancel at "save your changes?" (the quit says no): the helper is stopped, the update is off.
 P13 After the update: "Updated to 0.1.0-beta." once, What's new opens the notes, Dismiss hides it.
-P14 Linux (the AppImage cannot replace itself): the release page and one line of what to do.
+P14 Linux AppImage: Update now downloads the new AppImage beside the running one, checks it, and
+    the hand-over (a plain shell) waits for Fission 180 to quit, puts it in place of the old one
+    and starts it; Cancel at "save your changes?" removes the download. An AppImage in a folder
+    Fission 180 cannot change: the release page and one line of what to do.
 P15 Preferences > General > Updates: the two options, their defaults, and they work.
 P16 The update icon in the top bar (top right, left of the search button, like Fusion's): hidden
     while nothing newer is known, shown (lit, on the real screen) when the check finds a newer
@@ -832,23 +835,93 @@ def p13_updated_to():
 
 
 # -- P14 -------------------------------------------------------------------------------------
+def appimage_layout(writable=True):
+    """A Linux AppImage install: the AppImage file in a folder of the test's own."""
+    import tempfile
+
+    folder = tempfile.mkdtemp(prefix="fission180 apps ")  # (a space, as a real folder may have)
+    target = os.path.join(folder, "Fission180.AppImage")
+    with open(target, "wb") as handle:
+        handle.write(b"the AppImage that runs now")
+    s.setdefault("temp", []).append(folder)
+    return dict(APPIMAGE, target=target, writable=writable)
+
+
 def p14_linux_appimage():
+    from fission180 import update_core, update_ui
+
+    reset_state()
+    where = appimage_layout()
+    update_ui.LAYOUT = where
+    target = where["target"]
+    fake = s["fake"]
+    names = fake.publish("0.1.0-beta.10", core="newcore", appimage=True, extra_kb=1200)
+    auto_check()
+    h.check("P14 the line is there", line_text() == "Fission 180 0.1.0-beta.10 is available.", line_text())
+    fake.slow = True
+    press_update_now()
+    wait_for(lambda: update_ui._state["dialog"] is not None, 5)
+    dialog = update_ui._state["dialog"]
+    h.check("P14 a download dialog opens (no box saying to go to the website)", dialog is not None and answer() is None)
+    if dialog is not None:
+        note = dialog.findChild(QtWidgets.QLabel, "Fission180UpdateNote")
+        h.check("P14 it says the AppImage is replaced and Fission 180 starts again", note is not None and "in place of this one" in note.text() and "starts" in note.text(), note.text() if note else "")
+        h.shot("download_appimage")
+    h.check("P14 the hand-over is called once the file is in", wait_for(lambda: bool(s["handed"]), 25))
+    new = update_core.appimage_download_path(target)
+    h.check("P14 the new AppImage came down beside the old one", os.path.isfile(new), files_in(os.path.dirname(target)))
+    expected = fake.files["/dl/" + names["appimage"]]
+    h.check("P14 it is the file GitHub has (checksum)", os.path.isfile(new) and update_core.verify(new, hashlib.sha256(expected).hexdigest()))
+    h.check("P14 the running AppImage is not touched yet", open(target, "rb").read() == b"the AppImage that runs now")
+    h.check("P14 only the AppImage came down (not the Windows files)", fake.count("/dl/Fission180_v0.1.0-beta.10-Windows") == 0 and fake.count("/dl/Fission180-quick-update") == 0)
+    if s["handed"]:
+        argv = s["handed"][0]
+        h.check("P14 the hand-over is the AppImage one", argv == update_core.appimage_handover_argv(os.getpid(), new, target), argv)
+        h.check("P14 ... a plain shell, waiting for this very process", argv[:2] == ["/bin/sh", "-c"] and argv[4] == str(os.getpid()), argv)
+    h.check("P14 Fission 180 was asked to quit (once)", s["quit"] == [1], s["quit"])
+    h.check("P14 the update is remembered for 'Updated to'", group().GetString("UpdateJustInstalled", "") == "0.1.0-beta.10")
+    h.check("P14 no stray download is left", not [f for f in files_in(os.path.dirname(target)) if f.endswith(".part")])
+
+
+def p14_cancel_at_save_your_changes():
+    """Cancel at "save your changes?": the new AppImage (a large file) does not stay behind."""
+    from fission180 import update_core, update_ui
+
+    s["handed"].clear()
+    s["quit"].clear()
+    s["quit_answer"] = False
+    s["helper"].terminated = False
+    target = update_ui.LAYOUT["target"]
+    press_update_now()
+    wait_for(lambda: bool(s["handed"]), 25)
+    wait_for(lambda: answer() is not None, 5)
+    h.check("P14 the helper was stopped", s["helper"].terminated)
+    h.check("P14 the downloaded AppImage was removed", not os.path.exists(update_core.appimage_download_path(target)), files_in(os.path.dirname(target)))
+    h.check("P14 the running AppImage is as it was", open(target, "rb").read() == b"the AppImage that runs now")
+    h.check("P14 the update is not remembered as under way", group().GetString("UpdateJustInstalled", "") == "")
+    close_answer()
+    s["quit_answer"] = True
+
+
+def p14_a_folder_fission_180_cannot_change():
     from fission180 import update_ui
 
     reset_state()
-    update_ui.LAYOUT = dict(APPIMAGE)
+    where = appimage_layout(writable=False)
+    update_ui.LAYOUT = where
     fake = s["fake"]
-    fake.publish("0.1.0-beta.10", core="testcore")
+    fake.publish("0.1.0-beta.11", core="testcore", appimage=True)
     auto_check()
     press_update_now()
     wait_for(lambda: answer() is not None, 5)
     box = answer()
     h.check("P14 a box answers", box is not None)
     if box is not None:
-        h.check("P14 it says to replace the old AppImage", "replace the old one" in box.text(), box.text())
+        h.check("P14 it says to move the AppImage to a folder of one's own", "no permission" in box.text() and "~/Applications" in box.text(), box.text())
+        h.shot("appimage_no_permission")
         w.click(box_button(box, "Open the release page"))
         wait_for(lambda: bool(s["opened"]), 3)
-    h.check("P14 the release page opens", s["opened"] and s["opened"][-1].endswith("/releases/tag/fission180-v0.1.0-beta.10"), s["opened"])
+    h.check("P14 the release page opens", s["opened"] and s["opened"][-1].endswith("/releases/tag/fission180-v0.1.0-beta.11"), s["opened"])
     h.check("P14 nothing was downloaded or handed over", not s["handed"] and fake.count("/dl/Fission180") == 0)
     close_answer()
     update_ui.LAYOUT = dict(WINDOWS)
@@ -934,6 +1007,10 @@ def teardown():
         s["fake"].stop()
     except Exception:
         pass
+    import shutil
+
+    for folder in s.get("temp", []):
+        shutil.rmtree(folder, ignore_errors=True)
     h.check("the real GitHub is the default address again", update_core.API_BASE.startswith("https://api.github.com"))
 
 
@@ -968,6 +1045,8 @@ h.run(
         p12_cancel_at_save_your_changes,
         p13_updated_to,
         p14_linux_appimage,
+        p14_cancel_at_save_your_changes,
+        p14_a_folder_fission_180_cannot_change,
         p15_open_preferences,
         p15_the_updates_group,
         p15_switch_off_and_stable,

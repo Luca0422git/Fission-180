@@ -4,6 +4,17 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-06 (night): patch 0.1.0-beta.3.3.6, Linux AppImage updates itself, on `develop`**
+(Luca: "wait it doesnt auto update on linux? ... i dont think i would be very happy with having
+to open the terminal every time i push a new fix"; session log "AppImage self-update").
+Status: [x] Update now on an AppImage: download beside it, checksum, quit, detached /bin/sh
+swaps the file and starts it (update_core.plan kind "appimage", APPIMAGE_HANDOVER,
+restart_environment; update_ui) [x] unit + real hand-over checks [x] update_check P14 (170
+checks, stock FreeCAD and the AppImage) [x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.6,
+CHANGELOG, README, briefs, AI docs [ ] "Fission 180 tests" green [ ] **Luca: patch release**
+(Luca's own AppImage, 3.3.5 or older, cannot replace itself: he downloads 3.3.6 by hand ONCE,
+then Update now does it).
+
 **2026-11-06 (later): patch 0.1.0-beta.3.3.5, Luca on Linux, on `develop`** (Luca installed
 3.3.4 on CachyOS, KDE Plasma Wayland, AMD Radeon 680M: the AppImage aborted, "Could not
 initialize GLX"; once in: "a line where the main dialogue box appears", "the toolbar doesnt
@@ -14,7 +25,9 @@ leaves AppRun out) [x] no frame on the Tasks area [x] ribbon fits narrow windows
 [x] any command unpinnable (ribbon_pins #off) [x] right-click in drop-downs = options
 [x] Interface size (Preferences > General > Appearance; Init.py sets QT_SCALE_FACTOR)
 [x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.5, CHANGELOG, core-patches #12, AI docs
-[ ] "Fission 180 tests" green [ ] **Luca: patch release** (Linux: download the new AppImage).
+[x] "Fission 180 tests" #18 green on `79b95bad` [x] Luca started the patch release (run #7,
+2026-11-06 23:44 UTC; it pins develop's commit at its start, so the 3.3.6 push below does not
+change it).
 
 **2026-11-06: patch 0.1.0-beta.3.3.4, Luca's fourth round, on `develop`** (Luca on 3.3.3:
 "when i cut the top of the rectangle with the spline connected to it, the angles of the
@@ -1930,6 +1943,39 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: AppImage self-update, patch 0.1.0-beta.3.3.6 (`develop`, 2026-11-06)
+
+- **Why it was not there**: an AppImage's mount is read-only, so 3.3.5 and older open the
+  release page. But the AppImage FILE (`$APPIMAGE`, set by the type-2 runtime with APPDIR,
+  ARGV0, OWD) can be replaced while it runs: the mounted old inode stays until the old run
+  ends. So: `detect_layout` gives `{"kind": "appimage", "target": $APPIMAGE, "writable":
+  os.access(folder, W_OK)}`; `plan` gives kind "appimage" when the release's manifest has an
+  `appimage` role (make_release_files / the patch workflow put it there), else the release
+  page (no manifest, no AppImage, or a folder we cannot write: the box says to move it to
+  ~/Applications). Module-only updates were considered (FreeCADInit lets a user-dir Mod
+  override the bundled one) and rejected: a stale override would shadow a newer AppImage.
+- **Download** to `<folder>/.<name>.update` (same folder: the swap is one rename; free space
+  checked, size + 64 MB). **Hand-over**: `/bin/sh -c APPIMAGE_HANDOVER fission180-update <pid>
+  <new> <target>`: waits (kill -0, up to 15 min) for this process, `chmod 755`, `mv -f`,
+  `exec` the target; started with `start_new_session=True`, cwd ~, and
+  `restart_environment(os.environ)`: no APPDIR/APPIMAGE/ARGV0/OWD/PREFIX/PYTHONHOME/PYTHONPATH/
+  PATH_TO_FREECAD_LIBDIR/SSL_CERT_FILE/GIT_SSL_CAINFO, entries under the mount taken out of
+  lists (PATH holds every bundled Mod folder: FreeCADInit adds them), other variables pointing
+  into it dropped, the libdrm preload AppRun adds removed (the person's own preload kept), and
+  the interface size Fission 180 set (`FISSION180_SET_QT_SCALE` marks it, interface_scale)
+  dropped, so the new run reads the setting again. Without APPDIR (AppRun run from an unpacked
+  folder) the mount comes from AppRun's PREFIX (<dir>/usr). Cancel at "save your changes?":
+  helper stopped, the downloaded AppImage removed.
+- **Checked**: unit (72 in test_update_core + test_interface_scale; a real /bin/sh hand-over
+  with a target name holding a space and a quote); update_check P14 (download dialog note,
+  file beside the target with the right checksum, hand-over argv, quit, cancel removes the
+  file, a read-only folder gives the release page) PASS 170 on stock FreeCAD and the AppImage;
+  a real `update_ui._start_detached` under the AppImage's freecadcmd: the old process quit, the
+  helper (its own session) swapped the file (now 755) and started it under the old name with
+  a clean environment. Not checked here: a real FUSE-mounted AppImage replacing itself (no FUSE
+  in the sandbox); Luca's first Update now from 3.3.6 to the next patch is that check.
+- 3.3.5's box text said "Fission180 <version>": now "Fission 180".
 
 ### Session log: Linux, patch 0.1.0-beta.3.3.5 (`develop`, 2026-11-06)
 

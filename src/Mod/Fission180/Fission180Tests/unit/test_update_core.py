@@ -296,10 +296,31 @@ class Plan(unittest.TestCase):
         self.assertEqual(got["kind"], "browser")
         self.assertIn("releases/tag", got["page"])
 
-    def test_the_appimage_and_other_linux_open_the_browser(self):
-        appimage = uc.plan(OLD, make_release(), {"os": "linux", "kind": "appimage", "home": "/tmp/x"})
-        self.assertEqual(appimage["kind"], "browser")
-        self.assertIn("replace the old one", appimage["reason"])
+    def test_the_appimage_is_replaced_in_place(self):
+        # Luca, 2026-11-06: "i dont think i would be very happy with having to open the terminal
+        # every time i push a new fix"
+        layout = {"os": "linux", "kind": "appimage", "home": "/tmp/.mount_x",
+                  "target": "/home/l/Applications/Fission180.AppImage", "writable": True}  # fmt: skip
+        got = uc.plan(OLD, make_release(), layout)
+        self.assertEqual(got["kind"], "appimage")
+        self.assertEqual(got["asset"], "Fission180_x.AppImage")
+        self.assertEqual(got["sha256"], "c" * 64)
+
+    def test_an_appimage_in_a_folder_not_ours_opens_the_release_page(self):
+        layout = {"os": "linux", "kind": "appimage", "home": "/tmp/.mount_x",
+                  "target": "/opt/Fission180.AppImage", "writable": False}  # fmt: skip
+        got = uc.plan(OLD, make_release(), layout)
+        self.assertEqual(got["kind"], "browser")
+        self.assertIn("/opt", got["reason"])
+        self.assertIn("~/Applications", got["reason"])
+
+    def test_an_appimage_without_a_checksum_file_is_not_installed(self):
+        layout = {"os": "linux", "kind": "appimage", "home": "/x", "target": "/a/F.AppImage", "writable": True}
+        release = make_release()
+        release["manifest"] = None
+        self.assertEqual(uc.plan(OLD, release, layout)["kind"], "browser")
+
+    def test_other_linux_opens_the_browser(self):
         other = uc.plan(OLD, make_release(), {"os": "linux", "kind": "linux", "home": "/usr"})
         self.assertEqual(other["kind"], "browser")
 
@@ -322,6 +343,12 @@ class Layout(unittest.TestCase):
         self.assertEqual((got["os"], got["kind"]), ("windows", "portable"))
         got = uc.detect_layout("win32", "C:\\Program Files\\Fission180", env, lambda p: False)
         self.assertEqual(got["kind"], "other")
+
+    def test_an_appimage_knows_its_file_and_whether_its_folder_is_ours(self):
+        got = uc.detect_layout("linux", "/tmp/.mount_x", {"APPIMAGE": "/a/b.AppImage"}, writable=lambda f: f == "/a")
+        self.assertEqual((got["kind"], got["target"], got["writable"]), ("appimage", "/a/b.AppImage", True))
+        got = uc.detect_layout("linux", "/tmp/.mount_x", {"APPIMAGE": "/opt/b.AppImage"}, writable=lambda f: False)
+        self.assertFalse(got["writable"])
 
     def test_linux_appimage_and_other(self):
         self.assertEqual(uc.detect_layout("linux", "/tmp/.mount_x", {"APPIMAGE": "/a/b.AppImage"})["kind"], "appimage")
@@ -398,6 +425,65 @@ class Timing(unittest.TestCase):
         command = argv[argv.index("-Command") + 1]
         self.assertIn("Wait-Process -Id 77", command)
         self.assertIn("Start-Process -FilePath 'C:\\Users\\O''Neil\\u\\Fission180-installer.exe'", command)
+
+    def test_the_new_appimage_comes_down_beside_the_old_one(self):
+        self.assertEqual(
+            uc.appimage_download_path("/home/l/Applications/Fission180.AppImage"),
+            "/home/l/Applications/.Fission180.AppImage.update",
+        )
+
+    def test_the_restarted_fission_180_gets_a_clean_environment(self):
+        env = uc.restart_environment({
+            "APPDIR": "/tmp/.mount_ab", "APPIMAGE": "/a/F.AppImage", "ARGV0": "F", "OWD": "/h",
+            "PYTHONHOME": "/tmp/.mount_ab/usr", "PREFIX": "/tmp/.mount_ab/usr",
+            "PATH": "/tmp/.mount_ab/usr/bin:/usr/bin:/bin", "HOME": "/home/l",
+            "LD_PRELOAD": "/usr/lib/libdrm.so.2:/usr/lib/libdrm_amdgpu.so.1:/opt/mine.so",
+            "QT_SCALE_FACTOR": "0.75", "FISSION180_SET_QT_SCALE": "1",
+            "SOME_TOOL": "/tmp/.mount_ab/usr/share/x",
+        })  # fmt: skip
+        for gone in ("APPDIR", "APPIMAGE", "ARGV0", "OWD", "PYTHONHOME", "PREFIX", "SOME_TOOL",
+                     "QT_SCALE_FACTOR", "FISSION180_SET_QT_SCALE"):  # fmt: skip
+            self.assertNotIn(gone, env)
+        self.assertEqual(env["PATH"], "/usr/bin:/bin")
+        self.assertEqual(env["LD_PRELOAD"], "/opt/mine.so")  # the person's own preload stays
+        self.assertEqual(env["HOME"], "/home/l")
+
+    def test_without_appdir_the_folder_comes_from_apprun_s_prefix(self):
+        env = uc.restart_environment({
+            "PREFIX": "/opt/F/squashfs-root/usr", "PYTHONHOME": "/opt/F/squashfs-root/usr",
+            "PATH": "/opt/F/squashfs-root/usr/bin:/opt/F/squashfs-root/usr/Mod/Part:/usr/bin",
+        })  # fmt: skip
+        self.assertEqual(env["PATH"], "/usr/bin")
+        self.assertNotIn("PREFIX", env)
+
+    def test_a_scale_the_person_set_stays_for_the_restart(self):
+        env = uc.restart_environment({"QT_SCALE_FACTOR": "2", "HOME": "/h"})
+        self.assertEqual(env["QT_SCALE_FACTOR"], "2")
+
+    @unittest.skipUnless(os.path.exists("/bin/sh"), "a POSIX shell")
+    def test_the_appimage_handover_waits_replaces_and_starts(self):
+        import subprocess
+        import tempfile
+        import time
+
+        with tempfile.TemporaryDirectory() as folder:
+            target = os.path.join(folder, "Fission 180's.AppImage")  # (a space and a quote in the name)
+            new = uc.appimage_download_path(target)
+            started = os.path.join(folder, "started")
+            with open(target, "w") as handle:
+                handle.write("old")
+            with open(new, "w") as handle:
+                handle.write("#!/bin/sh\necho new > '%s'\n" % started)
+            old = subprocess.Popen(["sleep", "0.6"])  # the Fission 180 that quits
+            helper = subprocess.Popen(uc.appimage_handover_argv(old.pid, new, target))
+            time.sleep(0.2)
+            self.assertFalse(os.path.exists(started), "it waited for the old one to end")
+            old.wait()
+            helper.wait(timeout=10)
+            self.assertFalse(os.path.exists(new))
+            self.assertTrue(os.access(target, os.X_OK))
+            with open(started) as handle:
+                self.assertEqual(handle.read().strip(), "new")
 
     def test_the_core_id_defaults_to_unknown(self):
         # (a full build writes its real core id into core_info.py: only a source tree or a test

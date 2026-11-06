@@ -309,8 +309,13 @@ Tests:
      portable Windows build: download the quick-update zip (the 4-5 MB module);
    - **full installer** otherwise on Windows (or when the module asset is missing): download
      the installer .exe;
-   - **Linux AppImage**: the AppImage is read-only, so open the release page in the browser
-     with one line "download the new AppImage and replace the old one" (no in-place update);
+   - **Linux AppImage** (since 0.1.0-beta.3.3.6; Luca 2026-11-06: no terminal for updates):
+     the mounted AppImage is read-only, but the AppImage FILE (`$APPIMAGE`) can be replaced:
+     download the release's AppImage beside it (`.<name>.update`, same folder, so the swap is
+     one rename), verify, quit, then a detached `/bin/sh` waits for this process, `chmod 755`,
+     `mv -f` over the old file and starts it (`update_core.APPIMAGE_HANDOVER`, with the
+     AppImage's own variables taken out of its environment: `restart_environment`). A folder
+     Fission 180 cannot write to, no manifest or no AppImage in the release: the release page;
      other Linux layouts: the same.
 2. Download with a progress bar in a small dialog (Cancel works), to
    `<user data>/Fission180/updates/<version>/`; **verify the SHA256** from

@@ -8,6 +8,22 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.6
+
+### New
+
+- **Linux: Update now updates the AppImage itself.** Help > Check for Updates (or the update
+  line on Home) > Update now downloads the new AppImage next to the one you run, checks it
+  against its checksum, closes Fission 180 (it asks about unsaved designs first), puts the new
+  AppImage in place of the old one under the same name and starts it. No terminal, no
+  download folder; your menu entry and shortcuts keep working. If the AppImage is in a folder
+  Fission 180 is not allowed to change, it says so and opens the release page instead (move
+  the AppImage into a folder of your own, such as ~/Applications, and Update now works from
+  then on).
+  This works from this version on: an AppImage older than 0.1.0-beta.3.3.6 cannot replace
+  itself, so download this one by hand once (make it executable, and put it where the old one
+  was, under the same name).
+
 ## 0.1.0-beta.3.3.5
 
 ### Fixed

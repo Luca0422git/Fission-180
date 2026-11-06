@@ -96,20 +96,23 @@ class FakeGitHub:
 
     # -- what is published -----------------------------------------------------------------
     def publish(self, version, core="testcore", prerelease=True, module=True, installer=True,
-                bad_module_hash=False, manifest=True, extra_kb=0, notes_url=""):  # fmt: skip
+                bad_module_hash=False, manifest=True, extra_kb=0, notes_url="", appimage=False):  # fmt: skip
         """Add a release (newest first) with the files its fission180-release.json describes."""
         tag = "fission180-v" + version
         names = {
             "installer": "Fission180_v%s-Windows-x86_64-py311-installer.exe" % version,
             "module": "Fission180-quick-update-v%s.zip" % version,
+            "appimage": "Fission180_v%s-Linux-x86_64-py311.AppImage" % version,
         }
         data = {
             "installer": b"MZ installer of " + version.encode() + os.urandom(150 * 1024),
             "module": module_zip(extra_kb),
+            "appimage": b"\x7fELF AppImage of " + version.encode() + os.urandom((300 + extra_kb) * 1024),
         }
+        wanted = {"installer": installer, "module": module, "appimage": appimage}
         assets, sha, roles = {}, {}, {}
-        for role in ("installer", "module"):
-            if (role == "module" and not module) or (role == "installer" and not installer):
+        for role in ("installer", "module", "appimage"):
+            if not wanted[role]:
                 continue
             roles[role] = names[role]
             self.files["/dl/" + names[role]] = data[role]

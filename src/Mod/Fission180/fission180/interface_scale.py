@@ -38,15 +38,20 @@ def factor(value):
     return round(percent / 100.0, 3)
 
 
+MINE = "FISSION180_SET_QT_SCALE"  # set with QT_SCALE_FACTOR when Fission 180 set it
+
+
 def environment(value, environ):
-    """What to put in the environment for a setting: {"QT_SCALE_FACTOR": "0.85"}, or {} (the
-    system's size, or the person set QT_SCALE_FACTOR themselves)."""
-    if environ.get("QT_SCALE_FACTOR"):
+    """What to put in the environment for a setting: {"QT_SCALE_FACTOR": "0.85", MINE: "1"},
+    or {} (the system's size, or the person set QT_SCALE_FACTOR themselves). A
+    QT_SCALE_FACTOR Fission 180 set in an earlier run (a program it restarted, after an update,
+    inherits it) is not the person's: the setting decides again."""
+    if environ.get("QT_SCALE_FACTOR") and not environ.get(MINE):
         return {}
     f = factor(value)
     if f == 1.0:
-        return {}
-    return {"QT_SCALE_FACTOR": ("%.3f" % f).rstrip("0").rstrip(".")}
+        return {"QT_SCALE_FACTOR": None, MINE: None} if environ.get(MINE) else {}
+    return {"QT_SCALE_FACTOR": ("%.3f" % f).rstrip("0").rstrip("."), MINE: "1"}
 
 
 def at_start():
@@ -58,5 +63,9 @@ def at_start():
     value = App.ParamGet(PARAMS).GetString(KEY, DEFAULT)
     wanted = environment(value, os.environ)
     for name, text in wanted.items():
-        os.environ[name] = text
-        App.Console.PrintLog("[Fission 180] interface size %s %%: %s=%s\n" % (value, name, text))
+        if text is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = text
+    if wanted:
+        App.Console.PrintLog("[Fission 180] interface size %s %%: %s\n" % (value, wanted))
