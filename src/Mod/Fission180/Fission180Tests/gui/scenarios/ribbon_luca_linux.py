@@ -325,7 +325,8 @@ def e_saved():
     h.check("75 is kept for the next start", saved == "75", saved)
     from fission180 import interface_scale
 
-    h.check("...which starts Qt at 0.75", interface_scale.environment(saved, {}) == {"QT_SCALE_FACTOR": "0.75"})
+    wanted = interface_scale.environment(saved, {})
+    h.check("...which starts Qt at 0.75", wanted.get("QT_SCALE_FACTOR") == "0.75", wanted)
     ok = m.find_child(d, "Fission180PreferencesOK") if d is not None else None
     if ok is not None:
         w.click(ok)

@@ -1976,6 +1976,12 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   a clean environment. Not checked here: a real FUSE-mounted AppImage replacing itself (no FUSE
   in the sandbox); Luca's first Update now from 3.3.6 to the next patch is that check.
 - 3.3.5's box text said "Fission180 <version>": now "Fission 180".
+- CI #19 (c402cb91) red: (1) ribbon_luca_linux [e_saved] compared interface_scale.environment
+  with the old {"QT_SCALE_FACTOR": "0.75"} (it now carries FISSION180_SET_QT_SCALE too): my
+  miss, I ran only update_check after changing interface_scale; fixed, PASS 60. (2)
+  vex_qa_shaft2 FLAKY (shaft width 3.1768 for 3.175 once, then passed; 3 of 3 here). (3)
+  Windows simulation: the known CalculiX 0xC0000005 crash. Lesson: after changing a module,
+  grep the scenarios for it and run every one that uses it.
 
 ### Session log: Linux, patch 0.1.0-beta.3.3.5 (`develop`, 2026-11-06)
 
