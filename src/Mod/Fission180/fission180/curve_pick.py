@@ -130,7 +130,7 @@ def prepare_regions(body, extra=()):
     from . import extrude
 
     try:
-        sketches = profile_pick.candidate_sketches(body, extra)
+        sketches = profile_pick.candidate_sketches(body, extra, include_hidden=True)
     except Exception:
         return
     for sketch in sketches:

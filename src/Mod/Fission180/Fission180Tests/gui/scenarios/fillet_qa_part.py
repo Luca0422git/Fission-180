@@ -10,9 +10,9 @@ Path 9, history edits around fillets: an earlier fillet edited to round one more
         trims the edge a later fillet rounds), the timeline marker rolled back and a fillet
         inserted before two later ones; both later fillets keep their edges, nothing in the
         Report view (before: "Invalid edge link", the later fillets broke).
-Path 10, a body made of two separate solids (two rectangles extruded together, like a
-        Fusion body with two lumps): a fillet on one of them works (before: "would cut the
-        part into pieces").
+Path 10, a body made of two separate solids (two rectangles padded together, as an extrude
+        of separate areas made it before 0.1.0-beta.3.3.7; set up by code): a fillet on one of
+        them works (before: "would cut the part into pieces").
 Path 11, parameters: a radius typed as a formula ("r*2") follows the parameter; a typo is
         explained and OK waits; a plain number typed later drops the formula. (The
         parameter itself is set up and changed by code: the Change Parameters dialog has
@@ -468,28 +468,18 @@ def draw_two(sk):
     h.draw_rectangle(sk, 20, 0, 30, 10)
 
 
-def p10_e():
-    h.press("e")
-
-
-def p10_first():
-    h.fit()
-    pl.click_on_plane(V(5, 5, 0))
-
-
-def p10_second():
-    pl.click_on_plane(V(25, 5, 0))
-
-
-def p10_height():
-    p = x_extrude()
-    h.check("P10 both areas picked", p is not None and len(p.profiles) == 2, p and p.profiles)
-    if p:
-        ui.type_into(p.distance.widget, "10")
-
-
-def p10_ok():
-    h.task_button("OK")
+def p10_old_body():
+    """Set-up by code: the two squares padded into ONE body of two solids, as an extrude of
+    separate areas made it before 0.1.0-beta.3.3.7 (it makes a body each now, as in Fusion);
+    such bodies are still in older designs, and a cut that separates a body makes one too."""
+    sk = [o for o in App.ActiveDocument.Objects if o.TypeId == "Sketcher::SketchObject"][-1]
+    body = h.body()
+    pad = body.newObject("PartDesign::Pad", "Pad")
+    pad.Profile = sk
+    pad.Length = 10.0
+    body.AllowCompound = True
+    sk.ViewObject.Visibility = False
+    App.ActiveDocument.recompute()
 
 
 def p10_two_lumps():
@@ -671,11 +661,7 @@ h.run(
     ]
     + sketch_steps("lumps", V(12, -8, 0), draw_two)
     + [
-        p10_e,
-        p10_first,
-        p10_second,
-        p10_height,
-        p10_ok,
+        p10_old_body,
         p10_two_lumps,
         p10_pick,
         p10_preview,

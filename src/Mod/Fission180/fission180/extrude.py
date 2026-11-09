@@ -1954,7 +1954,8 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
         if owner_body(feature) is target and same_type:
             _update(feature, target, profiles, options, hide)
             sync_followers(feature, participants, options)
-            _sync_pieces(feature, options)
+            if hide:
+                _sync_pieces(feature, options)
             return feature
         blocking = dependents(feature)
         if blocking:
@@ -2018,17 +2019,24 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
 
         _show_only_tip(target)  # the new step is in the middle: the body's end stays shown
     merge_tip(new)
-    _sync_pieces(new, options)
+    if hide:
+        _sync_pieces(new, options)
     return new
 
 
 def _sync_pieces(feature, options):
     """A New Body extrude of separate profiles: one body per separate solid
-    (extrude_pieces.py). Never fails the extrude itself."""
+    (extrude_pieces.py). Never fails the extrude itself. Only for a final build (scripts,
+    the AI, the dialog's OK): the dialog's preview (hide=False) is rebuilt on every move of
+    a drag, and splitting it there rebuilt the solid each time and hid the extrude behind
+    the pieces step (live_shapes, CI #26); an existing pieces step follows the preview
+    anyway (it recomputes from the extrude)."""
     try:
         from . import extrude_pieces
 
-        extrude_pieces.sync(feature, options["operation"])
+        # what was built (a Join touching nothing is made as a New Body), else the options'
+        operation = load_meta(feature).get("operation") or options.get("operation")
+        extrude_pieces.sync(feature, operation)
     except Exception as exc:
         from . import warn
 

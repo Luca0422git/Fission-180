@@ -2949,6 +2949,9 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             self.message.setText("⚠ " + self.limit_hint(text))  # with the limit, if known
             return False
         feature = self.target
+        # separate areas: a body each, made now in this undo step (not during the preview)
+        extrude._sync_pieces(feature, self.options)
+        preview.recompute(self.doc)
         plastic.remember_links(feature, "extrude", self.body)  # plastic-1: rule links
         # Fusion hides the profile's sketch once the extrude is made (inside this step:
         # Undo shows it again). A sketch shown for the edit is hidden again after the step

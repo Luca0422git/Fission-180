@@ -555,12 +555,16 @@ def _linked_objects(value):
     return found
 
 
-def candidate_sketches(body, extra=()):
+def candidate_sketches(body, extra=(), include_hidden=False):
     """Sketches whose profiles are offered: every visible sketch of the document, and
     `extra` (the sketches of the extrude being edited, the sketch it was started from). A
     hidden sketch stays hidden, as in Fusion (Luca 2026-11-09: "when selecting a sketch to
     extrude, hidden sketches will be displayed. they should be hidden"); before, the body's
-    unused sketches were offered even when hidden."""
+    unused sketches were offered even when hidden.
+    include_hidden: the body's hidden unused sketches too, for curve_pick.prepare_regions,
+    which turns on the areas of every sketch a dialog may come to offer before its undo step
+    (a dialog can show a hidden sketch; its areas made inside the step emptied the Redo list:
+    sweep_loft_qa_sweep P4, CI #26)."""
     doc = body.Document if body is not None else App.ActiveDocument
     if doc is None:
         return []
@@ -577,7 +581,7 @@ def candidate_sketches(body, extra=()):
     if body is not None:
         for obj in body.Group:  # the body's unused sketches first (their order is kept)
             if obj.isDerivedFrom("Sketcher::SketchObject") and obj.Name not in used:
-                if _visible(obj):
+                if include_hidden or _visible(obj):
                     add(obj)
     for obj in doc.Objects:
         if not obj.isDerivedFrom("Sketcher::SketchObject"):
