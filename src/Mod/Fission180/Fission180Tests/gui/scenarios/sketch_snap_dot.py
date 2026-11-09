@@ -83,6 +83,32 @@ def a_end_check():
     white, colours = white_at((40.0, 0.0))
     h.check("A ...and shows on the screen (white)", white, colours)
     h.shot("A-dot-on-end")
+    st.hover(V(20.2, 0.3, 0))
+
+
+def a_middle_check():
+    """Luca, 2026-11-09: "the big white dot that you made covers the center triangle": inside a
+    snap glyph the dot is small, the triangle stays whole on the screen."""
+    from fission180 import sketch_infer
+
+    h.check("A the middle: the dot on the middle", near(overlay_dot(), (20.0, 0.0)), overlay_dot())
+    sess = st.session()
+    dot = sess.infer.overlay.dot if sess is not None and sess.infer is not None else None
+    h.check("A ...small, inside the triangle", dot is not None and getattr(dot, "small", False))
+    gl = h.gl_widget()
+    middle = h.screen_point(st.g(V(20, 0, 0)))
+    image = si.QtWidgets.QApplication.primaryScreen().grabWindow(0).toImage()
+    ratio = image.devicePixelRatio()
+    at = gl.mapToGlobal(middle)
+    # the triangle's base runs 3.6 px under the point (6 px glyph): the big dot covered it
+    colours = {
+        image.pixelColor(int((at.x() + dx) * ratio), int((at.y() + dy) * ratio)).name()
+        for dx in range(-2, 3)
+        for dy in (3, 4)
+    }
+    h.check("A ...the triangle's base shows (cyan) under the dot",
+            si.colour_near(sketch_infer.GUIDE_COLOR, {i: c for i, c in enumerate(colours)}), sorted(colours))
+    h.shot("A-dot-in-triangle")
     st.hover(V(13, 0.3, 0))
 
 
@@ -194,6 +220,7 @@ h.run(
         a_line,
         a_end,
         a_end_check,
+        a_middle_check,
         a_on_line_check,
         a_on_circle_check,
         a_empty_check,

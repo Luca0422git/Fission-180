@@ -50,6 +50,36 @@ from .kit import (  # noqa: F401  (the shared texts, re-exported)
     UNITS,
 )
 
+# The tools that make bodies or sketches take a "name" for them (ai/naming.py: an AI must name
+# what it makes; this way it does in the same call): sketch tools name their sketch, the others
+# their body (several bodies: "<name> 2", "<name> 3"...). Here, not in naming.py: the MCP
+# server an AI app starts carries the catalogue without FreeCAD.
+SKETCH_TOOLS = ("create_sketch", "create_curve_sketch")
+NAMEABLE = SKETCH_TOOLS + (
+    "extrude", "revolve", "sweep", "loft", "primitive", "coil", "pipe", "gear", "surface",
+    "insert_hardware", "mirror", "combine", "split_body", "silhouette_split", "move_copy",
+    "new_body", "pattern", "rectangular_pattern", "circular_pattern", "pattern_on_path",
+    "import_file", "emboss", "rib", "web",
+)  # fmt: skip
+
+
+def _add_name_argument():
+    for name in NAMEABLE:
+        entry = registry.BY_NAME.get(name)
+        if entry is None:
+            continue
+        props = entry["input_schema"].setdefault("properties", {})
+        if "name" in props:
+            continue
+        what = "the new sketch" if name in SKETCH_TOOLS else "the new body (several: numbered)"
+        props["name"] = {
+            "type": "string",
+            "description": "a descriptive name for %s, e.g. \"Base plate\" (required in effect: "
+            "unnamed bodies and sketches must be renamed before the next change)" % what,
+        }
+
+
+_add_name_argument()
 TOOLS = registry.TOOLS
 TOOL_NAMES = tuple(t["name"] for t in TOOLS)
 CATEGORIES = registry.CATEGORIES
@@ -365,6 +395,9 @@ WORKFLOW = (
     "lists the faces / edges a selector picks (with a stable ref for each) before you fillet "
     "or chamfer them; check_design says whether the design is sound; render returns a picture "
     "(highlight shows what a selector picks). Trust the numbers first, the picture second. "
+    "Every body and sketch you make must get a descriptive name (rename, right after the step "
+    "that made it: \"Base plate\", \"Bracket arm\", \"Hole sketch\"): this is mandatory, "
+    "and the next change is refused until they are named. "
     "4. Name things with set_parameter and expressions so the design stays easy to change; "
     "edit_step and set_model_parameter change what exists; get_timeline shows the history "
     "and roll_timeline / suppress_step / move_step / delete_step change it. 5. undo takes "

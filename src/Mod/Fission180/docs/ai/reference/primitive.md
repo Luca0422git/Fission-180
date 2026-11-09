@@ -28,6 +28,7 @@ Make a box, cylinder, sphere or torus (Fusion's primitives) on an origin plane o
 | `position` | `inside` \| `center` \| `outside` |  | `"inside"` |  | torus |
 | `operation` | `auto` \| `join` \| `cut` \| `intersect` \| `new_body` \| `new_component` |  | `"auto"` |  |  |
 | `expressions` | object |  |  |  | {field: formula}: a parameter or formula typed in a field (it keeps driving it) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

@@ -19,6 +19,7 @@ Fusion's Combine: join, cut or intersect bodies. target: the body kept (a step i
 | `new_body` | boolean |  | `false` |  |  |
 | `new_component` | boolean |  | `false` |  |  |
 | `keep_tools` | boolean |  | `false` |  |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

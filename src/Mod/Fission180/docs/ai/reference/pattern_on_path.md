@@ -26,6 +26,7 @@ Fusion's Pattern on Path: repeat features, faces or the body along a sketch curv
 | `direction_type` | `one` \| `symmetric` |  | `"one"` |  |  |
 | `orientation` | `identical` \| `path` |  | `"identical"` |  |  |
 | `start_point` | number |  |  | >= 0, <= 1 | 0 (start) .. 1 (end) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

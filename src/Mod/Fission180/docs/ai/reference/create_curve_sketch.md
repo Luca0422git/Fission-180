@@ -16,6 +16,7 @@ Create a sketch of open curves and points: the paths, rails, guide curves and ri
 | `plane` (required) | `XY` \| `XZ` \| `YZ` |  |  |  |  |
 | `offset` | number | mm | `0` |  | mm along the plane's normal |
 | `curves` (required) | array of objects |  |  | at least 1 item(s) | the curves and points |
+| `name` | string |  |  |  | a descriptive name for the new sketch, e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

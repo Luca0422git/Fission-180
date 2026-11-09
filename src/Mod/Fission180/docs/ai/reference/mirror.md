@@ -21,6 +21,7 @@ Fusion's Mirror: mirror features, faces or the whole body about a plane: XY | XZ
 | `compute` | `optimized` \| `identical` \| `adjust` |  |  |  | Compute Option |
 | `plane` (required) | string or object |  |  |  | XY, XZ, YZ or {"face": selector} |
 | `operation` | `join` \| `new_body` |  | `"new_body"` |  | body mirror only |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

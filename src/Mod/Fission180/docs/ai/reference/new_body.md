@@ -13,6 +13,7 @@ Make a new, empty body in the active component and make it the active body: the 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
 | `label` | string |  |  |  | its name |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

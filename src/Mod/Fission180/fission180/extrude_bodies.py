@@ -72,6 +72,18 @@ def is_merge(obj):
     return is_follower(obj) and getattr(obj, "Fission180Type", "") == "Combine"
 
 
+def is_pieces(obj):
+    """The hidden step after a New Body extrude of several separate solids
+    (extrude_pieces.py): it sits right after the extrude in the extrude's own body."""
+    return is_follower(obj) and getattr(obj, "Fission180Type", "") == "ExtrudePieces"
+
+
+def sits_after_lead(obj):
+    """A follower that sits right after its extrude in the extrude's own body: a Join's
+    merge, or the pieces step of a New Body extrude of separate solids."""
+    return is_merge(obj) or is_pieces(obj)
+
+
 def followers_of(lead):
     """The hidden steps a multi-body extrude drives in its bodies (oldest first)."""
     if lead is None or not _alive(lead):
@@ -1052,6 +1064,11 @@ def _new_merge(lead):
 
 
 def remove_follower(follower):
+    if is_pieces(follower):
+        from . import extrude_pieces
+
+        extrude_pieces.remove(follower)  # with the bodies of its pieces
+        return
     bodies.remove_step(follower)
 
 
@@ -1079,7 +1096,7 @@ def merge_tip(lead):
     if body is None or body.Tip is not lead:
         return
     for follower in followers_of(lead):
-        if is_merge(follower) and owner_body(follower) is body:
+        if sits_after_lead(follower) and owner_body(follower) is body:
             body.Tip = follower
             _show_only_tip(body)
             return
@@ -1093,7 +1110,7 @@ def ends_body(body, step):
         return False
     if tip is step:
         return True
-    return is_merge(tip) and tip in followers_of(step)
+    return sits_after_lead(tip) and tip in followers_of(step)
 
 
 def _save_bodies(lead, participants):
@@ -1122,6 +1139,8 @@ def sync_followers(lead, participants, options, old=None):
     for obj in followers_of(lead) + (
         followers_of(old) if old is not None and old is not lead else []
     ):
+        if is_pieces(obj):
+            continue  # a New Body extrude's own pieces step: extrude_pieces.sync
         if obj not in have and owner_body(obj) is not None:
             have.append(obj)
     doc = lead.Document

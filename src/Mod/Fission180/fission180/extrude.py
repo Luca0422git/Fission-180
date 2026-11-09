@@ -1954,6 +1954,7 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
         if owner_body(feature) is target and same_type:
             _update(feature, target, profiles, options, hide)
             sync_followers(feature, participants, options)
+            _sync_pieces(feature, options)
             return feature
         blocking = dependents(feature)
         if blocking:
@@ -2001,6 +2002,11 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
     # The other bodies' steps follow the new lead (before the old one goes, with its links).
     sync_followers(new, participants, options, old=feature)
     if feature is not None:
+        from .extrude_bodies import followers_of, is_pieces
+
+        for follower in followers_of(feature):
+            if is_pieces(follower) and owner_body(follower) is target:
+                follower.Source = new  # its bodies stay theirs (extrude_pieces.sync)
         label = feature.Label
         _remove(feature, keep_body=owner_body(feature) is target)
         new.Label = label
@@ -2012,7 +2018,21 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
 
         _show_only_tip(target)  # the new step is in the middle: the body's end stays shown
     merge_tip(new)
+    _sync_pieces(new, options)
     return new
+
+
+def _sync_pieces(feature, options):
+    """A New Body extrude of separate profiles: one body per separate solid
+    (extrude_pieces.py). Never fails the extrude itself."""
+    try:
+        from . import extrude_pieces
+
+        extrude_pieces.sync(feature, options["operation"])
+    except Exception as exc:
+        from . import warn
+
+        warn("extrude: separate bodies: %s" % exc)
 
 
 def _joins_nothing(profiles, options, feature):

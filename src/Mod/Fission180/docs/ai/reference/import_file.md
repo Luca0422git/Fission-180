@@ -16,6 +16,7 @@ Bring a file into the active design: STEP / IGES (one component with the file's 
 | `unit` | `mm` \| `cm` \| `m` \| `in` \| `ft` |  | `"mm"` |  | mesh / DXF files: the file's unit |
 | `sketch_plane` | `XY` \| `XZ` \| `YZ` |  | `"XY"` |  | DXF: the plane |
 | `label` | string |  |  |  | the name of what is made |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

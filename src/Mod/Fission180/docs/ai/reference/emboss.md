@@ -21,6 +21,7 @@ Emboss (raise) or deboss (sink) a sketch's areas onto faces of the part, wrappin
 | `v` | number | mm | `0` |  | vertical offset (mm) |
 | `angle` | number | deg | `0` |  | rotation (degrees) |
 | `tangent_chain` | boolean |  | `true` |  |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

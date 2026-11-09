@@ -556,8 +556,11 @@ def _linked_objects(value):
 
 
 def candidate_sketches(body, extra=()):
-    """Sketches whose profiles are offered: the body's unused sketches, every visible
-    sketch of the document, and `extra` (the sketches of the extrude being edited)."""
+    """Sketches whose profiles are offered: every visible sketch of the document, and
+    `extra` (the sketches of the extrude being edited, the sketch it was started from). A
+    hidden sketch stays hidden, as in Fusion (Luca 2026-11-09: "when selecting a sketch to
+    extrude, hidden sketches will be displayed. they should be hidden"); before, the body's
+    unused sketches were offered even when hidden."""
     doc = body.Document if body is not None else App.ActiveDocument
     if doc is None:
         return []
@@ -572,9 +575,10 @@ def candidate_sketches(body, extra=()):
     for obj in extra:
         add(obj)
     if body is not None:
-        for obj in body.Group:
+        for obj in body.Group:  # the body's unused sketches first (their order is kept)
             if obj.isDerivedFrom("Sketcher::SketchObject") and obj.Name not in used:
-                add(obj)
+                if _visible(obj):
+                    add(obj)
     for obj in doc.Objects:
         if not obj.isDerivedFrom("Sketcher::SketchObject"):
             continue

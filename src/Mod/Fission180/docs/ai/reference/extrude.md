@@ -43,6 +43,7 @@ Extrude a sketch's areas into a solid (Fission 180's Extrude). distance goes alo
 | `extend2` | `face` \| `adjacent` \| `body` \| `through` |  |  |  | side two's extend |
 | `object_offset` | number | mm |  |  | To Object: stop this far from the object (mm) |
 | `object_offset2` | number | mm |  |  | side two's object offset (mm) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

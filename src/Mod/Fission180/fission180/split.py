@@ -60,9 +60,10 @@ def with_defaults(options):
     return merged
 
 
-# Steps whose extra pieces live in bodies of their own (SplitPiece): Split Body, and
-# Silhouette Split's Split Solid Body / Split Shelled Body (silhouette.py).
-SPLIT_KINDS = (FISSION180_TYPE, "SilhouetteSplit")
+# Steps whose extra pieces live in bodies of their own (SplitPiece): Split Body,
+# Silhouette Split's Split Solid Body / Split Shelled Body (silhouette.py), and the hidden step
+# after a New Body extrude of separate solids (extrude_pieces.py).
+SPLIT_KINDS = (FISSION180_TYPE, "SilhouetteSplit", "ExtrudePieces")
 
 
 def is_split(obj):
@@ -233,6 +234,25 @@ def split_shape(shape, tool):
     return [s for s in result.Solids if s.Volume > 1e-9]
 
 
+def split_parts(shape, tool):
+    """(pieces, untouched) for a split by `tool`: a body of several separate solids (lumps)
+    has only the solids the tool crosses split; the others come back in `untouched` and stay
+    with the body's own piece (Luca 2026-11-09: one plane through one of six separate boxes
+    made six bodies, "no matter where the cutting plane is"). A body of one solid: all its
+    pieces, nothing untouched."""
+    solids = list(shape.Solids) if not shape.isNull() else []
+    if len(solids) < 2:
+        return split_shape(shape, tool), []
+    pieces, untouched = [], []
+    for solid in solids:
+        parts = split_shape(solid, tool)
+        if len(parts) < 2:
+            untouched.append(solid)
+        else:
+            pieces.extend(parts)
+    return pieces, untouched
+
+
 def _size(shape):
     """A piece's size: its volume, or its area for a surface piece."""
     return shape.Volume if shape.Solids else shape.Area
@@ -305,7 +325,7 @@ class SplitFeature:
             )
         shape = bodies.global_shape(base)
         tools = [tool_shape(ref, bool(obj.Extend), shape) for ref in refs]
-        pieces = split_shape(shape, tools)
+        pieces, untouched = split_parts(shape, tools)
         if len(pieces) < 2:
             raise SplitError(
                 "The splitting tool does not cut the body in two. Pick a tool that crosses the "
@@ -314,7 +334,7 @@ class SplitFeature:
         meta = bodies.load_meta(obj, META)
         pieces = order(pieces, meta.get("centers"))
         refine = bool(obj.Refine) and bool(shape.Solids)  # surface pieces keep their faces
-        first = bodies.as_result([pieces[0]], refine)
+        first = bodies.as_result([pieces[0]] + untouched, refine)
         obj.Shape = bodies.to_local(first, body)
         others = [bodies.as_result([p], refine) for p in pieces[1:]]
         obj.OtherPieces = Part.makeCompound(others) if others else Part.Shape()
@@ -430,7 +450,7 @@ def preview_pieces(options, feature=None):
     base = feature.BaseFeature if feature is not None else body.Tip
     shape = bodies.global_shape(base)
     tools = [tool_shape(tool_link(t), bool(options["extend"]), shape) for t in options["tools"]]
-    pieces = split_shape(shape, tools)
+    pieces, _untouched = split_parts(shape, tools)
     if len(pieces) < 2:
         raise SplitError(
             "The splitting tool does not cut the body in two. Pick a tool that crosses the "

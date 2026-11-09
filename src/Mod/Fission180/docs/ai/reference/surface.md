@@ -22,6 +22,7 @@ One of the SURFACE tab's tools (thin surface bodies with no volume; Thicken, Bou
 | `cells` | array of arrays |  |  | at least 1 item(s) | boundary_fill: a point inside each cell |
 | `bodies` | array of strings |  |  | at least 1 item(s) | reverse_normal: the bodies |
 | `target` | string |  |  |  | thicken / boundary_fill: the solid body it joins or cuts |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

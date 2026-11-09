@@ -29,6 +29,7 @@ Sweep a profile along a path (Fusion's Sweep). profile: a sketch id (its one are
 | `operation` | `auto` \| `join` \| `cut` \| `intersect` \| `new_body` |  | `"auto"` |  | auto (default: what the dialog picks by itself), join, cut, intersect or new_body |
 | `bodies` | string or array |  |  |  | Objects To Cut: "auto" (every body in the way) or a list of step ids |
 | `expressions` | object |  |  |  | {field: formula}: a parameter or formula typed in a field (it keeps driving it) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

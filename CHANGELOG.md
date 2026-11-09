@@ -8,6 +8,35 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.7
+
+### Fixed
+
+- **Extruding separate sketch areas made one body.** A New Body extrude of areas that do not
+  touch now makes one body per separate piece, as Fusion does; areas that touch are one body.
+  It is still one step in the timeline: editing it keeps each body, deleting it removes them.
+- **Split Body split every separate piece of a body.** A body made of separate pieces (from
+  older designs) split by a plane through one piece became a body per piece. Now only what the
+  splitting tool crosses is split; the other pieces stay as they were.
+- **Hidden sketches showed up while picking areas to extrude.** A sketch you hid stays hidden;
+  only shown sketches offer their areas (the sketch of an extrude you edit still shows).
+- **Clicking another tool sometimes did nothing.** FreeCAD's own commands refused to start
+  while another command's panel was open (or, in a sketch, while a drawing tool ran), and the
+  click was silently lost. Now the running command ends first (as in Fusion: its panel is
+  finished, a sketch tool stops) and the new one starts; if a command really cannot start, a
+  message says so. Drop-down menus no longer grey out commands just because another one is open.
+- **The snap dot covered the midpoint triangle.** Inside a snap marker (the middle's triangle,
+  an end's square) the dot is now small, so the marker stays readable.
+- **A cut hidden inside the part could not be seen.** The red preview of a cut now also shows
+  through the walls that hide it, fainter, as in Fusion.
+- **The Split Body icon** has its blade line in the cut between the two pieces, not at the top.
+
+### Changed
+
+- **AI: every body and sketch it makes must have a name.** Whatever AI you use (the chat panel or
+  an AI app connected to Fission 180), it is told to name what it makes, the making tools take a
+  name, and if it leaves something unnamed its next change is refused until it renames it.
+
 ## 0.1.0-beta.3.3.6
 
 ### New

@@ -36,8 +36,13 @@ def run(resolved, label):
     if not resolved:
         return
     name, index = resolved
-    from . import recent
+    from . import commands, recent
 
+    try:
+        if not commands.make_way_for(name):  # (the running command ends first, as in Fusion)
+            return
+    except Exception as exc:
+        warn("'%s': %s" % (label, exc))
     recent.record(name, label, index)
     try:
         if index is None:
@@ -46,6 +51,16 @@ def run(resolved, label):
             Gui.runCommand(name, index)
     except Exception as exc:
         warn("'%s' (%s) failed: %s" % (label, name, exc))
+
+
+def _command_running():
+    """A command panel is open or a sketch is being edited (FreeCAD's commands are greyed
+    then, though a click would end the running one and start them)."""
+    try:
+        gdoc = Gui.ActiveDocument
+        return bool(Gui.Control.activeDialog()) or (gdoc is not None and gdoc.getInEdit() is not None)
+    except Exception:
+        return False
 
 
 def is_active(resolved):
@@ -240,8 +255,11 @@ def build_menu(parent, entries, available, context=None):
             action.setToolTip(entry.get("note") or "Not available in Fission 180 yet")
 
     def refresh():
+        busy = _command_running()
         for action, resolved, checked in checks:
-            action.setEnabled(is_active(resolved))
+            # a command that only waits for the running one is offered: a click ends that one
+            # first (run: commands.make_way_for)
+            action.setEnabled(busy or is_active(resolved))
             if checked:
                 action.setChecked(is_checked(checked))
 

@@ -82,7 +82,10 @@ def _run(name):
     try:
         cmd = Gui.Command.get(name)
         if cmd is not None and hasattr(cmd, "isActive") and not cmd.isActive():
-            return
+            from . import commands
+
+            if not commands.make_way_for(name):  # the running command ends first (Fusion)
+                return
         from . import recent
 
         label = name

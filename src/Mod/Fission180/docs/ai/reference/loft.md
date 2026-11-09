@@ -27,6 +27,7 @@ Loft through profiles in order (Fusion's Loft). Each profile is {"profile": sket
 | `end_angle` | number | deg | `0` |  | (degrees) |
 | `operation` | `auto` \| `join` \| `cut` \| `intersect` \| `new_body` |  | `"auto"` |  | auto (default: what the dialog picks by itself), join, cut, intersect or new_body |
 | `bodies` | string or array |  |  |  | Objects To Cut: "auto" (every body in the way) or a list of step ids |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

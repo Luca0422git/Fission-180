@@ -188,6 +188,10 @@ def finish_open_dialog():
             current.finish()
         elif Gui.ActiveDocument is not None and Gui.ActiveDocument.getInEdit() is not None:
             leave_edit()
+        elif not taskui.press_dialog_button("accept"):
+            # a panel of FreeCAD's own (a datum plane, a coordinate system): its OK, else its
+            # Cancel, like a Fission 180 dialog's finish()
+            taskui.press_dialog_button("reject")
     except Exception as exc:
         warn("could not close the open dialog: %s" % exc)
     try:  # a design without history: the finished command's bake, before the next one starts
@@ -200,6 +204,79 @@ def finish_open_dialog():
         tell("Finish the open command first (OK or Cancel in the panel on the right).")
         return False
     return True
+
+
+def _is_sketch_command(name):
+    return name.startswith("Sketcher_") or name.startswith("Fission180_Sketch")
+
+
+def _in_sketch():
+    try:
+        gdoc = Gui.ActiveDocument
+        edit = gdoc.getInEdit() if gdoc is not None else None
+        return edit is not None and edit.Object.TypeId == "Sketcher::SketchObject"
+    except Exception:
+        return False
+
+
+def _active(cmd):
+    try:
+        return bool(cmd.isActive()) if hasattr(cmd, "isActive") else True
+    except Exception:
+        return True
+
+
+def make_way_for(name):
+    """Fusion: any command replaces the one running. FreeCAD's own commands refuse to start
+    while another command's panel is open (or, in a sketch, while a drawing tool runs), and a
+    click on them did nothing at all (Luca 2026-11-09: "Selecting other tools while having a
+    tool already selected sometimes does not work ... FIX IT"). So before a command that
+    cannot start now: a sketch tool stops (as Esc); a command panel is finished (OK, or
+    Cancel when OK is not possible); a sketch is finished when the command is not a sketch
+    command (Fusion finishes the sketch for Extrude too). Returns True when the command can
+    start; else tells why not."""
+    from .compat import QtWidgets
+
+    try:
+        cmd = Gui.Command.get(name)
+    except Exception:
+        cmd = None
+    if cmd is None or _active(cmd):
+        return True
+    try:
+        if _in_sketch():
+            from . import sketch_mode
+
+            session = sketch_mode.current()
+            if session is not None:
+                session.give_way()
+            QtWidgets.QApplication.processEvents()
+            if _active(cmd):
+                return True
+            if _is_sketch_command(name):
+                return _cannot(cmd, name)
+            leave_edit()
+            QtWidgets.QApplication.processEvents()
+            if _active(cmd):
+                return True
+        if Gui.Control.activeDialog():
+            finish_open_dialog()
+            QtWidgets.QApplication.processEvents()
+    except Exception as exc:
+        warn("starting %s: %s" % (name, exc))
+    if _active(cmd):
+        return True
+    return _cannot(cmd, name)
+
+
+def _cannot(cmd, name):
+    try:
+        label = (cmd.getInfo().get("menuText") or name).replace("&", "")
+    except Exception:
+        label = name
+    tell("%s cannot start here (it needs something selected or another kind of design)." % label)
+    log("command %s is not available now" % name)
+    return False
 
 
 def ensure_body():

@@ -33,6 +33,7 @@ Fusion's Move/Copy. What moves: bodies (step ids), faces (a selector: the faces 
 | `pz` | number | mm |  |  | (mm) |
 | `copy` | boolean |  | `false` |  |  |
 | `capture` | boolean |  | `false` |  | components: a Move step in the timeline |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

@@ -25,6 +25,7 @@ Insert a fastener with the hole it needs: click a flat face of the current body 
 | `sink_head` | boolean |  |  |  | counterbore / countersink for the head; default true, false for iso7380 (a button head sits on the face) |
 | `hole_depth` | `all` \| `length` |  | `"all"` |  |  |
 | `clearance` | number | mm |  | >= 0 | mm |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

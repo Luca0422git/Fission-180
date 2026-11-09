@@ -24,6 +24,7 @@ Revolve a sketch's areas around an axis (Fission 180's Revolve). axis: X, Y or Z
 | `direction` | `one_side` \| `two_sides` \| `symmetric` |  | `"one_side"` |  |  |
 | `angle2` | number | deg |  | > 0, <= 360 | side two's angle (degrees) |
 | `bodies` | string or array |  |  |  | "auto": every body the feature passes through is cut / joined (what the dialog lists by itself); or a list of step ids: exactly those bodies (the dialog's "Bodies to Cut" row) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

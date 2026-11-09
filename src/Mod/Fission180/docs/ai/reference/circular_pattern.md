@@ -23,6 +23,7 @@ Fusion's Circular Pattern dialog: repeat features, faces or the whole body aroun
 | `quantity` | integer | count | `3` | >= 1 |  |
 | `type` | `full` \| `angle` \| `symmetric` |  | `"full"` |  |  |
 | `angle` | number | deg |  |  | total angle (degrees) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

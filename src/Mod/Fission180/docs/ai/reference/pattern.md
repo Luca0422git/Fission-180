@@ -23,6 +23,7 @@ Repeat earlier steps (features: their ids, e.g. a cut or a hole). kind rectangul
 | `spacing2` | number | mm |  |  |  |
 | `axis` | `X` \| `Y` \| `Z` |  |  |  |  |
 | `angle` | number | deg | `360` | > 0, <= 360 |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

@@ -28,6 +28,7 @@ Fusion's Rectangular Pattern dialog: repeat features (step ids), faces or the wh
 | `quantity2` | integer | count |  | >= 1 |  |
 | `distance2` | number | mm |  |  | (mm) |
 | `direction_type2` | `one` \| `symmetric` |  |  |  |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

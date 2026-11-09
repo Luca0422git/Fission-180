@@ -21,6 +21,7 @@ Fusion's Rib: a thin wall from one open sketch curve; the rib grows in the sketc
 | `depth` | number | mm |  | > 0 | depth (mm), depth_type depth |
 | `flip` | boolean |  | `false` |  |  |
 | `extend` | boolean |  | `true` |  |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

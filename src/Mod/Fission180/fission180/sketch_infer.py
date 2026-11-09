@@ -1574,6 +1574,10 @@ class _ViewMap:
 DOT_RIM = "#15181d"  # the snap dot: a white disc with a dark rim (seen on any background)
 DOT_FILL = "#ffffff"
 DOT_PIXELS = (5.5, 3.5)  # their radii, in screen pixels
+# Inside a snap glyph (the middle's triangle, an end's square, a centre's circle) the dot is
+# small enough to leave the glyph whole (Luca, 2026-11-09: "the big white dot that you made
+# covers the center triangle. Maybe make the white dot a bit smaller")
+DOT_PIXELS_IN_GLYPH = (2.4, 1.4)
 
 
 class SnapDot:
@@ -1605,9 +1609,11 @@ class SnapDot:
         self.point = None
         self.clear()
 
-    def show(self, point, px):
-        """The dot at sketch point `point`; px: mm per screen pixel there."""
-        for (coords, faces), radius in zip(self.parts, DOT_PIXELS):
+    def show(self, point, px, in_glyph=False):
+        """The dot at sketch point `point`; px: mm per screen pixel there. in_glyph: a snap
+        glyph is drawn round the point: the small dot."""
+        self.small = bool(in_glyph)
+        for (coords, faces), radius in zip(self.parts, DOT_PIXELS_IN_GLYPH if in_glyph else DOT_PIXELS):
             pts = core.disc(point, radius * px)
             coords.point.setNum(0)
             coords.point.setValues(0, len(pts), [(x, y, 0.0) for x, y in pts])
@@ -1703,7 +1709,7 @@ class Overlay:
             marks += core.snap_mark(result.snap, 6 * px)
         self._draw(guides, marks, [])
         if result.snap is not None or result.on_line or result.on_curve is not None:
-            self._dot(result.point, px)
+            self._dot(result.point, px, in_glyph=result.snap is not None)
 
     def show_dot(self, point, px):
         """Only the snap dot: FreeCAD snaps the point itself (onto a curve or a point
@@ -1711,8 +1717,8 @@ class Overlay:
         self._draw([], [], [])
         self._dot(point, px)
 
-    def _dot(self, point, px):
-        self.dot.show(point, px)
+    def _dot(self, point, px, in_glyph=False):
+        self.dot.show(point, px, in_glyph)
         self._drawn["dot"] = [tuple(point)]
 
     def show_arc(self, arc, guides, marks):

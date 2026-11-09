@@ -33,6 +33,7 @@ Make an involute gear (Fission 180's Gear tool): type spur | internal (a ring wi
 | `rack_height` | number | mm | `5` | > 0 | mm |
 | `operation` | `join` \| `cut` \| `new_body` \| `new_component` |  | `"new_body"` |  |  |
 | `expressions` | object |  |  |  | {field: formula}: a parameter or formula typed in a field (it keeps driving it) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

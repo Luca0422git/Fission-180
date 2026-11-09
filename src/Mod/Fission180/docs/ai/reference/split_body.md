@@ -17,6 +17,7 @@ Fusion's Split Body: cut a body into pieces (new bodies). body: the body (a step
 | `tool` | string or object |  |  |  | the splitting tool |
 | `tools` | array of string or objects |  |  | at least 1 item(s) | several splitting tools |
 | `extend` | boolean |  | `true` |  |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

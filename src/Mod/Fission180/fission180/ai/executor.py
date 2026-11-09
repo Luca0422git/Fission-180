@@ -287,6 +287,13 @@ def _run(tool, args, host):
         from .actions import verify_actions
 
         doc = App.ActiveDocument
+        from . import naming
+
+        if entry["changes_design"] and tool not in naming.FREE_TOOLS and naming.enforced():
+            owed = naming.owed(doc)
+            if owed:
+                return bridge_core.error_result(naming.refusal(owed))
+        made_before = naming.snapshot(doc) if entry["changes_design"] else None
         before = verify_actions.before_change(doc) if entry["changes_design"] else None
         handler = None
         if entry["kind"] != "steps":
@@ -305,6 +312,21 @@ def _run(tool, args, host):
                 _close_left_transaction(ctx.title, failed)
         if before is not None and not answer.get("is_error"):
             verify_actions.after_change(before["doc"], before)  # (diff_design last_change)
+        if not answer.get("is_error") and entry["changes_design"]:
+            if tool == "new_design":
+                made_before = set()  # its empty body is the AI's too
+            elif App.ActiveDocument is not doc:
+                made_before = None  # another design opened: nothing of it was made here
+        if made_before is not None and not answer.get("is_error"):
+            made = naming.made_since(App.ActiveDocument, made_before)
+            try:
+                naming.apply_name(tool, args.get("name"), made)
+            except Exception as exc:
+                warn("AI: naming: %s" % exc)
+            note = naming.note_made(App.ActiveDocument, made_before, made) if naming.enforced() else ""
+            if note and isinstance(answer.get("text"), str):
+                answer = dict(answer)
+                answer["text"] = answer["text"].rstrip() + note
         return answer
     except UserError as exc:
         return bridge_core.error_result(str(exc))

@@ -19,6 +19,7 @@ Create a sketch with closed shapes (and lines) in it, ready for extrude, revolve
 | `on` | string |  |  |  | Instead of plane: the id of a construction plane to sketch on |
 | `auto_project` | boolean |  |  |  | with face: project the face's edges into the sketch |
 | `geometry` (required) | array of objects |  |  | at least 1 item(s) | (rules: [geometry](fission180://docs/tools.md#help-geometry)) |
+| `name` | string |  |  |  | a descriptive name for the new sketch, e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

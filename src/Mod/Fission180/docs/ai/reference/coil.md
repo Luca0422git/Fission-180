@@ -28,6 +28,7 @@ Make a coil (spring, helix) or a flat spiral (Fusion's Coil): plane and x / y of
 | `section_size` | number | mm | `2` | > 0 | mm |
 | `operation` | `auto` \| `join` \| `cut` \| `intersect` \| `new_body` |  | `"auto"` |  | auto (default: what the dialog picks by itself), join, cut, intersect or new_body |
 | `expressions` | object |  |  |  | {field: formula}: a parameter or formula typed in a field (it keeps driving it) |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

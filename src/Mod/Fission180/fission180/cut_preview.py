@@ -17,6 +17,11 @@ RED = (0.95, 0.20, 0.20)
 GLOW = (0.45, 0.05, 0.05)
 TRANSPARENCY = 0.45
 EDGE = (0.85, 0.08, 0.08)
+# Where the part hides the cut (a hole inside a block), the cut still shows through it, fainter
+# (Luca, 2026-11-09: "when im extruding a cut into an object and the cut is occluded by that
+# object, i should still be able to see the red of the cut through the walls of that object")
+XRAY_NAME = NAME + "XRay"
+XRAY_TRANSPARENCY = 0.78
 HIGHLIGHT_NAME = "Fission180BodyHighlight"
 BLUE = (0.247, 0.663, 0.961)  # theme.ACCENT (#3fa9f5), Fission 180's highlight blue
 BLUE_GLOW = (0.10, 0.28, 0.45)
@@ -106,6 +111,14 @@ class CutPreview:
         from pivy import coin
 
         node = _mesh_node(coin, shape, NAME, RED, GLOW, TRANSPARENCY, EDGE)
+        try:
+            # drawn last, over everything (no depth test): the part's walls do not hide it
+            xray = coin.SoAnnotation()
+            xray.setName(XRAY_NAME)
+            xray.addChild(_mesh_node(coin, shape, XRAY_NAME + "Mesh", RED, GLOW, XRAY_TRANSPARENCY, EDGE))
+            node.addChild(xray)
+        except Exception:
+            pass  # (the normal red stays)
         self.clear()
         self.view.getSceneGraph().addChild(node)
         self.root = node

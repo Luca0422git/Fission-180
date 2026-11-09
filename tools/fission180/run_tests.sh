@@ -130,6 +130,10 @@ source "${REPO}/tools/fission180/gui_env.sh"
 # No test goes online: the update check (fission180/update_core.py) refuses every address but
 # this computer's own (the tests' fake GitHub), and does not even start by itself.
 export FISSION180_NO_INTERNET=1
+# The tests drive the AI tools like scripts, many calls in a row: the rule that an AI must name
+# every body and sketch it makes before its next change (fission180/ai/naming.py) is off here;
+# its own tests turn it on (naming.FORCE).
+export FISSION180_AI_NAMES=off
 # The unit tests that check geometry against FreeCAD's exact solids run FreeCAD headless
 # themselves (Fission180Tests/unit/test_live_shapes_freecad.py); skipped without it.
 if [ ${#FC_CMD[@]} -gt 0 ]; then

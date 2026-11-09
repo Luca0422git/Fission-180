@@ -16,6 +16,7 @@ Fusion's Silhouette Split: split a body along its outline seen from a direction.
 | `body` (required) | string |  |  |  | the body |
 | `direction` (required) | string or object |  |  |  | the view direction (a body pick) |
 | `operation` | `faces` \| `body` \| `shelled` |  | `"faces"` |  |  |
+| `name` | string |  |  |  | a descriptive name for the new body (several: numbered), e.g. "Base plate" (required in effect: unnamed bodies and sketches must be renamed before the next change) |
 
 ## Answer
 

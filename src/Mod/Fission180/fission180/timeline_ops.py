@@ -1955,10 +1955,12 @@ def move_group(doc, gid, slot):
 
 
 def _is_merge(obj):
+    """A follower that sits right after its extrude in the extrude's own body (a Join's merge,
+    a New Body extrude's pieces step): it moves with the extrude."""
     try:
         from . import extrude_bodies
 
-        return extrude_bodies.is_merge(obj)
+        return extrude_bodies.sits_after_lead(obj)
     except Exception:
         return False
 
