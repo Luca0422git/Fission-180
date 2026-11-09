@@ -226,6 +226,18 @@ def _active(cmd):
         return True
 
 
+def _would_ask(name):
+    """FreeCAD's own command started while a command panel is open (not a sketch being
+    edited): FreeCAD would ask whether to close that panel. Fission 180's commands end it
+    themselves (finish_open_dialog); view and edit commands (Std_) work beside it."""
+    if name.startswith(("Std_", "Fission180_")) or _in_sketch():
+        return False
+    try:
+        return bool(Gui.Control.activeDialog())
+    except Exception:
+        return False
+
+
 def make_way_for(name):
     """Fusion: any command replaces the one running. FreeCAD's own commands refuse to start
     while another command's panel is open (or, in a sketch, while a drawing tool runs), and a
@@ -241,7 +253,15 @@ def make_way_for(name):
         cmd = Gui.Command.get(name)
     except Exception:
         cmd = None
-    if cmd is None or _active(cmd):
+    if cmd is None:
+        return True
+    if _active(cmd):
+        if _would_ask(name):
+            # FreeCAD's own panel command (a coordinate system, a datum) "can start", then
+            # stops at FreeCAD's "A dialog is already open in the task panel" question
+            # (seen in the tool switch probe): the open one finishes first
+            finish_open_dialog()
+            QtWidgets.QApplication.processEvents()
         return True
     try:
         if _in_sketch():
