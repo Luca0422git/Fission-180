@@ -18,7 +18,8 @@ Inside the open sketch (no drawing tool running):
 - E extrudes exactly the picked areas (both, or only B), Q too (as an Extrude).
 
 Two squares on XY: A = 0..20 x 0..20, B = 30..50 x 0..20, so each area is 400 mm^2 and
-the default 10 mm extrude of one is 4000 mm^3, of both 8000."""
+the default 10 mm extrude of one is 4000 mm^3, of both 8000 (since 0.1.0-beta.3.3.7 in two bodies:
+the areas are apart, Fusion makes a body of each)."""
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtCore, QtWidgets
@@ -185,7 +186,7 @@ def e_takes_b():
 
 
 def click_a_ctrl_b():
-    h.check("Cancel leaves no solid", near(h.solid_volume(), 0.0), h.solid_volume())
+    h.check("Cancel leaves no solid (in any body)", near(all_volume(), 0.0), all_volume())
     h.click(A)
     h.click(B, CTRL)
 
@@ -199,7 +200,7 @@ def two_selected():
 def e_takes_both():
     h.check("E extrudes A and B", profile_names() == sorted([s["A"], s["B"]]), profile_names())
     arrows.give_distance("10")  # Extrude starts at 0 (Fusion): type the distance
-    h.check("A + B 10 mm: 8000", near(h.solid_volume(), 8000.0), h.solid_volume())
+    h.check("A + B 10 mm: 8000 (two bodies: A and B are apart)", near(all_volume(), 8000.0), all_volume())
     h.click(B)
 
 
@@ -227,7 +228,7 @@ def q_takes_both():
     h.check("Q on sketch areas opens Extrude", p is not None and p is not s["extrude_before_q"])
     h.check("Q extrudes both areas", profile_names() == sorted([s["A"], s["B"]]), profile_names())
     arrows.give_distance("10")  # Extrude starts at 0 (Fusion): type the distance
-    h.check("A + B: 8000", near(h.solid_volume(), 8000.0), h.solid_volume())
+    h.check("A + B: 8000 (two bodies)", near(all_volume(), 8000.0), all_volume())
     cancel()
 
 
@@ -249,7 +250,7 @@ def whole_sketch_taken():
         profile_names(),
     )
     arrows.give_distance("10")  # Extrude starts at 0 (Fusion): type the distance
-    h.check("both areas: 8000", near(h.solid_volume(), 8000.0), h.solid_volume())
+    h.check("both areas: 8000 (two bodies)", near(all_volume(), 8000.0), all_volume())
     cancel()
 
 
@@ -381,7 +382,7 @@ def e_in_sketch_takes_both():
         profile_names(),
     )
     arrows.give_distance("10")  # Extrude starts at 0 (Fusion): type the distance
-    h.check("A + B: 8000", near(h.solid_volume(), 8000.0), h.solid_volume())
+    h.check("A + B: 8000 (two bodies)", near(all_volume(), 8000.0), all_volume())
     cancel()
 
 

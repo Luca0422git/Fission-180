@@ -11,7 +11,8 @@ T4  OK makes the text (one undo step): it belongs to the sketch, has its frame (
 T5  an empty text is refused: OK keeps the dialog open and says why.
 T6  Ctrl+Z takes the text and its frame away; Ctrl+Y brings them back.
 T7  after Finish Sketch, E takes the sketch's only profile, the text, by itself; dragging
-    the distance up extrudes the letters (the volume is the letters' area times it).
+    the distance up extrudes the letters (the volume is the letters' area times it; the
+    letters are apart, so each is a body of its own).
 """
 
 import FreeCAD as App
@@ -257,12 +258,20 @@ def t7_ok():
 
 
 def t7_done():
-    vol = h.solid_volume()
+    # the letters are apart: a body each since 0.1.0-beta.3.3.7 (Fusion: one body per piece)
+    bodies = [
+        o for o in App.ActiveDocument.Objects
+        if o.TypeId == "PartDesign::Body" and o.ViewObject.Visibility and not o.Shape.isNull()
+        and o.Shape.Solids
+    ]
+    vol = sum(o.Shape.Volume for o in bodies)
     h.check(
-        "T7 the letters are extruded (area x 2)",
+        "T7 the letters are extruded (area x 2, all their bodies)",
         near(vol, s["area"] * 2.0, 1e-3),
         (vol, s["area"] * 2.0),
     )
+    h.check("T7 each body is one piece", all(len(o.Shape.Solids) == 1 for o in bodies),
+            [len(o.Shape.Solids) for o in bodies])
     h.check("T7 the text's sketch is hidden after OK", not s["sketch"].ViewObject.Visibility)
     h.check("T7 and the text with it", not s["text"].ViewObject.Visibility)
     h.shot("t7-extruded")

@@ -231,6 +231,14 @@ def _active(cmd):
 KEEPS_SKETCH_TOOL = ("Sketcher_ToggleConstruction", "Fission180_SketchToggleConstruction")
 
 
+def _own_tool_running(session, name):
+    """The command's own Fission 180 tool runs already: the command decides what a second
+    press does (O again ends Offset, M again keeps Move/Copy with its picks), so it is not
+    stopped first."""
+    tool = getattr(session, "tool", None)
+    return tool is not None and bool(getattr(tool, "active", False)) and getattr(tool, "command", "") == name
+
+
 def _would_ask(name):
     """FreeCAD's own command started while a command panel is open (not a sketch being
     edited): FreeCAD would ask whether to close that panel. Fission 180's commands end it
@@ -268,7 +276,7 @@ def make_way_for(name):
             from . import sketch_mode
 
             session = sketch_mode.current()
-            if session is not None:
+            if session is not None and not _own_tool_running(session, name):
                 session.give_way()
         except Exception as exc:
             warn("starting %s: %s" % (name, exc))
