@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Patterns of several features, of faces, and of bodies on a real part (QA, only real input).
 
-Path 14, a boss with a hole in it (two steps), picked in the "wrong" order: the hole first (a
-         click on its wall), then the boss in the timeline. Patterned together along -X, the
+Path 14, a boss with a hole in it (two steps), picked in the "wrong" order: Pattern Type
+         set to Features (it starts as Bodies), the hole first (a click on its wall), then
+         the boss in the timeline. Patterned together along -X, the
          copy has its hole too (before, the steps were repeated in the order they were picked,
          so the copied boss filled its own hole).
 Path 15, a Faces pattern of a hole's wall, then the hole made shallower from the timeline:
@@ -95,6 +96,11 @@ def boss_hole_made():
 def p14_start():
     Gui.Selection.clearSelection()
     h.ribbon("Rectangular Pattern")
+
+
+def p14_features():
+    # Pattern Type starts as Bodies (Luca, 2026-11-09): a face click would take the body
+    b.choose(ps.panel().pattern_type, "Features")
 
 
 def p14_boss_in_timeline():
@@ -364,6 +370,7 @@ h.run(
         boss_hole_ok,
         boss_hole_made,
         p14_start,
+        p14_features,
         p14_hole_face,
         p14_boss_in_timeline,
         p14_both,

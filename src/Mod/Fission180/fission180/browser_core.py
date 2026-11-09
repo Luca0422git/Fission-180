@@ -632,6 +632,9 @@ MENUS = {
         "Find in Window",
         "Find in Timeline",
         "-",
+        # (the Physical Material and Appearance commands, on the selected bodies)
+        "Physical Material",
+        "Appearance",
         "Save As Mesh",
         "-",
         "Move to Component",
@@ -773,3 +776,37 @@ def menu_for(node):
     if node["kind"] == "folder" and node["visible"] is None:
         entries = []
     return entries
+
+
+# -- several rows selected ---------------------------------------------------------------------
+def menu_targets(node, selected):
+    """The rows a right-click entry acts on (Fusion): every selected row when the clicked row
+    is one of them, else the clicked row alone (the browser selects it first). ``selected``:
+    the selected rows' nodes."""
+    rows = [n for n in selected if n]
+    if node["key"] in [n["key"] for n in rows]:
+        return rows
+    return [node]
+
+
+def eye_rows(rows):
+    """The rows an eye or Show / Hide changes together: those with an eye, components first,
+    outer ones before the ones inside them (a hidden component remembers what it hid and
+    shows it again with its own eye), then the others in their order. ``rows``: nodes with
+    a "depth" (folders above them) where known."""
+    shown = [n for n in rows if n.get("visible") is not None]
+    parts = sorted(
+        [n for n in shown if n["kind"] == "component"], key=lambda n: n.get("depth", 0)
+    )
+    return parts + [n for n in shown if n["kind"] != "component"]
+
+
+def with_depth(tree, nodes):
+    """Copies of nodes with their "depth" (how many rows are above them) for eye_rows."""
+    out = []
+    for n in nodes:
+        path = path_to(tree, n["key"]) if tree is not None else None
+        copy = dict(n)
+        copy["depth"] = len(path) if path else 0
+        out.append(copy)
+    return out

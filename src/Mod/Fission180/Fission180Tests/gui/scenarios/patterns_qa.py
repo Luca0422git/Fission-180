@@ -2,13 +2,13 @@
 """Trying to break the pattern dialogs, the way an impatient user would (real input):
 
 1. A 40 x 30 x 10 box with a through hole r 2 at (8, 8).
-2. Wrong picks: the hole's sketch in the timeline (Pattern Type Features) and the hole's
+2. Wrong picks: the hole's sketch in the timeline (Pattern Type Bodies) and the hole's
    round wall (or rim) as a direction: the dialog says why, nothing in the Report view. Esc.
 3. Ctrl+Z while the preview is shown: the dialog ends and the model is as before.
 4. Pattern Type changed after a preview: the objects are cleared and the preview goes;
    the hole's wall picked as a face instead previews a copy. Cancel.
-5. A Rectangular Pattern made by clicking the hole's wall (the feature that made it is
-   taken, Pattern Type Features), then a pattern of the body (two new bodies), then that
+5. A Rectangular Pattern made by clicking the hole's wall (Pattern Type set to Features:
+   the feature that made it is taken), then a pattern of the body (two new bodies), then that
    step deleted from the timeline's right-click menu: its bodies go with it.
 6. Saved, closed and opened again: the patterns rebuild without an error and open in
    their dialog from the timeline.
@@ -177,6 +177,13 @@ def make_start():
     start_rect()
 
 
+def make_type():
+    # Pattern Type starts as Bodies (Luca, 2026-11-09: a click on the part takes its body)
+    p = ps.panel()
+    h.check("Pattern Type starts as Bodies", p and p.pattern_type.currentData() == "bodies")
+    b.choose(p.pattern_type, "Features")
+
+
 def make_pick():
     # Pattern Type Features, a click on the hole's wall in the view: Fusion takes the
     # feature that made the face.
@@ -341,6 +348,7 @@ h.run(
         face_preview,
         after_switch_cancel,
         make_start,
+        make_type,
         make_pick,
         make_box,
         make_axis,

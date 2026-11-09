@@ -2184,8 +2184,9 @@ def _selected_curves(sketch):
 
 def paste():
     """Ctrl+V in a sketch: FreeCAD pastes the copied curves on top of the originals;
-    Fusion then lets you place them. The pasted curves are selected and Move starts:
-    click a base point, then where they go (Esc leaves them where they are)."""
+    Fusion then lets you place them. The pasted curves are selected and Fission 180's
+    Move/Copy starts with them (its arrows, turn handle and fields; Esc leaves them where
+    they are). It handed them to FreeCAD's Translate before 0.1.0-beta.3.3.7."""
     from . import commands
 
     sketch = editing_sketch()
@@ -2202,10 +2203,11 @@ def paste():
         Gui.Selection.addSelection(sketch.Document.Name, sketch.Name, "Edge%d" % (index + 1))
 
     def place():
-        _run("Sketcher_Translate")
+        _run("Fission180_SketchMove")
         # said once the tool's panel has settled (its start hid an earlier tip)
         QtCore.QTimer.singleShot(
-            150, lambda: commands.tell("Pasted: click a base point, then where the copy goes.")
+            150,
+            lambda: commands.tell("Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."),
         )
 
     QtCore.QTimer.singleShot(0, place)

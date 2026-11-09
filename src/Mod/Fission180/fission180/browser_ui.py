@@ -20,7 +20,7 @@ import FreeCADGui as Gui
 from . import _remember, browser_core as core
 from . import commands, components, doc_epoch, hover_ghost, selectable, theme
 from . import timeline_ops as ops
-from . import ui_icon, warn
+from . import log, ui_icon, warn
 from .compat import QtCore, QtGui, QtWidgets
 from .inline_edit import InlineEditor
 
@@ -1558,7 +1558,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             return None
         return self._doc.getObject(node["object"]) if self._doc and node["object"] else None
 
-    def _set_visible(self, node, visible):
+    def _set_visible(self, node, visible, refresh=True):
         node = _with_children(self._tree, node)  # (vex: a row's item keeps no children)
         targets = [n for n in core.walk(node) if n["object"] and n["visible"] is not None]
         if node["kind"] == "component":
@@ -1571,7 +1571,45 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 _show_origin_feature(obj, visible, only=node["kind"] == "origin")
             else:
                 obj.ViewObject.Visibility = visible
+        if refresh:
+            self._refresh_soon()
+
+    def _shows(self, node):
+        """Whether a row's object is shown now (not the row's state at the last rebuild: a
+        component hidden just before took the rows inside it along)."""
+        obj = self._object(node)
+        try:
+            if obj is not None and obj.ViewObject is not None and node["kind"] != "origin":
+                return bool(obj.ViewObject.Visibility)
+        except Exception:
+            pass
+        return bool(node["visible"])
+
+    def _set_visible_rows(self, nodes, visible):
+        """Show / Hide (or an eye) on several selected rows: each takes `visible`, the new
+        state of the row clicked (Fusion). Rows already that way are left alone (a hidden
+        component keeps what it remembers to show again)."""
+        if self._tree is None:
+            return
+        fresh = [core.find(self._tree, n["key"]) for n in nodes if n is not None]
+        rows = core.eye_rows(core.with_depth(self._tree, [n for n in fresh if n is not None]))
+        changed = 0
+        for row in rows:
+            node = core.find(self._tree, row["key"])
+            if node is None or self._shows(node) == visible:
+                continue
+            self._set_visible(node, visible, refresh=False)
+            changed += 1
+        if changed > 1:
+            log("%s %d rows" % ("showed" if visible else "hid", changed))
         self._refresh_soon()
+
+    def _eye_targets(self, node):
+        """The rows an eye click changes: every selected row with an eye when the clicked
+        row is one of several selected (Fusion), else the row alone."""
+        selected = [i.data(1, ROLE_NODE) for i in self.selectedItems()]
+        rows = core.menu_targets(node, selected)
+        return [n for n in rows if n is not None and n.get("visible") is not None] or [node]
 
     # what a component hid with its eye, to show again: {(document, component): {names}}
     _eye_memory = {}
@@ -1596,12 +1634,47 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             self.rename(item)
 
     def toggle_eye(self, key):
+        """The eye of a row was clicked; with several rows selected and this one among them,
+        all of them take its new state."""
         try:
             node = core.find(self._tree, key) if self._tree is not None else None
-            if node is not None and node["visible"] is not None:
+            if node is None or node["visible"] is None:
+                return
+            rows = self._eye_targets(node)
+            if len(rows) > 1:
+                self._set_visible_rows(rows, not node["visible"])
+            else:
                 self._set_visible(node, not node["visible"])
         except Exception as exc:
             warn("browser: %s" % exc)
+
+    def selectionCommand(self, index, event=None):
+        """A click on a row's eye or activate ring leaves the selection as it is (Qt would
+        make the row the only selected one at the release when it was selected already:
+        then the eye of one of several selected bodies could not act on them all)."""
+        try:
+            kinds = (
+                QtCore.QEvent.MouseButtonPress,
+                QtCore.QEvent.MouseButtonRelease,
+                QtCore.QEvent.MouseButtonDblClick,
+            )
+            if event is not None and event.type() in kinds and self._on_mark(event):
+                return QtCore.QItemSelectionModel.NoUpdate
+        except Exception as exc:
+            warn("browser: %s" % exc)
+        return super().selectionCommand(index, event)
+
+    def _on_mark(self, event):
+        """Whether a mouse event is on a row's eye or activate ring."""
+        pos = event.position().toPoint()
+        item = self.itemAt(pos)
+        node = item.data(1, ROLE_NODE) if item is not None else None
+        if node is None:
+            return False
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        if node["visible"] is not None and self.delegate.eye_rect(rect).contains(pos):
+            return True
+        return self.delegate.has_radio(node) and self.delegate.radio_rect(rect).contains(pos)
 
     def _clicked(self, item, column):
         node = item.data(1, ROLE_NODE)
@@ -1945,9 +2018,14 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             self.blockSignals(True)
         try:
             if not item.isSelected():
+                # Fusion: a right-click outside the selection makes that row the selection
                 self.clearSelection()
                 item.setSelected(True)
-            self.setCurrentItem(item)
+                self.setCurrentItem(item)
+            else:
+                # one of the selected rows: they all stay selected (the menu acts on them all);
+                # a plain setCurrentItem would make this row the only selected one
+                self.setCurrentItem(item, 1, QtCore.QItemSelectionModel.NoUpdate)
         finally:
             if quiet:
                 self.blockSignals(False)
@@ -1978,11 +2056,14 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         selected_bodies = [b for b in selected_bodies if b is not None] or (
             [obj] if node["kind"] == "body" and obj is not None else []
         )
+        # Several rows selected and this one among them: the entries act on all of them
+        # (Fusion); a row outside the selection was made the selection by _menu.
+        targets = core.menu_targets(node, selected_nodes)
         handlers = {
-            "Show/Hide": lambda: self._set_visible(node, not node["visible"]),
+            "Show/Hide": lambda: self._set_visible_rows(targets, not node["visible"]),
             "Selectable/Unselectable": lambda: self._toggle_selectable(obj, selected_nodes),
             "Rename": lambda key=node["key"]: self._rename_key(key),
-            "Delete": lambda: self.delete([node]),
+            "Delete": lambda: self.delete(targets),
             "Edit Sketch": lambda: _edit_object(obj),
             "Edit Feature": lambda: _edit_object(obj),
             "Activate Body": lambda: self._activate(obj),
@@ -1993,9 +2074,13 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 obj if node["kind"] == "component" else None
             ),
             "Create Components from Bodies": lambda: self._components_from_bodies(selected_bodies),
-            "Isolate": lambda: self._isolate(obj),
-            "Find in Window": lambda: self._find_in_window(obj),
-            "Find in Timeline": lambda: self._find_in_timeline(node),
+            "Isolate": lambda: self._isolate(obj, targets),
+            "Find in Window": lambda: self._find_in_window(obj, targets),
+            "Find in Timeline": lambda: self._find_in_timeline(node, targets),
+            "Physical Material": lambda: self._body_command(
+                obj, targets, "Fission180_PhysicalMaterial"
+            ),
+            "Appearance": lambda: self._body_command(obj, targets, "Fission180_Appearance"),
             "Look At": lambda: self._look_at(obj),
             "Create Sketch": lambda: self._create_sketch(obj),
             "Change Active Units": open_units_panel,
@@ -2217,11 +2302,54 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         components_ui.create_from_bodies(self._doc, bodies)
         self.refresh(force=True)
 
-    def _isolate(self, obj):
+    def _isolate(self, obj, nodes=()):
+        """Isolate the row's body or component, or every selected body and component when it
+        is one of several selected: everything else hides (Exit Isolate shows it again)."""
         from . import components_ui
 
-        components_ui.isolate(obj)
+        targets = self._units_of(obj, nodes)
+        if len(targets) > 1:
+            self._isolate_many(targets)
+        elif targets:
+            components_ui.isolate(targets[0])
         self.refresh(force=True)
+
+    def _units_of(self, obj, nodes):
+        """The bodies and components among `nodes` (the row's own object when none is)."""
+        found = []
+        for n in nodes or ():
+            if n["kind"] in ("body", "component"):
+                o = self._object(n)
+                if o is not None and o not in found:
+                    found.append(o)
+        if not found and obj is not None:
+            found = [obj]
+        return found
+
+    def _isolate_many(self, targets):
+        """components_ui.isolate for several bodies / components at once: what none of them
+        keeps (not one of them, above or inside one) hides."""
+        from . import components_ui
+
+        doc = targets[0].Document
+        hide = None
+        for target in targets:
+            names = set(components.isolate_hidden(doc, target))
+            hide = names if hide is None else hide & names
+        hidden = []
+        for name in components.parents_map(doc):  # (in the design's order)
+            other = doc.getObject(name) if name in (hide or ()) else None
+            if other is None or other.ViewObject is None:
+                continue
+            if other.ViewObject.Visibility:
+                other.ViewObject.Visibility = False
+                hidden.append(name)
+        for target in targets:
+            for shown in [target] + components.ancestors(target):
+                if shown.ViewObject is not None and not shown.ViewObject.Visibility:
+                    shown.ViewObject.Visibility = True
+        components_ui.ISOLATED[doc.Name] = hidden
+        log("%d isolated (%d hidden)" % (len(targets), len(hidden)))
 
     def _unisolate(self):
         from . import components_ui
@@ -2240,16 +2368,37 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             components_ui.ISOLATED.pop(self._doc.Name, None)
         self.refresh(force=True)
 
-    def _find_in_window(self, obj):
+    def _find_in_window(self, obj, nodes=()):
+        """The view fits the row's object, or every selected row's object when it is one of
+        several selected."""
         if not commands.finish_open_dialog():  # the selection it makes is not a pick
             return
+        objs = [obj] if obj is not None else []
+        for n in nodes or ():
+            other = self._object(n)
+            if other is not None and other not in objs:
+                objs.append(other)
+        if not objs:
+            return
         Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(obj.Document.Name, obj.Name)
+        for each in objs:
+            Gui.Selection.addSelection(each.Document.Name, each.Name)
         Gui.SendMsgToActiveView("ViewSelection")
 
-    def _find_in_timeline(self, node):
+    def _find_in_timeline(self, node, nodes=()):
         from . import timeline_ui
 
+        if len([n for n in nodes or () if n is not None]) > 1:
+            names = []
+            for each in nodes:
+                for name in self._timeline_names(each):
+                    if name not in names:
+                        names.append(name)
+            w = timeline_ui.widget()
+            if w is not None and names:
+                w.refresh()
+                w.select(names)
+            return
         if node["kind"] in ("body", "component"):
             target = self._object(node)
             if node["kind"] == "body":
@@ -2266,6 +2415,48 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 w.select(names)
             return
         timeline_ui.find(node["object"])
+
+    def _timeline_names(self, node):
+        """The timeline steps of a row: a body's or component's steps, a sketch's (or other
+        step's) own."""
+        target = self._object(node)
+        if target is None:
+            return []
+        if node["kind"] == "body":
+            return [o.Name for o, b in ops.steps(self._doc) if b is target]
+        if node["kind"] == "component":
+            return [
+                o.Name
+                for o, b in ops.steps(self._doc)
+                if o is target or components.is_inside(b if b is not None else o, target)
+            ]
+        return [target.Name]
+
+    def _body_command(self, obj, nodes, command):
+        """Physical Material / Appearance on the row's body, or on every selected body (and
+        the bodies in selected components) when it is one of several selected: the command
+        starts with them selected and gives them all the first material / look picked (one
+        undo step at OK)."""
+        if self._doc is None or not commands.finish_open_dialog():
+            return
+        targets = []
+        for n in nodes or ():
+            other = self._object(n)
+            if other is None:
+                continue
+            if n["kind"] == "body":
+                found = [other]
+            elif n["kind"] == "component":
+                found = components.bodies_in(self._doc, other, recursive=True)
+            else:
+                found = []  # (sketches and the like have no material or look)
+            targets.extend(b for b in found if b not in targets)
+        if not targets and obj is not None:
+            targets = [obj]
+        Gui.Selection.clearSelection()
+        for body in targets:
+            Gui.Selection.addSelection(body.Document.Name, body.Name)
+        Gui.runCommand(command)
 
     def _look_at(self, sketch):
         view = Gui.ActiveDocument.ActiveView

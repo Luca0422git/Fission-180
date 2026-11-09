@@ -490,7 +490,7 @@ def check(kind, options):
     elif ptype == "bodies":
         bodies = _bodies(options)
         if not bodies:
-            raise NeedsPick("Select the body to pattern.")
+            raise NeedsPick("Select the body to pattern (or features in the timeline).")
         if len(bodies) > 1:
             raise PatternError("Select one body: each body gets its own pattern.")
         if bodies[0].Tip is None or bodies[0].Shape.isNull():

@@ -30,8 +30,37 @@ releases published under the old name (their tags are `sciforge-v...`).
 - **A cut hidden inside the part could not be seen.** The red preview of a cut now also shows
   through the walls that hide it, fainter, as in Fusion.
 - **The Split Body icon** has its blade line in the cut between the two pieces, not at the top.
+- **Sketch Move/Copy did not work, or left orange dots behind.** It is now Fission 180's own
+  tool, like Fusion's: it opens its MOVE/COPY panel every time (button or M), you pick curves by
+  clicking or by dragging a box, and red / green arrows, a turn handle and a ball move them with
+  the values shown live (X / Y Distance, Angle, Create Copy, Point to Point). Nothing is left
+  behind, and one Ctrl+Z undoes it. Ctrl+V in a sketch hands the pasted curves to it too.
+- **Moving or scaling sketch curves keeps them exactly where you put them:** dimensions show the
+  new sizes, and ties to curves that stay are loosened instead of pulling them back.
+- **A crash when closing a design while a sketch was open** (the right-angle marks read the 3D
+  view after it was gone).
+
+### New
+
+- **Sketch Scale has its own panel:** pick curves (a box too), click a base point, and set the
+  size as a factor (2, 0.5) or a percentage (150 %), or drag the blue arrow.
+- **Sketch Rectangular and Circular Pattern have Fusion's panels:** pick curves by clicking or a
+  box, see the copies before OK, drag blue arrows to space them or the white disc to set how far
+  a circular pattern goes (360, 180, 90...), and undo the whole pattern in one step.
+- **The body Circular Pattern's angle disc** can be dragged in Full too: dragging it turns the
+  pattern into an Angle pattern that goes as far round as you drag.
+- **Touchpads:** in the 3D view, drag two fingers to move the view, pinch to zoom around the
+  pointer; a mouse wheel still zooms as before. Preferences > General > Navigation > Touchpad:
+  Auto (default), Off (scrolling always zooms, as before) or On (scrolling always pans).
+- **The browser acts on every selected body:** with several selected, a right-click's Hide /
+  Show, Opacity, Delete, Remove, Isolate, Find in Window, Physical Material and Appearance apply to
+  all of them, and clicking the eye of one hides or shows them all. A right-click no longer
+  drops the others from the selection.
 
 ### Changed
+
+- **Pattern and Mirror start with Bodies,** like the other body tools: a click on the part takes
+  the whole body. Click a step in the timeline to pattern that feature instead.
 
 - **AI: every body and sketch it makes must have a name.** Whatever AI you use (the chat panel or
   an AI app connected to Fission 180), it is told to name what it makes, the making tools take a

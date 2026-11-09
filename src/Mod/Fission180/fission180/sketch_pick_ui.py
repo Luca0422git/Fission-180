@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Sketch commands that work on curves you pick first: Circular Pattern, Rectangular
-Pattern, Sketch Scale, Move/Copy. (Mirror has Fusion's MIRROR panel: sketch_mirror_tool.py.)
+Pattern. (Mirror has Fusion's MIRROR panel: sketch_mirror_tool.py; Sketch Scale and Move/Copy
+have theirs: sketch_scale_tool.py, sketch_move_tool.py, commands in sketch_*_ui.py.
+Circular and Rectangular Pattern are Fission 180 tools with a panel and drag handles like the
+body patterns' since 2026-11-09: sketch_pattern_tool.py; their commands are here.)
 
 FreeCAD's versions do nothing when nothing is selected, and its Rectangular Pattern
-opens a pop-up asking for rows and columns. Like in Fusion, the command now starts
-anyway: click the curves (each click adds one), press Enter (or click the command
-again), then the tool continues: FreeCAD's tool for the next pick (mirror line,
-centre, base point), or, for Rectangular Pattern, a panel at the top of the sketch
-panel with the quantity and spacing in both directions and a live preview.
+opens a pop-up asking for rows and columns. Fission 180's pattern tools start anyway and
+take the curves in their own panel (click, or a box). The waiting below (_Waiter,
+_PickCommand: click the curves, Enter, then a FreeCAD tool) has no command left using it;
+stop_waiting / on_enter / settle_box / close_box stay for sketch_mode's calls.
 """
 
 import FreeCAD as App
@@ -135,209 +137,88 @@ def _select(sketch, ids):
         Gui.Selection.addSelection(sketch.Document.Name, sketch.Name, "Edge%d" % (index + 1))
 
 
-class SketchCircularPattern(_PickCommand):
-    title = "Circular Pattern"
-    tip = "Copy curves around a centre: click them, Enter, then click the centre"
-    icon = "sk_pattern_circ"
-    freecad = "Sketcher_Rotate"
+class _SketchPatternCommand:
+    """SKETCH > CREATE > Rectangular / Circular Pattern: Fission 180's pattern tool with its
+    panel (sketch_pattern_tool.py). The command again while it runs ends it without making
+    anything, like another sketch tool (as Mirror)."""
 
+    title = ""
+    tip = ""
+    icon = ""
+    tool = ""  # the tool's class in sketch_pattern_tool
 
-class SketchScale(_PickCommand):
-    title = "Sketch Scale"
-    tip = "Scale curves: click them, Enter, then the base point and the size"
-    icon = "sk_scale"
-    freecad = "Sketcher_Scale"
+    def GetResources(self):
+        return {"MenuText": self.title, "ToolTip": self.tip, "Pixmap": ui_icon_path(self.icon)}
 
+    def IsActive(self):
+        return App.ActiveDocument is not None
 
-class SketchMove(_PickCommand):
-    title = "Move/Copy"
-    tip = "Move or copy curves: click them, Enter, then the base point and where to"
-    icon = "sk_move"
-    freecad = "Sketcher_Translate"
-
-
-class SketchRectangularPattern(_PickCommand):
-    title = "Rectangular Pattern"
-    tip = "Copy curves in rows and columns: click them, Enter, then set quantity and spacing"
-    icon = "sk_pattern_rect"
-
-    def go(self, sketch, ids):
-        session = sketch_mode.current()
-        if session is None:
-            return
-        RectangularPatternBox(session, ids)
-
-
-def _size(sketch, ids):
-    """(width, height) of the picked curves' bounding box (for the default spacing)."""
-    box = None
-    for index in ids:
+    def Activated(self):
         try:
-            b = sketch.Geometry[index].toShape().BoundBox
-        except Exception:
-            continue
-        if box is None:
-            box = b
-        else:
-            box.add(b)
-    if box is None:
-        return 10.0, 10.0
-    return max(box.XLength, 1.0), max(box.YLength, 1.0)
+            from . import sketch_draw, sketch_pattern_tool
 
-
-class RectangularPatternBox(theme.OwnBackground, QtWidgets.QFrame):
-    """Fusion's sketch Rectangular Pattern panel, shown at the top of the sketch panel:
-    Quantity and Distance (spacing) for both directions, live preview, OK / Cancel."""
-
-    def __init__(self, session, ids):
-        from . import sketch_palette
-        from .taskui import DistanceField
-
-        panel = sketch_palette.sketch_panel()
-        super().__init__(panel)
-        close_box()
-        _state["box"] = self
-        self.session = session
-        self.sketch = session.sketch
-        self.doc = self.sketch.Document
-        self.ids = list(ids)
-        self.setObjectName("Fission180RectangularPattern")
-        self.setStyleSheet(sketch_palette.STYLE.replace("Fission180SketchPalette", self.objectName()))
-        width, height = _size(self.sketch, self.ids)
-        layout = QtWidgets.QFormLayout(self)
-        title = QtWidgets.QLabel("RECTANGULAR PATTERN")
-        title.setProperty("role", "title")
-        layout.addRow(title)
-        layout.addRow(QtWidgets.QLabel("Objects: %d curve(s)" % len(self.ids)))
-        self.count1 = self._spin(3)
-        self.distance1 = DistanceField(round(width * 1.5, 2), on_change=self._changed)
-        self.count2 = self._spin(1)
-        self.distance2 = DistanceField(round(height * 1.5, 2), on_change=self._changed)
-        layout.addRow("Quantity (X)", self.count1)
-        layout.addRow("Distance (X)", self.distance1.widget)
-        layout.addRow("Quantity (Y)", self.count2)
-        layout.addRow("Distance (Y)", self.distance2.widget)
-        self.message = QtWidgets.QLabel("")
-        self.message.setStyleSheet("color: #ff8a80;")
-        self.message.setWordWrap(True)
-        layout.addRow(self.message)
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
-        )
-        buttons.accepted.connect(lambda: QtCore.QTimer.singleShot(0, self.accept))
-        buttons.rejected.connect(lambda: QtCore.QTimer.singleShot(0, self.reject))
-        layout.addRow(buttons)
-        if panel is not None and panel.layout() is not None:
-            panel.layout().insertWidget(0, self)
-        self.show()
-        self._open = False
-        self._timer = QtCore.QTimer()
-        self._timer.setSingleShot(True)
-        self._timer.setInterval(80)
-        self._timer.timeout.connect(self._preview)
-        Gui.Selection.clearSelection()
-        self._preview()
-        log("rectangular pattern: set quantity and spacing, then OK")
-
-    def keyPressEvent(self, event):
-        # Enter in a field updates the preview; it must not reach FreeCAD's sketch panel
-        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-            self._timer.start()
-            event.accept()
-            return
-        super().keyPressEvent(event)
-
-    def _spin(self, value):
-        box = QtWidgets.QSpinBox()
-        box.setRange(1, 999)
-        box.setValue(value)
-        box.valueChanged.connect(self._changed)
-        return box
-
-    def _changed(self, *_):
-        self._timer.start()
-
-    def _preview(self):
-        """Take the previous preview back and make the pattern again."""
-        try:
-            if self._open:
-                self.doc.abortTransaction()
-            self.doc.openTransaction("Rectangular Pattern")
-            self._open = True
-            nx, ny = self.count1.value(), self.count2.value()
-            dx, dy = self.distance1.value(), self.distance2.value()
-            if (nx > 1 or ny > 1) and abs(dx) < 1e-9:
-                raise ValueError("Distance (X) must not be 0")
-            if nx > 1 or ny > 1:
-                # FreeCAD: "rows" go along the vector, "columns" along the vector turned
-                # -90 degrees and scaled; so X copies are rows and +Y needs a minus sign
-                self.sketch.addRectangularArray(
-                    self.ids, App.Vector(dx, 0, 0), False, nx, ny, False, -dy / dx
+            tool_class = getattr(sketch_pattern_tool, self.tool)
+            running = sketch_draw.current_tool()
+            if isinstance(running, tool_class):
+                running.stop()  # the command again: it ends, nothing is made
+                return
+            sketch = sketch_mode.editing_sketch()
+            if sketch is None:
+                session = sketch_mode.current()
+                if session is not None:
+                    session.stop_tool()
+                commands.tell(
+                    "%s works inside a sketch: click Create Sketch (or edit a sketch) first."
+                    % self.title
                 )
-            self.sketch.solve()
-            self.message.setText("")
+                return
+            if not sketch.Geometry:
+                commands.tell("%s: draw some curves first." % self.title)
+                return
+            sketch_draw.run(tool_class)
         except Exception as exc:
-            self.message.setText(str(exc))
+            warn("%s failed: %s" % (self.title, exc))
 
-    def accept(self):
-        self._timer.stop()
-        self._preview()
-        if self.message.text():
-            return  # stay open with the reason, like Fusion
-        if self._open:
-            self.doc.commitTransaction()
-            self._open = False
-        log("rectangular pattern done")
-        self._close()
 
-    def reject(self):
-        self._timer.stop()
-        if self._open:
-            self.doc.abortTransaction()
-            self._open = False
-        self._close()
+class SketchCircularPattern(_SketchPatternCommand):
+    title = "Circular Pattern"
+    tip = (
+        "Copy curves around a centre point: pick the Objects, Center Point's Select and the "
+        "point; Full, Angle or Symmetric, Quantity, Total Angle; drag the disc to turn it"
+    )
+    icon = "sk_pattern_circ"
+    tool = "SketchCircularPattern"
 
-    def _close(self):
-        if _state["box"] is self:
-            _state["box"] = None
-        try:
-            self.hide()
-            self.setParent(None)
-            self.deleteLater()
-        except Exception:
-            pass
+
+class SketchRectangularPattern(_SketchPatternCommand):
+    title = "Rectangular Pattern"
+    tip = (
+        "Copy curves in rows and columns: pick the Objects; Directions (the sketch's X and Y, "
+        "or lines), Quantity and Distance of each; drag the arrows to space them"
+    )
+    icon = "sk_pattern_rect"
+    tool = "SketchRectangularPattern"
 
 
 def settle_box():
-    """The sketch closed under the panel (E, another command): keep what it shows,
-    without touching its widgets (they went with FreeCAD's sketch panel)."""
-    box = _state["box"]
+    """The sketch closed (E, another command): nothing waits for curves any more. (The
+    Rectangular Pattern box this kept is gone: the pattern tools are sketch_draw tools now,
+    which the sketch ends itself.)"""
     _state["box"] = None
     stop_waiting()
-    if box is not None and box._open:
-        try:
-            box._timer.stop()
-        except Exception:
-            pass
-        try:
-            box.doc.commitTransaction()
-        except Exception as exc:
-            warn("rectangular pattern: %s" % exc)
-        box._open = False
 
 
 def close_box(accept=False):
-    box = _state["box"]
-    if box is not None:
-        try:
-            box.accept() if accept else box.reject()
-        except Exception as exc:
-            warn("rectangular pattern: %s" % exc)
+    """Esc (accept False) or Finish Sketch (accept True) in the sketch: kept for its callers
+    in sketch_mode; the pattern tools end with the sketch's running tool (finish_tool makes
+    a pattern that can be made, Esc makes nothing)."""
+    _state["box"] = None
 
 
 COMMANDS = {
     "Fission180_SketchCircularPattern": SketchCircularPattern,
     "Fission180_SketchRectangularPattern": SketchRectangularPattern,
-    "Fission180_SketchScale": SketchScale,
-    "Fission180_SketchMove": SketchMove,
 }
+# Sketch Scale and Move/Copy are Fission 180 tools with Fusion's panels since 2026-11-09
+# (they waited here for curves, then handed them to FreeCAD's Scale / Translate):
+# sketch_scale_ui.py / sketch_move_ui.py and their sketch_*_tool.py.

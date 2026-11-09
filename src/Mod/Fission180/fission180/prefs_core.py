@@ -10,6 +10,7 @@ nothing here. Sources: docs/fission180/parity/misc.md.
 """
 
 from . import __version__ as _version, interface_scale as _interface_scale, update_core as _update_core
+from . import touchpad_core as _touchpad
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
 FISSION180 = "User parameter:BaseApp/Preferences/Mod/Fission180"
@@ -232,6 +233,21 @@ OPTIONS = [
         group="Navigation",
         tip="Off: rolling the wheel away from you zooms in. On: it zooms out.",
         apply="zoom",
+    ),
+    _option(
+        "touchpad",
+        "general",
+        "Touchpad",
+        "choice",
+        _touchpad.DEFAULT_MODE,
+        (PREFS, "String", "Touchpad"),
+        group="Navigation",
+        choices=[(value, label, True, "") for value, label in _touchpad.CHOICES],
+        tip="Auto: on a laptop's touchpad, two fingers dragged pan the view and a pinch zooms "
+        "about the pointer; a mouse wheel still zooms. Off: scrolling zooms, as with a mouse "
+        "wheel (pick it if your mouse's wheel ever pans). On: scrolling always pans and a "
+        "pinch or Ctrl + scroll zooms (for a touchpad Auto does not recognise; a mouse wheel "
+        "then pans too).",
     ),
     _option(
         "orbit_type",

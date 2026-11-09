@@ -4,6 +4,19 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-09: patch 0.1.0-beta.3.3.7, Luca's "bugs, polish" list (14 items), on `develop`**
+(Luca had shown Fission 180 to critical users; one uses it instead of Fusion: "it ran faster
+than fusion", "even he could see the unpolished edges"; newest session log "bugs, polish").
+Status: [x] separate extrude areas = separate bodies (extrude_pieces) [x] Split Body splits only
+what it crosses [x] hidden sketches stay hidden in profile picking [x] tool switching
+(commands.make_way_for; probes: 0 failed switches in 456 sketch + 74 body) [x] snap dot small in
+glyphs [x] sketch Move/Copy + Scale (own tools, helper agent) [x] sketch patterns + pattern drag
+handles + Bodies default (helper agent) [x] AI must name bodies and sketches (ai/naming) [x]
+touchpad pan/pinch + browser multi-select actions (helper agent) [x] Split Body icon [x] cut
+preview through walls [x] right-angle marks crash at close [x] VERSION / `_FALLBACK_VERSION`
+0.1.0-beta.3.3.7, CHANGELOG, parity checklist, AI docs [ ] "Fission 180 tests" green [ ] **Luca:
+patch release**.
+
 **2026-11-06 (night): patch 0.1.0-beta.3.3.6, Linux AppImage updates itself, on `develop`**
 (Luca: "wait it doesnt auto update on linux? ... i dont think i would be very happy with having
 to open the terminal every time i push a new fix"; session log "AppImage self-update").
@@ -1943,6 +1956,51 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: bugs, polish, patch 0.1.0-beta.3.3.7 (`develop`, 2026-11-09)
+
+Three helper agents worked in parallel on disjoint files (sketch Move/Copy + Scale; patterns;
+touchpad + browser), told not to touch git; I reviewed screenshots and ran their scenarios on a
+combined snapshot before committing (commits 74bfde43, 1b914a32, 4a4f6739 were mine alone).
+
+- **Separate bodies** (extrude_pieces.py): a hidden ExtrudePieces follower right after a New Body
+  /New Component extrude keeps one solid; the others go to bodies whose first step is
+  split.SplitPiece reading ExtrudePieces.OtherPieces (split.SPLIT_KINDS includes it, so delete.py
+  removes the bodies with the extrude). extrude_bodies.sits_after_lead (merge or pieces) for
+  merge_tip / ends_body / timeline_ops._is_merge; sync_followers skips it; a rebuilt lead takes it
+  over (Source). Pieces matched by centre (split.order + meta "centers"). Headless check 19 +
+  scenario extrude_separate_bodies. Pre-existing, not fixed: Pad of a WHOLE sketch whose rectangles
+  share sides (duplicate lines) gives broken solids after an edit (FreeCAD's face maker); the
+  dialog always expands a whole sketch to its areas, so only scripts / AI hit it.
+- **Split Body** (split.split_parts): with several solids only the crossed ones are split; the
+  untouched stay with piece 0.
+- **Hidden sketches**: profile_pick.candidate_sketches no longer offers hidden unused body sketches.
+- **Tool switching** (the bug Luca reported several times): probes (scratchpad, not committed)
+  ran every SKETCH command after Line / Fillet / Rectangle / Trim / Offset / Move/Copy / Dimension
+  and every SOLID command after Extrude / Fillet. Found: (1) FreeCAD's drawing tools started from
+  the ribbon or a key left Fission 180's Line chain or Fillet running under them (both took clicks;
+  26/206); (2) PartDesign_CoordinateSystem says active while a panel is open, then FreeCAD's modal
+  "A dialog is already open" stops it; (3) inactive FreeCAD commands ignored the click silently.
+  commands.make_way_for (ribbon run, drop-downs, shortcuts, marking menu): sketch commands give
+  way first (except Toggle Construction); FreeCAD non-Std commands finish the open panel first;
+  inactive ones: give way / finish sketch / finish panel, else a message. finish_open_dialog
+  presses a FreeCAD panel's OK (else Cancel). Drop-downs not greyed while a command runs.
+  Scenario tool_switch_any fails on the old code, passes now. Sweeps of 200+ steps hit the runner's
+  900 s scenario limit (not crashes: empty crash logs).
+- **Crash found**: sketch_right_angles' camera poll read a deleted 3D view at close (segfault,
+  sketch_paste_move run); _view_alive guard (shiboken validity + sketch still in edit).
+- **AI naming** (ai/naming.py): executor refuses an AI's next change while bodies/sketches it made
+  keep FreeCAD's names; making tools take "name" (catalog.NAMEABLE); instructions + chat prompt;
+  FISSION180_AI_NAMES=off in run_tests.sh (test drivers are scripts), naming.FORCE in its unit test.
+  MCP bundle carries the catalogue without naming.py: the tool list lives in catalog/__init__.py.
+- **Harness lesson**: h.press("Escape") types the letters E-s-c-a-p-e (E opened Extrude...): use
+  h.press(QtCore.Qt.Key_Escape).
+- Snap dot DOT_PIXELS_IN_GLYPH; cut preview SoAnnotation x-ray layer; Split Body icon redrawn.
+- Helpers' reports (details in their files): Move/Copy constraint rule = curves go exactly where
+  put, ties to unmoved geometry kept only if they still hold, dimensions re-measured; sketch
+  patterns copy geometry themselves (no FreeCAD array), copies not tied to originals; touchpad via
+  an event filter on the 3D view (touchpad_core.look decides; Auto/Off/On preference); browser
+  right-click no longer collapses the selection (setCurrentItem was the culprit).
 
 ### Session log: AppImage self-update, patch 0.1.0-beta.3.3.6 (`develop`, 2026-11-06)
 

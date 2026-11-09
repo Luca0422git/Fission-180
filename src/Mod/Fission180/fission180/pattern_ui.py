@@ -3,14 +3,21 @@
 (Mirror, which shares this dialog, is in mirror_ui.py).
 
 How it is used, like in Fusion:
-  * Pattern Type: Features (click steps in the timeline, or a face of the part: the step
-    that made it is taken), Faces (click every face of a hole or a boss) or Bodies.
-    Things selected before the command starts are taken at once.
+  * Pattern Type: Bodies (the default, like every body tool: a click anywhere on the part
+    takes its body; Luca, 2026-11-09: "when working with bodies, selections should always
+    default to body"), Features (click steps in the timeline, or a face of the part: the
+    step that made it is taken) or Faces (click every face of a hole or a boss). A step
+    clicked in the timeline while the type is Bodies switches it to Features (a timeline
+    step is a feature, never a body). Things selected before the command starts are taken
+    at once (features, faces or a body: the type follows them).
   * A selection box is blue while it takes the clicks; click a box to make it the one.
     Directions and axes: click an edge, a flat face (its normal), a round face (its axis)
     or one of the origin axes, which are drawn while such a box waits.
-  * The copies are previewed live. The blue arrows drag the distances (Rectangular, Pattern
-    on Path), the blue curved handle the total angle (Circular, Angle/Symmetric).
+  * The copies are previewed live. The blue arrows drag the distances (Rectangular: the
+    Distance of each direction, Extent or Spacing as the Distance Type says; Pattern on
+    Path), the curved handle (a white disc on an arc) the Total Angle (Circular, every
+    Type: dragged off 360 in Full it becomes an Angle pattern, as far round as it is
+    dragged: 360, 180, 90...). Typed values move the handles.
   * Values take parameters and formulas. Problems are said in the dialog; OK waits for a
     fix. Esc / Cancel leave the model as it was; the whole pattern is one undo step.
   * Double-click the pattern in the timeline to change it.
@@ -36,6 +43,7 @@ PATTERN_TYPES = [
     ("Features", "features"),
     ("Components", "components"),
 ]
+DEFAULT_TYPE = "bodies"  # a new pattern / mirror starts with Bodies (Luca, 2026-11-09)
 DISTRIBUTIONS = [("Extent", "extent"), ("Spacing", "spacing")]
 DIRECTION_TYPES = [("One Direction", "one"), ("Symmetric", "symmetric")]
 CIRCULAR_TYPES = [("Full", "full"), ("Angle", "angle"), ("Symmetric", "symmetric")]
@@ -657,7 +665,12 @@ class PatternPanel(Panel):
         self.gate = None
         self.watch = None
         self.view = Gui.ActiveDocument.ActiveView
-        self.options = pattern.with_defaults({"quantity": 3 if self.kind == "circular" else 2})
+        # A new pattern (or mirror) starts with Pattern Type Bodies, as every body tool does
+        # (Move/Copy, Align, Combine, Scale, Split take bodies); pattern.DEFAULTS stays
+        # Features for the document side (scripts and old files that name no type).
+        self.options = pattern.with_defaults(
+            {"quantity": 3 if self.kind == "circular" else 2, "pattern_type": DEFAULT_TYPE}
+        )
         if feature is not None:
             self.body = pattern.feature_body(feature)
             self.base = pattern.base_of(feature)
@@ -777,7 +790,7 @@ class PatternPanel(Panel):
         form = self.layout
         if self.kind == "rectangular":
             self.distribution = _combo(DISTRIBUTIONS, self.options["distribution"])
-            form.addRow("Distribution", self.distribution)
+            form.addRow("Distance Type", self.distribution)  # Fusion's name (as the sketch's)
             self.suppression = self._suppression()
             form.addRow(_bold("Direction 1"))
             self._selection("direction", "Select", "Direction")
@@ -833,7 +846,7 @@ class PatternPanel(Panel):
             self.quantity = self._quantity(self.options["quantity"], self._typed)
             form.addRow("Quantity", self.quantity)
             self.distribution = _combo(DISTRIBUTIONS, self.options["distribution"])
-            form.addRow("Distribution", self.distribution)
+            form.addRow("Distance Type", self.distribution)  # Fusion's name (as the sketch's)
             self.direction_type = _combo(DIRECTION_TYPES, self.options["direction_type"])
             form.addRow("Direction Type", self.direction_type)
             self.orientation = _combo(ORIENTATIONS, self.options["orientation"])
@@ -882,7 +895,14 @@ class PatternPanel(Panel):
                 if spin is not None:
                     spin.setValue(int(self.options[name]))
             for key, field in self._value_fields().items():
-                field.set_value(float(self.options[key]))
+                value = float(self.options[key])
+                if (
+                    key == "angle"
+                    and self.options.get("circular_type") == "full"
+                    and not self.options["expressions"].get("angle")
+                ):
+                    value = 360.0  # Full: the box beside the disc says the whole way round
+                field.set_value(value)
         finally:
             self._quiet = False
         self._update_visibility()
@@ -1170,8 +1190,14 @@ class PatternPanel(Panel):
         if ptype == "components":
             return "Click the component to repeat (in the window, or its browser row)."
         if self.kind == "mirror":
-            return "Click the body to mirror (on the part, or in the browser)."
-        return "Click the body to repeat: each copy becomes a new body."
+            return (
+                "Click the body to mirror (on the part, or in the browser). To mirror "
+                "features instead, click them in the timeline."
+            )
+        return (
+            "Click the body to repeat: each copy becomes a new body. To repeat features "
+            "instead, click them in the timeline."
+        )
 
     # -- watching clicks ----------------------------------------------------------------------------
     def _watch(self):
@@ -1271,6 +1297,21 @@ class PatternPanel(Panel):
             return False
         return obj is self.base or pattern.before(body, self.base, obj)
 
+    def _timeline_feature(self, obj, short):
+        """True for a whole solid step (a timeline click), not a body or a face of one: with
+        Pattern Type Bodies it means the user wants that feature repeated. Not while editing
+        a pattern (its type stays what it was made with)."""
+        if self.editing or short or obj is None:
+            return False
+        if obj.TypeId in ("PartDesign::Body", "Sketcher::SketchObject"):
+            return False
+        try:
+            if _surface_body([(obj, short)]) is not None:
+                return False  # a surface body's step: patterned as a body (surface-4)
+        except Exception:
+            pass
+        return pattern.is_solid_feature(obj) and not pattern.is_body_copy(obj)
+
     def _object_picked(self, obj, short):
         ptype = self.options["pattern_type"]
         if ptype == "components":
@@ -1285,7 +1326,24 @@ class PatternPanel(Panel):
             common.set_combo(self.pattern_type, ptype)
             self._quiet = False
             self._update_visibility()
+        elif ptype == "bodies" and self._timeline_feature(obj, short):
+            # A step clicked in the timeline is a feature, never a body: the type follows
+            # (Fusion clears the objects when the type changes; so does this).
+            self.options["pattern_type"] = ptype = "features"
+            self.options["objects"] = []
+            self._quiet = True
+            common.set_combo(self.pattern_type, ptype)
+            self._quiet = False
+            self._update_visibility()
+            log("%s: a timeline step was clicked: Pattern Type Features" % self.title)
         if ptype == "bodies":
+            if obj.TypeId == "Sketcher::SketchObject" and not short:
+                # a sketch's row in the timeline is no pick of the body it is in
+                self.message.setText(
+                    "⚠ A sketch cannot be patterned here: click the body, or the feature "
+                    "made from the sketch in the timeline."
+                )
+                return
             body = pattern.owner_body(obj)
             if body is None:
                 self.message.setText("⚠ Pick a body.")
@@ -1741,6 +1799,11 @@ class PatternPanel(Panel):
             self._quiet = True
             self.angle_field.set_value(180.0 if ctype == "angle" else 90.0)
             self._quiet = False
+        elif ctype == "full" and not self.options["expressions"].get("angle"):
+            # Full goes the whole way round: the box beside the disc says so (360)
+            self._quiet = True
+            self.angle_field.set_value(360.0)
+            self._quiet = False
         self._update_visibility()
         self._changed(new_geometry=True)
 
@@ -1769,6 +1832,13 @@ class PatternPanel(Panel):
     def _angle_typed(self, value):
         if self._quiet:
             return
+        if self.circular_type.currentData() == "full" and abs(abs(value) - 360.0) > 1e-9:
+            # an angle typed in the box beside the disc of a Full pattern: an Angle pattern
+            self._quiet = True
+            try:
+                common.set_combo(self.circular_type, "angle")
+            finally:
+                self._quiet = False
         handle = self.handles.get("angle")
         if handle is not None:
             # the curved handle turns past half a turn (_TurnDragger): a typed 270 puts it at
@@ -1803,16 +1873,24 @@ class PatternPanel(Panel):
             return
         self._handle_press = False
         value = round(value, 1)
-        if abs(value - round(self.angle_field.value(), 1)) < 1e-9:
+        full = self.circular_type.currentData() == "full"
+        shown = 360.0 if full else round(self.angle_field.value(), 1)
+        if abs(value - shown) < 1e-9 or (full and abs(abs(value) - 360.0) < 1e-9):
             return  # a click on the handle without turning it: the angle (and its formula) stays
         self.drop_formula("angle")
         if abs(value) < 1.0:
             value = 1.0 if value >= 0 else -1.0
         self._quiet = True
         try:
+            if full:
+                # Fusion: dragging the angle of a full circle makes an Angle pattern that goes
+                # as far round as the handle (Luca: "how far you want it to revolve")
+                common.set_combo(self.circular_type, "angle")
             self.angle_field.set_value(value)
         finally:
             self._quiet = False
+        if full:
+            log("%s: the angle handle was dragged: Type Angle, %.1f deg" % (self.title, value))
         self._changed()
 
     def _changed(self, new_geometry=False):
@@ -2065,7 +2143,8 @@ class PatternPanel(Panel):
             wanted.add("distance")
             if self.options["direction2"] is not None:
                 wanted.add("distance2")
-        elif self.kind == "circular" and self.options["circular_type"] != "full":
+        elif self.kind == "circular":
+            # every Type: in Full the disc stands at 360 and a drag makes it an Angle pattern
             wanted.add("angle")
         elif self.kind == "path":
             wanted.add("distance")
@@ -2139,7 +2218,10 @@ class PatternPanel(Panel):
                 radius = max(radial.Length, 5.0)
                 radial.normalize()
                 pivot = point + axis * offset.dot(axis)
-                angle = max(-360.0, min(360.0, float(self.options["angle"])))
+                if self.options["circular_type"] == "full":
+                    angle = 360.0  # the whole way round: the disc stands on the original
+                else:
+                    angle = max(-360.0, min(360.0, float(self.options["angle"])))
                 self.handles["angle"] = _TurnDragger(
                     pattern.to_global(self.body, pivot),
                     pattern.to_global(self.body, vector=axis),

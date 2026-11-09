@@ -300,9 +300,27 @@ class RightAngleMarks:
         except Exception:
             return None
 
+    def _view_alive(self):
+        """The sketch's 3D view still exists. A document closed with its sketch still open
+        (quitting Fission 180) deletes the view before the session hears of it; reading its
+        camera then crashed FreeCAD (a segfault, seen at the end of a test run)."""
+        try:
+            import FreeCADGui as Gui
+
+            from . import sketch_mode
+
+            session = self.session
+            if session.closed or not sketch_mode._is_valid(session.gl):
+                return False
+            gdoc = Gui.ActiveDocument
+            edit = gdoc.getInEdit() if gdoc is not None else None
+            return edit is not None and getattr(edit, "Object", None) is session.sketch
+        except Exception:
+            return False
+
     def _poll(self):
         try:
-            if self.session.closed:
+            if not self._view_alive():
                 self._timer.stop()
                 return
             if self._camera_key() != self._camera:

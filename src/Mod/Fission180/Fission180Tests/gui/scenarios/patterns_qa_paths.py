@@ -73,7 +73,8 @@ def p1_ok_with_nothing():
 def p1_ok_waits():
     p = ps.panel()
     h.check("OK with nothing picked keeps the dialog open", p is not None)
-    h.check("the dialog says what to pick", "select the features" in message().lower(), message())
+    # Pattern Type starts as Bodies (Luca, 2026-11-09): it asks for the body (or features)
+    h.check("the dialog says what to pick", "select the body" in message().lower(), message())
     h.check("model unchanged", ps.close(h.solid_volume(), s["v"]))
     ps.no_popups("OK with nothing picked")
     h.fit()

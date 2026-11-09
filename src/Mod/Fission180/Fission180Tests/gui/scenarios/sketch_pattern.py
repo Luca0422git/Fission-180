@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Sketch commands that take picked curves, started with nothing selected:
-Rectangular Pattern (no pop-up: a panel with quantity and spacing, live preview,
-OK / Cancel, one undo step), Mirror, Circular Pattern.
+Rectangular Pattern (no pop-up: Fission 180's pattern panel with quantity and distance per
+direction, live preview, OK / Cancel, one undo step), Mirror, Circular Pattern.
 
-C: a circle. Rectangular Pattern from the CREATE menu: click the circle, Enter; set
-4 x 10 mm and 2 x 15 mm, OK: 8 circles exactly 10 / 15 apart. Again, then Cancel:
+C: a circle. Rectangular Pattern from the CREATE menu: click the circle; Distance Type
+Spacing, 4 x 10 mm and 2 x 15 mm, OK: 8 circles exactly 10 / 15 apart. Again, then Cancel:
 nothing changes. Ctrl+Z / Ctrl+Y. L: a vertical line; Mirror: click the first circle,
-Enter, click the line: its mirror image appears. Circular Pattern: click a circle,
-Enter: FreeCAD's tool asks for the centre; Esc stops it, nothing changes.
+Mirror Line, click the line: its mirror image appears. Circular Pattern: click a circle,
+Enter: the tool waits for its centre point (its own pointer); Esc stops it, nothing changes.
+(The panel and handles in depth: sketch_pattern_tools.py.)
 """
 
 import FreeCAD as App
@@ -68,35 +69,44 @@ def pattern_pick():
 
 
 def pattern_enter():
-    h.check("circle picked", bool(Gui.Selection.getSelectionEx()))
-    h.press(QtCore.Qt.Key_Return)
+    # Fission 180's pattern panel: the circle clicked is the Objects (no Enter needed)
+    from Fission180Tests.gui import sketch_tools_steps as st
+
+    t = st.tool()
+    h.check("circle picked", t is not None and t.objects == [0], t and t.objects)
 
 
 def _box():
-    return Gui.getMainWindow().findChild(QtWidgets.QFrame, "Fission180RectangularPattern")
+    return Gui.getMainWindow().findChild(QtWidgets.QFrame, "Fission180SketchPatternPanel")
+
+
+def _child(name):
+    box = _box()
+    return box.findChild(QtWidgets.QWidget, name) if box is not None else None
 
 
 def pattern_values():
+    from Fission180Tests.gui import blend_steps as b
+
     box = _box()
     h.check("pattern panel shown (no pop-up)", box is not None and box.isVisible(), h.popups())
     h.check("no pop-up", not h.popups(), h.popups())
     if box is None:
         return
-    spins = box.findChildren(QtWidgets.QSpinBox)
-    fields = [
-        w
-        for w in box.findChildren(QtWidgets.QAbstractSpinBox)
-        if not isinstance(w, QtWidgets.QSpinBox)
-    ]
-    si.type_into(spins[0], "4")
-    si.type_into(fields[0], "10")
-    si.type_into(spins[1], "2")
-    si.type_into(fields[1], "15")
+    b.choose(_child("Fission180PatternDistanceType"), "Spacing")
+    si.type_into(_child("Fission180PatternQuantity"), "4")
+    si.type_into(_child("Fission180PatternDistance"), "10")
+    si.type_into(_child("Fission180PatternQuantity2"), "2")
+    si.type_into(_child("Fission180PatternDistance2"), "15")
 
 
 def pattern_preview():
-    n = len(si.circles(s["sk"]))
-    h.check("live preview: 8 circles", n == 8, n)
+    from Fission180Tests.gui import sketch_tools_steps as st
+
+    t = st.tool()
+    n = len(t.copies()) if t is not None else 0
+    h.check("live preview: 7 copies", n == 7, n)
+    h.check("the preview is no geometry yet", len(s["sk"].Geometry) == 1, len(s["sk"].Geometry))
     h.shot("1-pattern")
     box = _box()
     ok = [b for b in box.findChildren(QtWidgets.QPushButton) if b.text().replace("&", "") == "OK"]
@@ -106,6 +116,7 @@ def pattern_preview():
 
 
 def pattern_done():
+    h.settle("the pattern")
     sk = s["sk"]
     centres = sorted(
         (round(c.Center.x - s["c0"].x, 6), round(c.Center.y - s["c0"].y, 6))
@@ -126,14 +137,17 @@ def cancel_pick():
 
 
 def cancel_enter():
-    h.press(QtCore.Qt.Key_Return)
+    h.wait_for(lambda: _box() is not None, "the pattern panel")
 
 
 def cancel_click():
+    from Fission180Tests.gui import sketch_tools_steps as st
+
     box = _box()
     h.check("panel shown again", box is not None)
     if box is not None:
-        h.check("preview while open", len(s["sk"].Geometry) > s["count"])
+        t = st.tool()
+        h.check("preview while open", t is not None and len(t.copies()) > 0)
         cancel = [
             b
             for b in box.findChildren(QtWidgets.QPushButton)
@@ -145,6 +159,7 @@ def cancel_click():
 
 
 def cancelled():
+    h.settle("Cancel")
     h.check("Cancel leaves the sketch as it was", len(s["sk"].Geometry) == s["count"])
 
 
@@ -231,10 +246,15 @@ def circular_enter():
 
 
 def circular_running():
+    from Fission180Tests.gui import sketch_tools_steps as st
+
     h.check(
         "Circular Pattern runs with the picked circle",
         h.gl_widget().cursor().shape() != QtCore.Qt.ArrowCursor,
     )
+    t = st.tool()
+    h.check("it waits for the centre point", t is not None and t.title == "Circular Pattern"
+            and len(t.objects) == 1 and t.center is None, t and t.state().get("objects"))
     h.press(QtCore.Qt.Key_Escape)
 
 

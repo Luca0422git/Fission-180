@@ -281,7 +281,10 @@ def p13_dragged_on():
 def p13_full():
     p = ps.panel()
     h.check("Full: no Total Angle", not p.angle_field.widget.isVisible())
-    h.check("no curved handle for Full", "angle" not in p.handles, list(p.handles))
+    # the disc shows in Full too, at 360 (Luca, 2026-11-09: drag it to 180, 90...)
+    handle = p.handles.get("angle")
+    h.check("Full: the curved handle at 360", handle is not None and abs(handle.angle() - 360.0) < 1e-3,
+            (list(p.handles), handle and handle.angle()))
     h.task_button("Cancel")
 
 

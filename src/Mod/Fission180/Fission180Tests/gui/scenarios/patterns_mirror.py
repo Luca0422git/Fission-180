@@ -54,7 +54,9 @@ def waiting():
     if p is None:
         return
     h.check("Objects box active, nothing picked", p.fields["objects"].button.isChecked())
-    h.check("no Operation for features", not p.operation.isVisible())
+    # Luca, 2026-11-09: body tools start with bodies (Operation shows for a mirror of bodies)
+    h.check("Pattern Type Bodies", p.pattern_type.currentData() == "bodies")
+    h.check("Operation shown for bodies", p.operation.isVisible())
     h.check("model unchanged", ps.close(h.solid_volume(), s["v0"]))
     ps.no_popups("Mirror with nothing selected")
     h.shot("1-waiting")
@@ -67,6 +69,10 @@ def click_boss_step():
 def click_plane_box():
     p = ps.panel()
     h.check("boss picked", p and len(p.options["objects"]) == 1, p and p.options["objects"])
+    h.check(
+        "the timeline step switched to Features (no Operation)",
+        p and p.pattern_type.currentData() == "features" and not p.operation.isVisible(),
+    )
     ps.click_box("plane")
 
 

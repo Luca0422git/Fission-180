@@ -51,7 +51,8 @@ def waiting():
         return
     h.check("nothing picked yet", p.options["objects"] == [] and p.target is None)
     h.check("Objects box is active (blue)", p.fields["objects"].button.isChecked())
-    h.check("Pattern Type is Features", p.pattern_type.currentText() == "Features")
+    # Luca, 2026-11-09: body tools default to bodies (a timeline click switches to Features)
+    h.check("Pattern Type is Bodies", p.pattern_type.currentText() == "Bodies")
     h.check("no error shown while waiting", p.message.text() == "", p.message.text())
     h.check("a hint says what to click", "timeline" in p.info.text(), p.info.text())
     h.check("model unchanged while waiting", ps.close(h.solid_volume(), s["v0"]))
@@ -66,6 +67,11 @@ def click_hole_step():
 def hole_picked():
     p = ps.panel()
     h.check("the hole's step is the object", p and len(p.options["objects"]) == 1, p and p.options)
+    h.check(
+        "a timeline step switched Pattern Type to Features",
+        p and p.pattern_type.currentText() == "Features",
+        p and p.pattern_type.currentText(),
+    )
     h.check("Objects box says 1 selected", p and p.fields["objects"].button.text() == "1 selected")
     h.check("waits for a direction", p and "Direction" in p.info.text(), p and p.info.text())
     h.check("no preview yet", p and p.target is None)
