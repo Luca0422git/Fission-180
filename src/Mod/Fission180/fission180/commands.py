@@ -226,6 +226,11 @@ def _active(cmd):
         return True
 
 
+# Sketch commands that work with the running tool (FreeCAD's construction mode switches the
+# tool being drawn to construction lines)
+KEEPS_SKETCH_TOOL = ("Sketcher_ToggleConstruction", "Fission180_SketchToggleConstruction")
+
+
 def _would_ask(name):
     """FreeCAD's own command started while a command panel is open (not a sketch being
     edited): FreeCAD would ask whether to close that panel. Fission 180's commands end it
@@ -255,6 +260,18 @@ def make_way_for(name):
         cmd = None
     if cmd is None:
         return True
+    if _in_sketch() and _is_sketch_command(name) and name not in KEEPS_SKETCH_TOOL:
+        # a sketch tool replaces the running one, Fission 180's own (Line, Fillet...) too:
+        # FreeCAD's Rectangle started from the ribbon left Fission 180's Line chain or Fillet
+        # running under it, both taking the clicks (tool switch probe, 26 of 206 switches)
+        try:
+            from . import sketch_mode
+
+            session = sketch_mode.current()
+            if session is not None:
+                session.give_way()
+        except Exception as exc:
+            warn("starting %s: %s" % (name, exc))
     if _active(cmd):
         if _would_ask(name):
             # FreeCAD's own panel command (a coordinate system, a datum) "can start", then
