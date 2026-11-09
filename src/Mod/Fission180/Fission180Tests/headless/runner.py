@@ -26,6 +26,10 @@ import tempfile
 import time
 import traceback
 
+# A test driver, not an AI: the rule that an AI names what it makes is off here
+# (fission180/ai/naming.py; run_tests.sh sets it too, windows_sim.sh does not).
+os.environ.setdefault("FISSION180_AI_NAMES", "off")
+
 TOP = {"normal": [0, 0, 1], "at": {"axis": "z", "value": "max"}, "count": 1}
 TOP4 = {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4}
 BOTTOM4 = {"type": "line", "at": {"axis": "z", "value": "min"}, "count": 4}

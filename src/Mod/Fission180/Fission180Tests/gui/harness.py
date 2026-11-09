@@ -49,6 +49,10 @@ import FreeCADGui as Gui
 from PySide import QtCore, QtGui, QtWidgets
 from PySide6 import QtTest
 
+# A test driver, not an AI: the rule that an AI names what it makes is off here
+# (fission180/ai/naming.py; run_tests.sh sets it too, windows_sim.sh does not).
+os.environ.setdefault("FISSION180_AI_NAMES", "off")
+
 OUT_DIR = os.environ.get("FISSION180_SMOKE_OUT") or App.getUserAppDataDir()
 # the fixed wait after each step of a scenario not converted yet (paced_by="timer")
 STEP_MS = int(os.environ.get("FISSION180_STEP_MS", "700"))

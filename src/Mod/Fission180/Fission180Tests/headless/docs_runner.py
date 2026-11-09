@@ -34,6 +34,10 @@ import tempfile
 import time
 import traceback
 
+# A test driver, not an AI: the rule that an AI names what it makes is off here
+# (fission180/ai/naming.py; run_tests.sh sets it too, windows_sim.sh does not).
+os.environ.setdefault("FISSION180_AI_NAMES", "off")
+
 SHOWN_TMP = "/home/me/fission180"  # what a temporary folder is shown as on the pages
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 # A date in an answer (a drawing's title block takes today's): never compared as numbers, so

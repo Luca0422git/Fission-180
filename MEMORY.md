@@ -1993,6 +1993,8 @@ combined snapshot before committing (commits 74bfde43, 1b914a32, 4a4f6739 were m
   keep FreeCAD's names; making tools take "name" (catalog.NAMEABLE); instructions + chat prompt;
   FISSION180_AI_NAMES=off in run_tests.sh (test drivers are scripts), naming.FORCE in its unit test.
   MCP bundle carries the catalogue without naming.py: the tool list lives in catalog/__init__.py.
+  CI #24: windows_sim.sh runs sim_accuracy_qa outside run_tests.sh, so its AI cases were refused;
+  every test driver (headless runners, gui/harness.py) now sets FISSION180_AI_NAMES=off itself.
 - **Harness lesson**: h.press("Escape") types the letters E-s-c-a-p-e (E opened Extrude...): use
   h.press(QtCore.Qt.Key_Escape).
 - Snap dot DOT_PIXELS_IN_GLYPH; cut preview SoAnnotation x-ray layer; Split Body icon redrawn.

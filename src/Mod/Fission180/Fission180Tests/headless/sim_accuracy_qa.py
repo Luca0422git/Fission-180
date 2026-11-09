@@ -34,6 +34,10 @@ import traceback
 
 from . import sim_benchmarks as sb
 
+# A test driver, not an AI: the rule that an AI names what it makes is off here
+# (fission180/ai/naming.py; run_tests.sh sets it too, windows_sim.sh does not).
+os.environ.setdefault("FISSION180_AI_NAMES", "off")
+
 OMP = "1"  # one CalculiX thread: the timings compare between runs
 
 # Timoshenko shear coefficients (Cowper 1966, "The shear coefficient in Timoshenko's beam
