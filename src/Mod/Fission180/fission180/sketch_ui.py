@@ -14,7 +14,7 @@ Esc / Cancel leaves without creating anything.
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, log, taskui, ui_icon, warn
+from . import body_visibility, commands, log, taskui, ui_icon, warn
 from .compat import QtCore, QtWidgets
 
 PLANE_TYPES = ("App::Plane", "PartDesign::Plane")
@@ -74,7 +74,7 @@ def design_box(body):
     low = high = None
     for obj in body.Document.Objects:
         try:
-            if obj.TypeId != "PartDesign::Body" or not obj.ViewObject.Visibility:
+            if obj.TypeId != "PartDesign::Body" or not body_visibility.body_shown(obj):
                 continue
             shape = obj.Shape
             if shape.isNull() or not (shape.Solids or shape.Faces):

@@ -7,14 +7,17 @@ A sketch of two separate squares extruded (two bodies; the sketch hides with the
 the browser: the Bodies folder's eye hides both. Sketch 1's eye: the sketch shows on the
 screen, no solid does; the browser still shows both bodies hidden. Body's eye: its solid
 comes back, the sketch stays. Body's eye again: the solid goes, the sketch stays. Sketch 1's
-eye: the sketch goes too, and Body is plainly hidden again.
+eye: the sketch goes too, and Body is plainly hidden again. While the sketch shows alone, the
+mouse over Body's row shows Body's ghost (it did not: Luca, 2026-11-10).
 """
 import FreeCAD as App
 import FreeCADGui as Gui
+from PySide import QtCore
 
 from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import timeline_input as ti
+from Fission180Tests.gui import widget_input as wi
 
 V = App.Vector
 s = {}
@@ -77,7 +80,30 @@ def sketch_alone():
     on, colours = sketch_drawn_at(V(5, 5, 0))
     h.check("the sketch shows on the screen", on, colours)
     h.shot("1-sketch-in-hidden-body")
+    hover_row(body.Label)
+
+
+def ghost_while_sketch_shows():
+    """Hovering the hidden body's row shows its ghost, also while one of its sketches shows
+    (the body is on to draw the sketch: the ghost looked for an eye that was off; Luca,
+    2026-11-10)."""
+    from fission180 import hover_ghost
+
+    body = s["body"]
+    h.wait_for(lambda: hover_ghost.current() is not None, "the ghost")
+    h.check("hovering Body's row: its ghost", hover_ghost.current() is body, hover_ghost.current())
+    root = Gui.ActiveDocument.ActiveView.getSceneGraph()
+    node = hover_ghost.node()
+    h.check("the ghost is in the 3D view", node is not None and root.findChild(node) >= 0)
+    h.shot("1b-ghost-of-hidden-body")
     h.check("Body's eye", ti.click_eye(body.Label))
+
+
+def hover_row(label):
+    tree, pos = ti.row_point(label)
+    if pos is not None:
+        wi.move(tree.viewport(), pos + QtCore.QPoint(5, 0))
+        wi.move(tree.viewport(), pos)
 
 
 def body_back():
@@ -107,6 +133,7 @@ def all_hidden():
 
 h.run(
     "browser_sketch_in_hidden_body",
-    [setup, hide_bodies, show_sketch, sketch_alone, body_back, body_hidden_sketch_stays, all_hidden],
+    [setup, hide_bodies, show_sketch, sketch_alone, ghost_while_sketch_shows, body_back,
+     body_hidden_sketch_stays, all_hidden],
     paced_by="state",
 )

@@ -45,8 +45,13 @@ def _rolled_back(obj):
 
 
 def _visible(obj):
+    """True when `obj` is drawn as it is (no ghost needed). A body shown only to draw one of
+    its sketches (body_visibility.py: the body on, its solid hidden) counts as hidden: the
+    browser shows it hidden, and hovering its row shows its ghost (Luca, 2026-11-10)."""
     try:
-        return obj.ViewObject is not None and bool(obj.ViewObject.Visibility)
+        from . import body_visibility
+
+        return obj.ViewObject is not None and body_visibility.drawn(obj)
     except Exception:
         return False
 

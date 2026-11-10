@@ -20,7 +20,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import bodypick, commands, construct, handles3d, hole_common, log, pickpanel
-from . import preview, section, warn
+from . import body_visibility, preview, section, warn
 from . import ui_icon_path
 from .compat import QtCore, QtGui, QtWidgets
 from .taskui import DistanceField, ValueBoxes
@@ -210,7 +210,7 @@ def refresh(doc):
         own = _root(obj)
         for node in _clip_nodes(own):  # an earlier Fission 180 clipped the whole body
             own.removeChild(node)
-        cut = bool(obj.ViewObject is not None and obj.ViewObject.Visibility)
+        cut = bool(obj.ViewObject is not None and body_visibility.drawn(obj))
         for target in solid_displays(obj):
             root = _root(target)
             if root is None:
@@ -236,7 +236,8 @@ def cut_shapes(doc):
     found = []
     for obj in section.clipped_objects(doc):
         try:
-            if obj.ViewObject is None or not obj.ViewObject.Visibility:
+            # (a body on only to draw a sketch of it has its solid hidden: no cut faces)
+            if obj.ViewObject is None or not body_visibility.drawn(obj):
                 continue
             shape = obj.Shape
             if shape.isNull() or not shape.Solids:

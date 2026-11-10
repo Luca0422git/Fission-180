@@ -75,6 +75,14 @@ def body_shown(body):
     return tip is None or _on(tip)
 
 
+def drawn(obj):
+    """True when `obj`'s solid is on the screen: a body by its solid (body_shown; a body on
+    only to draw a sketch of it is hidden), anything else by its own eye."""
+    if is_body(obj):
+        return body_shown(obj)
+    return _on(obj)
+
+
 def show_body(body, visible):
     """The body's eye. Hiding keeps the body on (its solid off) while a sketch of it shows."""
     tip = _tip(body)
