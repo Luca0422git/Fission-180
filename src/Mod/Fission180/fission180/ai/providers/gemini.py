@@ -28,13 +28,19 @@ snake_case. Not verified against the REST pages themselves:
 The role of the turn carrying function responses is "user" (the SDK's README uses "tool",
 which it maps): not verified.
 
-Non-streaming only.
+Streaming (StreamReader below; google-genai 3.0.0's models.py and _api_client.py, read
+November 2026): POST {base}/v1beta/models/{model}:streamGenerateContent?alt=sse; each
+"data:" line holds a GenerateContentResponse with the next parts (text in pieces, a
+functionCall whole, a thoughtSignature on a part of its own or on the last one); the
+last one has the finishReason and the usage; the answer ends when the connection closes.
+An error can also come as plain JSON lines. Pieces of plain text are joined into one part;
+a part with a signature or a function call is kept as it came.
 """
 
 import copy
 import urllib.parse
 
-from . import _common
+from . import _common, _stream
 
 NAME = "gemini"
 DISPLAY_NAME = "Gemini (Google)"
@@ -154,6 +160,15 @@ class Adapter:
             body["tools"] = self.tools(tools)
         path = "/v1beta/%s:generateContent" % urllib.parse.quote(_model_path(model), safe="/.-_")
         return _common.join(base_url or BASE_URL, path), headers, body
+
+    def stream_request(self, url, headers, body):
+        """The same request, answered as a stream (streamGenerateContent with alt=sse)."""
+        url = url.replace(":generateContent", ":streamGenerateContent", 1)
+        url += ("&" if "?" in url else "?") + "alt=sse"
+        return url, dict(headers), dict(body)
+
+    def stream_reader(self):
+        return StreamReader()
 
     def parse_response(self, data):
         try:
@@ -282,3 +297,85 @@ class Adapter:
         error = (data or {}).get("error") if isinstance(data, dict) else None
         text = str(error or "")
         return status == 400 and ("API_KEY_INVALID" in text or "API key not valid" in text)
+
+
+_PLAIN = {"text", "thought"}  # a part with only these may be joined with the one before
+
+
+class StreamReader(_stream.StreamReader):
+    """One streamed Gemini answer, put back together as the GenerateContentResponse
+    parse_response reads. The answer ends when the connection closes (no end mark), so
+    reading goes on to the end; it is complete once a finishReason came."""
+
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+        self.finish = None
+        self.usage = None
+        self.model = None
+        self.feedback = None
+
+    @property
+    def complete(self):
+        blocked = isinstance(self.feedback, dict) and self.feedback.get("blockReason")
+        return self.finish is not None or bool(blocked)
+
+    @complete.setter
+    def complete(self, _value):
+        pass  # (worked out from what came)
+
+    def _feed(self, name, chunk):
+        if chunk.get("error"):
+            error = chunk["error"]
+            code = error.get("code") if isinstance(error, dict) else None
+            self._set_error(chunk, code if isinstance(code, int) else None)
+            return []
+        self.model = chunk.get("modelVersion") or self.model
+        if isinstance(chunk.get("usageMetadata"), dict):
+            self.usage = chunk["usageMetadata"]
+        if chunk.get("promptFeedback"):
+            self.feedback = chunk["promptFeedback"]
+        candidates = chunk.get("candidates") or []
+        candidate = candidates[0] if candidates and isinstance(candidates[0], dict) else {}
+        pieces = []
+        for part in (candidate.get("content") or {}).get("parts") or []:
+            if isinstance(part, dict):
+                pieces += self._part(copy.deepcopy(part))
+        if candidate.get("finishReason"):
+            self.finish = candidate["finishReason"]
+        return pieces
+
+    def _part(self, part):
+        last = self.parts[-1] if self.parts else None
+        text = part.get("text")
+        if (
+            isinstance(text, str)
+            and set(part) <= _PLAIN
+            and last is not None
+            and set(last) <= _PLAIN
+            and isinstance(last.get("text"), str)
+            and bool(last.get("thought")) == bool(part.get("thought"))
+        ):
+            last["text"] += text  # the next piece of the same text
+            return [] if part.get("thought") else self._text(text)
+        shown = []
+        if last is not None and last.get("thought") and last.get("text"):
+            shown.append(("progress", last["text"]))  # a thought is complete: show it
+        self.parts.append(part)
+        if isinstance(text, str) and not part.get("thought") and "functionCall" not in part:
+            self._new_block()
+            shown += self._text(text)
+        return shown
+
+    def result(self):
+        candidate = {"content": {"role": "model", "parts": self.parts}}
+        if self.finish:
+            candidate["finishReason"] = self.finish
+        data = {
+            "candidates": [candidate] if (self.parts or self.finish) else [],
+            "usageMetadata": self.usage or {},
+            "modelVersion": self.model,
+        }
+        if self.feedback:
+            data["promptFeedback"] = self.feedback
+        return data

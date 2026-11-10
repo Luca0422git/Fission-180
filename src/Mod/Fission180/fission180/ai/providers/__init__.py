@@ -12,6 +12,9 @@ care which one it drives:
   to_provider_messages(history, model) -> the neutral history in that API's words
   list_models(key, base_url) -> model ids from the provider's models endpoint ([] on errors)
   key_refused(status, body) -> True when the answer means "this key is not accepted"
+  stream_request(url, headers, body) -> the same request, answered word by word
+  stream_reader() -> a StreamReader for one such answer (providers/_stream.py): the text
+      pieces to show as they come, and at the end the answer parse_response reads
 
 Each module keeps its one DEFAULT_MODEL; nothing else names models.
 """

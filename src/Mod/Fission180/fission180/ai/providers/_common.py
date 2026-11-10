@@ -109,15 +109,20 @@ def request_json(method, url, headers=None, body=None, timeout=DEFAULT_TIMEOUT):
                 raw = b""
         except (urllib.error.URLError, OSError) as exc:
             return 0, None, _problem(exc)
-        if not raw:
-            return status, None, None if status < 400 else "bad_json"
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except ValueError:
-            return status, {"text": raw.decode("utf-8", "replace")[:500]}, "bad_json"
-        return status, data, None
+        data, problem = decode_answer(status, raw)
+        return status, data, problem
     except Exception as exc:  # a broken URL or anything else: still an answer
         return 0, None, "network: %s" % exc
+
+
+def decode_answer(status, raw):
+    """An answer's bytes -> (data, problem), as request_json gives them."""
+    if not raw:
+        return None, None if status < 400 else "bad_json"
+    try:
+        return json.loads(raw.decode("utf-8")), None
+    except ValueError:
+        return {"text": raw.decode("utf-8", "replace")[:500]}, "bad_json"
 
 
 def post_json(url, headers, body, timeout=DEFAULT_TIMEOUT):

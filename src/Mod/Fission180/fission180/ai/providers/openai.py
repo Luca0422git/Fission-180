@@ -21,13 +21,17 @@ reachable from the build machine):
     stateless use;
   * GET /v1/models lists the models (data[].id).
 
-Non-streaming only.
+Streaming ("stream": true; StreamReader below): server-sent events whose data has a "type":
+response.output_text.delta (and response.refusal.delta) carry the text in pieces,
+response.output_item.done each finished item (a reasoning item's summary is shown then),
+response.completed / response.incomplete the whole response object at the end (read by
+parse_response as before), response.failed and error a problem in the middle.
 """
 
 import copy
 import json
 
-from . import _common
+from . import _common, _stream
 
 NAME = "openai"
 DISPLAY_NAME = "ChatGPT (OpenAI)"
@@ -94,6 +98,15 @@ class Adapter:
         if tools:
             body["tools"] = self.tools(tools)
         return _common.join(base_url or BASE_URL, "/responses"), headers, body
+
+    def stream_request(self, url, headers, body):
+        """The same request, answered as a stream."""
+        body = dict(body)
+        body["stream"] = True
+        return url, dict(headers), body
+
+    def stream_reader(self):
+        return StreamReader()
 
     def parse_response(self, data):
         try:
@@ -224,3 +237,57 @@ class Adapter:
 
     def key_refused(self, status, data):
         return status in (401, 403)
+
+
+class StreamReader(_stream.StreamReader):
+    """One streamed Responses answer: the text as it comes, the response object at the end
+    (its output put together from the finished items if it came without them)."""
+
+    def __init__(self):
+        super().__init__()
+        self.response = None
+        self.items = {}  # output_index -> finished item
+        self._part = None  # (output_index, content_index) of the text being shown
+
+    def _feed(self, name, event):
+        kind = event.get("type") or name
+        if kind in ("response.output_text.delta", "response.refusal.delta"):
+            part = (event.get("output_index"), event.get("content_index"))
+            if part != self._part:
+                self._part = part
+                self._new_block()
+            return self._text(event.get("delta"))
+        if kind == "response.output_item.done":
+            item = event.get("item")
+            if not isinstance(item, dict):
+                return []
+            self.items[event.get("output_index", len(self.items))] = item
+            if item.get("type") == "reasoning":
+                return [
+                    ("progress", part["text"].strip())
+                    for part in item.get("summary") or []
+                    if isinstance(part, dict) and (part.get("text") or "").strip()
+                ]
+        elif kind in ("response.completed", "response.incomplete"):
+            self.response = dict(event.get("response") or {})
+            self.complete = True
+            self.finished = True
+        elif kind == "response.failed":
+            response = event.get("response") or {}
+            self._set_error({"error": response.get("error") or {"message": "the answer failed"}})
+        elif kind == "error":
+            error = event.get("error")
+            if not isinstance(error, dict):
+                error = {key: event.get(key) for key in ("code", "message", "param")}
+            self._set_error({"error": error})
+        return []
+
+    def result(self):
+        data = dict(self.response or {})
+        if not data.get("output") and self.items:
+            data["output"] = [self.items[i] for i in sorted(self.items, key=_order)]
+        return data
+
+
+def _order(index):
+    return index if isinstance(index, int) else 1 << 30

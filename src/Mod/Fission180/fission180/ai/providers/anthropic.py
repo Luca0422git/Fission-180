@@ -19,12 +19,21 @@ model the person picked (a reply that comes back after a fallback elsewhere is s
 Top-level cache_control caches the repeated tools + history: an agent loop resends them
 every step, so this cuts the cost a lot.
 
-Non-streaming only: each step's text arrives when the step is done.
+Streaming ("stream": true, server-sent events; StreamReader below, put together as the
+anthropic SDK 2.7.0's lib/streaming accumulate_event does, read November 2026):
+message_start (the message without content), content_block_start / content_block_delta
+(text_delta, input_json_delta: a tool call's arguments in pieces of JSON text,
+thinking_delta, signature_delta, citations_delta, compaction_delta) / content_block_stop
+for each block, message_delta (the stop_reason and the usage so far: totals, not
+additions), message_stop; ping events keep the connection open and an error event
+(overloaded_error...) can come in the middle. The blocks are put together into the message
+the non-streamed request returns.
 """
 
 import copy
+import json
 
-from . import _common
+from . import _common, _stream
 
 NAME = "anthropic"
 DISPLAY_NAME = "Claude (Anthropic)"
@@ -112,6 +121,15 @@ class Adapter:
         if betas:
             headers["anthropic-beta"] = ",".join(betas)
         return _common.join(base, "/v1/messages"), headers, body
+
+    def stream_request(self, url, headers, body):
+        """The same request, answered as a stream."""
+        body = dict(body)
+        body["stream"] = True
+        return url, dict(headers), body
+
+    def stream_reader(self):
+        return StreamReader()
 
     def parse_response(self, data):
         try:
@@ -230,6 +248,124 @@ class Adapter:
 
     def key_refused(self, status, data):
         return status in (401, 403)
+
+
+class StreamReader(_stream.StreamReader):
+    """One streamed Messages answer, put back together as the message parse_response
+    reads (see the module's notes)."""
+
+    def __init__(self):
+        super().__init__()
+        self.message = {"type": "message", "role": "assistant", "content": [], "usage": {}}
+        self.blocks = {}  # index -> the block as it grows
+        self.order = []  # the indexes in the order the blocks started
+        self.json = {}  # index -> a tool call's arguments so far (JSON text)
+        self.stopped = False  # message_stop came
+
+    @property
+    def complete(self):
+        return self.stopped or bool(self.message.get("stop_reason"))
+
+    @complete.setter
+    def complete(self, _value):
+        pass  # (worked out from what came)
+
+    def _feed(self, name, event):
+        kind = event.get("type") or name
+        if kind == "message_start":
+            start = event.get("message") or {}
+            for key, value in start.items():
+                if key != "content":
+                    self.message[key] = copy.deepcopy(value)
+            self.message.setdefault("usage", {})
+        elif kind == "content_block_start":
+            index = event.get("index", len(self.order))
+            block = copy.deepcopy(event.get("content_block") or {})
+            if index not in self.blocks:
+                self.order.append(index)
+            self.blocks[index] = block
+            to = block.get("to") if block.get("type") == "fallback" else None
+            if isinstance(to, dict) and to.get("model"):
+                self.message["model"] = to["model"]  # (the model that answered after all)
+            if block.get("type") == "text":
+                self._new_block()
+                return self._text(block.get("text"))
+        elif kind == "content_block_delta":
+            return self._delta(event.get("index"), event.get("delta") or {})
+        elif kind == "content_block_stop":
+            return self._stop(event.get("index"))
+        elif kind == "message_delta":
+            delta = event.get("delta") or {}
+            for key, value in delta.items():
+                self.message[key] = value
+            for key in ("context_management", "input_transformations"):
+                if event.get(key) is not None:
+                    self.message[key] = event[key]
+            usage = event.get("usage") or {}
+            self.message.setdefault("usage", {}).update(
+                {key: value for key, value in usage.items() if value is not None}
+            )
+        elif kind == "message_stop":
+            self.stopped = True
+            self.finished = True
+        elif kind == "error":
+            self._set_error(event)
+        return []
+
+    def _delta(self, index, delta):
+        block = self.blocks.get(index)
+        if block is None:
+            return []
+        kind = delta.get("type")
+        if kind == "text_delta":
+            piece = delta.get("text") or ""
+            block["text"] = (block.get("text") or "") + piece
+            return self._text(piece)
+        if kind == "input_json_delta":
+            self.json[index] = self.json.get(index, "") + (delta.get("partial_json") or "")
+        elif kind == "thinking_delta":
+            block["thinking"] = (block.get("thinking") or "") + (delta.get("thinking") or "")
+        elif kind == "signature_delta":
+            block["signature"] = delta.get("signature") or ""
+        elif kind == "citations_delta" and delta.get("citation") is not None:
+            block.setdefault("citations", []).append(delta["citation"])
+        elif kind == "compaction_delta":
+            block["content"] = delta.get("content")
+            block["encrypted_content"] = delta.get("encrypted_content")
+        return []
+
+    def _stop(self, index):
+        block = self.blocks.get(index)
+        if block is None:
+            return []
+        if index in self.json:
+            block["input"] = _tool_input(self.json.pop(index))
+        if block.get("type") == "thinking" and (block.get("thinking") or "").strip():
+            return [("progress", block["thinking"].strip())]
+        return []
+
+    def result(self):
+        message = dict(self.message)
+        content = []
+        for index in self.order:
+            block = self.blocks[index]
+            if index in self.json:  # (a block that never stopped: the answer was cut)
+                block["input"] = _tool_input(self.json[index])
+            content.append(block)
+        message["content"] = content
+        return message
+
+
+def _tool_input(text):
+    """A tool call's arguments from their JSON text: {} when there were none; anything
+    that is not a JSON object stays {} too (the tool then says what it is missing)."""
+    if not text.strip():
+        return {}
+    try:
+        value = json.loads(text)
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _after_fallback(content):

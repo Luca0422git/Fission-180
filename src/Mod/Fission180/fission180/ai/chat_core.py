@@ -11,8 +11,17 @@ the model answers in words, MAX_STEPS requests were made, or stop() was called.
 
 Threads: send() blocks for as long as the model works, so the chat panel runs it on a
 worker thread. stop() may be called from any thread; it is checked between steps and
-between tool calls (a request already on its way is not cut off). on_event(kind, data)
-reports progress from the worker thread: the GUI must hand it over to the GUI thread.
+between tool calls, and it ends an answer that is arriving word by word at once (the
+connection is closed). on_event(kind, data) reports progress from the worker thread: the
+GUI must hand it over to the GUI thread.
+
+Streaming: answers are asked for word by word (providers/_stream.py) whenever the
+provider can: each piece of text is sent as a "text_delta" event ({"text": piece}) as it
+arrives, a thinking note as a "progress" event once it is complete, and at the end of the
+step the usual "text" event comes as {"text": the whole text, "streamed": True} (the panel
+shows it already). A tool call is put together from its pieces and runs as before. A
+server that answers in one piece after all (or refuses a streamed request) is read the old
+way. Chat(http=...) without stream_http (the unit tests' fake models) does not stream.
 
 Nothing here raises: problems come back as plain sentences (event "error" and the
 result's text). API keys never appear in logs or messages.
@@ -22,7 +31,7 @@ import threading
 import time
 
 from . import catalog, tools_core
-from .providers import _common
+from .providers import _common, _stream
 
 MAX_STEPS = 25
 # while a part is rebuilt with a timeline (Auto Timeline) one Send carries the whole plan:
@@ -85,7 +94,7 @@ STOPPED_TEXT = (
     "Stopped. The steps already made stay in the design's timeline; Undo takes them back."
 )
 
-EVENTS = ("text", "progress", "tool_call", "tool_result", "error", "done")
+EVENTS = ("text_delta", "text", "progress", "tool_call", "tool_result", "error", "done")
 
 
 def post_json(url, headers, body, timeout=_common.DEFAULT_TIMEOUT):
@@ -97,6 +106,14 @@ def describe_error(status, data, problem, provider_name, base_url="", model="", 
     """A plain sentence for a failed request (keys are hidden by the caller)."""
     who = provider_name or "The AI provider"
     if status == 0:
+        if str(problem or "").startswith("cut"):
+            detail = str(problem)[len("cut") :].lstrip(": ").replace("network: ", "")
+            if detail == "timeout":
+                detail = "nothing more arrived for minutes"
+            return (
+                "The connection to %s was lost before the answer was complete (%s). Try "
+                "again." % (who, detail or "it ended early")
+            )
         if problem == "refused":
             if _common.is_local(base_url):
                 return (
@@ -145,6 +162,11 @@ def _error_message(data):
     return text[:300]
 
 
+def _anything(shown):
+    """Whether a streamed step showed something already (text or a note)."""
+    return bool(shown and (shown.get("text") or shown.get("progress")))
+
+
 def _result(text, image=None, is_error=False):
     return {"text": text, "image_png_base64": image or None, "is_error": bool(is_error)}
 
@@ -167,6 +189,7 @@ class Chat:
         call_tool=None,
         log=None,
         http=post_json,
+        stream_http=None,
         max_steps=MAX_STEPS,
         max_tokens=None,
         system=SYSTEM_PROMPT,
@@ -179,6 +202,13 @@ class Chat:
         self.base_url = base_url or getattr(adapter, "base_url", "")
         self.call_tool = call_tool
         self.http = http
+        # answers word by word: post_stream when the real network is used (a fake http
+        # without a fake stream_http means a test that wants the answers in one piece)
+        if stream_http is None and http is post_json:
+            stream_http = _stream.post_stream
+        self.stream_http = stream_http
+        self._abort = None  # while a streamed answer is read: closes its connection
+        self._no_stream = False  # the server refused a streamed request: ask in one piece
         self.max_steps = max(1, int(max_steps))
         self.max_tokens = max_tokens
         self.system = system
@@ -205,8 +235,27 @@ class Chat:
         return self._running.is_set()
 
     def stop(self):
-        """Ask send() to stop at the next step (thread-safe)."""
+        """Ask send() to stop at the next step, and end an answer that is arriving now
+        (thread-safe)."""
         self._stop.set()
+        abort = self._abort
+        if abort is not None:
+            try:
+                abort()
+            except Exception:
+                pass
+
+    def streams(self):
+        """True when the answers are asked for word by word."""
+        return (
+            self.stream_http is not None
+            and not self._no_stream
+            and callable(getattr(self.adapter, "stream_request", None))
+            and callable(getattr(self.adapter, "stream_reader", None))
+        )
+
+    def _set_abort(self, abort):
+        self._abort = abort
 
     def stopped(self):
         return self._stop.is_set()
@@ -283,7 +332,17 @@ class Chat:
             if turn is None:
                 message = self._last_error
                 return self._finish(False, "error", message, steps)
+            shown = turn.get("shown") or {}
+            if turn["stop"] == "stopped":  # Stop in the middle of a streamed answer
+                if turn["text"]:  # what the person saw stays in the conversation
+                    self.history.append({"role": "assistant", "text": turn["text"]})
+                    self._emit(on_event, "text", {"text": turn["text"], "streamed": True})
+                return self._finish(True, "stopped", STOPPED_TEXT, steps)
+            already = list(shown.get("progress") or [])
             for note in turn["progress"]:
+                if note in already:  # (shown while the answer streamed)
+                    already.remove(note)
+                    continue
                 self._emit(on_event, "progress", note)
             entry = {"role": "assistant", "text": turn["text"], "tool_calls": turn["tool_calls"]}
             if turn.get("raw") is not None:
@@ -291,7 +350,10 @@ class Chat:
             self.history.append(entry)
             if turn["text"]:
                 last_text = turn["text"]
-                self._emit(on_event, "text", turn["text"])
+                if (shown.get("text") or "").strip():
+                    self._emit(on_event, "text", {"text": turn["text"], "streamed": True})
+                else:
+                    self._emit(on_event, "text", turn["text"])
             calls = turn["tool_calls"]
             if turn["stop"] == "refusal":
                 self._close(calls, "Not run: the answer was declined.")
@@ -325,11 +387,24 @@ class Chat:
         url, headers, body = self.adapter.build_request(
             self.model, self.system, messages, self.tools, **kwargs
         )
+        stream = self.streams()
         for attempt in range(RETRIES + 1):
-            try:
-                status, data, problem = self.http(url, headers, body)
-            except Exception as exc:
-                status, data, problem = 0, None, "network: %s" % exc
+            shown = None
+            if stream:
+                status, data, problem, shown = self._ask_streamed(url, headers, body, on_event)
+                if problem == "stopped":
+                    text = (shown or {}).get("text", "").strip()
+                    turn = _common.neutral_turn(text=text, stop="stopped")
+                    turn["shown"] = shown
+                    return turn
+                if status == 400 and not _anything(shown) and not self.stopped():
+                    # (a server that cannot stream, an older local one: ask in one piece)
+                    self.log("a streamed request was refused; asking again in one piece")
+                    status, data, problem = self._post(url, headers, body)
+                    if status == 200 and problem is None:
+                        self._no_stream, stream = True, False
+            else:
+                status, data, problem = self._post(url, headers, body)
             if status == 200 and problem is None and isinstance(data, dict):
                 turn = self.adapter.parse_response(data)
                 if turn["stop"] == "unreadable":
@@ -338,8 +413,12 @@ class Chat:
                     value = (turn.get("usage") or {}).get(key)
                     if isinstance(value, int):
                         self.usage[key] += value
+                turn["shown"] = shown
                 return turn
-            retry = status >= 500 and attempt < RETRIES and not self.stopped()
+            # (a step that showed words already is not asked again: they would show twice)
+            retry = (
+                status >= 500 and attempt < RETRIES and not self.stopped() and not _anything(shown)
+            )
             self.log(
                 "request failed (status %s%s)%s"
                 % (status, ", " + problem if problem else "", ", trying again" if retry else "")
@@ -356,6 +435,56 @@ class Chat:
         self._last_error = self._hide(message)
         self._emit(on_event, "error", self._last_error)
         return None
+
+    def _post(self, url, headers, body):
+        try:
+            return self.http(url, headers, body)
+        except Exception as exc:
+            return 0, None, "network: %s" % exc
+
+    def _ask_streamed(self, url, headers, body, on_event):
+        """One request answered word by word -> (status, data, problem, shown): data is the
+        answer put together (as the non-streamed request gives it); problem "stopped" or
+        "cut: <reason>" when it did not come to its end; shown what the panel was given
+        ({"text", "progress"}; None when the answer came in one piece after all)."""
+        s_url, s_headers, s_body = self.adapter.stream_request(url, headers, body)
+        reader = self.adapter.stream_reader()
+        shown = {"text": "", "progress": []}
+
+        def on_sse(name, payload):
+            for kind, piece in reader.feed(name, payload):
+                if kind == "text":
+                    shown["text"] += piece
+                    self._emit(on_event, "text_delta", {"text": piece})
+                elif kind == "progress":
+                    shown["progress"].append(piece)
+                    self._emit(on_event, "progress", piece)
+            return reader.finished
+
+        try:
+            status, data, problem, streamed = self.stream_http(
+                s_url, s_headers, s_body, on_sse, self.stopped, self._set_abort
+            )
+        except Exception as exc:
+            status, data, problem, streamed = 0, None, "network: %s" % exc, False
+        finally:
+            self._abort = None
+        if not streamed:  # one piece after all: an error, or a server that does not stream
+            return status, data, problem, None
+        if reader.error is not None:
+            status, data = reader.error
+            return status, data, None, shown
+        if reader.complete:
+            try:
+                return 200, reader.result(), None, shown
+            except Exception as exc:
+                self.log("could not put the streamed answer together: %s" % exc)
+                return 200, None, "bad_json", shown
+        if problem == "stopped" or self.stopped():
+            return 0, None, "stopped", shown
+        if not (problem or "").startswith("cut"):
+            problem = "cut: it ended early"
+        return 0, None, problem, shown
 
     def _run_calls(self, calls, on_event):
         results = []

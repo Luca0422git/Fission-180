@@ -92,7 +92,7 @@ Implemented in `src/Mod/Fission180/fission180/`:
 | Cost and privacy | The panel says plainly: API use is billed by the provider per use, separately from a chat subscription; the design's data and screenshots go to that provider; the local option is free and private. |
 | Building | Every step the AI makes is one Undo step, as with AI apps. No "Allow this AI app?" question: the person typing is the one asking. The rest of the bridge's rules hold (busy while a dialog is open, overwriting a file asks). |
 | Stop | Stops after the current step; the steps made stay in the timeline. |
-| Answers | Shown whole when they arrive (not streamed word by word yet). |
+| Answers | Shown word by word as they arrive (Claude, ChatGPT, Gemini, local models); Stop ends one at once. |
 
 Tests: scenario `ai_chat.py` (a fake OpenAI-compatible server inside the test: List shows
 its model, "make a 40 x 30 x 10 box" builds the box in two Undo steps, a model that never

@@ -11,18 +11,11 @@ time you start it, but treat that as a safety net, not a plan.
 
 ## Things that look or feel unfinished
 
-- **A thin outline frame on the right.** While a panel is open at the right (the AI panel, the
-  Sketch Palette, a command's dialog), a thin empty rectangle outline can show over the 3D view
-  next to it. It is a leftover of FreeCAD's own overlay panel. As far as we know it is
-  only cosmetic. *Workaround:* none needed.
 - **Press Pull is work in progress on complex shapes.** On planes and cylinders it is solid. On
   curved or freeform faces, or with many faces picked at once, it can be slow and the result can
   look odd. Fission 180 says so in a small yellow warning on the Press Pull button and in its
   dialog. *Workaround:* use Fillet, Chamfer, Offset Face or Extrude for those faces, or press
   Undo (Ctrl+Z) when a result looks wrong.
-- **The AI chat shows an answer only when it is complete.** Answers are not streamed word by
-  word, so a long answer looks like nothing is happening for a while. *Workaround:* wait until
-  the Send button works again; press Stop to end it early.
 - **English only.** Fission 180's own screens, menus and messages are in English; there are no
   translations yet.
 - **The SHEET METAL and PLASTIC tabs are new in this beta** and the least used so far. A few

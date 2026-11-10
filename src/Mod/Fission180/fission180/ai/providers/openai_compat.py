@@ -17,13 +17,17 @@ GitHub (October 2026: tools, max_tokens and /v1/models are supported; the API ke
 Local models are less reliable with tools: a call with broken JSON comes back to the
 model as an error so it can try again.
 
-Non-streaming only.
+Streaming ("stream": true; StreamReader below): "data:" lines of chat.completion.chunk
+objects, choices[0].delta {content, tool_calls: [{index, id, function: {name, arguments}}]}
+in pieces (a tool call's arguments in pieces of JSON text, put together by index; Ollama
+sends each call whole), finish_reason in the last one, then "data: [DONE]". A server that
+cannot stream answers in one piece, which the chat reads the old way.
 """
 
 import copy
 import json
 
-from . import _common
+from . import _common, _stream
 
 NAME = "openai_compat"
 DISPLAY_NAME = "Local or other (OpenAI-compatible: Ollama, LM Studio)"
@@ -82,6 +86,15 @@ class Adapter:
         if tools:
             body["tools"] = self.tools(tools)
         return _common.join(base_url or BASE_URL, "/chat/completions"), headers, body
+
+    def stream_request(self, url, headers, body):
+        """The same request, answered as a stream."""
+        body = dict(body)
+        body["stream"] = True
+        return url, dict(headers), body
+
+    def stream_reader(self):
+        return StreamReader()
 
     def parse_response(self, data):
         try:
@@ -181,3 +194,98 @@ class Adapter:
 
     def key_refused(self, status, data):
         return status in (401, 403)
+
+
+class StreamReader(_stream.StreamReader):
+    """One streamed Chat Completions answer, put back together as the completion
+    parse_response reads."""
+
+    def __init__(self):
+        super().__init__()
+        self.text = []
+        self.calls = []  # [{"index", "id", "name", "arguments"}]
+        self.finish = None
+        self.usage = None
+        self.model = None
+
+    @property
+    def complete(self):
+        return self.finished or self.finish is not None
+
+    @complete.setter
+    def complete(self, _value):
+        pass  # (worked out from what came)
+
+    def _feed(self, name, chunk):
+        if chunk.get("error"):
+            self._set_error({"error": chunk["error"]})
+            return []
+        self.model = chunk.get("model") or self.model
+        if isinstance(chunk.get("usage"), dict):
+            self.usage = chunk["usage"]
+        pieces = []
+        for choice in chunk.get("choices") or []:
+            if not isinstance(choice, dict) or choice.get("index", 0) not in (0, None):
+                continue
+            delta = choice.get("delta")
+            if not isinstance(delta, dict):
+                delta = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+            content = delta.get("content")
+            if isinstance(content, list):  # some servers send parts
+                content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
+            if isinstance(content, str) and content:
+                self.text.append(content)
+                pieces += self._text(content)
+            for item in delta.get("tool_calls") or []:
+                if isinstance(item, dict):
+                    self._call(item)
+            if choice.get("finish_reason"):
+                self.finish = choice["finish_reason"]
+        return pieces
+
+    def _call(self, item):
+        index = item.get("index")
+        call_id = item.get("id") or ""
+        function = item.get("function") or {}
+        target = None
+        if isinstance(index, int):
+            target = next((c for c in self.calls if c["index"] == index), None)
+        elif self.calls and not call_id:
+            target = self.calls[-1]
+        if target is not None and call_id and target["id"] and call_id != target["id"]:
+            target = None  # (a server that numbers every call 0)
+        if target is None:
+            target = {
+                "index": index if isinstance(index, int) else len(self.calls),
+                "id": "",
+                "name": "",
+                "arguments": "",
+            }
+            self.calls.append(target)
+        if call_id:
+            target["id"] = call_id
+        if function.get("name") and not target["name"]:
+            target["name"] = function["name"]
+        arguments = function.get("arguments")
+        if isinstance(arguments, dict):  # (sent whole, as an object)
+            arguments = json.dumps(arguments)
+        if isinstance(arguments, str):
+            target["arguments"] += arguments
+
+    def result(self):
+        message = {"role": "assistant", "content": "".join(self.text)}
+        if self.calls:
+            message["tool_calls"] = [
+                {
+                    "id": call["id"] or "call_%d" % number,
+                    "type": "function",
+                    "function": {"name": call["name"], "arguments": call["arguments"]},
+                }
+                for number, call in enumerate(self.calls)
+            ]
+        return {
+            "object": "chat.completion",
+            "model": self.model,
+            "choices": [{"index": 0, "message": message, "finish_reason": self.finish}],
+            "usage": self.usage or {},
+        }

@@ -8,6 +8,11 @@ The conversation loop (fission180/ai/chat_core.py) waits on the network, so it r
 worker thread; Fission 180 is only touched on its own thread: the worker hands each tool call
 over (a queue the panel's timer empties) and waits for the answer (bridge.call). Keys are
 kept with fission180/secrets_store.py (Windows: encrypted for this user) and never logged.
+
+Answers show word by word, as they arrive: the worker queues each piece of text
+("text_delta"), and the panel's timer (every 50 ms) adds what came to the AI's paragraph at
+the end of the conversation (the "live" paragraph), redrawn once per tick however many
+pieces came. Anything else the panel writes closes that paragraph first.
 """
 
 import html
@@ -18,7 +23,7 @@ import threading
 import FreeCAD as App
 
 from .. import commands, log, secrets_store, warn
-from ..compat import QtCore, QtWidgets
+from ..compat import QtCore, QtGui, QtWidgets
 from . import bridge, chat_core, providers
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/AI"
@@ -61,6 +66,8 @@ class ChatPanel(QtWidgets.QWidget):
         self.events = queue.Queue()  # (kind, data) from the worker
         self.calls = queue.Queue()  # tool calls waiting for Fission 180's thread
         self.worker = None
+        self._live = None  # the AI's paragraph being written: {"text", "start", "dirty"}
+        self._turn_shown = False  # this step's words are on screen already (streamed)
         column = QtWidgets.QVBoxLayout(self)
         column.setContentsMargins(4, 4, 4, 4)
         form = QtWidgets.QFormLayout()
@@ -106,6 +113,12 @@ class ChatPanel(QtWidgets.QWidget):
         self.transcript = QtWidgets.QTextBrowser()
         self.transcript.setObjectName("Fission180ChatLog")
         column.addWidget(self.transcript, 1)
+        # the newest words stay in view while the conversation grows, unless the person
+        # scrolled up to read (the scroll bar says when the text got longer: its range)
+        self._follow = True
+        bar = self.transcript.verticalScrollBar()
+        bar.valueChanged.connect(self._scrolled)
+        bar.rangeChanged.connect(self._grown)
         self.input = QtWidgets.QPlainTextEdit()
         self.input.setObjectName("Fission180ChatInput")
         self.input.setPlaceholderText("Ask the AI to build something, e.g. a 40 x 30 x 10 box")
@@ -199,9 +212,64 @@ class ChatPanel(QtWidgets.QWidget):
 
     # -- the conversation
     def say(self, who, text, colour=None):
+        self._close_live()
         style = (" style='color:%s'" % colour) if colour else ""
         safe = html.escape(str(text)).replace("\n", "<br>")
         self.transcript.append("<p%s><b>%s</b> %s</p>" % (style, who, safe))
+
+    def _delta(self, piece):
+        """A piece of the AI's answer arrived: kept until the timer's next redraw."""
+        if not piece:
+            return
+        if self._live is None:
+            self._live = {"text": "", "start": None, "dirty": False}
+        self._live["text"] += piece
+        self._live["dirty"] = True
+
+    def _render_live(self):
+        """The AI's live paragraph with all the words that came so far (it is made with the
+        first word; a step that only had spaces so far shows nothing yet)."""
+        live = self._live
+        if live is None or not live["dirty"]:
+            return
+        live["dirty"] = False
+        text = live["text"].strip()
+        if not text:
+            return
+        document = self.transcript.document()
+        if live["start"] is None:
+            self.transcript.append("<p><b>AI:</b> </p>")
+            live["start"] = document.lastBlock().position()
+        cursor = QtGui.QTextCursor(document)
+        cursor.setPosition(live["start"])
+        cursor.movePosition(QtGui.QTextCursor.End, QtGui.QTextCursor.KeepAnchor)
+        cursor.insertHtml("<b>AI:</b> " + html.escape(text).replace("\n", "<br>"))
+        self._turn_shown = True
+
+    def _scrolled(self, value):
+        try:
+            bar = self.transcript.verticalScrollBar()
+            self._follow = value >= bar.maximum() - 4
+        except Exception as exc:
+            warn("AI chat: %s" % exc)
+
+    def _grown(self, _low, high):
+        try:
+            if self._follow:
+                self.transcript.verticalScrollBar().setValue(high)
+        except Exception as exc:
+            warn("AI chat: %s" % exc)
+
+    def _close_live(self):
+        """Show what is still waiting and end the live paragraph: the next words start a
+        new one below whatever is written now."""
+        if self._live is not None:
+            self._render_live()
+            self._live = None
+
+    def live_text(self):
+        """The words of the answer arriving now ("" when none is)."""
+        return self._live["text"].strip() if self._live is not None else ""
 
     def _chat_for(self, name, model, key, base_url):
         """The conversation, kept across sends; another AI or model continues it."""
@@ -304,7 +372,8 @@ class ChatPanel(QtWidgets.QWidget):
                         "image_png_base64": None,
                     }
                 job["done"].set()
-            for _n in range(50):
+            # (a piece of a streamed answer is cheap: many per tick, one redraw at the end)
+            for _n in range(1000):
                 try:
                     kind, data = self.events.get_nowait()
                 except queue.Empty:
@@ -312,19 +381,28 @@ class ChatPanel(QtWidgets.QWidget):
                 if not isinstance(data, dict):  # chat_core: "text", "progress", "error"
                     data = {"text": "" if data is None else str(data)}
                 self._event(kind, data)
+            self._render_live()
         except RuntimeError:
             pass  # (the panel was closed)
         except Exception as exc:
             warn("AI chat: %s" % exc)
 
     def _event(self, kind, data):
-        if kind == "models":
+        if kind == "text_delta":
+            self._delta(data.get("text", ""))
+        elif kind == "models":
             self._models(data.get("models", []))
-        elif kind == "text" and data.get("text"):
-            self.say("AI:", data["text"])
+        elif kind == "text":
+            # the step's whole text; a streamed one is on screen already
+            if data.get("streamed"):
+                self._close_live()
+            if data.get("text") and not (data.get("streamed") and self._turn_shown):
+                self.say("AI:", data["text"])
+            self._turn_shown = False
         elif kind == "progress" and data.get("text"):
             self.say("AI (thinking):", data["text"], "#9aa4b2")
         elif kind == "tool_call":
+            self._turn_shown = False
             self.say("Tool:", "%s" % data.get("name"), "#3fa9f5")
         elif kind == "tool_result":
             text = data.get("text", "")
@@ -333,6 +411,8 @@ class ChatPanel(QtWidgets.QWidget):
         elif kind == "error":
             self.say("Fission 180:", data.get("text", ""), "#ef6f6c")
         elif kind == "done":
+            self._close_live()
+            self._turn_shown = False
             self.send_button.setEnabled(True)
             self.stop_button.setEnabled(False)
             if data.get("reason") and not data.get("ok"):
@@ -351,6 +431,7 @@ class ChatPanel(QtWidgets.QWidget):
             commands.tell("Stop the chat first.")
             return
         self.chat = None
+        self._live, self._turn_shown = None, False
         self.transcript.clear()
 
     def list_models(self):
