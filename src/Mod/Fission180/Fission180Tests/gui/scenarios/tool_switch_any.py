@@ -11,6 +11,8 @@ already open" question. commands.make_way_for now ends the running tool first.
 A  In a sketch: L (Fission 180's Line), then the ribbon's 2-Point Rectangle button: the Line
    has stopped, FreeCAD's Rectangle runs. Fillet, then C (Center Diameter Circle by its key):
    the Fillet has stopped, the circle tool runs.
+   L again, then S (the command search), "2-Point Rectangle", Enter: the Line has stopped,
+   FreeCAD's Rectangle runs (the search ran commands without ending the running one).
 B  Finish Sketch. Extrude (E) open, then CONSTRUCT > User Coordinate System: no question pops
    up, the Extrude panel is gone, the coordinate system's panel is open.
 C  ... and the Fission 180 interface stays on with it (FreeCAD switches to Part Design to edit
@@ -20,7 +22,8 @@ C  ... and the Fission 180 interface stays on with it (FreeCAD switches to Part 
 """
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore
+from PySide import QtCore, QtWidgets
+from PySide6 import QtTest
 
 from Fission180Tests.gui import harness as h
 
@@ -116,6 +119,44 @@ def a_circle_runs():
     h.press(QtCore.Qt.Key_Escape)
 
 
+def a_line_again():
+    h.press("l")
+
+
+def a_search():
+    s = session()
+    h.check("L: the Line runs again", s is not None and s.line.active)
+    h.press("s")
+
+
+def a_search_type():
+    from fission180 import search_ui
+
+    def dialog():
+        for w in QtWidgets.QApplication.topLevelWidgets():
+            if isinstance(w, search_ui.CommandSearchDialog) and w.isVisible():
+                return w
+        return None
+
+    h.wait_for(lambda: dialog() is not None, "the command search")
+    box = dialog()
+    QtTest.QTest.keyClicks(box._edit, "2-Point Rectangle")
+    QtWidgets.QApplication.processEvents()
+    h.wait_for(lambda: box._list.count() > 0, "a search result")
+    item = box._list.currentItem() or box._list.item(0)
+    h.check("the search finds 2-Point Rectangle", "2-Point Rectangle" in item.text(), item.text())
+    QtTest.QTest.keyClick(box._edit, QtCore.Qt.Key_Return)
+    QtWidgets.QApplication.processEvents()
+
+
+def a_search_runs():
+    h.settle("the rectangle tool")
+    s = session()
+    h.check("the search's Rectangle: the Line has stopped", s is not None and not s.line.active)
+    h.check("...and FreeCAD's Rectangle runs", freecad_tool_running())
+    h.press(QtCore.Qt.Key_Escape)
+
+
 def b_finish():
     h.ribbon("Finish Sketch")
 
@@ -183,7 +224,8 @@ def b_closed():
 
 h.run(
     "tool_switch_any",
-    [setup, a_line, a_rectangle, a_rectangle_runs, a_fillet, a_circle_key, a_circle_runs, b_finish,
+    [setup, a_line, a_rectangle, a_rectangle_runs, a_fillet, a_circle_key, a_circle_runs, a_line_again,
+     a_search, a_search_type, a_search_runs, b_finish,
      b_extrude, b_ucs, b_ucs_open, c_interface_on, c_extrude, b_closed],
     paced_by="state",
 )

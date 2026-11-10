@@ -120,17 +120,23 @@ class CommandSearchDialog(QtWidgets.QDialog):
 
     def _run_item(self, item):
         name = item.data(QtCore.Qt.UserRole)
+        label = item.text()  # (read now: the row goes with the closed popup)
         self.close()
-        try:
-            from . import recent
+        # (ribbon_ui.run records it, as the ribbon, the menus and the keys do: Repeat, and the
+        # sketch knows which tool runs; a spline started here was lost on OK: Luca, 2026-11-04)
+        # Run after the popup has closed so commands that open dialogs work; the running
+        # tool ends first, as with the ribbon and the keys (ribbon_ui.run: it stayed, or
+        # FreeCAD asked about the dialog already open)
+        QtCore.QTimer.singleShot(0, lambda: _run(name, label))
 
-            # as the ribbon, the menus and the keys do: Repeat, and the sketch knows which
-            # tool runs (a spline started here was lost on OK: Luca, 2026-11-04)
-            recent.record(name, item.text())
-        except Exception as exc:
-            warn("search: %s" % exc)
-        # Run after the popup has closed so commands that open dialogs work.
-        QtCore.QTimer.singleShot(0, lambda: Gui.runCommand(name))
+
+def _run(name, label):
+    try:
+        from . import ribbon_ui
+
+        ribbon_ui.run((name, None), label)
+    except Exception as exc:
+        warn("search: %s" % exc)
 
 
 def show():

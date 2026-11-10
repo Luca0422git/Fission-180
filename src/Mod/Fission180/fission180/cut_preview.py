@@ -29,8 +29,10 @@ BLUE_TRANSPARENCY = 0.6
 BLUE_EDGE = (0.20, 0.55, 0.90)
 
 
-def _mesh_node(coin, shape, name, color, glow, transparency, edge):
-    """A see-through copy of `shape` with its outline, clicks going through it."""
+def _mesh_node(coin, shape, name, color, glow, transparency, edge, shared=None):
+    """A see-through copy of `shape` with its outline, clicks going through it. `shared`: a
+    dict that keeps the mesh and outline nodes made for the first copy, so a second copy
+    (the x-ray layer) draws the same nodes instead of tessellating the shape again."""
     node = coin.SoSeparator()
     node.setName(name)
     pick = coin.SoPickStyle()
@@ -46,23 +48,29 @@ def _mesh_node(coin, shape, name, color, glow, transparency, edge):
     hints.vertexOrdering = coin.SoShapeHints.UNKNOWN_ORDERING
     hints.shapeType = coin.SoShapeHints.UNKNOWN_SHAPE_TYPE  # lit from both sides
     node.addChild(hints)
-    size = max(shape.BoundBox.DiagonalLength, 1e-3)
-    points, triangles = shape.tessellate(max(0.002 * size, 0.005))
     material = coin.SoMaterial()
     material.diffuseColor.setValue(*color)
     material.emissiveColor.setValue(*glow)
     material.transparency.setValue(transparency)
     node.addChild(material)
-    coords = coin.SoCoordinate3()
-    coords.point.setValues(0, len(points), [(p.x, p.y, p.z) for p in points])
+    if shared is not None and "coords" in shared:
+        coords, faces, outline = shared["coords"], shared["faces"], shared["outline"]
+    else:
+        size = max(shape.BoundBox.DiagonalLength, 1e-3)
+        points, triangles = shape.tessellate(max(0.002 * size, 0.005))
+        coords = coin.SoCoordinate3()
+        coords.point.setValues(0, len(points), [(p.x, p.y, p.z) for p in points])
+        faces = coin.SoIndexedFaceSet()
+        index = []
+        for a, b, c in triangles:
+            index += [a, b, c, -1]
+        faces.coordIndex.setValues(0, len(index), index)
+        outline = _outline(coin, shape, size, edge)
+        if shared is not None:
+            shared.update(coords=coords, faces=faces, outline=outline)
     node.addChild(coords)
-    faces = coin.SoIndexedFaceSet()
-    index = []
-    for a, b, c in triangles:
-        index += [a, b, c, -1]
-    faces.coordIndex.setValues(0, len(index), index)
     node.addChild(faces)
-    node.addChild(_outline(coin, shape, size, edge))
+    node.addChild(outline)
     return node
 
 
@@ -110,12 +118,15 @@ class CutPreview:
         """Draw `shape` (a solid in global coordinates) in red, replacing what was shown."""
         from pivy import coin
 
-        node = _mesh_node(coin, shape, NAME, RED, GLOW, TRANSPARENCY, EDGE)
+        shared = {}
+        node = _mesh_node(coin, shape, NAME, RED, GLOW, TRANSPARENCY, EDGE, shared)
         try:
             # drawn last, over everything (no depth test): the part's walls do not hide it
             xray = coin.SoAnnotation()
             xray.setName(XRAY_NAME)
-            xray.addChild(_mesh_node(coin, shape, XRAY_NAME + "Mesh", RED, GLOW, XRAY_TRANSPARENCY, EDGE))
+            xray.addChild(
+                _mesh_node(coin, shape, XRAY_NAME + "Mesh", RED, GLOW, XRAY_TRANSPARENCY, EDGE, shared)
+            )
             node.addChild(xray)
         except Exception:
             pass  # (the normal red stays)

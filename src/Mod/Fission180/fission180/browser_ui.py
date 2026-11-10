@@ -575,6 +575,8 @@ def _can_remove(doc):
 
 def _run_command(name):
     try:
+        if not commands.make_way_for(name):  # the running tool ends first (ribbon_ui.run)
+            return
         Gui.runCommand(name)
     except Exception as exc:
         warn("%s failed: %s" % (name, exc))
