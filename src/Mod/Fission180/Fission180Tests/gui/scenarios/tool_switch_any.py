@@ -13,6 +13,10 @@ A  In a sketch: L (Fission 180's Line), then the ribbon's 2-Point Rectangle butt
    the Fillet has stopped, the circle tool runs.
 B  Finish Sketch. Extrude (E) open, then CONSTRUCT > User Coordinate System: no question pops
    up, the Extrude panel is gone, the coordinate system's panel is open.
+C  ... and the Fission 180 interface stays on with it (FreeCAD switches to Part Design to edit
+   it: the interface went off, ribbon and keys with it, found by a sweep of every tool then E,
+   2026-11-10). E: the coordinate system's panel is finished, Extrude opens, the interface is
+   still on.
 """
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -149,6 +153,27 @@ def b_ucs_open():
             and edit.Object.TypeId == "PartDesign::CoordinateSystem",
             edit.Object.TypeId if edit is not None else None)
     h.shot("B-ucs-after-extrude")
+
+
+def c_interface_on():
+    from fission180 import shell
+
+    h.check("C: the interface stays on while it is open", shell.is_on())
+    ribbon = shell.ribbon()
+    h.check("...its ribbon shown", ribbon is not None and ribbon.isVisible())
+    h.press("e")
+
+
+def c_extrude():
+    from fission180 import extrude_ui, shell
+
+    p = extrude_ui.ExtrudePanel.last
+    edit = Gui.ActiveDocument.getInEdit()
+    h.check("C: E finished the coordinate system's panel",
+            edit is None or edit.Object.TypeId != "PartDesign::CoordinateSystem",
+            edit.Object.TypeId if edit is not None else None)
+    h.check("...and Extrude opens", p is not None and not p._closed)
+    h.check("...the interface still on", shell.is_on())
     h.task_button("Cancel")
 
 
@@ -159,6 +184,6 @@ def b_closed():
 h.run(
     "tool_switch_any",
     [setup, a_line, a_rectangle, a_rectangle_runs, a_fillet, a_circle_key, a_circle_runs, b_finish,
-     b_extrude, b_ucs, b_ucs_open, b_closed],
+     b_extrude, b_ucs, b_ucs_open, c_interface_on, c_extrude, b_closed],
     paced_by="state",
 )

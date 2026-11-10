@@ -793,11 +793,16 @@ class PressPullPanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         return [self.target]
 
     def live_ghost_objects(self):
-        return [self.base]
+        return [] if self._pushing() else [self.base]
+
+    def live_solid_objects(self):
+        # pushed into the part: the part as it is with the red slab over it, as the still
+        # picture shows it (live_shapes.cut_look)
+        return [self.base] if self._pushing() else []
 
     def live_colors(self):
         if self._pushing():
-            return live_shapes.CUT_COLOR, (0.35, 0.05, 0.05)
+            return live_shapes.CUT_COLOR, live_shapes.CUT_LINE
         return live_shapes.colors(self.target if self.target is not None else self.base)
 
     def _hide_cut_view(self):

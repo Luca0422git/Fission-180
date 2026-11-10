@@ -655,6 +655,8 @@ class Live:
 
                 self.overlay = _Overlay(Gui.ActiveDocument.ActiveView, color, line)
                 self._colors = (color, line)
+                if color == CUT_COLOR:
+                    cut_look(self.overlay)
             self.overlay.hide()
             self.overlay.set_pictures(pictures)
             self.key = key
@@ -667,9 +669,10 @@ class Live:
             log("%s: no live picture here (%s); the preview follows on pauses" % (self.name, exc))
             return None
 
-    def show(self, key, make, values, hide=(), ghost=(), color=None, line=None):
+    def show(self, key, make, values, hide=(), ghost=(), color=None, line=None, solid=()):
         """Show the picture of `key` at `values`; the objects of `hide` out of sight, those of
-        `ghost` shown see-through. False when there is no picture (nothing changed)."""
+        `ghost` shown see-through, those of `solid` shown as they are. False when there is no
+        picture (nothing changed)."""
         kwargs = {}
         if color is not None:
             kwargs["color"] = color
@@ -681,15 +684,25 @@ class Live:
             return False
         overlay.show(values)
         self.values = values
-        self._out_of_the_way(hide, ghost)
+        self._out_of_the_way(hide, ghost, solid)
         return True
 
-    def _out_of_the_way(self, hide, ghost):
-        if self.hid:
-            return
+    def _out_of_the_way(self, hide, ghost, solid=()):
         from . import pickpanel
 
+        wanted = tuple(tuple(_name(o) for o in group) for group in (hide, ghost, solid))
+        if self.hid:
+            if wanted == getattr(self, "_arranged", wanted):
+                return
+            self._put_back()  # (an extrude turned into a cut while dragged: the part solid again)
+        self._arranged = wanted
         self.hid = True
+        for obj in solid:
+            vobj = getattr(obj, "ViewObject", None) if pickpanel.alive(obj) else None
+            if vobj is None:
+                continue
+            self._visible.append((vobj, shown(vobj)))
+            vobj.makeTemporaryVisible(True)
         for obj in hide:
             vobj = getattr(obj, "ViewObject", None) if pickpanel.alive(obj) else None
             if vobj is None:
@@ -715,6 +728,10 @@ class Live:
             except Exception:
                 pass
         self.values = None
+        self._put_back()
+
+    def _put_back(self):
+        """The objects the picture hid or showed see-through as they were."""
         if not self.hid:
             return
         self.hid = False
@@ -734,6 +751,13 @@ class Live:
         self.hide()
         self.overlay = None
         self.key = None
+
+
+def _name(obj):
+    try:
+        return obj.Name
+    except Exception:  # (deleted)
+        return ""
 
 
 def shown(vobj):
@@ -762,7 +786,40 @@ def colors(obj):
     return face, line
 
 
-CUT_COLOR = (0.85, 0.25, 0.2)  # a cut's picture: the material taken away (as cut_preview)
+CUT_COLOR = (0.95, 0.20, 0.20)  # a cut's picture: the material taken away (cut_preview.RED)
+CUT_LINE = (0.85, 0.08, 0.08)  # its edges (cut_preview.EDGE)
+LIVE_XRAY_NAME = "Fission180LiveShapeXRay"
+
+
+def cut_look(overlay):
+    """A cut's live picture as its still picture looks (cut_preview.CutPreview): see-through
+    red over the part, and fainter red where the part's walls hide it (the same points drawn
+    again with no depth test). While the arrow was dragged the cut went the part's own colour
+    with the part see-through, then red once the mouse rested (Luca, 2026-11-10: "when i drag
+    it, the live view looks bad. It shouldnt be changing colors")."""
+    try:
+        from pivy import coin
+
+        from . import cut_preview
+
+        m = overlay.material
+        m.diffuseColor.setValue(*cut_preview.RED)
+        m.emissiveColor.setValue(*cut_preview.GLOW)
+        m.specularColor.setValue(0.0, 0.0, 0.0)
+        m.transparency.setValue(cut_preview.TRANSPARENCY)
+        xray = coin.SoAnnotation()
+        xray.setName(LIVE_XRAY_NAME)
+        see = coin.SoMaterial()
+        see.diffuseColor.setValue(*cut_preview.RED)
+        see.emissiveColor.setValue(*cut_preview.GLOW)
+        see.transparency.setValue(cut_preview.XRAY_TRANSPARENCY)
+        xray.addChild(see)
+        xray.addChild(overlay.coords)  # (the same nodes: moved once per drag step)
+        xray.addChild(overlay.faces)
+        xray.addChild(overlay.lines)
+        overlay.root.addChild(xray)
+    except Exception as exc:
+        warn("cut picture: %s" % exc)
 
 
 class LivePanel:
@@ -789,6 +846,11 @@ class LivePanel:
         return []
 
     def live_ghost_objects(self):
+        return []
+
+    def live_solid_objects(self):
+        """Objects shown as they are while the picture shows (a cut's part: its red is drawn
+        over it, as in the still picture)."""
         return []
 
     def live_colors(self):
@@ -829,6 +891,7 @@ class LivePanel:
                 self.live_ghost_objects(),
                 color,
                 line,
+                self.live_solid_objects(),
             ):
                 return False
             self.live_shown(values)

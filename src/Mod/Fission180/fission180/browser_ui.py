@@ -17,6 +17,7 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
+from . import body_visibility
 from . import _remember, browser_core as core
 from . import commands, components, doc_epoch, hover_ghost, selectable, theme
 from . import timeline_ops as ops
@@ -284,6 +285,8 @@ def _objects(doc):
             visible = obj.ViewObject.Visibility if obj.ViewObject is not None else None
             if visible is not None and getattr(obj, "Role", None) in core.ORIGIN_ROLES:
                 visible = _origin_visible(obj)
+            elif visible is not None and body_visibility.is_body(obj):
+                visible = body_visibility.body_shown(obj)  # its solid (a sketch may keep it on)
             container = components.container_of(obj)
             row = {
                 "name": obj.Name,
@@ -1570,7 +1573,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             if n["kind"] == "origin":
                 _show_origin_feature(obj, visible, only=node["kind"] == "origin")
             else:
-                obj.ViewObject.Visibility = visible
+                # bodies and sketches the Fusion way: a sketch shows on its own, even in a
+                # hidden body (body_visibility)
+                body_visibility.set_shown(obj, visible)
         if refresh:
             self._refresh_soon()
 
@@ -1579,6 +1584,8 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         component hidden just before took the rows inside it along)."""
         obj = self._object(node)
         try:
+            if obj is not None and body_visibility.is_body(obj):
+                return body_visibility.body_shown(obj)
             if obj is not None and obj.ViewObject is not None and node["kind"] != "origin":
                 return bool(obj.ViewObject.Visibility)
         except Exception:
@@ -2363,7 +2370,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         types = core.BODY_TYPES if kind == "body" else core.SKETCH_TYPES
         for obj in self._doc.Objects:
             if obj.TypeId in types and obj.ViewObject is not None:
-                obj.ViewObject.Visibility = visible
+                body_visibility.set_shown(obj, visible)
         if kind == "body":
             components_ui.ISOLATED.pop(self._doc.Name, None)
         self.refresh(force=True)

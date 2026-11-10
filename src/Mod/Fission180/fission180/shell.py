@@ -75,6 +75,17 @@ def on_workbench(name):
     """Called for every workbench change (Qt signal) and from Fission 180's Activated()."""
     try:
         name = str(name)
+        if _state["on"] and name not in (FISSION180_WB, SKETCH_WB) and _for_an_edit():
+            # FreeCAD switches to Part Design to edit one of its features (a User Coordinate
+            # System, a datum, a native feature: PartDesignGui's setEdit) and back when the edit
+            # ends. Fusion keeps its window for those: the interface stays on (it went off, keys
+            # and ribbon with it, while such a dialog was open: Luca, 2026-11-10, "the switching
+            # tool bug is STILL there"), only that workbench's toolbars are hidden.
+            if config.USE_RIBBON:
+                _safely(_hide_toolbars)
+            _hide_toolbars_soon()
+            log("%s for an edit: the interface stays on" % name)
+            return
         # the bar Back to Fission 180: in FreeCAD's own interface only (freecad_tools_ui)
         _safely(lambda: __import__("fission180.freecad_tools_ui").freecad_tools_ui.follow(name))
         if name == FISSION180_WB:
@@ -106,6 +117,20 @@ def on_workbench(name):
             )
     except Exception as exc:
         warn("workbench change to %s: %s" % (name, exc))
+
+
+def _for_an_edit():
+    """True while a document is being edited or set up for an edit (FreeCAD names the edit
+    document before the feature's setEdit switches the workbench)."""
+    try:
+        import FreeCADGui as Gui
+
+        if Gui.editDocument() is not None:
+            return True
+        doc = Gui.ActiveDocument
+        return doc is not None and doc.getInEdit() is not None
+    except Exception:
+        return False
 
 
 def startup():

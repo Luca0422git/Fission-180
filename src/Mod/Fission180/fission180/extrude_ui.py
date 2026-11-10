@@ -2065,11 +2065,51 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         self.dirty = True
         if new_geometry:
             self._geometry_changed = True
+        if live and not new_geometry:
+            self._live_operation()
         if live and not new_geometry and self.live_show():
             self._hide_cut_view()
+            if self.picker is not None:
+                try:  # a cut: the picked profile's blue faded, as under the still red
+                    self.picker.dim_picked(self.options.get("operation") == "cut")
+                except Exception as exc:
+                    warn("extrude: %s" % exc)
             self.schedule(settle=True)
             return
         self.schedule()
+
+    def _live_operation(self):
+        """While an arrow is dragged: the automatic Cut at once. Its test depends only on
+        which way the extrusion goes (cached per side), so the live picture turns into the
+        red of a cut as soon as the arrow goes into the part; it stayed a Join, hidden
+        inside the part, until the mouse rested (Luca, 2026-11-10: "i have to stop dragging
+        for fission to catch up for me to see the live view"). Join or New Body is told
+        apart when the mouse rests (_auto_operation), as before."""
+        if self.user_picked_operation or not self.profiles:
+            return
+        try:
+            options = extrude.options_with_defaults(self._build_options() or self.options)
+            if options["direction"] == "symmetric":
+                return
+            into = self._starts_inside(options)
+        except Exception:
+            return
+        current = self.options.get("operation")
+        if into:
+            wanted = "cut"
+        elif current == "cut":
+            way = self._way
+            touches = bool(way[1]) if way is not None else self._base_has_solid()
+            wanted = "join" if touches else "new_body"
+        else:
+            return
+        if wanted != current:
+            self.options["operation"] = wanted
+            self._quiet = True
+            try:
+                _set_combo(self.operation, wanted)
+            finally:
+                self._quiet = False
 
     # -- the live picture (live_shapes.ExtrudePicture) --------------------------------------------
     def _live_options(self):
@@ -2129,12 +2169,20 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         return [self.target] if self.target is not None else []
 
     def live_ghost_objects(self):
+        if self.options.get("operation") == "cut":
+            return []  # (a cut: the part as it is, its red over it: live_solid_objects)
+        base = getattr(self.target, "BaseFeature", None) if self.target is not None else None
+        return [base] if base is not None else []
+
+    def live_solid_objects(self):
+        if self.options.get("operation") != "cut":
+            return []
         base = getattr(self.target, "BaseFeature", None) if self.target is not None else None
         return [base] if base is not None else []
 
     def live_colors(self):
         if self.options.get("operation") == "cut":
-            return live_shapes.CUT_COLOR, (0.35, 0.05, 0.05)
+            return live_shapes.CUT_COLOR, live_shapes.CUT_LINE
         if self.target is not None:
             return live_shapes.colors(self.target)
         return None, None

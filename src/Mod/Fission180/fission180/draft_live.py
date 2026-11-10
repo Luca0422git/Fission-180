@@ -478,6 +478,7 @@ class Overlay:
         material.specularColor.setValue(0.2, 0.2, 0.2)
         material.shininess = 0.3
         self.root.addChild(material)
+        self.material = material  # (live_shapes.cut_look: a cut's see-through red)
         self.coords = coin.SoCoordinate3()
         self.root.addChild(self.coords)
         self.faces = coin.SoIndexedFaceSet()
@@ -498,6 +499,7 @@ class Overlay:
         self.line_set = coin.SoLineSet()
         lines.addChild(self.line_set)
         self.root.addChild(lines)
+        self.lines = lines
         self.shown = False
         self.angles = None
 
