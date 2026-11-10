@@ -451,11 +451,19 @@ def new_save_starts_in_this_computer():
 
 
 def elsewhere_shown():
-    text = [t for _k, _key, p, t, _st in tiles("local") if p == s["bracket"]]
+    # a row of its own: under This computer's heading (its folder's path beside it) it looked
+    # as if it were in that folder (Luca, 2026-11-10: "Fission claims they are in documents.
+    # but they are not")
+    text = [t for _k, _key, p, t, _st in tiles("elsewhere") if p == s["bracket"]]
     h.check(
-        "a design saved in another folder shows with This computer", len(text) == 1, names("local")
+        "a design saved in another folder shows in Elsewhere on this computer",
+        len(text) == 1,
+        names("elsewhere"),
     )
-    h.check("... saying it is another folder", bool(text) and "another folder" in text[0], text)
+    h.check("... not under This computer's folder", "Bracket" not in names("local"), names("local"))
+    folder = os.path.basename(s["other"])
+    h.check("... saying which folder it is in", bool(text) and folder in text[0], text)
+    h.shot("elsewhere")
 
 
 wait_tiles(elsewhere_shown)

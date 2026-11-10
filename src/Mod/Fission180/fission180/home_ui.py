@@ -238,6 +238,7 @@ _CONFLICT = QtCore.Qt.UserRole + 3  # a conflict copy: the original's file name
 _ROOT = QtCore.Qt.UserRole + 4  # the folder of the tile's place ("" for Recent)
 
 RECENT = "recent"  # the first row
+ELSEWHERE = "elsewhere"  # designs saved outside every place's folder (their own row)
 
 QSS = """
 #Fission180Home {{ background: {view}; }}
@@ -460,7 +461,9 @@ class _Row(QtWidgets.QWidget):
         head.addStretch(1)
         self.clear_button = None
         self.menu_button = None
-        if row_id == RECENT:
+        if row_id == ELSEWHERE:
+            pass  # (no folder of its own: each tile's right-click has Show in Folder)
+        elif row_id == RECENT:
             self.clear_button = QtWidgets.QPushButton("Clear List")
             self.clear_button.setObjectName("Fission180HomeClear")
             self.clear_button.setCursor(QtCore.Qt.PointingHandCursor)
@@ -814,12 +817,17 @@ class HomeView(QtWidgets.QWidget):
             else:
                 _finish_unfinished_saves(root)
                 tiles = self._place_tiles(root, locations_core, locations_ui)
-                if local:
-                    tiles += self._elsewhere_tiles(state, known)
             title = place["name"]
             if not local and locations_core.status(place) != locations_core.OK:
                 title += "  · Offline"
             found.append((location_id, title, "folder", root, tiles, empty))
+        # Designs saved in another folder get a row of their own: under This computer's
+        # heading (its folder's path beside it) they looked as if they were in that folder,
+        # which Explorer showed empty (Luca, 2026-11-10: "Fission claims they are in
+        # documents. but they are not")
+        others = self._elsewhere_tiles(state, known)
+        if others:
+            found.append((ELSEWHERE, "Elsewhere on this computer", "folder", "", others, ""))
         return found
 
     def _place_tiles(self, root, locations_core, locations_ui):
@@ -859,7 +867,7 @@ class HomeView(QtWidgets.QWidget):
                     key=entry["key"],
                     path=path,
                     name=entry["name"],
-                    where="another folder",
+                    where="in %s" % _folder_words(path),
                     tip="Saved outside This computer's folder, in:\n%s" % path,
                     root="",
                     search="%s %s" % (entry["name"], path),
@@ -1354,6 +1362,15 @@ def _finish_unfinished_saves(root, max_depth=6):
                 todo.extend((sub["path"], depth + 1) for sub in subfolders)
         except Exception as exc:
             warn("home: unfinished saves in %s: %s" % (folder, exc))
+
+
+def _folder_words(path):
+    """Where a design is, in a tile's few words: its folder and the one above it
+    ("Downloads / VexRobot")."""
+    folder = os.path.dirname(os.path.normpath(path))
+    parent, name = os.path.split(folder)
+    above = os.path.basename(parent)
+    return " / ".join(n for n in (above, name) if n) or folder
 
 
 def _make_default_folder(root):

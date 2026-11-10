@@ -97,8 +97,12 @@ def designs_listed():
             versions.complete_save(os.path.join(s["project"], name + ".FCStd")),
         )
     listed = names("local")
-    # (Source, saved in another folder to make the files, is listed too: "another folder")
     h.check("This computer lists both", {"test", "the THING"} <= set(listed), listed)
+    # Source, saved in another folder to make the files, has a row of its own: under This
+    # computer's folder it looked as if it were in it (Luca, 2026-11-10)
+    elsewhere = names("elsewhere")
+    h.check("Source is not under This computer's folder", "Source" not in listed, listed)
+    h.check("... but in Elsewhere on this computer", "Source" in elsewhere, elsewhere)
     left = [n for n in os.listdir(s["project"]) if ".FCStd." in n]
     h.check("no unfinished save left beside them", left == [], left)
     kept = os.listdir(os.path.join(s["project"], versions.UNFINISHED_FOLDER))
