@@ -215,5 +215,26 @@ class LineAndArc(unittest.TestCase):
         self.assertAlmostEqual(d["point"][1], 0.0)
 
 
+class StartValues(unittest.TestCase):
+    """The values a corner starts with in the CHAMFER panel."""
+
+    def test_two_lines_a_fifth_of_the_shorter(self):
+        data = core.corner(((0.0, 0.0), (40.0, 0.0)), ((40.0, 0.0), (40.0, 30.0)))
+        self.assertAlmostEqual(core.reach(data), 30.0)
+        self.assertAlmostEqual(core.start_distance(data), 6.0)
+
+    def test_the_last_one_when_it_fits(self):
+        data = core.corner(((0.0, 0.0), (40.0, 0.0)), ((40.0, 0.0), (40.0, 30.0)))
+        self.assertEqual(core.start_distance(data, 8.0), 8.0)
+        self.assertAlmostEqual(core.start_distance(data, 35.0), 6.0)  # too long here
+
+    def test_a_line_and_an_arc_the_chord(self):
+        # a quarter arc of radius 15 from the corner: its far end 15 sqrt 2 away
+        arc = ((55.0, 0.0), 15.0, math.pi / 2, math.pi)
+        data = core.line_arc_corner(((0.0, 0.0), (40.0, 0.0)), arc)
+        self.assertAlmostEqual(core.reach(data), 15.0 * math.sqrt(2.0))
+        self.assertAlmostEqual(core.start_distance(data), 0.2 * 15.0 * math.sqrt(2.0))
+
+
 if __name__ == "__main__":
     unittest.main()

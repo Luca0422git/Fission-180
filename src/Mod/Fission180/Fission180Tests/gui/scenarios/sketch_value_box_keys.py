@@ -9,13 +9,13 @@ an arrow key went on to FreeCAD's 3D view, which pans with the arrow keys.
 
 Two corners of two lines each: (10, 10) and (60, 10).
 
-A  MODIFY > Fillet, the corner (10, 10), the pointer out to size it: the R box shows. Type
+A  MODIFY > Fillet, the corner (10, 10), the pointer out: the R box shows. Type
    15, Left, 2: "125" (the 2 went in before the 5), the caret drawn after the 2; the view
    did not move. Home, End, Backspace ("12"), Left, Delete ("1"), 0 ("10"), Up and Down:
    the view never moved. Enter: a fillet of radius 10.
-B  The next corner (60, 10), the pointer out: the R box shows the pointer's radius. Left:
-   that value is typed into, the caret one place before its end; the view did not move.
-   Esc, Esc.
+B  Fillet again (Enter was its OK), the corner (60, 10), the pointer out: the R box shows
+   the radius. Left: that value is typed into, the caret one place before its end; the view
+   did not move. Esc, Esc.
 C  FreeCAD's own fields keep working: Line (L), a first click, type 12, Left: the caret moves
    in the length field, the view does not move. Esc, Esc. 2-Point Rectangle, a first
    corner, type 12, Left: the same.
@@ -86,7 +86,7 @@ def a_corner():
 
 
 def a_size():
-    h.check("A the corner is picked", st.tool() is not None and st.tool().step == 2)
+    h.check("A the corner is picked", st.tool() is not None and len(st.tool().corners) == 1)
     st.hover(V(16, 16, 0))
 
 
@@ -159,8 +159,13 @@ def a_made():
 
 
 # == B ==================================================================================
+def b_open():
+    h.check("B Enter (OK) ended the Fillet", st.tool() is None, st.tool_title())
+    si.menu_item("MODIFY", "Fillet")
+
+
 def b_corner():
-    h.check("B Fillet waits for the next corner", st.tool_title() == "Fillet", st.tool_title())
+    h.check("B Fillet runs again", st.tool_title() == "Fillet", st.tool_title())
     st.click(V(60, 10, 0))
 
 
@@ -171,7 +176,7 @@ def b_size():
 def b_left():
     b = box()
     s["shown"] = b.text()[len("R ") :] if b is not None else None
-    h.check("B the R box shows the pointer's radius", bool(s["shown"]), st.box_texts())
+    h.check("B the R box shows the radius", bool(s["shown"]), st.box_texts())
     s["cam"] = h.view_key()
     si.key(QtCore.Qt.Key_Left)
 
@@ -314,6 +319,7 @@ h.run(
         a_delete,
         a_up_down,
         a_made,
+        b_open,
         b_corner,
         b_size,
         b_left,

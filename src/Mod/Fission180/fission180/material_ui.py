@@ -83,6 +83,10 @@ class MaterialPanel(BodyPanel):
     icon = "material"
     needs_pick = ()
 
+    def picks_bodies(self):
+        """Every click takes a whole body: it lights up whole under the pointer (body_hover)."""
+        return True
+
     def __init__(self, doc):
         self.key = None
         self.pending = []

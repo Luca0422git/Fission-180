@@ -8,6 +8,50 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.8
+
+### Fixed
+
+- **Switching tools still failed while some dialogs were open.** Starting User Coordinate System
+  (and editing other Part Design features with FreeCAD's own panel) made FreeCAD switch to its
+  Part Design workbench, which turned the Fission 180 interface off: no ribbon, and no tool key
+  (E, H, Q, F, M...) did anything until that panel closed. The interface now stays on, and a
+  tool started from there finishes that panel first. A sweep of every SOLID tool followed by
+  Extrude, Hole, Press Pull, Fillet, Shell and Move/Copy by their keys found no other case.
+  The command search (S) and the browser's right-click commands now also end the running tool
+  first (Fission 180's Line kept running under a tool started from the search).
+- **Dragging an extrude into the part was slow to show the cut, and changed colours.** While
+  the arrow was dragged the extrude stayed a Join, hidden inside the part, so nothing showed until
+  you stopped; then the part turned see-through grey with a dark red block. Now it becomes a Cut
+  as soon as the arrow goes into the part, and the cut looks the same while dragging as when you
+  stop: see-through red, fainter red through the walls, the part keeping its colour. Press Pull
+  pushing into a face looks the same way.
+- **A shown sketch disappeared when its body was hidden.** In FreeCAD a hidden body hides its
+  sketches. Now the body's eye hides only its solid while one of its sketches is shown, so you can
+  hide every body and still show a sketch; the browser still shows the body as hidden.
+- **Hovering a body in a tool that asks for bodies lit only one face.** In Move/Copy, Combine,
+  Split Body, Scale, Interference, Center of Mass, Remove, Silhouette Split, Physical Material,
+  Appearance, the Extrude "Bodies to Cut" row and Pattern / Mirror with Bodies, the whole body
+  now lights up under the mouse. Boxes that pick faces or edges still light one face or edge.
+- **Move/Copy took a "random" body of the ones selected first.** A box round several bodies
+  selected each body once per face and edge, and the tool toggled it on and off again, so some
+  dropped out. Now every selected body is taken, however it was selected (a box, the browser,
+  Shift-clicks); Combine (the first is the Target, the others the Tools), Scale, Remove and
+  Appearance take all of them too. A box drawn inside a tool's dialog adds the bodies it covers
+  and no longer drops the ones already picked.
+
+### Changed
+
+- **Sketch Fillet no longer follows the mouse.** Click the corners you want (click one again to
+  drop it), then drag the blue arrow or type the radius in the FILLET panel; nothing is made
+  until OK or Enter, and all the fillets are one undo step.
+- **Sketch Chamfer has a CHAMFER panel:** its type (Equal distance, Distance and angle, Two
+  distances), the numbers, blue arrows to drag the distances, OK and Cancel.
+- **Sketch Offset no longer follows the mouse:** drag its blue arrow (through the curve to switch
+  sides), type the distance, or click where the offset should go.
+- **Trim, Extend, Break, Project, Include 3D Geometry and Intersect** show a small panel saying
+  what to click, with a Done button to finish.
+
 ## 0.1.0-beta.3.3.7
 
 ### Fixed

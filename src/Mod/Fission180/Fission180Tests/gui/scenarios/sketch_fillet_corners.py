@@ -6,18 +6,19 @@ there should be a snap point and the corner should be highlighted").
 
 A 40 x 30 rectangle with its corners at (0, 0), (40, 0), (40, 30), (0, 30).
 
-A  MODIFY > Fillet, the pointer on the corner (40, 0): both of its sides light up, the arc
-   it would get shows, and the snap dot sits on the corner. Off the corners, on a side:
-   only that side lights up, no dot.
-B  A click on the corner (0, 0), then on (40, 0) and (40, 30): three corners picked; with
-   several corners the pointer no longer sizes them (it travels from corner to corner):
-   the radius holds at a guess (a fifth of the shortest side: 6); type 5, Enter: three arcs of radius 5,
-   one Radius dimension 5 and the other two Equal to the first; the sketch solves. Ctrl+Z
-   takes all three back in one step; Ctrl+Y brings them again.
+A  MODIFY > Fillet, the pointer on the corner (40, 0): both of its sides light up with the
+   arc it would get, and the snap dot sits on the corner. Off the corners, on a side: only
+   that side lights up, no dot.
+B  A click on the corner (0, 0), then on (40, 0) and (40, 30): three corners picked (the
+   FILLET panel since 2026-11-10: the pointer never sizes the radius); the radius starts at
+   a guess (a fifth of the shortest side: 6); type 5, Enter (OK): three arcs of radius 5, one
+   Radius dimension 5 and the other two Equal to the first; the sketch solves; the Fillet
+   ends. Ctrl+Z takes all three back in one step; Ctrl+Y brings them again.
 C  The Radius dimension set to 3: all three arcs follow (they stay equal).
 D  A second rectangle 40 x 30 at x = 60: its corners (60, 0) and (100, 0) share the
-   bottom side; type 25, Enter: held at 19.8 (each fillet alone could be 30; together they
-   leave a piece of the 40 mm side), and the pointer says so.
+   bottom side; type 25, Tab: held at 19.8 (each fillet alone could be 30; together they
+   leave a piece of the 40 mm side), the panel says so; Enter: two arcs of 19.8, and the
+   pointer says so.
 """
 
 import FreeCAD as App
@@ -69,12 +70,19 @@ def tool_dot():
     return dot[0] if dot else None
 
 
-def hint():
-    t = st.tool()
-    try:
-        return t.hint.text() if t is not None and t.hint is not None else ""
-    except Exception:
-        return ""
+def told():
+    """What was said by the pointer last (a note once the tool has ended)."""
+    from fission180 import commands
+
+    return commands._TOLD["msg"] or ""
+
+
+def panel_note():
+    import FreeCADGui as Gui
+    from PySide import QtWidgets
+
+    w = Gui.getMainWindow().findChild(QtWidgets.QLabel, "Fission180SketchFilletPanelMessage")
+    return w.text() if w is not None and w.isVisible() else ""
 
 
 # == A ==================================================================================
@@ -89,10 +97,10 @@ def a_hover():
 
 def a_hover_check():
     drawn = st.preview()
-    picked = drawn.get("picked", [])
-    h.check("A both sides of the corner light up", len(picked) == 2, len(picked))
-    curves = drawn.get("curves", [])
-    h.check("A the arc it would get shows", len(curves) == 1 and len(curves[0]) > 2, curves)
+    marks = drawn.get("marks", [])  # (lit, not picked: nothing is picked by hovering)
+    h.check("A both sides and the arc light up", len(marks) == 3, len(marks))
+    h.check("A ...with the arc it would get", any(len(m) > 2 for m in marks), marks)
+    h.check("A nothing picked by hovering", not drawn.get("picked") and not drawn.get("curves"), drawn)
     dot = tool_dot()
     h.check(
         "A the dot on the corner",
@@ -105,7 +113,7 @@ def a_hover_check():
 
 def a_side_check():
     drawn = st.preview()
-    h.check("A on a side: only that side lights up", len(drawn.get("picked", [])) == 1, drawn)
+    h.check("A on a side: only that side lights up", len(drawn.get("marks", [])) == 1, drawn)
     h.check("A ...no arc", not drawn.get("curves"), drawn.get("curves"))
     h.check("A ...no dot", tool_dot() is None, tool_dot())
 
@@ -118,22 +126,21 @@ def b_first():
 
 def b_second():
     t = st.tool()
-    h.check("B the first corner picked: the radius step", t is not None and t.step == 2)
+    h.check("B the first corner picked", t is not None and len(t.corners) == 1)
     st.click(V(40, 0, 0), towards=V(1.0, -0.6, 0))
 
 
 def b_third():
     t = st.tool()
     h.check(
-        "B the second corner is added", t is not None and len(t._pairs()) == 2, t and t._pairs()
+        "B the second corner is added", t is not None and len(t.corners) == 2, t and t.corners
     )
     st.click(V(40, 30, 0), towards=V(1.0, 0.6, 0))
 
 
 def b_away():
     t = st.tool()
-    h.check("B three corners picked", t is not None and len(t._pairs()) == 3, t and t._pairs())
-    h.check("B still the radius step", t is not None and t.step == 2)
+    h.check("B three corners picked", t is not None and len(t.corners) == 3, t and t.corners)
     st.hover(V(20, 15, 0))  # into the middle: the pointer no longer sizes them
 
 
@@ -141,7 +148,7 @@ def b_type():
     f = st.field("radius")
     shown = f.value if f is not None else None
     h.check(
-        "B with several corners the radius holds (a fifth of 30: 6)", st.near(shown, 6.0), shown
+        "B the radius holds wherever the pointer is (a fifth of 30: 6)", st.near(shown, 6.0), shown
     )
     h.shot("B-three-corners")
     st.keys("5\n")
@@ -163,6 +170,7 @@ def b_check():
     )
     h.check("B the other two Equal to it", len(equal) == 2, equal)
     st.sketch_ok("B")
+    h.check("B Enter (OK) ended the Fillet", st.tool() is None, st.tool_title())
     s["dim"] = [i for i, c in enumerate(sk.Constraints) if c.Type == "Radius"]
     st.esc()
     st.undo()
@@ -213,8 +221,15 @@ def d_second():
 
 def d_type():
     t = st.tool()
-    h.check("D two corners sharing the bottom side", t is not None and len(t._pairs()) == 2)
-    st.keys("25\n")
+    h.check("D two corners sharing the bottom side", t is not None and len(t.corners) == 2)
+    st.keys("25\t")
+
+
+def d_held():
+    t = st.tool()
+    h.check("D 25 is held at 19.8", t is not None and st.near(t.held(), 19.8, 1e-4), t and t.held())
+    h.check("D ...the panel says so", "limited to 19.8" in panel_note(), panel_note())
+    st.enter()
 
 
 def d_check():
@@ -225,7 +240,8 @@ def d_check():
         len(new) == 2 and all(st.near(g.Radius, 19.8, 1e-4) for _i, g in new),
         [g.Radius for _i, g in new],
     )
-    h.check("D ...and the pointer says so", "limited to 19.8" in hint(), hint())
+    h.settle("the note")
+    h.check("D ...and the pointer says so", "limited to 19.8" in told(), told())
     st.sketch_ok("D")
     st.esc()
 
@@ -253,6 +269,7 @@ h.run(
         d_first,
         d_second,
         d_type,
+        d_held,
         d_check,
     ],
     paced_by="state",

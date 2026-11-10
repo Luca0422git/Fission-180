@@ -167,7 +167,11 @@ def d_corner():
 
 def d_check():
     t = st.tool()
-    h.check("D the corner click was the Fillet's", t is not None and t.step == 2, t and t.step)
+    h.check(
+        "D the corner click was the Fillet's",
+        t is not None and len(getattr(t, "corners", [])) == 1,
+        t and getattr(t, "corners", None),
+    )
     h.check("D no line was drawn", count() == s["n"], count() - s["n"])
     stop()
 

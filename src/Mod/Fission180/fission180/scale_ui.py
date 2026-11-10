@@ -95,7 +95,7 @@ class ScalePanel(pickpanel.PickPanel):
     icon = "scale"
     last = None  # the most recent panel (tests and diagnostics)
 
-    def __init__(self, doc, feature=None, body=None, sketches=None):
+    def __init__(self, doc, feature=None, body=None, sketches=None, others=None):
         super().__init__(doc, "Scale" if feature is None else "Edit Scale")
         ScalePanel.last = self
         self.target = None
@@ -141,9 +141,20 @@ class ScalePanel(pickpanel.PickPanel):
         self.finish_layout()
         try:
             self._start()
+            self._take_others(others or [])
         except Exception as exc:  # never leave a half-open dialog without a reason
             self.say("⚠ %s" % exc)
             warn("Scale could not start picking: %s" % exc)
+
+    def _take_others(self, others):
+        """The other bodies selected before Scale (Fusion takes them all: one Scale step
+        scales every one)."""
+        taken = False
+        for other in others:
+            if other is not self.body and self.member(other) is None and scale_base(other):
+                taken = self._pick_body(other) or taken
+        if taken:
+            self._picks_updated()
 
     # -- layout -------------------------------------------------------------------------
     def _build(self):
@@ -293,6 +304,18 @@ class ScalePanel(pickpanel.PickPanel):
             return obj.Name == self.base.Name
         return _sketch_of(obj) is not None or self._body_of(obj) is not None
 
+    # -- the Entities box takes whole bodies (body_hover.py) ------------------------------------
+    def picks_bodies(self):
+        """The body under the pointer lights up whole while Entities takes the clicks (a
+        sketch's curve still lights up alone: it picks the sketch)."""
+        return self.active == "entities" and not (self.editing and self.record is not None)
+
+    def takes_body(self, body):
+        return self.allow(body, "")
+
+    def _holds(self, body):
+        return (body is self.body and self.base is not None) or self.member(body) is not None
+
     def picks_changed(self, added, dropped):
         changed = False
         for obj, short, _point in dropped:
@@ -303,15 +326,29 @@ class ScalePanel(pickpanel.PickPanel):
             elif _sketch_of(obj) in self.sketches and not short:
                 self.sketches.remove(obj)
                 changed = True
+        # One click, one box or the earlier selection is one batch: while it fills the
+        # Entities box (a body taken moves on to the Point box), each body and sketch counts
+        # once, and a box adds without dropping what it meets again (the rule of
+        # body_hover.take_batch, here with sketches too).
+        entities = self.active == "entities"
+        many = len(added) > 1
+        seen = []
         for obj, short, _point in added:
-            if self.active == "entities":
+            if entities:
                 sketch = _sketch_of(obj)
+                body = None if sketch is not None else self._body_of(obj)
+                thing = sketch if sketch is not None else body
+                if thing is None or any(thing is s for s in seen):
+                    continue
+                seen.append(thing)
                 if sketch is not None:
+                    if many and sketch in self.sketches:
+                        continue
                     changed = self._toggle_sketch(sketch) or changed
                     continue
-                body = self._body_of(obj)
-                if body is not None:
-                    changed = self._pick_body(body) or changed
+                if many and self._holds(body):
+                    continue
+                changed = self._pick_body(body) or changed
             elif not short and scale.is_point_object(obj) and self._point_in_body(obj):
                 changed = self._set_point((obj, "")) or changed
             elif short.startswith("Vertex") and self.allow(obj, short):
@@ -766,6 +803,18 @@ class ScaleCommand:
             warn("Scale could not start: %s" % exc)
 
 
+def _selected_bodies():
+    """Every body selected before Scale (by a face or edge of it, its browser row or a box
+    round it), each once, in the order selected."""
+    from . import body_hover, hole_common
+
+    def body_of(obj):
+        return obj if obj.TypeId == "PartDesign::Body" else scale.owner_body(obj)
+
+    objects = [obj for obj, _short, _point in hole_common.picks()]
+    return body_hover.unique_bodies(objects, body_of)
+
+
 def _selected_sketches():
     found = []
     for sel in Gui.Selection.getSelectionEx():
@@ -779,9 +828,11 @@ def start():
     """Run Scale: a body (or a face of it) or a sketch selected beforehand is taken at once;
     with nothing selected the dialog opens and waits for what to scale."""
     picked_body = pickpanel.selected_body()
+    others = _selected_bodies()
     sketches = _selected_sketches()
     if sketches:
         picked_body = None
+        others = []
     if not commands.finish_open_dialog():
         return None
     doc = App.ActiveDocument
@@ -793,11 +844,14 @@ def start():
         commands.tell("Scale needs a body or a sketch: make one first (Create Sketch).")
         return None
     body = picked_body if picked_body is not None and scale_base(picked_body) else None
+    if body is None:  # the first selected body without a solid: the next one leads
+        body = next((b for b in others if scale_base(b)), None)
+    others = [b for b in others if b is not body]
     if body is not None:
         pickpanel.activate(body)
     panel = None
     try:
-        panel = ScalePanel(doc, body=body, sketches=sketches)
+        panel = ScalePanel(doc, body=body, sketches=sketches, others=others)
         Gui.Control.showDialog(panel)
     except Exception:
         if panel is not None and not panel._closed:

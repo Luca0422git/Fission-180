@@ -168,10 +168,11 @@ def fillet_corner():
 
 
 def fillet_radius():
+    t = st.tool()
     h.check(
         "the corner point picks both lines",
-        st.tool() is not None and st.tool().step == 2,
-        st.tool() and st.tool().step,
+        t is not None and len(getattr(t, "corners", [])) == 1,
+        t and getattr(t, "corners", None),
     )
     st.keys("3\n")
 

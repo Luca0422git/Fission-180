@@ -69,9 +69,22 @@ class _Planar:
         self.place = coin.SoTransform()
         self.root = handle_look.top_root(coin, self.place)
         self.root.setName(NODE_NAME)
+        # Held until remove(): hidden, the view's graph no longer holds the root, and Coin
+        # freed it; shown again, freed memory went back into the view (a crash; found with
+        # the sketch value arrows, sketch_value_arrow.py, 2026-11-10)
+        self._held = []
+        self._hold(self.root)
         self.attached = False
+        self.removed = False
         self.paints = {}
         self.hot = None
+
+    def _hold(self, node):
+        try:
+            node.ref()
+            self._held.append(node)
+        except Exception:
+            pass
 
     def _ratio(self):
         try:
@@ -90,7 +103,7 @@ class _Planar:
         self.place.rotation.setValue(*rotation.Q)
 
     def show(self):
-        if self.attached:
+        if self.attached or self.removed:
             return
         try:
             self.view.getSceneGraph().addChild(self.root)
@@ -110,6 +123,13 @@ class _Planar:
     def remove(self):
         self.hide()
         self.paints = {}
+        self.removed = True
+        held, self._held = self._held, []
+        for node in held:
+            try:
+                node.unref()
+            except Exception:
+                pass
 
     def set_hot(self, name):
         if name == self.hot:
@@ -258,6 +278,7 @@ class ScaleArrow(_Planar):
         self.line_place = coin.SoTransform()
         self.line_root = handle_look.top_root(coin, self.line_place)
         self.line_root.setName(NODE_NAME)
+        self._hold(self.line_root)
         self.line = handle_look.Line(coin)
         self.line_root.addChild(self.line.node)
         self.update(self.base, self.ref, self.factor)
@@ -308,7 +329,7 @@ class ScaleArrow(_Planar):
             return False
 
     def show(self):
-        if self.attached:
+        if self.attached or self.removed:
             return
         super().show()
         try:

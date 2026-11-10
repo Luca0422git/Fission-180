@@ -6,9 +6,10 @@ A rectangle 50 x 30 ((-80, -15) to (-30, 15), its size and place set), a line
 (10, -40)-(60, -40) and a circle r 10 at (30, 25) are put in the sketch first.
 
 A  O opens the OFFSET panel (OK greyed, Chain Selection ticked). Chain Selection off, a
-   click on the rectangle's bottom edge picks that one line; the offset follows the
-   pointer below it; 4 and Enter: ONE line (-80, -19)-(-30, -19), its 4 mm dimension, one
-   undo step "Offset"; the panel goes.
+   click on the rectangle's bottom edge picks that one line; the offset shows below it (the
+   line's right) a tenth of its size out (5 mm), with its arrow, wherever the pointer goes
+   (since 2026-11-10 the pointer does not size it); 4 and Enter: ONE line (-80, -19)-(-30,
+   -19), its 4 mm dimension, one undo step "Offset"; the panel goes.
 B  Ctrl+Z takes it back in one step.
 C  O again: Chain Selection is remembered (off); ticked, one click takes the whole
    rectangle; 3 and Enter outside it: a rectangle 3 mm out, corners sharp (no arcs).
@@ -25,8 +26,12 @@ I  A line selected before O is the pick, as it is (Chain Selection on does not t
    rectangle); 4 and Enter: that one line offset.
 J  O while Offset runs ends it, nothing made; so does another sketch tool (L).
 K  Ctrl+Z undoes only the last offset.
-L  An inner offset typed too wide (20 mm in a 30 mm tall rectangle) stops at the largest
-   that fits (Luca's rule) and says so.
+L  An inner offset typed too wide (20 mm in a 30 mm tall rectangle; a click inside puts it
+   inside) stops at the largest that fits (Luca's rule) and says so.
+M  The arrow: O, the line (10,-40)-(60,-40): the arrow on its offset (below, the line's
+   right), pointing away from it; dragged 3 mm further: 3 mm more; dragged up through the
+   line: the offset goes above it; 6 typed in the panel: 6 above; OK: the line (10,-34)-
+   (60,-34) exactly, one undo step, no arrow, preview or box left.
 """
 
 import FreeCAD as App
@@ -198,8 +203,20 @@ def a_hover():
     )
     st.hover(V(-70, -19, 0), towards=V(0, -1, 0))
     curves = st.preview().get("curves", [])
-    ok = len(curves) == 1 and all(abs(pt[1] + 19.0) < 0.6 for pt in curves[0])
-    h.check("the offset of that one line follows the pointer below it", ok, curves)
+    ok = len(curves) == 1 and all(abs(pt[1] + 20.0) < 1e-9 for pt in curves[0])
+    h.check("the offset of that one line shows below it, 5 mm out", ok, curves)
+    a = arrow()
+    h.check(
+        "its arrow stands on it, across from the line's middle, pointing away",
+        a is not None
+        and st.vnear(V(a.foot[0], a.foot[1], 0), V(-55, -20, 0), 1e-9)
+        and st.vnear(V(a.direction[0], a.direction[1], 0), V(0, -1, 0), 1e-9),
+        a and (a.foot, a.direction),
+    )
+    st.hover(V(-70, -40, 0), towards=V(0, -1, 0))
+    curves = st.preview().get("curves", [])
+    ok = len(curves) == 1 and all(abs(pt[1] + 20.0) < 1e-9 for pt in curves[0])
+    h.check("the pointer further down does not move it", ok, curves)
     h.check("the distance box shows by the pointer", bool(st.box_texts()), st.box_texts())
     h.shot("A2-one-line")
 
@@ -652,7 +669,7 @@ def l_open():
 
 def l_pick():
     st.click(V(-80, 5, 0), towards=V(0, 0, 0))
-    st.hover(V(-70, 5, 0), towards=V(1, 0, 0))  # inside
+    st.click(V(-70, 5, 0), towards=V(1, 0, 0))  # inside: the offset goes inside
 
 
 def l_type():
@@ -678,6 +695,127 @@ def l_check():
     st.sketch_ok("held inner offset")
     h.check("no pop-up", not h.popups(), h.popups())
     h.shot("L-held")
+
+
+# == M: the arrow =================================================================================
+def arrow():
+    t = tool()
+    if t is None or t.arrows is None:
+        return None
+    a = t.arrows.items.get("distance")
+    return a if a is not None and a.attached else None
+
+
+def leftovers():
+    graph = Gui.ActiveDocument.ActiveView.getSceneGraph()
+    found = []
+    for i in range(graph.getNumChildren()):
+        name = graph.getChild(i).getName()
+        name = str(name.getString() if hasattr(name, "getString") else name)
+        if name in ("Fission180SketchTool", "Fission180SketchHandle"):
+            found.append(name)
+    return found
+
+
+def drag_arrow(mm):
+    a = arrow()
+    if not h.check("the arrow is there to drag", a is not None):
+        return
+    foot, tip = a.foot, a.tip()
+    start = V(foot[0] + 0.6 * (tip[0] - foot[0]), foot[1] + 0.6 * (tip[1] - foot[1]), 0)
+    d = V(a.direction[0], a.direction[1], 0)
+    st.press(start)
+    end = st.drag_to(start + d * mm, steps=12)
+    st.release(end)
+
+
+def m_open():
+    mark()
+    st.hover(V(0, -20, 0))
+    h.press("o")
+
+
+def m_pick():
+    st.click(V(20, -40, 0), towards=V(0, 0, 0))
+
+
+def m_arrow():
+    t = tool()
+    h.check("M: the line picked", picks() == [s["line"]], picks())
+    d = t.distance()
+    s["d"] = d
+    s["mm"] = si.mm_per_pixel(st.sketch())
+    a = arrow()
+    h.check(
+        "M: the arrow on the offset below the line, pointing down",
+        a is not None
+        and st.vnear(V(a.foot[0], a.foot[1], 0), V(35, -40 - d, 0), 1e-9)
+        and st.vnear(V(a.direction[0], a.direction[1], 0), V(0, -1, 0), 1e-9),
+        a and (a.foot, a.direction, d),
+    )
+    h.shot("M-arrow")
+    drag_arrow(3.0)
+
+
+def m_dragged():
+    t = tool()
+    d = t.distance()
+    tol = 4 * s["mm"] + 0.011
+    h.check("M: dragged 3 mm further: 3 mm more", abs(d - (s["d"] + 3.0)) <= tol, (d, s["d"]))
+    curves = st.preview().get("curves", [])
+    h.check(
+        "M: the offset follows exactly",
+        len(curves) == 1 and all(abs(pt[1] + 40.0 + d) < 1e-9 for pt in curves[0]),
+        curves,
+    )
+    a = arrow()
+    h.check("M: the arrow follows", a is not None and st.near(a.foot[1], -40 - d, 1e-9))
+    drag_arrow(-(d + 4.0))  # up, through the line
+
+
+def m_through():
+    t = tool()
+    curves = st.preview().get("curves", [])
+    h.check("M: dragged through the line: the offset is above it", t.side == -1 and len(curves) == 1 and all(pt[1] > -40 for pt in curves[0]), (t.side, curves))
+    a = arrow()
+    h.check(
+        "M: the arrow is above, pointing up",
+        a is not None and a.foot[1] > -40 and st.vnear(V(a.direction[0], a.direction[1], 0), V(0, 1, 0), 1e-9),
+        a and (a.foot, a.direction),
+    )
+    h.shot("M-through")
+    w = panel().findChild(QtWidgets.QWidget, "Fission180OffsetDistance")
+    wi.click(w)
+    from PySide6 import QtTest
+
+    QtTest.QTest.keyClick(w, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+    QtTest.QTest.keyClicks(w, "6")
+    QtWidgets.QApplication.processEvents()
+
+
+def m_typed():
+    t = tool()
+    h.check("M: 6 typed in the panel", st.near(t.distance(), 6.0, 1e-12), t.distance())
+    curves = st.preview().get("curves", [])
+    h.check("M: the offset 6 above", len(curves) == 1 and all(abs(pt[1] + 34.0) < 1e-9 for pt in curves[0]), curves)
+    s["undo"] = len(App.ActiveDocument.UndoNames)
+    click_panel("Fission180OffsetOK")
+
+
+def m_check():
+    h.settle("the offset")
+    made = [g for _i, g in new_curves(s["geo"]) if g.TypeId == LINE]
+    h.check("M: one line made", len(made) == 1, made)
+    if made:
+        g = made[0]
+        ends = sorted([(round(p.x, 9), round(p.y, 9)) for p in (g.StartPoint, g.EndPoint)])
+        h.check("M: (10, -34) to (60, -34) exactly", ends == [(10.0, -34.0), (60.0, -34.0)], ends)
+    undo = list(App.ActiveDocument.UndoNames)
+    h.check("M: one undo step Offset", undo[:1] == ["Offset"] and len(undo) == s["undo"] + 1, undo[:3])
+    h.check("M: Offset ended", tool() is None and panel() is None)
+    h.check("M: no arrow or preview left", not leftovers(), leftovers())
+    h.check("M: no value box left", not st.box_texts(), st.box_texts())
+    st.sketch_ok("M")
 
 
 def finish():
@@ -753,6 +891,13 @@ h.run(
             l_pick,
             l_type,
             l_check,
+            m_open,
+            m_pick,
+            m_arrow,
+            m_dragged,
+            m_through,
+            m_typed,
+            m_check,
             finish,
             finished,
         ]

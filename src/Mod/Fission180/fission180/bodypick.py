@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Dialog base for INSPECT commands that pick whole bodies (Center of Mass, Interference):
-a click on any face, edge or corner of a body picks the body (it lights up whole), a click on
-a picked body drops it again, like Fusion's body selection filter. Also draws things over the
-part (on_top) for the analyses' view providers.
+the body under the pointer lights up whole (body_hover.py), a click on any face, edge or
+corner of a body picks the body (it lights up whole), a click on a picked body drops it
+again, like Fusion's body selection filter; a box drawn round bodies adds each of them once.
+Also draws things over the part (on_top) for the analyses' view providers.
 """
 import FreeCADGui as Gui
 
@@ -70,12 +71,30 @@ class BodyPickPanel(Tones, pickpanel.PickPanel):
     def shown(self):
         return [(b, []) for b in self.picked if construct.alive(b)]
 
+    def picks_bodies(self):
+        """The one box takes whole bodies: the body under the pointer lights up whole."""
+        return True
+
+    def takes_body(self, body):
+        return bool(self.allow(body, ""))
+
     def picks_changed(self, added, dropped):
+        """A click toggles its body; a box (several picks at once) adds each body it meets
+        once and keeps the ones picked already (before, each face and edge in the box
+        toggled its body, so some bodies dropped out again)."""
         toggled = []
-        for obj, _short, _point in list(dropped) + list(added):
+        for obj, _short, _point in dropped:
             body = analysis.body_of(obj)
             if body is not None and body not in toggled:
                 toggled.append(body)
+        many = len(added) > 1
+        for obj, _short, _point in added:
+            body = analysis.body_of(obj)
+            if body is None or body in toggled:
+                continue
+            if many and body in self.picked:
+                continue
+            toggled.append(body)
         if not toggled:
             return False
         for body in toggled:

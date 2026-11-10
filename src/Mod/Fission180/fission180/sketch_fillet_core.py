@@ -358,6 +358,71 @@ def radius_through(c1, c2, ref1, ref2, pointer, high):
     return (lo + hi) / 2.0
 
 
+
+# -- the radius handle (Luca, 2026-11-10: the radius is dragged, the pointer no longer sizes it) --
+def arc_middle(c1, c2, r, ref1, ref2):
+    """The middle of the fillet arc of radius r (where its drag arrow stands)."""
+    centre, t1, t2 = fillet(c1, c2, r, ref1, ref2)
+    return arc_points(centre, t1, t2, 2)[1]
+
+
+def handle(c1, c2, r, ref1, ref2):
+    """(foot, direction) of the radius handle: the middle of the fillet arc of radius r and
+    the way that middle moves as the radius grows (a unit vector; from the corner into the
+    shape for two lines). FilletError when there is no fillet of radius r."""
+    foot = arc_middle(c1, c2, r, ref1, ref2)
+    for k in (1e-4, 1e-3, 1e-2):
+        try:
+            a = arc_middle(c1, c2, r * (1.0 - k), ref1, ref2)
+            b = arc_middle(c1, c2, r * (1.0 + k), ref1, ref2)
+        except FilletError:
+            continue
+        d = _sub(b, a)
+        if _len(d) > 1e-12:
+            return foot, _unit(d)
+    centre, _t1, _t2 = fillet(c1, c2, r, ref1, ref2)
+    d = _sub(centre, foot)
+    return foot, (_unit(d) if _len(d) > EPS else (1.0, 0.0))
+
+
+def radius_along(c1, c2, ref1, ref2, origin, direction, target, low, high):
+    """The radius whose arc middle stands `target` mm from `origin` along `direction`: the
+    radius handle dragged there. Between `low` and `high`; the nearer end when the pointer
+    is past one of them. None when no fillet exists at all between them."""
+
+    def reach(r):
+        try:
+            return _dot(_sub(arc_middle(c1, c2, r, ref1, ref2), origin), direction) - target
+        except FilletError:
+            return None
+
+    lo, hi = float(low), float(high)
+    if not 0.0 < lo < hi:
+        return None
+    g_lo, g_hi = reach(lo), reach(hi)
+    for _ in range(60):  # no fillet that big (arcs): the largest radius that has one
+        if g_hi is not None:
+            break
+        hi = (lo + hi) / 2.0
+        g_hi = reach(hi)
+    if g_lo is None or g_hi is None:
+        return None
+    if (g_lo > 0) == (g_hi > 0):
+        return lo if abs(g_lo) <= abs(g_hi) else hi
+    for _ in range(100):
+        mid = (lo + hi) / 2.0
+        g = reach(mid)
+        if g is None:
+            hi = mid
+            continue
+        if (g > 0) == (g_lo > 0):
+            lo, g_lo = mid, g
+        else:
+            hi = mid
+        if hi - lo <= 1e-13 * max(1.0, hi):
+            break
+    return (lo + hi) / 2.0
+
 def suggested(c1, c2):
     """A starting radius: a fifth of the shorter curve (FreeCAD's tool guesses so)."""
     sizes = []

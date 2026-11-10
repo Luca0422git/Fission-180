@@ -129,6 +129,10 @@ class RemovePanel(BodyPanel):
     title = "Remove"
     icon = "remove"
     needs_pick = (remove.RemoveError,)
+    body_boxes = ("objects",)  # the body under the pointer lights up whole (body_hover)
+
+    def has_body(self, body):
+        return any(body is o for o in self.picked_objects)
 
     def __init__(self, doc, feature=None):
         self.feature_ = feature

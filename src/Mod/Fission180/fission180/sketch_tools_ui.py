@@ -5,6 +5,10 @@
 - Circumscribed / Inscribed Polygon: 6 sides, no "how many sides?" pop-up; the
   number of sides is changed in the panel on the right (or U / J) while drawing.
 - Include 3D Geometry: brings part edges into the sketch as reference curves.
+- Project, Include 3D Geometry and Intersect run FreeCAD's own tools; a small panel at the
+  top of the sketch panel says what to click and has Done, which ends the tool (Luca,
+  2026-11-10: "there should be a button to finish that operation"). Esc still ends it; the
+  panel goes with FreeCAD's tool however it ends.
 
 Every command explains next to the mouse when it cannot start (no sketch open).
 """
@@ -13,7 +17,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import commands, log, sketch_mode, ui_icon_path, warn
-from .compat import QtCore
+from .compat import QtCore, QtWidgets
 
 NO_SKETCH = "%s works inside a sketch: click Create Sketch (or edit a sketch) first."
 
@@ -151,7 +155,138 @@ def last_offset():
 
 
 def stop_waiting():
-    """Nothing here waits for a pick any more (Offset used to); kept for its callers."""
+    """Esc, another tool or the sketch closing (sketch_mode, sketch_draw.run): the Done panel
+    of FreeCAD's Project / Include / Intersect tool goes (Offset used to wait here)."""
+    close_watched()
+
+
+# -- Done for FreeCAD's own pick tools (Project, Include 3D Geometry, Intersect) ---------------
+_WATCHED = {"tool": None}
+WATCH_MS = 250  # how often the panel looks whether FreeCAD's tool still runs
+
+
+class WatchedTool:
+    """FreeCAD's own sketch tool seen as a tool with a Done panel (sketch_modify_tools'
+    DonePanel): what to click, and Done, which ends FreeCAD's tool as OK in the right-click
+    menu does (what was projected stays). The panel goes when FreeCAD's tool ends however it
+    ends (Esc, Done, another tool: stop_waiting; a right-click or FreeCAD's own end: its
+    pointer on the view changes, looked at every WATCH_MS)."""
+
+    done_text = ""
+    done = 0
+
+    def __init__(self, session, title, panel_title, panel_text):
+        self.session = session
+        self.title = title
+        self.panel_title = panel_title
+        self.panel_text = panel_text
+        self.active = False
+        self.panel = None
+        self.timer = None
+        self.cursor = None
+
+    def _cursor_key(self):
+        gl = self.session.gl
+        cursor = gl.cursor()
+        try:
+            return (cursor.shape(), cursor.pixmap().cacheKey())
+        except Exception:
+            return (cursor.shape(), None)
+
+    def start(self):
+        """Shown when FreeCAD's tool runs (its pointer is on the view)."""
+        from . import sketch_modify_tools
+
+        if not self.session.tool_running():
+            return False
+        self.cursor = self._cursor_key()
+        self.active = True
+        self.panel = sketch_modify_tools.done_panel(self)
+        self.timer = QtCore.QTimer(self.panel)
+        self.timer.setInterval(WATCH_MS)
+        self.timer.timeout.connect(self._watch)
+        self.timer.start()
+        _WATCHED["tool"] = self
+        log("%s: Done panel up" % self.title)
+        return True
+
+    def _watch(self):
+        try:
+            if not self.active:
+                return
+            session = self.session
+            if session.closed or sketch_mode.current() is not session:
+                self.stop()
+                return
+            if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
+                return  # panning or orbiting: FreeCAD shows another pointer meanwhile
+            if not session.tool_running() or self._cursor_key() != self.cursor:
+                self.stop()  # FreeCAD's tool ended (or another one took the view)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            self.stop()
+
+    def accept(self):
+        """Done: FreeCAD's tool ends; what it made stays."""
+        if not self.active:
+            return
+        self.stop()
+        try:
+            session = self.session
+            if not session.closed and session.tool_running():
+                session.finish_tool()
+            log("%s: done" % self.title)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+
+    def finish(self):
+        self.accept()
+
+    def stop(self):
+        if not self.active:
+            return
+        self.active = False
+        timer, self.timer = self.timer, None
+        if timer is not None:
+            try:
+                timer.stop()
+            except RuntimeError:
+                pass
+        panel, self.panel = self.panel, None
+        if panel is not None:
+            panel.close_box()
+        if _WATCHED["tool"] is self:
+            _WATCHED["tool"] = None
+
+    def say(self, text):
+        commands.tell(text)
+
+
+def close_watched():
+    tool = _WATCHED["tool"]
+    if tool is not None:
+        try:
+            tool.stop()
+        except Exception as exc:
+            warn("sketch tool panel: %s" % exc)
+
+
+def watched_tool():
+    """The FreeCAD tool with a Done panel up now (tests), or None."""
+    tool = _WATCHED["tool"]
+    return tool if tool is not None and tool.active else None
+
+
+def show_done(title, panel_title, panel_text):
+    """After FreeCAD's tool `title` was started: its Done panel (when it runs)."""
+    try:
+        close_watched()
+        session = sketch_mode.current()
+        if session is None or session.closed:
+            return
+        WatchedTool(session, title, panel_title, panel_text).start()
+    except Exception as exc:
+        warn("%s: %s" % (title, exc))
 
 
 # -- Project / Include -----------------------------------------------------------------
@@ -165,7 +300,13 @@ class SketchProject(_SketchCommand):
             return
         stop_waiting()
         Gui.runCommand("Sketcher_Projection")
-        commands.tell("Project: click edges or faces of the part. Esc when done.")
+        commands.tell("Project: click edges or faces of the part. Done (or Esc) when finished.")
+        show_done(
+            self.title,
+            "PROJECT",
+            "Click edges or faces of the part: they are projected onto the sketch (purple, "
+            "they follow the part).",
+        )
 
 
 class SketchInclude3D(_SketchCommand):
@@ -189,7 +330,36 @@ class SketchInclude3D(_SketchCommand):
             Gui.runCommand("Sketcher_Projection")
         finally:
             group.SetBool("AlwaysExtGeoReference", before)
-        commands.tell("Include 3D Geometry: click edges or points of the part. Esc when done.")
+        commands.tell(
+            "Include 3D Geometry: click edges or points of the part. Done (or Esc) when finished."
+        )
+        show_done(
+            self.title,
+            "INCLUDE 3D GEOMETRY",
+            "Click edges or points of the part: they come into the sketch as reference curves.",
+        )
+
+
+class SketchIntersect(_SketchCommand):
+    """Project / Include > Intersect with its Done panel (FreeCAD's Sketcher_Intersection:
+    the curves where the sketch's plane cuts the part's faces)."""
+
+    title = "Intersect"
+    tip = "Bring in the curves where the sketch's plane cuts faces of the part: click them"
+    icon = "sk_intersect"
+
+    def run(self):
+        if _in_sketch(self.title) is None:
+            return
+        stop_waiting()
+        Gui.runCommand("Sketcher_Intersection")
+        commands.tell("Intersect: click faces or edges of the part. Done (or Esc) when finished.")
+        show_done(
+            self.title,
+            "INTERSECT",
+            "Click faces or edges of the part: where the sketch's plane cuts them comes into "
+            "the sketch.",
+        )
 
 
 # -- constraints ---------------------------------------------------------------------
@@ -312,4 +482,5 @@ COMMANDS = {
     "Fission180_PolygonInscribed": PolygonInscribed,
     "Fission180_SketchProject": SketchProject,
     "Fission180_SketchInclude3D": SketchInclude3D,
+    "Fission180_SketchIntersect": SketchIntersect,
 }

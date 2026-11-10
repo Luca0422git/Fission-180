@@ -59,6 +59,9 @@ time you start it, but treat that as a safety net, not a plan.
 
 ## Not built (yet)
 
+- **Pattern and Mirror of several bodies at once.** With several bodies selected, Rectangular,
+  Circular Pattern, Pattern on Path and Mirror pattern the first one only (Fusion patterns them
+  all in one step). *Workaround:* pattern each body on its own.
 - **Not all of Fusion's features.** Fission 180 covers the Design workspace: sketches, solid and
   surface modeling, patterns, components and joints, mesh, drawings, 3D printing, and more,
   and the Simulation workspace's Static Stress study. It does **not** have sculpting

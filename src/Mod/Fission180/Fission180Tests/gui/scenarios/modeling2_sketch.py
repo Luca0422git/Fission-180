@@ -58,22 +58,30 @@ def sk():
 
 
 def chooser():
+    """The Chamfer Type drop-down of the CHAMFER panel (it was a box on the view)."""
     from PySide import QtWidgets
     from fission180 import sketch_chamfer_tool
 
-    found = h.gl_widget().findChildren(QtWidgets.QWidget, sketch_chamfer_tool.CHOOSER_NAME)
+    found = Gui.getMainWindow().findChildren(QtWidgets.QComboBox, sketch_chamfer_tool.CHOOSER_NAME)
     shown = [w for w in found if w.isVisible()]
     return shown[0] if shown else None
 
 
 def choose_type(label):
-    from PySide import QtWidgets
-
-    box = chooser()
-    combo = box.findChild(QtWidgets.QComboBox) if box is not None else None
+    # the Chamfer ends with OK (its panel's, or Enter): it is started again for the next one
+    if st.tool_title() != "Chamfer":
+        open_chamfer()
+        h.wait_for(lambda: chooser() is not None, "the CHAMFER panel")
+    combo = chooser()
     h.check("the Chamfer Type box is shown", combo is not None)
     if combo is not None:
         h.check("type %s" % label, ui.choose(combo, label))
+
+
+def told():
+    from fission180 import commands
+
+    return commands._TOLD["msg"] or ""
 
 
 def chamfer_line(a, b, tol=1e-6):
@@ -131,7 +139,7 @@ def da_corner():
 
 def da_hover():
     st.hover(V(46, 13, 0))
-    h.check("the chamfer follows the pointer", bool(st.preview().get("curves")), st.preview())
+    h.check("the chamfer shows", bool(st.preview().get("curves")), st.preview())
     texts = st.box_texts()
     h.check("a distance and an angle box", len(texts) == 2 and "A " in texts[1], texts)
     h.shot("1-distance-angle")
@@ -160,7 +168,8 @@ def da_check():
     )
     h.check("still fully constrained", sk().solve() == 0 and not sk().RedundantConstraints)
     st.sketch_ok("distance and angle")
-    h.check("the tool waits for the next corner", st.tool_title() == "Chamfer")
+    # Luca, 2026-11-10: the Chamfer has a panel with OK; Enter is OK and ends it
+    h.check("Enter (OK) ended the Chamfer", st.tool_title() is None, st.tool_title())
 
 
 # -- 2. Equal distance ----------------------------------------------------------------------
@@ -181,8 +190,8 @@ def eq_too_long():
 def eq_largest():
     # Luca's decision (2026-10-21): a value past what fits stops at the largest that does (it
     # used to be refused); that largest chamfer takes the right side whole
-    t = st.tool()
-    hint = t.hint_text() if t is not None else ""
+    h.settle("the note")
+    hint = told()  # (said by the pointer once the Chamfer has ended)
     h.check(
         "30 is held at the largest chamfer that fits, and said",
         "30 mm does not fit: limited to 17.11 mm" in hint,
@@ -264,7 +273,7 @@ def two_lines():
     st.click(V(25, 30, 0))  # the top line (first: its distance is the first value)
     st.click(V(10, 18, 0))  # the left line
     t = st.tool()
-    h.check("two lines picked", t is not None and t.step == 2, t and (t.step, t.picks))
+    h.check("two lines picked", t is not None and sorted(t.picks) == [2, 3], t and t.picks)
     st.hover(V(12, 27, 0))
 
 
@@ -315,7 +324,11 @@ def fillet_second():
 
 def fillet_box():
     t = st.tool()
-    h.check("the radius box is up", t is not None and t.step == 2, t and t.step)
+    h.check(
+        "the two lines are the corner, the radius box is up",
+        t is not None and len(t.corners) == 1 and bool(t.boxes.fields),
+        t and t.corners,
+    )
     h.shot("fillet-click")
     st.keys("4\n")
 

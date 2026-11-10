@@ -176,5 +176,55 @@ class SeveralCorners(unittest.TestCase):
         self.assertAlmostEqual(core.largest_shared(three, 25.0), 30.0 * 0.99 / 2.0, places=5)
 
 
+class RadiusHandle(unittest.TestCase):
+    """The arrow that drags the radius (Luca, 2026-11-10: the pointer no longer sizes it)."""
+
+    REFS = ((20.0, 0.0), (40.0, 15.0))
+
+    def test_it_stands_on_the_arc_middle(self):
+        foot, d = core.handle(BOTTOM, RIGHT, 6.0, *self.REFS)
+        # the arc about (34, 6): its middle 6 from the centre towards the corner (40, 0)
+        k = 6.0 / math.sqrt(2.0)
+        self.assertTrue(near(foot, (34.0 + k, 6.0 - k)))
+        self.assertTrue(near(foot, core.arc_middle(BOTTOM, RIGHT, 6.0, *self.REFS)))
+
+    def test_it_points_the_way_the_radius_grows(self):
+        _foot, d = core.handle(BOTTOM, RIGHT, 6.0, *self.REFS)
+        self.assertTrue(near(d, (-1.0 / math.sqrt(2.0), 1.0 / math.sqrt(2.0)), 1e-9))
+
+    def test_dragged_along_it(self):
+        foot, d = core.handle(BOTTOM, RIGHT, 6.0, *self.REFS)
+        # the middle moves sqrt 2 - 1 per mm of radius in a square corner: 4 more of radius
+        r = core.radius_along(
+            BOTTOM, RIGHT, *self.REFS, foot, d, 4.0 * (math.sqrt(2.0) - 1.0), 1e-3, 30.0
+        )
+        self.assertAlmostEqual(r, 10.0, places=9)
+
+    def test_not_dragged_stays(self):
+        foot, d = core.handle(BOTTOM, RIGHT, 6.0, *self.REFS)
+        r = core.radius_along(BOTTOM, RIGHT, *self.REFS, foot, d, 0.0, 1e-3, 30.0)
+        self.assertAlmostEqual(r, 6.0, places=9)
+
+    def test_past_the_ends_it_stops_there(self):
+        foot, d = core.handle(BOTTOM, RIGHT, 6.0, *self.REFS)
+        self.assertEqual(core.radius_along(BOTTOM, RIGHT, *self.REFS, foot, d, 500.0, 1e-3, 30.0), 30.0)
+        self.assertEqual(core.radius_along(BOTTOM, RIGHT, *self.REFS, foot, d, -500.0, 0.5, 30.0), 0.5)
+
+    def test_line_and_arc(self):
+        refs = ((20.0, 0.0), (44.4, 10.6))
+        foot, d = core.handle(BOTTOM, ARC, 4.0, *refs)
+        r = core.radius_along(BOTTOM, ARC, *refs, foot, d, 0.0, 1e-3, 10.0)
+        self.assertAlmostEqual(r, 4.0, places=7)
+        # a little further along the arrow: a bigger radius, its middle where the arrow went
+        r2 = core.radius_along(BOTTOM, ARC, *refs, foot, d, 0.5, 1e-3, 10.0)
+        self.assertGreater(r2, 4.0)
+        m = core.arc_middle(BOTTOM, ARC, r2, *refs)
+        self.assertAlmostEqual((m[0] - foot[0]) * d[0] + (m[1] - foot[1]) * d[1], 0.5, places=7)
+
+    def test_no_range_no_radius(self):
+        foot, d = core.handle(BOTTOM, RIGHT, 6.0, *self.REFS)
+        self.assertIsNone(core.radius_along(BOTTOM, RIGHT, *self.REFS, foot, d, 0.0, 5.0, 5.0))
+
+
 if __name__ == "__main__":
     unittest.main()

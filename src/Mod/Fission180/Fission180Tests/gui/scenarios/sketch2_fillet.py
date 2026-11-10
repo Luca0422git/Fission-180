@@ -54,15 +54,21 @@ def on_arc(n, angle=A135):
 
 
 def chooser_combo():
+    """The Chamfer Type drop-down of the CHAMFER panel (it was a box on the view)."""
+    import FreeCADGui as Gui
     from PySide import QtWidgets
     from fission180 import sketch_chamfer_tool
 
-    found = h.gl_widget().findChildren(QtWidgets.QWidget, sketch_chamfer_tool.CHOOSER_NAME)
+    found = Gui.getMainWindow().findChildren(QtWidgets.QComboBox, sketch_chamfer_tool.CHOOSER_NAME)
     shown = [w for w in found if w.isVisible()]
-    return shown[0].findChild(QtWidgets.QComboBox) if shown else None
+    return shown[0] if shown else None
 
 
 def choose(label):
+    # the Chamfer ends with OK (its panel's, or Enter): it is started again for the next one
+    if st.tool_title() != "Chamfer":
+        si.menu_item("MODIFY", "Chamfer")
+        h.wait_for(lambda: chooser_combo() is not None, "the CHAMFER panel")
     combo = chooser_combo()
     h.check("the Chamfer Type box is shown", combo is not None)
     if combo is not None:
@@ -86,6 +92,18 @@ def lines_with_end(point, tol=1e-6):
 def hint():
     t = st.tool()
     return t.hint_text() if t is not None else ""
+
+
+def told():
+    """What was said by the pointer last (a note once the tool has ended)."""
+    from fission180 import commands
+
+    return commands._TOLD["msg"] or ""
+
+
+def corners():
+    t = st.tool()
+    return len(t.corners) if t is not None and hasattr(t, "corners") else None
 
 
 # -- setup ----------------------------------------------------------------------------------
@@ -141,7 +159,7 @@ def a_arc():
 
 
 def a_type():
-    h.check("A after two curves the tool asks for the radius", st.tool().step == 2, st.tool().step)
+    h.check("A the two curves are a corner (the radius is asked)", corners() == 1, corners())
     st.keys("3\n")
 
 
@@ -182,7 +200,7 @@ def a_check():
         (g[arc].StartPoint, g[arc].EndPoint, t2),
     )
     st.sketch_ok("A")
-    h.check("A the tool waits for the next corner", st.tool() is not None and st.tool().step == 0)
+    h.check("A Enter (OK) made it and ended the Fillet", st.tool() is None, st.tool_title())
     h.shot("A-fillet")
     st.esc()
     st.undo()
@@ -208,11 +226,7 @@ def b_corner():
 
 
 def b_too_big():
-    h.check(
-        "B the corner point picks both lines",
-        st.tool() is not None and st.tool().step == 2,
-        st.tool() and st.tool().step,
-    )
+    h.check("B the corner point picks both lines", corners() == 1, corners())
     st.keys("50\n")
 
 
@@ -224,8 +238,8 @@ def b_refused():
     h.check("B 50 makes the largest fillet that fits (the 30 mm line)", st.near(r, 30.0), r)
     h.check(
         "B ...and the pointer says so",
-        "50 mm does not fit: limited to %.2f mm" % r in hint(),
-        hint(),
+        "50 mm does not fit: limited to %.2f mm" % r in told(),
+        told(),
     )
     # the largest fillet takes the 30 mm line whole: no sliver of it is left, it stays as a
     # construction line (with its constraints) and the arc ends at its far end (0, 30)
@@ -261,7 +275,7 @@ def b_corner_again():
 
 
 def b_four():
-    h.check("B the corner again", st.tool() is not None and st.tool().step == 2)
+    h.check("B the corner again", corners() == 1, corners())
     st.keys("4\n")
 
 
@@ -299,7 +313,8 @@ def c_corner():
 
 
 def c_keys():
-    h.check("C the corner point picks the line and the arc", st.tool().step == 2, st.tool().step)
+    t = st.tool()
+    h.check("C the corner point picks the line and the arc", t is not None and len(t.picks) == 2, t and t.picks)
     st.keys("4\n")
 
 

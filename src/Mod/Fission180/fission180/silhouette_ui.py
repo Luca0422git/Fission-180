@@ -24,6 +24,13 @@ class SilhouettePanel(BodyPanel):
     title = "Silhouette Split"
     icon = "silhouette_split"
     needs_pick = (silhouette.NeedsPick,)
+    body_boxes = ("body",)  # Target Body: the body under the pointer lights up whole
+
+    def takes_body(self, body):
+        return not self._made_by_preview(body)
+
+    def has_body(self, body):
+        return body is self.options["body"]
 
     def __init__(self, doc, feature=None):
         self.options = silhouette.with_defaults({})

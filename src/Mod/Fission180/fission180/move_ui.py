@@ -561,6 +561,17 @@ class MovePanel(BodyPanel):
             except Exception as exc:
                 warn("%s pick: %s" % (self.title, exc))
 
+    # -- the Objects box takes whole bodies (body_hover.py) -------------------------------------------
+    def picks_bodies(self):
+        """Objects with Move Object Bodies: the body under the pointer lights up whole."""
+        return self.active == "objects" and not self._faces_mode() and not self.setting_pivot
+
+    def takes_body(self, body):
+        return not self._is_copy_body(body)  # a copy this Move makes is not picked
+
+    def has_body(self, body):
+        return any(body is b for b in self.options["bodies"])
+
     # -- form ----------------------------------------------------------------------------------------
     def build_form(self):
         self.move_object, _ = self.combo(

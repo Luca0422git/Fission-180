@@ -1,24 +1,37 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"""Fusion's sketch Fillet (SKETCH > MODIFY > Fillet) on Fission 180's own drawing handler
-(sketch_draw.DrawTool), for lines, arcs and circles in any pair.
+"""Fusion's sketch Fillet (SKETCH > MODIFY > Fillet) with its FILLET panel, on Fission 180's
+own drawing handler (sketch_draw.DrawTool), for lines, arcs and circles in any pair.
 
-Fusion (Autodesk help "Sketch modification tools"): pick a corner, two lines, two arcs or
-a line and an arc, then drag or type the radius; Enter makes the fillet; the arc is
-tangent to both curves, they are trimmed to it and the radius is a dimension.
+Luca, 2026-11-10: "sketch fillet just goes the second you touch a corner. it follows your
+mouse. Why? theres zero control that way ... all the tools should have some sort of dialogue
+box that displays the numbers of the operation. and there should be a button to finish that
+operation." The pointer no longer sizes the radius; the tool works as Move/Copy and Mirror:
 
-Here: click a point where two curves end (the corner), or the two curves on the parts
-that stay; the pointer gives the radius (the arc passes as far from the corner as the
-pointer is) and the R box takes a typed one (Enter, or a click, makes it). FreeCAD's own
-sketch fillet makes the arc and trims (SketchObject::fillet: the same rule as the
-preview, sketch_fillet_core.py); a corner of two lines keeps its old point as a
-construction point with the constraints that were on it, as FreeCAD's fillet tool does.
-The radius becomes a Radius dimension. One undo step per fillet; the tool waits for the
-next corner, Esc ends it. A radius past what the curves can take (the pointer far out, or
-a number typed) stops at the largest that fits, and the text by the pointer says so (Luca,
-2026-10-21; Fusion refuses it: value_limits.py).
+- Corners: a click on a corner (a sketch point where two lines or arcs end) adds it, a
+  click on a picked corner drops it; or click two curves (on the parts that stay: two
+  lines, two arcs, a line and an arc or circle), the same two again drop that corner. Any
+  number of corners, all with one radius (Fusion fillets every corner picked before OK and
+  keeps them equal). Corners selected before the command are taken. A corner under the
+  pointer lights up with the arc it would get and the snap dot on it; a picked one under the
+  pointer shows red (a click drops it).
+- The FILLET panel (at the top of the sketch panel): Corners (how many, x drops them all),
+  Radius, a note when a radius is held at the largest that fits, OK and Cancel.
+- The radius: it starts at the last fillet's (when it fits) or a fifth of the shorter curve
+  of the first corner. A blue arrow on the first corner's arc drags it (the arc follows the
+  arrow); a number typed over the sketch goes into the R box by the arrow (Tab or Enter takes
+  it), or type it in the panel. The arcs show (blue) as they will be made.
+- OK, Enter or OK in the right-click menu makes them, one undo step "Fillet"; Cancel or Esc
+  makes nothing. The tool then ends: no preview, arrow or box is left.
+- A radius past what the curves can take stops at the largest that fits (Luca,
+  2026-10-21; Fusion refuses it: value_limits.py), for every corner and for two corners
+  sharing a line; the panel and the text by the pointer say so.
 
-FreeCAD's own fillet tool picks through FreeCAD's preselection, which never registered a
-click on CI's virtual screen (CI #123-#126): this tool computes its picks itself.
+FreeCAD's own sketch fillet makes each arc and trims (SketchObject::fillet: the same rule as
+the preview, sketch_fillet_core.py); a corner of two lines keeps its old point as a
+construction point with the constraints that were on it, as FreeCAD's fillet tool does. The
+first arc gets a Radius dimension, the others are Equal to it. FreeCAD's own fillet tool
+picks through FreeCAD's preselection, which never registered a click on CI's virtual screen
+(CI #123-#126): this tool computes its picks itself.
 Never lets an exception out (warn() and carry on).
 """
 
@@ -26,17 +39,19 @@ import math
 
 import FreeCAD as App
 
-from . import log, value_limits
+from . import log, value_limits, warn
 from . import sketch_draw as draw
 from . import sketch_fillet_core as core
 from .sketch_draw import LENGTH, Field
 from .sketch_geometry import set_geometry
+from .sketch_move_tool import _ACTIVE, ToolPanel
 
 LINE = "Part::GeomLineSegment"
 ARC = "Part::GeomArcOfCircle"
 CIRCLE = "Part::GeomCircle"
 POINT = "Part::GeomPoint"
 KINDS = (LINE, ARC, CIRCLE)
+
 
 
 def _xy(v):
@@ -207,64 +222,110 @@ def middle(geometry):
         return _xy(geometry.StartPoint)
 
 
+def tell_later(text):
+    """`text` by the pointer once the tool has ended (its own text goes with it)."""
+    from . import commands
+    from .compat import QtCore
+
+    QtCore.QTimer.singleShot(0, lambda: commands.tell(text))  # (it logs it too)
+
+
+def pointer_pixels(view):
+    """The pointer of a sketch_infer._ViewMap in the arrows' screen pixels."""
+    from .sketch_move_handles import pointer_pixels as pixels
+
+    return pixels(view)
+
+
 class SketchFillet(draw.DrawTool):
-    """Fusion's sketch Fillet: one corner (or two curves), or several corners with one
-    radius (Luca, 2026-11-02: "sketching a fillet does not let me select multiple edges";
-    Fusion fillets every corner picked before Enter / OK, the same radius each, and keeps
-    them equal). A corner lights up under the pointer: both its curves, the arc it would
-    get and a dot on the corner (sketch_draw.DrawTool.show_dot)."""
+    """Fusion's sketch Fillet with its FILLET panel: corners picked (and dropped) by clicks,
+    one radius for all of them, dragged on its arrow or typed; OK makes them."""
 
     title = "Fillet"
     command = "Fission180_SketchFillet"
-    pick_steps = (0, 1)
+    repeat = False  # Fusion's panel: OK makes the fillets and ends the tool
+    last_radius = None  # the radius of the last fillet made (the next one starts with it)
 
     def __init__(self, session):
         super().__init__(session)
-        self.refs = []  # per picked curve: the click on the part that stays
-        self.more = []  # more corners picked in the radius step: [(picks, refs)]
-        self.made = {}  # the last fillet(s) made (tests): arc(s), radius, constraint
-        self.limits = value_limits.Limiter()  # radii past what fits stop at the largest
-        self._largest = {}  # the largest radius that fits, per pair of curves and picks
-        self._radius_now = None  # the radius shown last (held while on another corner)
-        self._make_radius = None  # the radius the click or Enter makes
-        self._last_radius = None  # the radius of the last fillet made (the hover's arc)
-        # with several corners the pointer no longer sizes them (it travels from corner to
-        # corner): this radius holds until one is typed
-        self._multi_radius = None
+        self.corners = []  # [(picks, refs)]: two curves, a point on the part of each that stays
+        self.pending = None  # (geo, click point): a curve clicked, waiting for the second one
+        self.radius = None  # the radius asked for (mm); None while no corner is picked
+        self.typed = False  # it was typed (a note then says "does not fit: limited to")
+        self.chosen = False  # typed or dragged (it no longer follows the first corner)
+        self.hover = None  # what a click at the pointer would take (_what_at)
+        self.note = ""  # a radius held at the largest that fits
+        self.panel = None
+        self.arrows = None
+        self.made = {}  # the fillets made (tests): arc(s), radius, constraint
+        self.limits = value_limits.Limiter()  # (the box's precision: Limiter.step)
+        self._largest = {}  # the largest radius that fits, per corner and per set of corners
+        self._grab = None
+        self._view_map = None
+        self._hover_key = None
+        self._make_radius = None
+
+    # -- life cycle ------------------------------------------------------------------------
+    def start(self):
+        from .sketch_value_arrow import Arrows
+
+        self.arrows = Arrows(self.session)
+        super().start()
+        try:
+            self.panel = FilletPanel(self)
+        except Exception as exc:
+            warn("Fillet: %s" % exc)
+            self.panel = None
+        self._changed()
+
+    def stop(self):
+        panel, self.panel = self.panel, None
+        if panel is not None:
+            panel.close_box()
+        arrows, self.arrows = self.arrows, None
+        if arrows is not None:
+            arrows.remove()
+        super().stop()
+
+    def undone(self):
+        """Ctrl+Z / Ctrl+Y while the tool runs: corners whose curves are gone are dropped."""
+        self._geometry = None
+        self.pending = None
+        self.corners = [c for c in self.corners if self._still(c)]
+        self._largest = {}
+        self._corners_changed()
+
+    def _still(self, corner):
+        picks, refs = corner
+        try:
+            if not all(self._usable(g) for g in picks):
+                return False
+            c1, c2 = self._curve(picks[0]), self._curve(picks[1])
+            return self._any_radius(c1, c2, refs)
+        except Exception:
+            return False
 
     def steps(self):
-        return 3
-
-    def _enter_step(self, step):
-        if step == 0:
-            self.refs = []
-            self.more = []
-            self._radius_now = None
-            self._multi_radius = None
-            if getattr(self, "limits", None) is not None:
-                self.limits.note = ""
-            self._largest = {}
-        super()._enter_step(step)
-
-    def prompt(self):
-        if self.step == 0:
-            return "click a corner, or the first curve."
-        if self.step == 1:
-            return "click the second curve."
-        note = getattr(self, "limits", None) and self.limits.note
-        if note:
-            return "%s (Enter makes it)." % note
-        count = 1 + len(getattr(self, "more", []))
-        if count > 1:
-            return "%d corners: type the radius, Enter (or click more corners)." % count
-        return "move to size it, or type the radius, Enter (click more corners to add them)."
+        return 1
 
     def fields(self):
-        if self.step != 2:
-            return []
-        return [Field("radius", LENGTH, "R")]
+        return [Field("radius", LENGTH, "R")] if self.corners else []
 
-    # -- picking -----------------------------------------------------------------------------
+    def prompt(self):
+        if self.pending is not None:
+            return "click the second curve (the first one again drops it)."
+        if not self.corners:
+            return "click the corners to round (or two curves); OK when they are all picked."
+        if self.note:
+            return "%s (OK or Enter makes it)." % self.note
+        count = len(self.corners)
+        what = "1 corner" if count == 1 else "%d corners" % count
+        return (
+            "%s: drag the arrow or type the radius; click corners to add or drop them; "
+            "OK or Enter makes it." % what
+        )
+
+    # -- the corners -------------------------------------------------------------------------
     def _curves_at(self, point):
         """Lines and arcs of the sketch with an end at `point`."""
         found = []
@@ -286,125 +347,11 @@ class SketchFillet(draw.DrawTool):
         except Exception:
             return False
 
-    def _pairs(self):
-        """Every pair picked: [(picks, refs)], the first one first."""
-        pairs = []
-        if len(self.picks) == 2:
-            pairs.append((list(self.picks), list(self.refs)))
-        return pairs + [(list(p), list(r)) for p, r in self.more]
-
-    def _corner(self, snap):
-        """(picks, refs) of the corner under the pointer: a sketch point where exactly two
-        lines or arcs end, with a fillet possible between them; or None."""
-        if snap is None or snap.free or snap.key is None:
-            return None
-        found = self._curves_at(snap.point)
-        if len(found) != 2:
-            return None
-        refs = [middle(self.sketch.Geometry[g]) for g in found]
-        c1, c2 = self._curve(found[0]), self._curve(found[1])
+    def _any_radius(self, c1, c2, refs):
         if c1 is None or c2 is None:
-            return None
-        try:
-            core.fillet(c1, c2, core.suggested(c1, c2), refs[0], refs[1])
-        except core.FilletError:
-            if not self._any_radius(c1, c2, refs):
-                return None
-        return found, refs
-
-    def _new_corner(self, snap):
-        """A corner under the pointer that is not picked yet (the radius step adds it)."""
-        corner = self._corner(snap)
-        if corner is None:
-            return None
-        taken = {frozenset(p) for p, _r in self._pairs()}
-        return None if frozenset(corner[0]) in taken else corner
-
-    def use_selection(self, selection):
-        curves = [geo for geo, pos in selection if pos == 0 and self._usable(geo)]
-        points = [(geo, pos) for geo, pos in selection if pos in (1, 2) and self._usable(geo)]
-        if len(curves) == 2 and not points:
-            picks = [curves]
-            refs = [[middle(self.sketch.Geometry[g]) for g in curves]]
-        elif points and not curves:
-            # corner points selected first (Fusion takes them all)
-            picks, refs, seen = [], [], set()
-            for geo, pos in points:
-                g = self.sketch.Geometry[geo]
-                at = _xy(g.StartPoint if pos == 1 else g.EndPoint)
-                found = self._curves_at(at)
-                if len(found) != 2 or frozenset(found) in seen:
-                    continue
-                seen.add(frozenset(found))
-                picks.append(found)
-                refs.append([middle(self.sketch.Geometry[x]) for x in found])
-            if not picks:
-                return
-        else:
-            return
-        self.picks = picks[0]
-        self.refs = refs[0]
-        if self._pair_ok():
-            self._enter_step(2)
-            self.more = [(list(p), list(r)) for p, r in zip(picks[1:], refs[1:])]
-            if self.more:
-                self._multi_radius = self._fixed_radius()
-            self._tell()
-        else:
-            self.picks, self.refs = [], []
-
-    def pick(self, snap):
-        if self.step == 0 and snap.key is not None:  # a point (the origin counts)
-            found = self._curves_at(snap.point)
-            if len(found) == 2:
-                self.picks = found
-                self.refs = [middle(self.sketch.Geometry[g]) for g in found]
-                if self._pair_ok():
-                    self._enter_step(2)
-                    self._tell()
-                    self.moved(snap)
-                    self.boxes.refresh()
-                else:
-                    self.picks, self.refs = [], []
-                return
-            if len(found) > 2:
-                self.say("more than two curves meet there: click the two curves.")
-                return
-        hit = self.geometry().curve_at(
-            snap.raw, draw.pick_pixels() * self._px(), kinds=KINDS, own=True
-        )
-        if hit is None or hit[0] < 0:
-            self.say("click a corner, a line, an arc or a circle.")
-            return
-        if hit[0] in self.picks:
-            self.say("that curve is picked already; click the other one.")
-            return
-        self.picks.append(hit[0])
-        self.refs.append(tuple(snap.raw))
-        if len(self.picks) == 2 and not self._pair_ok():
-            self.picks.pop()
-            self.refs.pop()
-            return
-        self.next_step()
-
-    def _pair_ok(self):
-        c1, c2 = self._curve(self.picks[0]), self._curve(self.picks[1])
-        if c1 is None or c2 is None:
-            self.say("only lines, arcs and circles can be filleted.")
             return False
-        try:
-            core.fillet(c1, c2, core.suggested(c1, c2), self.refs[0], self.refs[1])
-        except core.FilletError:
-            # parallel lines, curves that cannot touch one arc: refused at once
-            if not self._any_radius(c1, c2, self.refs):
-                self.say("no arc can touch both of those curves.")
-                return False
-        return True
-
-    def _any_radius(self, c1, c2, refs=None):
-        refs = refs if refs is not None else self.refs
         size = core.suggested(c1, c2)
-        for k in (0.01, 0.1, 0.5, 2.0, 5.0):
+        for k in (1.0, 0.01, 0.1, 0.5, 2.0, 5.0):
             try:
                 core.fillet(c1, c2, size * k, refs[0], refs[1])
                 return True
@@ -412,230 +359,470 @@ class SketchFillet(draw.DrawTool):
                 continue
         return False
 
-    # -- the radius ----------------------------------------------------------------------------
-    def _nearest_pair(self, raw):
-        """The picked pair whose corner is nearest the pointer (it sizes them all)."""
-        pairs = self._pairs()
-        if len(pairs) == 1 or raw is None:
-            return pairs[0]
-        best = None
-        for picks, refs in pairs:
-            c1, c2 = self._curve(picks[0]), self._curve(picks[1])
-            try:
-                corner = core.corner_of(c1, c2, refs[0], refs[1])
-            except Exception:
-                corner = None
-            if corner is None:
-                continue
-            d = math.hypot(corner[0] - raw[0], corner[1] - raw[1])
-            if best is None or d < best[0]:
-                best = (d, picks, refs)
-        return (best[1], best[2]) if best is not None else pairs[0]
-
-    def radius(self, snap):
-        """The radius: typed, else the pointer's (from the picked corner nearest to it)."""
-        typed = self.boxes.typed("radius")
-        picks, refs = self._nearest_pair(snap.raw if snap is not None else None)
+    def _pair_ok(self, picks, refs):
         c1, c2 = self._curve(picks[0]), self._curve(picks[1])
-        given = None
-        if self.more and self._multi_radius is not None:
-            given = self._multi_radius  # several corners: the pointer does not size them
-        elif snap is not None and self._off_corner(c1, c2, refs, snap.raw):
-            given = core.radius_through(
-                c1, c2, refs[0], refs[1], snap.raw, 20 * core.suggested(c1, c2)
-            )
-        if given is None:
-            # the pointer still on the corner just clicked: the last radius, else a guess
-            given = self._last_radius or core.suggested(c1, c2)
-        f = self.boxes.field("radius")
-        r = typed if typed is not None else given
-        held = self._held(r, typed is not None)
-        if f is not None:
-            f.value = held if typed is None else given
-        return held
+        if c1 is None or c2 is None:
+            self.say("only lines, arcs and circles can be filleted.")
+            return False
+        if not self._any_radius(c1, c2, refs):
+            self.say("no arc can touch both of those curves.")  # parallel lines...
+            return False
+        return True
 
-    def _off_corner(self, c1, c2, refs, raw, pixels=4.0):
-        """The pointer has left the corner (more than a few pixels): it gives the radius."""
+    def _index(self, picks):
+        key = frozenset(picks)
+        for i, (p, _r) in enumerate(self.corners):
+            if frozenset(p) == key:
+                return i
+        return None
+
+    def _what_at(self, snap):
+        """What a click at the pointer takes: ("corner", picks, refs, point), ("crowded",
+        None, None, point) (more than two curves end there), ("curve", geo, None, None), or
+        None."""
+        if snap is None:
+            return None
+        if not getattr(snap, "free", True) and snap.key is not None:  # a point (the origin too)
+            found = self._curves_at(snap.point)
+            if len(found) == 2:
+                refs = [middle(self.sketch.Geometry[g]) for g in found]
+                c1, c2 = self._curve(found[0]), self._curve(found[1])
+                if self._any_radius(c1, c2, refs):
+                    return ("corner", found, refs, tuple(snap.point))
+            elif len(found) > 2:
+                return ("crowded", None, None, tuple(snap.point))
+        hit = self.geometry().curve_at(
+            snap.raw, draw.pick_pixels() * self._px(), kinds=KINDS, own=True
+        )
+        if hit is not None and hit[0] >= 0:
+            return ("curve", hit[0], None, None)
+        return None
+
+    def _click(self, snap):
+        what = self._what_at(snap)
+        if what is None:
+            self.say("click a corner, or a line, an arc or a circle.")
+            return
+        kind = what[0]
+        if kind == "crowded":
+            self.say("more than two curves meet there: click the two curves.")
+            return
+        if kind == "corner":
+            self.pending = None
+            self._toggle(what[1], what[2])
+            return
+        geo = what[1]
+        if self.pending is None:
+            self.pending = (geo, tuple(snap.raw))
+            self._changed()
+            return
+        first, ref = self.pending
+        self.pending = None
+        if geo == first:
+            self._changed()  # the first curve clicked again: dropped
+            return
+        picks, refs = [first, geo], [ref, tuple(snap.raw)]
+        if not self._pair_ok(picks, refs):
+            self._changed()
+            return
+        self._toggle(picks, refs)
+
+    def _toggle(self, picks, refs):
+        """A corner clicked: added, or dropped when it is picked already."""
+        i = self._index(picks)
+        if i is not None:
+            del self.corners[i]
+            log("Fillet: a corner dropped (%d picked)" % len(self.corners))
+        else:
+            self.corners.append((list(picks), list(refs)))
+            log("Fillet: %d corner(s) picked" % len(self.corners))
+            if len(self.corners) == 1 and not self.chosen:
+                self.radius = self._start_radius()
+        self._corners_changed()
+
+    def clear_corners(self):
+        """x in the panel: every corner dropped."""
+        self.corners = []
+        self.pending = None
+        self._corners_changed()
+
+    def _corners_changed(self):
+        if not self.corners and not self.chosen:
+            self.radius = None
+        if bool(self.corners) != bool(self.boxes.fields):
+            self.boxes.set_fields(self.fields())
+        self._hover_key = None
+        self._changed()
+
+    def _start_radius(self):
+        """The radius the first corner starts with: the last fillet's when it fits there,
+        else a fifth of its shorter curve (FreeCAD's tool guesses so)."""
+        picks, refs = self.corners[0]
+        c1, c2 = self._curve(picks[0]), self._curve(picks[1])
+        last = SketchFillet.last_radius
+        if last:
+            try:
+                core.check(c1, c2, last, refs[0], refs[1])
+                return last
+            except core.FilletError:
+                pass
+        return core.suggested(c1, c2)
+
+    def use_selection(self, selection):
+        """Corner points or two curves selected before the command are the corners
+        (Fusion takes a selection made before the command)."""
+        curves = [geo for geo, pos in selection if pos == 0 and self._usable(geo)]
+        points = [(geo, pos) for geo, pos in selection if pos in (1, 2) and self._usable(geo)]
+        found = []
+        if len(curves) == 2 and not points:
+            found.append((curves, [middle(self.sketch.Geometry[g]) for g in curves]))
+        elif points and not curves:
+            seen = set()
+            for geo, pos in points:
+                g = self.sketch.Geometry[geo]
+                at = _xy(g.StartPoint if pos == 1 else g.EndPoint)
+                ends = self._curves_at(at)
+                if len(ends) != 2 or frozenset(ends) in seen:
+                    continue
+                seen.add(frozenset(ends))
+                found.append((ends, [middle(self.sketch.Geometry[x]) for x in ends]))
+        for picks, refs in found:
+            c1, c2 = self._curve(picks[0]), self._curve(picks[1])
+            if self._any_radius(c1, c2, refs) and self._index(picks) is None:
+                self.corners.append((list(picks), list(refs)))
+        if not self.corners:
+            return
+        if not self.chosen:
+            self.radius = self._start_radius()
         try:
-            corner = core.corner_of(c1, c2, refs[0], refs[1])
-            if corner is None:
-                return True
-            return math.hypot(raw[0] - corner[0], raw[1] - corner[1]) > pixels * self._px()
+            import FreeCADGui as Gui
+
+            Gui.Selection.clearSelection()  # the corners show in the tool's own colours
         except Exception:
-            return True
+            pass
+        self._corners_changed()
+
+    # -- the radius --------------------------------------------------------------------------
+    def set_radius(self, value, typed=True, panel=False):
+        """A radius typed (the panel, the box by the arrow) or dragged. Typed in the panel:
+        what was being typed in the box by the arrow is dropped (the newer value wins)."""
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return
+        if panel and self.boxes.typing is not None:
+            self.boxes.typing = None
+        if not math.isfinite(value) or value <= 0:
+            self.note = "The radius must be more than 0."
+            self._changed()
+            return
+        self.radius = value
+        self.typed = bool(typed)
+        self.chosen = True
+        self._changed()
+
+    def held(self):
+        """The radius the fillets get: the one asked for, held at the largest that fits every
+        corner (self.note says so). None while no corner is picked."""
+        if not self.corners or self.radius is None:
+            if self.note:
+                self.note = ""
+            return None
+        return self._held(self.radius, self.typed)
+
+    def _cap(self, near):
+        """The largest radius that fits every picked corner together, or None (no limit:
+        circles)."""
+        caps = []
+        corners = []
+        for picks, refs in self.corners:
+            c1, c2 = self._curve(picks[0]), self._curve(picks[1])
+            key = value_limits.make_key("sketch_fillet", c1, c2, refs)
+            if key not in self._largest:
+                self._largest[key] = core.largest_radius(c1, c2, refs[0], refs[1], near)
+            if self._largest[key] is not None:
+                caps.append(self._largest[key])
+            corners.append((c1, c2, refs[0], refs[1], tuple(picks)))
+        cap = min(caps) if caps else None
+        if len(corners) > 1:
+            high = cap if cap is not None else near
+            key = value_limits.make_key("sketch_fillet_shared", corners, high)
+            if key not in self._largest:
+                self._largest[key] = core.largest_shared(corners, high)
+            shared = self._largest[key]
+            if shared is not None and (cap is None or shared < cap):
+                cap = shared
+        return cap
 
     def _held(self, r, typed):
         """`r` held at the largest radius that fits every picked corner: a fillet then runs
-        to the far end of a curve and takes it whole (found once per pair, exactly, then
-        reused on every pointer move); two corners on one line leave a piece of it between
-        them. A radius within the box's precision of the limit is the limit too, so no
-        sliver of a curve is left. The text by the pointer says so."""
-        before = self.limits.note
+        to the far end of a curve and takes it whole (found once per corner, exactly); two
+        corners on one line leave a piece of it between them. A radius within the box's
+        precision of the limit is the limit too, so no sliver of a curve is left."""
+        before = self.note
         held, note = r, ""
         try:
-            if r is not None and r > 0:
-                caps = []
-                corners = []
-                for picks, refs in self._pairs():
-                    c1, c2 = self._curve(picks[0]), self._curve(picks[1])
-                    key = value_limits.make_key("sketch_fillet", c1, c2, refs)
-                    if key not in self._largest:
-                        self._largest[key] = core.largest_radius(c1, c2, refs[0], refs[1], r)
-                    if self._largest[key] is not None:
-                        caps.append(self._largest[key])
-                    corners.append((c1, c2, refs[0], refs[1], tuple(picks)))
-                cap = min(caps) if caps else None
-                if len(corners) > 1:
-                    high = cap if cap is not None else r
-                    key = value_limits.make_key("sketch_fillet_shared", corners, high)
-                    if key not in self._largest:
-                        self._largest[key] = core.largest_shared(corners, high)
-                    shared = self._largest[key]
-                    if shared is not None and (cap is None or shared < cap):
-                        cap = shared
-                if cap is not None and r > cap + 1e-9:
-                    held = cap
-                    if typed:
-                        note = value_limits.note_typed(r, cap)
-                    else:
-                        note = value_limits.note_reached(cap, "hi")
-                elif cap is not None and cap - r < self.limits.step():
-                    held = cap  # less than the box's precision short of it: take it whole
+            cap = self._cap(r)
+            if cap is not None and r > cap + 1e-9:
+                held = cap
+                if typed:
+                    note = value_limits.note_typed(r, cap)
+                else:
                     note = value_limits.note_reached(cap, "hi")
-        except Exception:
+            elif cap is not None and cap - r < self.limits.step():
+                held = cap  # less than the box's precision short of it: take it whole
+                note = value_limits.note_reached(cap, "hi")
+        except Exception as exc:
+            warn("Fillet: %s" % exc)
             return r
-        self.limits.note = note
+        self.note = note
         if note != before:
             self._tell()
         return held
 
     def _arc(self, picks, refs, r):
-        """(arc polyline, touch points) of the fillet of radius r at a pair, or None."""
+        """(arc polyline, touch points) of the fillet of radius r at a corner, or None."""
         c1, c2 = self._curve(picks[0]), self._curve(picks[1])
         try:
             centre, t1, t2 = core.check(c1, c2, r, refs[0], refs[1])
         except core.FilletError:
             return None
-        return core.arc_points(centre, t1, t2), [t1, t2], core.arc_points(centre, t1, t2, 2)[1]
+        return core.arc_points(centre, t1, t2), [t1, t2]
 
     def _hover_radius(self, picks, refs):
-        """The radius a hovered corner's arc shows: the last one made, else a guess; made
-        smaller until it fits."""
+        """The radius the arc of a hovered corner shows while none is picked: the last
+        fillet's, else a guess; smaller until it fits."""
         c1, c2 = self._curve(picks[0]), self._curve(picks[1])
-        r = self._last_radius or core.suggested(c1, c2)
+        r = SketchFillet.last_radius or core.suggested(c1, c2)
         for k in (1.0, 0.5, 0.25, 0.1):
             if self._arc(picks, refs, r * k) is not None:
                 return r * k
         return None
 
+    # -- the mouse -----------------------------------------------------------------------------
+    def snap_for(self, view, event):
+        self._view_map = view
+        return super().snap_for(view, event)
+
+    def snapped_to(self, snap):
+        """The dot sits on a corner under the pointer (Luca, 2026-11-02)."""
+        hover = self.hover
+        if hover is not None and hover[0] in ("corner", "crowded"):
+            return hover[3]
+        return None
+
+    def _arrow_at(self, view):
+        if self.arrows is None or view is None or not self.corners:
+            return None
+        try:
+            return self.arrows.at(pointer_pixels(view))
+        except Exception:
+            return None
+
     def moved(self, snap):
-        if self.step < 2:
-            corner = self._corner(snap) if self.step == 0 else None
-            if corner is not None:
-                # a corner under the pointer: its two curves light up with the arc it would
-                # get (and the dot on the corner)
-                picks, refs = corner
-                picked = [draw.curve_points(self.sketch, g) for g in picks]
-                r = self._hover_radius(picks, refs)
-                arc = self._arc(picks, refs, r) if r is not None else None
-                self.preview.show(picked=[p for p in picked if p], curves=[arc[0]] if arc else [])
-                return
-            hit = self.geometry().curve_at(
-                snap.raw, draw.pick_pixels() * self._px(), kinds=KINDS, own=True
-            )
-            picked = [draw.curve_points(self.sketch, g) for g in self.picks]
-            if hit is not None and hit[0] >= 0 and hit[0] not in self.picks:
-                picked.append(draw.curve_points(self.sketch, hit[0]))
-            points = [snap.point] if snap.key is not None else []
-            self.preview.show(picked=[p for p in picked if p], points=points)
-            return
-        hovered = self._new_corner(snap)
-        if hovered is not None and self._radius_now is not None:
-            r = self._radius_now  # on another corner: the size holds (a click adds it)
-        else:
-            r = self.radius(snap)
-            self._radius_now = r
-        pairs = self._pairs()
-        if hovered is not None:
-            pairs = pairs + [hovered]
-        picked, arcs, touches = [], [], []
-        anchor = None
-        for picks, refs in pairs:
-            picked += [draw.curve_points(self.sketch, g) for g in picks]
-            made = self._arc(picks, refs, r)
-            if made is None:
-                continue
-            arcs.append(made[0])
-            touches += made[1]
-            if anchor is None:
-                anchor = made[2]
-        f = self.boxes.field("radius")
-        if f is not None and anchor is not None:
-            f.anchor = anchor
-        self.preview.show(curves=arcs, picked=[p for p in picked if p], points=touches)
+        on_arrow = self._arrow_at(self._view_map)
+        if self.arrows is not None:
+            self.arrows.light(on_arrow)
+        self.hover = None if on_arrow else self._what_at(snap)
+        key = None
+        if self.hover is not None:
+            kind, what = self.hover[0], self.hover[1]
+            key = (kind, frozenset(what) if isinstance(what, list) else what)
+        if key != self._hover_key:
+            self._hover_key = key
+            self._show()
 
-    def _click(self, snap):
-        if self.step in self.pick_steps:
-            self.pick(snap)
-            return
-        corner = self._new_corner(snap)
-        if corner is not None:
-            self._add_corner(corner)
-            return
-        self._make_all(snap)
+    def pressed(self, snap, view):
+        self._grab = None
+        if self._arrow_at(view) == "radius":
+            self._start_grab(view)
 
-    def _add_corner(self, corner):
-        """A click on another corner in the radius step: it is filleted too, the same
-        radius."""
-        picks, refs = corner
-        r = self._radius_now
-        if r is not None and self._arc(picks, refs, r) is None:
-            self.say("the fillet does not fit at that corner at this radius: make it smaller.")
+    def dragged(self, snap, view):
+        if self._grab is not None:
+            if view is not None:
+                self._drag(view)
             return
-        if not self.more:
-            # from now on the radius holds (the pointer goes from corner to corner): the
-            # one typed, else the one shown before the pointer left the first corner's
-            # side (the last fillet's, or a guess)
-            self._multi_radius = self._fixed_radius()
-        self.more.append((list(picks), list(refs)))
-        log("Fillet: %d corners picked" % len(self._pairs()))
-        self._tell()
+        self.moved(snap)
+        self.boxes.refresh()
 
-    def _fixed_radius(self):
-        """The radius several corners start with: the last fillet's, else a fifth of the
-        shortest curve picked (as one corner's guess)."""
-        if self._last_radius:
-            return self._last_radius
-        sizes = []
-        for picks, _refs in self._pairs():
-            c1, c2 = self._curve(picks[0]), self._curve(picks[1])
-            if c1 is not None and c2 is not None:
-                sizes.append(core.suggested(c1, c2))
-        return min(sizes) if sizes else None
+    def released(self, press_snap, snap, moved):
+        if self._grab is not None:
+            try:
+                self._end_grab()
+            finally:
+                self._grab = None
+            return
+        self._click(press_snap)
+
+    def _start_grab(self, view):
+        picks, refs = self.corners[0]
+        c1, c2 = self._curve(picks[0]), self._curve(picks[1])
+        r = self.held()
+        try:
+            foot, d = core.handle(c1, c2, r, refs[0], refs[1])
+        except core.FilletError:
+            return
+        raw = view.raw
+        self._grab = {
+            "curves": (c1, c2, refs[0], refs[1]),
+            "origin": foot,
+            "dir": d,
+            "offset": (raw[0] - foot[0]) * d[0] + (raw[1] - foot[1]) * d[1],
+            "start": r,
+        }
+        self.hover = None
+        self._hover_key = None
+        if self.arrows is not None:
+            self.arrows.light("radius")
+
+    def _drag(self, view):
+        """The arrow dragged: the radius whose arc middle is under the arrow (its value
+        rounded to the box's precision)."""
+        g = self._grab
+        c1, c2, ref1, ref2 = g["curves"]
+        o, d = g["origin"], g["dir"]
+        raw = view.raw
+        target = (raw[0] - o[0]) * d[0] + (raw[1] - o[1]) * d[1] - g["offset"]
+        step = self.limits.step()
+        cap = self._cap(g["start"])
+        high = cap if cap is not None else max(50.0 * g["start"], 20.0 * core.suggested(c1, c2))
+        r = core.radius_along(c1, c2, ref1, ref2, o, d, target, min(step, high / 2.0), high)
+        if r is None:
+            return
+        r = max(round(r / step) * step, step)
+        self.radius = r
+        self.typed = False
+        self.chosen = True
+        self._changed()
+
+    def _end_grab(self):
+        if self.arrows is not None:
+            self.arrows.light(None)
+        log("Fillet: arrow dragged: radius %.6g mm" % (self.held() or 0.0))
+        self._changed()
+
+    # -- keys ----------------------------------------------------------------------------------
+    def key(self, obj, event):
+        used = super().key(obj, event)
+        self._take_box()  # Tab took a value typed in the box by the arrow
+        return used
+
+    def _take_box(self):
+        f = self.boxes.field("radius") if self.active else None
+        if f is not None and f.typed is not None:
+            value, f.typed = f.typed, None
+            self.set_radius(value, typed=True)
 
     def enter(self):
-        """Enter in the radius step makes the fillet(s), with the typed radius or the one
-        shown (Fusion's Enter / OK); in the pick steps it ends the tool."""
-        if self.step != 2:
-            return super().enter()
-        if self.boxes.busy() and not self.boxes.take():
-            return True
-        self._make_all(self.last)
+        """Enter: OK (a value being typed is taken first). With nothing picked it ends the
+        tool (False: the sketch's Enter handling does it)."""
+        if self.boxes.typing is not None:
+            if not self.boxes.take():
+                return True
+            self._take_box()
+        if not self.corners:
+            return False
+        self.accept()
         return True
 
-    def _make_all(self, snap):
-        if not self.boxes.take():
+    def on_finish(self):
+        """OK in the right-click menu (or Finish Sketch): made, if there is something."""
+        if self.corners:
+            self.accept()
+
+    # -- the preview ---------------------------------------------------------------------------
+    def _changed(self):
+        if not self.active:
             return
-        hovered = self._new_corner(snap)
-        if (
-            hovered is not None
-            and self._radius_now is not None
-            and self.boxes.typed("radius") is None
-        ):
-            r = self._radius_now
-        else:
-            r = self.radius(snap)
-        for picks, refs in self._pairs():
+        self._show()
+        self._tell()
+        if self.panel is not None:
+            self.panel.refresh()
+
+    def _show(self):
+        if not self.active:
+            return  # (the preview's nodes went with the tool: never put back in the view)
+        try:
+            self._show_now()
+        except Exception as exc:
+            warn("Fillet: %s" % exc)
+
+    def _show_now(self):
+        sketch = self.sketch
+        r = self.held()
+        picked, arcs, touches, marks, remove = [], [], [], [], []
+        for picks, refs in self.corners:
+            picked += [draw.curve_points(sketch, g) for g in picks]
+            made = self._arc(picks, refs, r) if r else None
+            if made is not None:
+                arcs.append(made[0])
+                touches += made[1]
+        if self.pending is not None:
+            picked.append(draw.curve_points(sketch, self.pending[0]))
+        hover = self.hover if self._grab is None else None
+        if hover is not None and hover[0] == "corner":
+            lines = [draw.curve_points(sketch, g) for g in hover[1]]
+            if self._index(hover[1]) is not None:
+                remove += lines  # a click drops it
+            else:
+                marks += lines
+                size = r if r else self._hover_radius(hover[1], hover[2])
+                made = self._arc(hover[1], hover[2], size) if size else None
+                if made is not None:
+                    marks.append(made[0])
+        elif hover is not None and hover[0] == "curve":
+            line = draw.curve_points(sketch, hover[1])
+            if self.pending is not None and self.pending[0] == hover[1]:
+                remove.append(line)
+            else:
+                marks.append(line)
+        self.preview.show(
+            curves=arcs,
+            picked=[p for p in picked if p],
+            marks=[p for p in marks if p],
+            remove=[p for p in remove if p],
+            points=touches,
+        )
+        anchor = self._place_arrow(r)
+        f = self.boxes.field("radius")
+        if f is not None:
+            f.value = r
+            f.anchor = anchor
+        self.boxes.refresh()
+
+    def _place_arrow(self, r):
+        """The radius arrow on the first corner's arc; returns where the R box goes."""
+        if self.arrows is None:
+            return None
+        if not self.corners or not r or not self.active:
+            self.arrows.keep_only(())
+            return None
+        picks, refs = self.corners[0]
+        c1, c2 = self._curve(picks[0]), self._curve(picks[1])
+        try:
+            foot, d = core.handle(c1, c2, r, refs[0], refs[1])
+        except core.FilletError:
+            self.arrows.keep_only(())
+            return None
+        arrow = self.arrows.place("radius", foot, d)
+        return arrow.tip() if arrow is not None else foot
+
+    # -- making it ---------------------------------------------------------------------------
+    def accept(self):
+        """OK: the fillets, one undo step "Fillet"; the tool then ends."""
+        if self.boxes.typing is not None and not self.boxes.take():
+            return
+        self._take_box()
+        if self.panel is not None and not self.panel.take_typed():
+            return
+        if not self.corners:
+            self.say("click the corners to round first.")
+            return
+        r = self.held()
+        if r is None or r <= 0:
+            self.say(self.note or "type the radius.")
+            return
+        for picks, refs in self.corners:
             c1, c2 = self._curve(picks[0]), self._curve(picks[1])
             try:
                 core.check(c1, c2, r, refs[0], refs[1])
@@ -643,21 +830,17 @@ class SketchFillet(draw.DrawTool):
                 self.say(str(exc))
                 return
         self._make_radius = r
-        if snap is not None:
-            self.snaps.append(snap)
-        self.make()
+        self.make()  # ends the tool when it worked
+        if self.active:
+            self.say("the sketch did not take the fillet (the report says why).")
 
-    # -- making it ---------------------------------------------------------------------------
     def build(self, construction):
         import Sketcher
 
         sketch = self.sketch
         r = self._make_radius
-        if r is None:
-            r = self.radius(self.snaps[-1] if self.snaps else None)
-        pairs = self._pairs()
         arcs = []
-        for n, (picks, refs) in enumerate(pairs):
+        for n, (picks, refs) in enumerate(self.corners):
             if n > 0:
                 # the corner's curves as they are now (an earlier fillet may have cut one)
                 refs = self._refs_now(picks, refs)
@@ -674,7 +857,6 @@ class SketchFillet(draw.DrawTool):
             if i + 1 in bad:
                 sketch.delConstraint(i)
         self.made = {"arc": arcs[0], "arcs": arcs, "radius": r, "constraint": index}
-        self._last_radius = r
         return []
 
     def _refs_now(self, picks, refs):
@@ -686,7 +868,7 @@ class SketchFillet(draw.DrawTool):
             return refs
 
     def _fillet_one(self, picks, refs, r, construction):
-        """One fillet (FreeCAD's sketch fillet, as before): returns the new arc's index."""
+        """One fillet (FreeCAD's sketch fillet): returns the new arc's index."""
         sketch = self.sketch
         g1, g2 = picks
         lines = all(sketch.Geometry[g].TypeId == LINE for g in (g1, g2))
@@ -717,11 +899,102 @@ class SketchFillet(draw.DrawTool):
 
     def after_make(self, kept):
         count = len(self.made.get("arcs", [])) or 1
+        SketchFillet.last_radius = self.made.get("radius") or SketchFillet.last_radius
         log(
             "Fillet: radius %.4g mm%s"
             % (self.made.get("radius", 0.0), (" at %d corners" % count) if count > 1 else "")
         )
-        if self.limits.note:
-            self.say(self.limits.note)  # a typed radius was held at the largest that fits
-            self.limits.note = ""
+        if self.note:
+            tell_later("Fillet: %s." % self.note)  # a radius held at the largest that fits
         self._make_radius = None
+
+    def state(self):
+        out = super().state()
+        out.update(
+            {
+                "corners": [(list(p), list(r)) for p, r in self.corners],
+                "pending": self.pending,
+                "radius": self.radius,
+                "held": self.held(),
+                "note": self.note,
+                "made": dict(self.made),
+            }
+        )
+        return out
+
+
+# -- the FILLET panel ---------------------------------------------------------------------------
+class FilletPanel(ToolPanel):
+    """Fusion's FILLET panel, at the top of the sketch panel (as Move/Copy's and Mirror's):
+    Corners (how many; x drops them), Radius, the note of a radius held at the largest that
+    fits, OK (greyed until a corner is picked) and Cancel."""
+
+    TITLE = "FILLET"
+    NAME = "Fission180SketchFilletPanel"
+
+    def build(self):
+        from .taskui import DistanceField
+
+        tool = self.tool
+        self._shown = None
+        self.corners, self.clear_corners, _row = self.selector(
+            "Corners",
+            "Fission180SketchFilletCorners",
+            "Click corners (or two curves) in the sketch to add them; a click on a picked "
+            "corner drops it",
+            lambda: tool.say(tool.prompt()),
+            tool.clear_corners,
+        )
+        self.corners.setStyleSheet(_ACTIVE)  # the one selection: always the active one
+        self.radius = DistanceField(1.0, on_change=self._typed)
+        self.radius.widget.setObjectName("Fission180SketchFilletRadius")
+        self.radius.widget.setToolTip("The radius of every fillet (or drag the arrow)")
+        self.form.addRow("Radius", self.radius.widget)
+
+    def _typed(self, value):
+        try:
+            if value is None or not self.radius.widget.hasFocus():
+                return  # set by a drag or a refresh, not typed
+            if value > 0:
+                self.tool.set_radius(value, typed=True, panel=True)
+        except Exception as exc:
+            warn("Fillet: %s" % exc)
+
+    def take_typed(self):
+        """The radius typed in the panel goes to the tool before OK."""
+        try:
+            if self.radius.widget.hasFocus():
+                value = float(self.radius.value())
+                if value <= 0:
+                    self.tool.note = "The radius must be more than 0."
+                    self.refresh()
+                    return False
+                self.tool.set_radius(value, typed=True, panel=True)
+        except Exception as exc:
+            warn("Fillet: %s" % exc)
+        return True
+
+    def type_into(self, event):
+        return self.send_key(self.radius.widget, event)
+
+    def refresh(self):
+        try:
+            tool = self.tool
+            count = len(tool.corners)
+            self.corners.setText("%d selected" % count if count else "Select")
+            self.clear_corners.setVisible(bool(count) or tool.pending is not None)
+            r = tool.held()
+            if r is not None and not self.radius.widget.hasFocus() and r != self._shown:
+                self._shown = r
+                self.radius.set_value(r)
+            self.radius.widget.setEnabled(bool(count))
+            self.ok.setEnabled(bool(count))
+            text = tool.note
+            if not text and tool.pending is not None:
+                text = "Next: the second curve of the corner."
+            self.message.setText(text)
+            self.message.setVisible(bool(text))
+        except RuntimeError:
+            pass  # the panel went with FreeCAD's sketch panel
+        except Exception as exc:
+            warn("Fillet panel: %s" % exc)

@@ -922,8 +922,8 @@ def g_box():
     t = fillet_tool()
     h.check(
         "G: the radius box opens (Fusion asks for the radius)",
-        t is not None and t.step == 2 and [f.name for f in t.fields()] == ["radius"],
-        t and t.step,
+        t is not None and len(t.corners) == 1 and [f.name for f in t.fields()] == ["radius"],
+        t and t.corners,
     )
     h.shot("G-fillet-box")
     si.type_text("4")

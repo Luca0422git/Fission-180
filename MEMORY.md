@@ -4,6 +4,21 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-10: patch 0.1.0-beta.3.3.8, Luca's round after 3.3.7, on `develop`** (Luca: sketch
+in a hidden body did not show; hovering a body in body tools must light the WHOLE body; the
+cut's live drag "way to slow ... It shouldnt be changing colors"; "the switching tool bug is
+STILL FUCKING THERE"; sketch fillet "follows your mouse ... all the tools should have some sort
+of dialogue box ... and a button to finish"; Move/Copy with several bodies selected took "a
+random body"; newest session log "after 3.3.7"). Status: [x] sketches show in hidden bodies
+(body_visibility) [x] interface stays on when FreeCAD switches to Part Design for an edit (UCS:
+keys and ribbon were off) + search / browser menu through make_way_for [x] cut drag: Cut at
+once, live picture in the still picture's red + x-ray [x] whole-body hover + multi-body picks
+(helper: body_hover.py) [x] sketch Fillet / Chamfer / Offset panels + arrows, Done panels for
+Trim / Extend / Break / Project / Include / Intersect (helper: sketch_value_arrow.py) [x] VERSION
+/ `_FALLBACK_VERSION` 0.1.0-beta.3.3.8, CHANGELOG, known issues, AI docs [ ] "Fission 180 tests"
+green [ ] **Luca: patch release**. Not done: Pattern / Mirror of several bodies (pattern.py keeps
+one SourceBody; known-issues).
+
 **2026-11-09: patch 0.1.0-beta.3.3.7, Luca's "bugs, polish" list (14 items), on `develop`**
 (Luca had shown Fission 180 to critical users; one uses it instead of Fusion: "it ran faster
 than fusion", "even he could see the unpolished edges"; newest session log "bugs, polish").
@@ -1956,6 +1971,43 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: after 3.3.7, patch 0.1.0-beta.3.3.8 (`develop`, 2026-11-10)
+
+Two helper agents in the same working tree (sketch modify tools; body hover + multi-body
+picks), told not to touch git; my commits took only my files until they reported.
+
+- **Tool switching, the real remaining case**: a sweep of every SOLID tool followed by Extrude /
+  Hole / Press Pull / Fillet / Shell / Move/Copy BY KEY (probe in the scratchpad, PROBE_KEYS=1)
+  found User Coordinate System: PartDesignGui's ViewProvider(Datum)::setEdit calls
+  assureWorkbench("PartDesignWorkbench"), shell.on_workbench turned the interface off, and with
+  it the QShortcuts and the ribbon until the panel closed. Now: a workbench activated while an
+  edit is set up (Gui.editDocument() is named BEFORE setEdit switches) keeps the interface on
+  (toolbars hidden); a workbench chosen in FreeCAD Tools still turns it off (shell.chosen). The
+  sweep also showed "Select Other" leaving its QMenu open in the probe (a menu grabs the keys:
+  every later key "dead"): a probe artifact, cleanup closes it now. Rerun: 207 pairs, 0 bad.
+  search_ui (S) and browser_ui._run_command ran commands without make_way_for: fixed.
+  tool_switch_any has C (UCS open, E) and the search case.
+- **Cut drag**: the probe showed the extrude stayed "join" during a continuous drag (the auto
+  operation is decided at _apply, after the rest), the live join picture hidden inside the
+  part; on a rest the part was ghosted with an opaque dark-red prism (Luca's screenshot).
+  ExtrudePanel._live_operation decides Cut at once from _starts_inside (cached per side);
+  live_shapes.cut_look gives the live overlay cut_preview's see-through red and an SoAnnotation
+  sharing its coords/faces/lines; live_solid_objects shows the base solid (not ghosted) for a
+  cut; Live re-arranges hide/ghost/solid when they change mid-drag. Press Pull pushing the same.
+  cut_preview's x-ray layer shares the mesh nodes (one tessellation). Scenario
+  extrude_cut_drag_live (red on screen while held, part colour unchanged).
+- **Hidden body hides its sketches** (FreeCAD draws a body's sketches under the body's node):
+  body_visibility: a body's eye hides its Tip while a sketch of it is shown, the body stays on;
+  the browser shows body_shown (body and Tip on). Scenario browser_sketch_in_hidden_body.
+- **Helpers** (reports: body_hover.py rules, take_batch: a box selected each body once per face/
+  edge and the pick handlers toggled it, so even counts dropped out; sketch_value_arrow.py,
+  Fillet/Chamfer pick corners then OK, Offset arrow, Done panels; Intersect ribbon entry now
+  Fission180_SketchIntersect). Coin roots of sketch handles are ref()'d until remove()
+  (sketch_move_handles._Planar, ScaleArrow.line_root): hidden roots were freed by Coin and
+  re-added later (a segfault the helper hit with its arrows).
+- Sketch lines outside edit draw dark (#212529) in the test runs, white on Luca's machine: not
+  looked into.
 
 ### Session log: bugs, polish, patch 0.1.0-beta.3.3.7 (`develop`, 2026-11-09)
 

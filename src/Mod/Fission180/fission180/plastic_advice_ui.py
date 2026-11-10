@@ -431,8 +431,16 @@ class DesignAdvicePanel(Panel):
             if not picks:
                 return
             Gui.Selection.clearSelection()
-            for obj, short in picks:
-                self._picked(obj, short)
+            # a box round bodies in the Bodies box takes each once (body_hover.take_batch)
+            from . import body_hover
+
+            body_hover.take_batch(
+                [(obj, short, None) for obj, short in picks],
+                lambda obj, short, _point: self._picked(obj, short),
+                lambda obj: obj if bodies.is_body(obj) else bodies.body_of(obj),
+                lambda: self.active == "bodies",
+                lambda body: body in plastic_advice.targets(self.analysis),
+            )
         except Exception as exc:
             warn("Design Advice pick: %s" % exc)
 

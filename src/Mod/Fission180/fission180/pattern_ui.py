@@ -1033,6 +1033,20 @@ class PatternPanel(Panel):
         self.message.setText("⚠ " + self.formula_error)
 
     # -- selection boxes --------------------------------------------------------------------------
+    def picks_bodies(self):
+        """Objects with Pattern Type Bodies: the body under the pointer lights up whole
+        (body_hover.py)."""
+        return self.active == "objects" and self.options.get("pattern_type") == "bodies"
+
+    def takes_body(self, body):
+        """A copy this pattern made is not picked (it stays dark under the pointer)."""
+        base = getattr(body, "BaseFeature", None)
+        return not (
+            self.target is not None
+            and pattern.is_body_copy(base)
+            and getattr(base, "Pattern", None) is self.target
+        )
+
     def activate(self, name):
         if name not in self.fields:
             return

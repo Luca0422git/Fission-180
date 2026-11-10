@@ -13,6 +13,11 @@
   breakCurve); FreeCAD's own Split cut at the clicked point instead.
 
 The curve maths and the edits are in sketch_build.py. Each click is one undo step.
+
+Each has a small panel at the top of the sketch panel (Luca, 2026-11-10: "all the tools should
+have some sort of dialogue box ... and there should be a button to finish that operation"):
+what to click, how many pieces were removed / curves extended / broken so far, and Done, which
+ends the tool (as Esc, Enter or OK in the right-click menu do). They have no values to type.
 """
 
 from . import log, warn
@@ -22,12 +27,47 @@ from . import sketch_infer_core as icore
 
 
 class _CurveTool(draw.DrawTool):
-    """A tool that works on the sketch curve under the pointer (no points placed)."""
+    """A tool that works on the sketch curve under the pointer (no points placed), with its
+    Done panel (DonePanel)."""
 
     snap_dot = False  # it picks curves: they light up instead
+    panel_title = ""  # the panel's title (TRIM...)
+    panel_text = ""  # what to click, in the panel
+    done_text = ""  # "Pieces removed: %d"
+
+    def __init__(self, session):
+        super().__init__(session)
+        self.panel = None
+        self.done = 0  # pieces removed, curves extended or broken since the tool started
 
     def steps(self):
         return 1
+
+    def start(self):
+        super().start()
+        try:
+            self.panel = done_panel(self)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            self.panel = None
+
+    def stop(self):
+        panel, self.panel = self.panel, None
+        if panel is not None:
+            panel.close_box()
+        super().stop()
+
+    def accept(self):
+        """Done in the panel: the tool ends (what was done stays: each click was its own undo
+        step)."""
+        if self.active:
+            log("%s: done (%d)" % (self.title, self.done))
+            self.finish()
+
+    def counted(self, n):
+        self.done += n
+        if self.panel is not None:
+            self.panel.refresh()
 
     def own_curve(self, snap):
         """The sketch's own curve under the pointer (not the axes or projected edges:
@@ -87,6 +127,12 @@ class _CurveTool(draw.DrawTool):
 class Trim(_CurveTool):
     title = "Trim"
     command = "Fission180_SketchTrim"
+    panel_title = "TRIM"
+    panel_text = (
+        "Click the piece of a curve to remove it (it shows red under the pointer), or press "
+        "and drag across several pieces."
+    )
+    done_text = "Pieces removed: %d"
     DRAG_PIXELS = 4
 
     def __init__(self, session):
@@ -202,6 +248,7 @@ class Trim(_CurveTool):
                 self.doc.commitTransaction()
                 self.sketch.solve()
                 log("Trim: %d piece(s) removed by dragging" % self.drag_trimmed)
+                self.counted(self.drag_trimmed)
             else:
                 self.doc.abortTransaction()
             self.drag_from = None
@@ -223,7 +270,8 @@ class Trim(_CurveTool):
                 raise
             return True
 
-        self._edit("Trim", work)
+        if self._edit("Trim", work):
+            self.counted(1)
         if refused:
             self.say("Trim: %s." % refused[0])
         self.preview.clear()
@@ -245,6 +293,12 @@ class Trim(_CurveTool):
 class Extend(_CurveTool):
     title = "Extend"
     command = "Fission180_SketchExtend"
+    panel_title = "EXTEND"
+    panel_text = (
+        "Click near the end of a line or an arc: it grows to the next curve it meets (the "
+        "growth shows under the pointer)."
+    )
+    done_text = "Curves extended: %d"
 
     def prompt(self):
         return "click near the end of a line or arc to extend it to the next curve."
@@ -286,7 +340,8 @@ class Extend(_CurveTool):
         if plan is None:
             self.say("Extend: there is no curve for this end to reach.")
             return
-        self._edit("Extend", lambda: build.extend_curve(self.sketch, geo, plan))
+        if self._edit("Extend", lambda: build.extend_curve(self.sketch, geo, plan)):
+            self.counted(1)
         self.preview.clear()
 
 
@@ -294,6 +349,12 @@ class Extend(_CurveTool):
 class Break(_CurveTool):
     title = "Break"
     command = "Fission180_SketchBreak"
+    panel_title = "BREAK"
+    panel_text = (
+        "Click a curve where other curves cross it: it is broken there into pieces that stay "
+        "joined (the piece shows under the pointer)."
+    )
+    done_text = "Curves broken: %d"
 
     def prompt(self):
         return "click a curve where it should be broken (at the curves crossing it)."
@@ -333,6 +394,8 @@ class Break(_CurveTool):
 
         if not self._edit("Break", work):
             self.say("Break: nothing crosses this curve here, so there is nowhere to break it.")
+        else:
+            self.counted(1)
         self.preview.clear()
 
 
@@ -624,3 +687,64 @@ def _same_curve(before, sketch, geo):
 
 
 TOOLS = {cls.command: cls for cls in (Trim, Extend, Break)}
+
+
+# -- the Done panel -------------------------------------------------------------------------------
+_PANEL = {}
+
+
+def done_panel(tool):
+    """The panel of Trim, Extend or Break: what to click, how many so far, Done. Made on
+    first use: sketch_move_tool (its ToolPanel) needs FreeCAD's GUI, and the headless Trim
+    check (Fission180Tests/headless/trim_accuracy_check.py) imports this module."""
+    if "class" not in _PANEL:
+        _PANEL["class"] = _done_panel_class()
+    if tool.title not in _PANEL:
+        word = "".join(ch for ch in tool.title if ch.isalnum())  # (a style sheet's name)
+        _PANEL[tool.title] = type(
+            "%sPanel" % word,
+            (_PANEL["class"],),
+            {"TITLE": tool.panel_title, "NAME": "Fission180Sketch%sPanel" % word},
+        )
+    return _PANEL[tool.title](tool)
+
+
+def _done_panel_class():
+    from .compat import QtWidgets
+    from .sketch_move_tool import ToolPanel
+
+    class DonePanel(ToolPanel):
+        """TRIM / EXTEND / BREAK: what to click, the count, Done (no Cancel: each click is
+        its own undo step; Ctrl+Z takes one back)."""
+
+        def __init__(self, tool):
+            super().__init__(tool)
+            self.ok.setText("Done")
+            self.ok.setToolTip("Finish %s (Esc or Enter does too)" % tool.title)
+            cancel = self.findChild(QtWidgets.QPushButton, self.NAME + "Cancel")
+            if cancel is not None:
+                cancel.hide()
+            self.message.hide()  # (no notes: refusals show by the pointer)
+            self.refresh()
+
+        def build(self):
+            self.text = QtWidgets.QLabel(self.tool.panel_text)
+            self.text.setObjectName(self.NAME + "Text")
+            self.text.setWordWrap(True)
+            self.form.addRow(self.text)
+            self.count = QtWidgets.QLabel("")
+            self.count.setObjectName(self.NAME + "Count")
+            self.count.setStyleSheet("color: #aab4c3;")
+            self.form.addRow(self.count)
+
+        def refresh(self):
+            try:
+                text = self.tool.done_text
+                self.count.setText(text % self.tool.done if "%" in text else text)
+                self.count.setVisible(bool(text))
+            except RuntimeError:
+                pass  # the panel went with FreeCAD's sketch panel
+            except Exception as exc:
+                warn("%s panel: %s" % (self.tool.title, exc))
+
+    return DonePanel

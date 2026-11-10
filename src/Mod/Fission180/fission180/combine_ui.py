@@ -24,6 +24,7 @@ class CombinePanel(BodyPanel):
     title = "Combine"
     icon = "combine"
     needs_pick = (combine.NeedsPick,)
+    body_boxes = ("target", "tools")  # the body under the pointer lights up whole (body_hover)
 
     def __init__(self, doc, feature=None):
         self.options = combine.with_defaults({})
@@ -136,6 +137,38 @@ class CombinePanel(BodyPanel):
                 self.options["tools"].append(body)
             self._show_picks()
         self.changed()
+
+    def takes_body(self, body):
+        """The body would be taken by a click now (it lights up whole under the pointer)."""
+        if self._made_by_preview(body):
+            return False
+        return self.active == "target" or body is not self.options["target"]
+
+    def hover_body(self, body, point):
+        """The body the pointer means: the preview covers the see-through tools, so the
+        pointer on it over a tool means that tool, as a click there does (_really_clicked).
+        The answer for the last spot is kept: the pointer resting on the part asks again at
+        every small move."""
+        feature = self.target
+        if body is None or point is None or feature is None or not bodies.alive(feature):
+            return body
+        on_target = body is self.options["target"] and not feature.NewBody
+        if not on_target and not self._made_by_preview(body):
+            return body  # not on the preview: the body itself (no solid test)
+        key = (body.Name, round(point.x, 2), round(point.y, 2), round(point.z, 2))
+        memo = getattr(self, "_hover_memo", None)
+        if memo is not None and memo[0] == key:
+            return memo[1]
+        meant = self._really_clicked(body, point)
+        self._hover_memo = (key, meant)
+        return meant
+
+    def has_body(self, body):
+        """Picked already: a box drawn round it again keeps it (and passes over the target
+        while the tools are picked, without a word)."""
+        if body is self.options["target"]:
+            return True
+        return self.active == "tools" and any(body is b for b in self.options["tools"])
 
     def _made_by_preview(self, body):
         feature = self.target
@@ -268,6 +301,10 @@ def _touches(obj, point, tol=1e-3):
     shape = bodies.global_shape(obj)
     if shape.isNull() or not shape.Solids:
         return False
+    box = shape.BoundBox
+    box.enlarge(tol)
+    if not box.isInside(point):
+        return False  # (quick: the hover asks this at every move over the preview)
     return any(solid.isInside(point, tol, True) for solid in shape.Solids)
 
 

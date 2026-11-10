@@ -13,10 +13,13 @@ Here:
 - Clicks on curves of the sketch (projected ones too) pick or drop them; curves selected
   before the command are taken as they are. The picked curves are yellow; the curve (or
   chain) under the pointer shows what a click would add, in red what it would drop.
-- Once curves are picked the offset follows the pointer: it runs through the pointer, on
-  the pointer's side (Symmetric: both sides). A click (or a drag) off the curves keeps
-  that distance; a number typed (the box by the pointer, or Distance in the panel) keeps
-  it too. Flip puts it on the other side.
+- Once curves are picked the offset shows at the last distance used (or a round tenth of the
+  curves' size) on the right of the first curve (outside a closed chain). The pointer does
+  not size it (Luca, 2026-11-10, of the sketch fillet: "it follows your mouse. Why? theres
+  zero control that way"): a blue arrow on the offset drags the distance (dragged through
+  the curves, the offset goes to the other side); a number typed (the box by the arrow, or
+  Distance in the panel) sets it; a click (or a drag) off the curves puts the offset through
+  that point. Flip puts it on the other side.
 - OK, Enter or OK in the right-click menu makes it, one undo step "Offset"; Cancel or Esc
   makes nothing. O again, or another sketch tool, ends it without making anything.
 - An inner offset wider than the curves allow stops at the largest that fits (Luca's rule
@@ -91,9 +94,16 @@ class SketchOffset(draw.DrawTool):
         self._hover_hit = None
         self._dragging = False
         self._pending = None
+        self.size = None  # the distance dragged on the arrow (a typed one is the box's)
+        self.arrows = None
+        self._grab = None
+        self._view_map = None
 
     # -- life cycle ------------------------------------------------------------------------
     def start(self):
+        from .sketch_value_arrow import Arrows
+
+        self.arrows = Arrows(self.session)
         super().start()
         try:
             self.panel = OffsetPanel(self)
@@ -105,6 +115,9 @@ class SketchOffset(draw.DrawTool):
         panel, self.panel = self.panel, None
         if panel is not None:
             panel.close_box()
+        arrows, self.arrows = self.arrows, None
+        if arrows is not None:
+            arrows.remove()
         super().stop()
 
     def changed(self):
@@ -135,10 +148,10 @@ class SketchOffset(draw.DrawTool):
             return "click the curves to offset."
         if self.note:
             return "%s (Enter makes it)." % self.note
-        typed = self.boxes.typed("distance") if self.boxes.fields else None
-        if typed is None:
-            return "move to size it, or type the distance; click to keep it, Enter makes it."
-        return "Enter or OK makes it; click elsewhere for another distance."
+        return (
+            "drag the arrow or type the distance (a click off the curves puts the offset "
+            "there); OK or Enter makes it."
+        )
 
     # -- the picks ------------------------------------------------------------------------------
     def _usable(self, geo):
@@ -264,13 +277,14 @@ class SketchOffset(draw.DrawTool):
         return max(round(got[0] / step) * step, step), got[1]
 
     def wanted(self):
-        """The distance asked for: typed (or kept by a click), else the pointer's, else the
-        last one used (or a round tenth of the curves' size)."""
+        """The distance asked for: typed (or kept by a click), else the one dragged on the
+        arrow, else the last one used (or a round tenth of the curves' size). The pointer
+        never sizes it."""
         f = self.boxes.field("distance")
         if f is not None and f.typed is not None:
             return f.typed, True
-        if f is not None and f.value is not None:
-            return f.value, False
+        if self.size is not None:
+            return self.size, False
         if _last["distance"]:
             return _last["distance"], False
         curves, _found = self.model()
@@ -378,30 +392,112 @@ class SketchOffset(draw.DrawTool):
             return tuple(snap.point)
         return tuple(snap.raw)
 
+    def snap_for(self, view, event):
+        self._view_map = view
+        return super().snap_for(view, event)
+
+    def _arrow_at(self, view):
+        if self.arrows is None or view is None or not self.curves:
+            return None
+        try:
+            from .sketch_move_handles import pointer_pixels
+
+            return self.arrows.at(pointer_pixels(view))
+        except Exception:
+            return None
+
     def moved(self, snap):
         self.pointer_at = self._where(snap)
-        hit = self._curve_at(snap.raw)
+        on_arrow = self._arrow_at(self._view_map)
+        if self.arrows is not None:
+            self.arrows.light(on_arrow)
+        hit = None if on_arrow else self._curve_at(snap.raw)
         if hit != self._hover_hit:
             self._hover_hit = hit
             if hit is not None:
                 self.hover, self.hover_drops = self._group(hit)
             else:
                 self.hover, self.hover_drops = [], False
-        f = self.boxes.field("distance")
-        if f is not None and f.typed is None and self.boxes.typing is None:
-            got = self._from_pointer(self.pointer_at)
-            if got is not None:
-                f.value, self.side = got
-        self._show()
+            self._show()
 
     def pressed(self, snap, view):
+        self._grab = None
+        if self._arrow_at(view) == "distance":
+            self._start_grab(view)
+            return
         self._press_hit = self._curve_at(snap.raw)
         self._dragging = self._press_hit is None and bool(self.curves)
         if self._dragging:
             self.keep(self._where(snap))
             self._show()
 
+    # -- the arrow ----------------------------------------------------------------------------
+    def _arrow_spot(self, d):
+        """(foot, direction, base) of the distance arrow for the offset at d: on the offset
+        of the first curve, across from that curve's middle (`base`), pointing away from it
+        (the way the distance grows); None when there is no offset."""
+        curves, found = self.model()
+        if not found or d is None or d <= TINY:
+            return None
+        results = self.results(d)
+        if not results:
+            return None
+        chain, moved = results[0]
+        first = curves[chain.items[0][0]]
+        poly = core.points(first)
+        if first[0] == core.LINE:
+            base = ((poly[0][0] + poly[-1][0]) / 2.0, (poly[0][1] + poly[-1][1]) / 2.0)
+        else:
+            base = poly[len(poly) // 2]
+        foot, gap, _where = core.nearest_on(moved[0], base)
+        if gap <= TINY:
+            return None
+        n = ((foot[0] - base[0]) / gap, (foot[1] - base[1]) / gap)
+        return foot, n, base
+
+    def _start_grab(self, view):
+        d = self.distance()
+        try:
+            spot = self._arrow_spot(d)
+        except core.OffsetError:
+            spot = None
+        if spot is None:
+            return
+        _foot, n, base = spot
+        raw = view.raw
+        along = (raw[0] - base[0]) * n[0] + (raw[1] - base[1]) * n[1]
+        self._grab = {"base": base, "dir": n, "offset": along - d}
+        self._dragging = False
+        self._press_hit = None
+        if self.arrows is not None:
+            self.arrows.light("distance")
+
+    def _drag(self, view):
+        """The arrow dragged: the distance is how far the pointer is from the curve along the
+        arrow (less where on the arrow it was grabbed); past the curve, the other side."""
+        g = self._grab
+        base, n = g["base"], g["dir"]
+        raw = view.raw
+        d = (raw[0] - base[0]) * n[0] + (raw[1] - base[1]) * n[1] - g["offset"]
+        if d < 0 and SketchOffset.direction == ONE_SIDE:
+            self.side = -self.side  # through the curves: the other side
+            g["dir"] = (-n[0], -n[1])
+            g["offset"] = -g["offset"]
+            d = -d
+        step = value_limits.step_for()
+        self.size = max(round(abs(d) / step) * step, step)
+        f = self.boxes.field("distance")
+        if f is not None:
+            f.typed = None
+        self.boxes.typing = None
+        self._show()
+        self._tell()
+
     def dragged(self, snap, view):
+        if self._grab is not None:
+            if view is not None:
+                self._drag(view)
+            return
         if self._dragging:
             self.pointer_at = self._where(snap)
             self.keep(self.pointer_at)
@@ -411,6 +507,14 @@ class SketchOffset(draw.DrawTool):
         self.boxes.refresh()
 
     def released(self, press_snap, snap, moved):
+        if self._grab is not None:
+            self._grab = None
+            if self.arrows is not None:
+                self.arrows.light(None)
+            log("Offset: arrow dragged: %.6g mm" % (self.distance() or 0.0))
+            self._show()
+            self._tell()
+            return
         hit, self._press_hit = self._press_hit, None
         if self._dragging:
             self._dragging = False
@@ -441,6 +545,8 @@ class SketchOffset(draw.DrawTool):
 
     # -- the preview -------------------------------------------------------------------------------
     def _show(self):
+        if not self.active:
+            return  # (the preview's nodes went with the tool: never put back in the view)
         try:
             self._show_now()
         except Exception as exc:
@@ -453,17 +559,28 @@ class SketchOffset(draw.DrawTool):
         hover = [draw.curve_points(self.sketch, g) for g in self.hover]
         drawn = []
         f = self.boxes.field("distance")
+        spot = None
         if self.curves:
             d = self.distance()
             if d is not None and d > TINY:
                 try:
                     for _chain, moved in self.results(d):
                         drawn += [core.points(c) for c in moved]
+                    spot = self._arrow_spot(d)
                 except core.OffsetError as exc:
                     self.note = str(exc)
                     self._tell()
             if f is not None:
+                f.value = d  # shown in the box by the arrow (the pointer does not size it)
                 f.anchor = self._anchor(drawn)
+        arrow = None
+        if self.arrows is not None:
+            if spot is not None:
+                arrow = self.arrows.place("distance", spot[0], spot[1])
+            else:
+                self.arrows.keep_only(())
+        if f is not None and arrow is not None:
+            f.anchor = arrow.tip()
         self.preview.show(
             curves=drawn,
             picked=[p for p in picked if p],

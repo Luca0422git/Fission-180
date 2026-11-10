@@ -389,3 +389,24 @@ def line_arc_pointer(kind, data, pointer, line_first=True):
             return {"distance": along, "distance2": away}
         return {"distance": away, "distance2": along}
     return {"distance": along}
+
+
+# -- the values a corner starts with (the CHAMFER panel, 2026-11-10) ---------------------------
+def reach(data):
+    """How far a chamfer can cut back the shorter curve of a corner (mm, straight from the
+    corner): `data` is corner()'s tuple (two lines) or line_arc_corner()'s dict (the arc's
+    part: the chord to its far end, at most its diameter)."""
+    if isinstance(data, dict):
+        turn = min(data["reach2"], math.pi)
+        return min(data["reach1"], 2.0 * data["radius"] * math.sin(turn / 2.0))
+    return min(data[3], data[4])
+
+
+def start_distance(data, last=None):
+    """The distance a new corner starts with: the last chamfer's when it fits there, else a
+    fifth of what the shorter curve allows."""
+    room = reach(data)
+    if last and last < room:
+        return last
+    return max(0.2 * room, 1e-3)
+

@@ -31,6 +31,13 @@ class SplitPanel(BodyPanel):
     title = "Split Body"
     icon = "split_body"
     needs_pick = (split.NeedsPick,)
+    body_boxes = ("body",)  # Body to Split: the body under the pointer lights up whole
+
+    def takes_body(self, body):
+        return not self._made_by_preview(body)
+
+    def has_body(self, body):
+        return body is self.options["body"]
 
     def __init__(self, doc, feature=None):
         self.options = split.with_defaults({})

@@ -98,6 +98,11 @@ class BossPanel(Panel):
     icon = "pl_boss"
     last = None
 
+    def picks_bodies(self):
+        """The two Body boxes: the body under the pointer lights up whole (body_hover.py)."""
+        box = getattr(self, "active_box", None)
+        return box is not None and box != "points"
+
     def __init__(self, doc, feature=None):
         super().__init__(doc, "Boss" if feature is None else "Edit Boss")
         BossPanel.last = self

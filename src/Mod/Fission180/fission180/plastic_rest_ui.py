@@ -26,6 +26,10 @@ class RestPanel(Panel):
     icon = "pl_rest"
     last = None
 
+    def picks_bodies(self):
+        """The Body box: the body under the pointer lights up whole (body_hover.py)."""
+        return getattr(self, "active_box", None) == "body"
+
     def __init__(self, doc, feature=None):
         super().__init__(doc, "Rest" if feature is None else "Edit Rest")
         RestPanel.last = self

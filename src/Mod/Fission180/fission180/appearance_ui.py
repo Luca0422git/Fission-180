@@ -151,13 +151,27 @@ class AppearancePanel(BodyPanel):
     icon = "appearance"
     needs_pick = ()
 
+    def picks_bodies(self):
+        """Apply To Bodies: the body under the pointer lights up whole (body_hover); Faces:
+        the face."""
+        try:
+            return self.apply_to.currentData() == "bodies"
+        except Exception:
+            return False
+
     def __init__(self, doc):
         self.look = None
         self.pending = []  # selection made before the command, waiting for the first look
         super().__init__(doc, "Appearance")
         self.pending = [(o, s) for o, s, _p in bodies_gui.selection_entries() if o.Document is doc]
         bodies_gui.clear_selection()
-        if self.pending and any(s.startswith("Face") for _o, s in self.pending):
+        # Faces clicked first: Apply To Faces. A box round bodies also brings their edges:
+        # that means the bodies (each gets the look once), not the faces it happened to see.
+        if (
+            self.pending
+            and any(s.startswith("Face") for _o, s in self.pending)
+            and not any(s.startswith(("Edge", "Vertex")) for _o, s in self.pending)
+        ):
             from . import hole_common
 
             hole_common.set_combo(self.apply_to, "faces")
@@ -266,7 +280,14 @@ class AppearancePanel(BodyPanel):
         self.info.setText("Click bodies (or faces) to give them this look.")
         if self.pending:
             pending, self.pending = self.pending, []
+            whole = self.picks_bodies()
+            given = []
             for obj, short in pending:
+                if whole:  # Apply To Bodies: each body once, however many of its faces came
+                    body = bodies.body_of(obj)
+                    if any(body is b for b in given):
+                        continue
+                    given.append(body)
                 self._give(obj, short)
 
     def _rgb(self):

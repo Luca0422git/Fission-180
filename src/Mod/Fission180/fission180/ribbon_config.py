@@ -1114,7 +1114,11 @@ SKETCH_CREATE = group(
             "Project / Include",
             [
                 item("Project", "Fission180_SketchProject", "sk_project", "P"),
-                item("Intersect", "Sketcher_Intersection", "sk_intersect"),
+                item(
+                    "Intersect",
+                    ("Fission180_SketchIntersect", "Sketcher_Intersection"),
+                    "sk_intersect",
+                ),
                 item("Include 3D Geometry", "Fission180_SketchInclude3D", "sk_project"),
                 item("Project to Surface", "Fission180_SketchProjectToSurface", "sk_project"),
                 item(

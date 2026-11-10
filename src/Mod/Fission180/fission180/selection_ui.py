@@ -23,6 +23,12 @@ How it is built (Fission 180's own code; Fusion's behaviour, see parity/selectio
 * Shift adds (FreeCAD's own Shift does nothing: a Shift click is handed on as a Ctrl
   click, except on something already selected, which Fusion keeps). Ctrl toggles, as in
   FreeCAD. With the Body priority, a click on a face selects the whole body.
+* The whole body lights up under the pointer with the Body priority, and inside a command
+  while its active selection box takes bodies (body_hover.py says which; a face or edge
+  box keeps FreeCAD's own face / edge highlight). It is FreeCAD's own preselection of the
+  whole body, set by a mouse callback that runs right after FreeCAD's preselection of the
+  same move; it goes when the pointer leaves the body or the view, when the box changes
+  and when the command closes.
 * Esc with no command open clears the selection (Fusion); keys 1 / 2 / 3 choose the mode.
 """
 
@@ -62,9 +68,12 @@ _state = {
     "menu": None,
     "told": 0.0,
     "last": None,  # what the last box or Select Other did (tests, Diagnostics)
-    "hover_views": [],  # [(gl widget, view, callback)]: the Body priority's hover
+    "hover_views": [],  # [(gl widget, view, callback)]: the whole-body hover
     "gate_restored": 0,  # how often the filters' gate came back after FreeCAD dropped it
+    "lit": None,  # (document, object, sub) of the whole body the hover lit, or None
+    "lit_watch": None,  # QTimer: puts the lit body out when it should not stay lit
 }
+LIT_WATCH_MS = 120  # how often a lit body is looked at (only while one is lit)
 
 
 # -- preferences ------------------------------------------------------------------------------
@@ -1547,6 +1556,10 @@ class _ViewFilter(QtCore.QObject):
                 return False
             if kind == QtCore.QEvent.KeyPress:
                 return self._key(obj, event)
+            if kind == QtCore.QEvent.Leave:
+                if _state["lit"] is not None and _is_gl(obj):
+                    put_out_lit()  # the pointer left the view: the whole body goes dark
+                return False
             if kind in _MOUSE and not _is_gl(obj):
                 return False  # an event Quarter ignored, handed on to the viewer widget
             if kind == QtCore.QEvent.MouseButtonPress:
@@ -2001,13 +2014,168 @@ def _preselect_body(target):
         if target is None:
             if pre.ObjectName and (not names or names[0].endswith(".") or not names[0]):
                 Gui.Selection.clearPreselection()
+            _forget_lit()
             return
         _body, root, sub = target
         if pre.ObjectName == root.Name and (names[0] if names else "") == sub:
+            _remember_lit(root, sub)
             return  # lit already
         Gui.Selection.setPreselection(root, sub)
+        _remember_lit(root, sub)
     except Exception:
         pass  # the body went (deleted, undone) between the move and this moment
+
+
+def _whole_bodies_wanted():
+    """Why the hover lights whole bodies now: "priority" (the Body priority), "dialog"
+    (the open command's active selection box takes bodies) or None (FreeCAD's own face /
+    edge highlight)."""
+    if core.only_bodies(filters()):
+        return "priority"
+    from . import body_hover
+
+    if body_hover.takes_bodies():
+        return "dialog"
+    return None
+
+
+def _preselected_info():
+    """What FreeCAD lit under the pointer on this very move, as getObjectInfo would say it
+    (its own pick, read back: no second pick of the part), or None when it lit no face,
+    edge or corner (nothing there, the open command's gate refused it, or a whole object
+    such as a plane or a body lit before)."""
+    pre = Gui.Selection.getPreselection()
+    if not getattr(pre, "ObjectName", ""):
+        return None  # (pre.Object of an empty preselection raises "Object already deleted")
+    names = list(getattr(pre, "SubElementNames", []) or [])
+    sub = names[0] if names else ""
+    if not sub or sub.endswith("."):
+        return None
+    top = pre.Object
+    path, short = sub.rsplit(".", 1) if "." in sub else ("", sub)
+    leaf = top.getSubObject(path + ".", retType=1) if path else top
+    if leaf is None:
+        return None
+    found = {
+        "Document": pre.DocumentName,
+        "Object": leaf.Name,
+        "Component": short,
+        "ParentObject": top,
+        "SubName": sub,
+    }
+    try:
+        point = pre.PickedPoints[0]
+        found["x"], found["y"], found["z"] = point.x, point.y, point.z
+    except Exception:
+        pass  # (no point: a dialog's hover_body gets None)
+    return found
+
+
+def _whole_target(body):
+    """(body, root, sub) that preselects `body` whole: the body itself, or its top
+    component with the path down to it ("Arm.Body001.")."""
+    names = []
+    top = body
+    parent = body.getParentGeoFeatureGroup()
+    while parent is not None:
+        names.insert(0, top.Name)
+        top = parent
+        parent = top.getParentGeoFeatureGroup()
+    if top is body:
+        return body, body, ""
+    return body, top, ".".join(names) + "."
+
+
+def _dialog_target(info, target):
+    """(body, root, sub) the open command takes for a click on what `info` names (an element
+    of a solid, not a sketch or a plane, allowed by the command's own gate; the body the
+    command means there, and would take), or None."""
+    from . import body_hover
+
+    if _kind_of_info(info) not in ("faces", "edges", "vertices"):
+        return None
+    if not _dialog_allows(info):
+        return None
+    body = target[0]
+    point = App.Vector(info["x"], info["y"], info["z"]) if "x" in info else None
+    meant = body_hover.meant_body(body, point)
+    if meant is None or not body_hover.takes_body(meant):
+        return None
+    return target if meant is body else _whole_target(meant)
+
+
+def _remember_lit(root, sub):
+    """The hover lit this body: watched until it should go dark (_check_lit)."""
+    try:
+        _state["lit"] = (root.Document.Name, root.Name, sub)
+    except Exception:
+        _state["lit"] = None
+        return
+    timer = _state["lit_watch"]
+    if timer is None:
+        timer = QtCore.QTimer()
+        timer.setInterval(LIT_WATCH_MS)
+        timer.timeout.connect(_check_lit)
+        _state["lit_watch"] = timer
+    if not timer.isActive():
+        timer.start()
+
+
+def _forget_lit():
+    _state["lit"] = None
+    timer = _state["lit_watch"]
+    if timer is not None:
+        try:
+            timer.stop()
+        except RuntimeError:
+            _state["lit_watch"] = None
+
+
+def _lit_is_shown():
+    """True while FreeCAD's preselection is still the whole body the hover lit."""
+    lit = _state["lit"]
+    if lit is None:
+        return False
+    try:
+        pre = Gui.Selection.getPreselection()
+        names = list(getattr(pre, "SubElementNames", []) or [])
+        return (pre.DocumentName, pre.ObjectName, names[0] if names else "") == lit
+    except Exception:
+        return False
+
+
+def put_out_lit():
+    """Put out the whole body the hover lit (the pointer left the view, the box changed,
+    the command closed). FreeCAD's preselection of anything else is left alone."""
+    try:
+        if _lit_is_shown():
+            Gui.Selection.clearPreselection()
+    except Exception as exc:
+        warn("selection hover: %s" % exc)
+    _forget_lit()
+
+
+def _check_lit():
+    """Timer, while a body is lit: put it out once nothing wants whole bodies any more (the
+    command closed, its box changed to faces or edges, the Body priority went, a sketch
+    opened). Moves over the view are handled by _hover_moved."""
+    try:
+        if _state["lit"] is None:
+            _forget_lit()
+            return
+        if not _lit_is_shown():
+            _forget_lit()  # FreeCAD lit something else since (or nothing)
+            return
+        if not _state["on"] or _whole_bodies_wanted() is None or _sketch_edit():
+            put_out_lit()
+    except Exception as exc:
+        _forget_lit()
+        warn("selection hover: %s" % exc)
+
+
+def lit_body():
+    """(document, object, sub) of the whole body lit under the pointer, or None (tests)."""
+    return _state["lit"] if _lit_is_shown() else None
 
 
 def _sketch_edit():
@@ -2028,17 +2196,30 @@ def _sketch_edit():
 
 def _hover_moved(view, info):
     """A mouse move over a 3D view, after FreeCAD's own preselection of it: the Body
-    priority lights the whole body (nested in a component, or a loose solid, too); a gate
-    FreeCAD dropped is noticed and put back."""
+    priority, and a command whose active box takes bodies, light the whole body (nested in
+    a component, or a loose solid, too); a gate FreeCAD dropped is noticed and put back.
+
+    Inside a command the body is found from what FreeCAD lit on this move (no second pick
+    of the part: a big part costs no more than a face); the Body priority's gate refuses
+    faces, so FreeCAD lit nothing and the view is asked what is under the pointer."""
     try:
         if not _state["on"] or QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
             return
         if _state["gate"] is not None and _gate_lost():
             _refresh_gate()
-        if not core.only_bodies(filters()) or _sketch_edit():
+        wanted = _whole_bodies_wanted()
+        if wanted is None or _sketch_edit():
+            if _state["lit"] is not None:
+                put_out_lit()
             return
-        position = info.get("Position")
-        target = _body_target(view.getObjectInfo(tuple(position))) if position else None
+        if wanted == "dialog":
+            found = _preselected_info()
+            target = _body_target(found) if found else None
+            if target is not None:
+                target = _dialog_target(found, target)
+        else:
+            position = info.get("Position")
+            target = _body_target(view.getObjectInfo(tuple(position))) if position else None
         _preselect_body(target)
     except Exception as exc:
         warn("selection hover: %s" % exc)
@@ -2165,6 +2346,7 @@ def disable():
     except Exception as exc:
         warn("selection filters: %s" % exc)
     _state["inner"] = None
+    put_out_lit()
     _unwatch_hover()
     _unpatch_gate_api()
 

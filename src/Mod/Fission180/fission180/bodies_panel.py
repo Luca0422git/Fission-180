@@ -26,6 +26,12 @@ class BodyPanel(Panel):
     icon = None
     needs_pick = (Exception,)  # the core's NeedsPick (a hint, not a problem)
     last = None
+    # The boxes that take whole bodies (body_hover.py): while one of them takes the clicks,
+    # the body under the pointer lights up whole, and many picks at once (a box drawn round
+    # bodies, bodies selected before the command) take each body once. None: the box
+    # called "bodies", if there is one. A dialog whose box takes bodies or faces depending on
+    # a choice (Move/Copy's Move Object, Appearance's Apply To) has picks_bodies() instead.
+    body_boxes = None
 
     def __init__(self, doc, transaction, editing=False):
         super().__init__(doc, transaction)
@@ -164,28 +170,45 @@ class BodyPanel(Panel):
                 self._syncing = False
             if time.time() < self._busy_until:
                 return
-            for obj, short, point in entries:
-                self.picked(obj, short, point)
+            self.take_picks_batch(entries)
         except Exception as exc:
             warn("%s pick: %s" % (self.title, exc))
 
     def picked(self, obj, short, point):
         """A click (subclasses)."""
 
+    def has_body(self, body):
+        """True when the box taking the clicks holds `body` already (a box drawn round it
+        again keeps it). Dialogs with a body box say; the default holds none."""
+        return False
+
+    def take_picks_batch(self, entries):
+        """One click's, one box's or the earlier selection's picks, handed to picked(): a body
+        in a body box counts once, however many of its faces and edges came (before, each of
+        them toggled it, and the dialog kept a seemingly random few of the bodies)."""
+        from . import body_hover
+
+        def one(obj, short, point):
+            try:
+                self.picked(obj, short, point)
+            except Exception as exc:
+                warn("%s pick: %s" % (self.title, exc))
+
+        body_hover.take_batch(
+            entries, one, _owner, lambda: body_hover.takes_bodies(self), self.has_body
+        )
+
     def start_from_selection(self):
         """What was selected before the command started, as if clicked now (Fusion takes a
-        preselection), then cleared."""
+        preselection), then cleared. Several bodies selected (by a face each, in the browser
+        or with a box) are all taken, each once."""
         entries = [e for e in bodies_gui.selection_entries() if e[0].Document is self.doc]
         self._syncing = True
         try:
             Gui.Selection.clearSelection()
         finally:
             self._syncing = False
-        for obj, short, point in entries:
-            try:
-                self.picked(obj, short, point)
-            except Exception as exc:
-                warn("%s pick: %s" % (self.title, exc))
+        self.take_picks_batch(entries)
         return bool(entries)
 
     # -- the preview -------------------------------------------------------------------------------
@@ -336,6 +359,19 @@ class BodyPanel(Panel):
 
     def remove_handles(self):
         pass
+
+
+def _owner(obj):
+    """The body (or loose solid) a pick belongs to, or None."""
+    found = bodies.body_of(obj)
+    if found is not None:
+        return found
+    try:
+        from . import analysis
+
+        return analysis.body_of(obj)
+    except Exception:
+        return None
 
 
 def _sync_later(name):
