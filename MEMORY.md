@@ -4,6 +4,18 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-10 (evening): patch 0.1.0-beta.3.3.10, Luca's bugs after 3.3.9 (released 17:48 UTC),
+on `develop`** (Luca kept the fixes local until "commit and get the update ready").
+Status: [x] hover ghost of a hidden body whose sketch shows (body_visibility.drawn: also
+section caps, origin squares) [x] Home hides browser + timeline (timeline_ui.hold: Home and
+drawings) [x] browser out of FreeCAD's overlay (browser_ui._out_of_overlay: DockWindows/
+OverlayLeft... "Widgets" lists hold "Model", the dock the browser lives in; ParentChange
+guard; shortcuts.PARKED_ALWAYS = Std_DockOverlayToggle* Ctrl+arrows) [x] Home "Elsewhere on
+this computer" row [x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.10, CHANGELOG [ ] "Fission
+180 tests" green [ ] **Luca: patch release**. Also given to Luca: the VEX test robot
+(fixtures/vex/vex_robot.build headless, 298 parts; he found it underwhelming, no change wanted).
+Open: his tester's designs "not in Documents": ask for Show in Folder's path.
+
 **2026-11-10 (night): patch 0.1.0-beta.3.3.9, the known issues that are Fission 180 code, on
 `develop`** (Luca at 23:33: "Got a big change to make? Now's a GREAT time to do it. Fix it. Why
 put it in the known issues if you're just never going to fix it?"; newest session log "known

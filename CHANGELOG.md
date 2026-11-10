@@ -8,6 +8,26 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.10
+
+### Fixed
+
+- **The browser was see-through until the mouse went into it**, had no BROWSER title, and stayed
+  over the Home tab. FreeCAD had put the panel the browser lives in into its "overlay" (its
+  see-through panels that float over the 3D view) and remembers that in its settings; its keys
+  Ctrl+Left / Right / Up / Down do it. While Fission 180 is on, the browser is kept out of
+  FreeCAD's overlay (taken out again if anything moves it in), and those four keys do nothing.
+  FreeCAD's own interface gets its settings back.
+- **Going from a design to Home kept the browser and the timeline open.** Home now has the
+  window to itself; both come back when you go back to a design (a browser you closed stays
+  closed). Drawing tabs hide the timeline the same way.
+- **Hovering a hidden body's row in the browser showed no ghost** while one of its sketches was
+  shown. It does now. Section Analysis no longer draws cut faces for such a body's hidden solid.
+- **Home made it look as if designs were in Documents\Fission 180 Designs when they were not.**
+  A design saved in another folder (like a download you opened) was listed under This
+  computer's heading. It now has its own row, Elsewhere on this computer, and its tile says
+  which folder it is in; hover it for the full path, right-click > Show in Folder opens it.
+
 ## 0.1.0-beta.3.3.9
 
 ### New
