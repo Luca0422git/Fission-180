@@ -30,3 +30,4 @@ from . import verify_actions  # noqa: E402,F401
 from . import docs_actions  # noqa: E402,F401
 from . import simulate_actions  # noqa: E402,F401  (beta 3)
 from . import rebuild_actions  # noqa: E402,F401  (beta 3)
+from . import sheetmetal_actions  # noqa: E402,F401  (SHEET METAL and PLASTIC)

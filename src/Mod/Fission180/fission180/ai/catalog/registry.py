@@ -22,6 +22,8 @@ CATEGORIES = (
     ("create", "Create (SOLID)"),
     ("modify", "Modify"),
     ("surface", "Surface"),
+    ("sheet_metal", "Sheet metal"),
+    ("plastic", "Plastic"),
     ("construct", "Construct"),
     ("assemble", "Assemble"),
     ("timeline", "Timeline (history)"),

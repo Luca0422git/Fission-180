@@ -4,6 +4,16 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-10 (night): patch 0.1.0-beta.3.3.9, the known issues that are Fission 180 code, on
+`develop`** (Luca at 23:33: "Got a big change to make? Now's a GREAT time to do it. Fix it. Why
+put it in the known issues if you're just never going to fix it?"; newest session log "known
+issues night"). Status: [x] Pattern / Mirror of several bodies (pattern.py Source2..N,
+MirrorFollower) [x] AI chat streams (helper) [x] outline frame: gone since 3.3.5, test
+overlay_outline (helper) [x] AI tools for SHEET METAL, PLASTIC, surface modify: 154 tools
+(helper) [x] AI patterns take "bodies" [x] VERSION / `_FALLBACK_VERSION` 0.1.0-beta.3.3.9,
+CHANGELOG, known issues (4 entries gone), AI docs [ ] "Fission 180 tests" green [ ] **Luca:
+patch release** (3.3.8 was green but not released: 3.3.9 contains it).
+
 **2026-11-10: patch 0.1.0-beta.3.3.8, Luca's round after 3.3.7, on `develop`** (Luca: sketch
 in a hidden body did not show; hovering a body in body tools must light the WHOLE body; the
 cut's live drag "way to slow ... It shouldnt be changing colors"; "the switching tool bug is
@@ -1971,6 +1981,43 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: known issues night, patch 0.1.0-beta.3.3.9 (`develop`, 2026-11-10)
+
+Luca asked to fix the known issues instead of listing them. Fixed the ones that are Fission 180
+code; the others need things a patch cannot give (a C++ change and the 4-hour build: big robots
+opening; Apple hardware: macOS; Autodesk's closed format: .f3d; a paid certificate: SmartScreen;
+big projects: Press Pull on freeform, simulation studies, external components, drawing
+templates/DWG, T-splines/CAM/rendering, translations). Two helper agents (chat streaming; AI
+tools) in the same tree, told not to touch git; their reports are summarised here.
+
+- **Several bodies in one pattern** (pattern.py): BodyPatternFeature keeps Source/SourceBody for
+  the first body and Source2..N (PropertyLinkGlobal each: a deleted body leaves its slot None)
+  + OtherSourceBodies (names). Copies move-major: index = copy * bodies + body, so a quantity
+  change adds/drops at the end and keeps the copy bodies; a deleted source's copies keep their
+  shape (SOME_DELETED_NOTE). body_copy_shapes(definition, shapes) takes one shape per body;
+  Pattern on Path centres the compound. Mirror Join of several: native Mirrored in the first
+  body + modify_bodies.MirrorFollower (fuse with its mirror, plane via point_between) in the
+  others; _sync_followers(feature, kind, options) routes that case past pattern_adjust (which
+  would drop followers it does not know); build() moves followers to a replacing feature.
+  Surface bodies + Join + several: refused with a message. pattern_ui: click toggles a body,
+  take_batch for boxes, a preselection with edges (a box) means bodies (it made a Faces pattern
+  of the first body's faces). timeline_ops._body_pattern_uses / rebuild_links know all sources.
+  AI: "bodies": [step ids] in the pattern tools (pattern_ops._objects). Tests: headless
+  multibody_pattern_check (32), scenario pattern_several_bodies (33), 16 pattern scenarios.
+- **Chat streaming** (helper): ai/providers/_stream.py SSE; per provider a reader rebuilds the
+  one-piece answer (tool calls, stop reasons, history unchanged); pieces via the chat queue to
+  the panel's 50 ms timer; Stop closes the connection; 400 on stream -> one-piece mode; error
+  event before words retries, after words does not. Not tested with real keys; Stop on
+  Windows not tested (falls back to the next piece / keep-alive).
+- **Outline frame**: overlay_outline compares grabs with FreeCAD's overlay shown/hidden: 0
+  pixels differ; the pre-3.3.5 style as a control: 1942 (the outline). readme_shots.py's
+  hide_overlay_frames is no longer needed.
+- **AI tools** (helper): 23 new (15 sheet metal, 7 plastic, surface_modify), 154 in all; they
+  emit the existing design steps; edges as points on them (executor converts selectors);
+  edit_step/get_step know the new kinds; AI_TOOLS_TO_COME empty. Not exposed: deleting /
+  copying sheet metal rules, per-component rules, boss/rest/snap sketches on faces, snap fit
+  Manual points, the "largest that fits" hint (value_fit.py).
 
 ### Session log: after 3.3.7, patch 0.1.0-beta.3.3.8 (`develop`, 2026-11-10)
 

@@ -92,6 +92,79 @@ SIM_READY = SIM_HELD + [
 ]
 SIM_SOLVED = SIM_READY + [call("solve_study")]
 
+# --- SHEET METAL, PLASTIC, SURFACE > MODIFY: the parts of their golden models -------------------
+TOP_Z_MIN = {"type": "plane", "normal": [0, 0, 1], "at": {"axis": "z", "value": "min"}, "count": 1}
+SM_PLATE = EMPTY + [
+    call("create_sketch", plane="XY", geometry=[{"rect": [0, 0, 50, 30]}]),
+    call("flange", kind="base", profile="Sketch1"),
+]
+SM_TRAY = SM_PLATE + [
+    call(
+        "flange",
+        kind="edge",
+        edges={"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4},
+        height=15,
+    )
+]
+SM_CHANNEL = EMPTY + [
+    call(
+        "create_sketch",
+        plane="XZ",
+        geometry=[
+            {"polyline": [[0, 30], [0, 0], [60, 0], [60, 30], [59, 30], [59, 1], [1, 1], [1, 30]]}
+        ],
+    ),
+    call("extrude", profile="Sketch1", distance=20),
+    call(
+        "fillet",
+        edges={"type": "line", "parallel": [0, 1, 0], "at": {"axis": "z", "value": 0}, "count": 2},
+        radius=2,
+    ),
+    call(
+        "fillet",
+        edges={"type": "line", "parallel": [0, 1, 0], "at": {"axis": "z", "value": 1}, "count": 2},
+        radius=1,
+    ),
+]
+SM_CHANNEL_CONVERTED = SM_CHANNEL + [call("convert_to_sheet_metal", face=TOP_Z_MIN)]
+SM_TUBE = EMPTY + [
+    call("create_sketch", plane="XY", geometry=[{"rect": [0, 0, 40, 30]}]),
+    call("extrude", profile="Sketch1", distance=20),
+    call("fillet", edges={"type": "line", "parallel": [0, 0, 1], "count": 4}, radius=2),
+    call(
+        "shell",
+        faces={
+            "any_of": [
+                {"type": "plane", "normal": [0, 0, 1], "count": 1},
+                {"type": "plane", "normal": [0, 0, -1], "count": 1},
+            ]
+        },
+        thickness=1,
+    ),
+    call(
+        "convert_to_sheet_metal",
+        face={"type": "plane", "normal": [0, -1, 0], "at": {"axis": "y", "value": "min"},
+              "count": 1},
+    ),
+]
+PL_BOX_AND_LID = EMPTY + [
+    call("create_sketch", plane="XY", geometry=[{"rect": [0, 0, 60, 40]}]),
+    call("extrude", profile="Sketch1", distance=20),
+    call("shell", faces={"normal": [0, 0, 1], "count": 1}, thickness=2),
+    call("create_sketch", plane="XY", offset=20, geometry=[{"rect": [0, 0, 60, 40]}]),
+]
+SURFACE_BOX = EMPTY + [
+    call(
+        "create_curve_sketch",
+        plane="XY",
+        curves=[{"polyline": [[0, 0], [30, 0], [30, 20], [0, 20], [0, 0]]}],
+    ),
+    call("surface", kind="extrude", refs=[{"sketch": "Sketch1", "at": [15, 0]}],
+         options={"distance": 10}),
+    call("surface", kind="patch", refs=[{"sketch": "Sketch1", "at": [15, 0]}]),
+    call("surface", kind="stitch", refs=[{"step": "Surface1"}, {"step": "Surface2"}]),
+]
+
 SETUPS = {
     "none": [],
     "empty": EMPTY,
@@ -203,6 +276,73 @@ SETUPS = {
         call("create_sketch", plane="XY", offset=10, geometry=[{"circle": [30, 20, 4]}]),
         call("hole", sketch="Sketch2", diameter=8, through_all=True),
     ],
+    # --- SHEET METAL, PLASTIC, SURFACE > MODIFY
+    "sm_plate": SM_PLATE,
+    "sm_wall": SM_PLATE + [call("flange", kind="edge", edges=[[50, 15, 1]], height=20)],
+    "sm_tray": SM_TRAY,
+    "sm_flat": SM_TRAY + [call("flat_pattern", face=TOP_Z_MIN)],
+    "sm_bend_line": EMPTY
+    + [
+        call("create_sketch", plane="XY", geometry=[{"rect": [0, 0, 100, 40]}]),
+        call("flange", kind="base", profile="Sketch1"),
+        call("create_sketch", plane="XY", offset=1, geometry=[{"line": [50, -5, 50, 45]}]),
+    ],
+    "sm_two_plates": EMPTY
+    + [
+        call("create_sketch", plane="XY", geometry=[{"rect": [0, 0, 50, 40]}]),
+        call("flange", kind="base", profile="Sketch1"),
+        call("create_sketch", plane="YZ", offset=60, geometry=[{"rect": [20, 5, 60, 45]}]),
+        call("flange", kind="base", profile="Sketch2"),
+    ],
+    "sm_notched": EMPTY
+    + [
+        call(
+            "create_sketch",
+            plane="XY",
+            geometry=[
+                {"polyline": [[0, 0], [100, 0], [100, 55], [95, 55], [95, 60], [0, 60]]}
+            ],
+        ),
+        call("flange", kind="base", profile="Sketch1"),
+        call("flange", kind="edge", edges=[[100, 20, 1]], height=20),
+        call("flange", kind="edge", edges=[[50, 60, 1]], height=20),
+    ],
+    "sm_square_round": EMPTY
+    + [
+        call("create_sketch", plane="XY", geometry=[{"rect": [-20, -20, 20, 20]}]),
+        call("create_sketch", plane="XY", offset=30, geometry=[{"circle": [0, 0, 15]}]),
+    ],
+    "sm_channel": SM_CHANNEL,
+    "sm_channel_converted": SM_CHANNEL_CONVERTED,
+    "sm_unfolded": SM_CHANNEL_CONVERTED
+    + [
+        call("unfold", face=TOP_Z_MIN, all=True),
+        call("create_sketch", plane="XY", geometry=[{"rect": [56, -15, 61, -5]}]),
+        call("extrude", profile="Sketch2", distance=5, operation="cut", direction="symmetric"),
+    ],
+    "sm_tube": SM_TUBE,
+    "pl_box_and_lid": PL_BOX_AND_LID
+    + [
+        call("extrude", profile="Sketch2", distance=10, operation="new_body"),
+        call("shell", faces={"normal": [0, 0, -1], "count": 1}, thickness=2),
+    ],
+    "pl_bossed": PL_BOX_AND_LID
+    + [
+        call("extrude", profile="Sketch2", distance=10, operation="new_body"),
+        call("shell", faces={"normal": [0, 0, -1], "count": 1}, thickness=2),
+        call("boss", points=[[10, 10], [50, 30]], plane="XY", offset=20),
+    ],
+    "pl_closed_box": EMPTY
+    + [
+        call("create_sketch", plane="XY", geometry=[{"rect": [0, 0, 60, 40]}]),
+        call("extrude", profile="Sketch1", distance=20),
+        call("create_sketch", plane="XY", offset=2, geometry=[{"rect": [2, 2, 58, 38]}]),
+        call("extrude", profile="Sketch2", distance=16, operation="cut"),
+    ],
+    "pl_box_flat_lid": PL_BOX_AND_LID
+    + [call("extrude", profile="Sketch2", distance=2, operation="new_body")],
+    "pl_cylinder": EMPTY + [call("primitive", kind="cylinder", plane="XY", diameter=16, height=10)],
+    "surface_box": SURFACE_BOX,
 }
 
 EXAMPLES = [
@@ -1052,5 +1192,162 @@ EXAMPLES = [
         "setup": "rebuilt",
         "args": {},
         "note": "the rebuild matches: it takes the original's name and place",
+    },
+    # -- SHEET METAL ----------------------------------------------------------------------------
+    {
+        "tool": "sheet_metal_rule",
+        "setup": "empty",
+        "args": {"rule": "Steel 0.5", "from": "Steel (mm)", "set": {"thickness": 0.5},
+                 "active": True},
+        "note": "a 0.5 mm steel rule, the one the next flanges start with",
+    },
+    {
+        "tool": "flange",
+        "setup": "sm_plate",
+        "args": {
+            "kind": "edge",
+            "edges": {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4},
+            "height": 15,
+        },
+        "note": "15 mm walls on the four top edges of a 1 mm plate: an open tray",
+    },
+    {
+        "tool": "lofted_flange",
+        "setup": "sm_square_round",
+        "args": {"profile1": "Sketch1", "profile2": "Sketch2", "value": 0.5},
+        "note": "a square-to-round transition, its facets within 0.5 mm of the circle",
+    },
+    {
+        "tool": "bend",
+        "setup": "sm_bend_line",
+        "args": {"lines": "Sketch2", "stationary": [10, 20, 1], "angle": 90},
+        "note": "fold the right half of a plate up along the line x = 50",
+    },
+    {
+        "tool": "hem",
+        "setup": "sm_wall",
+        "args": {"edges": [[50, 15, 21]], "type": "open"},
+        "note": "an open hem on the top edge of a 20 mm wall",
+    },
+    {
+        "tool": "join_by_bend",
+        "setup": "sm_two_plates",
+        "args": {"first": [60, 40, 5], "other": "Flange1", "second": [50, 20, 1]},
+        "note": "join a standing plate to a flat one with one bend",
+    },
+    {
+        "tool": "corner_closure",
+        "setup": "sm_notched",
+        "args": {"dominant": [100, 55, 12], "submissive": [95, 60, 12], "gap": 1},
+        "note": "close the corner between two flanges, 1 mm apart",
+    },
+    {
+        "tool": "sheet_metal_fillet",
+        "setup": "sm_plate",
+        "args": {"edges": {"type": "line", "parallel": [0, 0, 1], "count": 4}, "radius": 5},
+        "note": "round the plate's four corners",
+    },
+    {
+        "tool": "sheet_metal_chamfer",
+        "setup": "sm_plate",
+        "args": {"edges": {"type": "line", "parallel": [0, 0, 1], "count": 4}, "distance": 3},
+        "note": "chamfer the plate's four corners",
+    },
+    {
+        "tool": "convert_to_sheet_metal",
+        "setup": "sm_channel",
+        "args": {"face": TOP_Z_MIN},
+        "note": "an even 1 mm U channel becomes sheet metal",
+    },
+    {
+        "tool": "unfold",
+        "setup": "sm_channel_converted",
+        "args": {"face": TOP_Z_MIN, "all": True},
+        "note": "lay both bends of the channel flat, its floor staying where it is",
+    },
+    {
+        "tool": "refold",
+        "setup": "sm_unfolded",
+        "args": {"unfold": "Unfold1"},
+        "note": "fold the channel up again, carrying the slot cut while it was flat",
+    },
+    {
+        "tool": "rip",
+        "setup": "sm_tube",
+        "args": {
+            "type": "face",
+            "face": {
+                "type": "cylinder",
+                "radius": 2,
+                "at": [{"axis": "x", "value": "max"}, {"axis": "y", "value": "max"}],
+                "count": 1,
+            },
+        },
+        "note": "cut one round corner out of a closed tube so it can be laid flat",
+    },
+    {
+        "tool": "flat_pattern",
+        "setup": "sm_tray",
+        "args": {"face": TOP_Z_MIN},
+        "note": "the tray laid flat from its floor",
+    },
+    {
+        "tool": "export_flat_pattern",
+        "setup": "sm_flat",
+        "args": {"path": "{tmp}/tray-flat.dxf"},
+        "note": "the tray's flat pattern as DXF for a laser cutter",
+    },
+    # -- PLASTIC --------------------------------------------------------------------------------
+    {"tool": "plastic_rule", "setup": "empty", "args": {"rule": "PC 2 mm"},
+     "note": "polycarbonate, 2 mm walls"},
+    {
+        "tool": "boss",
+        "setup": "pl_box_and_lid",
+        "args": {"points": [[10, 10], [50, 30]], "plane": "XY", "offset": 20, "screw": 3},
+        "note": "M3 bosses at two corners where the lid sits on the box",
+    },
+    {
+        "tool": "boss_fastener",
+        "setup": "pl_bossed",
+        "args": {"boss": "Boss", "head": "pan"},
+        "note": "pan head screws in the bosses",
+    },
+    {
+        "tool": "rest",
+        "setup": "pl_closed_box",
+        "args": {"rect": [20, 10, 40, 30], "plane": "XY", "offset": -3, "thickness": 2,
+                 "draft": 0},
+        "note": "a pad 3 mm below the floor of a hollow box",
+    },
+    {
+        "tool": "snap_fit",
+        "setup": "pl_box_flat_lid",
+        "args": {"points": [[58, 20]], "plane": "XY", "offset": 20, "length": 12, "width": 6},
+        "note": "a hook under the lid catching in the box's right-hand wall",
+    },
+    {
+        "tool": "lip",
+        "setup": "pl_cylinder",
+        "args": {
+            "edges": {"type": "circle", "at": {"axis": "z", "value": "max"}, "count": 1},
+            "type": "lip",
+            "lip_width": 1,
+            "lip_height": 1,
+        },
+        "note": "a 1 x 1 mm lip on the cylinder's top rim",
+    },
+    {
+        "tool": "design_advice",
+        "setup": "pl_cylinder",
+        "args": {"checks": ["draft"]},
+        "note": "faces without enough draft to come out of the mould along +Z",
+    },
+    # -- SURFACE > MODIFY -----------------------------------------------------------------------
+    {
+        "tool": "surface_modify",
+        "setup": "surface_box",
+        "args": {"kind": "press_pull", "faces": {"normal": [0, 0, 1], "count": 1},
+                 "distance": -5},
+        "note": "push the floor of an open box of surfaces 5 mm down: the walls grow",
     },
 ]

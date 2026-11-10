@@ -143,6 +143,135 @@ define(
     ],
 )
 
+# SURFACE > MODIFY on surface bodies (fission180/surfmod.py, the code its dialogs run): the
+# tool's kind -> (the step's kind, what it picks, the options it takes)
+SURFACE_MODIFY = {
+    "fillet": (
+        "surface_fillet",
+        "edges",
+        ("radius", "radius_type", "radius2", "tangent_chain"),
+    ),
+    "chamfer": (
+        "surface_chamfer",
+        "edges",
+        ("chamfer_type", "distance", "distance2", "angle", "flip", "tangent_chain"),
+    ),
+    "press_pull": ("surface_press_pull", "faces", ("distance",)),
+    "delete_face": ("surface_delete_face", "faces", ()),
+    "merge": ("surface_merge", "faces", ()),
+}
+_SURFACE_MODIFY_VALUES = (
+    "radius",
+    "radius_type",
+    "radius2",
+    "tangent_chain",
+    "chamfer_type",
+    "distance",
+    "distance2",
+    "angle",
+    "flip",
+)
+
+
+def _extra_surface_modify(args, problems):
+    kind = args.get("kind")
+    if kind not in SURFACE_MODIFY:
+        return
+    _step_kind, what, takes = SURFACE_MODIFY[kind]
+    other = "faces" if what == "edges" else "edges"
+    if what not in args:
+        problems.append("kind %s needs %s (a selector)" % (kind, what))
+    if other in args:
+        problems.append("kind %s picks %s, not %s" % (kind, what, other))
+    for key in _SURFACE_MODIFY_VALUES:
+        if key in args and key not in takes:
+            problems.append("%s is not a value of kind %s" % (key, kind))
+    if kind == "press_pull" and "distance" not in args:
+        problems.append("press_pull needs distance (mm: + pulls, - pushes)")
+    if kind == "fillet" and args.get("radius_type") == "variable" and "radius2" not in args:
+        problems.append("radius_type variable needs radius2 (the end radius)")
+    if kind == "chamfer":
+        ctype = args.get("chamfer_type", "equal")
+        if ctype == "two" and "distance2" not in args:
+            problems.append("chamfer_type two needs distance2")
+        if ctype == "angle" and "angle" not in args:
+            problems.append("chamfer_type angle needs angle")
+
+
+def _steps_surface_modify(a, sid):
+    step_kind, what, takes = SURFACE_MODIFY[a["kind"]]
+    steps = []
+    if "body" in a:
+        steps.append({"op": "use_body", "step": a["body"]})
+    step = {"op": "sf_surface_modify", "id": sid, "kind": step_kind}
+    step[what] = copy.deepcopy(a[what])
+    options = {k: a[k] for k in takes if k in a}
+    if options:
+        step["options"] = options
+    return steps + [step]
+
+
+define(
+    "surface_modify",
+    "Surface modify",
+    "surface",
+    "SURFACE > MODIFY (Fillet, Chamfer, Press Pull, Delete, Merge on surface bodies)",
+    "The SURFACE tab's Fillet, Chamfer, Press Pull, Delete and Merge on a surface body (open "
+    "faces, no volume, made with the surface tool; for a solid use fillet, chamfer, press_pull "
+    "and delete_face). body: the surface body (a step in it; default the active body: the "
+    "last one made or activated). kind fillet: edges (each "
+    "between two faces of the body), radius (mm, default 1), radius_type constant | chord "
+    "(radius is the chord's length) | variable (radius at each edge's start, radius2 at its "
+    "end), tangent_chain (default true). kind chamfer: edges, chamfer_type equal | two "
+    "(distance2 on the edge's second face) | angle (angle degrees), distance (mm, default 1), "
+    "flip, tangent_chain. kind press_pull: faces, distance (mm; + pulls the face out along "
+    "its normal, - pushes it in; the faces around it follow). kind delete_face: faces taken "
+    "away without healing the hole. kind merge: faces of the body that lie on one surface "
+    "become one face. Surface bodies have no volume: inspect_design and diff_design give "
+    "their area_mm2 and faces to check the result.",
+    schema(
+        {
+            "kind": enum(sorted(SURFACE_MODIFY)),
+            "body": step_id("the surface body (default: the active body)"),
+            "edges": kit.selector("fillet / chamfer: the edges", "edges"),
+            "faces": kit.selector("press_pull / delete_face / merge: the faces"),
+            "radius": kit.positive("fillet: mm", default=1),
+            "radius_type": enum(["constant", "chord", "variable"], default="constant"),
+            "radius2": kit.positive("fillet, variable: the end radius (mm)"),
+            "tangent_chain": boolean("take the edges tangent to them too", default=True),
+            "chamfer_type": enum(["equal", "two", "angle"], default="equal"),
+            "distance": number("chamfer: mm (above 0); press_pull: mm, + pulls, - pushes"),
+            "distance2": kit.positive("chamfer two: the second distance (mm)"),
+            "angle": number("chamfer angle: degrees", above=0, maximum=89.999),
+            "flip": boolean("chamfer: swap the two faces' distances", default=False),
+        },
+        ["kind"],
+    ),
+    ops=["sf_surface_modify", "use_body"],
+    steps=_steps_surface_modify,
+    extra=_extra_surface_modify,
+    id_base="SurfaceModify",
+    title_fn=lambda a: "AI: Surface %s" % str(a.get("kind", "")).replace("_", " "),
+    examples=[
+        example(
+            {
+                "kind": "fillet",
+                "edges": {"parallel": [0, 0, 1], "count": 4},
+                "radius": 3,
+            },
+            "round the four vertical corners of an open box of surfaces",
+        ),
+        example(
+            {"kind": "press_pull", "faces": {"normal": [0, 0, 1], "count": 1}, "distance": -5},
+            "push the box's floor 5 mm down (the walls grow)",
+        ),
+        example(
+            {"kind": "merge", "faces": {"parallel": [0, 1, 0], "count": 2}},
+            "two faces in one plane become one face",
+        ),
+    ],
+)
+
 # -- CONSTRUCT ----------------------------------------------------------------------------------
 PLANE_PRESETS = (
     "OffsetPlane",

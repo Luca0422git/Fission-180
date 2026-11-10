@@ -8,6 +8,38 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.3.3.9
+
+### New
+
+- **Pattern and Mirror of several bodies at once.** Select several bodies (a box round them,
+  Ctrl-clicks in the browser, or clicks while the dialog is open) and Rectangular Pattern,
+  Circular Pattern, Pattern on Path and Mirror copy every one of them in one timeline step, as
+  in Fusion. In the dialog a click adds a body and a click on a picked one drops it. Mirror
+  with Operation Join joins each body with its own mirror image. Changing the quantity later
+  keeps the copy bodies already made; deleting one of the original bodies keeps its copies as
+  they were, and the step says why. The AI can do it too (`bodies` in its pattern tools).
+- **The AI chat shows its answers word by word**, as they arrive, like Claude's and ChatGPT's
+  own apps: Claude, ChatGPT, Gemini and local models (Ollama, LM Studio). Stop ends an answer
+  at once, even in the middle of a sentence; the words already shown stay. If the connection
+  drops in the middle of an answer, the chat says so. A local server that cannot stream works
+  as before. The conversation keeps its newest lines in view unless you scrolled up to read.
+- **The AI can use the SHEET METAL tab:** sheet metal rules, Flange (base, contour, edge),
+  Lofted Flange, Bend, Hem, Join by Bend, Corner Closure, sheet metal Fillet and Chamfer,
+  Convert to Sheet Metal, Unfold, Refold, Rip and Create Flat Pattern. It also tells you how
+  big the flat sheet is, lists its bends, and saves the flat pattern as a DXF for a laser
+  cutter.
+- **The AI can use the PLASTIC tab:** Assign Plastic Rule (and change the rule), Boss with its
+  screws, Rest, Snap Fit, Lip and Groove, and Design Advice (it only reads your part and lists
+  moulding problems).
+- **The AI can Fillet, Chamfer, Press Pull, Delete and Merge on surface bodies,** and change all
+  of these steps afterwards, as a double-click in the timeline does.
+
+### Fixed
+
+- **The thin outline frame next to right-side panels** has been gone since 0.1.0-beta.3.3.5; a
+  test now makes sure it stays gone, and it is off the known issues.
+
 ## 0.1.0-beta.3.3.8
 
 ### Fixed

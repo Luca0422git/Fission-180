@@ -12,7 +12,7 @@ List every tool by category with its Fusion command, whether it changes the desi
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `category` | `help` \| `document` \| `inspect` \| `sketch` \| `create` \| `modify` \| `surface` \| `construct` \| `assemble` \| `timeline` \| `parameters` \| `import_export` \| `drawing` \| `view` |  |  |  |  |
+| `category` | `help` \| `document` \| `inspect` \| `sketch` \| `create` \| `modify` \| `surface` \| `construct` \| `assemble` \| `timeline` \| `parameters` \| `import_export` \| `drawing` \| `view` \| `simulate` \| `rebuild` \| `sheet_metal` \| `plastic` |  |  |  |  |
 
 ## Answer
 

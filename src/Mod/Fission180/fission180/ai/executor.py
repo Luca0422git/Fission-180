@@ -484,7 +484,7 @@ class Context:
         builder = self.builder(doc)
         step_id = self.new_id(self.entry["id_base"] or DEFAULT_IDS.get(self.tool, "Step"))
         steps = catalog.to_steps(self.tool, self.args, step_id)
-        steps = [_at_marker(doc, s) for s in steps]
+        steps = [_prepared(doc, builder, s) for s in steps]
         before = _broken(doc)
         shapes_before = shape_signature(doc) if self.tool not in KEEPS_SHAPES else None
         limited = bool(value_fit.candidates(self.tool, self.args))
@@ -495,7 +495,8 @@ class Context:
             if args is None:
                 break
             self.args = args
-            steps = [_at_marker(doc, s) for s in catalog.to_steps(self.tool, args, step_id)]
+            steps = catalog.to_steps(self.tool, args, step_id)
+            steps = [_prepared(doc, builder, s) for s in steps]
             began = time.perf_counter()  # (one try: the one with the ids)
             failed = self._run_steps(doc, builder, steps, step_id, before, shapes_before, limited)
         if failed is not None:
@@ -515,7 +516,8 @@ class Context:
                 return bridge_core.error_result("Not done (%s): %s" % (self.title, text))
             # changed nothing and no smaller value helps: built as asked, with the warning
             # below (as before value_fit)
-            steps = [_at_marker(doc, s) for s in catalog.to_steps(self.tool, self.args, step_id)]
+            steps = catalog.to_steps(self.tool, self.args, step_id)
+            steps = [_prepared(doc, builder, s) for s in steps]
             failed = self._run_steps(doc, builder, steps, step_id, before, shapes_before, False)
             if failed is not None:
                 return bridge_core.error_result("Not done (%s): %s" % (self.title, failed[0]))
@@ -597,7 +599,7 @@ class Context:
         doc.openTransaction("AI: trying a value")
         try:
             steps = catalog.to_steps(self.tool, args, step_id)
-            for step in [_at_marker(doc, s) for s in steps]:
+            for step in [_prepared(doc, builder, s) for s in steps]:
                 builder.run(step)
             ok = (
                 not broke_text(doc, before)
@@ -732,6 +734,91 @@ def _at_marker(doc, step):
     return out
 
 
+def _prepared(doc, builder, step):
+    """A step as the builder runs it: at the history marker (_at_marker), its edge picks given
+    as selectors turned into points (_picked_points)."""
+    return _picked_points(builder, _at_marker(doc, step))
+
+
+# The sheet metal steps of fission180/ai/ops/sheetmetal_ops.py take each edge as a point on it
+# ([x, y, z]); their AI tools also take a selector there, like every other tool's: it becomes
+# the middle point of each edge it picks on the body the step works on, just before the step
+# is built. op -> [(key, one edge only, the point in design coordinates (else the body's own,
+# as sf_flange's edges are read))]; "sets": the rows' edges (sheet metal Fillet / Chamfer).
+_POINT_PICKS = {
+    "sf_flange": (("edges", False, False),),
+    "sf_sm_hem": (("edges", False, True),),
+    "sf_sm_corner_closure": (("dominant", True, True), ("submissive", True, True)),
+    "sf_sm_join_bend": (("first", True, True), ("second", True, True)),
+    "sf_sm_fillet": (("sets", False, True),),
+    "sf_sm_chamfer": (("sets", False, True),),
+}
+
+
+def _picked_points(builder, step):
+    """The step with every edge selector of _POINT_PICKS turned into points (a copy; the step
+    itself when it has none). Raises UserError, in words, when a selector picks nothing or
+    more than its one edge."""
+    keys = _POINT_PICKS.get(step.get("op"))
+    if not keys:
+        return step
+    out = dict(step)
+    for key, one, design in keys:
+        value = out.get(key)
+        if key == "sets" and isinstance(value, list):
+            rows = []
+            for i, row in enumerate(value):
+                if isinstance(row, dict) and isinstance(row.get("edges"), dict):
+                    where = "sets[%d].edges" % i
+                    row = dict(row, edges=_edge_points(builder.body, row["edges"], where, design))
+                rows.append(row)
+            out["sets"] = rows
+        elif isinstance(value, dict):
+            body = builder.body
+            if key == "second":  # (Join by Bend: an edge of the other body)
+                from .. import bodies
+
+                other = builder.objects.get(step.get("other"))
+                body = other if bodies.is_body(other) else bodies.body_of(other)
+                if body is None:
+                    raise UserError(
+                        "Not done: other must name a step of the other sheet metal body."
+                    )
+            points = _edge_points(body, value, key, design)
+            if one and len(points) != 1:
+                raise UserError(
+                    "Not done: %s must pick one edge; its selector picked %d (give count: 1)."
+                    % (key, len(points))
+                )
+            out[key] = points[0] if one else points
+    return out
+
+
+def _edge_points(body, selector, where, design):
+    """[[x, y, z]] the middle point of every edge the selector picks on the body's last step."""
+    from .ops import selectors
+
+    tip = getattr(body, "Tip", None) if body is not None else None
+    if tip is None or tip.Shape.isNull():
+        raise UserError("Not done: there is no sheet metal body here to pick %s on yet." % where)
+    shape = tip.Shape
+    try:
+        names = selectors.select(shape, selector, "edges")
+    except Exception as exc:
+        raise UserError("Not done: %s: %s." % (where, _plain(exc).rstrip(".")))
+    if not names:
+        raise UserError("Not done: %s picks no edge of %s." % (where, body.Label))
+    place = body.getGlobalPlacement() if design else None
+    points = []
+    for name in names:
+        edge = shape.getElement(name)
+        point = edge.valueAt((edge.FirstParameter + edge.LastParameter) / 2.0)
+        if place is not None:
+            point = place.multVec(point)
+        points.append([point.x, point.y, point.z])
+    return points
+
+
 _NOT_IDS = ("label", "name", "text", "title", "comment", "description", "value", "expression")
 
 
@@ -823,6 +910,8 @@ KEEPS_SHAPES = frozenset(
         "copy_component",
         "pattern_components",
         "insert_hardware",
+        "surface_modify",  # (surface bodies are no solids: their area and faces change)
+        "convert_to_sheet_metal",  # (the solid stays as it is: it becomes sheet metal)
     )
 )
 NOTHING_CHANGED = (

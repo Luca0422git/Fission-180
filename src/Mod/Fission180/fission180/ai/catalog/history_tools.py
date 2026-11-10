@@ -66,7 +66,10 @@ define(
     "operation, through_all...; revolve: angle, type, direction, operation; fillet / chamfer: "
     "radius, distance...; hole: diameter, depth, extent, hole_type...; patterns: quantity, "
     "distance, angle...; shell, draft, scale, sweep, loft, rib, primitives, coil, pipe, gear, "
-    "hardware, emboss, thread, surface, combine, split, move, align, construction planes...). "
+    "hardware, emboss, thread, surface, combine, split, move, align, construction planes...; "
+    "sheet metal flange: height, angle, distance, position, datum, width_type...; bend, hem, "
+    "corner closure, lofted flange, snap fit, lip, surface modify: the options get_step "
+    "lists). "
     "A fillet or chamfer also takes add_edges / add_faces (more edges). The steps after it "
     "update and keep their faces and edges; steps that break are named in the answer. An "
     "option name the step does not have is refused with the names it has (get_step's values "
@@ -104,6 +107,11 @@ define(
         "move_face_edit",
         "sf_gear_edit",
         "sf_hardware_edit",
+        "sf_flange_edit",
+        "sf_sm_more_edit",
+        "sf_snap_fit_edit",
+        "sf_lip_edit",
+        "sf_surface_modify_edit",
     ],
     title_fn=lambda a: "AI: Edit %s" % a.get("step", "step"),
     examples=[
@@ -843,6 +851,10 @@ define(
                         "import_export",
                         "drawing",
                         "view",
+                        "simulate",
+                        "rebuild",
+                        "sheet_metal",
+                        "plastic",
                     )
                 ]
             )

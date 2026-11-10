@@ -16,6 +16,7 @@ Fusion's Rectangular Pattern dialog: repeat features (step ids), faces or the wh
 | `features` | array of strings |  |  | at least 1 item(s) | Pattern Type Features: the steps to repeat |
 | `faces` | object |  |  |  | Pattern Type Faces: faces of the part to repeat (a face selector: filters type, normal, along, radius, at, all, count, any_of; see get_help topic selectors). Give count. |
 | `body` | boolean |  |  |  | Pattern Type Bodies: the whole current body (the copies are new bodies) |
+| `bodies` | array of strings |  |  | at least 1 item(s) | Pattern Type Bodies of several bodies at once: a step id in each body (one step, every body copied; Mirror join: each body joined with its own mirror image) |
 | `expressions` | object |  |  |  | {field: formula}: a parameter or formula typed in a field (it keeps driving it) |
 | `suppressed` | array of integers |  |  |  | copies left out, by their number among the copies (Suppression) |
 | `compute` | `optimized` \| `identical` \| `adjust` |  |  |  | Compute Option |

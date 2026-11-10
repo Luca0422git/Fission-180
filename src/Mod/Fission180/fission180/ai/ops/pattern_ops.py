@@ -8,6 +8,8 @@ What is patterned (exactly one):
   "faces": <face selector>    faces of the part as it is now (Pattern Type Faces)
   "body": true                the whole body (Pattern Type Bodies: the copies are new bodies;
                               the model is then measured over every body)
+  "bodies": ["e1", "e7"]      several bodies, by a step id in each (one step, every body
+                              copied; Mirror join: each body joined with its own image)
 
   {"op": "rectangular_pattern", "id": "p1", <what>, "direction": "X" | {"edge": sel} |
    {"face": sel}, "quantity": 3, "distance": 40, "distribution": "extent" | "spacing",
@@ -32,7 +34,7 @@ What is patterned (exactly one):
 from . import selectors
 from .core import _AXIS_ROLE, _PLANE_ROLE, Builder, BuildError
 
-COMMON = ("features", "faces", "body", "comment", "expressions")
+COMMON = ("features", "faces", "body", "bodies", "comment", "expressions")
 VALUE_KEYS = (
     "quantity",
     "distance",
@@ -51,9 +53,25 @@ VALUE_KEYS = (
 
 
 def _objects(builder, step):
-    keys = [k for k in ("features", "faces", "body") if k in step]
+    keys = [k for k in ("features", "faces", "body", "bodies") if k in step]
     if len(keys) != 1:
-        raise BuildError("%s %r: give one of features, faces, body" % (step["op"], step["id"]))
+        raise BuildError(
+            "%s %r: give one of features, faces, body, bodies" % (step["op"], step["id"])
+        )
+    if "bodies" in step:
+        from fission180 import bodies
+
+        found = []
+        for name in step["bodies"]:
+            obj = builder.objects.get(name)
+            if obj is None:
+                raise BuildError("%s %r: unknown step %r" % (step["op"], step["id"], name))
+            body = bodies.body_of(obj) or (obj if bodies.is_body(obj) else None)
+            if body is None:
+                raise BuildError("%s %r: %r is not in a body" % (step["op"], step["id"], name))
+            if (body, "") not in found:
+                found.append((body, ""))
+        return "bodies", found
     if "features" in step:
         return "features", [(builder.objects[name], "") for name in step["features"]]
     if "faces" in step:

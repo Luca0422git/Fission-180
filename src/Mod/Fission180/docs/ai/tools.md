@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180 offers 131 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
+Fission 180 offers 154 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
 
 ## All tools
 
@@ -71,6 +71,7 @@ Fission 180 offers 131 tools to AI apps (through MCP, the built-in chat panel an
 | [`appearance`](fission180://docs/reference/appearance.md) | Appearance | Modify | SOLID > MODIFY > Appearance (A) | changes the design (one undo step) | an open design |
 | [`capture_design_history`](fission180://docs/reference/capture_design_history.md) | Capture design history | Timeline (history) | the design's menu: Capture Design History / Do Not Capture Design History | changes the design (one undo step), destructive | an open design |
 | [`surface`](fission180://docs/reference/surface.md) | Surface | Surface | SURFACE > CREATE / MODIFY (Extrude, Revolve, Sweep, Loft, Patch, Ruled, Offset, Boundary Fill, Thicken, Trim, Untrim, Extend, Stitch, Unstitch, Reverse Normal) | changes the design (one undo step) | nothing |
+| [`surface_modify`](fission180://docs/reference/surface_modify.md) | Surface modify | Surface | SURFACE > MODIFY (Fillet, Chamfer, Press Pull, Delete, Merge on surface bodies) | changes the design (one undo step) | an open design |
 | [`construct_plane`](fission180://docs/reference/construct_plane.md) | Construction plane | Construct | SOLID > CONSTRUCT > (planes) | changes the design (one undo step) | an open design |
 | [`construct_axis`](fission180://docs/reference/construct_axis.md) | Construction axis | Construct | SOLID > CONSTRUCT > (axes) | changes the design (one undo step) | an open design |
 | [`construct_point`](fission180://docs/reference/construct_point.md) | Construction point | Construct | SOLID > CONSTRUCT > (points) | changes the design (one undo step) | an open design |
@@ -139,6 +140,28 @@ Fission 180 offers 131 tools to AI apps (through MCP, the built-in chat panel an
 | [`describe_reference`](fission180://docs/reference/describe_reference.md) | Describe reference | Rebuild with a timeline | Browser: right-click a body > Rebuild with Timeline (AI)... (beyond Fusion) | read-only | an open design, a rebuild going on (start_rebuild) |
 | [`compare_to_reference`](fission180://docs/reference/compare_to_reference.md) | Compare to reference | Rebuild with a timeline | Rebuild > Compare with Reference (beyond Fusion) | read-only | an open design, a rebuild going on (start_rebuild) |
 | [`finish_rebuild`](fission180://docs/reference/finish_rebuild.md) | Finish rebuild | Rebuild with a timeline | Rebuild > Finish Rebuild (beyond Fusion) | changes the design (one undo step), destructive | an open design, a rebuild going on (start_rebuild) |
+| [`sheet_metal_rule`](fission180://docs/reference/sheet_metal_rule.md) | Sheet metal rule | Sheet metal | SHEET METAL > MODIFY > Sheet Metal Rules | changes the design (one undo step) | an open design |
+| [`flange`](fission180://docs/reference/flange.md) | Flange | Sheet metal | SHEET METAL > CREATE > Flange | changes the design (one undo step) | an open design |
+| [`lofted_flange`](fission180://docs/reference/lofted_flange.md) | Lofted flange | Sheet metal | SHEET METAL > CREATE > Lofted Flange | changes the design (one undo step) | an open design |
+| [`bend`](fission180://docs/reference/bend.md) | Bend | Sheet metal | SHEET METAL > CREATE > Bend | changes the design (one undo step) | a solid body |
+| [`hem`](fission180://docs/reference/hem.md) | Hem | Sheet metal | SHEET METAL > CREATE > Hem | changes the design (one undo step) | a solid body |
+| [`join_by_bend`](fission180://docs/reference/join_by_bend.md) | Join by bend | Sheet metal | SHEET METAL > CREATE > Join by Bend | changes the design (one undo step) | a solid body |
+| [`corner_closure`](fission180://docs/reference/corner_closure.md) | Corner closure | Sheet metal | SHEET METAL > MODIFY > Corner Closure | changes the design (one undo step) | a solid body |
+| [`sheet_metal_fillet`](fission180://docs/reference/sheet_metal_fillet.md) | Sheet metal fillet | Sheet metal | SHEET METAL > MODIFY > Fillet | changes the design (one undo step) | a solid body |
+| [`sheet_metal_chamfer`](fission180://docs/reference/sheet_metal_chamfer.md) | Sheet metal chamfer | Sheet metal | SHEET METAL > MODIFY > Chamfer | changes the design (one undo step) | a solid body |
+| [`convert_to_sheet_metal`](fission180://docs/reference/convert_to_sheet_metal.md) | Convert to sheet metal | Sheet metal | SHEET METAL > MODIFY > Convert to Sheet Metal | changes the design (one undo step) | a solid body |
+| [`unfold`](fission180://docs/reference/unfold.md) | Unfold | Sheet metal | SHEET METAL > MODIFY > Unfold | changes the design (one undo step) | a solid body |
+| [`refold`](fission180://docs/reference/refold.md) | Refold | Sheet metal | SHEET METAL > MODIFY > Refold | changes the design (one undo step) | a solid body |
+| [`rip`](fission180://docs/reference/rip.md) | Rip | Sheet metal | SHEET METAL > MODIFY > Rip | changes the design (one undo step) | a solid body |
+| [`flat_pattern`](fission180://docs/reference/flat_pattern.md) | Create flat pattern | Sheet metal | SHEET METAL > CREATE > Create Flat Pattern | changes the design (one undo step) | a solid body |
+| [`export_flat_pattern`](fission180://docs/reference/export_flat_pattern.md) | Export flat pattern DXF | Sheet metal | FLAT PATTERN > EXPORT > Export DXF | writes files | a solid body |
+| [`plastic_rule`](fission180://docs/reference/plastic_rule.md) | Assign plastic rule | Plastic | PLASTIC > SETUP > Assign Plastic Rule / Manage Plastic Rules | changes the design (one undo step) | an open design |
+| [`boss`](fission180://docs/reference/boss.md) | Boss | Plastic | PLASTIC > CREATE > Boss | changes the design (one undo step) | a solid body |
+| [`boss_fastener`](fission180://docs/reference/boss_fastener.md) | Boss fastener | Plastic | PLASTIC > CREATE > Boss > Fastener: Create Component | changes the design (one undo step) | a solid body |
+| [`rest`](fission180://docs/reference/rest.md) | Rest | Plastic | PLASTIC > CREATE > Rest | changes the design (one undo step) | a solid body |
+| [`snap_fit`](fission180://docs/reference/snap_fit.md) | Snap fit | Plastic | PLASTIC > CREATE > Snap Fit | changes the design (one undo step) | a solid body |
+| [`lip`](fission180://docs/reference/lip.md) | Lip | Plastic | PLASTIC > CREATE > Lip | changes the design (one undo step) | a solid body |
+| [`design_advice`](fission180://docs/reference/design_advice.md) | Design advice | Plastic | PLASTIC > INSPECT > Design Advice | read-only | a solid body |
 
 ## Help
 
@@ -236,6 +259,35 @@ Fission 180 offers 131 tools to AI apps (through MCP, the built-in chat panel an
 ## Surface
 
 - [`surface`](fission180://docs/reference/surface.md): One of the SURFACE tab's tools (thin surface bodies with no volume; Thicken, Boundary Fill and Stitch make solids).
+- [`surface_modify`](fission180://docs/reference/surface_modify.md): The SURFACE tab's Fillet, Chamfer, Press Pull, Delete and Merge on a surface body (open faces, no volume, made with the surface tool; for a solid use fillet, chamfer, press_pull and delete_face).
+
+## Sheet metal
+
+- [`sheet_metal_rule`](fission180://docs/reference/sheet_metal_rule.md): Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): the thickness, bend radius, K factor, miter / rip / seam gap and the reliefs that every flange, bend and flat pattern of a body following it uses.
+- [`flange`](fission180://docs/reference/flange.md): Fusion's Flange, the sheet metal body maker, in the active sheet metal rule's thickness.
+- [`lofted_flange`](fission180://docs/reference/lofted_flange.md): Fusion's lofted flange: a sheet of the rule's thickness lofted between two profiles on separate planes (both open or both closed, lines and arcs only), like a square-to-round transition.
+- [`bend`](fission180://docs/reference/bend.md): Fusion's Bend: bend the active flat sheet metal body along sketch lines that lie across its top or bottom face (draw them in a sketch on that face, or on its plane).
+- [`hem`](fission180://docs/reference/hem.md): Fusion's Hem: fold sheet edges of the active sheet metal body back on themselves (safe edges, stiffening).
+- [`join_by_bend`](fission180://docs/reference/join_by_bend.md): Fusion's Join by Bend: one bend joins two sheet metal bodies of the same thickness into one (the active body keeps the step; the other is used up).
+- [`corner_closure`](fission180://docs/reference/corner_closure.md): Fusion's Corner Closure: close the open corner where two flanges of the active sheet metal body meet.
+- [`sheet_metal_fillet`](fission180://docs/reference/sheet_metal_fillet.md): Fusion's sheet metal fillet: round the corners of the active sheet metal body's plates, i.e.
+- [`sheet_metal_chamfer`](fission180://docs/reference/sheet_metal_chamfer.md): Fusion's sheet metal chamfer: chamfer the corners of the active sheet metal body's plates, i.e.
+- [`convert_to_sheet_metal`](fission180://docs/reference/convert_to_sheet_metal.md): Fusion's Convert to Sheet Metal: the active solid body, one sheet of even thickness (made with Shell, Extrude, or imported) with flat walls and round bends, becomes a sheet metal body (its walls the flanges, its round faces the bends) that unfold, rip and the flat pattern work on.
+- [`unfold`](fission180://docs/reference/unfold.md): Fusion's Unfold: lay some or all bends of the active sheet metal body flat in the timeline (the stationary face stays put), to cut holes and slots across the bends while they are flat; refold folds them back carrying the cuts.
+- [`refold`](fission180://docs/reference/refold.md): Fusion's Refold: fold the bends an unfold laid flat back up, carrying the holes and slots cut while flat onto the walls and bends.
+- [`rip`](fission180://docs/reference/rip.md): Fusion's Rip: open a closed or overlapping sheet (a tube, a box) of the active sheet metal body so it can be laid flat.
+- [`flat_pattern`](fission180://docs/reference/flat_pattern.md): Fusion's Create Flat Pattern: lay a sheet metal body (body; default the active one) flat from a stationary face, every bend developed with the rule's K factor; the flat pattern follows later changes of the folded part (one per component).
+- [`export_flat_pattern`](fission180://docs/reference/export_flat_pattern.md): Write a flat pattern as DXF for a laser or water-jet cutter (Fusion's Export DXF on the FLAT PATTERN tab): the outline and holes on their layers, the bend centre lines (up / down) and extent lines on theirs, with notes.
+
+## Plastic
+
+- [`plastic_rule`](fission180://docs/reference/plastic_rule.md): Assign a plastic rule to the design (Fusion's Assign Plastic Rule): the wall thickness, draft, radii, clearance and limits that Boss, Snap Fit, Lip, Rest and Design Advice start from, and the material the bodies get.
+- [`boss`](fission180://docs/reference/boss.md): Fusion's Boss: screw bosses joining two halves of a plastic part (an enclosure and its lid).
+- [`boss_fastener`](fission180://docs/reference/boss_fastener.md): Add the screws to an existing boss (the Boss dialog's Fastener > Create Component): a simple screw at every boss point in a component of its own, following the boss when it changes.
+- [`rest`](fission180://docs/reference/rest.md): Fusion's Rest: a flat landing on a curved or sloping plastic wall (for a label, a switch, a PCB standoff).
+- [`snap_fit`](fission180://docs/reference/snap_fit.md): Fusion's Snap Fit: a cantilever hook at each point between two bodies (a lid and its box) and the part it catches on the other body.
+- [`lip`](fission180://docs/reference/lip.md): Fusion's Lip (Lip, Groove or Lip And Groove): a lip on the rim of one half of a plastic part and the matching groove in the other half, so the two locate and seal.
+- [`design_advice`](fission180://docs/reference/design_advice.md): Fusion's Design Advice, read only: check plastic bodies for moulding problems against their plastic rule and say where: walls too thin or too thick (thickness), thickness that varies too much (variation), faces with too little draft for the pull direction (draft), knife edges (knife) and undercuts (undercut).
 
 ## Construct
 
@@ -261,7 +313,7 @@ Fission 180 offers 131 tools to AI apps (through MCP, the built-in chat panel an
 - [`capture_design_history`](fission180://docs/reference/capture_design_history.md): Turn the timeline on or off for the design (Fusion's Capture Design History).
 - [`get_timeline`](fission180://docs/reference/get_timeline.md): List the timeline in order: every step with its id, its name as the timeline shows it ("Extrude 2"), its kind, the body / component it belongs to, whether it is before the history marker (done) or after it (rolled_back), suppressed, its status (ok, warning, error, with the reason in plain words) and its main values (distance, radius, quantity...); plus where the history marker stands.
 - [`get_step`](fission180://docs/reference/get_step.md): Read one step's definition, the way its dialog shows it when you double-click it: its kind and every option (distances, angles, operation, what it is built on), the formulas that drive values, its status and what it uses.
-- [`edit_step`](fission180://docs/reference/edit_step.md): Change an existing step's options, as double-clicking it in the timeline: set {option: value} with the names get_step shows (extrude: distance, distance2, taper, direction, operation, through_all...; revolve: angle, type, direction, operation; fillet / chamfer: radius, distance...; hole: diameter, depth, extent, hole_type...; patterns: quantity, distance, angle...; shell, draft, scale, sweep, loft, rib, primitives, coil, pipe, gear, hardware, emboss, thread, surface, combine, split, move, align, construction planes...).
+- [`edit_step`](fission180://docs/reference/edit_step.md): Change an existing step's options, as double-clicking it in the timeline: set {option: value} with the names get_step shows (extrude: distance, distance2, taper, direction, operation, through_all...; revolve: angle, type, direction, operation; fillet / chamfer: radius, distance...; hole: diameter, depth, extent, hole_type...; patterns: quantity, distance, angle...; shell, draft, scale, sweep, loft, rib, primitives, coil, pipe, gear, hardware, emboss, thread, surface, combine, split, move, align, construction planes...; sheet metal flange: height, angle, distance, position, datum, width_type...; bend, hem, corner closure, lofted flange, snap fit, lip, surface modify: the options get_step lists).
 - [`roll_timeline`](fission180://docs/reference/roll_timeline.md): Move the timeline's history marker: to start (an empty design), end, previous / next (one step), or after / before a step.
 - [`suppress_step`](fission180://docs/reference/suppress_step.md): Suppress steps (they stay in the timeline but are skipped, as if they were not there) or bring them back (suppress: false).
 - [`delete_step`](fission180://docs/reference/delete_step.md): Delete steps from the timeline (Fusion asks the same: steps that depend on them may break and are named in the answer).

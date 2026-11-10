@@ -7829,5 +7829,1810 @@
    "text": "Done: AI: Finish rebuild. Body001 is now the rebuilt part (id 'Body002') with 4 timeline steps; the original was deleted, the reference removed. Bodies now: Body001: 23497.3 mm3, 60 x 40 x 10 mm.",
    "is_error": false
   }
+ },
+ "sheet_metal_rule#1": {
+  "setup": "empty",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   }
+  ],
+  "args": {
+   "rule": "Steel 0.5",
+   "from": "Steel (mm)",
+   "set": {
+    "thickness": 0.5
+   },
+   "active": true
+  },
+  "note": "a 0.5 mm steel rule, the one the next flanges start with",
+  "answer": {
+   "text": "Done: AI: Sheet metal rule Steel 0.5. No solid body yet.\n{\n \"rule\": {\n  \"name\": \"Steel 0.5\",\n  \"units\": \"mm\",\n  \"thickness\": \"0.5\",\n  \"bend_radius\": \"Thickness\",\n  \"k_factor\": \"0.44\",\n  \"unfold_rule\": \"k_factor\",\n  \"miter_gap\": \"Thickness\",\n  \"bend_relief_shape\": \"round\",\n  \"bend_relief_width\": \"Thickness\",\n  \"bend_relief_depth\": \"Thickness / 2\",\n  \"bend_relief_remnant\": \"Thickness * 2\",\n  \"corner_relief_2bend_shape\": \"round\",\n  \"corner_relief_2bend_placement\": \"intersection\",\n  \"corner_relief_2bend_size\": \"Thickness * 4\",\n  \"corner_relief_3bend_shape\": \"round_with_radius\",\n  \"corner_relief_3bend_radius\": \"Thickness * 4\",\n  \"in_mm\": {\n   \"thickness\": 0.5,\n   \"bend_radius\": 0.5,\n   \"miter_gap\": 0.5,\n   \"bend_relief_width\": 0.5,\n   \"bend_relief_depth\": 0.25,\n   \"bend_relief_remnant\": 1.0,\n   \"corner_relief_2bend_size\": 2.0,\n   \"corner_relief_3bend_radius\": 2.0\n  }\n },\n \"active_rule\": \"Steel 0.5\",\n \"design_rules\": [\"Steel (mm)\", \"Steel 0.5\"],\n \"sheet_metal_bodies\": []\n}",
+   "is_error": false
+  }
+ },
+ "flange#1": {
+  "setup": "sm_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   }
+  ],
+  "args": {
+   "kind": "edge",
+   "edges": {
+    "type": "line",
+    "at": {
+     "axis": "z",
+     "value": "max"
+    },
+    "count": 4
+   },
+   "height": 15
+  },
+  "note": "15 mm walls on the four top edges of a 1 mm plate: an open tray",
+  "answer": {
+   "text": "Done: AI: Flange (edge). Its id is 'Flange2'. Bodies now: Body1: 3645.43 mm3, 50 x 30 x 16 mm.",
+   "is_error": false
+  }
+ },
+ "lofted_flange#1": {
+  "setup": "sm_square_round",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -20,
+        -20,
+        20,
+        20
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 30,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "profile1": "Sketch1",
+   "profile2": "Sketch2",
+   "value": 0.5
+  },
+  "note": "a square-to-round transition, its facets within 0.5 mm of the circle",
+  "answer": {
+   "text": "Done: AI: Lofted flange. Its id is 'LoftedFlange1'. Bodies now: Body2: 3867.85 mm3, 41.81 x 41.86 x 30 mm.",
+   "is_error": false
+  }
+ },
+ "bend#1": {
+  "setup": "sm_bend_line",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        100,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 1,
+     "geometry": [
+      {
+       "line": [
+        50,
+        -5,
+        50,
+        45
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "lines": "Sketch2",
+   "stationary": [
+    10,
+    20,
+    1
+   ],
+   "angle": 90
+  },
+  "note": "fold the right half of a plate up along the line x = 50",
+  "answer": {
+   "text": "Done: AI: Bend 90 deg. Its id is 'Bend1'. Bodies now: Body1: 4003.77 mm3, 50.87 x 40 x 50.87 mm.",
+   "is_error": false
+  }
+ },
+ "hem#1": {
+  "setup": "sm_wall",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "edge",
+     "edges": [
+      [
+       50,
+       15,
+       1
+      ]
+     ],
+     "height": 20
+    }
+   }
+  ],
+  "args": {
+   "edges": [
+    [
+     50,
+     15,
+     21
+    ]
+   ],
+   "type": "open"
+  },
+  "note": "an open hem on the top edge of a 20 mm wall",
+  "answer": {
+   "text": "Done: AI: Hem (open). Its id is 'Hem1'. Bodies now: Body1: 2196.37 mm3, 51.5 x 30 x 21 mm.",
+   "is_error": false
+  }
+ },
+ "join_by_bend#1": {
+  "setup": "sm_two_plates",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "YZ",
+     "offset": 60,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        5,
+        60,
+        45
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch2"
+    }
+   }
+  ],
+  "args": {
+   "first": [
+    60,
+    40,
+    5
+   ],
+   "other": "Flange1",
+   "second": [
+    50,
+    20,
+    1
+   ]
+  },
+  "note": "join a standing plate to a flat one with one bend",
+  "answer": {
+   "text": "Done: AI: Join by bend. Its id is 'JoinByBend1'. Bodies now: Body1: 2000 mm3, 50 x 40 x 1 mm; Body2: 3887.12 mm3, 61 x 60 x 45 mm.",
+   "is_error": false
+  }
+ },
+ "corner_closure#1": {
+  "setup": "sm_notched",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "polyline": [
+        [
+         0,
+         0
+        ],
+        [
+         100,
+         0
+        ],
+        [
+         100,
+         55
+        ],
+        [
+         95,
+         55
+        ],
+        [
+         95,
+         60
+        ],
+        [
+         0,
+         60
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "edge",
+     "edges": [
+      [
+       100,
+       20,
+       1
+      ]
+     ],
+     "height": 20
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "edge",
+     "edges": [
+      [
+       50,
+       60,
+       1
+      ]
+     ],
+     "height": 20
+    }
+   }
+  ],
+  "args": {
+   "dominant": [
+    100,
+    55,
+    12
+   ],
+   "submissive": [
+    95,
+    60,
+    12
+   ],
+   "gap": 1
+  },
+  "note": "close the corner between two flanges, 1 mm apart",
+  "answer": {
+   "text": "Done: AI: Corner closure. Its id is 'CornerClosure1'. Bodies now: Body1: 9041.44 mm3, 100 x 60 x 21 mm.",
+   "is_error": false
+  }
+ },
+ "sheet_metal_fillet#1": {
+  "setup": "sm_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   }
+  ],
+  "args": {
+   "edges": {
+    "type": "line",
+    "parallel": [
+     0,
+     0,
+     1
+    ],
+    "count": 4
+   },
+   "radius": 5
+  },
+  "note": "round the plate's four corners",
+  "answer": {
+   "text": "Done: AI: Sheet metal fillet 5 mm. Its id is 'SheetMetalFillet1'. Bodies now: Body1: 1478.54 mm3, 50 x 30 x 1 mm.",
+   "is_error": false
+  }
+ },
+ "sheet_metal_chamfer#1": {
+  "setup": "sm_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   }
+  ],
+  "args": {
+   "edges": {
+    "type": "line",
+    "parallel": [
+     0,
+     0,
+     1
+    ],
+    "count": 4
+   },
+   "distance": 3
+  },
+  "note": "chamfer the plate's four corners",
+  "answer": {
+   "text": "Done: AI: Sheet metal chamfer 3 mm. Its id is 'SheetMetalChamfer1'. Bodies now: Body1: 1482 mm3, 50 x 30 x 1 mm.",
+   "is_error": false
+  }
+ },
+ "convert_to_sheet_metal#1": {
+  "setup": "sm_channel",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XZ",
+     "geometry": [
+      {
+       "polyline": [
+        [
+         0,
+         30
+        ],
+        [
+         0,
+         0
+        ],
+        [
+         60,
+         0
+        ],
+        [
+         60,
+         30
+        ],
+        [
+         59,
+         30
+        ],
+        [
+         59,
+         1
+        ],
+        [
+         1,
+         1
+        ],
+        [
+         1,
+         30
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       1,
+       0
+      ],
+      "at": {
+       "axis": "z",
+       "value": 0
+      },
+      "count": 2
+     },
+     "radius": 2
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       1,
+       0
+      ],
+      "at": {
+       "axis": "z",
+       "value": 1
+      },
+      "count": 2
+     },
+     "radius": 1
+    }
+   }
+  ],
+  "args": {
+   "face": {
+    "type": "plane",
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "min"
+    },
+    "count": 1
+   }
+  },
+  "note": "an even 1 mm U channel becomes sheet metal",
+  "answer": {
+   "text": "Done: AI: Convert to sheet metal. Its id is 'ConvertToSheetMetal1'. Bodies now: Body1: 2334.25 mm3, 60 x 20 x 30 mm.",
+   "is_error": false
+  }
+ },
+ "unfold#1": {
+  "setup": "sm_channel_converted",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XZ",
+     "geometry": [
+      {
+       "polyline": [
+        [
+         0,
+         30
+        ],
+        [
+         0,
+         0
+        ],
+        [
+         60,
+         0
+        ],
+        [
+         60,
+         30
+        ],
+        [
+         59,
+         30
+        ],
+        [
+         59,
+         1
+        ],
+        [
+         1,
+         1
+        ],
+        [
+         1,
+         30
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       1,
+       0
+      ],
+      "at": {
+       "axis": "z",
+       "value": 0
+      },
+      "count": 2
+     },
+     "radius": 2
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       1,
+       0
+      ],
+      "at": {
+       "axis": "z",
+       "value": 1
+      },
+      "count": 2
+     },
+     "radius": 1
+    }
+   },
+   {
+    "tool": "convert_to_sheet_metal",
+    "args": {
+     "face": {
+      "type": "plane",
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "at": {
+       "axis": "z",
+       "value": "min"
+      },
+      "count": 1
+     }
+    }
+   }
+  ],
+  "args": {
+   "face": {
+    "type": "plane",
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "min"
+    },
+    "count": 1
+   },
+   "all": true
+  },
+  "note": "lay both bends of the channel flat, its floor staying where it is",
+  "answer": {
+   "text": "Done: AI: Unfold. Its id is 'Unfold1'. Bodies now: Body1: 2330.48 mm3, 116.5 x 20 x 1 mm.",
+   "is_error": false
+  }
+ },
+ "refold#1": {
+  "setup": "sm_unfolded",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XZ",
+     "geometry": [
+      {
+       "polyline": [
+        [
+         0,
+         30
+        ],
+        [
+         0,
+         0
+        ],
+        [
+         60,
+         0
+        ],
+        [
+         60,
+         30
+        ],
+        [
+         59,
+         30
+        ],
+        [
+         59,
+         1
+        ],
+        [
+         1,
+         1
+        ],
+        [
+         1,
+         30
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       1,
+       0
+      ],
+      "at": {
+       "axis": "z",
+       "value": 0
+      },
+      "count": 2
+     },
+     "radius": 2
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       1,
+       0
+      ],
+      "at": {
+       "axis": "z",
+       "value": 1
+      },
+      "count": 2
+     },
+     "radius": 1
+    }
+   },
+   {
+    "tool": "convert_to_sheet_metal",
+    "args": {
+     "face": {
+      "type": "plane",
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "at": {
+       "axis": "z",
+       "value": "min"
+      },
+      "count": 1
+     }
+    }
+   },
+   {
+    "tool": "unfold",
+    "args": {
+     "face": {
+      "type": "plane",
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "at": {
+       "axis": "z",
+       "value": "min"
+      },
+      "count": 1
+     },
+     "all": true
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        56,
+        -15,
+        61,
+        -5
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5,
+     "operation": "cut",
+     "direction": "symmetric"
+    }
+   }
+  ],
+  "args": {
+   "unfold": "Unfold1"
+  },
+  "note": "fold the channel up again, carrying the slot cut while it was flat",
+  "answer": {
+   "text": "Done: AI: Refold. Its id is 'Refold1'. Bodies now: Body1: 2283.31 mm3, 60 x 20 x 30 mm.",
+   "is_error": false
+  }
+ },
+ "rip#1": {
+  "setup": "sm_tube",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        40,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "fillet",
+    "args": {
+     "edges": {
+      "type": "line",
+      "parallel": [
+       0,
+       0,
+       1
+      ],
+      "count": 4
+     },
+     "radius": 2
+    }
+   },
+   {
+    "tool": "shell",
+    "args": {
+     "faces": {
+      "any_of": [
+       {
+        "type": "plane",
+        "normal": [
+         0,
+         0,
+         1
+        ],
+        "count": 1
+       },
+       {
+        "type": "plane",
+        "normal": [
+         0,
+         0,
+         -1
+        ],
+        "count": 1
+       }
+      ]
+     },
+     "thickness": 1
+    }
+   },
+   {
+    "tool": "convert_to_sheet_metal",
+    "args": {
+     "face": {
+      "type": "plane",
+      "normal": [
+       0,
+       -1,
+       0
+      ],
+      "at": {
+       "axis": "y",
+       "value": "min"
+      },
+      "count": 1
+     }
+    }
+   }
+  ],
+  "args": {
+   "type": "face",
+   "face": {
+    "type": "cylinder",
+    "radius": 2,
+    "at": [
+     {
+      "axis": "x",
+      "value": "max"
+     },
+     {
+      "axis": "y",
+      "value": "max"
+     }
+    ],
+    "count": 1
+   }
+  },
+  "note": "cut one round corner out of a closed tube so it can be laid flat",
+  "answer": {
+   "text": "Done: AI: Rip (face). Its id is 'Rip1'. Bodies now: Body1: 2621.37 mm3, 40 x 30 x 20 mm.",
+   "is_error": false
+  }
+ },
+ "flat_pattern#1": {
+  "setup": "sm_tray",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "edge",
+     "edges": {
+      "type": "line",
+      "at": {
+       "axis": "z",
+       "value": "max"
+      },
+      "count": 4
+     },
+     "height": 15
+    }
+   }
+  ],
+  "args": {
+   "face": {
+    "type": "plane",
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "min"
+    },
+    "count": 1
+   }
+  },
+  "note": "the tray laid flat from its floor",
+  "answer": {
+   "text": "Done: AI: Create flat pattern. Its id is 'FlatPattern1': flat 78.5239 x 58.5239 mm, 4 bends. Bodies now: Body1: 3645.43 mm3, 50 x 30 x 16 mm.\n{\n \"id\": \"FlatPattern1\",\n \"label\": \"Flat Pattern\",\n \"body\": \"Body\",\n \"stationary_face\": \"Face5\",\n \"flat_size_mm\": [78.5239, 58.5239],\n \"bbox_mm\": [0.0, 0.0, -1.0, 78.5239, 58.5239, 0.0],\n \"thickness_mm\": 1.0,\n \"k_factor\": 0.44,\n \"volume_mm3\": 3553.4913,\n \"bends\": [\n  {\n   \"angle_deg\": 90.0,\n   \"inside_radius_mm\": 1.0,\n   \"direction\": \"up\",\n   \"allowance_mm\": 2.261947,\n   \"centre_line_mm\": [[15.969053492, 43.392920066], [62.554839929, 43.392920066]]\n  },\n  {\n   \"angle_deg\": 90.0,\n   \"inside_radius_mm\": 1.0,\n   \"direction\": \"up\",\n   \"allowance_mm\": 2.261947,\n   \"centre_line_mm\": [[63.392920066, 42.554839929], [63.392920066, 15.969053492]]\n  },\n  {\n   \"angle_deg\": 90.0,\n   \"inside_radius_mm\": 1.0,\n   \"direction\": \"up\",\n   \"allowance_mm\": 2.261947,\n   \"centre_line_mm\": [[62.554839929, 15.130973355], [15.969053492, 15.130973355]]\n  },\n  {\n   \"angle_deg\": 90.0,\n   \"inside_radius_mm\": 1.0,\n   \"direction\": \"up\",\n   \"allowance_mm\": 2.261947,\n   \"centre_line_mm\": [[15.130973355, 15.969053492], [15.130973355, 42.554839929]]\n  }\n ]\n}",
+   "is_error": false
+  }
+ },
+ "export_flat_pattern#1": {
+  "setup": "sm_flat",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        50,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "base",
+     "profile": "Sketch1"
+    }
+   },
+   {
+    "tool": "flange",
+    "args": {
+     "kind": "edge",
+     "edges": {
+      "type": "line",
+      "at": {
+       "axis": "z",
+       "value": "max"
+      },
+      "count": 4
+     },
+     "height": 15
+    }
+   },
+   {
+    "tool": "flat_pattern",
+    "args": {
+     "face": {
+      "type": "plane",
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "at": {
+       "axis": "z",
+       "value": "min"
+      },
+      "count": 1
+     }
+    }
+   }
+  ],
+  "args": {
+   "path": "{tmp}/tray-flat.dxf"
+  },
+  "note": "the tray's flat pattern as DXF for a laser cutter",
+  "answer": {
+   "text": "Exported /home/me/fission180/tray-flat.dxf: the flat pattern of Body1, 78.5239 x 58.5239 mm, 4 bends (outline and holes, bend lines on their own layers).",
+   "is_error": false
+  }
+ },
+ "plastic_rule#1": {
+  "setup": "empty",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   }
+  ],
+  "args": {
+   "rule": "PC 2 mm"
+  },
+  "note": "polycarbonate, 2 mm walls",
+  "answer": {
+   "text": "Done: AI: Plastic rule PC 2 mm. No solid body yet.\n{\n \"rule\": {\n  \"name\": \"PC 2 mm\",\n  \"units\": \"mm\",\n  \"material\": \"Polycarbonate\",\n  \"thickness\": \"2.0\",\n  \"draft_angle\": \"1.0\",\n  \"nominal_radius\": \"Thickness / 2\",\n  \"reveal_height\": \"Thickness / 2\",\n  \"clearance\": \"0.1\",\n  \"minimum_thickness\": \"1.0\",\n  \"maximum_thickness\": \"3.8\",\n  \"thickness_variation\": \"25\",\n  \"minimum_draft_angle\": \"0.5\",\n  \"knife_edge_threshold\": \"Thickness / 4\",\n  \"values\": {\n   \"thickness\": 2.0,\n   \"nominal_radius\": 1.0,\n   \"reveal_height\": 1.0,\n   \"clearance\": 0.1,\n   \"minimum_thickness\": 1.0,\n   \"maximum_thickness\": 3.8,\n   \"knife_edge_threshold\": 0.5,\n   \"draft_angle\": 1.0,\n   \"thickness_variation\": 25.0,\n   \"minimum_draft_angle\": 0.5\n  }\n },\n \"assigned_to\": \"the design (its root component)\",\n \"design_rules\": [\"PC 2 mm\"]\n}",
+   "is_error": false
+  }
+ },
+ "boss#1": {
+  "setup": "pl_box_and_lid",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "shell",
+    "args": {
+     "faces": {
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "count": 1
+     },
+     "thickness": 2
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 10,
+     "operation": "new_body"
+    }
+   },
+   {
+    "tool": "shell",
+    "args": {
+     "faces": {
+      "normal": [
+       0,
+       0,
+       -1
+      ],
+      "count": 1
+     },
+     "thickness": 2
+    }
+   }
+  ],
+  "args": {
+   "points": [
+    [
+     10,
+     10
+    ],
+    [
+     50,
+     30
+    ]
+   ],
+   "plane": "XY",
+   "offset": 20,
+   "screw": 3
+  },
+  "note": "M3 bosses at two corners where the lid sits on the box",
+  "answer": {
+   "text": "Done: AI: Boss. Its id is 'Boss'. Bodies now: Body1: 13345.6 mm3, 60 x 40 x 20.85 mm; Body2: 8531.15 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "boss_fastener#1": {
+  "setup": "pl_bossed",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "shell",
+    "args": {
+     "faces": {
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "count": 1
+     },
+     "thickness": 2
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 10,
+     "operation": "new_body"
+    }
+   },
+   {
+    "tool": "shell",
+    "args": {
+     "faces": {
+      "normal": [
+       0,
+       0,
+       -1
+      ],
+      "count": 1
+     },
+     "thickness": 2
+    }
+   },
+   {
+    "tool": "boss",
+    "args": {
+     "points": [
+      [
+       10,
+       10
+      ],
+      [
+       50,
+       30
+      ]
+     ],
+     "plane": "XY",
+     "offset": 20
+    }
+   }
+  ],
+  "args": {
+   "boss": "Boss",
+   "head": "pan"
+  },
+  "note": "pan head screws in the bosses",
+  "answer": {
+   "text": "Done: AI: Boss fastener. Its id is 'Fastener' (shown as 'Fastener001'). Bodies now: Body1: 13345.6 mm3, 60 x 40 x 20.85 mm; Body2: 8531.15 mm3, 60 x 40 x 10 mm; Screw: 392.306 mm3, 46 x 26 x 22.35 mm.",
+   "is_error": false
+  }
+ },
+ "rest#1": {
+  "setup": "pl_closed_box",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 2,
+     "geometry": [
+      {
+       "rect": [
+        2,
+        2,
+        58,
+        38
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 16,
+     "operation": "cut"
+    }
+   }
+  ],
+  "args": {
+   "rect": [
+    20,
+    10,
+    40,
+    30
+   ],
+   "plane": "XY",
+   "offset": -3,
+   "thickness": 2,
+   "draft": 0
+  },
+  "note": "a pad 3 mm below the floor of a hollow box",
+  "answer": {
+   "text": "Done: AI: Rest. Its id is 'Rest1'. Bodies now: Body1: 16176 mm3, 60 x 40 x 23 mm.",
+   "is_error": false
+  }
+ },
+ "snap_fit#1": {
+  "setup": "pl_box_flat_lid",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 20
+    }
+   },
+   {
+    "tool": "shell",
+    "args": {
+     "faces": {
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "count": 1
+     },
+     "thickness": 2
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 2,
+     "operation": "new_body"
+    }
+   }
+  ],
+  "args": {
+   "points": [
+    [
+     58,
+     20
+    ]
+   ],
+   "plane": "XY",
+   "offset": 20,
+   "length": 12,
+   "width": 6
+  },
+  "note": "a hook under the lid catching in the box's right-hand wall",
+  "answer": {
+   "text": "Done: AI: Snap fit (parallel). Its id is 'SnapFit1'. Bodies now: Body1: 11690.2 mm3, 60 x 40 x 20 mm; Body2: 4954.65 mm3, 60 x 40 x 14 mm.",
+   "is_error": false
+  }
+ },
+ "lip#1": {
+  "setup": "pl_cylinder",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "cylinder",
+     "plane": "XY",
+     "diameter": 16,
+     "height": 10
+    }
+   }
+  ],
+  "args": {
+   "edges": {
+    "type": "circle",
+    "at": {
+     "axis": "z",
+     "value": "max"
+    },
+    "count": 1
+   },
+   "type": "lip",
+   "lip_width": 1,
+   "lip_height": 1
+  },
+  "note": "a 1 x 1 mm lip on the cylinder's top rim",
+  "answer": {
+   "text": "Done: AI: Lip (lip). Its id is 'Lip1'. Bodies now: Body1: 2056.92 mm3, 16 x 16 x 11 mm.",
+   "is_error": false
+  }
+ },
+ "design_advice#1": {
+  "setup": "pl_cylinder",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "cylinder",
+     "plane": "XY",
+     "diameter": 16,
+     "height": 10
+    }
+   }
+  ],
+  "args": {
+   "checks": [
+    "draft"
+   ]
+  },
+  "note": "faces without enough draft to come out of the mould along +Z",
+  "answer": {
+   "text": "{\n \"pull\": [0.0, 0.0, 1.0],\n \"checks\": [\"draft\"],\n \"summary\": \"Issues: Draft 1\",\n \"bodies\": [{\"id\": \"Body\", \"label\": \"Body1\", \"rule\": \"Default (mm)\"}],\n \"counts\": {\"draft\": 1},\n \"issues\": [\n  {\n   \"check\": \"Draft\",\n   \"body\": \"Body\",\n   \"element\": \"Face1\",\n   \"issue\": \"Draft 0.00 deg\",\n   \"center_mm\": [0.0, 0.0, 5.0],\n   \"ref\": {\"type\": \"cylinder\", \"radius\": 8.0, \"count\": 1, \"body\": \"Body\"}\n  }\n ],\n \"issues_listed\": \"1 of 1\"\n}",
+   "is_error": false
+  }
+ },
+ "surface_modify#1": {
+  "setup": "surface_box",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_curve_sketch",
+    "args": {
+     "plane": "XY",
+     "curves": [
+      {
+       "polyline": [
+        [
+         0,
+         0
+        ],
+        [
+         30,
+         0
+        ],
+        [
+         30,
+         20
+        ],
+        [
+         0,
+         20
+        ],
+        [
+         0,
+         0
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "surface",
+    "args": {
+     "kind": "extrude",
+     "refs": [
+      {
+       "sketch": "Sketch1",
+       "at": [
+        15,
+        0
+       ]
+      }
+     ],
+     "options": {
+      "distance": 10
+     }
+    }
+   },
+   {
+    "tool": "surface",
+    "args": {
+     "kind": "patch",
+     "refs": [
+      {
+       "sketch": "Sketch1",
+       "at": [
+        15,
+        0
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "surface",
+    "args": {
+     "kind": "stitch",
+     "refs": [
+      {
+       "step": "Surface1"
+      },
+      {
+       "step": "Surface2"
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "press_pull",
+   "faces": {
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "count": 1
+   },
+   "distance": -5
+  },
+  "note": "push the floor of an open box of surfaces 5 mm down: the walls grow",
+  "answer": {
+   "text": "Done: AI: Surface press pull. Its id is 'SurfacePressPull'. No solid body yet.",
+   "is_error": false
+  }
  }
 }

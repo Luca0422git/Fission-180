@@ -43,10 +43,6 @@ time you start it, but treat that as a safety net, not a plan.
   a small axis marker for every body, which needs a change to the compiled program. On such a
   robot the browser can take a second or so to catch up after Ctrl+Z.
   *Workaround:* none needed; once open, hovering, joints and Drive Joints are quick.
-- **The AI cannot use the SHEET METAL and PLASTIC tabs yet**, nor the SURFACE tab's Fillet,
-  Chamfer, Press Pull, Delete and Merge on surface bodies. Everything else you can do, it
-  can do. *Workaround:* make those steps yourself; the AI can carry on from there. Its tools
-  for them come next.
 
 ## Not built (yet)
 

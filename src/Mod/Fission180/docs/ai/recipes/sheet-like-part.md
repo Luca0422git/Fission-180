@@ -3,8 +3,10 @@
 Tags: sheet-metal, sheet, thin, thin-extrude, open-profile, bend, fillet_sets, hole, u-bracket
 
 A U-shaped bracket bent from 2 mm sheet: a 40 mm wide base with two 25 mm legs, 30 mm deep,
-inside bend radius 2 (outside 4) and a 5 mm hole in the base. Fission 180 has no sheet metal
-workspace yet; a thin extrude of an open profile with the bends rounded gives the same solid.
+inside bend radius 2 (outside 4) and a 5 mm hole in the base. This recipe builds it as a thin
+extrude of an open profile with the bends rounded, which gives the same solid; for a part that
+must unfold to a flat pattern, use the SHEET METAL tools instead (`sheet_metal_rule`,
+`flange`, `flat_pattern`).
 Every call was run by Fission 180's tests; `expect` is what the answer must contain.
 
 ## 1. The open profile, thin extruded

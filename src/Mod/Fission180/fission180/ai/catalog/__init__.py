@@ -15,8 +15,9 @@ The tools are defined in the modules below, grouped like Fusion's ribbon: core_t
 first sixteen, whose names and argument shapes never change), sketch_tools, create_tools,
 modify_tools, more_tools (surface, construct, assemble, inspect), history_tools
 (timeline, parameters, files, drawings, view, help), verify_tools (the tools an agent checks
-its own work with: inspect_design, query_geometry, check_design, render, diff_design) and
-docs_tools (the documentation: docs_search, docs_read, examples_search). There is no tool
+its own work with: inspect_design, query_geometry, check_design, render, diff_design),
+docs_tools (the documentation: docs_search, docs_read, examples_search), sheetmetal_tools and
+plastic_tools (the SHEET METAL and PLASTIC tabs). There is no tool
 that runs arbitrary code. Pure Python: no FreeCAD, no Qt (the MCP server an AI app starts
 imports it).
 """
@@ -34,6 +35,8 @@ from . import verify_tools  # noqa: F401  (checking: inspect_design, query_geome
 from . import docs_tools  # noqa: F401  (documentation: docs_search, docs_read, examples_search)
 from . import simulate_tools  # noqa: F401  (Static Stress simulation, beta 3)
 from . import rebuild_tools  # noqa: F401  (Auto Timeline: rebuild with a timeline, beta 3)
+from . import sheetmetal_tools  # noqa: F401  (the SHEET METAL tab)
+from . import plastic_tools  # noqa: F401  (the PLASTIC tab)
 from .kit import (  # noqa: F401  (the shared texts, re-exported)
     BODY_PICK_HELP,
     CURVES_HELP,
@@ -59,8 +62,19 @@ NAMEABLE = SKETCH_TOOLS + (
     "extrude", "revolve", "sweep", "loft", "primitive", "coil", "pipe", "gear", "surface",
     "insert_hardware", "mirror", "combine", "split_body", "silhouette_split", "move_copy",
     "new_body", "pattern", "rectangular_pattern", "circular_pattern", "pattern_on_path",
-    "import_file", "emboss", "rib", "web",
+    "import_file", "emboss", "rib", "web", "flange", "lofted_flange", "boss", "boss_fastener",
+    "rest", "snap_fit",
 )  # fmt: skip
+# Tools whose name goes to the sketch they draw for the step (and to the body they make, when
+# they make one) rather than to a new body: how their "name" argument is described.
+NAME_WHAT = {
+    "boss": "what this makes: its sketch of the boss points becomes \"<name> sketch\" (with "
+    "fastener, the screws' body \"<name>\")",
+    "boss_fastener": "the screws' new body",
+    "rest": "what this makes: its sketch of the rest's rectangle becomes \"<name> sketch\"",
+    "snap_fit": "what this makes: its sketch of the hook points becomes \"<name> sketch\"",
+    "flange": "the new body (base / contour with operation new_body or new_component)",
+}
 
 
 def _add_name_argument():
@@ -72,6 +86,7 @@ def _add_name_argument():
         if "name" in props:
             continue
         what = "the new sketch" if name in SKETCH_TOOLS else "the new body (several: numbered)"
+        what = NAME_WHAT.get(name, what)
         props["name"] = {
             "type": "string",
             "description": "a descriptive name for %s, e.g. \"Base plate\" (required in effect: "
@@ -117,38 +132,10 @@ TEST_ONLY_OPS = (
     "revolve",  # PartDesign's plain revolve (revolve builds Fission 180's, sf_revolve)
     "mirror",  # PartDesign's plain mirror (mirror builds Fusion's dialog, fusion_mirror)
 )
-# Ops a person can do that no tool builds YET (Luca, 2026-10-23, 0.1.0-beta.2: release the
-# SHEET METAL / PLASTIC / SURFACE part 4 steps from develop now, their AI tools next). Named
-# in docs/fission180/known-issues.md. Remove an op here when its tool lands (a unit test fails
-# while a tool lists an op that is still here).
-AI_TOOLS_TO_COME = (
-    "sf_sheet_rule",
-    "sf_flange",
-    "sf_flange_edit",
-    "sf_sm_bend",
-    "sf_sm_hem",
-    "sf_sm_join_bend",
-    "sf_sm_corner_closure",
-    "sf_sm_lofted_flange",
-    "sf_sm_fillet",
-    "sf_sm_chamfer",
-    "sf_sm_more_edit",
-    "sf_sm_convert",
-    "sf_flat_pattern",
-    "sf_unfold",
-    "sf_refold",
-    "sf_rip",
-    "sf_plastic_rule",
-    "sf_boss",
-    "sf_boss_fastener",
-    "sf_rest",
-    "sf_snap_fit",
-    "sf_snap_fit_edit",
-    "sf_lip",
-    "sf_lip_edit",
-    "sf_surface_modify",
-    "sf_surface_modify_edit",
-)
+# Ops a person can do that no tool builds YET, named in docs/fission180/known-issues.md. Remove
+# an op here when its tool lands (a unit test fails while a tool lists an op that is still here).
+# (Empty since the SHEET METAL, PLASTIC and SURFACE > MODIFY tools landed.)
+AI_TOOLS_TO_COME = ()
 
 
 def tool(name):

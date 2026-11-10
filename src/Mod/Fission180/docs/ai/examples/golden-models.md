@@ -832,63 +832,63 @@ Each model is listed under its first tag; its other tags follow it.
 | `roll` | `roll_timeline` | 9 | `blend_insert_chamfer_before_fillet`, `comp_move_captured_roll`, `extrude_multi_cut_timeline`, `extrude_multi_move`, `plastic2_snap_rolled_back` |
 | `rule_fillet` | `rule_fillet` | 3 | `fillet2_rule_all_edges`, `fillet2_rule_between_follows_edit`, `live_fillet2_rule_all_edges` |
 | `section_expect` | (a test helper) | 1 | `inspect_measure_section` |
-| `sf_boss` | (a test helper) | 9 | `plastic_boss_alignment_roots`, `plastic_boss_blends`, `plastic_boss_enclosure`, `plastic_boss_fastener`, `plastic_boss_hole_radii` |
-| `sf_boss_fastener` | (a test helper) | 1 | `plastic_boss_fastener` |
+| `sf_boss` | `boss` | 9 | `plastic_boss_alignment_roots`, `plastic_boss_blends`, `plastic_boss_enclosure`, `plastic_boss_fastener`, `plastic_boss_hole_radii` |
+| `sf_boss_fastener` | `boss_fastener` | 1 | `plastic_boss_fastener` |
 | `sf_coil` | `coil` | 13 | `sf_coil_basic`, `sf_coil_cut_block`, `sf_coil_edit_turns`, `sf_coil_old_narrow_upgraded`, `sf_coil_param_driven` |
 | `sf_curves` | `create_curve_sketch` | 97 | `extrude_thin_arc_center`, `extrude_thin_open_l`, `sf_loft_centerline_ends`, `sf_loft_centerline_torus`, `sf_loft_cone_point` |
 | `sf_draft` | `draft` | 13 | `sf_draft_cylinder`, `sf_draft_edit_angle`, `sf_draft_ellipse_wall`, `sf_draft_ellipse_wall_edit`, `sf_draft_ellipse_wall_flip` |
 | `sf_draft2` | `draft` | 5 | `modify2_draft_fixed_symmetric`, `modify2_draft_fixed_two_side`, `modify2_draft_parting_plane_two_side`, `modify2_draft_parting_sketch_one_side`, `modify2_draft_two_bodies` |
 | `sf_draft_edit` | `edit_step` | 2 | `sf_draft_edit_angle`, `sf_draft_ellipse_wall_edit` |
-| `sf_flange` | (a test helper) | 72 | `sheetmetal_base_flange_join`, `sheetmetal_base_flange_new_component`, `sheetmetal_base_flange_rect`, `sheetmetal_base_flange_side2_rule`, `sheetmetal_contour_flange_l` |
-| `sf_flange_edit` | (a test helper) | 5 | `sheetmetal_base_flange_side2_rule`, `sheetmetal_contour_flange_two_sides`, `sheetmetal_edge_flange_angle_edit`, `sheetmetal_edge_flange_bend_positions`, `sheetmetal_extrude_cut_then_edit` |
-| `sf_flat_pattern` | (a test helper) | 19 | `sm_flat_bend_box`, `sm_flat_bend_roundtrip`, `sm_flat_contour_flange`, `sm_flat_corner_closure`, `sm_flat_corner_closure_tangent` |
+| `sf_flange` | `flange` | 72 | `sheetmetal_base_flange_join`, `sheetmetal_base_flange_new_component`, `sheetmetal_base_flange_rect`, `sheetmetal_base_flange_side2_rule`, `sheetmetal_contour_flange_l` |
+| `sf_flange_edit` | `edit_step` | 5 | `sheetmetal_base_flange_side2_rule`, `sheetmetal_contour_flange_two_sides`, `sheetmetal_edge_flange_angle_edit`, `sheetmetal_edge_flange_bend_positions`, `sheetmetal_extrude_cut_then_edit` |
+| `sf_flat_pattern` | `flat_pattern` | 19 | `sm_flat_bend_box`, `sm_flat_bend_roundtrip`, `sm_flat_contour_flange`, `sm_flat_corner_closure`, `sm_flat_corner_closure_tangent` |
 | `sf_gear` | `gear` | 7 | `sf_gear_cut_block`, `sf_gear_edit_teeth`, `sf_gear_english`, `sf_gear_internal`, `sf_gear_join_block` |
 | `sf_gear_edit` | `edit_step` | 1 | `sf_gear_edit_teeth` |
 | `sf_hardware` | `insert_hardware` | 8 | `hardware_button_head_m4`, `hardware_countersunk_m4_on_rim`, `hardware_edit_length`, `hardware_insert_m3_hole`, `hardware_magnet_6x3_pocket` |
 | `sf_hardware_edit` | `edit_step` | 1 | `hardware_edit_length` |
-| `sf_lip` | (a test helper) | 11 | `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_face_guide`, `plastic2_lip_open_chain` |
-| `sf_lip_edit` | (a test helper) | 1 | `plastic2_lip_swap` |
+| `sf_lip` | `lip` | 11 | `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_face_guide`, `plastic2_lip_open_chain` |
+| `sf_lip_edit` | `edit_step` | 1 | `plastic2_lip_swap` |
 | `sf_loft` | `loft` | 22 | `sf_loft_centerline_ends`, `sf_loft_centerline_torus`, `sf_loft_closed_direction`, `sf_loft_cone_point`, `sf_loft_cut_cone` |
 | `sf_loft_edit` | `edit_step` | 3 | `sf_loft_edit_intersect`, `sf_loft_ends_direction_weight`, `sf_loft_merge_slot` |
 | `sf_path_sketch` | (a test helper) | 9 | `sf_join_away_new_body`, `sf_pipe_hollow_half`, `sf_pipe_old_upgraded`, `sf_pipe_param_driven`, `sf_pipe_ring_hollow` |
 | `sf_pipe` | `pipe` | 14 | `sf_join_away_new_body`, `sf_pipe_corner_hollow_cut`, `sf_pipe_corner_intersect`, `sf_pipe_corner_mitre_join`, `sf_pipe_edge_auto_join` |
-| `sf_plastic_rule` | (a test helper) | 2 | `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss` |
+| `sf_plastic_rule` | `plastic_rule` | 2 | `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss` |
 | `sf_primitive` | `primitive` | 31 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere`, `plastic2_lip_round_rim`, `plastic2_lip_tip_radius` |
 | `sf_primitive_edit` | `edit_step` | 3 | `sf_box_pocket_edit_join`, `sf_coil_edit_turns`, `sf_pipe_triangle_edit` |
-| `sf_refold` | (a test helper) | 1 | `sm_flat_unfold_cut_refold` |
-| `sf_rest` | (a test helper) | 3 | `plastic_rest_closed_box`, `plastic_rest_cut`, `plastic_rest_cylinder` |
+| `sf_refold` | `refold` | 1 | `sm_flat_unfold_cut_refold` |
+| `sf_rest` | `rest` | 3 | `plastic_rest_closed_box`, `plastic_rest_cut`, `plastic_rest_cylinder` |
 | `sf_revolve` | `revolve` | 20 | `modify2_replace_face_cone`, `sf_revolve_cone`, `sf_revolve_construction_follows`, `sf_revolve_cut_other_body`, `sf_revolve_cut_two_bodies` |
 | `sf_revolve_edit` | `edit_step` | 3 | `sf_revolve_edit_operation`, `sf_revolve_face_profile_follows`, `sf_revolve_to_then_angle` |
 | `sf_rib` | `rib`, `web` | 14 | `sf_rib_arc`, `sf_rib_depth`, `sf_rib_edit_thickness`, `sf_rib_far_from_origin`, `sf_rib_gusset` |
 | `sf_rib_edit` | `edit_step` | 3 | `sf_rib_edit_thickness`, `sf_web_not_extended`, `sf_web_one_side_flip` |
-| `sf_rip` | (a test helper) | 2 | `sm_flat_rip_points`, `sm_flat_rip_tube` |
+| `sf_rip` | `rip` | 2 | `sm_flat_rip_points`, `sm_flat_rip_tube` |
 | `sf_scale` | `scale` | 7 | `sf_scale_about_corner`, `sf_scale_corner_follows_edit`, `sf_scale_edit_factor`, `sf_scale_non_uniform`, `sf_scale_non_uniform_keeps_faces` |
 | `sf_scale_bodies` | `scale` | 1 | `modify2_scale_two_bodies` |
 | `sf_scale_edit` | `edit_step` | 2 | `sf_scale_edit_factor`, `sf_scale_non_uniform_keeps_faces` |
 | `sf_scale_sketch` | `scale` | 1 | `modify2_scale_sketch` |
 | `sf_scale_sketch_edit` | `edit_step` | 1 | `modify2_scale_sketch` |
-| `sf_sheet_rule` | (a test helper) | 6 | `sheetmetal_base_flange_side2_rule`, `sheetmetal_rule_edit_recomputes`, `sm_flat_k_factor`, `sm_flat_moved_body`, `sm_flat_thickness_change` |
+| `sf_sheet_rule` | `sheet_metal_rule` | 6 | `sheetmetal_base_flange_side2_rule`, `sheetmetal_rule_edit_recomputes`, `sm_flat_k_factor`, `sm_flat_moved_body`, `sm_flat_thickness_change` |
 | `sf_shell` | `shell` | 13 | `picks_shell_kept_on_taper`, `sf_draft_then_shell`, `sf_shell_both`, `sf_shell_both_edit_presspull`, `sf_shell_both_follows_extrude_edit` |
 | `sf_shell_bodies` | `shell` | 1 | `modify2_shell_two_bodies` |
 | `sf_shell_edit` | `edit_step` | 3 | `sf_shell_both_edit_presspull`, `sf_shell_edit_to_both`, `sf_shell_swap_presspull_follows` |
-| `sf_sm_bend` | (a test helper) | 14 | `sheetmetal_smm_bend_after_flange`, `sheetmetal_smm_bend_box`, `sheetmetal_smm_bend_center`, `sheetmetal_smm_bend_diagonal`, `sheetmetal_smm_bend_flip_start_45` |
-| `sf_sm_chamfer` | (a test helper) | 1 | `sheetmetal_smm_fillet_chamfer` |
-| `sf_sm_convert` | (a test helper) | 7 | `sm_flat_l_bracket`, `sm_flat_moved_body`, `sm_flat_rip_points`, `sm_flat_rip_tube`, `sm_flat_u_channel_hole` |
-| `sf_sm_corner_closure` | (a test helper) | 12 | `sheetmetal_smm_corner_closure`, `sheetmetal_smm_corner_closure_60`, `sheetmetal_smm_corner_closure_mitred`, `sheetmetal_smm_corner_closure_mitred_square`, `sheetmetal_smm_corner_closure_not_aligned` |
-| `sf_sm_fillet` | (a test helper) | 2 | `sheetmetal_smm_fillet_chamfer`, `sheetmetal_smm_reopen_all` |
-| `sf_sm_hem` | (a test helper) | 14 | `sheetmetal_smm_hem_after_bend`, `sheetmetal_smm_hem_beside_flange`, `sheetmetal_smm_hem_double`, `sheetmetal_smm_hem_edit_type`, `sheetmetal_smm_hem_flat` |
-| `sf_sm_join_bend` | (a test helper) | 3 | `sheetmetal_smm_join_bend`, `sheetmetal_smm_join_bend_below`, `sheetmetal_smm_join_bend_overlap` |
-| `sf_sm_lofted_flange` | (a test helper) | 4 | `sheetmetal_smm_lofted_brake`, `sheetmetal_smm_lofted_die`, `sheetmetal_smm_lofted_join`, `sheetmetal_smm_lofted_lines` |
-| `sf_sm_more_edit` | (a test helper) | 6 | `sheetmetal_smm_bend_diagonal`, `sheetmetal_smm_bend_flip_start_45`, `sheetmetal_smm_corner_closure_mitred_square`, `sheetmetal_smm_hem_edit_type`, `sheetmetal_smm_lofted_die` |
-| `sf_snap_fit` | (a test helper) | 9 | `plastic2_snap_distance`, `plastic2_snap_edit_taper`, `plastic2_snap_loop`, `plastic2_snap_parallel`, `plastic2_snap_perpendicular` |
-| `sf_snap_fit_edit` | (a test helper) | 1 | `plastic2_snap_edit_taper` |
+| `sf_sm_bend` | `bend` | 14 | `sheetmetal_smm_bend_after_flange`, `sheetmetal_smm_bend_box`, `sheetmetal_smm_bend_center`, `sheetmetal_smm_bend_diagonal`, `sheetmetal_smm_bend_flip_start_45` |
+| `sf_sm_chamfer` | `sheet_metal_chamfer` | 1 | `sheetmetal_smm_fillet_chamfer` |
+| `sf_sm_convert` | `convert_to_sheet_metal` | 7 | `sm_flat_l_bracket`, `sm_flat_moved_body`, `sm_flat_rip_points`, `sm_flat_rip_tube`, `sm_flat_u_channel_hole` |
+| `sf_sm_corner_closure` | `corner_closure` | 12 | `sheetmetal_smm_corner_closure`, `sheetmetal_smm_corner_closure_60`, `sheetmetal_smm_corner_closure_mitred`, `sheetmetal_smm_corner_closure_mitred_square`, `sheetmetal_smm_corner_closure_not_aligned` |
+| `sf_sm_fillet` | `sheet_metal_fillet` | 2 | `sheetmetal_smm_fillet_chamfer`, `sheetmetal_smm_reopen_all` |
+| `sf_sm_hem` | `hem` | 14 | `sheetmetal_smm_hem_after_bend`, `sheetmetal_smm_hem_beside_flange`, `sheetmetal_smm_hem_double`, `sheetmetal_smm_hem_edit_type`, `sheetmetal_smm_hem_flat` |
+| `sf_sm_join_bend` | `join_by_bend` | 3 | `sheetmetal_smm_join_bend`, `sheetmetal_smm_join_bend_below`, `sheetmetal_smm_join_bend_overlap` |
+| `sf_sm_lofted_flange` | `lofted_flange` | 4 | `sheetmetal_smm_lofted_brake`, `sheetmetal_smm_lofted_die`, `sheetmetal_smm_lofted_join`, `sheetmetal_smm_lofted_lines` |
+| `sf_sm_more_edit` | `edit_step` | 6 | `sheetmetal_smm_bend_diagonal`, `sheetmetal_smm_bend_flip_start_45`, `sheetmetal_smm_corner_closure_mitred_square`, `sheetmetal_smm_hem_edit_type`, `sheetmetal_smm_lofted_die` |
+| `sf_snap_fit` | `snap_fit` | 9 | `plastic2_snap_distance`, `plastic2_snap_edit_taper`, `plastic2_snap_loop`, `plastic2_snap_parallel`, `plastic2_snap_perpendicular` |
+| `sf_snap_fit_edit` | `edit_step` | 1 | `plastic2_snap_edit_taper` |
 | `sf_surface` | `surface` | 53 | `surface2_extrude_all`, `surface2_extrude_from_curved_face`, `surface2_extrude_from_face`, `surface2_extrude_to_body`, `surface2_extrude_to_chain_faces` |
 | `sf_surface_edit` | `edit_step` | 8 | `surface2_extrude_all`, `surface2_extrude_from_face`, `surface2_loft_centerline`, `surface2_sweep_rail`, `surface3_extend_align_edges` |
-| `sf_surface_modify` | (a test helper) | 13 | `surface4_chamfer_delete`, `surface4_fillet_box`, `surface4_fillet_chord`, `surface4_fillet_variable`, `surface4_merge` |
-| `sf_surface_modify_edit` | (a test helper) | 2 | `surface4_fillet_box`, `surface4_press_pull` |
+| `sf_surface_modify` | `surface_modify` | 13 | `surface4_chamfer_delete`, `surface4_fillet_box`, `surface4_fillet_chord`, `surface4_fillet_variable`, `surface4_merge` |
+| `sf_surface_modify_edit` | `edit_step` | 2 | `surface4_fillet_box`, `surface4_press_pull` |
 | `sf_sweep` | `sweep` | 18 | `sf_sweep_both_sides`, `sf_sweep_distance_parameter`, `sf_sweep_edit_distance`, `sf_sweep_face_taper`, `sf_sweep_groove_cut` |
 | `sf_sweep_edit` | `edit_step` | 1 | `sf_sweep_edit_distance` |
-| `sf_unfold` | (a test helper) | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
+| `sf_unfold` | `unfold` | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
 | `shell` | `shell` | 28 | `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain` |
 | `silhouette_split` | `silhouette_split` | 3 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
 | `sketch` | `create_sketch` | 527 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
@@ -901,4 +901,4 @@ Each model is listed under its first tag; its other tags follow it.
 | `suppress` | `suppress_step` | 9 | `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `extrude_multi_move`, `hole_second_survives_first`, `plastic2_lip_suppress` |
 | `thread` | `thread` | 8 | `thread_edit_length`, `thread_hole_modeled`, `thread_second_after_modeled`, `thread_shaft_cosmetic`, `thread_shaft_modeled` |
 | `unsuppress` | `suppress_step` | 8 | `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `extrude_multi_move`, `hole_second_survives_first`, `plastic2_lip_suppress` |
-| `use_body` | `activate` | 26 | `extrude_multi_cut`, `extrude_multi_cut_all`, `extrude_multi_cut_all_far`, `extrude_multi_cut_edit`, `extrude_multi_cut_excluded` |
+| `use_body` | `surface_modify`, `activate` | 26 | `extrude_multi_cut`, `extrude_multi_cut_all`, `extrude_multi_cut_all_far`, `extrude_multi_cut_edit`, `extrude_multi_cut_excluded` |

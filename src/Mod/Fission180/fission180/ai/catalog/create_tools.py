@@ -616,6 +616,10 @@ _WHAT = {
     "features": step_ids("Pattern Type Features: the steps to repeat"),
     "faces": kit.selector("Pattern Type Faces: faces of the part to repeat"),
     "body": boolean("Pattern Type Bodies: the whole current body (the copies are new bodies)"),
+    "bodies": step_ids(
+        "Pattern Type Bodies of several bodies at once: a step id in each body (one step, "
+        "every body copied; Mirror join: each body joined with its own mirror image)"
+    ),
     "expressions": _EXPRESSIONS,
     "suppressed": array(
         integer(minimum=1), "copies left out, by their number among the " "copies (Suppression)"
@@ -625,9 +629,11 @@ _WHAT = {
 
 
 def _check_what(args, problems):
-    found = [k for k in ("features", "faces", "body") if k in args]
+    found = [k for k in ("features", "faces", "body", "bodies") if k in args]
     if len(found) != 1:
-        problems.append("give exactly one of features, faces, body (what is patterned)")
+        problems.append("give exactly one of features, faces, body, bodies (what is patterned)")
+    if "bodies" in args and not args["bodies"]:
+        problems.append("bodies: give at least one step id")
     if "faces" in args:
         kit.check_selector(args["faces"], "faces", "faces", problems)
     if "body" in args and args["body"] is not True:

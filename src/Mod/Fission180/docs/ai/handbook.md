@@ -22,8 +22,10 @@ FreeCAD's PartDesign and OpenCASCADE do the geometry. The AI tools are the same 
 Fission 180's own dialogs: an `extrude` call builds exactly what the Extrude dialog builds, and
 the result is a step in the timeline that the person can double-click and edit.
 
-What Fission 180 does not have (yet): sheet metal, T-spline sculpting, simulation, rendering,
-CAM, electronics, `.f3d` files (Fusion's format is closed: STEP comes in fine). The person's
+What Fission 180 does not have (yet): T-spline sculpting, simulation studies other than Static
+Stress, rendering, CAM, electronics, `.f3d` files (Fusion's format is closed: STEP comes in
+fine). The SHEET METAL and PLASTIC tabs have their own tools (`flange`, `bend`, `flat_pattern`,
+`boss`, `snap_fit`... see `list_tools` with category `sheet_metal` or `plastic`). The person's
 own documentation lists what is built and what is not: [known issues](fission180://docs/user/known-issues.md),
 [feature outline](fission180://docs/user/feature-outline.md) and one Fusion parity spec per
 feature (`user/parity/<feature>.md`).

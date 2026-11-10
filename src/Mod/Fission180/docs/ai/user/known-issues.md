@@ -13,18 +13,11 @@ time you start it, but treat that as a safety net, not a plan.
 
 ## Things that look or feel unfinished
 
-- **A thin outline frame on the right.** While a panel is open at the right (the AI panel, the
-  Sketch Palette, a command's dialog), a thin empty rectangle outline can show over the 3D view
-  next to it. It is a leftover of FreeCAD's own overlay panel. As far as we know it is
-  only cosmetic. *Workaround:* none needed.
 - **Press Pull is work in progress on complex shapes.** On planes and cylinders it is solid. On
   curved or freeform faces, or with many faces picked at once, it can be slow and the result can
   look odd. Fission 180 says so in a small yellow warning on the Press Pull button and in its
   dialog. *Workaround:* use Fillet, Chamfer, Offset Face or Extrude for those faces, or press
   Undo (Ctrl+Z) when a result looks wrong.
-- **The AI chat shows an answer only when it is complete.** Answers are not streamed word by
-  word, so a long answer looks like nothing is happening for a while. *Workaround:* wait until
-  the Send button works again; press Stop to end it early.
 - **English only.** Fission 180's own screens, menus and messages are in English; there are no
   translations yet.
 - **The SHEET METAL and PLASTIC tabs are new in this beta** and the least used so far. A few
@@ -52,16 +45,9 @@ time you start it, but treat that as a safety net, not a plan.
   a small axis marker for every body, which needs a change to the compiled program. On such a
   robot the browser can take a second or so to catch up after Ctrl+Z.
   *Workaround:* none needed; once open, hovering, joints and Drive Joints are quick.
-- **The AI cannot use the SHEET METAL and PLASTIC tabs yet**, nor the SURFACE tab's Fillet,
-  Chamfer, Press Pull, Delete and Merge on surface bodies. Everything else you can do, it
-  can do. *Workaround:* make those steps yourself; the AI can carry on from there. Its tools
-  for them come next.
 
 ## Not built (yet)
 
-- **Pattern and Mirror of several bodies at once.** With several bodies selected, Rectangular,
-  Circular Pattern, Pattern on Path and Mirror pattern the first one only (Fusion patterns them
-  all in one step). *Workaround:* pattern each body on its own.
 - **Not all of Fusion's features.** Fission 180 covers the Design workspace: sketches, solid and
   surface modeling, patterns, components and joints, mesh, drawings, 3D printing, and more,
   and the Simulation workspace's Static Stress study. It does **not** have sculpting

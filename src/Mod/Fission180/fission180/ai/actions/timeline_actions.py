@@ -131,6 +131,11 @@ def step_kind(obj):
         thread,
     )
 
+    from . import sheetmetal_actions  # (SHEET METAL, PLASTIC, SURFACE > MODIFY steps)
+
+    found = sheetmetal_actions.edit_kind(obj)
+    if found:
+        return found
     checks = (
         ("sketch", lambda o: o.TypeId == "Sketcher::SketchObject"),
         ("text", text.is_text),
@@ -252,7 +257,9 @@ def _read(obj, kind):
             zip(("preset", "refs", "points", "values", "formulas"), construct.read(o) or ())
         ),
     }
-    reader = readers.get(kind)
+    from . import sheetmetal_actions
+
+    reader = readers.get(kind) or sheetmetal_actions.READERS.get(kind)
     if reader is None:
         return None
     return jsonable(reader(obj))
@@ -323,6 +330,12 @@ _EDIT_OPS = {
     "split_face": "modify_edit",
     "silhouette_split": "modify_edit",
     "align_bodies": "modify_edit",
+    # SHEET METAL, PLASTIC, SURFACE > MODIFY (sheetmetal_actions.edit_kind)
+    "sf_flange": "sf_flange_edit",
+    "sf_sm_more": "sf_sm_more_edit",
+    "sf_snap_fit": "sf_snap_fit_edit",
+    "sf_lip": "sf_lip_edit",
+    "sf_surface_modify": "sf_surface_modify_edit",
 }
 _EXTRUDE_KEYS = {
     "distance": "distance",
@@ -397,7 +410,9 @@ def _option_keys(obj, kind):
         "extrude": lambda o: tuple(_EXTRUDE_KEYS) + ("through_all", "flip"),
         "construct": lambda o: ("distance", "angle", "fraction", "distance_type"),
     }
-    reader = readers.get(kind)
+    from . import sheetmetal_actions
+
+    reader = readers.get(kind) or sheetmetal_actions.OPTION_KEYS.get(kind)
     if reader is None:
         reader = (lambda o: core._EDIT_PROPS[kind]) if kind in core._EDIT_PROPS else None
     if reader is None:

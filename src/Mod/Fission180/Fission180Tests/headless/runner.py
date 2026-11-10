@@ -1017,6 +1017,18 @@ SESSION = [
     },
     {"tool": "split_body", "args": {"body": "$ring", "tool": "YZ"}},
     {"tool": "circular_pattern", "args": {"body": True, "axis": "Z", "quantity": 2}, "check": None},
+    # several bodies in one step (Fusion; Luca, 2026-11-10)
+    {
+        "tool": "rectangular_pattern",
+        "args": {
+            "bodies": ["$plate", "$cyl"],
+            "direction": "Y",
+            "quantity": 2,
+            "distance": 400,
+            "distribution": "spacing",
+        },
+        "check": None,
+    },
     {"tool": "activate", "args": {"target": "$plate"}, "contains": ["active body"]},
     {"tool": "mirror", "args": {"body": True, "plane": "YZ", "operation": "new_body"}},
     {
@@ -2058,6 +2070,12 @@ def main():
         from Fission180Tests.headless import rebuild_e2e
 
         run_session(run, rebuild_e2e.RUNNER_SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
+        # the SHEET METAL, PLASTIC and SURFACE > MODIFY tools (sheetmetal_plastic_tools.py)
+        from Fission180Tests.headless import sheetmetal_plastic_tools
+
+        run_session(
+            run, sheetmetal_plastic_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
+        )
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)
