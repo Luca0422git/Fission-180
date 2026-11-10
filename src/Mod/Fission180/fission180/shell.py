@@ -75,7 +75,12 @@ def on_workbench(name):
     """Called for every workbench change (Qt signal) and from Fission 180's Activated()."""
     try:
         name = str(name)
-        if _state["on"] and name not in (FISSION180_WB, SKETCH_WB) and _for_an_edit():
+        if (
+            _state["on"]
+            and name not in (FISSION180_WB, SKETCH_WB)
+            and name != _state.get("chosen")
+            and _for_an_edit()
+        ):
             # FreeCAD switches to Part Design to edit one of its features (a User Coordinate
             # System, a datum, a native feature: PartDesignGui's setEdit) and back when the edit
             # ends. Fusion keeps its window for those: the interface stays on (it went off, keys
@@ -117,6 +122,11 @@ def on_workbench(name):
             )
     except Exception as exc:
         warn("workbench change to %s: %s" % (name, exc))
+
+
+def chosen(name):
+    """The workbench the person chose (FreeCAD Tools) while it is activated, else None."""
+    _state["chosen"] = name
 
 
 def _for_an_edit():

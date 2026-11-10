@@ -39,8 +39,14 @@ def workbenches():
 
 def switch(name):
     """Go to FreeCAD's workbench `name`: Fission 180 steps aside, the designs stay open."""
+    from . import shell
+
     try:
-        Gui.activateWorkbench(name)
+        shell.chosen(name)  # (chosen: the interface goes off even while a sketch is edited)
+        try:
+            Gui.activateWorkbench(name)
+        finally:
+            shell.chosen(None)
         log("FreeCAD tools: switched to %s" % name)
         show_back_bar()
         if not _state["told"]:

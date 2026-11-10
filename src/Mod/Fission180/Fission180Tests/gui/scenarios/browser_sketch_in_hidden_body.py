@@ -85,6 +85,8 @@ def body_back():
 
     h.check("Body's solid is back", bv.body_shown(s["body"]))
     h.check("the sketch stays", s["sketch"].ViewObject.Visibility)
+    h.settle("the view to redraw")
+    h.shot("2-body-back")
     h.check("Body's eye again", ti.click_eye(s["body"].Label))
 
 
