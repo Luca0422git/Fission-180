@@ -337,17 +337,12 @@ def _set_mode(on):
     try:
         from . import navbar_ui, timeline_ui
 
-        dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
+        # Fusion's Drawing workspace has no timeline (timeline_ui.hold: with Home's, one rule)
+        timeline_ui.hold("drawing", on)
         if on:
-            STATE["timeline"] = bool(dock is not None and dock.isVisible())
-            if STATE["timeline"]:
-                timeline_ui.hide()  # Fusion's Drawing workspace has no timeline
             navbar_ui.hide()  # the design's orbit / look-at bar
             STATE["navbar"] = True
         else:
-            if STATE["timeline"] and shell.is_on():
-                timeline_ui.show()
-            STATE["timeline"] = False
             if STATE["navbar"] and shell.is_on():
                 navbar_ui.show()
             STATE["navbar"] = False

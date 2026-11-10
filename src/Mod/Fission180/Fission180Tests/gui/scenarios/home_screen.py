@@ -129,7 +129,8 @@ def at_start():
     h.check("the ribbon is shown", ribbon is not None and ribbon.isVisible())
     h.check("... its commands hidden on Home, the top bar kept", not commands_shown())
     timeline = main.findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
-    h.check("the timeline is shown", timeline is not None and timeline.isVisible())
+    # the timeline goes while Home is in front, as the browser (Luca, 2026-11-10)
+    h.check("the timeline is away on Home", timeline is not None and not timeline.isVisible())
     button = wi.quick_access("Home")
     h.check("the Home button is in the application bar", button is not None)
     data = wi.quick_access("Data Panel")
@@ -183,6 +184,8 @@ def new_design_made():
     nav = navbar_ui.bar()
     h.check("the navigation bar is back on the design", nav is not None and nav.isVisible())
     h.check("the ribbon's commands are back on the design", commands_shown())
+    timeline = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
+    h.check("the timeline shows on the design", timeline is not None and timeline.isVisible())
     close_all()
 
 

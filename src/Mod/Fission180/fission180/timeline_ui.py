@@ -1640,8 +1640,45 @@ def find(name):
     return bool(w.selected())
 
 
+# Pages that have no timeline while they are in front (Home, a drawing): {reason: True}. The
+# timeline is hidden while any holds it and comes back when the last one lets go, if it was
+# shown (or asked to show) meanwhile. One place decides, so Home and the Drawing workspace
+# do not undo each other (Luca, 2026-11-10: "going from the document to home keeps the
+# browser and timeline open").
+_HOLDS = {}
+_SHOW_AFTER = [False]
+
+
+def hold(reason, on):
+    """`reason`'s page is in front (on) or not: the timeline away / back. Never raises."""
+    try:
+        dock = _ensure_dock()
+        if on:
+            if not _HOLDS:
+                _SHOW_AFTER[0] = dock.isVisible()
+            _HOLDS[reason] = True
+            if dock.isVisible():
+                dock.widget().stop()
+                dock.hide()
+        elif _HOLDS.pop(reason, None) and not _HOLDS and _SHOW_AFTER[0]:
+            _SHOW_AFTER[0] = False
+            show()
+    except RuntimeError:
+        pass  # (the window is closing)
+    except Exception as exc:
+        warn("timeline: %s" % exc)
+
+
+def held():
+    """The pages holding the timeline away (tests)."""
+    return dict(_HOLDS)
+
+
 def show():
     dock = _ensure_dock()
+    if _HOLDS:
+        _SHOW_AFTER[0] = True  # shown once the page that has no timeline goes
+        return
     dock.show()
     dock.widget().start()
 

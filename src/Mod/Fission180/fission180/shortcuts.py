@@ -32,6 +32,18 @@ PARKED = "User parameter:BaseApp/Preferences/Mod/Fission180/ParkedShortcuts"
 SHORTCUT_PREFS = "User parameter:BaseApp/Preferences/Shortcut"  # FreeCAD's own
 
 
+# FreeCAD commands whose keys are taken away while Fission 180 is on, whatever Fission 180's own
+# keys are: Ctrl+Left / Right / Up / Down put that side's panels into FreeCAD's see-through
+# overlay, the browser with them (Luca, 2026-11-10: "the browser is transparent until you move
+# your mouse into it"; it then also stayed over the Home tab). Given back with the others.
+PARKED_ALWAYS = (
+    "Std_DockOverlayToggleLeft",
+    "Std_DockOverlayToggleRight",
+    "Std_DockOverlayToggleTop",
+    "Std_DockOverlayToggleBottom",
+)
+
+
 def _kept():
     import FreeCAD
 
@@ -124,7 +136,7 @@ def apply():
                 _parked[name] = stored[name]
                 if current:
                     cmd.setShortcut("")
-            elif current and normalise(current) in keys:
+            elif current and (normalise(current) in keys or name in PARKED_ALWAYS):
                 _parked[name] = current
                 if kept is not None:
                     kept.SetString(name, current)

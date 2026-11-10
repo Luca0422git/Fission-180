@@ -61,7 +61,13 @@ def run():
         tabs = main.findChild(QtWidgets.QTabBar, "Fission180DocumentTabs")
         check("the document tabs bar exists", tabs is not None)
         timeline = main.findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
-        check("the timeline is shown", timeline is not None and timeline.isVisible())
+        # (away while Home is in front, Luca 2026-11-10; it shows on a design)
+        from fission180 import timeline_ui
+
+        check(
+            "the timeline is there, held away on Home",
+            timeline is not None and not timeline.isVisible() and "home" in timeline_ui.held(),
+        )
         check("FreeCAD's menu bar is hidden", not main.menuBar().isVisible())
         from fission180 import home_ui
 

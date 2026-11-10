@@ -1635,6 +1635,12 @@ def _follow_active(*_args):
         if ribbon is not None:
             ribbon.set_home(is_active())
         _follow_browser()
+        if shell.is_on():
+            # nor the timeline (Luca, 2026-11-10: "going from the document to home keeps the
+            # browser and timeline open")
+            from . import timeline_ui
+
+            timeline_ui.hold("home", is_active())
         nav = navbar_ui.bar()
         if nav is None:
             return

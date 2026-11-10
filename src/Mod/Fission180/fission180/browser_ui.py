@@ -2618,10 +2618,97 @@ def show():
             _state["original"].hide()
         dock.setWidget(_state["widget"])
     _state["dock"] = dock
+    _out_of_overlay(dock)
+    _watch_overlay(dock)
     dock.setWindowTitle("BROWSER")
     dock.show()
     _state["widget"].show()
     _state["widget"].start()
+
+
+OVERLAYS = ("OverlayLeft", "OverlayRight", "OverlayTop", "OverlayBottom")
+OVERLAY_PARAMS = "User parameter:BaseApp/MainWindow/DockWindows/"
+
+
+def _overlay_names(grp):
+    return [n for n in (grp.GetString("Widgets", "") or "").split(",") if n]
+
+
+def _out_of_overlay(dock):
+    """The browser's dock never sits in FreeCAD's overlay (its see-through panels that float
+    over the 3D view): there it was see-through until the mouse went in, had no title, and
+    stayed over the Home tab (Luca, 2026-11-10). FreeCAD keeps which panels it overlays in its
+    settings by name ("Model", the dock the browser lives in, put there by a key or by an
+    older FreeCAD): the name is taken off those lists while Fission 180 is on (FreeCAD rebuilds
+    its overlays at once) and given back by hide()."""
+    name = dock.objectName()
+    if not name:
+        return
+    kept = _state.setdefault("overlays", {})
+    for area in OVERLAYS:
+        try:
+            grp = App.ParamGet(OVERLAY_PARAMS + area)
+            names = _overlay_names(grp)
+            if name not in names:
+                continue
+            kept.setdefault(area, list(names))
+            rest = [n for n in names if n != name]
+            grp.SetString("Widgets", "".join(n + "," for n in rest))
+            log("browser: taken out of FreeCAD's %s overlay" % area)
+        except Exception as exc:
+            warn("browser: overlay %s: %s" % (area, exc))
+    if _in_overlay(dock):
+        # (FreeCAD did not rebuild its overlays: the dock back in the window's left side)
+        try:
+            Gui.getMainWindow().addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
+        except Exception as exc:
+            warn("browser: out of the overlay: %s" % exc)
+
+
+class _OverlayGuard(QtCore.QObject):
+    """Takes the browser's dock out of FreeCAD's overlay again whenever something moves it in
+    (FreeCAD's overlay buttons or menu): a moment later, once FreeCAD is done."""
+
+    def eventFilter(self, obj, event):
+        try:
+            if event.type() == QtCore.QEvent.ParentChange and _state.get("dock") is obj:
+                QtCore.QTimer.singleShot(0, lambda: _state.get("dock") is obj and _out_of_overlay(obj))
+        except Exception:
+            pass
+        return False
+
+
+def _watch_overlay(dock):
+    if _state.get("overlay_guard") is None:
+        _state["overlay_guard"] = _OverlayGuard()
+    if _state.get("guarded") is not dock:
+        try:
+            dock.installEventFilter(_state["overlay_guard"])
+            _state["guarded"] = dock
+        except Exception as exc:
+            warn("browser: overlay guard: %s" % exc)
+
+
+def _in_overlay(widget):
+    try:
+        parent = widget.parentWidget()
+        while parent is not None:
+            if parent.metaObject().className() in ("Gui::OverlayTabWidget", "Gui::OverlaySplitter"):
+                return True
+            parent = parent.parentWidget()
+    except RuntimeError:
+        pass
+    return False
+
+
+def _give_back_overlays():
+    """FreeCAD's own overlay lists as they were before Fission 180 (its own interface again)."""
+    kept = _state.pop("overlays", None) or {}
+    for area, names in kept.items():
+        try:
+            App.ParamGet(OVERLAY_PARAMS + area).SetString("Widgets", "".join(n + "," for n in names))
+        except Exception as exc:
+            warn("browser: overlay %s: %s" % (area, exc))
 
 
 def hide():
@@ -2638,6 +2725,13 @@ def hide():
         if _state["title"]:
             dock.setWindowTitle(_state["title"])
     _state["dock"] = None
+    guard, guarded = _state.get("overlay_guard"), _state.pop("guarded", None)
+    if guard is not None and guarded is not None:
+        try:
+            guarded.removeEventFilter(guard)
+        except RuntimeError:
+            pass
+    _give_back_overlays()
 
 
 def widget():
