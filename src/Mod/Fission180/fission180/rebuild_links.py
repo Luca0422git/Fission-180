@@ -417,10 +417,16 @@ class Follow:
     def _pattern_sources(self):
         """A pattern of bodies keeps the copied body's NAME (SourceBody) beside its link."""
         for obj in self.doc.Objects:
-            if getattr(obj, "SourceBody", None) == self.original.Name and obj.Name not in (
-                self.old_names
-            ):
+            if obj.Name in self.old_names:
+                continue
+            if getattr(obj, "SourceBody", None) == self.original.Name:
                 self.changes.append((obj, "SourceBody", self.rebuilt.Name))
+                if obj not in self.moved:
+                    self.moved.append(obj)
+            others = list(getattr(obj, "OtherSourceBodies", None) or [])
+            if self.original.Name in others:  # one of the other bodies it copies
+                names = [self.rebuilt.Name if n == self.original.Name else n for n in others]
+                self.changes.append((obj, "OtherSourceBodies", names))
                 if obj not in self.moved:
                     self.moved.append(obj)
 

@@ -450,6 +450,15 @@ def implementation(kind, options):
     return "native"
 
 
+def _is_surface(body):
+    try:
+        from . import surfmod
+
+        return surfmod.is_surface_body(body)
+    except Exception:
+        return False
+
+
 def _surface_pick(options):
     """True when the body picked for a pattern of bodies is a surface body (surface-4)."""
     try:
@@ -490,11 +499,16 @@ def check(kind, options):
     elif ptype == "bodies":
         bodies = _bodies(options)
         if not bodies:
-            raise NeedsPick("Select the body to pattern (or features in the timeline).")
-        if len(bodies) > 1:
-            raise PatternError("Select one body: each body gets its own pattern.")
-        if bodies[0].Tip is None or bodies[0].Shape.isNull():
-            raise PatternError("%s has no solid to copy yet." % bodies[0].Label)
+            raise NeedsPick("Select the bodies to pattern (or features in the timeline).")
+        for body in bodies:  # several bodies: one step, every body copied (Fusion)
+            if body.Tip is None or body.Shape.isNull():
+                raise PatternError("%s has no solid to copy yet." % body.Label)
+        if len(bodies) > 1 and kind == "mirror" and not makes_bodies(kind, options):
+            if _surface_pick(options) or any(_is_surface(b) for b in bodies[1:]):
+                raise PatternError(
+                    "Join stitches one surface body at a time: mirror the surface bodies one "
+                    "by one, or choose Operation New Body."
+                )
     elif ptype == "components":  # components-2: component_pattern.py
         from . import component_pattern
 
@@ -579,7 +593,7 @@ def build(kind, options, feature=None, name=None):
         same = feature.TypeId == wanted and kind_of(feature) == kind
         if same and owner_body(feature) is body:
             _update(feature, kind, options)
-            _sync_followers(feature)
+            _sync_followers(feature, kind, options)
             return feature
     new = _create(body, kind, wanted, name or TITLES[kind].replace(" ", ""), feature)
     try:
@@ -595,17 +609,43 @@ def build(kind, options, feature=None, name=None):
         # edges, another pattern of it) move over to the new one; FreeCAD would just drop
         # those references when the old one is deleted.
         relink_dependents(feature, new)
+        from . import modify_bodies
+
+        modify_bodies.move_followers(feature, new)  # (they are synced to `new` below)
         _delete(feature)
         new.Label = label
         if was_tip:
             body.Tip = new
-    _sync_followers(new)
+    _sync_followers(new, kind, options)
     return new
 
 
-def _sync_followers(feature):
-    """A pattern of an extrude that cut other bodies repeats the cut there too (a hidden
-    follower step in each of them, pattern_adjust.py)."""
+def _joins_several(kind, options):
+    """A Mirror of several bodies with Operation Join: every body joined with its own mirror
+    image, one timeline step (the lead in the first body, a follower in each other one)."""
+    return (
+        kind == "mirror"
+        and options.get("pattern_type") == "bodies"
+        and not makes_bodies(kind, options)
+        and len(_bodies(options)) > 1
+    )
+
+
+def _sync_followers(feature, kind=None, options=None):
+    """A Mirror (Join) of several bodies: a MirrorFollower in each other body. A pattern of
+    an extrude that cut other bodies repeats the cut there too (a hidden follower step in
+    each of them, pattern_adjust.py)."""
+    if (
+        kind == "mirror"
+        and options is not None
+        and options.get("pattern_type") == "bodies"
+        and not makes_bodies(kind, options)
+    ):
+        from . import modify_bodies
+
+        others = _bodies(options)[1:]
+        modify_bodies.sync(feature, [(b, None) for b in others], modify_bodies.MirrorFollower, "Mirror")
+        return
     from . import pattern_adjust
 
     pattern_adjust.sync_followers(feature)
@@ -2011,6 +2051,14 @@ def _read_native(obj, kind, meta):
         options["pattern_type"] = "bodies"
         body = owner_body(obj)
         options["objects"] = [(body, "")] if body is not None else []
+        try:  # a Mirror (Join) of several bodies: the bodies of its followers
+            from . import modify_bodies
+
+            for other in modify_bodies.bodies_of(obj)[1:]:
+                if (other, "") not in options["objects"]:
+                    options["objects"].append((other, ""))
+        except Exception:
+            pass
     else:
         options["pattern_type"] = "features"
         options["objects"] = [(o, "") for o in obj.Originals]
@@ -2199,6 +2247,12 @@ def _on_shell(shape, point):
 # with the history marker like a component (Fission180Rolls): while the marker stands before it,
 # its copies are hidden. Deleting the original leaves the copies as they are; the pattern step
 # then keeps them and says why (a warning, not a failure: nothing downstream breaks).
+#
+# Several bodies (Fusion patterns every selected body in one step): the first body is Source /
+# SourceBody as above, the others Source2, Source3... (one link each, so a deleted body leaves
+# its place empty) with their names in OtherSourceBodies. The copies go copy by copy, body by
+# body (index = copy * bodies + body): a new quantity adds or drops copies at the end, the
+# copies already made keep their bodies.
 COPY = "Part::FeaturePython"
 BODY = "PartDesign::Body"
 BODY_PROPS = (
@@ -2218,6 +2272,10 @@ BODY_ENUMS = (
 DELETED_NOTE = (
     "The body it copied was deleted: its copies keep the shape they had. Undo the delete to "
     "change them again."
+)
+SOME_DELETED_NOTE = (
+    "One of the bodies it copies was deleted: its copies keep the shape they had. Undo the "
+    "delete to change them again."
 )
 
 
@@ -2292,6 +2350,60 @@ def source_body(definition):
     return found if found is not None and found.TypeId == BODY else None
 
 
+def _other_names(definition):
+    return list(getattr(definition, "OtherSourceBodies", None) or [])
+
+
+def _source_prop(index):
+    return "Source" if index == 0 else "Source%d" % (index + 1)
+
+
+def _ensure_source_prop(definition, index):
+    prop = _source_prop(index)
+    if prop not in definition.PropertiesList:
+        definition.addProperty(
+            "App::PropertyLinkGlobal",
+            prop,
+            "Pattern",
+            "Another copied body's step right before this pattern in the timeline",
+        )
+    return prop
+
+
+def source_count(definition):
+    """How many bodies the pattern copies (deleted ones included: their places stay)."""
+    return 1 + len(_other_names(definition))
+
+
+def source_bodies(definition):
+    """Every body the pattern copies, in the order they were picked; None in the place of a
+    deleted one."""
+    out = [source_body(definition)]
+    doc = definition.Document
+    for i, name in enumerate(_other_names(definition), start=1):
+        body = None
+        step = getattr(definition, _source_prop(i), None)
+        if step is not None and alive(step):
+            body = step if step.TypeId == BODY else owner_body(step)
+        if body is None and name:
+            found = doc.getObject(name)
+            body = found if found is not None and found.TypeId == BODY else None
+        out.append(body)
+    return out
+
+
+def source_step_at(definition, index):
+    """The step of the index-th copied body that its copies are made from (None: deleted)."""
+    if index == 0:
+        return source_step(definition)
+    step = getattr(definition, _source_prop(index), None)
+    if step is None or not alive(step):
+        return None
+    if step.TypeId == BODY:
+        return wanted_source(definition, body=step)
+    return step
+
+
 def _is_follower(obj):
     try:
         from . import timeline_ops
@@ -2301,12 +2413,13 @@ def _is_follower(obj):
         return False
 
 
-def wanted_source(definition, order=None):
+def wanted_source(definition, order=None, body=None):
     """The source body's last solid step before the pattern in the timeline (the body as it
     stands there), or None. ``order``: the timeline's step names in order (computed when not
     given). Hidden steps (a multi-body extrude's step in this body, a copy's base feature) sit
-    where their lead or the step before them is."""
-    body = source_body(definition)
+    where their lead or the step before them is. ``body``: another of the copied bodies."""
+    if body is None:
+        body = source_body(definition)
     if body is None:
         return None
     if order is None:
@@ -2349,16 +2462,26 @@ def resolve_source(definition, order=None):
     changes while the body is gone or nothing of it exists before the pattern."""
     if not is_body_pattern(definition):
         return False
+    changed = False
     body = source_body(definition)
-    if body is None:
-        return False
-    if (getattr(definition, "SourceBody", "") or "") != body.Name:
-        definition.SourceBody = body.Name
-    step = wanted_source(definition, order)
-    if step is None or definition.Source is step:
-        return False
-    definition.Source = step
-    return True
+    if body is not None:
+        if (getattr(definition, "SourceBody", "") or "") != body.Name:
+            definition.SourceBody = body.Name
+        step = wanted_source(definition, order)
+        if step is not None and definition.Source is not step:
+            definition.Source = step
+            changed = True
+    doc = definition.Document
+    for i, name in enumerate(_other_names(definition), start=1):
+        prop = _ensure_source_prop(definition, i)
+        other = doc.getObject(name) if name else None
+        if other is None or other.TypeId != BODY:
+            continue  # deleted: its copies keep their shape
+        step = wanted_source(definition, order, other)
+        if step is not None and getattr(definition, prop) is not step:
+            setattr(definition, prop, step)
+            changed = True
+    return changed
 
 
 def resolve_sources(doc):
@@ -2432,6 +2555,8 @@ class BodyPatternFeature:
         # The body's name (no link: a link to the body would make every later step of the
         # original reach the copies, and a Combine of a copy into it a dependency cycle)
         add("App::PropertyString", "SourceBody", "The body that is copied", 4)
+        # the other bodies copied by the same step (their steps: Source2, Source3...)
+        add("App::PropertyStringList", "OtherSourceBodies", "The other bodies copied", 4)
         for prop, _key, _kinds in BODY_PROPS:
             add("App::PropertyLinkSubGlobal", prop, prop)
         if add("App::PropertyInteger", "Quantity", "Instances (the original included)"):
@@ -2460,27 +2585,32 @@ class BodyPatternFeature:
             pass
 
     def execute(self, obj):
-        step = source_step(obj)
-        if step is None:
-            body = source_body(obj)
-            if body is None:
-                # The original was deleted: its copies keep their shape (Fusion leaves the
-                # copies of a deleted body), and so does this step; it says why.
-                set_note(obj, DELETED_NOTE)
-                return
-            raise PatternError(
-                "Nothing of %s exists before this step in the timeline: move the step after "
-                "the steps that make %s." % (body.Label, body.Label)
-            )
-        shape = _source_shape(step)
-        if shape.isNull() or not shape.Faces:  # a solid or a surface body (surface-4)
-            body = owner_body(step)
-            raise PatternError(
-                "%s has nothing before this step to copy."
-                % (body.Label if body is not None else "The body")
-            )
-        set_note(obj, "")
-        copies = body_copy_shapes(obj, shape)
+        shapes = []
+        for index, body in enumerate(source_bodies(obj)):
+            step = source_step_at(obj, index)
+            if step is None:
+                if body is None:
+                    # The original was deleted: its copies keep their shape (Fusion leaves
+                    # the copies of a deleted body), and so does this step; it says why.
+                    shapes.append(None)
+                    continue
+                raise PatternError(
+                    "Nothing of %s exists before this step in the timeline: move the step "
+                    "after the steps that make %s." % (body.Label, body.Label)
+                )
+            shape = _source_shape(step)
+            if shape.isNull() or not shape.Faces:  # a solid or a surface body (surface-4)
+                owner = owner_body(step)
+                raise PatternError(
+                    "%s has nothing before this step to copy."
+                    % (owner.Label if owner is not None else "The body")
+                )
+            shapes.append(shape)
+        if all(s is None for s in shapes):
+            set_note(obj, DELETED_NOTE)
+            return
+        set_note(obj, SOME_DELETED_NOTE if any(s is None for s in shapes) else "")
+        copies = [c for c in body_copy_shapes(obj, shapes) if c is not None]
         obj.Shape = Part.makeCompound(copies) if copies else Part.Shape()
 
     def dumps(self):
@@ -2523,11 +2653,11 @@ class BodyCopyFeature:
             # The pattern step was deleted: the copy keeps its shape (pattern_ui removes such
             # orphans right after a delete, as Fusion deletes the copies with the pattern).
             return
-        if source_step(definition) is None:
-            return  # the copied body was deleted (the pattern step says so): keep the shape
         copies = _computed_copies(definition)
         if obj.Index >= len(copies):
             return  # about to be removed by the pattern (fewer copies now)
+        if copies[obj.Index] is None:
+            return  # the body it copies was deleted (the pattern step says so): keep the shape
         # design coordinates -> the new body's own (a body in a moved component: components-2)
         body = _body_of_copy(obj)
         if body is not None:
@@ -2568,8 +2698,7 @@ def read_body_pattern(obj):
     options["distance2"] = obj.Distance2.Value
     options["angle"] = obj.Angle.Value
     options["suppressed"] = list(getattr(obj, "SuppressedCopies", []) or [])
-    body = source_body(obj)
-    options["objects"] = [(body, "")] if body is not None else []
+    options["objects"] = [(b, "") for b in source_bodies(obj) if b is not None]
     return options
 
 
@@ -2581,38 +2710,50 @@ def _source_shape(step):
     return bodies.global_shape(step)
 
 
-def body_copy_shapes(definition, shape=None):
-    """The copies of a pattern of bodies, in design coordinates (the original not included):
-    the source body as it stands at the pattern's place in the timeline (``shape``: that
-    solid, design coordinates, when the caller has it already). [] when there is nothing to
-    copy (the body was deleted)."""
+def body_copy_shapes(definition, shapes=None):
+    """The copies of a pattern of bodies, in design coordinates (the originals not included):
+    each copied body as it stands at the pattern's place in the timeline (``shapes``: those
+    solids, design coordinates, one per copied body, when the caller has them already).
+    Copy by copy, body by body (index = copy * bodies + body); None in the places of a
+    deleted body. [] when there is nothing to copy (every body was deleted)."""
     kind = kind_of(definition)
     options = read_body_pattern(definition)
-    if shape is None:
-        step = source_step(definition)
-        if step is None:
-            return []
-        shape = _source_shape(step)
-    if shape.isNull():
+    sources = source_bodies(definition)
+    if shapes is None:
+        shapes = []
+        for index in range(len(sources)):
+            step = source_step_at(definition, index)
+            shapes.append(_source_shape(step) if step is not None else None)
+    shapes = [s if s is not None and not s.isNull() else None for s in shapes]
+    if all(s is None for s in shapes):
         return []
-    body = source_body(definition)
-    # The references (an edge of the body, its origin axes) are read in the body's own
-    # coordinates; the movements are applied in design coordinates.
-    place = body.getGlobalPlacement() if body is not None else App.Placement()
-    local = shape.copy()
-    local.transformShape(place.inverse().toMatrix(), True)
-    center = local.BoundBox.Center if kind == "path" else None
-    moves = placements(kind, options, [(local, "add")], center)
+    frame = next((b for b in sources if b is not None), None)
+    # The references (an edge of the body, its origin axes) are read in the (first) body's
+    # own coordinates; the movements are applied in design coordinates.
+    place = frame.getGlobalPlacement() if frame is not None else App.Placement()
+    locals_ = []
+    for shape in shapes:
+        if shape is None:
+            continue
+        local = shape.copy()
+        local.transformShape(place.inverse().toMatrix(), True)
+        locals_.append(local)
+    # Pattern on Path moves the bodies together: their common centre goes along the path
+    center = Part.makeCompound(locals_).BoundBox.Center if kind == "path" else None
+    moves = placements(kind, options, [(local, "add") for local in locals_], center)
     copies = []
     for move in moves:
-        if isinstance(move, tuple):
-            _tag, point, normal = move
-            copies.append(shape.mirror(place.multVec(point), place.Rotation.multVec(normal)))
-        else:
-            whole = place.multiply(move).multiply(place.inverse())
-            copy = shape.copy()
-            copy.transformShape(whole.toMatrix(), True)
-            copies.append(copy)
+        for shape in shapes:
+            if shape is None:
+                copies.append(None)
+            elif isinstance(move, tuple):
+                _tag, point, normal = move
+                copies.append(shape.mirror(place.multVec(point), place.Rotation.multVec(normal)))
+            else:
+                whole = place.multiply(move).multiply(place.inverse())
+                copy = shape.copy()
+                copy.transformShape(whole.toMatrix(), True)
+                copies.append(copy)
     return copies
 
 
@@ -2622,7 +2763,10 @@ def _computed_copies(definition):
     try:
         state = set(definition.State)
         shape = definition.Shape
-        if not shape.isNull() and not state & {"Touched", "Invalid", "Error"}:
+        complete = all(
+            source_step_at(definition, i) is not None for i in range(source_count(definition))
+        )
+        if complete and not shape.isNull() and not state & {"Touched", "Invalid", "Error"}:
             children = [_baked(c) for c in shape.childShapes()]
             if children:
                 return children
@@ -2655,10 +2799,19 @@ def _body_of_copy(copy):
 
 
 def _set_body_props(obj, kind, options):
-    source = _bodies(options)[0]
+    sources = _bodies(options)
+    source = sources[0]
     if obj.SourceBody != source.Name or source_body(obj) is not source:
         obj.SourceBody = source.Name
         obj.Source = None  # another body: resolve_source() finds its step
+    names = [b.Name for b in sources[1:]]
+    old = _other_names(obj)
+    if names != old:
+        for i in range(1, max(len(old), len(names)) + 1):
+            prop = _ensure_source_prop(obj, i)
+            if i - 1 >= len(old) or i - 1 >= len(names) or old[i - 1] != names[i - 1]:
+                setattr(obj, prop, None)  # another body there: resolve_source() links it
+        obj.OtherSourceBodies = names
     for prop, key, kinds in BODY_PROPS:
         _set_link(obj, prop, options[key] if kind in kinds else None)
     for prop, key in BODY_ENUMS:
@@ -2672,7 +2825,8 @@ def _set_body_props(obj, kind, options):
 
 
 def _build_body_copies(kind, options, feature, name=None):
-    source = _bodies(options)[0]
+    sources = _bodies(options)
+    source = sources[0]
     doc = source.Document
     label = None
     if feature is not None and alive(feature):
@@ -2721,12 +2875,17 @@ def _build_body_copies(kind, options, feature, name=None):
             "expressions": {k: v for k, v in options["expressions"].items() if v},
         },
     )
+    for index in range(len(sources)):
+        if source_step_at(feature, index) is None:
+            raise PatternError(
+                "%s has no solid at this point of the timeline." % sources[index].Label
+            )
     count = len(body_copy_shapes(feature))
     copies = _copies_of(feature)
     for copy in copies[count:]:
         _remove_copy(copy)
     for index in range(len(copies), count):
-        _new_copy(feature, index, source)
+        _new_copy(feature, index, sources[index % len(sources)])
     return feature
 
 

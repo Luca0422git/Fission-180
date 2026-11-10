@@ -656,22 +656,24 @@ def _body_pattern_uses(obj, names):
     try:
         from . import pattern
 
-        body = pattern.source_body(obj)
-        if body is None:
-            return
-        # a body that starts as a copy (another pattern's, a Move/Copy's) exists from that
-        # step on
-        base = getattr(body, "BaseFeature", None)
-        if pattern.is_body_copy(base) and base.Pattern is not None:
-            names.add(base.Pattern.Name)
-        elif base is not None and _is_step(base):
-            names.add(base.Name)
-        for o in body.Group:
-            if _is_solid_step(o) and _is_step(o):
-                names.add(o.Name)
-                return
+        sources = [b for b in pattern.source_bodies(obj) if b is not None]
     except Exception:
-        pass
+        return
+    for body in sources:  # every body it copies (several: one step, Fusion)
+        try:
+            # a body that starts as a copy (another pattern's, a Move/Copy's) exists from
+            # that step on
+            base = getattr(body, "BaseFeature", None)
+            if pattern.is_body_copy(base) and base.Pattern is not None:
+                names.add(base.Pattern.Name)
+            elif base is not None and _is_step(base):
+                names.add(base.Name)
+            for o in body.Group:
+                if _is_solid_step(o) and _is_step(o):
+                    names.add(o.Name)
+                    break
+        except Exception:
+            pass
 
 
 def problem(obj, broken_before=None):

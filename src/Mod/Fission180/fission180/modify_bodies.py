@@ -17,7 +17,7 @@ the timeline. In FreeCAD a step belongs to one body, so the step the dialog make
 
 A follower keeps the body as it was (passes its solid through) when its lead is gone. The
 follower kinds are the classes at the end of this file: ShellFollower, DraftFollower,
-ScaleFollower and PatternFollower. Saved files store "fission180.modify_bodies.<Class>":
+ScaleFollower, MirrorFollower and PatternFollower. Saved files store "fission180.modify_bodies.<Class>":
 keep the names and the properties.
 """
 
@@ -397,6 +397,26 @@ class ScaleFollower(_Follower):
 
         point, factors = scale.spec_of(lead, obj)
         return scale.scaled(base_shape, point, factors)
+
+
+class MirrorFollower(_Follower):
+    """Mirror (Operation Join) of several bodies, in another body: the body joined with its
+    own mirror image in the lead's plane (read in this body's coordinates), as the lead
+    (FreeCAD's Mirrored, Whole shape) does in the first body."""
+
+    KIND = "MirrorFollower"
+
+    def build(self, obj, lead, base_shape):
+        from . import pattern
+
+        link = getattr(lead, "MirrorPlane", None)
+        if not link or link[0] is None:
+            raise FollowerError("the mirror plane is missing")
+        ref = (link[0], (list(link[1]) or [""])[0])
+        point, normal = pattern.plane_of(ref)
+        point = point_between(point, ref[0], obj)
+        normal = vector_between(normal, ref[0], obj)
+        return base_shape.fuse(base_shape.mirror(point, normal))
 
 
 class PatternFollower(_Follower):

@@ -1132,6 +1132,11 @@ class PatternPanel(Panel):
     # -- start ------------------------------------------------------------------------------------
     def _start(self, preselection):
         objects, ptype = self._from_selection(preselection)
+        if ptype == "bodies" and objects and self.target is None:
+            first = objects[0][0]  # the first picked body frames the references
+            if getattr(first, "TypeId", "") == "PartDesign::Body" and first.Tip is not None:
+                self.body = first
+                self.base = first.Tip
         if ptype == "components" or (objects == [] and self._components_only()):
             self._use_design_frame()  # a pattern of components: the design's origin axes
         elif self.body is None or self.base is None or self.base.Shape.isNull():
@@ -1156,6 +1161,20 @@ class PatternPanel(Panel):
         """(objects, pattern type) from what was selected before the command started."""
         features, faces, bodies = [], [], []
         parts = []
+        if any(sub.startswith("Edge") for _obj, sub in preselection if sub):
+            # Faces and edges together came from a box round bodies (a click picks one face
+            # or one edge): the box means those bodies, all of them (Fusion; a box round two
+            # bodies made a Faces pattern of the first one's faces)
+            for obj, sub in preselection:
+                if obj is None or obj.Document is not self.doc:
+                    continue
+                body = obj if obj.TypeId == "PartDesign::Body" else pattern.owner_body(obj)
+                surface = _surface_body([(obj, sub)])
+                body = surface or body
+                if body is not None and (body, "") not in bodies:
+                    bodies.append((body, ""))
+            if bodies:
+                return bodies, "bodies"
         for obj, sub in preselection:
             if obj is None or obj.Document is not self.doc:
                 continue
@@ -1184,7 +1203,7 @@ class PatternPanel(Panel):
         if faces:
             return faces, "faces"
         if bodies:
-            return bodies[:1], "bodies"
+            return bodies, "bodies"  # every selected body (Fusion patterns them all)
         if parts and self.kind != "mirror":
             return parts[:1], "components"
         return [], self.options["pattern_type"]
@@ -1205,12 +1224,12 @@ class PatternPanel(Panel):
             return "Click the component to repeat (in the window, or its browser row)."
         if self.kind == "mirror":
             return (
-                "Click the body to mirror (on the part, or in the browser). To mirror "
-                "features instead, click them in the timeline."
+                "Click the bodies to mirror (on the part, or in the browser; a box takes "
+                "several). To mirror features instead, click them in the timeline."
             )
         return (
-            "Click the body to repeat: each copy becomes a new body. To repeat features "
-            "instead, click them in the timeline."
+            "Click the bodies to repeat (a box takes several): each copy becomes a new body. "
+            "To repeat features instead, click them in the timeline."
         )
 
     # -- watching clicks ----------------------------------------------------------------------------
@@ -1288,10 +1307,31 @@ class PatternPanel(Panel):
             if getattr(self, "_handle_press", False):
                 self._handle_press = False
                 return  # released after a press on a drag handle: not a pick
-            for obj, short, _point in picks:
-                self._picked(obj, short)
+            # One click, one box: each body taken once, and a box adds bodies, never drops
+            # one already picked (a box gave every face and edge of each body: they
+            # toggled it on and off; body_hover.take_batch)
+            from . import body_hover
+
+            body_hover.take_batch(
+                picks,
+                lambda obj, short, _point: self._picked(obj, short),
+                self._pick_body_of,
+                self.picks_bodies,
+                self._has_body,
+            )
         except Exception as exc:
             warn("%s pick: %s" % (self.title, exc))
+
+    def _pick_body_of(self, obj):
+        try:
+            if obj.TypeId == "PartDesign::Body":
+                return obj
+            return pattern.owner_body(obj)
+        except Exception:
+            return None
+
+    def _has_body(self, body):
+        return any(o is body for o, _s in self.options.get("objects") or [])
 
     def _picked(self, obj, short):
         if self.active == "objects":
@@ -1362,9 +1402,6 @@ class PatternPanel(Panel):
             if body is None:
                 self.message.setText("⚠ Pick a body.")
                 return
-            if self.editing and self.body is not None and body is not self.body:
-                self.message.setText("⚠ This pattern copies %s." % self.body.Label)
-                return
             base_feature = getattr(body, "BaseFeature", None)
             if (
                 self.target is not None
@@ -1373,10 +1410,18 @@ class PatternPanel(Panel):
             ):
                 self.message.setText("⚠ %s is a copy made by this pattern." % body.Label)
                 return
-            self.body = body
-            if self.target is None:
-                self.base = body.Tip
-            self.options["objects"] = [(body, "")]
+            # Several bodies (Fusion): a click adds a body, a click on a picked one drops it
+            picked = [o for o, _s in self.options.get("objects") or [] if o is not None]
+            if any(o is body for o in picked):
+                picked = [o for o in picked if o is not body]
+            else:
+                picked.append(body)
+            self.options["objects"] = [(o, "") for o in picked]
+            if picked:
+                if self.body is None or not any(o is self.body for o in picked):
+                    self.body = picked[0]
+                    if self.target is None:
+                        self.base = picked[0].Tip
             self._changed(new_geometry=True)
             return
         if ptype == "features":

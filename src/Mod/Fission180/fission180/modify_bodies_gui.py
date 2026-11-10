@@ -12,6 +12,7 @@ ICONS = {
     "DraftFollower": "draft",
     "ScaleFollower": "scale",
     "PatternFollower": "pattern_rect",
+    "MirrorFollower": "mirror",
 }
 
 
