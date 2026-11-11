@@ -50,14 +50,32 @@ def score(query, entry):
     return total
 
 
+def once(entries):
+    """The entries without the ones a person reads as a repeat: a command listed under its
+    own name although one of Fission 180's menus lists it already (book parity report:
+    "Change Parameters" twice), and a second row with the same words and the same key (the
+    first one stays: Fission 180's menu entries come first)."""
+    in_menus = {e.get("name") for e in entries if e.get("ribbon")}
+    seen, kept = set(), []
+    for entry in entries:
+        if not entry.get("ribbon") and entry.get("name") in in_menus:
+            continue
+        key = (" ".join(entry.get("text", "").lower().split()), entry.get("shortcut") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(entry)
+    return kept
+
+
 def rank(query, entries, limit=30):
-    """Best matches first. An empty query returns entries alphabetically."""
+    """Best matches first, each row once. An empty query returns entries alphabetically."""
     if not query.strip():
-        return sorted(entries, key=lambda e: e.get("text", "").lower())[:limit]
+        return once(sorted(entries, key=lambda e: e.get("text", "").lower()))[:limit]
     scored = []
     for entry in entries:
         value = score(query, entry)
         if value is not None:
             scored.append((-value, len(haystack(entry)), entry))
     scored.sort(key=lambda t: (t[0], t[1]))
-    return [entry for _, _, entry in scored[:limit]]
+    return once([entry for _, _, entry in scored])[:limit]

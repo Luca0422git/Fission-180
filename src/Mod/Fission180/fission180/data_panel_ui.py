@@ -372,6 +372,104 @@ class DataPanelList(QtWidgets.QListWidget):
         super().keyPressEvent(event)
 
 
+class NameField(QtWidgets.QLineEdit):
+    """A card's name typed in place, over the card (Fusion: New Folder and New Project open
+    with the name ready to type; Rename edits it where it is). Enter or a click elsewhere
+    keeps the name, Esc leaves it as it was; a name that cannot be used is said under the
+    cards and the field stays open."""
+
+    def __init__(self, panel, kind, path):
+        super().__init__(panel.list.viewport())
+        self.panel = panel
+        self.kind = kind  # "folder" or "design"
+        self.path = path
+        self.done = False
+        self.setObjectName("Fission180DataPanelName")
+        self.old = os.path.basename(path) if kind == "folder" else core.design_name(path)
+        self.setText(self.old)
+        self.selectAll()
+        self.setAlignment(QtCore.Qt.AlignLeft if panel.as_list else QtCore.Qt.AlignHCenter)
+        self.place()
+        self.show()
+        self.raise_()
+        self.setFocus()
+
+    def place(self):
+        """Over the card's name (the card may have moved: the cards were listed again)."""
+        item = self.panel.item_for(self.path)
+        if item is None:
+            return False
+        self.panel.list.scrollToItem(item)
+        rect = self.panel.list.visualItemRect(item)
+        height = self.fontMetrics().height() + 6
+        if self.panel.as_list:
+            left = rect.left() + 6 + SMALL + 6
+            self.setGeometry(left, rect.top() + 3, max(80, rect.right() - 8 - left), height)
+        else:
+            self.setGeometry(rect.left() + 1, rect.top() + 6 + THUMB + 2, rect.width() - 2, height)
+        return True
+
+    def keyPressEvent(self, event):
+        # every key stays here: Qt hands an Enter the field has used on to the cards under
+        # it, which opened the folder just named (and Backspace would go up a folder)
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.cancel()
+        elif event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            self.commit()
+        else:
+            super().keyPressEvent(event)
+        event.accept()
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        try:
+            # a click elsewhere keeps the name (a moment later: the click runs first; a
+            # question box or a menu that took the keyboard is no click elsewhere)
+            if not self.done and event.reason() != QtCore.Qt.PopupFocusReason:
+                QtCore.QTimer.singleShot(0, self._left)
+        except Exception as exc:
+            warn("data panel name: %s" % exc)
+
+    def _left(self):
+        try:
+            if not self.done and not self.hasFocus() and self.isVisible():
+                if not self.commit():
+                    self.cancel()  # (nobody is typing any more: the name stays as it was)
+        except RuntimeError:
+            pass
+        except Exception as exc:
+            warn("data panel name: %s" % exc)
+
+    def commit(self):
+        if self.done:
+            return True
+        try:
+            ok = self.panel.take_name(self, self.text())
+        except Exception as exc:
+            warn("rename: %s" % exc)
+            ok = False
+        if ok:
+            self.close_field()
+        return ok
+
+    def cancel(self):
+        self.close_field()
+        self.panel.status_now()
+
+    def close_field(self):
+        if self.done:
+            return
+        self.done = True
+        if self.panel.name_field is self:
+            self.panel.name_field = None
+        self.hide()
+        self.deleteLater()
+        try:
+            self.panel.list.setFocus()
+        except RuntimeError:
+            pass
+
+
 def make_mime(paths):
     mime = QtCore.QMimeData()
     mime.setData(dp.MIME, QtCore.QByteArray(dp.encode_paths(paths).encode("utf-8")))
@@ -881,8 +979,14 @@ class DataPanel(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setObjectName("Fission180DataPanel")
-        self.folder = vui.project_folder()
         self.root = None  # the place shown (None: This computer, the project folder)
+        # (wave 7) the folder it showed last, while that is still a folder of the project
+        try:
+            kept = _prefs().GetString("DataPanelFolder", "")
+        except Exception:
+            kept = ""
+        self.folder = dp.remembered_folder(vui.project_folder(), kept)
+        self.name_field = None  # the name being typed in place (NameField)
         self.conflicts = {}  # file name -> its original's name (sync apps' copies here)
         self.dragging = False
         self.details_closed = None  # the design whose details were closed (stay closed)
@@ -910,6 +1014,11 @@ class DataPanel(QtWidgets.QWidget):
         self.crumbs = QtWidgets.QLabel("")
         self.crumbs.setTextFormat(QtCore.Qt.RichText)
         self.crumbs.linkActivated.connect(self.set_folder)
+        # the path never widens the panel (a long one pushed the browser down to a strip):
+        # it is shortened from the front to what fits (_show_crumbs)
+        self.crumbs.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        self.crumbs.setMinimumWidth(40)
+        self._crumbs = []
         bar.addWidget(self.crumbs, 1)
         self.reload = self._tool("Refresh", "Refresh", self.refresh, "Fission180DataPanelRefresh")
         bar.addWidget(self.reload)
@@ -935,8 +1044,21 @@ class DataPanel(QtWidgets.QWidget):
             "border: none; border-radius: 3px; padding: 4px 12px; }" % accent
         )
         actions.addWidget(self.upload)
+        # Fusion's New Project: a project is a folder directly in the project folder (wave 7)
+        self.new_project = self._tool(
+            "New Project",
+            "New Project: a new project (a folder at the top of this place); type its name",
+            lambda *_: self.make_project(),
+            "Fission180DataPanelNewProject",
+        )
+        self.new_project.setIcon(ui_icon("project"))
+        self.new_project.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        actions.addWidget(self.new_project)
         self.new_folder = self._tool(
-            "New Folder", "New Folder", self.make_folder, "Fission180DataPanelNewFolder"
+            "New Folder",
+            "New Folder in the folder shown; type its name",
+            lambda *_: self.make_folder(),
+            "Fission180DataPanelNewFolder",
         )
         self.new_folder.setIcon(ui_icon("folder"))
         self.new_folder.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
@@ -1002,6 +1124,7 @@ class DataPanel(QtWidgets.QWidget):
         self._poll.setInterval(POLL_MS)
         self._poll.timeout.connect(self._look_for_changes)
         self._poll.start()
+        self._status_text = ""
         self.refresh()
 
     @staticmethod
@@ -1116,6 +1239,10 @@ class DataPanel(QtWidgets.QWidget):
         if not core.inside(project, folder):
             folder = project
         self.folder = folder
+        try:  # (wave 7) the panel opens on it again next time; Save suggests it
+            _prefs().SetString("DataPanelFolder", folder)
+        except Exception:
+            pass
         if self.search.text():
             self.search.blockSignals(True)
             self.search.clear()  # opening a folder leaves the search
@@ -1149,7 +1276,51 @@ class DataPanel(QtWidgets.QWidget):
         except Exception:
             return 0
 
+    def _show_crumbs(self):
+        """The path to the folder shown, each part a link; the first parts give way to "…"
+        (a link to the last one left out) when the panel is too narrow for all of it."""
+        try:
+            crumbs = list(self._crumbs)
+            width = max(60, self.crumbs.width())
+            shown = dp.fit_crumbs(
+                [label for label, _path in crumbs],
+                width,
+                self.crumbs.fontMetrics().horizontalAdvance,
+            )
+            link = theme.TEXT or "#f5f5f5"
+            parts = []
+            for index in shown:
+                if index is None:
+                    hidden = [i for i in range(len(crumbs)) if i not in shown]
+                    label, path = "\u2026", crumbs[hidden[-1]][1]
+                else:
+                    label, path = crumbs[index]
+                parts.append(
+                    '<a href="%s" style="color:%s;text-decoration:none">%s</a>'
+                    % (path, link, label.replace("&", "&amp;").replace("<", "&lt;"))
+                )
+            self.crumbs.setText(" / ".join(parts))
+        except Exception as exc:
+            warn("data panel: path: %s" % exc)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        try:
+            self._show_crumbs()
+        except Exception:
+            pass
+
+    def status_now(self):
+        """The status line as the last listing wrote it (after a refusal shown there)."""
+        try:
+            self.status.setText(self._status_text)
+        except Exception:
+            pass
+
     def refresh(self):
+        editing = None
+        if self.name_field is not None and not self.name_field.done:
+            editing = self.name_field  # the cards are listed again under the open name field
         try:
             self._fill_places()
             project = self.place_root()
@@ -1177,14 +1348,8 @@ class DataPanel(QtWidgets.QWidget):
                 self.details.show_for(None, None)
                 return
             crumbs = core.breadcrumbs(project, self.folder)
-            link = theme.TEXT or "#f5f5f5"
-            self.crumbs.setText(
-                " / ".join(
-                    '<a href="%s" style="color:%s;text-decoration:none">%s</a>'
-                    % (path, link, label)
-                    for label, path in crumbs
-                )
-            )
+            self._crumbs = crumbs
+            self._show_crumbs()
             self.crumbs.setToolTip(self.folder)
             self.up.setEnabled(len(crumbs) > 1)
             query = self.search.text() if self.searching() else None
@@ -1204,11 +1369,15 @@ class DataPanel(QtWidgets.QWidget):
             counts = self._version_counts(project)
             now = time.time()
             for folder in folders:
-                item = QtWidgets.QListWidgetItem(ui_icon("folder"), folder["name"])
+                project_card = dp.is_project(project, folder["path"])
+                item = QtWidgets.QListWidgetItem(
+                    ui_icon("project" if project_card else "folder"), folder["name"]
+                )
                 item.setData(ROLE, ("folder", folder["path"]))
                 item.setData(ROLE_NAME, folder["name"])
                 where = folder.get("where")
-                item.setData(ROLE_SUB, ("Folder, in " + where) if where else "Folder")
+                kind_word = "Project" if project_card else "Folder"
+                item.setData(ROLE_SUB, (kind_word + ", in " + where) if where else kind_word)
                 item.setData(ROLE_SHORT, ("in " + where) if where else "")
                 item.setToolTip(folder["path"])
                 self.list.addItem(item)
@@ -1239,12 +1408,20 @@ class DataPanel(QtWidgets.QWidget):
                 if item is not None:
                     item.setSelected(True)
                     self.list.setCurrentItem(item, QtCore.QItemSelectionModel.NoUpdate)
-            self.status.setText(dp.status_text(folders, designs, query, more))
+            self._status_text = dp.status_text(folders, designs, query, more)
+            if editing is None:
+                self.status.setText(self._status_text)
         except Exception as exc:
             warn("data panel: %s" % exc)
             self.status.setText("The folder could not be read: %s" % exc)
         finally:
             self.list.blockSignals(False)
+        if editing is not None:
+            try:
+                if not editing.place():
+                    editing.close_field()  # its card is gone
+            except RuntimeError:
+                self.name_field = None
         self._selection_changed()
 
     # -- changes made elsewhere (the file manager, another computer on the NAS)
@@ -1264,7 +1441,20 @@ class DataPanel(QtWidgets.QWidget):
             log("data panel: %s is slow to list; it is refreshed on Refresh only" % folder)
         return found
 
+    def _typing_name(self):
+        field = self.name_field
+        try:
+            return field is not None and not field.done and field.isVisible()
+        except RuntimeError:
+            self.name_field = None
+            return False
+
     def _look_for_changes(self):
+        if self._typing_name():
+            return  # (the cards stay as they are under the name being typed)
+        self._look_for_changes_now()
+
+    def _look_for_changes_now(self):
         try:
             if (
                 not self.isVisible()
@@ -1419,6 +1609,9 @@ class DataPanel(QtWidgets.QWidget):
         if key == QtCore.Qt.Key_Delete and kind == "design":
             QtCore.QTimer.singleShot(0, lambda: self._trash(path))
             return True
+        if key == QtCore.Qt.Key_Delete and kind == "folder":
+            QtCore.QTimer.singleShot(0, lambda: self._trash_folder(path))
+            return True
         if key == QtCore.Qt.Key_Backspace:
             QtCore.QTimer.singleShot(0, self.go_up)
             return True
@@ -1508,17 +1701,131 @@ class DataPanel(QtWidgets.QWidget):
             self.select(made[-1])
         return made
 
-    def make_folder(self):
+    def make_folder(self, name=True):
+        """New Folder in the folder shown; its name is typed at once, in place (Fusion).
+        name=False: no name field (the folder keeps "New Folder")."""
         try:
+            self._end_name()
             path = core.new_folder(self.folder)
             log("made the folder %s" % path)
             if self.search.text():
                 self.search.clear()
             self.refresh()
             self.select(path)
+            if name:
+                self.edit_name(path)
+            return path
         except Exception as exc:
             warn("new folder: %s" % exc)
             commands.tell("The folder could not be made: %s" % exc)
+            return None
+
+    def make_project(self, name=True):
+        """Fusion's New Project: a new folder at the top of the place shown (a project), the
+        panel showing the projects, its name typed at once."""
+        try:
+            self._end_name()
+            root = self.place_root()
+            os.makedirs(root, exist_ok=True)
+            path = core.new_folder(root, dp.NEW_PROJECT)
+            log("made the project %s" % path)
+            self.set_folder(root)
+            self.select(path)
+            if name:
+                self.edit_name(path)
+            return path
+        except Exception as exc:
+            warn("new project: %s" % exc)
+            commands.tell("The project could not be made: %s" % exc)
+            return None
+
+    # -- a name typed in place (New Folder, New Project, Rename, F2)
+    def _end_name(self):
+        """A name still being typed is kept (or left as it was when it cannot be used)."""
+        field = self.name_field
+        if field is None:
+            return
+        try:
+            if not field.done and not field.commit():
+                field.cancel()
+        except RuntimeError:
+            self.name_field = None
+
+    def edit_name(self, path):
+        """Open the name field over the card of `path` (a folder or a design)."""
+        try:
+            self._end_name()
+            item = self.item_for(path)
+            if item is None:
+                return None
+            kind = item.data(ROLE)[0]
+            if kind == "design" and core.is_cad_file(path):
+                commands.tell("An uploaded STEP or IGES file keeps its name here.")
+                return None
+            self.name_field = NameField(self, kind, path)
+            return self.name_field
+        except Exception as exc:
+            warn("rename: %s" % exc)
+            return None
+
+    def take_name(self, field, text):
+        """The name typed for field.path: renamed (True), or refused with the reason in the
+        status line (False: the field stays open)."""
+        path, old = field.path, field.old
+        new = " ".join((text or "").split())
+        if new == old:
+            self.status_now()
+            return True
+        parent = os.path.dirname(path)
+        if field.kind == "folder":
+            refusal = dp.name_refusal(parent, new, old)
+        else:
+            refusal = dp.name_refusal(parent, new)
+            if not refusal and os.path.exists(core.design_path(parent, new)):
+                refusal = "A design called %s is there already. Choose another name." % new
+        if refusal:
+            self.status.setText(refusal)
+            QtWidgets.QToolTip.showText(
+                field.mapToGlobal(QtCore.QPoint(0, field.height())), refusal
+            )
+            return False
+        try:
+            if field.kind == "folder":
+                opened = vui._open_in_folder(path)
+                if opened:
+                    raise core.StoreError(
+                        "Close %s first: a design of this folder is open." % ", ".join(opened)
+                    )
+                target = os.path.join(parent, new)
+                os.replace(path, target)
+                if core.inside(path, self.folder):  # (the folder shown, or one above it)
+                    self.folder = os.path.normpath(
+                        os.path.join(target, os.path.relpath(self.folder, path))
+                    )
+                    _prefs().SetString("DataPanelFolder", self.folder)
+                log("renamed the folder %s to %s" % (path, target))
+            else:
+                open_doc = vui.doc_for_file(path)
+                if open_doc is not None and vui._has_views(open_doc):
+                    raise core.StoreError("Close the design before renaming it.")
+                users = vui._open_referrers(path)
+                if users:
+                    raise core.StoreError("Close %s first: it uses %s." % (", ".join(users), old))
+                target = core.rename_design(path, new, vui.project_folder(), vui.use_git())
+                log("renamed the design %s to %s" % (path, target))
+        except Exception as exc:
+            self.status.setText("Could not rename: %s" % exc)
+            commands.tell("Could not rename: %s" % exc)
+            return False
+        field.done = True  # (the cards are listed again without it)
+        field.hide()
+        field.deleteLater()
+        self.name_field = None
+        self.refresh()
+        if isinstance(target, str):
+            self.select(target)
+        self.list.setFocus()
+        return True
 
     def choose_project_folder(self):
         try:
@@ -1553,13 +1860,24 @@ class DataPanel(QtWidgets.QWidget):
         self.refresh()
         return moved
 
-    def _menu(self, pos):
+    def contextMenuEvent(self, event):
+        """A right-click anywhere on the panel that is not a card: the same menu as on the
+        empty space between the cards (New Project, New Folder, Upload, Refresh)."""
         try:
-            item = self.list.itemAt(pos)
+            self._menu(None, event.globalPos())
+            event.accept()
+        except Exception as exc:
+            warn("data panel menu: %s" % exc)
+
+    def _menu(self, pos, at=None):
+        try:
+            item = self.list.itemAt(pos) if pos is not None else None
             menu = QtWidgets.QMenu(self)
             menu.setObjectName("Fission180DataPanelMenu")
+            later = QtCore.QTimer.singleShot  # (a name field opens once the menu has closed)
             if item is None:
-                menu.addAction("New Folder", self.make_folder)
+                menu.addAction("New Project", lambda: later(0, self.make_project))
+                menu.addAction("New Folder", lambda: later(0, self.make_folder))
                 menu.addAction("Upload...", lambda: self.upload_file())
                 menu.addAction("Refresh", self.refresh)
             else:
@@ -1569,7 +1887,11 @@ class DataPanel(QtWidgets.QWidget):
                 has_doc = App.ActiveDocument is not None
                 if kind == "folder":
                     menu.addAction("Open", lambda: self.set_folder(path))
-                    menu.addAction("Rename", lambda: self._rename(path, True))
+                    menu.addSeparator()
+                    menu.addAction("Rename", lambda: later(0, lambda: self._rename(path, True)))
+                    menu.addAction("Move...", lambda: self.move_or_copy(path, "move"))
+                    menu.addAction("Copy...", lambda: self.move_or_copy(path, "copy"))
+                    menu.addAction("Delete", lambda: later(0, lambda: self._trash_folder(path)))
                 elif core.is_cad_file(path):  # an uploaded STEP / IGES file
                     menu.addAction("Open", lambda: vui.open_design(path))
                     menu.addAction(
@@ -1583,7 +1905,7 @@ class DataPanel(QtWidgets.QWidget):
                     if original:
                         twin = os.path.join(os.path.dirname(path), original)
                         menu.addAction(
-                            "Compare with %s" % core.design_name(original),
+                            "Compare with %s" % core.design_name(original).replace("&", "&&"),
                             lambda: vui.compare_files(path, twin),
                         )
                         menu.addAction("Keep This One", lambda: self.keep_copy(path, twin))
@@ -1597,13 +1919,13 @@ class DataPanel(QtWidgets.QWidget):
                         "Insert a Copy into Current Design", lambda: vui.insert_copy(path)
                     ).setEnabled(has_doc)
                     menu.addSeparator()
-                    menu.addAction("Rename", lambda: self._rename(path, False))
+                    menu.addAction("Rename", lambda: later(0, lambda: self._rename(path, False)))
                     menu.addAction("Move...", lambda: self.move_or_copy(path, "move"))
                     menu.addAction("Copy...", lambda: self.move_or_copy(path, "copy"))
                     menu.addAction("Delete", lambda: self._trash(path))
                 menu.addSeparator()
                 menu.addAction("Show in Folder", lambda: vui._show_in_folder(path))
-            menu.exec_(self.list.mapToGlobal(pos))
+            menu.exec_(at if at is not None else self.list.viewport().mapToGlobal(pos))
         except Exception as exc:
             warn("data panel menu: %s" % exc)
 
@@ -1613,28 +1935,10 @@ class DataPanel(QtWidgets.QWidget):
         return kept
 
     def _rename(self, path, is_folder):
-        try:
-            old = os.path.basename(path) if is_folder else core.design_name(path)
-            new, ok = QtWidgets.QInputDialog.getText(self, "Rename", "New name", text=old)
-            if not ok or not new.strip() or new.strip() == old:
-                return
-            if is_folder:
-                target = os.path.join(os.path.dirname(path), core.clean_name(new))
-                if os.path.exists(target):
-                    raise core.StoreError("A folder called %s is already there." % new)
-                os.replace(path, target)
-            else:
-                open_doc = vui.doc_for_file(path)
-                if open_doc is not None and vui._has_views(open_doc):
-                    raise core.StoreError("Close the design before renaming it.")
-                users = vui._open_referrers(path)
-                if users:
-                    raise core.StoreError("Close %s first: it uses %s." % (", ".join(users), old))
-                core.rename_design(path, new, vui.project_folder(), vui.use_git())
-            self.refresh()
-        except Exception as exc:
-            warn("rename: %s" % exc)
-            commands.tell("Could not rename: %s" % exc)
+        """Rename (the menu, F2): the name is typed in place, over the card (it was a small
+        dialog of its own: book parity report)."""
+        del is_folder
+        return self.edit_name(path)
 
     def move_or_copy(self, path, kind):
         """Right-click > Move... / Copy...: pick the folder (Fusion's Move / Copy To)."""
@@ -1648,12 +1952,25 @@ class DataPanel(QtWidgets.QWidget):
     def _moved_or_copied(self, path, kind, folder):
         if not folder:
             return
-        done = vui.move_design(path, folder) if kind == "move" else vui.copy_design(path, folder)
+        if os.path.isdir(path):  # (wave 7) a folder with everything in it
+            done = (
+                vui.move_folder(path, folder) if kind == "move" else vui.copy_folder(path, folder)
+            )
+        else:
+            done = (
+                vui.move_design(path, folder) if kind == "move" else vui.copy_design(path, folder)
+            )
         if done:
             self.refresh()
+            self.select(done)
 
     def _trash(self, path):
         """Delete (right-click, the details' Delete, the Delete key): versions_ui asks, then
         moves it to this place's trash folder."""
         if vui.delete_design(path, self.place_root(), self):
+            self.refresh()
+
+    def _trash_folder(self, path):
+        """Delete on a folder: versions_ui asks, then the folder goes to the trash."""
+        if vui.delete_folder(path, self.place_root(), self):
             self.refresh()

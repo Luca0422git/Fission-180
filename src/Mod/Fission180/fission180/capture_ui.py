@@ -138,9 +138,14 @@ class ImageOptions(QtWidgets.QDialog):
         if doc is None or Gui.ActiveDocument is None:
             self.message.setText("⚠ Open a design first.")
             return
-        start = App.ParamGet(PREFS).GetString("LastImageFolder", "") or (
-            os.path.dirname(doc.FileName) if doc.FileName else os.path.expanduser("~")
-        )
+        start = App.ParamGet(PREFS).GetString("LastImageFolder", "")
+        if not start:
+            try:  # (wave 7, shell) the design's folder, then the Data Panel's: never "home"
+                from . import versions_ui
+
+                start = versions_ui.start_folder(doc)
+            except Exception:
+                start = os.path.expanduser("~")
         start = os.path.join(start, (doc.Label or "Design") + ".png")
         filters = "PNG (*.png);;JPEG (*.jpg *.jpeg);;TIFF (*.tif *.tiff);;BMP (*.bmp)"
         if SAVE_DIALOG is not None:

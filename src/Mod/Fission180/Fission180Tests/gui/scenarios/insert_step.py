@@ -174,7 +174,18 @@ def d_check():
     h.check("a sketch opened on the plate", sketch is not None)
     plate = x.body_of("Plate")
     if sketch is not None and plate is not None:
-        h.check("in the Plate's body", sketch in plate.Group, [o.Label for o in plate.Group])
+        # (wave 7, components) new work goes into the ACTIVE component, as in Fusion: with
+        # the design's own row active a sketch on the inserted plate's face is the design's,
+        # not the Plate's (it went into the clicked body before; activate Plate to add to it)
+        from fission180 import components
+
+        h.check(
+            "in the active component (the design), not the Plate's body",
+            sketch not in plate.Group and components.component_of(sketch) is None,
+            (components.component_of(sketch), [o.Label for o in plate.Group]),
+        )
+        top = sketch.getGlobalPlacement().Base.z
+        h.check("on the plate's top face (z 5)", abs(top - 5.0) < 1e-6, top)
     i.no_file()
 
 

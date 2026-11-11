@@ -45,7 +45,15 @@ BACKUP = "User parameter:BaseApp/Preferences/Mod/Fission180/FilesBackup"
 # FreeCAD's own autosave is off while Fission 180 is on: Fission 180's recovery copies replace it
 # (two autosavers would write every design twice and show two recovery dialogs after a
 # crash). The user's own value comes back when Fission 180 is off (theme.keep_and_set).
-FREECAD_SETTINGS = [(FREECAD_DOC_PREFS, "Bool", "AutoSaveEnabled", False)]
+# (wave 7) RecoveryEnabled too: it is what makes FreeCAD look for its own autosaves of a
+# crashed session when it starts and put up its "Document Recovery" dialog, beside Fission
+# 180's "Recover unsaved work?" (book parity report, Finger Surfboard). Switching
+# AutoSaveEnabled off does not stop the autosave timer of the session it is switched off in
+# (FreeCAD reads it at start-up only): a first session still wrote FreeCAD's copies.
+FREECAD_SETTINGS = [
+    (FREECAD_DOC_PREFS, "Bool", "AutoSaveEnabled", False),
+    (FREECAD_DOC_PREFS, "Bool", "RecoveryEnabled", False),
+]
 RECOVERED_DESCRIPTION = "Recovered after a crash"
 
 _state = {
@@ -67,6 +75,43 @@ _dialogs = {}  # open dialogs by key (one Save dialog per design, one history pe
 # -- settings ----
 def prefs():
     return App.ParamGet(PREFS)
+
+
+def panel_folder():
+    """The folder the Data Panel shows (or showed last), while it is a folder of the project
+    folder or of a connected place; else None. A new design is saved there by default
+    (Fusion saves into the project and folder open in the Data Panel: book parity report)."""
+    try:
+        panel_ = _state.get("panel")
+        folder = panel_.folder if _alive(panel_) else prefs().GetString("DataPanelFolder", "")
+        if not folder or not os.path.isdir(folder):
+            return None
+        if core.inside(project_folder(), folder):
+            return folder
+        from . import locations_ui
+
+        for place in locations_ui.all_places():
+            if place.get("root") and core.inside(place["root"], folder):
+                return folder
+    except Exception as exc:
+        log("the Data Panel's folder: %s" % exc)
+    return None
+
+
+def start_folder(doc=None):
+    """Where a file dialog of Fission 180 starts (Export, Save As DXF, Capture Image...): the
+    design's own folder, else the folder open in the Data Panel, else the project folder
+    (it was the home folder or wherever FreeCAD was last: book parity report)."""
+    try:
+        doc = doc or App.ActiveDocument
+        if doc is not None and doc.FileName:
+            folder = os.path.dirname(doc.FileName)
+            if os.path.isdir(folder):
+                return folder
+    except Exception:
+        pass
+    folder = panel_folder() or project_folder()
+    return folder if os.path.isdir(folder) else os.path.expanduser("~")
 
 
 def default_project_folder():
@@ -295,6 +340,18 @@ class SaveDialog(QtWidgets.QDialog):
         row.addWidget(self.new_folder)
         form.addRow("Location", row)
         layout.addLayout(form)
+        # (wave 7) Fusion's Save shows the projects and folders in the dialog itself: click
+        # one and the design is saved there (the "..." chooser is for a folder elsewhere)
+        self.tree = QtWidgets.QTreeWidget()
+        self.tree.setObjectName("Fission180SaveFolders")
+        self.tree.setHeaderHidden(True)
+        self.tree.setMinimumHeight(170)
+        self.tree.setToolTip("The projects and folders of this place: click where to save")
+        self.tree.itemExpanded.connect(self._fill_children)
+        self.tree.currentItemChanged.connect(self._tree_chosen)
+        self.tree.itemChanged.connect(self._tree_renamed)
+        layout.addWidget(self.tree, 1)
+        self._tree_root = None
         self.message = QtWidgets.QLabel("")
         self.message.setWordWrap(True)
         self.message.setStyleSheet("color: #ff8a80;")
@@ -313,7 +370,8 @@ class SaveDialog(QtWidgets.QDialog):
         older = version_of(doc)  # an older version opened read-only: its design's place
         design_file = older[0] if older else doc.FileName
         folder = os.path.dirname(design_file) if design_file else ""
-        folder = folder or project_folder()
+        # (wave 7) a design without a file: the folder open in the Data Panel
+        folder = folder or panel_folder() or project_folder()
         self.location.setText(folder)
         base = core.clean_name(core.design_name(design_file) if design_file else doc.Label)
         base = base or "Design"
@@ -327,6 +385,130 @@ class SaveDialog(QtWidgets.QDialog):
         self._fill_places(folder)
         self.place.activated.connect(self._place_chosen)
         self.location.textChanged.connect(self._match_place)
+        self.location.textChanged.connect(self._show_in_tree)
+        self._show_in_tree(folder)
+
+    # -- the folders of the place, in the dialog
+    def _place_root(self, folder):
+        """The root of the place `folder` is in (the innermost), or None (a folder elsewhere:
+        the tree then shows the project folder with nothing selected)."""
+        best = None
+        for i in range(self.place.count()):
+            root = self.place.itemData(i)
+            if root and core.inside(root, folder) and (best is None or len(root) > len(best)):
+                best = root
+        return best
+
+    def _folder_item(self, parent, name, path, root=False):
+        item = QtWidgets.QTreeWidgetItem(parent, [name])
+        item.setData(0, QtCore.Qt.UserRole, path)
+        project = (
+            not root and self._tree_root and core.same_path(os.path.dirname(path), self._tree_root)
+        )
+        item.setIcon(0, ui_icon("project" if project else "folder"))
+        # filled when it is opened: a NAS is not walked whole, nor looked into just to know
+        # whether a folder has folders (the arrow goes once it is opened and has none)
+        item.setChildIndicatorPolicy(QtWidgets.QTreeWidgetItem.ShowIndicator)
+        item.setData(0, QtCore.Qt.UserRole + 1, False)
+        return item
+
+    def _fill_children(self, item):
+        if item.data(0, QtCore.Qt.UserRole + 1):
+            return
+        self.tree.blockSignals(True)
+        try:
+            item.setData(0, QtCore.Qt.UserRole + 1, True)
+            folders, _designs = core.list_folder(item.data(0, QtCore.Qt.UserRole))
+            for folder in folders:
+                self._folder_item(item, folder["name"], folder["path"])
+            item.setChildIndicatorPolicy(QtWidgets.QTreeWidgetItem.DontShowIndicatorWhenChildless)
+        finally:
+            self.tree.blockSignals(False)
+
+    def _tree_item(self, folder):
+        """The tree's row of `folder` (the rows down to it are filled and opened), or None."""
+        item = self.tree.topLevelItem(0)
+        if item is None or not core.inside(self._tree_root, folder):
+            return None
+        rel = os.path.relpath(os.path.abspath(folder), os.path.abspath(self._tree_root))
+        for part in [p for p in rel.split(os.sep) if p not in ("", ".")]:
+            self._fill_children(item)
+            found = None
+            for i in range(item.childCount()):
+                if item.child(i).text(0).lower() == part.lower():
+                    found = item.child(i)
+                    break
+            if found is None:
+                return None
+            item.setExpanded(True)
+            item = found
+        return item
+
+    def _show_in_tree(self, folder):
+        """The tree follows the Location (typed, chosen with "...", a place picked)."""
+        try:
+            folder = (folder or "").strip()
+            root = self._place_root(folder) if folder else None
+            root = root or project_folder()
+            self.tree.blockSignals(True)
+            try:
+                if self._tree_root is None or not core.same_path(root, self._tree_root):
+                    self.tree.clear()
+                    self._tree_root = root
+                    top = self._folder_item(self.tree, "Project", root, root=True)
+                    self._fill_children(top)
+                    top.setExpanded(True)
+                item = self._tree_item(folder) if folder and os.path.isdir(folder) else None
+                self.tree.setCurrentItem(item)
+                if item is not None:
+                    self.tree.scrollToItem(item)
+            finally:
+                self.tree.blockSignals(False)
+        except Exception as exc:
+            warn("save dialog: folders: %s" % exc)
+
+    def _tree_chosen(self, item, _previous=None):
+        try:
+            if item is not None:
+                path = item.data(0, QtCore.Qt.UserRole)
+                if path and not core.same_path(path, self.location.text().strip()):
+                    self.location.setText(path)
+                self.message.setText("")
+        except Exception as exc:
+            warn("save dialog: %s" % exc)
+
+    def _tree_renamed(self, item, _column=0):
+        """A folder's name typed in the tree (New Folder opens it at once)."""
+        try:
+            path = item.data(0, QtCore.Qt.UserRole)
+            if not path or item.parent() is None:
+                return
+            old, new = os.path.basename(path), " ".join(item.text(0).split())
+            if new == old:
+                return
+            from . import data_panel_core as dp
+
+            refusal = dp.name_refusal(os.path.dirname(path), new, old)
+            self.tree.blockSignals(True)
+            try:
+                if refusal:
+                    item.setText(0, old)
+                    self.message.setText(refusal)
+                    return
+                target = os.path.join(os.path.dirname(path), new)
+                os.replace(path, target)
+                item.setText(0, new)
+                item.setData(0, QtCore.Qt.UserRole, target)
+                log("renamed the folder %s to %s" % (path, target))
+            finally:
+                self.tree.blockSignals(False)
+            self.message.setText("")
+            self.location.setText(target)
+            panel_ = _state.get("panel")
+            if _alive(panel_):
+                panel_.refresh()
+        except Exception as exc:
+            self.message.setText("The folder could not be renamed: %s" % exc)
 
     def _fill_places(self, folder):
         try:
@@ -371,9 +553,18 @@ class SaveDialog(QtWidgets.QDialog):
             parent = self.location.text().strip() or project_folder()
             os.makedirs(parent, exist_ok=True)
             path = core.new_folder(parent)
+            # the tree is read again from the new folder's parent down
+            self._tree_root = None
             self.location.setText(path)
             self.message.setText("")
             log("made the folder %s" % path)
+            item = self._tree_item(path)
+            if item is not None:  # (wave 7) its name is typed at once, in the tree
+                self.tree.blockSignals(True)
+                item.setFlags(item.flags() | QtCore.Qt.ItemIsEditable)
+                self.tree.blockSignals(False)
+                self.tree.setCurrentItem(item)
+                self.tree.editItem(item, 0)
         except Exception as exc:
             self.message.setText("The folder could not be made: %s" % exc)
 
@@ -1664,17 +1855,29 @@ class MoveCopyDialog(QtWidgets.QDialog):
         super().__init__(_main())
         self.kind = kind
         self.path = path
+        self.is_folder = os.path.isdir(path)  # (wave 7: a folder moves or copies whole)
         self.setObjectName("Fission180MoveCopyDialog")
         verb = "Move" if kind == "move" else "Copy"
-        self.setWindowTitle("%s %s" % (verb, core.design_name(path)))
+        name = (
+            os.path.basename(os.path.normpath(path)) if self.is_folder else core.design_name(path)
+        )
+        self.setWindowTitle("%s %s" % (verb, name))
         self.setModal(True)
         self.setMinimumWidth(420)
         layout = QtWidgets.QVBoxLayout(self)
-        text = QtWidgets.QLabel(
-            "Move %s and its versions to:" % core.design_name(path)
-            if kind == "move"
-            else "Copy %s to (the copy is a separate design, v1):" % core.design_name(path)
-        )
+        if self.is_folder:
+            words = (
+                "Move the folder %s and everything in it to:" % name
+                if kind == "move"
+                else "Copy the folder %s to (its designs become separate designs, v1):" % name
+            )
+        else:
+            words = (
+                "Move %s and its versions to:" % name
+                if kind == "move"
+                else "Copy %s to (the copy is a separate design, v1):" % name
+            )
+        text = QtWidgets.QLabel(words)
         text.setWordWrap(True)
         layout.addWidget(text)
         self.list = QtWidgets.QListWidget()
@@ -1701,6 +1904,8 @@ class MoveCopyDialog(QtWidgets.QDialog):
         self.list.clear()
         here = os.path.dirname(self.path)
         for label, folder in core.project_folders(project_folder()):
+            if self.is_folder and core.inside(self.path, folder):
+                continue  # a folder never goes into itself
             item = QtWidgets.QListWidgetItem(ui_icon("folder"), label)
             item.setData(QtCore.Qt.UserRole, folder)
             if self.kind == "move" and core.same_path(folder, here):
@@ -1931,6 +2136,216 @@ def delete_design(path, root=None, parent=None):
         return None
 
 
+# -- whole folders (wave 7: the Data Panel's folder menu had Open and Rename only) ----
+def _open_in_folder(folder):
+    """The labels of the open designs whose file is in the folder."""
+    found = []
+    for name in App.listDocuments():
+        doc = App.getDocument(name)
+        if doc is not None and doc.FileName and core.inside(folder, doc.FileName):
+            found.append(doc.Label)
+    return found
+
+
+def _folder_in_use(folder, verb):
+    """True (and it is said) when the folder cannot be touched now: a design of it is open,
+    or an open design uses one of its designs."""
+    from . import data_panel_core as dp
+
+    name = os.path.basename(os.path.normpath(folder))
+    opened = _open_in_folder(folder)
+    if opened:
+        commands.tell(
+            "Close %s first: %s in %s."
+            % (", ".join(opened), "it is" if len(opened) == 1 else "they are", name)
+        )
+        return True
+    users = []
+    for design in dp.designs_under(folder):
+        for label in _open_referrers(design):
+            if label not in users:
+                users.append(label)
+    if users:
+        commands.tell(
+            "Close %s first: %s designs of %s, and %s needs them where they are."
+            % (", ".join(users), "it uses" if len(users) == 1 else "they use", name, verb)
+        )
+        return True
+    return False
+
+
+def move_folder(folder, target_parent):
+    """Move a folder with everything in it into `target_parent` (Fusion's Move on a
+    folder): each design goes with its versions, and the designs elsewhere that insert one
+    of them are pointed at its new place. Returns the folder's new path, or None (said)."""
+    from . import data_panel_core as dp
+
+    try:
+        name = os.path.basename(os.path.normpath(folder))
+        refusal = dp.folder_refusal(folder, target_parent, "move")
+        if refusal:
+            commands.tell("Could not move: %s" % refusal)
+            return None
+        if _folder_in_use(folder, "moving"):
+            return None
+        plan = dp.tree_plan(folder, target_parent)
+        for made in plan["folders"]:
+            os.makedirs(made, exist_ok=True)
+        fallback = os.path.join(user_dir(), "Fission180", "versions")
+        updated = []
+        for design, there in plan["designs"]:
+            _new, changed = core.move_design(design, there, project_folder(), use_git(), fallback)
+            updated += [c for c in changed if c not in updated]
+        for source, target in plan["files"]:
+            os.replace(source, target)
+        _remove_empty_tree(folder)
+        log("moved the folder %s to %s" % (folder, plan["root"]))
+        where = os.path.basename(os.path.normpath(target_parent)) or target_parent
+        commands.tell(
+            "%s moved to %s with %d design%s%s."
+            % (
+                name,
+                where,
+                len(plan["designs"]),
+                "" if len(plan["designs"]) == 1 else "s",
+                (" (%d other designs now point there)" % len(updated)) if updated else "",
+            )
+        )
+        _refresh_views()
+        return plan["root"]
+    except core.StoreError as exc:
+        log("folder move refused: %s" % exc)
+        commands.tell("Could not move: %s" % exc)
+        return None
+    except Exception as exc:
+        warn("folder move: %s" % exc)
+        commands.tell("Could not move: %s" % exc)
+        return None
+
+
+def _remove_empty_tree(folder):
+    """Remove what a moved folder left behind: the folders, once nothing but emptied
+    version folders is in them. Anything else that is still there stays (never deleted)."""
+    for here, dirs, files in os.walk(folder, topdown=False):
+        if files:
+            continue
+        try:
+            os.rmdir(here)
+        except OSError:
+            pass
+
+
+def copy_folder(folder, target_parent):
+    """Copy a folder with everything in it into `target_parent`: every design a separate
+    design (v1), under the folder's name or "Name 2" when taken. Returns the new path."""
+    from . import data_panel_core as dp
+
+    try:
+        name = os.path.basename(os.path.normpath(folder))
+        refusal = dp.folder_refusal(folder, target_parent, "copy")
+        if refusal:
+            commands.tell("Could not copy: %s" % refusal)
+            return None
+        os.makedirs(target_parent, exist_ok=True)
+        new_name = core.unique_name(target_parent, name)
+        plan = dp.tree_plan(folder, target_parent, new_name)
+        for made in plan["folders"]:
+            os.makedirs(made, exist_ok=True)
+        import shutil
+
+        for design, there in plan["designs"]:
+            new = core.copy_design(design, there)
+            try:
+                store_of(new).record("Copy of %s" % core.design_name(design))
+            except Exception as exc:
+                warn("the copy's first version could not be recorded: %s" % exc)
+        for source, target in plan["files"]:
+            shutil.copy2(source, target)
+        log("copied the folder %s to %s" % (folder, plan["root"]))
+        commands.tell(
+            "%s copied to %s as %s (%d design%s, each a separate design)."
+            % (
+                name,
+                os.path.basename(os.path.normpath(target_parent)) or target_parent,
+                new_name,
+                len(plan["designs"]),
+                "" if len(plan["designs"]) == 1 else "s",
+            )
+        )
+        _refresh_views()
+        return plan["root"]
+    except Exception as exc:
+        warn("folder copy: %s" % exc)
+        commands.tell("Could not copy: %s" % exc)
+        return None
+
+
+# Tests put a function(path) -> bool here instead of the system's trash.
+SYSTEM_TRASH = None
+
+
+def _to_system_trash(path):
+    try:
+        if SYSTEM_TRASH is not None:
+            return bool(SYSTEM_TRASH(path))
+        return bool(QtCore.QFile.moveToTrash(path))
+    except Exception as exc:
+        log("the system's trash did not take %s: %s" % (path, exc))
+        return False
+
+
+def delete_folder(folder, root=None, parent=None):
+    """Delete a folder of the Data Panel: after a question it goes, with everything in it, to
+    the system's trash (the recycle bin), where it can be taken back; a place without one (a
+    NAS share) keeps it in its own trash folder instead, like deleted designs. Nothing is
+    deleted for good. Refused while one of its designs is open. True when it went."""
+    from . import data_panel_core as dp
+
+    try:
+        if not folder or not os.path.isdir(folder):
+            commands.tell("%s is not there any more." % os.path.basename(folder or "The folder"))
+            return False
+        name = os.path.basename(os.path.normpath(folder))
+        if _folder_in_use(folder, "deleting"):
+            return False
+        designs = dp.designs_under(folder)
+        count = len(designs)
+        text = "Move the folder %s to the trash?" % name
+        if count:
+            text += "\n\n%d design%s in it go%s with it." % (
+                count,
+                "" if count == 1 else "s",
+                "es" if count == 1 else "",
+            )
+        text += "\n\nYou can take it back from the trash of your computer."
+        if not _ask_delete(parent, name, text):
+            return False
+        root = root or project_folder()
+        if _to_system_trash(folder):
+            where = "the trash of your computer"
+        else:
+            trash_root = root if core.inside(root, folder) else os.path.dirname(folder)
+            trash = os.path.join(trash_root, core.TRASH_FOLDER)
+            os.makedirs(trash, exist_ok=True)
+            os.replace(folder, os.path.join(trash, core.unique_name(trash, name)))
+            where = "the trash folder (%s)" % trash
+        log("deleted the folder %s: moved to %s" % (folder, where))
+        try:
+            from . import home_ui
+
+            for design in designs:
+                home_ui.forget_file(design)
+        except Exception as exc:
+            warn("home: %s" % exc)
+        commands.tell("%s is in %s." % (name, where))
+        _refresh_views()
+        return True
+    except Exception as exc:
+        warn("delete folder: %s" % exc)
+        commands.tell("Could not delete: %s" % exc)
+        return False
+
+
 def _ask_delete(parent, name, text):
     """The Delete question: Move to Trash, or Cancel (the default: Enter keeps the design)."""
     box = QtWidgets.QMessageBox(parent or _main())
@@ -2049,9 +2464,69 @@ def _ensure_dock():
 
     panel = data_panel_ui.DataPanel()
     dock.setWidget(panel)
+    dock.setTitleBarWidget(_panel_title(dock))
     main.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
     _state["dock"], _state["panel"] = dock, panel
+    _state["beside"] = _panel_beside_browser(main, dock)
     return dock
+
+
+PANEL_WIDTH = 320  # px, the Data Panel when it opens
+
+
+def _panel_title(dock):
+    """The panel's own title bar: its name and a close button a person can see (the dock's
+    own was a faint 8-pixel square: book parity report)."""
+    bar = QtWidgets.QWidget(dock)
+    bar.setObjectName("Fission180DataPanelTitle")
+    row = QtWidgets.QHBoxLayout(bar)
+    row.setContentsMargins(8, 4, 4, 2)
+    label = QtWidgets.QLabel("DATA PANEL")
+    row.addWidget(label, 1)
+    close = QtWidgets.QToolButton()
+    close.setObjectName("Fission180DataPanelClose")
+    close.setText("\u2715")
+    close.setAutoRaise(True)
+    close.setToolTip("Close the Data Panel  (Ctrl+Alt+P)")
+    font = close.font()
+    font.setPointSizeF(font.pointSizeF() * 1.25)
+    close.setFont(font)
+    close.setMinimumSize(26, 24)
+    close.clicked.connect(lambda *_: hide_panel())
+    row.addWidget(close)
+    return bar
+
+
+def _panel_beside_browser(main, dock):
+    """Fusion's Data Panel comes in on the left over the whole height, the browser beside
+    it. FreeCAD put a new dock under the browser, where it was a small square (book parity
+    report). Only where the browser is docked on the left; a floating or moved browser is
+    left alone. True when the two stand side by side afterwards."""
+    try:
+        from . import browser_ui
+
+        browser = browser_ui._state.get("dock")
+        if browser is None or browser.isFloating() or not browser.isVisible():
+            return False  # (Home is in front: tried again the next time the panel shows)
+        if dock.isFloating() or main.dockWidgetArea(dock) != QtCore.Qt.LeftDockWidgetArea:
+            return True  # the person moved the panel: theirs
+        if main.dockWidgetArea(browser) != QtCore.Qt.LeftDockWidgetArea:
+            return True
+        if browser_ui._in_overlay(browser):
+            return False
+        wide = max(browser.width(), 200)  # the browser keeps the width it had
+        main.splitDockWidget(dock, browser, QtCore.Qt.Horizontal)
+        # Qt shares the browser's old width between the two unless each has a least width
+        # (the browser came out 64 pixels wide): the 3D view gives the room
+        if not _state.get("browser_min"):
+            _state["browser_min"] = (browser, browser.minimumWidth())
+        browser.setMinimumWidth(wide)
+        dock.setMinimumWidth(PANEL_WIDTH - 30)
+        main.resizeDocks([dock, browser], [PANEL_WIDTH, wide], QtCore.Qt.Horizontal)
+        return True
+    except Exception as exc:
+        warn("data panel: beside the browser: %s" % exc)
+        return True
 
 
 def panel():
@@ -2060,6 +2535,9 @@ def panel():
 
 def show_panel():
     dock = _ensure_dock()
+    if not _state.get("beside"):  # (it was made while Home hid the browser)
+        _state["beside"] = _panel_beside_browser(_main(), dock)
+    _browser_width(True)
     dock.show()
     dock.raise_()
     _state["panel"].refresh()
@@ -2072,6 +2550,22 @@ def hide_panel():
             dock.hide()
         except RuntimeError:
             pass
+    _browser_width(False)
+
+
+def _browser_width(panel_shown):
+    """While the panel shows, the browser beside it keeps at least the width it had."""
+    kept = _state.get("browser_min")
+    if not kept:
+        return
+    browser, least = kept
+    try:
+        if panel_shown:
+            browser.setMinimumWidth(max(least, 200))
+        else:
+            browser.setMinimumWidth(least)
+    except RuntimeError:
+        _state["browser_min"] = None
 
 
 def toggle_panel():
@@ -2136,10 +2630,14 @@ def insert_design(path=None):
         try:
             made = [design_insert.insert_linked(doc, other, components.active_component(doc))]
         except ValueError as exc:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
             commands.tell(str(exc))
             return None
-        doc.commitTransaction()
+        from . import transactions
+
+        transactions.close(doc)
         doc.recompute()
         rel = core.relative_path(doc.FileName, path)
         log("inserted %s, linked by the relative path %s" % (core.design_name(path), rel))
@@ -2151,7 +2649,9 @@ def insert_design(path=None):
         return made
     except Exception as exc:
         try:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
         except Exception:
             pass
         warn("insert design failed: %s" % exc)
@@ -2214,10 +2714,14 @@ def insert_copy(path, doc=None, parent=ACTIVE, place=True):
         try:
             comp = design_insert.insert_copy(doc, other, parent)
         except ValueError as exc:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
             commands.tell(str(exc))
             return None
-        doc.commitTransaction()
+        from . import transactions
+
+        transactions.close(doc)
         doc.recompute()
         log("inserted a copy of %s into %s" % (core.design_name(path), doc.Label))
         if place:
@@ -2229,7 +2733,9 @@ def insert_copy(path, doc=None, parent=ACTIVE, place=True):
         return comp
     except Exception as exc:
         try:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
         except Exception:
             pass
         warn("insert copy failed: %s" % exc)
@@ -2709,7 +3215,7 @@ def out_of_date_menu(menu, doc):
     """Fill the application bar's Out-of-Date menu for `doc` (ribbon_ui calls this)."""
     items = out_of_date(doc)
     for kind, _name, words in items:
-        action = menu.addAction(words)
+        action = menu.addAction(str(words).replace("&", "&&"))  # (a name's & stays)
         action.setEnabled(False)
     menu.addSeparator()
     if any(kind in ("link", "derive") for kind, _n, _w in items):

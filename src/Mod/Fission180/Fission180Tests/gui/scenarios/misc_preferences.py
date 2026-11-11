@@ -342,6 +342,8 @@ def p5_history_off():
     open_prefs()
     page("design")
     m.set_check(widget("capture_history"), False)
+    # (wave 7) Default modeling orientation is on General, where Fusion has it
+    page("general")
     y_up = widget("orientation")
     index = y_up.findText("Y up")
     h.check("P5 Y up greyed", index >= 0 and not y_up.model().item(index).isEnabled())

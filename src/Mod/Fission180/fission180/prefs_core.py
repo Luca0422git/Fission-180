@@ -145,6 +145,18 @@ def _option(
     }
 
 
+LANGUAGES = ["English"]  # the languages Fission 180's own words exist in
+
+
+def languages(current=None):
+    """What User Language lists: Fission 180's languages, and the one FreeCAD runs in now
+    when that is another (chosen in FreeCAD itself), so a person can go back to English."""
+    names = list(LANGUAGES)
+    if current and current not in names:
+        names.append(current)
+    return names
+
+
 OPTIONS = [
     # -- General ----------------------------------------------------------------------------
     _option(
@@ -155,7 +167,8 @@ OPTIONS = [
         None,
         (GENERAL, "String", "Language"),
         group="Language",
-        tip="The language of FreeCAD's own windows; Fission 180's own words stay English.",
+        tip="Fission 180 is in English. (FreeCAD's own windows, under UTILITIES > FreeCAD "
+        "Tools, have more languages in FreeCAD's own Preferences.)",
         restart=True,
     ),
     _option(
@@ -362,12 +375,13 @@ OPTIONS = [
     ),
     _option(
         "orientation",
-        "design",
+        # (wave 7) on General, where Fusion has it (it was on General > Design)
+        "general",
         "Default modeling orientation",
         "choice",
         "z",
         (PREFS, "String", "ModelingOrientation"),
-        group="General",
+        group="Modeling",
         choices=[
             ("z", "Z up", True, ""),
             ("y", "Y up", False, "Fission 180's views, ViewCube and sketches are made for Z up."),

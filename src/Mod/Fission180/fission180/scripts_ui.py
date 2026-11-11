@@ -109,7 +109,9 @@ def run_script(entry):
             return _ran(entry, doc, opened)  # sys.exit() / exit(0): a normal end
         if opened and doc is not None and _alive_doc(doc):
             try:
-                doc.abortTransaction()
+                from . import transactions
+
+                transactions.close(doc, abort=True)
             except Exception:
                 pass
         text = core.short_error(traceback.format_exc())
@@ -122,7 +124,9 @@ def _ran(entry, doc, opened):
     """The script ended normally: its changes are one undo step."""
     if opened and _alive_doc(doc):
         try:
-            doc.commitTransaction()
+            from . import transactions
+
+            transactions.close(doc)
             doc.recompute()
         except Exception:
             pass

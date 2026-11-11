@@ -106,8 +106,17 @@ class RibbonConfigTests(unittest.TestCase):
     def test_solid_tab_matches_fusion_group_order(self):
         solid = [t for t in cfg.TABS if t["id"] == "solid"][0]
         titles = [g["title"] for g in solid["groups"]]
+        # (wave 7) Fusion: CREATE, (AUTOMATE), MODIFY, ASSEMBLE, (CONFIGURE), CONSTRUCT,
+        # INSPECT, INSERT, SELECT; ASSEMBLE stood after INSERT (book parity report)
         self.assertEqual(
-            titles, ["CREATE", "MODIFY", "CONSTRUCT", "INSPECT", "INSERT", "ASSEMBLE", "SELECT"]
+            titles, ["CREATE", "MODIFY", "ASSEMBLE", "CONSTRUCT", "INSPECT", "INSERT", "SELECT"]
+        )
+
+    def test_sketch_modify_ends_with_change_parameters(self):
+        labels = [e["label"] for e in cfg.SKETCH_MODIFY["items"] if e]
+        self.assertEqual(labels[-1], "Change Parameters")
+        self.assertIs(
+            cfg.SKETCH_MODIFY["items"][-1], cfg.find(cfg.SOLID_MODIFY, "Change Parameters")
         )
 
     def test_press_pull_is_listed_with_q(self):
