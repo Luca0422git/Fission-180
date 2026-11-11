@@ -362,6 +362,7 @@ def ensure_body():
     doc = App.ActiveDocument
     body = find_body()
     if body is not None:
+        _MADE_BODY.pop(doc.Name, None)  # an existing body: nothing to take back on Cancel
         return body
     component = components.active_component(doc)  # the new body goes in here
     try:
@@ -384,7 +385,64 @@ def ensure_body():
     except Exception as exc:
         warn("could not place the new body: %s" % exc)
     components.activate_body(body)
+    try:  # (wave 7, components-2) for drop_made_body: the body, and the undo step it is in
+        active = App.getActiveTransaction()
+        _MADE_BODY[doc.Name] = (body.Name, active[0] if active else "")
+    except Exception:
+        pass
     return body
+
+
+_MADE_BODY = {}  # design name -> (name of the body ensure_body() made, its undo step's name)
+
+
+def keep_made_body(doc=None):
+    """The command that asked ensure_body() for a body was finished: the body is its."""
+    doc = doc or App.ActiveDocument
+    if doc is not None:
+        _MADE_BODY.pop(doc.Name, None)
+
+
+def drop_made_body(doc=None):
+    """The command that asked ensure_body() for a body was CANCELLED (Create Sketch's plane
+    picker closed with Esc, a CONSTRUCT or Insert dialog cancelled): the body it made must
+    not exist afterwards, and no undo step may stay open (wave 7, components-2).
+
+    FreeCAD's Body command leaves its step "Add a Body" open when it is run from inside
+    another command; nothing closed it when the plane picker was cancelled, so an empty
+    body and a pending undo step stayed behind (the next change anywhere was recorded as
+    "Add a Body"). Now: the open step is aborted (the body goes with it, nothing is left
+    to undo or redo); when a dialog's own step closed it meanwhile, it is taken back while
+    it is still the newest step. A body something was put in stays. True when the body
+    went."""
+    from . import components
+
+    doc = doc or App.ActiveDocument
+    if doc is None:
+        return False
+    made = _MADE_BODY.pop(doc.Name, None)
+    if not made:
+        return False
+    name, step = made
+    try:
+        body = doc.getObject(name)
+        if body is None or not components.is_unused(body):
+            return False
+        if doc.HasPendingTransaction:
+            doc.abortTransaction()
+            App.closeActiveTransaction(True)
+            if doc.getObject(name) is None:
+                log("the body made for the cancelled command is gone again")
+                return True
+        names = list(getattr(doc, "UndoNames", []) or [])
+        if step and names[:1] == [step]:
+            doc.undo()
+            if doc.getObject(name) is None:
+                log("the body made for the cancelled command is gone again")
+                return True
+    except Exception as exc:
+        warn("could not take the unused body away: %s" % exc)
+    return False
 
 
 class _Command:

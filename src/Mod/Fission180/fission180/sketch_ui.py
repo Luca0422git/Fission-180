@@ -1049,9 +1049,11 @@ class SketchPicker:
     def _create(self, target):
         try:
             sketch = create_sketch(self.body, target)
+            commands.keep_made_body(sketch.Document)
             open_sketch(sketch)
             _then(self.then, sketch)
         except Exception as exc:
+            commands.drop_made_body()  # (wave 7, components-2) no sketch: no body for it
             warn("Create Sketch failed: %s" % exc)
             commands.tell("The sketch could not be made here: %s. Try another face or plane." % exc)
 
@@ -1080,6 +1082,9 @@ class SketchPicker:
             return True
         self._cleanup()
         Gui.Control.closeDialog()
+        # (wave 7, components-2) the body Create Sketch made to show its planes, and the
+        # undo step FreeCAD left open for it, go when no sketch was made
+        commands.drop_made_body(getattr(self.body, "Document", None))
         log("Create Sketch cancelled")
         return True
 
@@ -1109,6 +1114,7 @@ def start(then=None, title="Create Sketch"):
     target = sketch_target()
     if target is not None:
         sketch = create_sketch(body, target)
+        commands.keep_made_body(sketch.Document)
         open_sketch(sketch)
         _then(then, sketch)
         return sketch

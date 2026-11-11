@@ -2052,6 +2052,14 @@ class Panel:
             components.settle_active(
                 self.doc, say=kept, before=getattr(self, "_outside_tips_at_open", None)
             )
+            # ...and the body commands.ensure_body() made for a command that was then
+            # cancelled (a CONSTRUCT tool, Insert) goes again; no undo step stays open
+            from . import commands
+
+            if kept:
+                commands.keep_made_body(self.doc)
+            else:
+                commands.drop_made_body(self.doc)
         except Exception as exc:
             warn("active component after the dialog: %s" % exc)
         try:  # nothing waits after the dialog (its undo step closed and rebuilt them); a
