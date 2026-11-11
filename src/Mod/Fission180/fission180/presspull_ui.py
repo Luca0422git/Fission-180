@@ -914,7 +914,8 @@ class PressPullPanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         def works(value):
             trial = dict(options)
             trial[key] = value
-            blends.check_build(kind, info, refs, trial)
+            # (FreeCAD's own step holds the size: not one only another route builds)
+            blends.check_plain(kind, info, refs, trial)
             return True
 
         return works

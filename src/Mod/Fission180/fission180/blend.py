@@ -974,6 +974,22 @@ def check_build(kind, info, refs, options):
             raise BlendError(too_big(kind, label, size))
 
 
+def check_plain(kind, info, refs, options):
+    """check_build() for FreeCAD's own Fillet / Chamfer step, which only holds what the
+    kernel builds in one run: a size only another route builds (fillet_robust: a face used
+    up exactly, a bevel past a narrowing face) is refused as too big for it. For a dialog
+    that changes such a step and cannot turn it into Fission 180's (Press Pull on a fillet):
+    its search for the largest size that fits must not find a size the step then fails at
+    (fix-1, wave 7: "50 mm" held at 10.00 mm and FreeCAD's fillet said "BRep_API: command
+    not done")."""
+    from . import fillet_robust
+
+    check_build(kind, info, refs, options)
+    if fillet_robust.used():
+        label, size = _size_name(kind, options)
+        raise BlendError(too_big(kind, label, size))
+
+
 def too_big(kind, label, size, exc=None):
     what = "round" if kind == "fillet" else "bevel"
     return "%s %g mm is too big here: the %s does not fit on the faces next to it." % (

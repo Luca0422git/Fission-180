@@ -90,7 +90,10 @@ def rib_rounded():
     expect = s["v0"] - half_round(4)
     h.check("the rib's end is a half round (r 2)", b.close(v, expect), (v, expect))
     h.check("one half cylinder of radius 2", radii() == [2.0], radii())
-    h.check("the dialog says the radius", p is not None and "2.00 mm" in p.round_info.text())
+    # In the design's units since builder modify-b (092b5080, builder params' hand-over): a
+    # length as the value boxes write it, trailing zeros dropped ("2 mm"; it was "2.00 mm")
+    text = p.round_info.text() if p is not None else ""
+    h.check("the dialog says the radius", text.endswith("side faces: 2 mm"), text)
     h.shot("1-rib")
     if p:
         f2.press_plus(p)

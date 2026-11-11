@@ -15,6 +15,7 @@ Path C, an edit, then a change made outside any transaction (a script moving the
 Path D, two edits, two Ctrl+Z in a row: neither rebuilds, the part is the original one.
 Path E (integration, 2026-10-22), Fillet 1 edited with 50 typed: the dialog holds it at the
         largest radius that fits (value_limits), OK; Ctrl+Z and Ctrl+Y: nothing rebuilt, right.
+        (The held 15 mm is Fission 180's own step since modify-b: Ctrl+Z once more before F.)
 Path F (integration), the AI tools: edit_step of Fillet 1 through the bridge (one undo step
         "AI: ..."), then the AI's own undo / redo: nothing rebuilt, right (the AI tools settle
         an undo like the timeline does). An AI edit with a radius that does not fit is
@@ -262,10 +263,33 @@ def e_held():
     h.check("E: 50 is held at the largest radius that fits", text.startswith("50 mm does not fit"), text)
 
 
+def e_back():
+    h.check("E: Ctrl+Z gives the part before E's Ctrl+Y", shapes() == S["undone_e"], shapes())
+    S["stats"] = stats()
+
+
+def fillet_radius(fillet):
+    """The radius of a one-set fillet step: FreeCAD's Fillet, or Fission 180's own step. Since
+    builder modify-b (fillet_section) the largest radius that fits on these four corners is
+    the 15 mm at which two rounds use up the 30 mm side exactly; only Fission 180's own step
+    builds that, and the dialog holding 50 there turns Fillet 1 into it (on purpose:
+    sessions/book-modify-b.md, "the dialog switches to Fission 180's step")."""
+    if fillet is None:
+        return 0.0
+    if hasattr(fillet, "Radius"):
+        return fillet.Radius.Value
+    from fission180 import fillet_sets
+
+    return float(fillet_sets.read_spec(fillet)["sets"][0].get("radius", 0.0))
+
+
 def e_edited():
     fillet = t.obj("Fillet 1")
-    radius = fillet.Radius.Value if fillet is not None else 0.0
+    radius = fillet_radius(fillet)
     h.check("E: the fillet is at the limit (between 3 and 50)", 3 < radius < 50, radius)
+    h.check(
+        "E: held at the 15 mm that uses up the 30 mm side", abs(radius - 15.0) < 0.01, radius
+    )
     S["edited_e"] = shapes()
     S["stats"] = stats()
 
@@ -554,6 +578,11 @@ h.run(
         a_undo, h.idle_step(), remember("undone_e"),
         a_redo, h.idle_step(),
         expect("edited_e", True, "E Ctrl+Y"),
+        # E's held radius is Fission 180's own step (fillet_radius): the AI's edit_step
+        # changes FreeCAD's Fillet only (an own step's sizes go through set_model_parameter),
+        # so F starts from Fillet 1 before E. (Not timed: the check's full rebuild just above
+        # was outside a transaction, so this Ctrl+Z rebuilds, as after path A's first check.)
+        a_undo, h.idle_step(), e_back,
         # F: the AI tools' undo steps
         f_start,
         f_edit(2.5), h.idle_step(),
