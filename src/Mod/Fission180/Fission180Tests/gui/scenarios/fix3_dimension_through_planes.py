@@ -284,9 +284,27 @@ def d_two_value():
 
 
 # == D  D line to axis: the X axis (under the XY plane), the line on the YZ plane's line =======
+def on_x_axis_under(plane):
+    """A point of the sketch's X axis where the edge-on `plane` is under the pointer (aim()'s
+    pixel), clear of the origin point and of the YZ plane and Z axis drawn edge-on through it:
+    found on the screen, not assumed (fix-5: x = 3 mm had the XY plane under the pointer
+    here, nothing on GitHub's renderer, whose origin squares end nearer the origin). 3 mm
+    first, then nearer the origin, then farther; none: 3 mm (aim() then says what is there)."""
+    vm = view_map()
+    for tenths in list(range(30, 14, -1)) + list(range(31, 61)):
+        x = tenths / 10.0
+        found = vm.pixel_for((x, OFF_PX * vm.px))
+        under = glyphs_under(QtCore.QPoint(int(found.x()), int(found.y())))
+        if any(n.startswith(plane) for n in under) and not any(
+            n.startswith(("YZ_Plane", "Z_Axis")) for n in under
+        ):
+            return V(x, 0, 0)
+    return V(3, 0, 0)
+
+
 def d_axis_first():
     s["count"] = len(b.sk().Constraints)
-    aim(V(3, 0, 0), "XY_Plane", "D, the X axis")
+    aim(on_x_axis_under("XY_Plane"), "XY_Plane", "D, the X axis")
 
 
 def d_axis_second():

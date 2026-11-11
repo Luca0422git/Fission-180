@@ -168,7 +168,12 @@ def hex_dim_flats():
     if not h.check("the circle that touches the edges", circle is not None):
         return
     _i, c = circle
-    a = math.radians(30.0)  # towards a corner: inside the hexagon, on the circle only
+    # towards a corner (the top edge is level: the corners lie at 0, 60, ... degrees):
+    # inside the hexagon, on the circle only. (fix-5: it was 30 degrees, the middle of an
+    # edge, where the circle TOUCHES that edge: which of the two the click picked was a
+    # rounding of the renderer; GitHub's took the edge, its length became 5.95, the flats
+    # 5.95 x sqrt 3.)
+    a = 0.0
     on = V(c.Radius * math.cos(a), c.Radius * math.sin(a), 0)
     place = V(1.6 * c.Radius, 1.4 * c.Radius, 0)
     r.dimension([on], place, "5.95")
