@@ -1351,3 +1351,172 @@ EXAMPLES = [
         "note": "push the floor of an open box of surfaces 5 mm down: the walls grow",
     },
 ]
+
+# -- MANUFACTURE and ANIMATION (wave 7, builder workspaces-2) -----------------------------------
+# a 100 x 60 x 10 plate with two 6 mm holes (the golden model cam_plate_face_contour_drill)
+CAM_PLATE = EMPTY + [
+    call("primitive", kind="box", plane="XY", length=100, width=60, height=10),
+    call(
+        "primitive", kind="cylinder", plane="XY", x=20, y=30, diameter=6, height=10,
+        operation="cut",
+    ),
+    call(
+        "primitive", kind="cylinder", plane="XY", x=80, y=30, diameter=6, height=10,
+        operation="cut",
+    ),
+]
+CAM_SETUP = CAM_PLATE + [
+    call(
+        "cam_setup",
+        stock={"mode": "relative", "offset_mode": "sides_top_bottom", "side": 2, "top": 1},
+        wcs={"origin": "stock_point", "box_point": [-1, -1, 1]},
+        post={"program": "1001", "comment": "plate"},
+    )
+]
+CAM_TOOL_6 = {"library": "sample:mm", "id": "sample-mm-flat-6"}
+CAM_OPS = CAM_SETUP + [
+    call("cam_operation", kind="face", tool={"type": "flat", "diameter": 10, "number": 1}),
+    call(
+        "cam_operation",
+        kind="contour2d",
+        faces={"normal": [0, 0, -1], "count": 1},
+        tool=CAM_TOOL_6,
+        options={"linking": {"lead_in": False, "lead_out": False}},
+    ),
+]
+ANIM_EXPLODED = COMPONENTS + [
+    call("anim_storyboard", name="Explode"),
+    call("anim_explode", at=3),
+]
+SETUPS.update(
+    {
+        "cam_plate": CAM_PLATE,
+        "cam_setup": CAM_SETUP,
+        "cam_ops": CAM_OPS,
+        "cam_stale": CAM_OPS + [call("cam_edit", target="Setup1", stock={"top": 2})],
+        "anim_exploded": ANIM_EXPLODED,
+    }
+)
+EXAMPLES += [
+    {
+        "tool": "cam_setup",
+        "setup": "cam_plate",
+        "args": {
+            "stock": {"mode": "relative", "offset_mode": "sides_top_bottom", "side": 2, "top": 1},
+            "wcs": {"origin": "stock_point", "box_point": [-1, -1, 1]},
+            "post": {"program": "1001", "comment": "plate"},
+        },
+        "note": "a plate in stock 2 mm larger around and 1 mm on top, the origin on the "
+        "stock's top at low X and Y",
+    },
+    {
+        "tool": "cam_tools",
+        "setup": "none",
+        "args": {"library": "sample:mm", "type": "flat", "diameter": 6},
+        "note": "the 6 mm end mill of the metric sample library",
+    },
+    {
+        "tool": "cam_operation",
+        "setup": "cam_setup",
+        "args": {
+            "kind": "drill",
+            "faces": {"type": "cylinder", "radius": 3, "count": 2},
+            "tool": {"type": "drill", "diameter": 6, "number": 3},
+        },
+        "note": "drill the plate's two 6 mm holes",
+    },
+    {
+        "tool": "cam_edit",
+        "setup": "cam_ops",
+        "args": {
+            "target": "2D Contour1",
+            "options": {"passes": {"multiple_depths": True, "stepdown": 4}},
+        },
+        "note": "cut the outline in steps of 4 mm; the toolpath is made again",
+    },
+    {
+        "tool": "cam_delete",
+        "setup": "cam_ops",
+        "args": {"target": "Face1"},
+        "note": "delete the facing operation",
+    },
+    {
+        "tool": "cam_generate",
+        "setup": "cam_stale",
+        "args": {},
+        "note": "the setup's stock changed: make its toolpaths again",
+    },
+    {
+        "tool": "cam_simulate",
+        "setup": "cam_ops",
+        "args": {},
+        "note": "play the facing and the contour against the stock",
+    },
+    {
+        "tool": "cam_post",
+        "setup": "cam_ops",
+        "args": {"path": "{tmp}/plate.nc"},
+        "note": "the program for a Grbl router, checked",
+    },
+    {
+        "tool": "cam_setups",
+        "setup": "cam_ops",
+        "args": {},
+        "note": "the setup and its two operations",
+    },
+    {
+        "tool": "anim_storyboard",
+        "setup": "components",
+        "args": {"name": "Explode"},
+        "note": "a new storyboard",
+    },
+    {
+        "tool": "anim_transform",
+        "setup": "components",
+        "args": {"at": 2, "of": ["Wheel"], "move": [0, 0, 30]},
+        "note": "lift the wheel 30 mm in the first 2 seconds",
+    },
+    {
+        "tool": "anim_explode",
+        "setup": "components",
+        "args": {"at": 3},
+        "note": "explode the top level in 3 seconds",
+    },
+    {
+        "tool": "anim_manual_explode",
+        "setup": "components",
+        "args": {"at": 2, "picks": [{"of": "Wheel", "axis": "Z+"}], "distance": 40},
+        "note": "the wheel 40 mm up",
+    },
+    {
+        "tool": "anim_show_hide",
+        "setup": "components",
+        "args": {"at": 2, "of": ["Wheel"], "show": False},
+        "note": "the wheel disappears at 2 seconds",
+    },
+    {
+        "tool": "anim_restore_home",
+        "setup": "anim_exploded",
+        "args": {"at": 5, "of": ["Wheel"]},
+        "note": "the wheel back in place by 5 seconds",
+    },
+    {
+        "tool": "anim_callout",
+        "setup": "anim_exploded",
+        "args": {"at": 3, "text": "Wheel", "point": [0, 0, 40], "of": "Wheel"},
+        "note": "a note on the lifted wheel",
+    },
+    {
+        "tool": "anim_storyboards",
+        "setup": "anim_exploded",
+        "args": {"storyboard": "Explode", "at": 1.5},
+        "note": "the storyboard's actions, and where the wheel is half way",
+    },
+    {
+        "tool": "anim_publish_video",
+        "setup": "anim_exploded",
+        "gui": True,
+        "args": {"path": "{tmp}/explode.avi", "width": 320, "height": 240, "fps": 12},
+        "note": "a small video of the explosion",
+    },
+]

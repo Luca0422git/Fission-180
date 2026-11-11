@@ -76,6 +76,21 @@ def formats():
     ]
 
 
+FFMPEG_HELP = (
+    "MP4 needs the ffmpeg program, which does not come with Fission 180 and was not found on "
+    "this computer. Get it from ffmpeg.org/download.html (Windows: a \"release essentials\" "
+    "build, unpacked so that C:\\ffmpeg\\bin\\ffmpeg.exe exists, or `winget install ffmpeg`; "
+    "macOS: `brew install ffmpeg`; Linux: your package manager's ffmpeg), then start Fission "
+    "180 again. AVI (Motion JPEG) needs nothing and plays in VLC and Windows' players."
+)
+
+
+def mp4_help():
+    """Why MP4 is not offered here and where to get ffmpeg (the dialog's greyed entry, the
+    refusal and the AI tool say the same)."""
+    return FFMPEG_HELP
+
+
 def encoder_note():
     if ffmpeg() is not None:
         return "ffmpeg was found on this computer: MP4 is offered too."
