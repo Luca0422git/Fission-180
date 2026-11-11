@@ -663,25 +663,43 @@ class BlendPanel(Panel):
             if count != 3:
                 return "%d: click a face" % (i + 1)
             size = self._round_radius(i)
-            return "%d: full round" % (i + 1) + (", r %.2f mm" % size if size else "")
+            return "%d: full round" % (i + 1) + (", r %s" % self._in_units(size) if size else "")
         picks = "%d pick%s" % (count, "" if count == 1 else "s")
         if self.kind == "chamfer":
             ctype = row.get("chamfer_type", "equal")
             if ctype == "two":
-                size = "%g / %g mm" % (row.get("distance", 1.0), row.get("distance2", 1.0))
+                size = self._in_units(row.get("distance", 1.0), row.get("distance2", 1.0))
             elif ctype == "angle":
-                size = "%g mm, %g°" % (row.get("distance", 1.0), row.get("angle", 45.0))
+                size = "%s, %g°" % (
+                    self._in_units(row.get("distance", 1.0)),
+                    row.get("angle", 45.0),
+                )
             else:
-                size = "%g mm" % row.get("distance", 1.0)
+                size = self._in_units(row.get("distance", 1.0))
             return "%d: %s · %s" % (i + 1, picks, size)
         rtype = row.get("radius_type", "constant")
         if rtype == "chord":
-            size = "chord %g mm" % row.get("chord", 1.0)
+            size = "chord %s" % self._in_units(row.get("chord", 1.0))
         elif rtype == "variable":
-            size = "variable %g → %g mm" % (row.get("start", 1.0), row.get("end", 1.0))
+            size = "variable %s" % self._in_units(
+                row.get("start", 1.0), row.get("end", 1.0), joiner=" → "
+            )
         else:
-            size = "%g mm" % row.get("radius", 1.0)
+            size = self._in_units(row.get("radius", 1.0))
         return "%d: %s · %s" % (i + 1, picks, size)
+
+    def _in_units(self, *values, joiner=" / "):
+        """Lengths (mm) as the dialog writes them: in the design's units ("0.02 in" in an
+        inch design: the rows read millimetres there; wave 7, from builder params), several
+        of them with the unit once ("1 / 2 mm")."""
+        from . import design_units
+
+        try:
+            texts = [design_units.length_text(float(v), self.doc) for v in values]
+            unit = texts[-1].rsplit(" ", 1)[-1]
+            return joiner.join(t.rsplit(" ", 1)[0] for t in texts) + " " + unit
+        except Exception:
+            return joiner.join("%g" % float(v) for v in values) + " mm"
 
     def _round_radius(self, i):
         try:
@@ -1246,7 +1264,9 @@ class BlendPanel(Panel):
         points.append([position, radius])
         points.sort()
         row["points"] = points
-        self.help.setText("Radius point added at %g (radius %g mm)." % (position, radius))
+        self.help.setText(
+            "Radius point added at %g (radius %s)." % (position, self._in_units(radius))
+        )
         return True
 
     # -- values ---------------------------------------------------------------------------
@@ -1749,8 +1769,9 @@ class BlendPanel(Panel):
             field = self._field_for(what)
             if field is not None and (row is None or row == self.active):
                 return field.widget.text()
-            unit = "°" if what == "angle" else " mm"
-            return "%.2f%s" % (self._value(row, what), unit)
+            if what == "angle":
+                return "%.2f°" % self._value(row, what)
+            return self._in_units(self._value(row, what))
 
         return self.value_boxes.attach(
             dragger,
@@ -2614,7 +2635,7 @@ class FilletPanel(BlendPanel):
             sizes = [s for s in sizes if s]
             self.round_info.setText(
                 "Half the width between the side faces: %s"
-                % ", ".join("%.2f mm" % s for s in sizes)
+                % ", ".join(self._in_units(s) for s in sizes)
                 if sizes
                 else "Half the width between the side faces (pick a face)."
             )
