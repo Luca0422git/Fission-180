@@ -265,8 +265,8 @@ def project_across(sketch, obj, sub, defining=True):
     previous part's face" did nothing, with no message).
 
     A hidden reference to the element is made inside the sketch's body, before the sketch
-    (components.reference_binder: a SubShapeBinder linked through the components, so the
-    projection follows the other part when it changes and both components when they move),
+    (components.reference_binder: a copy that follows the other part when it changes and
+    keeps the place the two components had when it was made, as a Fusion projection does),
     and the sketch projects that. A face gives all its edges, as FreeCAD's own Project
     does. `defining` False: reference curves that make no profile (Include 3D Geometry).
 
