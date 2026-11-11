@@ -166,3 +166,13 @@ that run out on the pipe; the classes of a pipe thread (G A / B) are not modeled
 modeled thread still has one B-spline face per turn and flank (Fusion: 4 faces), so Offset
 Face / Press Pull on a modeled thread stays refused ("Work in progress on complex shapes" is
 FreeCAD's own Thickness limit): use the Class to loosen a thread.
+
+## Wave 7, second pass (branch `sf/book-modify-c`, 2026-11-11)
+
+| Behaviour | Source | Fission 180 now |
+|---|---|---|
+| The Hole dialog starts with the last hole's settings | Fusion (kept since the first pass) | Kept. With Tapped + Modeled remembered, a Hole step of several holes cut every thread again at each click and key (the report's "~60 s" for five holes From Sketch): now more than one modeled thread is previewed as the drilled holes, the dialog says "The 5 threads are modeled when you press OK", and OK cuts them once (Guess: what Fusion's preview shows for modeled threads was not found) |
+| A Simple hole of a typed diameter made Tapped | Fission 180's own (in Fusion the thread size is picked and the diameter follows) | The diameter stays as the tap drill: 5 mm gives M6x1 (`hole_tables.size_for_drill`). The Thread tool's rule (the nominal size nearest to the picked face: Autodesk) is its own function again |
+| The hole's dot dragged | G | A drag lands on clean values: the smallest clean step of the design's unit that is at least two pixels on the screen (0.5 mm in a fitted view of a small part); typed values are taken as typed. FreeCAD's value box still shows a length below 0.1 mm in micrometres (the box is `taskui.DistanceField`: params / shell) |
+
+Scenarios: `book_modifyc_hole_sketch` (58 checks), `book_modifyc_hole_drag` (27).

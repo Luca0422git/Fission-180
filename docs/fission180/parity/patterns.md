@@ -248,3 +248,22 @@ Fission 180's guess at Fusion's rule.
 | Directions are picked on edges | Book (Play Brick). Whether Fusion takes a flat face as a direction at all: Guess (Fission 180 does, by its normal) | A click a few pixels beside a straight edge of the face it hit means that edge (`PatternPanel._edge_meant`, 12 px) |
 | Quantity takes a parameter | Book (Metric Bolt: a pattern of bodies with Quantity = "Quantity") | Features and faces: as before (the formula is kept). Bodies: the number the formula gives now is taken and the dialog says that it is kept as a number (each copy is a body of its own); it was refused |
 | Performance of a 25x pattern of two crossing swept grooves (the knurl) | Book ("Fusion does this in seconds") | 30-40 s on the test machine, built once per value shown, not again by OK (scenario `book_modify_knurl`). One boolean of all copies is the fastest route measured (27 s; one by one 55 s; in batches of copies that do not touch 31 s): the time is the kernel crossing 50 swept B-spline grooves. Fusion's "Optimized" (pattern the faces) is not built |
+
+## Wave 7, second pass (branch `sf/book-modify-c`, 2026-11-11)
+
+A = Autodesk (help, blog, staff on the forum), F = forum, B = the book (through the parity
+report), G = guess.
+
+| Behaviour | Source | Fission 180 now |
+|---|---|---|
+| The preview of a pattern is not the built feature | A: the blog on compute options speaks of a preview that "shows exactly what you want" while OK gives another result | Copies that would be slow to build (many swept faces: a knurl) are shown as shaded copies of the faces the picked features made; the dialog says "Preview: 24 copies. Built when you press OK." Plain copies (holes, bosses, the Metric Bolt's 40 straight knurls) are built live as before (`pattern_light.py`) |
+| A big pattern takes time | A (support): "any pattern large enough will cause some performance issues"; B: the 25x knurl "in seconds" in Fusion | OK builds heavy copies once, in a command-line FreeCAD of its own: the window stays alive, a small window says what is built and for how long, Cancel stops it, the memory goes back (`pattern_progress.py`). The kernel still needs half a minute for 25 crossing pairs of grooves (38 s of processor with the report's threaded body): OpenCASCADE's surface intersections; one boolean of all copies is the fastest sound route of seven measured (session log) |
+| Quantity takes a parameter, also for bodies | B (Metric Bolt) | A pattern of bodies keeps the formula; its copy bodies are added or taken away when the parameter changes, in the parameter change's own undo step when it is made in Change Parameters (`pattern.follow_counts`). A pattern of components still takes a plain number (components) |
+| Symmetric: is Quantity each side or in all? | A: ambiguous for the sketch pattern ("the specified number of copies in two directions") and silent for solids; B: sketch patterns, Quantity 5 gives 5 | Not changed in this pass: solid, body and component patterns count each side (Quantity 3 gives 5), sketch patterns (sketch-b) count all. Open, with what a change touches, in the session log |
+| Mirror started in an assembly | G | Starts with a sub-component active and with the root active when only components hold solids; the mirror image of a body goes into the body's component (`book_modifyc_mirror_assembly`) |
+| Undo while a command's dialog is open | G (Fusion's own commands grey Undo out; an add-in's command is run when another command ends it: A, Brian Ekins on `isExecutedWhenPreEmpted`) | Undo (toolbar, menu, Ctrl+Z) cancels the command being made, in every dialog; nothing of it is left on the Redo list (`preview.dialog_takes`) |
+
+Scenarios: `book_modifyc_knurl` (53 checks), `book_modifyc_knurl_piston` (24),
+`book_modifyc_pattern_quantity` (58), `book_modifyc_mirror_assembly` (40),
+`book_modifyc_undo_in_dialog` (59). Golden model `book_pattern_bodies_follow_quantity`.
+Benchmark: `Fission180Tests/headless/pattern_benchmark.py`.
