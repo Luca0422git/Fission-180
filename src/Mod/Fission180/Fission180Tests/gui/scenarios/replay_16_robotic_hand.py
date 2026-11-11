@@ -976,4 +976,240 @@ steps += [contact_menu, contact_pick, contact_ok, contact_made]
 steps += drive("Revolute 1", "0", "contact")[:1] + [into_palm_type, into_palm, away_from_palm]
 steps += [contact_off]
 
+
+# == 8: Motion Study over both knuckles ============================================================
+def study_keys(p, name):
+    joint = bj.joint(name)
+    return [list(x) for x in p.data["keys"].get(joint.Name, [])]
+
+
+def study_enter(widget):
+    QtTest.QTest.keyClick(widget, QtCore.Qt.Key_Return)
+    h.settle("the Enter key to be handled")
+
+
+def study_open():
+    h.click_empty()
+    h.fit()
+    j.menu("Motion Study")
+
+
+study_open.done = lambda: j.panel() is not None and j.panel().title == "Motion Study"
+study_open.done_what = "the Motion Study dialog is open"
+
+
+def study_pick():
+    t.click_row("Revolute 1")
+    h.settle()
+    t.click_row("Revolute 2")
+
+
+def study_point_1():
+    p = j.panel()
+    names = [bj.joint(x).Name for x in ("Revolute 1", "Revolute 2")]
+    h.check("8 both knuckles are in the study", p.data["joints"] == names, p.data["joints"])
+    # the report: "No line graph of the joint over steps (Fusion's main view)"
+    h.check(
+        "8 the graph shows a line for each",
+        [x[0] for x in p.graph.lanes] == names,
+        [x[0] for x in p.graph.lanes],
+    )
+    h.check("8 the first knuckle can be chosen", ui.choose(p.joint_box, "Revolute 1"))
+    bl.type_into(p.step, "50")
+    bl.type_into(p.value_field.widget, "%g" % (30 * S["up"]))
+    study_enter(p.value_field.widget)
+
+
+def study_point_2():
+    p = j.panel()
+    # the report: "Pressing Enter in the Step/Angle box closes the dialog (Enter = OK)"
+    h.check("8 Enter set the point and kept the dialog open", p is not None and not p._closed)
+    h.check(
+        "8 Revolute 1: (50, %g)" % (30 * S["up"]),
+        study_keys(p, "Revolute 1") == [[0.0, 0.0], [50.0, 30.0 * S["up"]]],
+        study_keys(p, "Revolute 1"),
+    )
+    h.check("8 the second knuckle can be chosen", ui.choose(p.joint_box, "Revolute 2"))
+    bl.type_into(p.step, "100")
+    bl.type_into(p.value_field.widget, "45")
+    study_enter(p.value_field.widget)
+
+
+def study_play():
+    p = j.panel()
+    h.check(
+        "8 Revolute 2: (100, 45)",
+        study_keys(p, "Revolute 2") == [[0.0, 0.0], [100.0, 45.0]],
+        study_keys(p, "Revolute 2"),
+    )
+    h.check("8 the graph has the points", sum(len(x[2]) for x in p.graph.lanes) == 4, p.graph.lanes)
+    h.shot("8-motion-study")
+    w.click(p.play)
+
+
+study_play.done = lambda: j.panel() is not None and not j.panel().playing
+study_play.done_what = "the study to play to its end"
+study_play.timeout_s = 60
+
+
+def study_played():
+    one, two = angle("Revolute 1"), angle("Revolute 2")
+    h.check(
+        "8 played to the end: the finger at %g, its tip at 45" % (30 * S["up"]),
+        abs(one - 30 * S["up"]) < 1e-3 and abs(two - 45) < 1e-3,
+        (one, two),
+    )
+    got = tips()
+    h.check("8 ...every finger the same (they are one component)", max(got) - min(got) < 1e-3, got)
+    j.ok()
+
+
+study_played.done = lambda: j.panel() is None
+study_played.done_what = "the Motion Study dialog closed"
+
+
+def study_kept():
+    studies = jm().motion_studies(r.doc())
+    h.check(
+        "8 Motion Study 1 is kept",
+        len(studies) == 1 and studies[0].Label == "Motion Study 1",
+        [x.Label for x in studies],
+    )
+    h.check(
+        "8 it is in the browser's Motion Studies folder",
+        "Motion Study 1" in (t.children("Motion Studies") or []),
+    )
+    h.check("8 OK: every finger is straight again", tips() == [10.0, 10.0, 10.0, 10.0], tips())
+    r.no_open_step("Motion Study")
+    j.browser_menu("Motion Study 1", "Edit Motion Study")
+
+
+study_kept.done = lambda: j.panel() is not None and j.panel().editing
+study_kept.done_what = "Edit Motion Study reopened it"
+
+
+def study_reopened():
+    p = j.panel()
+    h.check(
+        "8 its points are back",
+        study_keys(p, "Revolute 2") == [[0.0, 0.0], [100.0, 45.0]],
+        study_keys(p, "Revolute 2"),
+    )
+    j.cancel()
+
+
+study_reopened.done = lambda: j.panel() is None
+study_reopened.done_what = "the Motion Study dialog closed"
+
+
+steps += [study_open, study_pick, study_point_1, study_point_2, study_play, study_played]
+steps += [study_kept, study_reopened]
+
+
+# == 9: a component holding only a construction axis ===============================================
+def axis_open():
+    from Fission180Tests.gui import inspect_steps as ist
+
+    h.click_empty()
+    h.fit()
+    ist.menu("CONSTRUCT", "Axis Through Cylinder/Cone/Torus")
+
+
+axis_open.done = (
+    lambda: __import__("Fission180Tests.gui.inspect_steps", fromlist=["x"]).construct_panel()
+    is not None
+)
+axis_open.done_what = "the Axis dialog is open"
+
+
+def axis_wall():
+    # the far side of the palm's hole, inside, near its top (it faces the viewer)
+    h.click(V(30 - 3 * 0.7071, 10 + 3 * 0.7071, 8))
+
+
+def axis_ok():
+    from Fission180Tests.gui import inspect_steps as ist
+
+    p = ist.construct_panel()
+    h.check("9 the hole's wall is picked", p is not None and p.picks[0] is not None, p and p.picks)
+    h.task_button("OK")
+
+
+axis_ok.done = (
+    lambda: __import__("Fission180Tests.gui.inspect_steps", fromlist=["x"]).construct_panel()
+    is None
+)
+axis_ok.done_what = "the Axis dialog closed"
+
+
+def axis_made():
+    axes = k.datums_in("Axle", "PartDesign::Line")
+    every = [o for o in r.doc().Objects if o.TypeId == "PartDesign::Line"]
+    # the report: "the axis was created inside the clicked cylinder's component"
+    h.check(
+        "9 the axis is in Axle, the active component",
+        len(axes) == 1 and len(every) == 1,
+        [(o.Label, k.container_label(o)) for o in every],
+    )
+    if axes:
+        place = axes[0].getGlobalPlacement()
+        direction = place.Rotation.multVec(V(0, 0, 1))
+        h.check(
+            "9 along the hole (Z), through its centre (30, 10)",
+            abs(abs(direction.z) - 1) < 1e-6
+            and abs(place.Base.x - 30) < 1e-6
+            and abs(place.Base.y - 10) < 1e-6,
+            place,
+        )
+    h.check("9 Axle holds no body", not r.bodies("Axle"), [x.Label for x in r.bodies("Axle")])
+    h.check("9 the Palm got no axis", not k.datums_in("Palm", "PartDesign::Line"))
+    r.no_open_step("Axis")
+    h.fit()
+    h.shot("9-hand")
+
+
+steps += r.new_component("Axle", parent_reads="root", activate_root=True)
+steps += [axis_open, axis_wall, axis_ok, axis_made]
+
+
+# == 10: save, close, reopen =======================================================================
+def save_close():
+    S["path"] = os.path.join(tempfile.mkdtemp(prefix="fission180_replay16_"), "robotic_hand.FCStd")
+    r.doc().saveAs(S["path"])
+    App.closeDocument(r.doc().Name)
+
+
+def reopen():
+    App.openDocument(S["path"])
+    h.fit()
+
+
+def reopened():
+    h.settle()
+    h.check("10 reopened: the design is not marked changed", not Gui.ActiveDocument.Modified)
+    h.check(
+        "10 reopened: two knuckles with their limits",
+        limits("Revolute 1")["min"] == -60
+        and limits("Revolute 1")["max"] == 60
+        and limits("Revolute 2")["min"] == -90
+        and limits("Revolute 2")["max"] == 90,
+        (limits("Revolute 1"), limits("Revolute 2")),
+    )
+    h.check("10 reopened: four fingers", len(fingers()) == 4, [x.Label for x in fingers()])
+    h.check("10 reopened: the mirrored thumb", r.part(S["mirror"]) is not None, k.labels())
+    h.check(
+        "10 reopened: the contact set and the motion study",
+        len(jm().contact_sets(r.doc())) == 1 and len(jm().motion_studies(r.doc())) == 1,
+    )
+    h.check("10 reopened: the axis in Axle", len(k.datums_in("Axle", "PartDesign::Line")) == 1)
+    h.check(
+        "10 reopened: the solver is happy",
+        jm().solve(r.doc()) == 0 and not jm().broken_joints(r.doc()),
+        jm().broken_joints(r.doc()),
+    )
+    r.no_open_step("reopening")
+
+
+steps += [save_close, reopen, reopened]
+
 h.run("replay_16_robotic_hand", steps, paced_by="state")

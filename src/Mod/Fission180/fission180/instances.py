@@ -147,6 +147,25 @@ def copy_features(part):
     return found
 
 
+def follow(doc):
+    """Bring the copies up to where their source parts stand now, after parts were moved
+    without a recompute (a Motion Study playing, then putting everything back): the copies
+    of a subassembly show its joints' positions (Fusion: every occurrence of a component is
+    the same), and they lagged one move behind: after OK three of the Robotic Hand's four
+    fingers stayed bent (wave 7, replay-f). True when something was recomputed."""
+    touched = False
+    try:
+        for part in [o for o in components.of_type(doc, "App::Part") if is_instance(o)]:
+            for feature, _body in copy_features(part):
+                feature.touch()
+                touched = True
+        if touched:
+            doc.recompute()
+    except Exception as exc:
+        warn("instances: %s" % exc)
+    return touched
+
+
 def is_nested_holder(part):
     """True for a component inside an instance that stands for a nested component of the
     instance's source (wave 7, components-2): the copy of a subassembly keeps its

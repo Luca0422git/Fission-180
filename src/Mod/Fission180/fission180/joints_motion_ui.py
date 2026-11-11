@@ -934,6 +934,7 @@ class MotionStudyPanel(_JointsPanel):
     def _pose(self, step):
         joints.apply_placements(self.doc, self.start_places)
         joints.study_pose(self.doc, self.data, step)
+        _copies_follow(self.doc)
 
     def _scrub(self, value):
         self.graph.set_playhead(value)
@@ -1006,6 +1007,7 @@ class MotionStudyPanel(_JointsPanel):
         try:
             joints.apply_placements(self.doc, self.start_places)
             joints.solve(self.doc)
+            _copies_follow(self.doc)
         except Exception as exc:
             warn("Motion Study: %s" % exc)
 
@@ -1015,6 +1017,16 @@ class MotionStudyPanel(_JointsPanel):
         except Exception:
             pass
         super().remove_handles()
+
+
+def _copies_follow(doc):
+    """The copies of a moved subassembly (a pattern of fingers) follow it at once."""
+    try:
+        from . import instances
+
+        instances.follow(doc)
+    except Exception as exc:
+        warn("Motion Study: %s" % exc)
 
 
 # -- commands --------------------------------------------------------------------------------------
