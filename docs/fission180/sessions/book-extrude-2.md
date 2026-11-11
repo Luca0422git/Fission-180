@@ -190,6 +190,27 @@ Without a window (each with a unit test that runs it in real FreeCAD):
 `front_plane_check.py` (98 checks), `body_names_check.py` (21), `sketch_area_id_check.py`
 (64 + 27 for save / reopen). Unit: `test_extrude_bodies_core.py` (2 new tests).
 
+Unit tests: 3564 run, all pass (10 skipped, as before). Golden models: 644 pass, 2 expected
+failures (`plate_hole_grid`, `sf_loft_merge_slot_volume`, both known before): the step
+language builds what it built.
+
+### Left from item 1's last paragraph
+
+- Label lookups that pass today but go by label (none clashes now, because none makes a body
+  with the same number in a component): `surface3_qa` (16 lookups; it has a New Component
+  path), `surface3_qa3`, `surface_reopen`, `surface4_qa`, `surface4_qa_reopen`,
+  `surface4_split`, `surface4_presspull`, `journey_surface`, `journey_surface2`,
+  `journey_surface3`, `sweep_loft_qa_loft`, `plastic2_steps.by_label`,
+  `bodies_qa` (`body_named("Body") or body_named("Body1")`). The headless journey's balloon
+  check compared two labels that are equal in the app ("Body1", "Body1") and only differed
+  because a headless FreeCAD renames a second "Body1": it compares object names now.
+- The search for scenarios that expect the old Operation or the old Front-plane side in
+  Press Pull, Emboss, Hole, Rib, Web, Sweep, Sheet Metal Flange and the Plastic tools was not
+  done one by one. What was run: every scenario that places a primitive or coil on the Front
+  plane or makes an Offset Plane in the dialog (`primitives_qa`, `inspect_construct*`), and
+  the scenarios listed above. Hole was probed on the three planes
+  (`book_extrude2_planes` P2): it drills into the part on each.
+
 ## Shared files touched
 
 - `construct.py`, `construct_ui.py` (components'): the Offset Plane's side on the Front
