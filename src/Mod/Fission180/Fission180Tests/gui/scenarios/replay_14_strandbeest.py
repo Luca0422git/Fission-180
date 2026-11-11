@@ -22,6 +22,7 @@ from PySide import QtCore, QtWidgets
 from PySide6 import QtTest
 
 from Fission180Tests.gui import book_components_steps as k
+from Fission180Tests.gui import book_joints_steps as bj
 from Fission180Tests.gui import book_sketch_b_steps as b
 from Fission180Tests.gui import dialog_input as ui
 from Fission180Tests.gui import harness as h
@@ -722,5 +723,127 @@ steps += link_extrude(
     "b_link", lambda: (S["a_end"] + S["d_end"]) * 0.5, "Thickness", start="Thickness"
 )
 steps += [b_made]
+
+
+# == 8: three As-built Revolute joints: Pins + A Link, Pins + DGF Plate, A Link + B Link ==========
+def jm():
+    return bj.jm()
+
+
+def places():
+    return [bj.place(r.part(n)) for n in ("A Link", "B Link", "DGF Plate")]
+
+
+def front_view():
+    h.click_empty()
+    h.view().viewFront()
+    h.fit(iso=False)
+
+
+def as_built(tag, first, second, labels, at, hover=None, edge=False):
+    """Steps: ASSEMBLE > As-built Joint, a click on each component (`first()`, `second()`:
+    points in the design), Type Revolute, the position clicked at the snap `at()` (the
+    pointer rests on `hover()` first: a round edge, whose centre lights up)."""
+    name = "Revolute %d" % (len(S.setdefault("joints", [])) + 1)
+    S["joints"].append(name)
+
+    def command():
+        S["before"] = places()
+        j.menu("As-built Joint")
+
+    command.done = lambda: j.panel() is not None
+    command.done_what = "the As-built Joint dialog is open"
+
+    def one():
+        h.click(first())
+
+    def two():
+        h.click(second())
+
+    def kind():
+        p = j.panel()
+        h.check("%s: %s and %s are taken" % (tag, labels[0], labels[1]),
+                [x.Label for x in p.parts] == list(labels), [x.Label for x in p.parts])
+        h.check("%s: Type Revolute chosen" % tag, j.choose_type(p, "Revolute"))
+
+    def aim():
+        target = (hover or at)()
+        if edge:
+            bj.hover_edge(target)
+        else:
+            bj.hover_point(target)
+
+    def position():
+        spot = bj.hot(j.panel())
+        h.check("%s: the centre is lit under the pointer" % tag,
+                spot is not None and (spot["point"] - at()).Length < 1e-4,
+                spot and (spot["kind"], spot["point"], at()))
+        target = (hover or at)()
+        if edge:
+            h.click_edge(target)
+        else:
+            h.click(target)
+
+    def ok():
+        p = j.panel()
+        made = bj.joint(name)
+        h.check("%s: %s is previewed" % (tag, name), made is not None, bj.labels())
+        h.check("%s: no problem said" % tag, p.message.text() == "", p.message.text())
+        j.ok()
+
+    ok.done = lambda: j.panel() is None
+    ok.done_what = "the As-built Joint dialog closed"
+
+    def made():
+        joint = bj.joint(name)
+        h.check("%s: %s made, a Revolute joint" % (tag, name),
+                joint is not None and joint.JointType == "Revolute", bj.labels())
+        h.check("%s: nothing moved (as-built)" % tag,
+                not any(bj.moved(a, c) for a, c in zip(places(), S["before"])))
+        h.check("%s: the solver is happy" % tag, jm().solve(bj.doc()) == 0, jm().broken_joints(bj.doc()))
+        if joint is not None:
+            frame = jm().global_of(joint.Reference1) if hasattr(joint, "Reference1") else None
+            S.setdefault("frames", {})[name] = frame
+        r.no_open_step("As-built Joint")
+
+    return [r.named(x, "%s_%s" % (tag, x.__name__)) for x in (command, one, two, kind, aim, position, ok, made)]
+
+
+def on_a():
+    return front(S["a_end"] * 0.5, -2)
+
+
+def on_d():
+    return front(V(GROUND, 15, 0), -2)
+
+
+def on_b():
+    return front((S["a_end"] + S["d_end"]) * 0.5, -4)
+
+
+def b_rim_at_a():
+    """A point on the coupler's round end over the crank's hole (its front edge), a
+    quarter of the way round from the arc's middle (right on the middle or an end the arc
+    offers that point; anywhere else its centre, as a slot's end does in Fusion)."""
+    out = (S["a_end"] - S["d_end"]).normalize()
+    turned = V(out.x * 0.7071 - out.y * 0.7071, out.x * 0.7071 + out.y * 0.7071, 0)
+    return front(S["a_end"] + turned * 2.5, -4)
+
+
+def joints_made():
+    h.check("8 three joints", bj.labels() == ["Revolute 1", "Revolute 2", "Revolute 3"], bj.labels())
+    rows = t.children("Joints") or []
+    h.check("8 they are in the browser's Joints folder", all(n in rows for n in bj.labels()), rows)
+    h.shot("8-joints")
+
+
+steps += [r.activate(""), front_view]
+steps += as_built("j1", on_a, lambda: V(GROUND, -6, 0), ("A Link", "Pins"), lambda: V(0, -6, 0))
+# (the first pin now carries Revolute 1's glyph at its centre, which takes a click like
+# Fusion's joint glyphs do: the Pins are picked on the second pin)
+steps += as_built("j2", on_d, lambda: V(GROUND, -6, 0), ("DGF Plate", "Pins"), lambda: V(GROUND, -6, 0))
+steps += as_built("j3", on_b, on_a, ("B Link", "A Link"), lambda: front(S["a_end"], -4),
+                  hover=b_rim_at_a, edge=True)
+steps += [joints_made]
 
 h.run("replay_14_strandbeest", steps, paced_by="state")
