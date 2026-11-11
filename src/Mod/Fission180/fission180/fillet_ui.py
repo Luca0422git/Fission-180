@@ -1019,6 +1019,15 @@ class BlendPanel(Panel):
                 return obj.Name == base.Name and short.startswith(("Edge", "Face"))
 
             found = profile_pick.behind_glyphs(self.view, pixel, usable)
+            # an edge a few pixels away comes before the face it bounds (a person aims at
+            # the edge; the pixel itself is often on the face beside it)
+            near = [
+                hit
+                for hit in profile_pick.under(self.view, pixel, 4)
+                if usable(hit[0], hit[1]) and hit[1].startswith("Edge")
+            ]
+            if near:
+                found = near[0]
             if found is None:
                 return
             if getattr(self, "_release", None) is None:

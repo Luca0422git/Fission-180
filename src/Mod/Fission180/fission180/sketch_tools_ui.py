@@ -322,6 +322,7 @@ class SketchProject(_SketchCommand):
         from . import sketch_project_across  # (wave 7) other bodies and components too
 
         sketch_project_across.watch(self.title)
+        _through_glyphs(True)
 
 
 class SketchInclude3D(_SketchCommand):
@@ -356,6 +357,7 @@ class SketchInclude3D(_SketchCommand):
         from . import sketch_project_across  # (wave 7) other bodies and components too
 
         sketch_project_across.watch(self.title, defining=False)
+        _through_glyphs(False)
 
 
 class SketchIntersect(_SketchCommand):
@@ -385,6 +387,112 @@ class SketchIntersect(_SketchCommand):
 
 
 PLANE_TYPES = ("PartDesign::Plane", "Part::DatumPlane", "App::Plane")
+
+
+def _through_glyphs(defining):
+    """While Project (P) or Include 3D Geometry runs: a click on an origin or construction
+    plane or axis drawn over the part reaches the face, edge or corner behind it
+    (_GlyphClicks)."""
+    tool = watched_tool()
+    session = sketch_mode.current()
+    if tool is not None and session is not None and session.gl is not None:
+        tool.after = _GlyphClicks(session, defining).stop
+
+
+class _GlyphClicks(QtCore.QObject):
+    """Fusion's Project takes edges, faces and points: a construction or origin plane in
+    front of the part is not picked, the click goes on to the face behind it. FreeCAD's tool
+    took the plane (the book's Tensegrity: the Origin is shown for the holes' Mirror, and
+    "P, click the front face" then took the YZ plane: replay-b, wave 7). Here such a click
+    is taken before FreeCAD's tool sees it and the element behind is projected (as P does:
+    defining; Include 3D Geometry: reference curves). Qt's own events only."""
+
+    DRAG_PIXELS = 4
+
+    def __init__(self, session, defining):
+        super().__init__()
+        self.session = session
+        self.defining = defining
+        self.gl = session.gl
+        self.press = None
+        self.gl.installEventFilter(self)
+
+    def stop(self):
+        try:
+            self.gl.removeEventFilter(self)
+        except Exception:
+            pass
+
+    def _behind(self, pos):
+        """(object, element) behind a glyph under the widget pixel `pos`, or None (also when
+        nothing of a glyph is in front)."""
+        from . import profile_pick, sketch_project_across
+
+        ratio = self.gl.devicePixelRatioF() or 1.0
+        spot = (pos.x() * ratio, (self.gl.height() - pos.y()) * ratio)
+        try:
+            first = self.session.view.getObjectInfo(spot)
+            doc = App.getDocument(str(first["Document"])) if first else None
+            obj = doc.getObject(str(first["Object"])) if doc is not None else None
+            if obj is None or not profile_pick.is_glyph(obj):
+                return None
+        except Exception:
+            return None
+        found = sketch_project_across.element_at(self.session.view, self.gl, pos)
+        if found is None or found[0] is self.session.sketch:
+            return None
+        if getattr(found[0], "TypeId", "") == "Sketcher::SketchObject":
+            return None
+        return found
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            if kind not in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease):
+                return False
+            if event.button() != QtCore.Qt.LeftButton:
+                return False
+            if kind == QtCore.QEvent.MouseButtonPress:
+                found = self._behind(event.pos())
+                self.press = (QtCore.QPoint(event.pos()), found) if found is not None else None
+                return found is not None
+            if self.press is not None:
+                (at, found), self.press = self.press, None
+                if (event.pos() - at).manhattanLength() <= self.DRAG_PIXELS:
+                    QtCore.QTimer.singleShot(0, lambda: self._project(found))
+                return True
+        except Exception as exc:
+            warn("Project: %s" % exc)
+        return False
+
+    def _project(self, found):
+        session = self.session
+        try:
+            if session.closed or sketch_mode.current() is not session:
+                return
+            from . import sketch_external
+
+            obj, sub = found
+            sketch = session.sketch
+            doc = sketch.Document
+            count = len(sketch.ExternalGeo)
+            doc.openTransaction("Project")
+            try:
+                if sketch_external.needs_reference(sketch, obj):
+                    sketch_external.project_across(sketch, obj, sub, defining=self.defining)
+                else:
+                    sketch.addExternal(obj.Name, sub, self.defining, False)
+                doc.recompute()
+                made = len(sketch.ExternalGeo) > count
+            except Exception:
+                made = False
+            if made:
+                doc.commitTransaction()
+            else:
+                doc.abortTransaction()
+                commands.tell("Project: %s could not be projected onto the sketch." % sub)
+        except Exception as exc:
+            warn("Project: %s" % exc)
 
 
 class _PlaneClicks(QtCore.QObject):
