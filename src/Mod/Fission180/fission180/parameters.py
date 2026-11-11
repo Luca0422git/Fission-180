@@ -511,13 +511,31 @@ def fix_document(doc):
 
 
 class _Opened:
-    def slotFinishRestoreDocument(self, doc):
+    """A design that was opened: its sketch formulas are re-bound. FreeCAD 1.1.4 has no "a
+    file finished loading" signal for Python (a `slotFinishRestoreDocument` method is never
+    called: App/DocumentObserverPython.cpp has no such slot). It activates a design when it
+    is made (still empty) and again once it has loaded, so every activation looks (a design
+    with nothing to re-bind costs one look at each of its sketches)."""
+
+    def slotActivateDocument(self, doc):
         try:
+            if getattr(doc, "Restoring", False):
+                return  # (activated again once loaded)
+            self._rebind(doc)
+        except Exception as exc:
+            from . import warn
+
+            warn("parameters: sketch formulas not re-bound: %s" % exc)
+
+    def _rebind(self, doc):
+        try:
+            name = doc.Name
+            gui_doc = None
             modified = None
             if App.GuiUp:
                 import FreeCADGui as Gui
 
-                gui_doc = Gui.getDocument(doc.Name)
+                gui_doc = Gui.getDocument(name)
                 modified = bool(gui_doc.Modified) if gui_doc is not None else None
             moved = fix_document(doc)
             if moved:
@@ -1010,9 +1028,12 @@ def _row(obj, path, label, value, expr):
     }
 
 
-def set_model(doc, row, text):
+def set_model(doc, row, text, unit="mm"):
+    """Set a model parameter. `unit`: what a number without a unit is in. Scripts and the AI
+    tools work in millimetres (the default); the Parameters dialog passes the design's
+    unit, like every value box a person types in."""
     obj = doc.getObject(row["object"])
-    _set(obj, row["path"], text, user_names(doc))
+    _set(obj, row["path"], text, user_names(doc), unit=unit)
 
 
 def is_plain_number(text):
@@ -1038,9 +1059,11 @@ def kind_of_path(obj, path):
     return core.kind_of_type(type_id)
 
 
-def _set(obj, path, text, names=None, unit=None):
+def _set(obj, path, text, names=None, unit="mm"):
     """Plain numbers set the value; anything else becomes an expression. A number without a
-    unit is in the design's units (`unit`: in that unit, a user parameter's own)."""
+    unit is in `unit` (millimetres for scripts and the AI tools, whatever the design's
+    units; a user parameter's own unit; the design's unit for what a person types in the
+    Parameters dialog), also inside a formula."""
     text = (text or "").strip()
     if not text:
         set_expression(obj, path, None)

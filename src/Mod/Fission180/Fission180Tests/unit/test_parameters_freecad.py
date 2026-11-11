@@ -14,7 +14,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODULE = os.path.dirname(os.path.dirname(HERE))
-CASES = 14
+CASES = 16
 
 
 def _command():

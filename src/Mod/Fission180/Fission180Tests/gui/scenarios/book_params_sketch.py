@@ -31,6 +31,8 @@ Head_Length 5, Head_Diam 8.5, Shank_Length 20, Support_Width 4.
   G  Finish Sketch; MODIFY > Change Parameters: Width's Expression typed 15: the rectangle's
      height is 15 (and nothing else moved); the sketch's dimensions are listed with their
      formulas. OK.
+  H  The design saved the way an older Fission 180 bound formulas, closed and opened: the
+     formulas are bound FreeCAD's way by themselves and the design is not marked changed.
 """
 
 import FreeCAD as App
@@ -502,6 +504,64 @@ g_check.done = lambda: dialog() is None
 g_check.done_what = "the Parameters dialog closed"
 
 
+# == H: a design made before wave 7, opened ===================================================
+def h_save():
+    """The design saved the way an older Fission 180 bound formulas ('.Constraints[n]'),
+    closed and opened."""
+    import os
+    import tempfile
+
+    sketch = s["sketch"]
+    d = sketch.Document
+    held = list(sketch.ExpressionEngine)
+    h.check(
+        "H: the sketch holds two formulas, bound without the dot",
+        len(held) == 2 and all(not p.startswith(".") for p, _e in held),
+        held,
+    )
+    for path, expr in held:  # the old spelling
+        sketch.setExpression(path, None)
+        sketch.setExpression("." + path, expr)
+    d.recompute()
+    s["old"] = sorted(dict(sketch.ExpressionEngine))
+    h.check(
+        "H: saved with the old spelling",
+        all(p.startswith(".Constraints[") for p in s["old"]),
+        s["old"],
+    )
+    s["path"] = os.path.join(tempfile.mkdtemp(prefix="fission180-book-sketch-"), "old.FCStd")
+    d.saveAs(s["path"])
+    App.closeDocument(d.Name)
+
+
+def h_open():
+    App.openDocument(s["path"])
+    h.fit()
+
+
+def h_opened():
+    import FreeCADGui as Gui
+
+    from fission180 import parameters
+
+    d = App.ActiveDocument
+    sketch = [o for o in d.Objects if o.TypeId == "Sketcher::SketchObject"][0]
+    held = dict(sketch.ExpressionEngine)
+    h.check(
+        "H: opened, the formulas are bound FreeCAD's way",
+        sorted(held) == [p[1:] for p in s["old"]],
+        held,
+    )
+    h.check("H: the design is not marked as changed by that", not Gui.getDocument(d.Name).Modified)
+    h.check(
+        "H: the sketch is fine",
+        "Invalid" not in sketch.State and "Touched" not in sketch.State,
+        sketch.State,
+    )
+    shown = sorted(r["shown"] for r in parameters.model_parameters(d) if r["object"] == sketch.Name)
+    h.check("H: and still read as typed", shown == ["9 mm * 1.02", "Width"], shown)
+
+
 steps = st.start_steps("BookParamsSketch") + [p_setup, r_rect, r_c1, r_c2, r_done]
 steps += [a_dim, a_pick, a_place, a_type, a_check]
 steps += [b_dim, b_pick, b_place, b_type_s, b_list, b_finish, b_check]
@@ -519,5 +579,6 @@ steps += [
 ]
 steps += [f_select, f_delete, f_check, f_undo, f_undone, f_redo, f_redone]
 steps += [g_finish, g_open, g_type, g_check]
+steps += [h_save, h_open, h_opened]
 
 h.run("book_params_sketch", steps, paced_by="state")

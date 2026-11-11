@@ -367,6 +367,58 @@ def formulas_of_an_older_design(doc):
 
 
 @case
+def an_older_design_opened(doc):
+    """Saved with '.Constraints[n]', opened: the formulas are re-bound by themselves, the
+    sketch is as it was, and a delete renumbers them."""
+    from fission180 import parameters
+
+    parameters.add_user(doc, "w", "mm", "30")
+    sk, angle, w, h, extra = rectangle(doc)
+    sk.setExpression(".Constraints[%d]" % w, "Parameters.w")  # the old spelling
+    doc.recompute()
+    path = os.path.join(tempfile.mkdtemp(prefix="fission180-params-"), "old.FCStd")
+    doc.saveAs(path)
+    App.closeDocument(doc.Name)
+    again = App.openDocument(path)
+    try:
+        sk = again.getObject("Sketch")
+        held = dict(sk.ExpressionEngine)
+        expect(held == {"Constraints[%d]" % w: "Parameters.w"}, held)
+        expect("Touched" not in sk.State and "Invalid" not in sk.State, sk.State)
+        expect(near(size(sk)[0], 30), size(sk))
+        sk.delConstraint(angle)
+        parameters.set_user(again, "w", "44")
+        again.recompute()
+        expect(near(size(sk)[0], 44) and near(size(sk)[1], 20), size(sk))
+    finally:
+        App.closeDocument(again.Name)
+    return "closed"
+
+
+@case
+def scripts_work_in_millimetres(doc):
+    """A number without a unit from a script or an AI tool is millimetres, also in an inch
+    design (the Parameters dialog passes the design's unit; a value box reads it itself)."""
+    from fission180 import parameters
+
+    doc.UnitSystem = doc.getEnumerationsOfProperty("UnitSystem")[3]
+    sk, angle, w, h, extra = rectangle(doc)
+    doc.recompute()
+    rows = {r["path"]: r for r in parameters.model_parameters(doc) if r["object"] == sk.Name}
+    row = rows[".Constraints[%d]" % w]
+    expect(row["shown"].endswith(" in") and near(row["value"], 40), row)
+    parameters.set_model(doc, row, "50")
+    doc.recompute()
+    expect(near(size(sk)[0], 50), size(sk))
+    parameters.set_model(doc, row, "2", unit="in")
+    doc.recompute()
+    expect(near(size(sk)[0], 50.8), size(sk))
+    parameters._set(sk, ".Constraints[%d]" % h, "10 + 5", parameters.user_names(doc))
+    doc.recompute()
+    expect(near(size(sk)[1], 15), size(sk))
+
+
+@case
 def set_a_dimension(doc):
     from fission180 import parameters
 

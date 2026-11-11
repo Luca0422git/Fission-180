@@ -499,7 +499,10 @@ class ParametersDialog(QtWidgets.QDialog):
 
     def _set_model(self, row, text):
         return self._apply(
-            lambda: parameters.set_model(self.doc, row, text),
+            # (a number typed here is in the design's units, like in every value box)
+            lambda: parameters.set_model(
+                self.doc, row, text, unit=parameters.design_unit(self.doc)
+            ),
             (
                 self.doc.getObject(row["object"]),
                 row["path"],
@@ -661,10 +664,32 @@ class ChangeParametersCommand:
 
     def Activated(self):
         try:
+            if not _finish_open_command():
+                return
             dialog = ParametersDialog(App.ActiveDocument)
             dialog.show()
         except Exception as exc:
             warn("Change Parameters failed to open: %s" % exc)
+
+
+def _finish_open_command():
+    """Fusion: starting a command ends the one in progress. A Fission 180 command dialog
+    that is open (Extrude, Fillet...) is finished first: Change Parameters holds an undo step
+    of its own, and opened over another command's it would close that one half-way. An open
+    sketch stays open (Fusion's sketch has Change Parameters in its MODIFY menu)."""
+    from . import commands, taskui
+
+    panel = taskui.current()
+    if panel is None:
+        return True
+    try:
+        panel.finish()
+    except Exception as exc:
+        warn("could not finish the open command: %s" % exc)
+    if taskui.current() is not None:
+        commands.tell("Finish the open command first (OK or Cancel in its panel).")
+        return False
+    return True
 
 
 try:  # the list of parameter names under every value box (parameters_complete.py)

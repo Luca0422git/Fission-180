@@ -887,11 +887,11 @@ def split_assignment(text):
     """'Thickness = -2.5 mm' -> ('Thickness', '-2.5 mm'): Fusion's way to make a parameter
     while typing a value. (None, text without a leading '=') when it is no assignment."""
     text = (text or "").strip()
+    while text.startswith("=") and not text.startswith("=="):
+        text = text[1:].strip()  # ("=Width = 5": a leading = means "a formula follows")
     match = _ASSIGN.match(text)
     if match:
         return match.group(1), match.group(2).strip()
-    while text.startswith("="):
-        text = text[1:].strip()
     return None, text
 
 

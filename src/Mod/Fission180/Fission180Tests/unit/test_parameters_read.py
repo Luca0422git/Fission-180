@@ -226,6 +226,7 @@ class Assignment(unittest.TestCase):
         self.assertEqual(core.split_assignment("Width=5mm"), ("Width", "5mm"))
         self.assertEqual(core.split_assignment("Head_Diam = 8.5"), ("Head_Diam", "8.5"))
         self.assertEqual(core.split_assignment("=x+1"), (None, "x+1"))
+        self.assertEqual(core.split_assignment("=Width = 5"), ("Width", "5"))
         self.assertEqual(core.split_assignment("a == b"), (None, "a == b"))
         self.assertEqual(core.split_assignment("25"), (None, "25"))
 

@@ -150,8 +150,15 @@ class _Watch:
     def slotCreatedDocument(self, doc):
         _record(doc)
 
-    def slotFinishRestoreDocument(self, doc):
-        _record(doc)
+    def slotActivateDocument(self, doc):
+        # (a design opened from a file is activated when it is loaded; FreeCAD 1.1.4 has no
+        # "finished loading" signal for Python. Its units changed while it loaded: that
+        # change is taken in _changed, by doc.Restoring)
+        try:
+            if doc.Name not in _units:
+                _record(doc)
+        except Exception:
+            pass
 
     def slotDeletedDocument(self, doc):
         try:
