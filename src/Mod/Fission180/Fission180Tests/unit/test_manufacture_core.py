@@ -550,6 +550,71 @@ class FieldsThatReachTheToolpath(unittest.TestCase):
         self.assertEqual(text.splitlines()[7], helix.splitlines()[7])
 
 
+class TabsAtPointsAndPrecedingStock(unittest.TestCase):
+    """What the book's two CAM projects need beyond the first build: tabs at clicked points
+    and the second setup's stock From preceding setup."""
+
+    def options(self, **tabs):
+        tabs.setdefault("on", True)
+        return core.op_options(
+            "contour2d", {"tool": core.make_tool("flat", 6.0), "geometry": {"tabs": tabs}}
+        )
+
+    def env(self, **more):
+        heights = {"clearance": 15.0, "retract": 5.0, "feed": 5.0, "top": 0.0, "bottom": -6.0}
+        env = {"heights": heights, "parts": [{"base": [[0, ["Face1"]]]}]}
+        env.update(more)
+        return env
+
+    def test_positioning_at_points_is_offered(self):
+        self.assertEqual([k for k, _t in core.TAB_POSITIONING], ["distance", "count", "points"])
+        self.assertEqual(dict(core.TAB_POSITIONING)["points"], "At points")
+        self.assertEqual(core.op_options("contour2d")["geometry"]["tabs"]["points"], [])
+        with self.assertRaises(core.CamError):
+            self.options(positioning="somewhere")
+
+    def test_points_are_kept_as_three_numbers(self):
+        got = self.options(positioning="points", points=[[1, 2, 3], (4, 5)])
+        self.assertEqual(got["geometry"]["tabs"]["points"], [[1.0, 2.0, 3.0], [4.0, 5.0, 0.0]])
+        for bad in ([["a", 1, 2]], [[1]], [[1, 2, 3, 4]], [[float("nan"), 0, 0]]):
+            with self.assertRaises(core.CamError):
+                self.options(positioning="points", points=bad)
+
+    def test_without_a_point_it_says_what_to_do(self):
+        said = core.op_problems("contour2d", self.options(positioning="points"), {"faces": 1})
+        self.assertEqual(len(said), 1)
+        self.assertIn("click on the contour where each tab goes", said[0])
+        ready = self.options(positioning="points", points=[[5, 0, 0]])
+        self.assertEqual(core.op_problems("contour2d", ready, {"faces": 1}), [])
+        # (the points are only asked for when tabs are on and placed at points)
+        off = self.options(on=False, positioning="points")
+        self.assertEqual(core.op_problems("contour2d", off, {"faces": 1}), [])
+
+    def test_the_points_reach_the_plan_in_setup_coordinates(self):
+        options = self.options(positioning="points", points=[[60, 0, 15]])
+        plan = core.engine_plan("contour2d", options, self.env(tab_points=[[-40.0, -60.0]]))
+        tags = plan[0]["dressups"][0]
+        self.assertEqual(tags["module"], "Tags")
+        self.assertEqual(tags["tabs"]["positioning"], "points")
+        self.assertEqual(tags["tabs"]["points"], [[-40.0, -60.0]])
+        # a click on the model's edge is the tool's radius (and 1 mm) from the toolpath
+        self.assertEqual(tags["tabs"]["reach"], 4.0)
+        counted = core.engine_plan("contour2d", self.options(positioning="count"), self.env())
+        self.assertEqual(counted[0]["dressups"][0]["tabs"]["points"], [])
+
+    def test_stock_from_the_preceding_setup_is_a_mode(self):
+        modes = {k: (title, built) for k, title, built, _why in core.STOCK_MODES}
+        self.assertEqual(modes["preceding"], ("From preceding setup", True))
+        opts = core.setup_options({"stock": {"mode": "preceding"}})
+        self.assertEqual(opts["stock"]["mode"], "preceding")
+        # it has no box of its own: manufacture.Frame takes the preceding setup's block
+        with self.assertRaises(core.CamError):
+            core.stock_box(MODEL, opts["stock"])
+        with self.assertRaises(core.CamError) as caught:
+            core.setup_options({"stock": {"mode": "rel_cylinder"}})
+        self.assertIn("turning", str(caught.exception))
+
+
 class Paths(unittest.TestCase):
     def test_parse_keeps_commands_parameters_and_lines(self):
         got = core.parse_gcode("(a comment)\nN10 G0 X1 Y-2.5 ; go\nG1 Z-1 F100\nX5\n%\nM3 S1000\n")

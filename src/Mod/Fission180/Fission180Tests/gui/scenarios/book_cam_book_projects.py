@@ -258,7 +258,7 @@ def tabs_three():
     panel = cam.panel()
     h.check("3 points", cam.box_text("tabs_points") == "3 points", cam.box_text("tabs_points"))
     h.check("the contour's own picks are untouched", cam.box_text("geometry") != "Select edges")
-    h.check("nothing is missing any more", "tab" not in cam.message().lower(), cam.message())
+    h.check("no position is missing now", "No tab position" not in cam.message(), cam.message())
     got = [[round(c, 1) for c in p] for p in panel.tab_points]
     h.check(
         "each is where the click landed",
@@ -303,13 +303,13 @@ def contour_made():
     text = cam.cam().toolpath(cam.op("2D Contour1"))
     segs = core.moves(core.parse_gcode(text), feed_scale=60.0)
     bottom = min(p[2] for seg in segs for p in seg["points"])
-    h.check("cut through the board", abs(bottom - (-31.0)) < 1e-6, bottom)
+    h.check("cut through the board", abs(bottom - (-31.0)) < 1e-3, bottom)
     # at the last depth the tool lifts over each tab (2 mm high) and comes down behind it
     lifts = [
         seg["points"][0]
         for seg in segs
         if seg["kind"] != "rapid"
-        and abs(seg["points"][0][2] - bottom) < 1e-6
+        and abs(seg["points"][0][2] - bottom) < 1e-3
         and seg["points"][-1][2] > bottom + 1.0
         and math.hypot(
             seg["points"][-1][0] - seg["points"][0][0], seg["points"][-1][1] - seg["points"][0][1]

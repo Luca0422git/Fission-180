@@ -345,7 +345,9 @@ def oval_fine():
     h.check("2D Contour1 has a toolpath", cam.state("2D Contour1") == "valid")
     worst, count = deviation("2D Contour1")
     s["fine"] = (worst, count)
-    h.check("tolerance 0.01: the toolpath is within 0.01 mm of the true path", worst <= 0.0105, worst)
+    h.check(
+        "tolerance 0.01: the toolpath is within 0.01 mm of the true one", worst <= 0.0105, worst
+    )
     h.check("in many short moves", count >= 12, count)
 
 

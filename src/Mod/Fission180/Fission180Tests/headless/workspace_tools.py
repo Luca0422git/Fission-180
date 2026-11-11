@@ -183,6 +183,39 @@ def _details(answer, run):
     return None
 
 
+def _two_tabs(answer, run):
+    """The contour's toolpath lifts over a tab at each of the two points given, and nowhere
+    else (setup coordinates: origin at the stock's low X, low Y corner, 2 mm outside the
+    plate; the 6 mm tool runs 3 mm outside the plate)."""
+    import FreeCAD as App
+
+    from fission180 import manufacture as cam
+    from fission180 import manufacture_core as core
+
+    doc = App.ActiveDocument
+    op = [o for s in cam.setups(doc) for o in cam.operations(s) if o.Label == "2D Contour1"][0]
+    segs = core.moves(core.parse_gcode(cam.toolpath(op)), feed_scale=60.0)
+    bottom = min(p[2] for seg in segs for p in seg["points"])
+    lifts = [
+        seg["points"][0]
+        for seg in segs
+        if seg["kind"] != "rapid"
+        and abs(seg["points"][0][2] - bottom) < 1e-3
+        and seg["points"][-1][2] > bottom + 1.0
+        and math.hypot(
+            seg["points"][-1][0] - seg["points"][0][0], seg["points"][-1][1] - seg["points"][0][1]
+        )
+        < 1e-6
+    ]
+    if len(lifts) != 2:
+        return "%d lifts over tabs, expected 2: %s" % (len(lifts), lifts)
+    for want in ((52.0, -1.0), (105.0, 32.0)):
+        near = min(math.hypot(p[0] - want[0], p[1] - want[1]) for p in lifts)
+        if near > 7.0:
+            return "no tab near %s: the lifts are at %s" % (want, lifts)
+    return None
+
+
 def _undo_names(expected_first):
     def check(answer, run):
         import FreeCAD as App
@@ -442,6 +475,47 @@ CAM = [
         "args": {},
         "contains": ["1 setup, 3 operations"],
         "check": _body_unchanged,
+    },
+    # the other side: the stock From preceding setup is Setup1's block, turned over (the top
+    # is 2 mm above the plate by now: 104 x 64 x 12, the plate's underside flush with it)
+    {
+        "tool": "cam_setup",
+        "args": {"stock": {"mode": "preceding"}, "wcs": {"flip_z": True}},
+        "contains": ["'Setup2'", "104 x 64 x 12"],
+        "check": setup_boxes([-52, -32, -12, 52, 32, 0], [-50, -30, -10, 50, 30, 0], [50, 30, 0]),
+    },
+    {"tool": "cam_delete", "args": {"target": "Setup2"}, "contains": ["Setup2 deleted"]},
+    # tabs at points: on the plate's outline (y = 0 and x = 100), and one that is not
+    {
+        "tool": "cam_edit",
+        "args": {
+            "target": "2D Contour1",
+            "options": {
+                "passes": {"multiple_depths": False},
+                "geometry": {
+                    "tabs": {
+                        "on": True,
+                        "positioning": "points",
+                        "points": [[50, 0, 0], [100, 30, 5]],
+                    }
+                },
+            },
+        },
+        "check": _two_tabs,
+    },
+    {
+        "tool": "cam_edit",
+        "args": {
+            "target": "2D Contour1",
+            "options": {"geometry": {"tabs": {"points": [[50, 30, 0]]}}},
+        },
+        "expect": "error",
+        "contains": ["Tab position 1 is not on the picked contour", "30 mm away"],
+    },
+    {
+        "tool": "cam_setups",
+        "args": {},
+        "check": states({"Face1": "valid", "2D Contour1": "valid", "Drill1": "valid"}),
     },
     {"tool": "cam_delete", "args": {"target": "Setup1"}, "contains": ["3 operations"]},
     {"tool": "cam_setups", "args": {}, "contains": ["no setup yet"]},
