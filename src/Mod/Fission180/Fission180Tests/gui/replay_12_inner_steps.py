@@ -27,7 +27,14 @@ ROD = PI * 0.25**2 * 4.0
 
 def activate_design():
     """The book makes each component from the top of the design: the ring at the end of
-    the design's own row (a new component goes into the active one, as in Fusion)."""
+    the design's own row (a new component goes into the active one, as in Fusion). The
+    browser is long by now: a person scrolls up to the design's row first."""
+    from Fission180Tests.gui import timeline_input as ti
+
+    tree = ti.tree()
+    row = tree.row(r.doc().Label)
+    if row is not None:
+        tree.scrollToItem(row)
     cs.click_radio(r.doc().Label)
 
 
