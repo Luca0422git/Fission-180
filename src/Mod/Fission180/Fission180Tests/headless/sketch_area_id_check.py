@@ -19,6 +19,12 @@ legacy    a design saved without the notes: they are taken before its first chan
           memory: the design is not changed by being opened) and the extrude follows
 undo      a pitch change undone and redone
 slivers   areas thinner than any real profile are not offered
+reopened  one design with an Extrude (18 areas), a Revolve (2 areas), a Sweep (1 area) and a
+          Loft (an area to an area of a second sketch), all of areas of the parametric plate:
+          saved, closed and opened they are whole (GitHub's run after the extrude merge showed
+          a loft and a revolve "empty after reopen"; it was the scenarios' label lookup);
+          every step touched and rebuilt: the same; the pitch changed after reopening: each
+          follows, to volumes worked out by hand; saved and opened once more
 """
 
 import math
@@ -29,7 +35,7 @@ import FreeCAD as App
 import Part
 import Sketcher
 
-from fission180 import extrude, revolve, sketch_area_fill, sketch_area_id
+from fission180 import extrude, loft, revolve, sketch_area_fill, sketch_area_id, sweep
 
 V = App.Vector
 _count = [0]
@@ -428,9 +434,111 @@ def slivers():
     App.closeDocument(doc.Name)
 
 
+# -- save, reopen, change a parameter ------------------------------------------------------------
+def _cell(sk, pitch, i, j):
+    """The name of the grid's square (i, j)."""
+    for name, face in extrude.regions(sk):
+        c = face.CenterOfMass
+        if int(c.x // pitch) == i and int(c.y // pitch) == j and face.Area > 0.5 * pitch * pitch:
+            return name
+    return None
+
+
+def _reopened_volumes(pitch):
+    """By hand: the checkerboard 3 high; the squares (2, 0) and (3, 0) turned about the Y
+    axis (a ring from 2 to 4 pitches, one pitch high); the square (5, 5) swept 20 up; the
+    square (0, 4) lofted to a 10 x 10 square 10 above it (a frustum of squares)."""
+    return {
+        "extrude": _checker_volume(pitch, 3.0),
+        "revolve": math.pi * ((4 * pitch) ** 2 - (2 * pitch) ** 2) * pitch,
+        "sweep": pitch * pitch * 20.0,
+        "loft": 10.0 / 3.0 * (pitch * pitch + 100.0 + pitch * 10.0),
+    }
+
+
+def _reopened_check(doc, names, pitch, what):
+    want = _reopened_volumes(pitch)
+    for kind in ("extrude", "revolve", "sweep", "loft"):
+        feature = doc.getObject(names[kind])
+        got = 0.0 if feature is None or feature.Shape.isNull() else feature.Shape.Volume
+        ok = feature is not None and _valid(feature) and abs(got - want[kind]) < 1e-4 * want[kind]
+        _print(ok, "%s: the %s is whole (%.3f, expected %.3f)" % (what, kind, got, want[kind]))
+
+
+def reopened():
+    doc, body, sk = _plate("areas_reopened")
+    origin = {getattr(o, "Role", ""): o for o in body.Origin.OutList}
+    # a path for the sweep: 20 straight up from the origin, on the XZ plane
+    path = body.newObject("Sketcher::SketchObject", "Path")
+    path.AttachmentSupport = (origin["XZ_Plane"], [""])
+    path.MapMode = "FlatFace"
+    path.addGeometry(Part.LineSegment(V(0, 0, 0), V(0, 20, 0)), False)
+    # the loft's other end: a 10 x 10 square (and a second one beside it) 10 above the plate
+    top = body.newObject("Sketcher::SketchObject", "Top")
+    top.AttachmentSupport = (origin["XY_Plane"], [""])
+    top.MapMode = "FlatFace"
+    top.AttachmentOffset = App.Placement(V(0, 0, 10), App.Rotation())
+    for x0 in (0.0, 10.0):
+        pts = [V(x0, 40, 0), V(x0 + 10, 40, 0), V(x0 + 10, 50, 0), V(x0, 50, 0)]
+        for i in range(4):
+            top.addGeometry(Part.LineSegment(pts[i], pts[(i + 1) % 4]), False)
+    doc.recompute()
+    upper = [n for n, f in extrude.regions(top) if f.CenterOfMass.x < 10.0]
+    _print(len(upper) == 1, "the loft's upper square is one of two areas (%s)" % upper)
+    made = {}
+    # (a rebuild after each, as every command does: a step asked for as a new body goes
+    # into a body that is still empty, and a body is empty until its first step is built)
+    made["extrude"] = extrude.build(
+        [(sk, name) for name in _checker(sk, 10.0)], {"distance": 3.0, "operation": "new_body"}
+    )
+    doc.recompute()
+    made["revolve"] = revolve.build(
+        [(sk, _cell(sk, 10.0, 2, 0)), (sk, _cell(sk, 10.0, 3, 0))],
+        (origin["Y_Axis"], ""),
+        {"operation": "new_body", "angle": 360.0},
+    )
+    doc.recompute()
+    made["sweep"] = sweep.make(
+        [(sk, _cell(sk, 10.0, 5, 5))], [(path, "Edge1")], {"operation": "new_body"}
+    )
+    doc.recompute()
+    made["loft"] = loft.make(
+        [(sk, _cell(sk, 10.0, 0, 4)), (top, upper[0])], {"operation": "new_body"}
+    )
+    doc.recompute()
+    names = {kind: feature.Name for kind, feature in made.items()}
+    _reopened_check(doc, names, 10.0, "made")
+    folder = tempfile.mkdtemp(prefix="fission180_areas_")
+    file_name = os.path.join(folder, "reopened.FCStd")
+    doc.saveAs(file_name)
+    sketch = sk.Name
+    App.closeDocument(doc.Name)
+
+    doc = App.openDocument(file_name)
+    _reopened_check(doc, names, 10.0, "saved and opened")
+    for obj in doc.Objects:
+        obj.touch()
+    doc.recompute()
+    _reopened_check(doc, names, 10.0, "every step rebuilt after opening")
+    _set_pitch(doc, doc.getObject(sketch), 12.0)
+    _reopened_check(doc, names, 12.0, "pitch 12 after opening")
+    cells = _cells(doc.getObject(names["extrude"]).Shape, 12.0)
+    _print(cells == WANTED, "pitch 12 after opening: the same 18 squares (%d)" % len(cells))
+    doc.save()
+    App.closeDocument(doc.Name)
+
+    doc = App.openDocument(file_name)
+    _reopened_check(doc, names, 12.0, "saved and opened again")
+    _set_pitch(doc, doc.getObject(sketch), 8.0)
+    _reopened_check(doc, names, 8.0, "pitch 8 after the second opening")
+    bad = [o.Name for o in doc.Objects if "Invalid" in o.State or "Error" in o.State]
+    _print(not bad, "no step in error (%s)" % bad)
+    App.closeDocument(doc.Name)
+
+
 def main():
     sketch_area_fill.install()  # (also installs the follower, as at start-up)
-    for case in (lens, plate, offset, revolved, legacy, undo, slivers):
+    for case in (lens, plate, offset, revolved, legacy, undo, slivers, reopened):
         try:
             case()
         except Exception as exc:

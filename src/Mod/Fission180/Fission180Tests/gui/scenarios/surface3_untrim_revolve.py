@@ -51,9 +51,10 @@ def doc():
     return App.ActiveDocument
 
 
-def by_label(label):
-    found = doc().getObjectsByLabel(label)
-    return found[0] if found else None
+def by_name(name):
+    # (by name, not by label: bodies are numbered per component, so the body of the new
+    # component and the design's first body are both "Body1")
+    return doc().getObject(name)
 
 
 def new_design():
@@ -367,7 +368,7 @@ def r2_done():
 def save_first():
     path = os.path.join(tempfile.mkdtemp(prefix="fission180-surface3-"), "surface3.FCStd")
     s["path"] = path
-    s["labels"] = [s[k].Label for k in ("patch", "rev1", "rev2")]
+    s["names"] = [s[k].Name for k in ("patch", "rev1", "rev2")]
     doc().saveAs(path)
     h.check("saved", os.path.isfile(path), path)
     h.press(QtCore.Qt.Key_S, QtCore.Qt.ControlModifier)
@@ -388,8 +389,8 @@ def reopen():
 
 
 def reopened():
-    patch, rev1, rev2 = (by_label(x) for x in s["labels"])
-    h.check("the bodies are back", None not in (patch, rev1, rev2), s["labels"])
+    patch, rev1, rev2 = (by_name(x) for x in s["names"])
+    h.check("the bodies are back", None not in (patch, rev1, rev2), s["names"])
     if None in (patch, rev1, rev2):
         return
     h.check("the untrimmed face (900)", st.near(st.area(patch), 900.0, 1e-6), st.area(patch))
