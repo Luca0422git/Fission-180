@@ -866,15 +866,7 @@ def combine_meshes(target, tools, operation="Join"):
                 "%s needs closed bodies: Repair them first (or use Merge, which keeps them as "
                 "they are)." % operation
             )
-        try:
-            if operation == "Join":
-                result = result.unite(tool)
-            elif operation == "Cut":
-                result = result.difference(tool)
-            else:
-                result = result.intersect(tool)
-        except Exception as exc:
-            raise MeshError("The bodies could not be combined (%s)." % exc)
+        result = _boolean(result, tool, operation)
         if result.CountFacets == 0:
             if operation == "Intersect":
                 raise MeshError("The bodies do not overlap: Intersect leaves nothing.")
@@ -883,6 +875,68 @@ def combine_meshes(target, tools, operation="Join"):
             raise MeshError("Join gave nothing: check that both bodies are closed.")
     _orient_outward(result)
     return result
+
+
+BOOLEAN_TRIES = 6  # facet orders tried before a Combine gives up (_boolean)
+
+
+def _boolean(target, tool, operation):
+    """Join / Cut / Intersect of two closed meshes, as a closed mesh.
+
+    FreeCAD's mesh booleans (MeshCore) depend on the order of the facets: the same two boxes
+    with their facets in another order gave an open, wrong result about once in a hundred
+    (Intersect 120 instead of 180 mm3, Cut 880 for 820: fix-2, the GitHub flake of
+    mesh_separate_combine D; checked with 300 shuffles in freecadcmd). The order changes
+    from run to run (the pieces of Separate, an STL file). So a result that is not closed is
+    computed again with the facets in other orders (deterministic ones) and, for Join and
+    Intersect, the operands swapped; still not closed: said, never a wrong body."""
+    err = None
+    for attempt in range(BOOLEAN_TRIES):
+        a, b = (
+            (target, tool)
+            if attempt == 0
+            else (_reordered(target, attempt), _reordered(tool, attempt))
+        )
+        if attempt % 2 == 1 and operation in ("Join", "Intersect"):
+            a, b = b, a  # (the same result either way round)
+        try:
+            if operation == "Join":
+                result = a.unite(b)
+            elif operation == "Cut":
+                result = a.difference(b)
+            else:
+                result = a.intersect(b)
+        except Exception as exc:
+            err = exc
+            continue
+        if result.CountFacets == 0 or result.isSolid():
+            if attempt:
+                log(
+                    "mesh %s: computed again with the faces in another order (%d)"
+                    % (operation, attempt)
+                )
+            return result
+    if err is not None:
+        raise MeshError("The bodies could not be combined (%s)." % err)
+    raise MeshError(
+        "%s gave a body with holes (FreeCAD's mesh booleans fail on some shapes): try "
+        "Repair on both bodies, or Merge." % operation
+    )
+
+
+def _reordered(mesh, k):
+    """The same mesh with its facets in another order (rotated by k parts of the list, each
+    facet's corners rotated by k), for _boolean."""
+    points, facets = topology(mesh)
+    if not facets:
+        return mesh.copy()
+    shift = (k * len(facets)) // BOOLEAN_TRIES
+    facets = facets[shift:] + facets[:shift]
+    if k % 2:
+        facets = list(reversed(facets))
+    turn = k % 3
+    facets = [f[turn:] + f[:turn] for f in facets]
+    return from_topology(points, facets)
 
 
 def _picked_indices(mesh, picks):
