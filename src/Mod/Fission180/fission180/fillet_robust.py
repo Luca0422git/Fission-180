@@ -28,6 +28,9 @@ one run fails, retry() tries, in this order, and takes the first that gives a so
              that runs past where a face narrows, the Tensegrity Tower's 20 mm chamfer), or
   turns      its inside corners first, then its outside edges (_in_turn: the kernel gives
              up where the two kinds meet at a point with a third, unpicked edge).
+  tolerance  the part itself is not clean (an earlier boolean of faces that touch along a
+           line left edges that do not lie on their faces: the Tesla Turbine's housing): the
+           blend is built on a copy whose tolerances are widened to 0.001 mm (_loosened).
 
 What is never done: blending the edges of one group one by one (corners where blends of
 one kind meet would come out differently from the one run, and from Fusion), or leaving
@@ -46,6 +49,7 @@ this (the dialog and the timeline then use Fission 180's step: fillet_sets).
 """
 
 import contextlib
+import math
 import time
 
 from . import blend, fillet_section
@@ -98,7 +102,7 @@ def source(feature):
 
 def used():
     """The route the last successful retry() took ("thread", "refine", "chains", "sections",
-    "turns"), or None
+    "turns", "tolerance"), or None
     when the kernel's one run worked."""
     return _STATE["used"]
 
@@ -679,6 +683,70 @@ def _by_groups(kind, shape, items, tag, once, ran=True):
     return work, []
 
 
+def _clean(shape):
+    """False when the part itself is not clean: an earlier step left edges that do not lie
+    on their faces within their tolerance (OpenCASCADE's check for booleans; the solid
+    still counts as valid). Booleans of faces that touch along a line leave such edges (a
+    tube as wide as the housing it is joined to, a hole that touches a bore: the Tesla
+    Turbine's housing)."""
+    table = _table(shape)
+    if "clean" not in table:
+        try:
+            shape.check(True)
+            table["clean"] = True
+        except Exception:
+            table["clean"] = False
+    return table["clean"]
+
+
+def _loosened(kind, shape, items, tag, once):
+    """The blend on a copy of a part that is not clean (_clean), its tolerances widened to
+    a thousandth of a millimetre (then five) so that the edges count as lying on their
+    faces again. None when the part is clean, or it does not help."""
+    if _clean(shape):
+        return None
+    for tolerance in (1e-3, 5e-3):
+        try:
+            loose = shape.copy()
+            loose.fixTolerance(tolerance)
+            result = once(kind, loose, items, tag)
+            if sound(result, shape):
+                return result
+        except Exception:
+            continue
+    return None
+
+
+SMOOTH_END = math.radians(0.6)  # the faces count as running into each other below this
+
+
+def _tangent_ends(shape, items):
+    """Names of the picked edges at an end of which the two faces run into each other
+    smoothly (no corner left) although they meet at a corner along the edge: a tube that
+    leaves a round housing at a tangent. A blend of one size cannot end there, and
+    OpenCASCADE builds none on such an edge at any size."""
+    found = []
+    for item in items:
+        try:
+            edge = _edge(shape, item[0])
+            faces = blend.faces_of(shape, edge)
+            if len(faces) != 2:
+                continue
+            first, last = edge.FirstParameter, edge.LastParameter
+            for parameter in (first, last):
+                point = edge.valueAt(parameter)
+                normals = []
+                for face in faces:
+                    u, v = face.Surface.parameter(point)
+                    normals.append(face.normalAt(u, v))
+                if normals[0].getAngle(normals[1]) < SMOOTH_END:
+                    found.append("Edge%d" % item[0])
+                    break
+        except Exception:
+            continue
+    return found
+
+
 def _memo_key(kind, shape, items, tag):
     try:
         return (
@@ -755,6 +823,14 @@ def first(kind, shape, items, tag, once):
 
 def _first(kind, shape, items, tag, once):
     threaded = _thread_source(shape) is not None  # (its bevel lands on the part under it)
+    shape_key = _shape_key(shape)
+    # No size will do where the two faces run into each other at an end of the edge: said
+    # at once (the kernel took 9 to 25 s to give up on the Tesla Turbine's inlet tube, and
+    # a search for the largest size that fits would ask it a dozen times)
+    tangent = _tangent_ends(shape, items)
+    if tangent:
+        _STATE["blockers"] = tangent
+        raise Refused("command not done", tangent, "tangent")
     if not threaded:
         every = _table(shape)["edges"]
         missed = [
@@ -766,7 +842,6 @@ def _first(kind, shape, items, tag, once):
     if not threaded and _mixed_open_corner(shape, items):
         # (group by group, the groups that were in the way a moment ago first)
         return _retry(kind, shape, items, tag, once, "command not done", ran=False)
-    shape_key = _shape_key(shape)
     if any(key[0] == shape_key and key[1] == kind for key in _STATE["suspects"]):
         for part in groups(shape, items):
             if not _suspect(shape_key, kind, part):
@@ -806,6 +881,14 @@ def _retry(kind, shape, items, tag, once, error, ran=True):
     if result is not None:
         _STATE["used"] = "refine"
         return result
+    tangent = _tangent_ends(shape, items)
+    if tangent:
+        _STATE["blockers"] = tangent
+        raise Refused(str(error) or "command not done", tangent, "tangent")
+    result = _loosened(kind, shape, items, tag, once)
+    if result is not None:
+        _STATE["used"] = "tolerance"
+        return result
     _STATE["sections"] = _STATE["turns"] = 0
     result, blocked = _by_groups(kind, shape, items, tag, once, ran)
     if result is not None:
@@ -837,6 +920,30 @@ def _alone(kind, shape, items, tag, once):
         except Exception:
             blocked.append("Edge%d" % item[0])
     return blocked if len(blocked) < len(items) else []
+
+
+def refusal_text(shape, refused, total, kind, reason):
+    """The whole refusal for a dialog: `reason` (the caller's "Radius 5 mm is too big
+    here...") with what retry() / first() found about the edges in the way; or, where no
+    size would do, that instead (it must not read as "too big": a search for the largest
+    size that fits would start)."""
+    if refused.why == "tangent":
+        what = "rounded" if kind == "fillet" else "bevelled"
+        count = len(refused.blockers)
+        if total > 1 and count < total:
+            who = "%d of the %d edges cannot be %s" % (count, total, what)
+            tail = " Leave them out (click them again): the other %d can." % (total - count)
+        else:
+            who = "This edge cannot be %s" % what if total == 1 else "These edges cannot be " + what
+            tail = ""
+        return (
+            "%s at any size: at one end the two faces run into each other smoothly (a tube "
+            "that leaves a round face at a tangent, for example), and there is no corner "
+            "left there for a %s to end in.%s Or move one of the two features a little so "
+            "that the faces meet at an angle everywhere."
+            % (who, "round" if kind == "fillet" else "bevel", tail)
+        )
+    return reason + in_the_way(shape, refused.blockers, total, kind, refused.why)
 
 
 def in_the_way(shape, blocked, total, kind, why=""):

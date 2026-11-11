@@ -937,9 +937,7 @@ def _another_route(kind, info, names, options, reason):
 def _refused_text(kind, info, items, refused, reason):
     from . import fillet_robust
 
-    return reason + fillet_robust.in_the_way(
-        info.shape, refused.blockers, len(items), kind, refused.why
-    )
+    return fillet_robust.refusal_text(info.shape, refused, len(items), kind, reason)
 
 
 def check_build(kind, info, refs, options):

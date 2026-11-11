@@ -179,6 +179,8 @@ def _refusal(kind, shape, items, refused):
 
     error = KernelError(str(refused))
     error.way = fillet_robust.in_the_way(shape, refused.blockers, len(items), kind, refused.why)
+    if refused.why == "tangent":  # no size would do: its own words, not "too big"
+        error.instead = fillet_robust.refusal_text(shape, refused, len(items), kind, "")
     return error
 
 
@@ -881,10 +883,11 @@ def _compute(shape, spec, refs, refs2, features, features2):
                 raise core.SetError("The radius must be more than 0 mm.")
             try:
                 result = kernel("fillet", shape, [(_index(n), r, r) for n in edges])
-            except KernelError:
+            except KernelError as exc:
                 raise core.SetError(
-                    "Radius %g mm is too big here: the rounds do not fit on the faces next "
-                    "to their edges." % r
+                    getattr(exc, "instead", "")
+                    or "Radius %g mm is too big here: the rounds do not fit on the faces next "
+                    "to their edges.%s" % (r, getattr(exc, "way", ""))
                 )
         elif mode == "full_round":
             result = shape
@@ -935,7 +938,7 @@ def _with_rows(build, shape, spec, groups):
             build(shape, spec, alone)
         except KernelError as exc:
             # (the edges in the way, when building group by group found them)
-            text = _too_big(spec, i) + getattr(exc, "way", "")
+            text = getattr(exc, "instead", "") or _too_big(spec, i) + getattr(exc, "way", "")
             raise core.SetError(text if len(filled) == 1 else "Set %d: %s" % (i + 1, text))
         except (core.SetError, blend.BlendError) as exc:
             raise core.SetError("Set %d: %s" % (i + 1, exc))
