@@ -7,8 +7,9 @@ drawing area as h.press does.
 
 R1 Create Sketch, Esc: nothing is created. Create Sketch again, click the XY plane.
 R2 L, click the origin, type 20, Enter (in FreeCAD's field): a 20 mm line, and the line
-   tool goes on from its end. Type 12 mm, Enter: the next line, 12 up, joined to the
-   first (the letters of a unit stay in the field, M does not start Move).
+   tool goes on from its end. Type 12 mm, the hand moves a little along the upright
+   guide, Enter: the next line, 12 up (exactly upright), joined to the first (the letters
+   of a unit stay in the field, M does not start Move).
 R3 Esc right after typing (FreeCAD keeps Esc in its field for two seconds): the tool
    stops, the sketch stays open.
 R4 C, click, type 10, Enter: a circle 10 wide. L while the circle's field has the
@@ -25,7 +26,7 @@ import math
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore
+from PySide import QtCore, QtWidgets
 
 from Fission180Tests.gui import arrow_input as arrows
 from Fission180Tests.gui import harness as h
@@ -123,8 +124,29 @@ def r_after_20():
     si.move_towards(V(20.3, 8, 0), Y)
 
 
+def field_text():
+    """The text of the widget with the keyboard focus (FreeCAD's on-screen field)."""
+    widget = QtWidgets.QApplication.focusWidget()
+    try:
+        return widget.text() if widget is not None else ""
+    except Exception:
+        return ""
+
+
 def r_type_12():
-    si.type_text("12 mm")  # a unit: its letters stay in the field
+    si.type_text("12 mm", enter=False)  # a unit: its letters stay in the field
+
+
+def r_hand_moves():
+    # The hand moves on a little, along the upright guide, before Enter (fix-2). A pointer
+    # event after the typed value drops what the pointer showed (the typed length puts the
+    # end off the pointer), and FreeCAD makes the line from its angle field as read off the
+    # pointer's pixel: 90 degrees here, 89.856 on GitHub's screen (12 up came out x 20.0302,
+    # with no upright). The upright is now decided from the line itself at the commit
+    # (sketch_infer._typed_direction), whatever came in between.
+    h.move(h.screen_point(V(20.3, 9, 0)))
+    h.check("R2: the typed 12 is still in the field", "12" in field_text(), field_text())
+    si.key(QtCore.Qt.Key_Return)
 
 
 def r_after_12():
@@ -346,6 +368,7 @@ h.run(
             r_type_20,
             r_after_20,
             r_type_12,
+            r_hand_moves,
             r_after_12,
             r_after_esc,
             r_circle,
