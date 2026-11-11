@@ -381,6 +381,35 @@ def nearest_vertex(raw, vertices, tol):
     return (best[1], best[2]) if best else None
 
 
+AXES = (-1, -2)  # the sketch's X and Y axes (FreeCAD's H and V axes): the origin's
+
+
+def curves_under(raw, hits, tol):
+    """The curves of `hits` ([(geo, curve)]) within `tol` of `raw`, as geometry indices,
+    best first: the nearest first, of two equally near the sketch's own (geo >= 0) before a
+    projected one, and the sketch's two axes (AXES) after every other curve there.
+
+    The axes are the origin's: in a sketch on an origin plane the planes at right angles lie
+    edge-on over them, and the origin's axes run there too once the Origin is shown. A tool
+    that picks curves takes the sketch's curve through them (Fusion's selection priority:
+    origin and construction geometry come last; for a model edge behind a plane or axis the
+    same is sketch_project_across.element_at). By distance alone the axis won whenever the
+    pointer was a hair nearer to it than to the line: D on the Tensegrity arm's bottom line,
+    clicked at its middle where the YZ plane lies edge-on over the Y axis, picked the axis
+    and made no dimension (replay_04_tensegrity arm_base_driven; fix-3, wave 7)."""
+    found = []
+    for geo, curve in hits:
+        if not near_curve(raw, curve, tol):
+            continue
+        d = curve_distance(raw, curve)
+        found.append((geo in AXES, round(d, 6), 0 if geo >= 0 else 1, geo))
+    out = []
+    for _axis, _d, _own, geo in sorted(found):
+        if geo not in out:
+            out.append(geo)
+    return out
+
+
 def nearest_line(raw, lines, tol):
     """(geo, a, b) of the inference line nearest to raw within tol, or None."""
     best = None

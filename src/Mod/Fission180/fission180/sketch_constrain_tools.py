@@ -507,23 +507,17 @@ class PickConstraint(draw.DrawTool):
     def candidates(self, snap):
         """What is under the pointer, best first: [(geo, pos)]. A point (when the tool
         takes points), then the curves within the pick radius, the nearest first; of two
-        equally near the sketch's own curve comes before an axis or a projected curve (a
-        line drawn along the X axis is the line, not the axis)."""
+        equally near the sketch's own curve comes before a projected curve (a line drawn
+        along a projected edge is the line), and the sketch's axes, over which the origin's
+        planes lie edge-on, come after every other curve there (a line clicked where it
+        crosses the Y axis is the line: draw.Geometry.curves_under)."""
         geo = self.geometry()
         tol = draw.pick_pixels() * self._px()
         out = []
         vertex = icore.nearest_vertex(snap.raw, geo.verts, tol)
         if self.points_ok and vertex is not None:
             out.append(vertex[0])
-        curves = []
-        for index, curve in geo.hits:
-            if draw._type_of(self.sketch, index) not in CURVES:
-                continue
-            if not icore.near_curve(snap.raw, curve, tol):
-                continue
-            d = icore.curve_distance(snap.raw, curve)
-            curves.append((round(d, 6), 0 if index >= 0 else 1, index))
-        for _d, _own, index in sorted(curves):
+        for index in geo.curves_under(snap.raw, tol, kinds=CURVES):
             if (index, 0) not in out:
                 out.append((index, 0))
         if not self.points_ok and vertex is not None:

@@ -52,6 +52,45 @@ class UnderThePointer(unittest.TestCase):
         self.assertAlmostEqual(core.curve_distance((0.5, 70.0), axis), 0.5)
 
 
+class CurvesUnder(unittest.TestCase):
+    """What a pick tool (D, the constraints) takes under the pointer: the sketch's curve
+    through the origin's axes (fix-3, wave 7: the Tensegrity arm's bottom line clicked where
+    the YZ plane lies edge-on over the Y axis). The X axis is geo -1, the Y axis -2."""
+
+    X_AXIS = (-1, ("line", (0.0, 0.0), (1.0, 0.0)))
+    Y_AXIS = (-2, ("line", (0.0, 0.0), (0.0, 1.0)))
+    BASE = (4, ("seg", (-4.0, 6.0), (4.0, 6.0)))  # the arm's bottom line, y = 6
+    PROJECTED = (-3, ("seg", (-25.0, 6.0), (25.0, 6.0)))  # the frame's edge under it
+
+    def hits(self):
+        return [self.X_AXIS, self.Y_AXIS, self.BASE, self.PROJECTED]
+
+    def test_a_line_crossing_the_y_axis_comes_before_the_nearer_axis(self):
+        # the pointer at (0.05, 6.3): 0.05 from the Y axis, 0.3 from the line and the edge
+        found = core.curves_under((0.05, 6.3), self.hits(), 1.0)
+        self.assertEqual(found, [4, -3, -2])
+
+    def test_the_sketchs_own_line_before_a_projected_edge_equally_near(self):
+        found = core.curves_under((2.0, 6.0), self.hits(), 1.0)
+        self.assertEqual(found, [4, -3])
+
+    def test_the_nearer_of_two_sketch_curves_first(self):
+        other = (5, ("seg", (-4.0, 6.5), (4.0, 6.5)))  # 0.5 above the bottom line
+        found = core.curves_under((1.0, 6.4), [self.BASE, other, self.Y_AXIS], 1.5)
+        self.assertEqual(found, [5, 4, -2])  # 0.1 from 5, 0.4 from 4; the axis last
+
+    def test_an_axis_alone_is_taken(self):
+        self.assertEqual(core.curves_under((-20.0, 0.2), self.hits(), 1.0), [-1])
+
+    def test_nothing_out_of_reach(self):
+        self.assertEqual(core.curves_under((-20.0, 3.0), self.hits(), 1.0), [])
+
+    def test_each_curve_once(self):
+        # a curve given as two pieces (FreeCAD's polyline of an arc) is listed once
+        twice = [(7, ("seg", (0.0, 1.0), (5.0, 1.0))), (7, ("seg", (5.0, 1.0), (9.0, 1.0)))]
+        self.assertEqual(core.curves_under((5.0, 1.2), twice, 1.0), [7])
+
+
 class Guides(unittest.TestCase):
     def test_straight_below_an_acquired_point_snaps_onto_its_x(self):
         a = ((3, 2), (10.0, 5.0))
