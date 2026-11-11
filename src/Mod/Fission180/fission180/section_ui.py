@@ -1045,6 +1045,20 @@ def start():
     (on the plane or face selected, or wait for one)."""
     chosen = selected_section()
     picks = hole_common.picks()
+    try:
+        from . import taskui
+
+        if taskui.current() is not None:
+            # A command's dialog is still open: what is selected is that command's pick, not
+            # a selection made for this one. Section Analysis pressed again while its dialog
+            # was open kept the first section (Fusion also runs a command that another one
+            # ends) and at once made a second one on the same plane (book parity report,
+            # line 1357: "two Section entries were created during the retry"). The new
+            # dialog now waits for its own plane.
+            picks = []
+            chosen = None
+    except Exception:
+        pass
     if not commands.finish_open_dialog():
         return None
     if App.ActiveDocument is None:

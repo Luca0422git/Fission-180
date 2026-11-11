@@ -49,6 +49,10 @@ LINE_TYPES = ("Part::GeomLine", "Part::GeomLineSegment")
 MIN_DIAMETER = 0.1  # mm: the diameter arrow stops here
 TO_WAITING = "Click the face or plane the hole goes to (in the 3D view or the browser)."
 MISSES = "The hole misses the part. Drag it (or type X / Y) back onto a face of the part."
+# More modeled threads than this in one Hole step: the dialog's preview shows the drilled
+# holes, and the threads are cut once, by OK.
+LIGHT_THREADS = 1
+THREADS_LATER = "The %d threads are modeled when you press OK (the preview shows the holes)."
 
 
 class PointDragger(BoxCarrier):
@@ -1414,7 +1418,16 @@ class HolePanel(Panel):
         except Exception:
             return False
 
-    def _apply(self):
+    def _many_modeled(self, options):
+        """True when the hole step would cut more than LIGHT_THREADS modeled threads."""
+        try:
+            if options.get("tap_type") != "tapped" or not options.get("modeled"):
+                return False
+            return len(hole.centres(self.target)) > LIGHT_THREADS
+        except Exception:
+            return False
+
+    def _apply(self, final=False):
         if self.target is None:
             return
         self._collect()
@@ -1423,6 +1436,13 @@ class HolePanel(Panel):
             # Fusion: the To box waits for its click, nothing is wrong yet; the hole keeps its
             # depth meanwhile (the dialog says what it waits for).
             options["extent"] = "distance"
+        # Several modeled threads: the preview drills the holes and the threads are cut once,
+        # by OK (book parity report, line 2192: five holes From Sketch took about 60 s. The
+        # dialog starts with the last hole's settings; with Tapped + Modeled every click on a
+        # circle and every key cut all the threads again, 1.3 s of kernel time for each).
+        self.threads_later = not final and self._many_modeled(options)
+        if self.threads_later:
+            options["modeled"] = False
         try:
             hole.apply(self.target, options)
             self.error = ""
@@ -1462,6 +1482,9 @@ class HolePanel(Panel):
 
     def show_status(self):
         text = self.problem()
+        if not text and getattr(self, "threads_later", False):
+            self.message.setText(THREADS_LATER % len(hole.centres(self.target)))
+            return
         self.message.setText("⚠ " + text if text else "")
 
     # -- handles --------------------------------------------------------------------------
@@ -1670,13 +1693,17 @@ class HolePanel(Panel):
             self.message.setText("⚠ " + TO_WAITING)
             return False
         self._timer.stop()
-        if self.dirty:
+        if self.dirty or getattr(self, "threads_later", False):
             self.dirty = False
-            self._apply()
+            self._apply(final=True)  # the threads the preview left out are cut now
         if self.error:
             self.message.setText("⚠ " + self.error)
             return False
-        preview.recompute(self.doc)
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        try:
+            preview.recompute(self.doc)
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
         text = self.problem()
         if text:
             self.message.setText("⚠ " + text)
