@@ -65,3 +65,43 @@ class Notes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _Doc:
+    """Stands in for a FreeCAD document: setting its UnitSystem records what
+    store_target reads off the statement that set it."""
+
+    def __init__(self, name, seen):
+        object.__setattr__(self, "Name", name)
+        object.__setattr__(self, "seen", seen)
+
+    def __setattr__(self, key, value):
+        if key == "UnitSystem":
+            self.seen.append(core.store_target(sys._getframe(1)))
+        object.__setattr__(self, key, value)
+
+
+class StoreTarget(unittest.TestCase):
+    """Whose units a running statement sets (fix-2: a statement that set a throw-away
+    document's units was taken for the inch design's own, and the design stayed in mm)."""
+
+    def test_a_name(self):
+        seen = []
+        scratch = _Doc("Scratch", seen)
+        scratch.UnitSystem = 0
+        self.assertEqual(seen, [(True, scratch)])
+
+    def test_an_attribute_chain(self):
+        seen = []
+
+        class Holder:
+            pass
+
+        holder = Holder()
+        holder.doc = _Doc("Design", seen)
+        holder.doc.UnitSystem = 3
+        self.assertEqual(seen, [(True, holder.doc)])
+
+    def test_another_statement_is_no_store(self):
+        self.assertEqual(core.store_target(sys._getframe(0)), (False, None))
+        self.assertEqual(core.store_target(None), (False, None))

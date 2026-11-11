@@ -24,11 +24,12 @@ P4. Editing from the timeline twice, then undo / redo: a Sphere d10 on the box's
 Volumes by hand (pi = PI): box 30 x 12 x 10 = 3600; cylinder d6 h5 = 45 pi; d8 h5 = 80 pi;
 d8 h8 = 128 pi; box 15 x 50 x 25 = 18750; half sphere r5 = 250 pi / 3.
 """
+
 import math
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore, QtWidgets
+from PySide import QtCore, QtGui, QtWidgets
 from PySide6 import QtTest
 
 from Fission180Tests.gui import dialog_input as ui
@@ -147,6 +148,43 @@ def p1_type_length():
         ui.type_into(p.length.widget, "30")
 
 
+def plane_point(pos):
+    """The point of the XY plane under widget pixel `pos` of the 3D view."""
+    widget = h.gl_widget()
+    ratio = widget.devicePixelRatioF()
+    view = h.view()
+    at = V(*view.getPoint(int(pos.x() * ratio), int((widget.height() - pos.y()) * ratio)))
+    look = V(view.getViewDirection())
+    return at + look * (-at.z / look.z)
+
+
+def p1_onto_box():
+    # A hand that comes to rest on a size box (fix-2, primitives_ui.PlacingBox): the move
+    # still reaches the view, the outline follows the pointer and the box makes room.
+    pi.hover(V(14, 12, 0))
+    p = pi.panel("BoxPanel")
+    box = p.value_boxes.boxes.get("placing:width") if p is not None else None
+    if not h.check("P1 a Width box on the canvas", box is not None and box.isVisible(), box):
+        return
+    centre = box.geometry().center()
+    h.move(centre)
+    s["onto_box"] = plane_point(centre)
+
+
+p1_onto_box.done = lambda: QtWidgets.QApplication.widgetAt(QtGui.QCursor.pos()) is h.gl_widget()
+p1_onto_box.done_what = "the Width box to make room for the pointer that came onto it"
+
+
+def p1_onto_box_followed():
+    p = pi.panel("BoxPanel")
+    want = abs(s["onto_box"].y)
+    h.check(
+        "P1 the pointer on the size box still sizes the outline (width)",
+        p is not None and abs(p.width.value() - want) < 1.0,
+        (p and p.width.value(), want),
+    )
+
+
 def p1_mouse_moves():
     pi.hover(V(14, 12, 0))
     pi.hover(V(20, 15, 0))
@@ -156,6 +194,17 @@ def p1_length_kept():
     p = pi.panel("BoxPanel")
     if p is None:
         return
+    # The size boxes sit on the canvas beside the outline's sides; one came to rest under
+    # the pointer here (fix-2): the pointer's moves went to the box, the outline stayed at
+    # the width from before (GitHub: 12), and a person's click there would land in the box,
+    # not place the shape. A box makes room for the pointer, and a move over one still
+    # reaches the view (primitives_ui.PlacingBox).
+    under = QtWidgets.QApplication.widgetAt(QtGui.QCursor.pos())
+    h.check(
+        "P1 no size box under the pointer (the click places the shape)",
+        under is h.gl_widget(),
+        under and under.metaObject().className(),
+    )
     h.check(
         "P1 the typed length stays while the mouse moves",
         near(p.length.value(), 30.0),
@@ -530,6 +579,8 @@ h.run(
         p1_plane,
         p1_corner_again,
         p1_type_length,
+        p1_onto_box,
+        p1_onto_box_followed,
         p1_mouse_moves,
         p1_length_kept,
         p1_placed,

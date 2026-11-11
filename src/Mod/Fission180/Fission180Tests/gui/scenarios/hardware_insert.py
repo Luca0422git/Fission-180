@@ -23,6 +23,7 @@ Expected sizes come from the ISO tables (fission180/hardware_core.py, unit teste
 import math
 
 import FreeCAD as App
+from PySide import QtWidgets
 
 from Fission180Tests.gui import blend_steps as b
 from Fission180Tests.gui import bodies_steps as s
@@ -359,11 +360,56 @@ def f_type():
         h.check("Heat-set insert again", ui.choose(p.kind, "Heat-set insert"))
 
 
+def f_zoom():
+    # The rim of the magnet's pocket (6.2) and the magnet's own top edge (6.0) are 0.1 mm
+    # apart: a pixel or two at this zoom, and which of the two is drawn on top differs
+    # between renderers (GitHub's software OpenGL drew the magnet's edge there, and the click
+    # went to the magnet, which the dialog does not take). A person zooms in on the pocket
+    # until the two are apart: the pocket brought to the middle of the view, then the view
+    # zoomed in about it until a millimetre there is at least 30 pixels. (The camera is set
+    # directly: the zoom is not what is tested; a wheel event sent to the view changed
+    # nothing here.)
+    target = V(30 + 3.1, 8, 10)
+
+    def mm_px():
+        a, c = h.screen_point(target), h.screen_point(target + V(1, 0, 0))
+        return math.hypot(a.x() - c.x(), a.y() - c.y())
+
+    middle = h.gl_widget().rect().center()
+    at = h.screen_point(target)
+    h.pan(middle.x() - at.x(), middle.y() - at.y())
+    factor = min(1.0, mm_px() / 40.0)
+    camera = h.view().getCameraNode()
+    try:
+        camera.height.setValue(camera.height.getValue() * factor)
+    except AttributeError:  # a perspective camera: step towards what it looks at
+        look = V(h.view().getViewDirection())
+        position = V(*camera.position.getValue().getValue())
+        focal = camera.focalDistance.getValue()
+        moved = position + look * (focal * (1 - factor))
+        camera.position.setValue(moved.x, moved.y, moved.z)
+        camera.focalDistance.setValue(focal * factor)
+    QtWidgets.QApplication.processEvents()
+    h.view_still()
+    h.check("zoomed in on the pocket (px per mm)", mm_px() >= 30, mm_px())
+
+
 def f_rim():
-    # the rim of the magnet's pocket: a 6.2 round edge on the top face. The magnet's own edge
-    # (6.0) is a pixel inside it and cannot be clicked: aimed from just outside the rim, the
-    # way a person comes at it (library-2: the joints' marks at the holes changed the fit).
-    h.check("click the pocket's rim", h.click_edge(V(30 + 3.4, 8, 10)), h.state.get("last_click"))
+    # the rim of the magnet's pocket: a 6.2 round edge on the top face, aimed at until it is
+    # the edge that lights up (the dialog's own rule for what can be clicked: never the
+    # hardware itself, so the magnet's edge next to it never lights up)
+    p = panel()
+    doc = App.ActiveDocument
+
+    def lights_up(info):
+        obj = doc.getObject(info.get("Object", ""))
+        return p is not None and obj is not None and p.allow(obj, str(info.get("Component")))
+
+    h.check(
+        "click the pocket's rim",
+        h.click_edge(V(30 + 3.1, 8, 10), accept=lights_up),
+        h.state.get("last_click"),
+    )
 
 
 def f_on_rim():
@@ -413,6 +459,7 @@ h.run(
         e_longer,
         e_kept,
         f_type,
+        f_zoom,
         f_rim,
         f_on_rim,
         f_cancelled,

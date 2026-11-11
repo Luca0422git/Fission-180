@@ -1428,11 +1428,16 @@ def click(point, modifiers=QtCore.Qt.NoModifier, button=QtCore.Qt.LeftButton):
     return hit
 
 
-def click_edge(point, modifiers=QtCore.Qt.NoModifier):
+def click_edge(point, modifiers=QtCore.Qt.NoModifier, accept=None):
     """Click an edge at a 3D point on it. Edges are a few pixels wide and renderers round
     differently (the CI's software OpenGL picked the face next to an outline edge), so,
     like a person aiming until the edge lights up, try the pixels around the point and
-    click the nearest one where an edge is under the mouse."""
+    click the nearest one where an edge is under the mouse.
+
+    accept(info) -> bool (info: what FreeCAD finds under that pixel, its "Object" and
+    "Component"): only such an edge will do, the one a person waits to see light up when
+    two edges are a pixel apart and the other one does not light up at all (hardware_insert:
+    the magnet's own edge drawn over the pocket's rim on GitHub's software OpenGL)."""
     uncover(point)
     widget = gl_widget()
     ratio = widget.devicePixelRatioF()
@@ -1446,6 +1451,8 @@ def click_edge(point, modifiers=QtCore.Qt.NoModifier):
                 qx, qy = centre.x() + dx, centre.y() + dy
                 info = view().getObjectInfo((qx * ratio, (widget.height() - qy) * ratio))
                 if info and str(info.get("Component", "")).startswith("Edge"):
+                    if accept is not None and not accept(info):
+                        continue
                     best = QtCore.QPoint(qx, qy)
                     break
             if best is not None:

@@ -251,7 +251,21 @@ def b_look():
     h.check("B the button knows all seven names", all(n in full for n in NAMES), full)
     shown = button.text()
     h.check("B it shows the first names and how many more", "more" in shown, shown)
-    h.check("B the & of a name is drawn (&& to Qt)", shown.startswith("Housing && In"), shown)
+    # The button shortens the names to the room it has, and that room depends on the
+    # machine's fonts: on GitHub the first name itself was cut before its "&" ("Housing… + 6
+    # more"). So: every "&" the button shows is doubled for Qt (a lone one would be taken
+    # as a keyboard mark and vanish) ...
+    h.check("B no lone & on the button (each one && to Qt)", "&" not in shown.replace("&&", ""))
+    # ... and with room for the first name (the most a names button shows, NAMES_WIDTH),
+    # its "&" is drawn
+    roomy = taskui.NamesButton()
+    roomy.set_names(full)
+    h.check(
+        "B the & of a name is drawn (&& to Qt)",
+        roomy.text().startswith("Housing && Inlet Tube"),
+        roomy.text(),
+    )
+    roomy.deleteLater()
     h.check(
         "B the full list is its tool tip",
         all(n in button.toolTip() for n in NAMES),

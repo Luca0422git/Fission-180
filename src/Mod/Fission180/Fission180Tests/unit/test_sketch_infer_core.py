@@ -822,3 +822,35 @@ class Glyphs(unittest.TestCase):
     def test_digit_strokes(self):
         self.assertEqual(len(core.digit_strokes("8", (0.0, 0.0), 1.0)), 7)
         self.assertEqual(core.digit_strokes("1", (0.0, 0.0), 1.0)[0], [(1.0, 2.0), (1.0, 1.0)])
+
+
+class TypedLength(unittest.TestCase):
+    """A line finished with a typed length while the pointer was on a level / upright
+    guide (fix-2: sketch_qa_keys R2 on GitHub, a typed vertical 12 at x 20.0302)."""
+
+    def test_upright_within_the_guide_angle(self):
+        self.assertEqual(core.typed_axis(core.VERTICAL, (20, 0), (20.0302, 12), 4.0), "Vertical")
+        self.assertEqual(core.typed_axis(core.HORIZONTAL, (0, 0), (20, -0.1), 4.0), "Horizontal")
+
+    def test_too_far_off_or_no_guide(self):
+        self.assertIsNone(core.typed_axis(core.VERTICAL, (20, 0), (21.5, 12), 4.0))  # 7 deg
+        self.assertIsNone(core.typed_axis(None, (20, 0), (20, 12), 4.0))
+        self.assertIsNone(core.typed_axis(core.VERTICAL, (20, 0), (20, 0), 4.0))
+
+    def test_an_angle_one_pixel_off_gives_way(self):
+        # 0.04 mm pixels, the pointer 8 mm up the guide: 89.856 degrees is that pixel
+        angle = math.radians(89.8558)
+        self.assertTrue(core.pointer_angle(core.VERTICAL, angle, (20, 0), (20, 8), 0.04))
+        self.assertTrue(core.pointer_angle(core.VERTICAL, -angle, (20, 0), (20, -8), 0.04))
+        self.assertTrue(
+            core.pointer_angle(core.HORIZONTAL, math.radians(0.1), (0, 0), (20, 0), 0.04)
+        )
+
+    def test_an_angle_the_person_typed_is_kept(self):
+        self.assertFalse(
+            core.pointer_angle(core.VERTICAL, math.radians(88), (20, 0), (20, 8), 0.04)
+        )
+        self.assertFalse(core.pointer_angle(None, math.radians(90), (20, 0), (20, 8), 0.04))
+        self.assertFalse(
+            core.pointer_angle(core.VERTICAL, math.radians(90), (20, 0), (20, 0), 0.04)
+        )

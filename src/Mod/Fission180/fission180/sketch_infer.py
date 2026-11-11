@@ -185,6 +185,10 @@ class Inference:
         self.last = None  # last Result (for tests and diagnostics)
         self.last_px = None
         self.last_step = None  # which click `last` was computed for
+        # (Result, px, step) of the last pointer MOVE, kept when `last` is dropped because a
+        # typed value put the point elsewhere (_check_preview) or the pointer left the view:
+        # which way a line went before its length was typed (commit_signal; fix-2)
+        self.last_move = None
         self.last_start = None  # the line's first point as last previewed
         self._cache = None
         self._curve_geos = []  # the sketch curve of each curve of the cache (-1 / -2 the axes)
@@ -218,6 +222,7 @@ class Inference:
         self.current = {"points": []}
         self.last = None
         self.last_step = None
+        self.last_move = None
         self.last_start = None
         self.arc.reset()
         self.overlay.clear()
@@ -314,6 +319,7 @@ class Inference:
         if ctrl and setting("CtrlFree"):
             self.overlay.clear()
             self.last = None
+            self.last_move = None  # Ctrl: no inference, also not for a typed length
             if kind in PRESSES and tool is not None:
                 view = _ViewMap(session, obj, event.position())
                 self._remember_press(None, None, step, view if view.ok else None, True)
@@ -361,6 +367,8 @@ class Inference:
             # is malformed": sketch_spline_luca A. They keep FreeCAD's own grid rule.)
             result = self._grid_only(view, grid)
         self.last, self.last_px, self.last_step = result, view.px, step
+        if kind == QtCore.QEvent.MouseMove:
+            self.last_move = (result, view.px, step)
         if kind in PRESSES:
             self._remember_press(result, view.px, step, view, False)
         if result is None:
@@ -865,15 +873,24 @@ class Inference:
             return
         points = self.current["points"]
         wanted = core.POINTS.get(self.kind, 0)
-        if self.tool_on and self.last is not None and 0 < len(points) < wanted:
+        last, last_px, last_step = self.last, self.last_px, self.last_step
+        if last is None and self.kind == "line" and self.last_move is not None:
+            # a value typed into FreeCAD's field put the end off what the pointer showed,
+            # and a pointer event after it dropped `last` (_check_preview, a Leave): which
+            # way the line went is still the last move's (fix-2: on GitHub's slower machine
+            # a typed vertical 12 came out 0.03 mm off upright, sketch_qa_keys R2)
+            last, last_px, last_step = self.last_move
+        if self.tool_on and last is not None and 0 < len(points) < wanted:
             # no click for the last point: a shape finished with Enter after a typed
             # value takes what the pointer showed last (FreeCAD drops its own
             # level/upright then)
-            if self.last_step == len(points):
-                points.append((self.last, self.last_px))
+            if last_step == len(points):
+                points.append((last, last_px))
+                self.current["typed"] = len(points) - 1  # (_apply_shape: _typed_direction)
         if any(r is not None for r, _px in points):
             self.pending.append(self.current)
         self.current = {"points": []}
+        self.last_move = None
         self.placed = []
         self.last_start = None  # the shape is done: the next one starts afresh
         if not self._queued:
@@ -1071,6 +1088,10 @@ class Inference:
                 continue
             hit = core.nearest_vertex(result.point, verts, 1.5 * px)
             if hit is None:
+                if step == record.get("typed"):
+                    # its end is where the typed length put it, off the pointer: the
+                    # level / upright the pointer showed is decided from the line itself
+                    self._typed_direction(new, geos, result, px, constraints, drops)
                 continue
             key, placed = hit
             directed = result.kind is not None or result.on_line
@@ -1136,6 +1157,36 @@ class Inference:
                 "sketch: %s added to %s (inferred)"
                 % (", ".join(names), ", ".join("curve %d" % (i + 1) for i in new))
             )
+
+    def _typed_direction(self, new, geos, result, px, constraints, drops):
+        """A line finished with a typed length while the pointer was on a level / upright
+        guide: Horizontal / Vertical when the line FreeCAD made runs within the guide's
+        angle of that axis (core.typed_axis), whatever came between the typed value and
+        the commit (fix-2: a typed vertical 12 came out 0.03 mm off upright on GitHub).
+        FreeCAD makes that line from its on-screen angle field as it stands, read off the
+        pointer's pixel: exactly 90 degrees on one screen (its own Vertical), 89.856 on
+        another (an Angle, or nothing). An Angle that is only that pixel off the axis
+        (core.pointer_angle) gives way to the Horizontal / Vertical."""
+        import Sketcher
+
+        if result.kind not in (core.HORIZONTAL, core.VERTICAL):
+            return
+        line = self._direction_line(new, geos, result)
+        if line is None:
+            return
+        g = geos[line]
+        start = _xy(g.StartPoint)
+        name = core.typed_axis(result.kind, start, _xy(g.EndPoint), setting("HVDegrees"))
+        sketch = self.session.sketch
+        if name is None or _has(sketch, name, line):
+            return
+        for i, c in enumerate(sketch.Constraints):
+            if c.Type != "Angle" or c.First != -1 or c.Second != line:
+                continue
+            if not core.pointer_angle(result.kind, c.Value, start, result.point, px):
+                return  # an angle the person typed: kept, no level / upright
+            drops.add(i)
+        constraints.append(Sketcher.Constraint(name, line))
 
     def _direction_line(self, new, geos, result):
         """The line of the new shape that runs along the inferred direction (the line

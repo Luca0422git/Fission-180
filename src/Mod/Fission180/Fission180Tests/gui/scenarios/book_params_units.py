@@ -218,8 +218,6 @@ def c_ok():
 
 
 def c_made():
-    from fission180 import design_units
-
     cut = 40 * (0.02 * IN) ** 2 / 2.0 + 40 * (0.03 * IN) ** 2 / 2.0
     v = h.solid_volume()
     s["v_chamfer"] = v
@@ -230,16 +228,54 @@ def c_made():
         len(sets) == 1,
         [o.Label for o in design().Objects],
     )
-    # the cause of bug 2 did happen here, and the design was held to its units
-    h.check(
-        "C: FreeCAD carried the hidden document's units over, and they were put back",
-        design_units.put_back_count() > 0,
-        design_units.put_back_count(),
-    )
     h.check(
         "J: the chamfer box's tooltip names inches (it said mm)",
         "(in)" in s.get("chamfer_tip", "") and "(mm)" not in s.get("chamfer_tip", ""),
         s.get("chamfer_tip"),
+    )
+
+
+def c_hidden_mm():
+    """The cause of bug 2, made on purpose: a hidden throw-away document in millimetres while
+    the inch design is active, and a few property writes in it. FreeCAD's window code
+    carries the hidden document's units into the active design at each of them
+    (design_units, docstring); the guard puts the design's back.
+
+    (This check used to read the count after the chamfer's OK: its hidden document was in
+    mm then. Since wave 7 (modify-b, fillet_sets.same_units) that document takes the
+    design's units, so nothing is carried over there any more; an import, an export or a
+    draft can still make one in other units, so the guard is proved with one here.)"""
+    import Part
+    from fission180 import design_units
+
+    s["put_back"] = design_units.put_back_count()
+    names = design().getEnumerationsOfProperty("UnitSystem")
+    scratch = App.newDocument("Fission180UnitsProbe", "probe", True, True)
+    try:
+        scratch.UnitSystem = names[0]  # millimetres, as a throw-away document is made
+        scratch.UndoMode = 0
+        part = scratch.addObject("Part::Feature", "Base")
+        part.Shape = Part.makeBox(10, 10, 10)
+        part.Placement = App.Placement(V(5, 0, 0), App.Rotation())
+        scratch.recompute()
+    finally:
+        App.closeDocument(scratch.Name)
+        if App.ActiveDocument is None or App.ActiveDocument.Name != s["design"]:
+            App.setActiveDocument(s["design"])
+
+
+def c_hidden_held():
+    from fission180 import design_units
+
+    h.check(
+        "C: FreeCAD carried a hidden mm document's units over, and they were put back",
+        design_units.put_back_count() > s["put_back"],
+        (s["put_back"], design_units.put_back_count()),
+    )
+    h.check(
+        "C: the design is still in inches",
+        design_units.length_unit(design()) == "in",
+        design().UnitSystem,
     )
 
 
@@ -536,6 +572,7 @@ steps += [
 steps += [named(undo, "undo_extrude"), checker("Ctrl+Z of the extrude")]
 steps += [named(redo, "redo_extrude"), checker("Ctrl+Y of the extrude")]
 steps += [c_chamfer, c_pick, c_type, c_plus, c_pick_second, c_type_second, c_ok, c_made]
+steps += [c_hidden_mm, c_hidden_held]
 steps += [checker("Chamfer OK")]
 steps += [named(undo, "undo_chamfer"), checker("Ctrl+Z of the chamfer")]
 steps += [named(redo, "redo_chamfer"), checker("Ctrl+Y of the chamfer")]

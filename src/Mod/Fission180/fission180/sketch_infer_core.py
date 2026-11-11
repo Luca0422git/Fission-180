@@ -980,6 +980,43 @@ def grid_off(result, grid, px):
     return False
 
 
+def typed_axis(kind, start, end, hv_deg):
+    """ "Horizontal" / "Vertical" for a line drawn from `start` along a level (upright) guide
+    whose end a value typed into FreeCAD's field placed (no click for it), when the line
+    FreeCAD made runs within `hv_deg` of that axis; else None. Decided from the line itself,
+    at the commit: the pointer's own record of the guide is lost when any pointer event
+    comes after the typed value (the end is then off the pointer: _check_preview), which
+    happened on GitHub's slower machine and left a typed vertical 12 0.03 mm off upright
+    (sketch_qa_keys R2; fix-2)."""
+    if kind not in (HORIZONTAL, VERTICAL) or start is None or end is None:
+        return None
+    v = sub(end, start)
+    length = math.hypot(v[0], v[1])
+    if length < 1e-9:
+        return None
+    off = abs(v[1] if kind == HORIZONTAL else v[0]) / length
+    if math.degrees(math.asin(min(1.0, off))) > hv_deg:
+        return None
+    return "Horizontal" if kind == HORIZONTAL else "Vertical"
+
+
+def pointer_angle(kind, angle, start, pointer, px):
+    """True when `angle` (radians from the sketch's X axis), which FreeCAD gave a line drawn
+    from `start` along a level (upright) guide, is only the pointer's pixel off that axis:
+    within the angle 1.5 pixels (`px` mm each) make at the pointer's distance. FreeCAD
+    takes its on-screen angle field as it stands when a typed length is accepted, and that
+    angle is read off the pixel the pointer is on: 89.856 degrees instead of 90 on GitHub's
+    screen (fix-2). An angle the person typed is further off and is kept."""
+    if kind not in (HORIZONTAL, VERTICAL) or start is None or pointer is None or not px:
+        return False
+    d = dist(start, pointer)
+    if d < 1e-9:
+        return False
+    axis = 0.0 if kind == HORIZONTAL else math.pi / 2
+    off = abs(math.remainder(float(angle) - axis, math.pi))
+    return off <= math.atan2(1.5 * px, d)
+
+
 def exact_point(result, placed, px, start=None):
     """Where the point FreeCAD placed (`placed`, at most a pixel away from the guide)
     goes exactly, or None when FreeCAD put it somewhere else (a typed length, a point

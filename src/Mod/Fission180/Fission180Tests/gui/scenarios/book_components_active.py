@@ -24,10 +24,11 @@ Setup (through the modules): the component "Nozzle" with a 20 x 20 x 10 block, s
      (a plane of another component): the sketch is in Axle, lies on that plane (x 56) and
      hangs on a hidden reference; no "Reference" row shows.
   H  (bug 10, as the report saw it) Axle still active (no solid in it yet), a sketch on the
-     Nozzle's top face, a circle
-     (r 2) beside the tube, E, 4 mm INTO the Nozzle: the operation stays New Body (it came
-     up as Cut and silently cut the other component); OK: a body in Axle, the Nozzle
-     unchanged.
+     Nozzle's top face, a circle (r 2) beside the tube, E. 25 mm down (two fifths of it
+     inside the Nozzle): New Body, the Nozzle untouched (it came up as Cut and silently cut
+     the other component). 4 mm down (wholly inside the Nozzle): Cut by itself, the Nozzle
+     listed under Bodies to Cut (Fusion's rule, extrude-2). New Body chosen by hand, OK: a
+     body in Axle, the Nozzle unchanged.
   F  The Nozzle moved 15 mm along Y (its Placement): the tube's sketch, the gasket and
      the axis' plane follow as far as FreeCAD links allow (the sketch stays on the face).
   G  Save, close, reopen: everything is where it was, in the same components.
@@ -42,6 +43,7 @@ import FreeCADGui as Gui
 from Fission180Tests.gui import blend_steps as b
 from Fission180Tests.gui import book_components_steps as k
 from Fission180Tests.gui import component_steps as cs
+from Fission180Tests.gui import dialog_input as ui
 from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import inspect_steps as ist
 from Fission180Tests.gui import timeline_input as t
@@ -542,16 +544,60 @@ def h_distance():
     if not h.check("extrude dialog open", p is not None):
         return
     h.check("a profile is picked", bool(p.profiles), p.profiles)
-    b.type_into(p.distance.widget, "-4")
+    b.type_into(p.distance.widget, "-25")
 
 
-def h_operation():
+def h_small_overlap():
+    # Bug 10 as the book report met it (the Strandbeest link overlapped another component's
+    # pin by about 6 % and came up as a Cut that silently cut the pin): a new part that only
+    # overlaps a body of another component is a New Body. 25 down through the Nozzle's 10 mm
+    # is two fifths inside it.
     p = xpanel()
     if p is None:
         return
     h.caught_up(p)
     h.check(
-        "into another component's body: still New Body, not Cut (bug 10)",
+        "two fifths inside another component's body: New Body, not Cut (bug 10)",
+        p.operation.currentText() == "New Body",
+        p.operation.currentText(),
+    )
+    h.check(
+        "the Nozzle is untouched in that preview",
+        k.close(k.volume(nozzle_body()), NOZZLE),
+        k.volume(nozzle_body()),
+    )
+    b.type_into(p.distance.widget, "-4")
+
+
+def h_operation():
+    # The other side of the rule (extrude-2, book-extrude-2.md item 3; Autodesk's J. Strater
+    # on the forum, "Tool behaviour - unexpected": mostly inside a shown body, of whichever
+    # component: Cut): 4 down is wholly inside the Nozzle, so Fusion proposes Cut, and not
+    # silently: the Nozzle's body is listed under Bodies to Cut. (This check expected New
+    # Body here until extrude-2 built the rule; the first fix for bug 10 had let only bodies
+    # of the active component decide. The one-half threshold is a Guess.)
+    p = xpanel()
+    if p is None:
+        return
+    h.caught_up(p)
+    h.check(
+        "wholly inside another component's body: Cut by itself",
+        p.operation.currentText() == "Cut",
+        p.operation.currentText(),
+    )
+    names = p._participant_names(compute=False) or []
+    h.check("the Nozzle's body is under Bodies to Cut", names == [state["nozzle_body"]], names)
+    # the Axle's pin is wanted as a body of its own here: New Body chosen by hand
+    ui.choose(p.operation, "New Body")
+
+
+def h_new_body():
+    p = xpanel()
+    if p is None:
+        return
+    h.caught_up(p)
+    h.check(
+        "New Body chosen by hand stays",
         p.operation.currentText() == "New Body",
         p.operation.currentText(),
     )
@@ -678,7 +724,9 @@ h.run(
         h_extrude,
         h_profile,
         h_distance,
+        h_small_overlap,
         h_operation,
+        h_new_body,
         a_ok,
         h_made,
         f_move,

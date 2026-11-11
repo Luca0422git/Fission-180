@@ -8,9 +8,11 @@ Only real input (saving and reopening through FreeCAD, as the other scenarios).
 
   A  A new design, Create Sketch ("Click a plane or a flat face"): the design holds the body
      Fission 180 made for the sketch, the browser shows Origin (the planes to click) but no
-     Bodies folder. Esc: still none (the unlisted body stays and takes the next sketch).
-  B  Create Sketch on XY, a rectangle, Finish Sketch: Sketches > Sketch 1, no Bodies, the
-     same one body in the design.
+     Bodies folder. Esc: the body made for the cancelled command goes again (wave 7,
+     components-2: a cancelled command leaves nothing behind, as in Fusion; before, the
+     unlisted body stayed with its undo step "Add a Body" open).
+  B  Create Sketch on XY, a rectangle, Finish Sketch: Sketches > Sketch 1, no Bodies, one
+     body in the design.
   C  Undo back to before the sketch (no Sketches, no Bodies) and to the empty design (no
      body at all), Redo all of it: the sketch is back, still no Bodies.
   D  Saved, closed, opened again: the same (Origin, Sketches > Sketch 1, no Bodies).
@@ -19,6 +21,10 @@ Only real input (saving and reopening through FreeCAD, as the other scenarios).
   F  The body hidden with its eye: still listed (it has a solid).
   G  A component (New Component, Arm): Origin only; a sketch in it: Origin, Sketches; an
      extrude: Bodies > Body1 (20 x 20 x 5 = 2000). The root's Body is still listed.
+  H  A body that was there before the command is never taken away: a new design, a sketch
+     made and undone (its empty body stays, "Add a Body" is an undo step of its own), then
+     Create Sketch, Esc: the same body is still there, no undo step open; Create Sketch on
+     XY: the sketch goes into it, no second body.
 """
 
 import os
@@ -99,8 +105,13 @@ a_picker.done_what = "Esc to close Create Sketch"
 
 def a_cancelled():
     no_body_rows("A, after Esc")
-    s["body"] = bodies()[0].Name if bodies() else None
-    h.check("A: the unlisted body is still there", s["body"] is not None)
+    # Wave 7 (components-2, commands.drop_made_body): the body Create Sketch made for itself
+    # goes again when the command is cancelled, and no undo step stays open. (This check
+    # used to expect the unlisted body to stay; it stayed with FreeCAD's "Add a Body" step
+    # pending, so the next change anywhere was recorded under that name.)
+    h.check("A: Esc took the body made for the sketch away", bodies() == [], bodies())
+    h.check("A: no undo step left open", not doc().HasPendingTransaction)
+    h.check("A: nothing to undo", doc().UndoCount == 0, list(doc().UndoNames))
     h.ribbon("Create Sketch")
 
 
@@ -110,7 +121,8 @@ a_cancelled.done_what = "Create Sketch to wait for a plane again"
 
 # -- B: a sketch, no body ---------------------------------------------------------------------------
 def b_pick():
-    h.check("B: Create Sketch made no second body", len(bodies()) == 1, [b.Name for b in bodies()])
+    h.check("B: Create Sketch made one body", len(bodies()) == 1, [b.Name for b in bodies()])
+    s["body"] = bodies()[0].Name if bodies() else None
     pl.click_square("XY_Plane")
 
 
@@ -254,7 +266,11 @@ def f_hide():
 def f_hidden():
     body = doc().getObject(s["body"])
     h.check("F: the body is hidden", not t.shown(body))
-    h.check("F: ... and still listed", cs.children_of(["Bodies"]) == [body.Label], cs.children_of(["Bodies"]))
+    h.check(
+        "F: ... and still listed",
+        cs.children_of(["Bodies"]) == [body.Label],
+        cs.children_of(["Bodies"]),
+    )
     t.click_eye(body.Label)
 
 
@@ -281,7 +297,11 @@ def g_ok():
 
 def g_made():
     h.check("G: Arm made and active", cs.active_label() == "Arm", cs.active_label())
-    h.check("G: Arm holds its Origin only", cs.children_of(["Arm"]) == ["Origin"], cs.children_of(["Arm"]))
+    h.check(
+        "G: Arm holds its Origin only",
+        cs.children_of(["Arm"]) == ["Origin"],
+        cs.children_of(["Arm"]),
+    )
     s["count"] = len(bodies())
     h.fit()
     h.ribbon("Create Sketch")
@@ -345,6 +365,102 @@ def g_body():
     h.shot("G-end")
 
 
+# -- H: a body that was there before is never taken away ------------------------------------------
+def h_new():
+    App.newDocument("OwnBody")
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+h_new.done = picker_open
+h_new.done_what = "Create Sketch to wait for a plane in the new design"
+
+
+def h_pick():
+    pl.click_square("XY_Plane")
+
+
+h_pick.done = lambda: h.in_sketch() is not None
+h_pick.done_what = "the sketch to open"
+
+
+def h_finish():
+    h.ribbon("Finish Sketch")
+
+
+h_finish.done = lambda: h.in_sketch() is None
+h_finish.done_what = "the sketch to close"
+
+
+def h_undo_sketch():
+    names = list(doc().UndoNames)
+    h.check("H: the body's own undo step", names[-1:] == ["Add a Body"], names)
+    # Ctrl+Z until the sketch is gone, not further: its body stays, empty (FreeCAD's
+    # "Sketch recompute" step is undone together with "Create Sketch", so count by state)
+    for _ in range(len(names)):
+        if not doc().findObjects("Sketcher::SketchObject"):
+            break
+        press_times("z", 1)
+
+
+def h_empty_body():
+    h.check("H: the sketch is undone", doc().findObjects("Sketcher::SketchObject") == [])
+    h.check("H: its empty body is still there", len(bodies()) == 1, list(doc().UndoNames))
+    s["own"] = bodies()[0].Name if bodies() else None
+    s["own_undos"] = list(doc().UndoNames)
+    h.ribbon("Create Sketch")
+
+
+h_empty_body.done = picker_open
+h_empty_body.done_what = "Create Sketch to wait for a plane (the empty body there)"
+
+
+def h_escape():
+    h.check("H: no second body for the sketch", len(bodies()) == 1, [b.Name for b in bodies()])
+    h.press(QtCore.Qt.Key_Escape)
+
+
+h_escape.done = lambda: not picker_open()
+h_escape.done_what = "Esc to close Create Sketch"
+
+
+def h_kept():
+    # only the body commands.ensure_body() made for the cancelled command itself may go
+    names = [b.Name for b in bodies()]
+    h.check("H: Esc left the body that was there alone", names == [s["own"]], names)
+    h.check("H: no undo step left open", not doc().HasPendingTransaction)
+    undos = list(doc().UndoNames)
+    h.check("H: the undo list is as before", undos == s["own_undos"], undos)
+    h.ribbon("Create Sketch")
+
+
+h_kept.done = picker_open
+h_kept.done_what = "Create Sketch to wait for a plane again"
+
+
+def h_pick_again():
+    pl.click_square("XY_Plane")
+
+
+h_pick_again.done = lambda: h.in_sketch() is not None
+h_pick_again.done_what = "the sketch to open in the body that was there"
+
+
+def h_in_own():
+    sk = h.in_sketch()
+    h.check("H: the sketch went into that body", sk.getParentGeoFeatureGroup().Name == s["own"])
+    h.check("H: still one body", len(bodies()) == 1, [b.Name for b in bodies()])
+    h.ribbon("Finish Sketch")
+
+
+h_in_own.done = lambda: h.in_sketch() is None
+h_in_own.done_what = "the sketch to close"
+
+
+def h_end():
+    t.no_popups("the end of H")
+
+
 STEPS = [
     a_new,
     a_create_sketch,
@@ -379,6 +495,16 @@ STEPS = [
     g_sketch_only,
     g_distance,
     g_body,
+    h_new,
+    h_pick,
+    h_finish,
+    h_undo_sketch,
+    h_empty_body,
+    h_escape,
+    h_kept,
+    h_pick_again,
+    h_in_own,
+    h_end,
 ]
 
 

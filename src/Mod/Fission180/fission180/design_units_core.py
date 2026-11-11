@@ -42,3 +42,62 @@ def adaptive_step(view_height_mm, unit, grid_step):
     for a height (nav_core.grid_step)."""
     per = per_unit(unit)
     return grid_step(float(view_height_mm) / per) * per
+
+
+# -- whose units a running statement sets (design_units._asked_for) -----------------------------
+_BASE_LOADS = ("LOAD_FAST", "LOAD_FAST_CHECK", "LOAD_NAME", "LOAD_GLOBAL", "LOAD_DEREF")
+_UNKNOWN = object()
+
+
+def store_target(frame, attribute="UnitSystem"):
+    """(True, obj) when the statement running in Python frame `frame` is `obj.<attribute> =
+    ...` and obj can be read back from the frame (a name, or a chain of attributes on one:
+    `doc`, `self.doc`); (False, None) when it is no such statement or obj cannot be told.
+
+    FreeCAD's window code writes the units of the document whose property changed into the
+    ACTIVE design (design_units): a statement that sets ANOTHER document's units (a throw-away
+    document's, a design in another tab) then changes the active design's too, with that very
+    statement running. Telling which document the statement sets keeps the guard from taking
+    that carried-over change for the person's or a script's own choice (fix-2)."""
+    import builtins
+    import dis
+
+    if frame is None:
+        return False, None
+    try:
+        code = frame.f_code
+        if attribute not in code.co_names:
+            return False, None
+        seen = []
+        for ins in dis.get_instructions(code):
+            if ins.offset > frame.f_lasti:
+                break
+            seen.append(ins)
+        if not seen or seen[-1].opname != "STORE_ATTR" or seen[-1].argval != attribute:
+            return False, None
+        chain = []
+        for ins in reversed(seen[:-1]):
+            if ins.opname == "LOAD_ATTR":
+                chain.append(ins.argval)
+                continue
+            if ins.opname == "LOAD_FAST_LOAD_FAST":  # (Python 3.13: two loads in one)
+                name = ins.argval[1]
+            elif ins.opname in _BASE_LOADS:
+                name = ins.argval
+            else:
+                return False, None
+            break
+        else:
+            return False, None
+        found = _UNKNOWN
+        for space in (frame.f_locals, frame.f_globals, vars(builtins)):
+            if name in space:
+                found = space[name]
+                break
+        if found is _UNKNOWN:
+            return False, None
+        for attr in reversed(chain):
+            found = getattr(found, attr)
+        return True, found
+    except Exception:
+        return False, None

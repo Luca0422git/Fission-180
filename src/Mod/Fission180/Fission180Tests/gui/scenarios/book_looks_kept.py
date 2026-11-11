@@ -180,6 +180,13 @@ def b_back():
 
 
 # -- C ---------------------------------------------------------------------------------------------
+def c_unground():
+    # Wave 7 (components-2): the first component of a level is grounded to its parent, as in
+    # Fusion ("First component Ground to Parent"), and Move refuses a grounded component. A
+    # person who wants to move it ungrounds it first: right-click > Unground From Parent.
+    cs.unground("Bracket")
+
+
 def c_move():
     h.click_empty()
     h.press("m")
@@ -404,6 +411,7 @@ h.run(
         b_isolated,
         b_exit,
         b_back,
+        c_unground,
         c_move,
         c_components,
         c_pick,

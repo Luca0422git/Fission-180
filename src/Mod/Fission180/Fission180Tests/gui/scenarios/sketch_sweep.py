@@ -17,6 +17,10 @@ from Fission180Tests.gui import sketch_input as si
 
 V = App.Vector
 GROUPS = ("CREATE", "MODIFY", "CONSTRAINTS")
+# A command whose own window is a pop-up by design (as ribbon_sweep's INTENDED): Change
+# Parameters, in the sketch's MODIFY menu since wave 7 (shell: Fusion's ends with it too),
+# opens the Parameters dialog, modal on purpose (params: one undo step, Cancel puts back).
+INTENDED = {"Change Parameters": "Parameters"}
 report = []
 s = {}
 
@@ -66,7 +70,11 @@ def _steps(group, label, command):
     def look():
         from PySide import QtWidgets
 
-        entry["popups"] = h.popups()
+        shown = h.popups()
+        own = INTENDED.get(label)
+        if own:
+            h.check("%s: its own dialog opens (%s)" % (label, own), own in shown, shown)
+        entry["popups"] = [p for p in shown if p != own]
         entry["in_sketch"] = h.in_sketch() is s["sk"]
         entry["tool"] = h.gl_widget().cursor().shape() != QtCore.Qt.ArrowCursor
         entry["tip"] = QtWidgets.QToolTip.text() if QtWidgets.QToolTip.isVisible() else ""
