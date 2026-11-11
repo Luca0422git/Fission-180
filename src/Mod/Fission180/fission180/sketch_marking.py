@@ -43,7 +43,7 @@ LIST = [
     item("Move/Copy", "Fission180_SketchMove", "sk_move", "M"),
     item("Normal/Construction", "Sketcher_ToggleConstruction", "sk_line", "X"),
     cfg.SEP,
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Sketcher_ViewSketch", "nav_lookat"),
 ]
 

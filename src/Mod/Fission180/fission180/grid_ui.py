@@ -25,7 +25,10 @@ from .compat import QtCore, QtWidgets
 
 PARAMS = increments.PARAMS
 DEFAULTS = {
-    "LayoutGrid": False,
+    # (wave 7) on, as in Fusion: a new design shows the grid on the ground with the origin
+    # in its middle (book parity report, The Basics; it was FreeCAD's "off" until then)
+    "LayoutGrid": True,
+    "ReferenceNumbers": False,
     "GridLock": False,
     "Adaptive": True,
     "MajorSpacing": 10.0,
@@ -34,6 +37,11 @@ DEFAULTS = {
 NODE_NAME = "Fission180LayoutGrid"
 MAJOR_COLOR = (0.34, 0.36, 0.40)
 MINOR_COLOR = (0.22, 0.23, 0.25)
+X_COLOR = (0.75, 0.25, 0.25)  # the grid's line along X (red) and along Y (green): Fusion's
+Y_COLOR = (0.30, 0.65, 0.30)
+ORIGIN_COLOR = (0.93, 0.93, 0.93)  # the dot where they cross
+NUMBER_COLOR = (0.62, 0.64, 0.68)
+MAX_NUMBERS = 40  # reference numbers along one axis
 _STATE = {"nodes": {}, "timer": None, "step": None, "locked_step": None, "observer": None}
 
 
@@ -131,9 +139,30 @@ def _detach(doc_name):
     node.unref()
 
 
+def ground_centre(view):
+    """Where the middle of the view meets the ground (the XY plane): the layout grid is
+    drawn round it. Looking along the ground (a side view), or with the ground behind the
+    camera: the point of the ground nearest the camera's own position."""
+    cam = view.getCameraNode()
+    pos = cam.position.getValue()
+    px, py, pz = float(pos[0]), float(pos[1]), float(pos[2])
+    try:
+        direction = view.getViewDirection()
+        dz = float(direction.z)
+        if abs(dz) > 0.05:
+            t = -pz / dz
+            if t > 0:
+                return px + t * float(direction.x), py + t * float(direction.y)
+    except Exception:
+        pass
+    return px, py
+
+
 def draw(doc, view=None):
     """The layout grid of `doc` (removed when Layout Grid is off)."""
     from pivy import coin
+
+    from . import view_fit
 
     _detach(doc.Name)
     if not get("LayoutGrid"):
@@ -142,27 +171,28 @@ def draw(doc, view=None):
     _STATE["step"] = step
     try:
         active = view or Gui.getDocument(doc.Name).ActiveView
-        centre = active.getCameraNode().position.getValue()
-        cx, cy = float(centre[0]), float(centre[1])
-        half = max(view_height(active) * 2.0, step * 5)
+        cx, cy = ground_centre(active)
+        # (a tilted view sees more of the ground than its own height)
+        half = max(view_height(active) * 3.0, step * 5)
     except Exception:
         cx, cy, half = 0.0, 0.0, step * 20
     # the grid lines lie on round values, so they stay put while the view moves
     cx, cy = nav_core.snap(cx, step), nav_core.snap(cy, step)
     majors, minors = nav_core.grid_lines((cx, cy), half, step, int(get("Subdivisions")))
-    node = coin.SoSeparator()
-    node.setName(NODE_NAME)
-    node.ref()
+    inner = coin.SoSeparator()
     pick = coin.SoPickStyle()
     pick.style = coin.SoPickStyle.UNPICKABLE
     light = coin.SoLightModel()
     light.model = coin.SoLightModel.BASE_COLOR
-    node.addChild(pick)
-    node.addChild(light)
-    for lines, color in ((minors, MINOR_COLOR), (majors, MAJOR_COLOR)):
-        if not lines:
-            continue
+    inner.addChild(pick)
+    inner.addChild(light)
+
+    def lines_node(lines, color, width=None):
         sep = coin.SoSeparator()
+        if width:
+            style = coin.SoDrawStyle()
+            style.lineWidth = width
+            sep.addChild(style)
         material = coin.SoMaterial()
         material.diffuseColor.setValue(*color)
         coords = coin.SoCoordinate3()
@@ -174,13 +204,72 @@ def draw(doc, view=None):
         line_set.numVertices.setValues(0, len(lines), [2] * len(lines))
         for item in (material, coords, line_set):
             sep.addChild(item)
-        node.addChild(sep)
+        return sep
+
+    for lines, color in ((minors, MINOR_COLOR), (majors, MAJOR_COLOR)):
+        if lines:
+            inner.addChild(lines_node(lines, color))
+    # Fusion's grid: the line along X is red, the one along Y green, a dot at the origin
+    x_lo, x_hi, y_lo, y_hi = cx - half, cx + half, cy - half, cy + half
+    if y_lo <= 0.0 <= y_hi:
+        inner.addChild(lines_node([(x_lo, 0.0, x_hi, 0.0)], X_COLOR, 2))
+    if x_lo <= 0.0 <= x_hi:
+        inner.addChild(lines_node([(0.0, y_lo, 0.0, y_hi)], Y_COLOR, 2))
+    if x_lo <= 0.0 <= x_hi and y_lo <= 0.0 <= y_hi:
+        dot = coin.SoSeparator()
+        style = coin.SoDrawStyle()
+        style.pointSize = 7
+        material = coin.SoMaterial()
+        material.diffuseColor.setValue(*ORIGIN_COLOR)
+        coords = coin.SoCoordinate3()
+        coords.point.setValues(0, 1, [(0.0, 0.0, 0.0)])
+        for item in (style, material, coords, coin.SoPointSet()):
+            dot.addChild(item)
+        inner.addChild(dot)
+    if get("ReferenceNumbers"):
+        try:
+            inner.addChild(_numbers(coin, (x_lo, x_hi, y_lo, y_hi), step))
+        except Exception as exc:
+            warn("grid numbers: %s" % exc)
+    # every Fit leaves the grid out (it follows the size of the view: a fit that framed
+    # the grid doubled the view each time, view_fit.py)
+    node = coin.SoSeparator()
+    node.setName(NODE_NAME)
+    node.ref()
+    node.addChild(view_fit.skip_fit(coin, inner))
     _STATE["nodes"][doc.Name] = node
     for v in _views(doc):
         try:
             v.getSceneGraph().addChild(node)
         except Exception:
             continue
+
+
+def _numbers(coin, extent, step):
+    """Fusion's Reference Numbers: the distance from the origin written at the major lines,
+    along the grid's X and Y lines."""
+    x_lo, x_hi, y_lo, y_hi = extent
+    sep = coin.SoSeparator()
+    material = coin.SoMaterial()
+    material.diffuseColor.setValue(*NUMBER_COLOR)
+    font = coin.SoFont()
+    font.size = 11
+    sep.addChild(material)
+    sep.addChild(font)
+    for values, place in (
+        (nav_core.grid_numbers(x_lo, x_hi, step, MAX_NUMBERS), lambda v: (v, 0.0, 0.0)),
+        (nav_core.grid_numbers(y_lo, y_hi, step, MAX_NUMBERS), lambda v: (0.0, v, 0.0)),
+    ):
+        for value in values:
+            one = coin.SoSeparator()
+            move = coin.SoTranslation()
+            move.translation.setValue(*place(value))
+            text = coin.SoText2()
+            text.string.setValue(nav_core.number_text(value))
+            one.addChild(move)
+            one.addChild(text)
+            sep.addChild(one)
+    return sep
 
 
 def redraw_all():
@@ -219,9 +308,9 @@ def _tick():
         view = gui.ActiveView
         if not hasattr(view, "getCameraNode"):
             return
-        pos = view.getCameraNode().position.getValue()
+        cx, cy = ground_centre(view)
         step = current_step(view)
-        sig = (doc.Name, step, round(float(pos[0]) / step), round(float(pos[1]) / step))
+        sig = (doc.Name, step, round(cx / step), round(cy / step), bool(get("ReferenceNumbers")))
         if sig != _LAST["sig"]:
             _LAST["sig"] = sig
             draw(doc, view)
@@ -372,6 +461,12 @@ class GridSettingsDialog(QtWidgets.QDialog):
         self.minor.setRange(1, 100)
         self.minor.setValue(int(get("Subdivisions")))
         form.addRow("Minor Subdivisions", self.minor)
+        # Fusion's Reference Numbers: the distances written along the layout grid's axes
+        self.numbers = QtWidgets.QCheckBox("Reference Numbers")
+        self.numbers.setObjectName("Fission180Grid_numbers")
+        self.numbers.setToolTip("Write the distance from the origin at the layout grid's lines")
+        self.numbers.setChecked(bool(get("ReferenceNumbers")))
+        form.addRow("", self.numbers)
         (self.adaptive if get("Adaptive") else self.fixed).setChecked(True)
         self.adaptive.toggled.connect(self._mode)
         self._mode()
@@ -397,6 +492,7 @@ class GridSettingsDialog(QtWidgets.QDialog):
             put("Adaptive", self.adaptive.isChecked())
             put("MajorSpacing", spacing)
             put("Subdivisions", int(self.minor.value()))
+            put("ReferenceNumbers", self.numbers.isChecked())
             _subdivisions()
             sketch = editing_sketch()
             if sketch is not None:

@@ -85,7 +85,10 @@ class SelectionField:
         self.button.setStyleSheet(ACTIVE_STYLE if active else "")
 
     def set_text(self, text):
-        self.button.setText(text or self.empty)
+        # (wave 7, shell) "&" of a name stays, a long list of names is shortened: taskui
+        from . import taskui
+
+        taskui.set_names(self.button, text or self.empty)
 
 
 def on_top(root):

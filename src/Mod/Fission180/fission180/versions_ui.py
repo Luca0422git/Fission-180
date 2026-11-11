@@ -45,7 +45,15 @@ BACKUP = "User parameter:BaseApp/Preferences/Mod/Fission180/FilesBackup"
 # FreeCAD's own autosave is off while Fission 180 is on: Fission 180's recovery copies replace it
 # (two autosavers would write every design twice and show two recovery dialogs after a
 # crash). The user's own value comes back when Fission 180 is off (theme.keep_and_set).
-FREECAD_SETTINGS = [(FREECAD_DOC_PREFS, "Bool", "AutoSaveEnabled", False)]
+# (wave 7) RecoveryEnabled too: it is what makes FreeCAD look for its own autosaves of a
+# crashed session when it starts and put up its "Document Recovery" dialog, beside Fission
+# 180's "Recover unsaved work?" (book parity report, Finger Surfboard). Switching
+# AutoSaveEnabled off does not stop the autosave timer of the session it is switched off in
+# (FreeCAD reads it at start-up only): a first session still wrote FreeCAD's copies.
+FREECAD_SETTINGS = [
+    (FREECAD_DOC_PREFS, "Bool", "AutoSaveEnabled", False),
+    (FREECAD_DOC_PREFS, "Bool", "RecoveryEnabled", False),
+]
 RECOVERED_DESCRIPTION = "Recovered after a crash"
 
 _state = {

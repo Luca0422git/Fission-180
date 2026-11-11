@@ -548,6 +548,52 @@ def restore_active_document(name):
             pass
 
 
+class _svg_question_off:
+    """FreeCAD's SVG importer asks, in a box of its own, whether a file "not produced by
+    Inkscape" counts 96 or 90 pixels per inch (book parity report: white text on white).
+    Fusion asks nothing: 96 per inch, the SVG standard's (and what this module's docs
+    promise). While the importer runs, the box it would show answers Yes without showing."""
+
+    class _Box:
+        Yes, No = 1, 0
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def __getattr__(self, _name):  # setText, setInformativeText, setStandardButtons...
+            return lambda *_args, **_kwargs: None
+
+        def exec_(self):
+            return self.Yes
+
+        exec = exec_
+
+    def __init__(self, module):
+        self.module = module
+        self.was = None
+
+    def __enter__(self):
+        real = getattr(self.module, "QtWidgets", None)
+        if real is None:
+            return self
+        self.was = real
+        box = self._Box
+
+        class _Widgets:
+            QMessageBox = box
+
+            def __getattr__(self, name):
+                return getattr(real, name)
+
+        self.module.QtWidgets = _Widgets()
+        return self
+
+    def __exit__(self, *exc):
+        if self.was is not None:
+            self.module.QtWidgets = self.was
+        return False
+
+
 class _dxf_dialog_off:
     """FreeCAD's DXF importer shows its own import dialog in the GUI: Fission 180's dialog has
     the choices (units, layers), so FreeCAD's is kept off for the import and the user's own
@@ -600,7 +646,8 @@ def read_curves(path, notes=None):
         if ext == ".svg":
             import importSVG
 
-            importSVG.insert(path, doc.Name)
+            with _svg_question_off(importSVG):
+                importSVG.insert(path, doc.Name)
             if notes is not None:
                 _svg_notes(path, notes)
         else:

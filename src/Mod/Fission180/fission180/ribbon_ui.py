@@ -550,7 +550,18 @@ class RibbonWidget(QtWidgets.QWidget):
         from .doc_tabs import DocumentTabs
 
         self.doc_tabs = DocumentTabs()
-        row.addWidget(self.doc_tabs, 1)
+        row.addWidget(self.doc_tabs, 0)
+        # Fusion's "+" at the end of the design tabs: a new design (wave 7)
+        self.new_tab = QtWidgets.QToolButton()
+        self.new_tab.setObjectName("Fission180NewTab")
+        self.new_tab.setIcon(ui_icon("qa_plus"))
+        self.new_tab.setProperty("fission180Icon", "qa_plus")
+        self.new_tab.setIconSize(QtCore.QSize(SMALL - 4, SMALL - 4))
+        self.new_tab.setAutoRaise(True)
+        self.new_tab.setToolTip("New Design  (Ctrl+N)")
+        new_design = resolve(("Fission180_NewDesign", "Std_New"), available)
+        self.new_tab.clicked.connect(lambda _=False, r=new_design: run(r, "New Design"))
+        row.addWidget(self.new_tab)
         self.title = QtWidgets.QLabel("")  # (the active document's name; the tabs show it)
         self.title.setProperty("role", "document")
         self.title.hide()
@@ -585,8 +596,32 @@ class RibbonWidget(QtWidgets.QWidget):
         search.setToolTip("Search commands  (S)")
         search.clicked.connect(lambda: run(("Fission180_CommandSearch", None), "Search"))
         row.addWidget(search)
+        # Fusion's profile button at the far right: its menu is where Preferences live
+        # (no account here; wave 7: Preferences were only on Home and in UTILITIES)
+        self.profile = QtWidgets.QToolButton()
+        self.profile.setObjectName("Fission180Profile")
+        self.profile.setIcon(ui_icon("qa_profile"))
+        self.profile.setProperty("fission180Icon", "qa_profile")
+        self.profile.setIconSize(QtCore.QSize(SMALL, SMALL))
+        self.profile.setAutoRaise(True)
+        self.profile.setToolTip("Preferences")
+        self.profile.clicked.connect(self._profile_menu)
+        row.addWidget(self.profile)
         self.refresh_update()
         return bar
+
+    def _profile_menu(self):
+        try:
+            menu = QtWidgets.QMenu(self.profile)
+            menu.setObjectName("Fission180ProfileMenu")
+            available = set(Gui.listCommands())
+            prefs = resolve(("Fission180_Preferences", None), available)
+            action = menu.addAction("Preferences")
+            action.setEnabled(bool(prefs))
+            action.triggered.connect(lambda _=False, r=prefs: run(r, "Preferences"))
+            menu.exec_(self.profile.mapToGlobal(QtCore.QPoint(0, self.profile.height())))
+        except Exception as exc:
+            warn("profile menu: %s" % exc)
 
     def refresh_update(self):
         """Show the update icon while a newer Fission 180 is known."""
@@ -696,8 +731,34 @@ class RibbonWidget(QtWidgets.QWidget):
                         __import__("fission180.report_ui").report_ui.add_help_entry(action.menu())
                     except Exception as exc:
                         warn("help menu: %s" % exc)
-                menu.addMenu(action.menu())
+                menu.addMenu(self._without_freecad_preferences(menu, action.menu()))
         menu.exec_(button.mapToGlobal(QtCore.QPoint(0, button.height())))
+
+    def _without_freecad_preferences(self, parent, source):
+        """A FreeCAD menu as the application menu shows it: "Preferences..." there opens
+        Fission 180's Preferences, not FreeCAD's own dialog (a different, confusing one: book
+        parity report; FreeCAD's stays under UTILITIES > FreeCAD Tools). FreeCAD's menu itself
+        is left as it is: a copy with that one entry replaced."""
+        try:
+            found = [a for a in source.actions() if a.objectName() == "Std_DlgPreferences"]
+            if not found or "Fission180_Preferences" not in Gui.listCommands():
+                return source
+            copy = QtWidgets.QMenu(source.title(), parent)
+            copy.setIcon(source.icon())
+            copy.setObjectName("Fission180" + (source.objectName() or "Menu").replace("&", ""))
+            for action in source.actions():
+                if action in found:
+                    own = copy.addAction(ui_icon("tl_settings"), "Preferences")
+                    own.setObjectName("Fission180_Preferences")
+                    own.triggered.connect(
+                        lambda _=False: run(("Fission180_Preferences", None), "Preferences")
+                    )
+                else:
+                    copy.addAction(action)
+            return copy
+        except Exception as exc:
+            warn("application menu: %s" % exc)
+            return source
 
     def _fill_file_menu(self, menu):
         menu.setObjectName("Fission180FileMenu")

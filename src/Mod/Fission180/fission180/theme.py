@@ -320,6 +320,17 @@ QPushButton {{ background: {button}; color: {text}; border: 1px solid {line}; bo
     padding: 4px 14px; }}
 QPushButton:hover {{ background: {hover}; }}
 QPushButton:default {{ border: 1px solid {accent}; }}
+/* A plain tool button in a dialog (Parameters' "+" and "-", Save's "..."): without a rule it
+   kept the system's light button under the theme's light text, a blank white square (book
+   parity report, bug 1). The bars with rules of their own (the ribbon, the timeline, the
+   navigation bar, a command dialog's rows) are named further down and win. */
+QDialog QToolButton {{ background: {button}; color: {text}; border: 1px solid {line};
+    border-radius: 2px; padding: 2px 6px; }}
+QDialog QToolButton:hover {{ background: {hover}; }}
+QDialog QToolButton:pressed, QDialog QToolButton:checked {{ background: {active}; }}
+QDialog QToolButton:disabled {{ color: {disabled}; }}
+QDialog QToolButton[autoRaise="true"] {{ background: transparent; border: none; }}
+QDialog QToolButton[autoRaise="true"]:hover {{ background: {hover}; }}
 QCheckBox, QRadioButton, QLabel, QGroupBox {{ color: {text}; background: transparent; }}
 /* An unticked box must be visible on the dark panels (it was only visible once ticked) */
 QCheckBox::indicator {{ width: 13px; height: 13px; border: 1px solid {check_line}; border-radius: 2px;

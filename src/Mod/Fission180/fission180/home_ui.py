@@ -1255,6 +1255,12 @@ def new_design():
             return None
         doc = App.newDocument("Untitled")
         commands.ensure_body()
+        try:  # (wave 7) Fusion's first view: Home (isometric), the origin in the middle
+            from . import view_fit
+
+            view_fit.show_new_design(doc)
+        except Exception as exc:
+            warn("home: new design view: %s" % exc)
         log("home: new design %s" % doc.Name)
         return doc
     except Exception as exc:
@@ -1736,4 +1742,28 @@ class HomeCommand:
             warn("Home: %s" % exc)
 
 
-COMMANDS = {"Fission180_Home": HomeCommand}
+class NewDesignCommand:
+    """File > New Design, the New button, Ctrl+N: the same new design as Home's (its first
+    body, the Home view). FreeCAD's own Std_New made an empty document without the Origin
+    folder Fusion's browser always shows."""
+
+    def GetResources(self):
+        from . import ui_icon_path
+
+        return {
+            "MenuText": "New Design",
+            "ToolTip": "New Design: start a new design",
+            "Pixmap": ui_icon_path("qa_new"),
+        }
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        try:
+            new_design()
+        except Exception as exc:
+            warn("New Design: %s" % exc)
+
+
+COMMANDS = {"Fission180_Home": HomeCommand, "Fission180_NewDesign": NewDesignCommand}

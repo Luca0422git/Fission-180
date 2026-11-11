@@ -819,6 +819,22 @@ def _command_running():
         return False
 
 
+def _dialog_open():
+    """A command's dialog is open (not just a sketch being edited: its menus stay whole)."""
+    try:
+        if not Gui.Control.activeDialog():
+            return False
+        from . import taskui
+
+        if taskui.current() is not None:
+            return True
+        gdoc = Gui.ActiveDocument
+        edit = gdoc.getInEdit() if gdoc is not None else None
+        return not (edit is not None and edit.Object.TypeId == "Sketcher::SketchObject")
+    except Exception:
+        return False
+
+
 def _later(fn, *args):
     def run():
         try:
@@ -2206,6 +2222,11 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         if node["kind"] in ("body", "component") and isolated:
             handlers["Isolate"] = lambda: self._unisolate()
         entries = core.menu_for(node)
+        if _dialog_open():
+            # (wave 7) a look elsewhere does not end the command (book parity report: a
+            # right-click > Find in Window closed the Decal dialog): while a dialog is open
+            # the menu holds what changes only what is seen, and none of it ends the dialog
+            entries = core.while_command(entries)
         if node["visible"] is None and "Show/Hide" in entries:
             entries.remove("Show/Hide")
         if node["kind"] in self.OBJECT_KINDS and obj is None:
@@ -2311,7 +2332,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def _toggle_selectable(self, obj, selected_nodes):
         """Fusion's Selectable/Unselectable: the row's object, or every selected body / mesh
         body / component when the row is one of them, turned the other way."""
-        if obj is None or not commands.finish_open_dialog():
+        if obj is None:
             return
         kinds = ("body", "mesh_body", "component")
         targets = [self._object(n) for n in selected_nodes if n["kind"] in kinds]
@@ -2448,8 +2469,6 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def _find_in_window(self, obj, nodes=()):
         """The view fits the row's object, or every selected row's object when it is one of
         several selected."""
-        if not commands.finish_open_dialog():  # the selection it makes is not a pick
-            return
         objs = [obj] if obj is not None else []
         for n in nodes or ():
             other = self._object(n)
@@ -2457,10 +2476,12 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 objs.append(other)
         if not objs:
             return
-        Gui.Selection.clearSelection()
-        for each in objs:
-            Gui.Selection.addSelection(each.Document.Name, each.Name)
-        Gui.SendMsgToActiveView("ViewSelection")
+        # (wave 7) the view is framed on the objects themselves: no selection is made, so a
+        # command waiting for picks keeps running and keeps its picks
+        from . import view_fit
+
+        if not view_fit.fit_objects(objs):
+            commands.tell("There is nothing of %s to show yet." % objs[0].Label)
 
     def _find_in_timeline(self, node, nodes=()):
         from . import timeline_ui

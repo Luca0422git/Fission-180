@@ -1422,6 +1422,125 @@ class ArrowDragger(BoxCarrier):
         self.drop_box()
 
 
+# -- names on buttons, and dialogs that stay as wide as the panel ---------------------------
+# (book parity report: a component "Housing & Inlet Tube" showed as "Housing  Inlet Tube" on
+# the dialogs' buttons, and Rigid Group's button with seven names made its dialog 2,300 px
+# wide: OK and Cancel were off the screen.)
+NAMES_WIDTH = 250  # px: the widest the text of a button showing picked names gets
+PANEL_WIDTH = 560  # px: the widest a command dialog's own content may ask for
+_NAMES = "fission180_names"
+
+
+def shown_name(text):
+    """A name as a button, a check box, a tab or a menu entry must be given it: Qt reads "&"
+    there as the mark of a keyboard letter and drops it ("Nut & Bolt" showed as "Nut  Bolt")."""
+    return str(text).replace("&", "&&")
+
+
+def fit_names(text, width, measure, separator=", "):
+    """`text` (names joined by ", ") shortened to `width` pixels: the first names that fit and
+    how many more ("Arm, Base + 5 more"), one name too long cut with "…". measure(text) gives
+    a text's width in pixels."""
+    text = str(text)
+    if width <= 0 or measure(text) <= width:
+        return text
+    names = text.split(separator)
+    if len(names) > 1:
+        for count in range(len(names) - 1, 0, -1):
+            short = "%s + %d more" % (separator.join(names[:count]), len(names) - count)
+            if measure(short) <= width:
+                return short
+        tail = " + %d more" % (len(names) - 1)
+        head = names[0]
+    else:
+        tail, head = "", text
+    while len(head) > 1 and measure(head + "…" + tail) > width:
+        head = head[:-1]
+    return head.rstrip() + "…" + tail
+
+
+def set_names(button, text, width=None):
+    """Show `text` (a name, or names joined by ", ") on a button, a check box or an action:
+    "&" stays, and a text wider than `width` (NAMES_WIDTH) is shortened with the full list
+    as the tool tip. names_of(button) gives the full text back."""
+    text = str(text)
+    width = NAMES_WIDTH if width is None else width
+    try:
+        measure = button.fontMetrics().horizontalAdvance
+        short = fit_names(text, width, measure)
+    except Exception:
+        short = text
+    try:
+        was = button.property(_NAMES)
+        button.setProperty(_NAMES, text)
+        if short != text:
+            button.setToolTip(text.replace(", ", "\n"))
+        elif was is not None and button.toolTip() == str(was).replace(", ", "\n"):
+            button.setToolTip("")  # (the tool tip of an earlier, longer list)
+    except Exception:
+        pass
+    button.setText(shown_name(short))
+
+
+def names_of(button):
+    """The full text a button shows (set_names), or its own text without Qt's "&&"."""
+    try:
+        kept = button.property(_NAMES)
+        if kept is not None:
+            return str(kept)
+    except Exception:
+        pass
+    return str(button.text()).replace("&&", "&")
+
+
+class _WidthGuard(QtCore.QObject):
+    """Keeps a command dialog's content from asking for more than PANEL_WIDTH: FreeCAD's
+    panel grows with what is in it, and a long text on one button (seven picked names) pushed
+    OK and Cancel off the screen. Texts of buttons too wide are shortened (set_names), labels
+    too wide wrap; nothing else changes."""
+
+    def __init__(self, form):
+        super().__init__(form)
+        self._form = form
+        self._busy = False
+        form.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        try:
+            if event.type() == QtCore.QEvent.LayoutRequest and not self._busy:
+                self._busy = True
+                try:
+                    self.narrow()
+                finally:
+                    self._busy = False
+        except Exception:
+            pass
+        return False
+
+    def limit(self):
+        try:
+            window = Gui.getMainWindow().width()
+        except Exception:
+            window = 1280
+        return int(max(300, min(PANEL_WIDTH, window * 0.4)))
+
+    def narrow(self):
+        form = self._form
+        limit = self.limit()
+        if form.minimumSizeHint().width() <= limit:
+            return
+        for child in form.findChildren(QtWidgets.QWidget):
+            try:
+                if child.sizeHint().width() <= limit * 0.6:
+                    continue
+                if isinstance(child, (QtWidgets.QPushButton, QtWidgets.QCheckBox)):
+                    set_names(child, names_of(child), int(limit * 0.5))
+                elif isinstance(child, QtWidgets.QLabel) and not child.wordWrap():
+                    child.setWordWrap(True)
+            except Exception:
+                continue
+
+
 def _end_transaction(doc, abort=False):
     """Close a dialog's undo step. doc.commitTransaction()/abortTransaction() only close a
     step that holds changes: a dialog OK'd or cancelled without a change left its step name
@@ -1489,6 +1608,10 @@ class Panel:
         if self.icon:
             self.form.setWindowIcon(ui_icon(self.icon))
         self.layout = QtWidgets.QFormLayout(self.form)
+        try:  # never wider than the panel: OK and Cancel stay on the screen
+            self._width_guard = _WidthGuard(self.form)
+        except Exception as exc:
+            warn("dialog width: %s" % exc)
         self.message = QtWidgets.QLabel("")
         self.message.setWordWrap(True)
         self.message.setStyleSheet("color: #ff8a80;")
