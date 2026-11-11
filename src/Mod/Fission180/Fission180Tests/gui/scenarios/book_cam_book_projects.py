@@ -49,6 +49,9 @@ def board():
         st._hole(body, "Hole%d" % i, (x, y, 0), 3.0, 30.0)
     doc.recompute()
     s["volume"] = round(body.Shape.Volume, 3)
+    stale = os.path.join(cam.out_dir(), "2600.nc")  # (of an earlier run)
+    if os.path.isfile(stale):
+        os.remove(stale)
     h.fit()
 
 

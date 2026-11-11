@@ -118,8 +118,33 @@ def _run_step(ctx, builder, step, after=None):
         raise UserError("Not done (%s): %s." % (ctx.title, text))
 
 
+def _body_names(ctx, ident):
+    """The solid bodies an id stands for, by name: a body (or a step in it), or every solid
+    body of a component (an AI names what the browser shows: "Plate" may be a component)."""
+    from ... import bodies, components
+
+    obj = ctx.resolve(ident, "body, step or component")
+    if components.is_component(obj):
+        found = [
+            b.Name for b in bodies.solid_bodies(ctx.need_doc()) if components.is_inside(b, obj)
+        ]
+        if not found:
+            raise UserError("The component %s has no solid body." % obj.Label)
+        return found
+    return [ctx.body_of(ident).Name]
+
+
 def _body_name(ctx, ident):
-    return ctx.body_of(ident).Name if ident else None
+    """The one body an id stands for (a component with one solid body: that body)."""
+    if not ident:
+        return None
+    names = _body_names(ctx, ident)
+    if len(names) > 1:
+        raise UserError(
+            "%r is a component with %d bodies: name the body (%s)."
+            % (ident, len(names), ", ".join(names))
+        )
+    return names[0]
 
 
 def _setup_parts(ctx, args):
@@ -270,7 +295,7 @@ def cam_setup(ctx, args):
     step = {"op": "cam_setup", "id": sid}
     step.update(_setup_parts(ctx, args))
     if args.get("bodies"):
-        step["bodies"] = [_body_name(ctx, b) for b in args["bodies"]]
+        step["bodies"] = [name for b in args["bodies"] for name in _body_names(ctx, b)]
 
     def after(setup):
         if args.get("label"):
@@ -411,7 +436,8 @@ def cam_edit(ctx, args):
 
     def after(_made):
         if is_setup and args.get("bodies"):
-            cam.update_setup(target, model_bodies=[ctx.body_of(b) for b in args["bodies"]])
+            names = [name for b in args["bodies"] for name in _body_names(ctx, b)]
+            cam.update_setup(target, model_bodies=[doc.getObject(name) for name in names])
         if picks:
             from ..ops import manufacture_ops
 

@@ -36,6 +36,9 @@ s = {}
 
 
 def enter():
+    stale = os.path.join(h.OUT_DIR, "book-animation.avi")  # (of an earlier run)
+    if os.path.isfile(stale):
+        os.remove(stale)
     s["placements"] = a.design_placements()
     a.enter()
 

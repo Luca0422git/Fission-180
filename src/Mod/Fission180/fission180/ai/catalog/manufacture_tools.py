@@ -164,7 +164,10 @@ define(
     "are never changed by anything in MANUFACTURE.",
     schema(
         {
-            "bodies": step_ids("the bodies to machine (default: every solid body)"),
+            "bodies": step_ids(
+                "the bodies to machine, or components (all their bodies); default: every "
+                "solid body"
+            ),
             "stock": free_object("the stock (see the description)"),
             "wcs": free_object("the work coordinate system (see the description)"),
             "post": free_object("program name / number, comment, wcs_offset"),
