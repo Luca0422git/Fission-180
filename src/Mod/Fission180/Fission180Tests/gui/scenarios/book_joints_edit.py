@@ -95,7 +95,7 @@ def a_done():
 
 
 def a_ground():
-    j.browser_menu("Handle", "Ground")
+    j.browser_menu("Handle", "Ground to Parent")
 
 
 def a_grounded():

@@ -18,6 +18,9 @@ A Base plate (grounded) with an Arm lying on it; the Arm turns about the middle 
   D  Edit Joint Limits, Rest 30, OK: the Arm goes to 30; dragged to another angle and let
      go, it is back at 30.
   E  Save, reopen: limits and rest are kept, a drag still returns to rest.
+  F  An animation stopped at any moment of its swing, also where it is a few hundredths of
+     a degree from its start: the Arm is put back exactly, and a tick that was already on
+     its way moves nothing (the cause of CI's vex_shaft flake).
 """
 
 import os
@@ -372,6 +375,56 @@ def e_rest_again():
     bj.no_open_step("reopening and dragging")
 
 
+# -- F: an animation stopped at any moment leaves nothing turned -----------------------------------
+def f_stopped_anywhere():
+    """The preview stopped where its swing is a few hundredths of a degree from where it
+    began (its first and last frames, where a slow machine's last tick may land) and in
+    mid-swing: the Arm is put back exactly each time, and a tick that was already on its way
+    when it stopped moves nothing. (CI's vex_shaft found the part turned 0.0175 to 0.03
+    degrees after OK: the restore skipped a placement FreeCAD's isSame called the same.)"""
+    import time
+
+    from fission180 import joints_ui
+
+    arm = bj.part("Arm")
+    home = App.Placement(arm.Placement)
+    seen = []
+    for alone in (True, False):
+        for seconds in (0.0003, 0.0009, 0.45, 0.9, 1.7991, 1.7997):
+            animator = joints_ui.Animator(joint(), loop=True, alone=alone)
+            animator.start()
+            animator.started = time.perf_counter() - seconds  # as if it had played that long
+            animator._tick()
+            away = abs(angle() - 30)
+            animator.stop()
+            exact = jm().same_place(arm.Placement, home)
+            animator._tick()  # the tick that was already queued when it stopped
+            late = jm().same_place(arm.Placement, home)
+            seen.append((alone, seconds, round(away, 5), exact, late))
+    tiny = [x for x in seen if 0 < x[2] < 0.036]
+    h.check(
+        "some frames stood within a few hundredths of a degree of the start", len(tiny) >= 2, seen
+    )
+    h.check("stopped there, the Arm is put back exactly", all(x[3] for x in seen), seen)
+    h.check("a tick after the stop moves nothing", all(x[4] for x in seen), seen)
+    h.check("the joint reads its rest again", abs(angle() - 30) < 1e-9, angle())
+
+
+def f_exact_restore():
+    arm = bj.part("Arm")
+    home = jm().placements(bj.doc())
+    was = App.Placement(arm.Placement)
+    # turned 0.02 degrees where it stands (about its own origin, as a shaft turns about its
+    # axis): only the rotation differs, by less than isSame's 1e-7 can tell
+    spin = App.Rotation(V(0, 0, 1), 0.02)
+    arm.Placement = App.Placement(was.Base, spin.multiply(was.Rotation))
+    h.check("the Arm is turned", not jm().same_place(arm.Placement, was))
+    h.check("FreeCAD calls a 0.02 degree turn the same placement", arm.Placement.isSame(was, 1e-7))
+    jm().apply_placements(bj.doc(), home)
+    h.check("the positions are put back exactly all the same", jm().same_place(arm.Placement, was))
+    h.check("the solver is happy", jm().solve(bj.doc()) == 0)
+
+
 steps = [setup, a_command, a_arm, a_base, a_revolute, a_position, a_position_click]
 steps += [a_maximum, a_maximum_shows_now, a_flip, a_flipped, a_flipped_back, a_both]
 steps += [a_both_flipped, a_both_back, b_preview, b_previewed, b_with_all, b_stopped, b_done]
@@ -387,5 +440,7 @@ steps += [
     e_reopened,
     e_rest_again,
 ]
+
+steps += [f_stopped_anywhere, f_exact_restore]
 
 h.run("book_joints_limits", steps, paced_by="state")

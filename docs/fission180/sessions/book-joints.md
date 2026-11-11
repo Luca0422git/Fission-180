@@ -15,7 +15,7 @@ change. Three of the report's five joint bugs had one root cause it did not see.
 | Bug 12: "Edit Joint Limits opens showing Rigid with no limits; its Cancel also reverts the earlier edit" | Yes, same setup | The same thing seen from the next command: the edit had just been cancelled by it, so the joint *was* Rigid again. With the edit really kept, the dialog shows the joint's type and limits (it always did: `joints_asbuilt_group` C). |
 | Bug 13: "As-built Slider with no axis silently becomes Rigid" | Partly | OK was refused (it always was), in the dialog's last line. But the preview kept the joint it had made while the type was still Rigid: "Rigid 5" stood in the browser and the timeline and looked finished. |
 | Bug 14: "Joint references go stale: Broken link, ?Face5, ?Edge41, fights the others" | Yes, three causes | (1) The same rolled-back joints as bug 11 (any roll of the marker, by hand or by an edit). (2) **As-built joints and rigid groups stored the joint origin as a place in the design** and worked it out again against the component's place at every recompute: after a component had moved, the joint silently had a new zero, or fought the others; a rigid group let go of its members (found here, not in the report). (3) The repair by signature only matched an element that had not changed at all, did not run while a dialog was open, never repaired an as-built side, and a snap on an edge of a face (a midpoint, a corner) fell back to the face's centre when the edges were numbered anew. |
-| Bug 15: "clicking a nested component's row does nothing" | Yes, differently | The row of a component inside a subassembly is selected as (outer component, "Inner."); the dialogs took the *outer* component for it, and the second nested row then dropped it again (a click on a picked component drops it), which looked like nothing happening. `joints.part_of_row` takes the object at the end of the path (As-built Joint, Rigid Group, Contact Set, Motion Link, Motion Study, Duplicate With Joints). |
+| Bug 15: "clicking a nested component's row does nothing" | Yes, differently | The row of a component inside a subassembly is selected as (outer component, "Inner."); the dialogs took the *outer* component for it, and the second nested row then dropped it again. **Fixed by the components builder** where the selection is read (`components.whole_pick` in `joints_ui._selection_entries`, branch `sf/book-components`, merged into this branch). A second fix made here (`joints.part_of_row`) was taken out again so there is one fix only; `book_joints_study` C tests it through the joint dialogs. |
 | "Clicking a round edge gives (corner) or (midpoint)" | Yes | The kernel's own points were offered as snaps: a full circle's seam vertex and the point opposite it, a cylinder's seam line. They are on the edge, so they were always nearer the pointer than the centre. |
 | "The (loop) centre is 0.37 mm off on threaded geometry" | Yes (a notched rim) | A hole's centre was the centre of area of its outline; a thread's run-out makes the outline not quite round. |
 | "Dragging the crank moved A and B but the rocker stayed" | Yes (headless: the crank did not move at all) | The solver is free to satisfy a closed loop by turning the driven joint back, and did. Cause (2) of bug 14 made it look different each time. |
@@ -29,6 +29,25 @@ joint (Autodesk: "swaps the minimum and maximum motion limit values"); "Preview 
 Preview Motion with a With All Limits tick; "Link with Same Joint" exists under that name in
 the forum's words only (Autodesk's own page could not be read).
 
+## The CI flake of `vex_shaft` (a part left turned 0.0175 to 0.03 degrees after OK)
+
+Not a race between the preview animation and OK. **Cause:** `joints.apply_placements` (what
+puts every part back when a joint's animation stops) skipped a part whose placement FreeCAD's
+`Placement.isSame(p, 1e-7)` called the same. That tolerance is on the rotations' dot
+product: two placements up to 2 x sqrt(1e-7) radians = **0.036 degrees** apart are "the
+same" when their positions agree, and a part that turns about its own origin (a shaft about
+its axis) does not change position. So whenever the animation's last drawn frame stood
+within 0.036 degrees of the start (the first and last frames of the swing; on a slow machine
+the last tick lands anywhere), the part was left there. All three sightings (0.0175, 0.028,
+0.03) are below 0.036, and all were parts turning about their own axis. (CI also saw the
+turn after Undo; why an undo did not take it back was not reproduced here: the skipped
+restore is proved, that part is not.) Fixed with `joints.same_place` (exact, to 1e-12) in `apply_placements`,
+`set_global_placement` and `place_joint_origin`; a tick that arrives after `stop()` returns
+at once. Proved without timing luck in `book_joints_limits` F: the animation is stopped at
+twelve chosen moments of its swing (some within hundredths of a degree of the start), the
+part is put back exactly each time, a tick after the stop moves nothing, and a part turned
+0.02 degrees in place (which `isSame(..., 1e-7)` calls the same) is put back exactly.
+
 ## What was built
 
 - `joints.py`: joints follow the history marker (`mark_rolling`, `rolled_back`,
@@ -41,7 +60,7 @@ the forum's words only (Autodesk's own page could not be read).
   (`in_loop`, `_holding`, `solve(hold=...)`); Rest (`rest_values`, `settle_rest`); one joint
   alone (`lone_side`, `drive_alone`).
 - `joints.py` also: a joint made while the timeline is rolled back goes in at the marker
-  (`place_step`, Fusion); `part_of_row`.
+  (`place_step`, Fusion).
 - `joints_ui.py`: OK of an edit rolls the marker forward inside the edit's undo step, lets the
   later joints take their parts along and only then remembers the positions
   (`_JointsPanel.roll_forward`); a refused OK said next to the mouse, a dialog cancelled by another command
@@ -84,6 +103,17 @@ the forum's words only (Autodesk's own page could not be read).
 
 ## For the merger
 
+- **`sf/book-components` is merged into this branch** (it merges into develop first). This
+  branch did not change `joints_ui._selection_entries`; the components' three lines there
+  are as they wrote them.
+- **A grounded first component** (components' "First component Ground to Parent"): the Joint
+  dialog ungrounds the first component picked when it is grounded, inside its undo step, and
+  says so (Autodesk's help: "if it is the first component that you select, it is
+  automatically ungrounded from parent. The second component you select maintains its
+  current ground to parent status"). Scenario `book_joints_ground` switches the preference
+  on. A drag of a grounded component says why and names Unground From Parent; Move already
+  did (`component_move.refusal`).
+
 - **An older scenario changed for the new (Fusion) behaviour**: `journey_vex_steps.py` step
   j7 edits the shaft's joint and checked, with the dialog still open, that the wheel (held
   on the shaft by a *later* joint) had moved with it. That later joint is now rolled back
@@ -105,6 +135,9 @@ the forum's words only (Autodesk's own page could not be read).
   (`timeline_ops.rolls_back`). `timeline_ops.py` was not edited.
 
 ## Changelog lines
+
+- Joint: when the first part you click is grounded, it is ungrounded so that it can move
+  onto the second, as in Fusion, and the dialog says so.
 
 - Editing a joint no longer fails when the design has components and joints made after it:
   the later joints wait, like every later step, while the earlier one is edited.

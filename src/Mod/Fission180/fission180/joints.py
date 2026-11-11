@@ -230,10 +230,27 @@ def global_placement(part):
     return parent_global(part) * part.Placement
 
 
+def same_place(a, b, tol=1e-12):
+    """True when two placements are the same to the last digits. Not Placement.isSame: its
+    tolerance is on the rotations' dot product, so isSame(p, 1e-7) calls two placements the
+    same when they are up to 0.036 degrees apart (2 x sqrt(tol) radians). Putting the parts
+    back after a joint's animation went through it: a last frame that close to the start
+    was left standing (the shaft found turned 0.0175 to 0.03 degrees after OK and after
+    Undo on the slow CI machine: vex_shaft, vex_qa_real, CI #307 and #324)."""
+    try:
+        qa, qb = a.Rotation.Q, b.Rotation.Q
+        if (a.Base - b.Base).Length > tol:
+            return False
+        same = max(abs(x - y) for x, y in zip(qa, qb)) <= tol
+        return same or max(abs(x + y) for x, y in zip(qa, qb)) <= tol  # q and -q: one turn
+    except Exception:
+        return False
+
+
 def set_global_placement(part, plc):
     """Put a part at a placement given in design coordinates."""
     local = parent_global(part).inverse() * plc
-    if not part.Placement.isSame(local, 1e-12):
+    if not same_place(part.Placement, local):
         part.Placement = local
 
 
@@ -279,24 +296,6 @@ def part_of(obj):
             parent = owners[0] if owners else None
         current = parent
     return None
-
-
-def part_of_row(root, sub=""):
-    """The part a whole-object selection means (a row of the browser, no face or edge): the
-    part of the object at the end of the path. A component inside another one is selected
-    as (the outer component, "Inner."): the part is the inner one, not the root (it was
-    the root: a nested component's row picked its parent; the book parity report, bug 15)."""
-    obj = root
-    try:
-        doc = root.Document
-        for name in [n for n in (sub or "").split(".")[:-1] if n]:
-            child = doc.getObject(name)
-            if child is None:
-                break
-            obj = child
-    except Exception:
-        obj = root
-    return part_of(obj) or part_of(root)
 
 
 def _path(part, obj):
@@ -2578,8 +2577,8 @@ def drag_plan(part):
     if is_grounded(part):
         return {
             "kind": "held",
-            "why": "%s is grounded: it does not move. Unground it in the browser to drag it."
-            % part.Label,
+            "why": "%s is grounded to its parent: it does not move. Right-click it in the "
+            "browser > Unground From Parent to drag it." % part.Label,
         }
     graph = _graph(doc)
     held = {g.ObjectToGround.Name for g in grounds(doc) if g.ObjectToGround is not None}
@@ -3711,7 +3710,7 @@ def apply_placements(doc, stored):
         obj = doc.getObject(name)
         if obj is not None and is_part(obj):
             plc = _plc_from_list(values)
-            if not obj.Placement.isSame(plc, 1e-7):
+            if not same_place(obj.Placement, plc):  # (see same_place: never isSame here)
                 obj.Placement = plc
     angles = stored.get(ANGLES_KEY, {})
     for joint in joints(doc):
@@ -4109,7 +4108,7 @@ def place_joint_origin(obj):
     parent = obj.getParentGeoFeatureGroup()
     if parent is not on:
         local = on.Placement * local
-    if not obj.Placement.isSame(local, 1e-9):
+    if not same_place(obj.Placement, local):
         obj.Placement = local
 
 

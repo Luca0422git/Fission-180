@@ -91,7 +91,7 @@ class DuplicatePanel(joints_ui._JointsPanel):
 
     def picked_raw(self, root, sub, point):
         pick = joints.resolve_selection(root, sub, point)
-        part = pick.part if pick is not None else joints.part_of_row(root, sub)
+        part = pick.part if pick is not None else joints.part_of(root)
         if part is None:
             return
         slot_box = self.active if self.slot_of(self.active) is not None else None
@@ -139,7 +139,7 @@ class DuplicatePanel(joints_ui._JointsPanel):
         for root, sub, point in entries:
             try:
                 pick = joints.resolve_selection(root, sub, point)
-                part = pick.part if pick is not None else joints.part_of_row(root, sub)
+                part = pick.part if pick is not None else joints.part_of(root)
                 if part is not None and all(part is not m for m in self.members):
                     self._toggle(part)
             except Exception as exc:

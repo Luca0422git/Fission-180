@@ -652,7 +652,9 @@ class Animator:
 
     def _tick(self):
         try:
-            if not self.running or self.joint.Document is None:
+            if not self.running:
+                return  # stopped: a tick that was already on its way moves nothing
+            if self.joint.Document is None:
                 self.stop()
                 return
             elapsed = time.perf_counter() - self.started
@@ -1859,12 +1861,24 @@ class JointPanel(_JointsPanel):
                 axes[AXIS_KEYS[label]] = box.currentData()
         made = False
         if self.joint is None:
+            freed = ""
+            if self.first and joints.is_grounded(pick1.part):
+                # Fusion: "if it is the first component that you select, it is automatically
+                # ungrounded from parent" (the first component is the one that moves); the
+                # second keeps its ground. Inside this undo step: Cancel grounds it again.
+                joints.unground(pick1.part)
+                freed = (
+                    "%s was grounded to its parent: it is ungrounded so that it can move onto "
+                    "%s (the first component picked is the one that moves)."
+                    % (pick1.part.Label, pick2.part.Label)
+                )
+                log(freed)
             self.joint = joints.create_joint(
                 self.doc, kind, pick1, self.snaps["comp1"], pick2, self.snaps["comp2"], offset, axes
             )
             self.target = self.joint
             made = True
-            self._announce = ""
+            self._announce = freed
         else:
             if self._rejoin:
                 self._rejoin = False
@@ -2060,7 +2074,7 @@ class AsBuiltPanel(_JointsPanel):
 
     def picked_raw(self, root, sub, point):
         pick = joints.resolve_selection(root, sub, point)
-        part = pick.part if pick is not None else joints.part_of_row(root, sub)
+        part = pick.part if pick is not None else joints.part_of(root)
         if part is None:
             return
         slot_box = self.active if self.slot_of(self.active) is not None else None
@@ -2355,7 +2369,7 @@ class RigidGroupPanel(_JointsPanel):
 
     def picked_raw(self, root, sub, point):
         pick = joints.resolve_selection(root, sub, point)
-        part = pick.part if pick is not None else joints.part_of_row(root, sub)
+        part = pick.part if pick is not None else joints.part_of(root)
         if part is None:
             return
         if part in self.members:
@@ -2480,7 +2494,7 @@ class DrivePanel(_JointsPanel):
             joint = root
         else:
             pick = joints.resolve_selection(root, sub, point)
-            part = pick.part if pick is not None else joints.part_of_row(root, sub)
+            part = pick.part if pick is not None else joints.part_of(root)
             if part is not None:
                 for j in joints.joints(self.doc):
                     if (
