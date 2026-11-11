@@ -480,7 +480,16 @@ def _tick():
     try:
         _poll_run()
         if STATE["on"]:
-            from . import shell
+            from . import shell, simulation_ui
+
+            if simulation_ui.in_workspace():
+                # Simulation was entered another way than the workspace menu (a command
+                # found by search): one workspace at a time
+                doc = _doc()
+                if doc is not None:
+                    STATE["docs"][doc.Name] = False
+                _apply(False)
+                return
 
             if shell.is_on():
                 refresh_view()
