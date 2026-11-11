@@ -162,7 +162,8 @@ def _expression_paths(sketch, index, name):
     out = []
     try:
         for path, _expr in sketch.ExpressionEngine:
-            if path == ".Constraints[%d]" % index or (name and path == ".Constraints.%s" % name):
+            path_ = path.lstrip(".")  # (bound with or without the leading dot)
+            if path_ == "Constraints[%d]" % index or (name and path_ == "Constraints.%s" % name):
                 out.append(path)
     except Exception:
         pass

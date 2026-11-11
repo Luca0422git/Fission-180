@@ -675,8 +675,11 @@ class Boxes:
             return True
         if key in UP_DOWN:
             return self.typing is not None  # nothing to step through: kept off the view
-        value_char = text and (text.isdigit() or text in ".,-+*/()")
-        unit_char = text and text.isalpha() and self.typing
+        # "=" starts a parameter name or a formula (wave 7: =Head_Diam, =Support_Width / 2;
+        # a letter typed first is still its shortcut: L, C, X...); once something is typed,
+        # letters and _ go into the box (a unit, a name), ";" separates arguments
+        value_char = text and (text.isdigit() or text in ".,-+*/()=")
+        unit_char = text and (text.isalpha() or text in "_;") and self.typing
         if value_char or unit_char or (text == " " and self.typing):
             if self.typing is None:
                 self.typing = ""
@@ -1343,10 +1346,10 @@ class DrawTool:
         mods = event.modifiers() & ~(QtCore.Qt.KeypadModifier | QtCore.Qt.ShiftModifier)
         if mods != QtCore.Qt.NoModifier or not text:
             return False
-        if text.isdigit() or text in ".,-+*/()":
+        if text.isdigit() or text in ".,-+*/()=":
             return bool(self.boxes.fields)
-        if text.isalpha() and self.boxes.typing:
-            return True  # a unit after a typed value ("12 mm")
+        if (text.isalpha() or text in "_; ") and self.boxes.typing:
+            return True  # a unit after a typed value ("12 mm"), a name after "="
         return self.wants_letter(text)
 
     def wants_letter(self, text):

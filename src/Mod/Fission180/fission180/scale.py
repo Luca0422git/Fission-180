@@ -18,6 +18,7 @@ A uniform scale keeps the exact geometry (planes stay planes, circles circles). 
 uniform one turns every face into a NURBS surface: the shape is still exact, but FreeCAD
 then measures the volume of curved NURBS faces only approximately (to about 1 %).
 """
+
 import FreeCAD as App
 
 from . import log, warn
@@ -482,9 +483,10 @@ def sketch_point(sketch, point=None):
 def _expression_bound(sketch, index, name):
     try:
         for path, _expr in sketch.ExpressionEngine:
-            if path == ".Constraints[%d]" % index:
+            path = path.lstrip(".")  # (bound with or without the leading dot)
+            if path == "Constraints[%d]" % index:
                 return True
-            if name and path == ".Constraints.%s" % name:
+            if name and path == "Constraints.%s" % name:
                 return True
     except Exception:
         pass

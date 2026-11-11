@@ -2399,7 +2399,9 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
 
     def _current_text(self):
         try:
-            expressions = dict(self.sketch.ExpressionEngine)
+            from . import parameters
+
+            expressions = parameters.expressions_of(self.sketch)
             path = ".Constraints[%d]" % self.index
             if path in expressions:
                 # the formula as the person writes it (Fusion shows "Arm_Length", not
@@ -2565,7 +2567,9 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                 # (an unknown name) is said, not kept (parameters.read raises).
                 kind = "angle" if self.is_angle() else "length"
                 formula = parameters.read(doc, expression, kind, create=True).freecad
-                self.sketch.setExpression(".Constraints[%d]" % self.index, formula)
+                # (bound the way FreeCAD renumbers it when a constraint before it is
+                # deleted: parameters.set_expression, bug 3 of the book parity report)
+                parameters.set_expression(self.sketch, ".Constraints[%d]" % self.index, formula)
                 self.sketch.recompute()
                 # a formula is checked like a typed value: no size of 0 or less
                 kind = self._constraint().Type

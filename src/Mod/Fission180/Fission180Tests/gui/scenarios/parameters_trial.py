@@ -304,7 +304,7 @@ def e_type():
 
 
 def e_check():
-    from fission180 import sketch_mode
+    from fission180 import parameters, sketch_mode
 
     session = sketch_mode.current()
     ed = session.editor if session is not None else None
@@ -314,7 +314,8 @@ def e_check():
     h.check("E: the height stays 20", abs(s["sk"].getDatum(s["h"]).Value - 20) < 1e-9)
     h.check(
         "E: no formula left on the height",
-        ".Constraints[%d]" % s["h"] not in dict(s["sk"].ExpressionEngine),
+        # (read through expressions_of: a formula is bound without the leading dot now)
+        ".Constraints[%d]" % s["h"] not in parameters.expressions_of(s["sk"]),
         s["sk"].ExpressionEngine,
     )
     si.key(QtCore.Qt.Key_Escape)

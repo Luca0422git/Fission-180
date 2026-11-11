@@ -408,6 +408,130 @@ def set_user(doc, name, text):
     _set(obj, core.prop_name(name), text, user_names(doc), unit=unit_of_parameter(doc, name))
 
 
+# -- a sketch dimension's formula ----------------------------------------------------------------
+
+
+# -- a sketch dimension's formula ----------------------------------------------------------------
+# Bug 3 of the book parity report: "Deleting a sketch constraint mis-wires parameter links
+# (Support_Width / 2 jumped onto another constraint; Array out of bound: 34, 31)."
+# FreeCAD does renumber the formulas of a sketch's dimensions when a constraint before them
+# is deleted (PropertyConstraintList::applyValues tells the sketch which `Constraints[n]`
+# became which), but only formulas bound under the path `Constraints[n]`. Fission 180 bound
+# them under `.Constraints[n]` (a leading dot: "this object's own property"), which FreeCAD
+# computes the same way but does not match when it renumbers: the formula stayed at its old
+# number and so sat on whatever dimension had that number after the delete. Reproduced with
+# sketch.delConstraint, delGeometry and Undo; with the path spelled without the dot all
+# three keep every formula on its own dimension (scenario book_params_delete).
+#
+# So: formulas are bound without the dot (set_expression), the ones designs already hold are
+# re-bound when a design is opened (fix_document), and Fission 180's own code keeps naming a
+# dimension ".Constraints[n]" in its rows and reads formulas through expressions_of(), which
+# gives that spelling whatever the design holds.
+def _is_constraint_path(path):
+    return path.lstrip(".").startswith("Constraints")
+
+
+def expressions_of(obj):
+    """{path: formula} of an object's formulas, a sketch dimension's path always spelled
+    `.Constraints[n]` (or `.Constraints.name`), however the design holds it."""
+    out = {}
+    for path, expr in obj.ExpressionEngine:
+        if path.startswith("Constraints"):
+            path = "." + path
+        out[path] = expr
+    return out
+
+
+def set_expression(obj, path, expr):
+    """obj.setExpression(path, expr), a sketch dimension bound the way FreeCAD renumbers it
+    (no leading dot); a formula left under the old spelling is dropped."""
+    if not _is_constraint_path(path):
+        obj.setExpression(path, expr)
+        return
+    bare = path.lstrip(".")
+    held = dict(obj.ExpressionEngine)
+    if "." + bare in held:
+        obj.setExpression("." + bare, None)
+    if expr is None and bare not in held:
+        return
+    obj.setExpression(bare, expr)
+
+
+def fix_constraint_paths(sketch):
+    """Re-bind the formulas a sketch holds under `.Constraints...` without the dot. Returns
+    how many were re-bound."""
+    moved = 0
+    try:
+        held = list(sketch.ExpressionEngine)
+    except Exception:
+        return 0
+    touched = "Touched" in sketch.State
+    for path, expr in held:
+        if path.startswith(".Constraints"):
+            sketch.setExpression(path, None)
+            sketch.setExpression(path[1:], expr)
+            moved += 1
+    if moved and not touched:
+        try:
+            sketch.purgeTouched()  # the same formulas on the same dimensions: nothing to rebuild
+        except Exception:
+            pass
+    return moved
+
+
+def fix_document(doc):
+    """fix_constraint_paths for every sketch of a design (when it is opened)."""
+    moved = 0
+    for obj in doc.Objects:
+        if obj.TypeId == "Sketcher::SketchObject":
+            try:
+                moved += fix_constraint_paths(obj)
+            except Exception:
+                pass
+    return moved
+
+
+class _Opened:
+    def slotFinishRestoreDocument(self, doc):
+        try:
+            modified = None
+            if App.GuiUp:
+                import FreeCADGui as Gui
+
+                gui_doc = Gui.getDocument(doc.Name)
+                modified = bool(gui_doc.Modified) if gui_doc is not None else None
+            moved = fix_document(doc)
+            if moved:
+                from . import log
+
+                log(
+                    "parameters: %d sketch formula(s) of %s bound FreeCAD's way"
+                    % (moved, doc.Label)
+                )
+                if modified is False:
+                    gui_doc.Modified = False  # opening a design does not change it
+        except Exception as exc:
+            from . import warn
+
+            warn("parameters: sketch formulas not re-bound: %s" % exc)
+
+
+_opened = {"observer": None}
+
+
+def watch_opened_designs():
+    """Re-bind sketch formulas of every design opened from now on, and of the open ones."""
+    if _opened["observer"] is not None:
+        return
+    _opened["observer"] = _Opened()
+    App.addDocumentObserver(_opened["observer"])
+    for doc in App.listDocuments().values():
+        try:
+            fix_document(doc)
+        except Exception:
+            pass
+
+
 # -- reading what a person typed, in this design -------------------------------------------------
 def _host(doc):
     """An object that can compute a formula for this design (FreeCAD computes them in the
@@ -566,7 +690,7 @@ def bind_typed(sketch, first, fields):
     (`field.formula`, FreeCAD's spelling; `field.typed`, its value in mm or radians) get
     that formula, so they follow the parameter like a dimension typed afterwards. Returns
     how many dimensions were bound."""
-    engine = dict(sketch.ExpressionEngine)
+    engine = expressions_of(sketch)
     constraints = sketch.Constraints
     taken = set()
     for field in fields:
@@ -593,7 +717,7 @@ def bind_typed(sketch, first, fields):
                 continue
             if value * typed < 0:
                 expr = "-(%s)" % expr  # FreeCAD keeps a dimension's direction in its sign
-            sketch.setExpression(path, expr)
+            set_expression(sketch, path, expr)
             taken.add(i)
             break
     return len(taken)
@@ -632,7 +756,7 @@ def model_parameters(doc):
     length_unit = design_unit(doc)
     # (the groups keep the objects' labels: scenarios and scripts find them by it)
     for obj in doc.Objects:
-        expressions = dict(obj.ExpressionEngine)
+        expressions = expressions_of(obj)
         found = []
         if obj.TypeId == "Sketcher::SketchObject":
             for i, constraint in enumerate(obj.Constraints):
@@ -833,7 +957,7 @@ def _set(obj, path, text, names=None, unit=None):
     unit is in the design's units (`unit`: in that unit, a user parameter's own)."""
     text = (text or "").strip()
     if not text:
-        obj.setExpression(path, None)
+        set_expression(obj, path, None)
         return
     doc = obj.Document
     holder = container(doc)
@@ -841,9 +965,9 @@ def _set(obj, path, text, names=None, unit=None):
     kind = kind_of_path(obj, path)
     got = read(doc, text, kind, unit=unit, skip=skip)
     if not got.plain:
-        obj.setExpression(path, got.freecad)
+        set_expression(obj, path, got.freecad)
         return
-    obj.setExpression(path, None)
+    set_expression(obj, path, None)
     if path.startswith(".Constraints["):
         obj.setDatum(
             int(path[len(".Constraints[") : -1]),
@@ -868,7 +992,7 @@ def _set(obj, path, text, names=None, unit=None):
         # FreeCAD holds this kind of property inside limits (an App::PropertyLength of an
         # older design at 0 or more, an angle within one turn): a formula is not held back
         suffix = {"length": " mm", "angle": " deg"}.get(kind, "")
-        obj.setExpression(path, "%r%s" % (got.value, suffix))
+        set_expression(obj, path, "%r%s" % (got.value, suffix))
 
 
 # -- Change Parameters checked on a trial ------------------------------------------------------
@@ -934,7 +1058,7 @@ def _formula_value(obj, index, value, typed=None):
     formula gives less: the message says what it gave, with the values `typed`)."""
     import re
 
-    expr = dict(obj.ExpressionEngine).get(".Constraints[%d]" % index)
+    expr = expressions_of(obj).get(".Constraints[%d]" % index)
     if not expr:
         return value
     for ref, number in (typed or {}).items():
@@ -1048,7 +1172,7 @@ def _step_names(doc):
 
 def _snapshot(obj, path):
     """What `path` of `obj` holds now (its expressions and its value), to put it back."""
-    return dict(obj.ExpressionEngine), _value_at(obj, path)
+    return expressions_of(obj), _value_at(obj, path)
 
 
 def _sketch_shots(doc):
@@ -1090,13 +1214,13 @@ def _put_back_sketches(doc, shots):
 
 def _put_back(obj, path, snapshot):
     expressions, value = snapshot
-    now = dict(obj.ExpressionEngine)
+    now = expressions_of(obj)
     for key in now:
         if key not in expressions:
-            obj.setExpression(key, None)
+            set_expression(obj, key, None)
     for key, expr in expressions.items():
         if now.get(key) != expr:
-            obj.setExpression(key, expr)
+            set_expression(obj, key, expr)
     if path in expressions:
         return  # its formula is back: the value follows it
     if path.startswith(".Constraints["):
@@ -1106,9 +1230,9 @@ def _put_back(obj, path, snapshot):
         except Exception:
             # the sketch cannot solve until the value is back: through a formula, which
             # sets the value without asking the solver first, then the formula goes again
-            obj.setExpression(path, str(value))
+            set_expression(obj, path, str(value))
             obj.recompute()
-            obj.setExpression(path, None)
+            set_expression(obj, path, None)
     else:
         _put_value(obj, path, value)
 
@@ -1238,3 +1362,9 @@ def change_checked(doc, obj, path, apply, what):
     _put_back_sketches(doc, shots)  # (the recompute then solves them from where they were)
     doc.recompute()
     return message
+
+
+try:
+    watch_opened_designs()
+except Exception:
+    pass
