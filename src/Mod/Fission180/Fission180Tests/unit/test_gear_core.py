@@ -237,13 +237,60 @@ class CheckTests(unittest.TestCase):
 
     def test_fillet_too_big_says_the_largest(self):
         text = _message({"fillet": 1.5})
-        self.assertIn("at most 1.146 mm", text)
+        # Fusion's SpurGear takes up to 0.4 x the tooth thickness on the base circle,
+        # 0.4 * pi * 2 * cos(20 deg) / 2 = 1.1808 mm for module 2, whatever the teeth
+        # (neighbouring fillets then cross); it was "1.146", the largest radius that still
+        # leaves a flat between two fillets of this 24 tooth gear (wave 7, replay-f)
+        self.assertIn("at most 1.18 mm", text)
         biggest = core.max_fillet({})
         self.assertEqual(_message({"fillet": biggest}), "")
         self.assertIn("Root Fillet", _message({"type": "rack", "fillet": 2.0}))
         self.assertEqual(
             _message({"type": "rack", "fillet": core.max_fillet({"type": "rack"})}), ""
         )
+
+    def test_fusions_root_fillet_limit(self):
+        # 0.4 * pi * 1.5 * cos(20 deg) / 2 = 0.4 * 2.35619 * 0.93969 = 0.88564
+        self.assertAlmostEqual(core.fusion_max_fillet(1.5, 20), 0.88564, places=5)
+        self.assertAlmostEqual(core.fusion_max_fillet(2.0, 20), 1.18085, places=5)
+
+    def test_the_books_100_tooth_gear_takes_its_root_fillet(self):
+        """The Gear Train: module 1.5, 100 teeth, root fillet 0.88 (it was refused: "at
+        most 0.741 mm"; Fusion makes it, the fillets of neighbouring teeth crossing)."""
+        book = {"module": 1.5, "teeth": 100, "hole": 4.0, "fillet": 0.88}
+        self.assertEqual(_message(book), "")
+        self.assertEqual(core.max_fillet(book), 0.885)
+        self.assertIn("at most 0.885 mm", _message(dict(book, fillet=0.9)))
+        outer = core.profile(book)[0]
+        # per tooth: two flank curves up, the tip, two down, and the two crossing fillets
+        self.assertEqual(len(outer), 7 * 100)
+        for a, b in zip(outer, outer[1:] + outer[:1]):  # a closed outline
+            end = a[1][-1] if a[0] == "bezier" else a[-1]
+            start = b[1][0] if b[0] == "bezier" else b[1]
+            self.assertAlmostEqual(end[0], start[0], places=9)
+            self.assertAlmostEqual(end[1], start[1], places=9)
+        # nothing dips under the root circle, r = 1.5 * (100 - 2.5) / 2 = 73.125
+        lowest = min(math.hypot(x, y) for x, y in core.polylines(book, fine=True)[0])
+        self.assertGreater(lowest, 73.125)
+        # more metal than with the largest fillets that leave a flat (0.741), a little
+        tight = core.area(dict(book, fillet=0.741))
+        self.assertGreater(core.area(book), tight)
+        self.assertLess(core.area(book) - tight, 100 * 0.1)
+
+    def test_where_two_root_fillets_cross(self):
+        # a fillet circle of radius 2 centred on the middle ray at radius 10 crosses it at 8
+        self.assertAlmostEqual(core._fillet_crossing(10.0, 2.0, 0.3, 0.3), 8.0)
+        # its centre 0.1 rad beyond the ray: 10 cos 0.1 - sqrt(4 - (10 sin 0.1)^2)
+        want = 10 * math.cos(0.1) - math.sqrt(4 - (10 * math.sin(0.1)) ** 2)
+        self.assertAlmostEqual(core._fillet_crossing(10.0, 2.0, 0.4, 0.3), want)
+        # too far beyond to reach the ray (10 sin 0.3 = 2.96 > 2)
+        self.assertIsNone(core._fillet_crossing(10.0, 2.0, 0.6, 0.3))
+
+    def test_a_20_tooth_gear_takes_the_books_fillet_with_a_flat_left(self):
+        o = core.with_defaults({"module": 1.5, "teeth": 20, "fillet": 0.88})
+        _loops, lands = core._circular(o)
+        self.assertFalse(lands["crossed"])
+        self.assertGreater(lands["root"], 0.0)
 
     def test_backlash_too_big(self):
         self.assertIn("come to a point", _message({"backlash": 2.0}))

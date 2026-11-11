@@ -300,7 +300,7 @@ def _circular(o):
     r_ref = m * z / 2.0
     teeth = _Recorder()
     if o["type"] == "spur":
-        outer, inner = _involute(
+        outer, inner, crossed = _involute(
             teeth,
             m,
             z,
@@ -309,9 +309,11 @@ def _circular(o):
             inner_height=DEDENDUM,
             inner_fillet=fillet / m,
             thinning=backlash / (2.0 * r_ref),
+            # (wave 7, replay-f) up to Fusion's own limit the root fillets may cross
+            crossing_fillets=fillet <= fusion_max_fillet(m, o["pressure_angle"]) + 1e-9,
         )
-        lands = {"tip": outer, "root": inner}
-        if min(outer, inner) < _least(m):
+        lands = {"tip": outer, "root": inner, "crossed": crossed}
+        if min(outer, inner) < _least(m) and not crossed:
             return [], lands
         loops = [teeth.loop()]
         hole = float(o["hole"])
@@ -319,7 +321,7 @@ def _circular(o):
             loops.append([("circle", (0.0, 0.0), hole / 2.0)])
         return loops, lands
     add = internal_addendum(z, float(o["pressure_angle"]))
-    outer, inner = _involute(
+    outer, inner, _crossed = _involute(
         teeth,
         m,
         z,
@@ -357,7 +359,7 @@ def _check_lands(lands, o):
             "With these values the teeth come to a point. Use more teeth or another "
             "pressure angle."
         )
-    if lands["root"] < _least(m):
+    if lands["root"] < _least(m) and not lands.get("crossed"):
         if fillet > 1e-9:
             raise GearError(
                 "The Root Fillet Radius (%s mm) does not fit between the teeth. Make it "
@@ -378,7 +380,8 @@ def max_fillet(options):
         mid = (lo + hi) / 2.0
         try:
             _loops, lands = _circular(dict(o, fillet=mid))
-            fits = lands["root"] >= _least(m) and lands["tip"] >= _least(m)
+            root_fits = lands["root"] >= _least(m) or lands.get("crossed")
+            fits = bool(root_fits) and lands["tip"] >= _least(m)
         except GearError:
             fits = False
         if fits:
@@ -549,11 +552,15 @@ def _involute(
     outer_fillet=0.0,
     inner_fillet=0.0,
     thinning=0.0,
+    crossing_fillets=False,
 ):
     """fcgear's _create_involute_profile (split involutes, no profile shift) with
     `thinning`: the tooth's half thickness angle at the reference circle is that much
     smaller (the backlash). Returns the widths (mm) of the outer and inner lands (the flat
-    of each circle left between the flanks or fillets; < 0: the flanks cross)."""
+    of each circle left between the flanks or fillets; < 0: the flanks cross) and whether
+    the inner fillets cross (`crossing_fillets`: two neighbouring root fillets too big to
+    leave a flat between them are each drawn up to where they meet, on the middle of the
+    gap, as Fusion's SpurGear leaves them: see fusion_max_fillet)."""
     r_ref = z * module / 2.0
     rb = r_ref * math.cos(alpha)
     ro = r_ref + outer_height * module
@@ -643,8 +650,15 @@ def _involute(
     # inner one, as widths: below 0 the flanks cross and no outline can close.
     outer_land = 2.0 * ro * (psi - ref_to_stop - outer_a)
     inner_land = ri * (pitch - 2 * (psi + start_to_ref + inner_a))
-    if min(outer_land, inner_land) < 1e-4 * module:
-        return outer_land, inner_land  # the caller says why
+    cusp = None
+    if crossing_fillets and has_inner and outer_land >= 1e-4 * module > inner_land:
+        cusp = _fillet_crossing(rci, fi, psi + start_to_ref + inner_a, pitch / 2.0)
+        if cusp is not None and not (
+            ri - 1e-9 <= cusp < rfi - 1e-9 and psi + start_to_ref < pitch / 2.0 - 1e-9
+        ):
+            cusp = None  # the fillets would meet above where they leave the flanks
+    if min(outer_land, inner_land) < 1e-4 * module and cusp is None:
+        return outer_land, inner_land, False  # the caller says why
 
     inner_fillet_pt = _polar(rfi, -psi - start_to_ref)
     inner_fillet_back = _mirror(inner_fillet_pt)
@@ -674,12 +688,41 @@ def _involute(
         w.curve(inv_r[2], inv_r[1], inv_r[0])
         if non_involute:
             w.line(inner_fillet_back)
+        if cusp is not None:
+            # the two root fillets cross: each runs up to the middle of the gap
+            w.arc(_polar(cusp, pitch / 2.0), fi, 0)
+            w.arc(inner_fillet_next, fi, 0)
+            continue
         if has_inner:
             w.arc(inner_circle_back, fi, 0)
         w.arc(inner_circle_next, ri, 1)
         if has_inner:
             w.arc(inner_fillet_next, fi, 0)
-    return outer_land, inner_land
+    return outer_land, inner_land, cusp is not None
+
+
+def _fillet_crossing(rc, fillet, centre_angle, middle_angle):
+    """The radius at which a root fillet's circle (radius `fillet`, its centre at radius
+    `rc` and polar angle `centre_angle`) crosses the middle of the gap (the ray at
+    `middle_angle`) on its way down to the root circle; None when it does not reach it.
+    The neighbour's fillet, its mirror image in that ray, crosses it at the same point."""
+    delta = centre_angle - middle_angle
+    under = fillet * fillet - (rc * math.sin(delta)) ** 2
+    if under <= 0.0:
+        return None
+    return rc * math.cos(delta) - math.sqrt(under)
+
+
+def fusion_max_fillet(module, pressure_angle_deg):
+    """The largest Root Fillet Radius Fusion's SpurGear sample takes (mm): 0.4 x the tooth
+    thickness on the base circle, pi m cos(alpha) / 2, whatever the number of teeth
+    (Autodesk's sample SpurGear.py: "if rootFilletRad > toothThickness * .4: The root
+    fillet radius is too large"). 0.8857 mm for module 1.5 at 20 degrees: the book's Gear
+    Train types 0.88 for both its 20 and its 100 tooth gear. The sample fillets ONE tooth
+    on the root cylinder and patterns it, so on a gear of many teeth neighbouring fillets
+    simply run into each other."""
+    alpha = math.radians(float(pressure_angle_deg))
+    return 0.4 * math.pi * float(module) * math.cos(alpha) / 2.0
 
 
 # -- the rack -------------------------------------------------------------------------------------
