@@ -11,9 +11,9 @@ file is out of date.
 
 ## Headline
 
-**Fusion commands present: 542 / 703 (77.1%)**
+**Fusion commands present: 553 / 713 (77.6%)**
 
-In the areas Fission 180 builds (without the 73 entries left out on purpose, see the end): **542 / 630 (86.0%)**.
+In the areas Fission 180 builds (without the 72 entries left out on purpose, see the end): **553 / 641 (86.3%)**.
 
 What the number means:
 
@@ -46,8 +46,8 @@ What the number means:
 | | New Drawing | 2 | 1 | 50.0% |
 | | Share | 2 | 0 | 0.0% |
 | | View | 8 | 0 | 0.0% |
-| **WORKSPACES** | all | **7** | **4** | **57.1%** |
-| | (top level) | 6 | 3 | 50.0% |
+| **WORKSPACES** | all | **7** | **5** | **71.4%** |
+| | (top level) | 6 | 4 | 66.7% |
 | | Drawing | 1 | 1 | 100.0% |
 | **SOLID** | all | **135** | **119** | **88.1%** |
 | | CREATE | 27 | 25 | 92.6% |
@@ -163,6 +163,12 @@ What the number means:
 | | DRILLING | 1 | 1 | 100.0% |
 | | ACTIONS | 4 | 4 | 100.0% |
 | | MANAGE | 1 | 1 | 100.0% |
+| **ANIMATION** | all | **10** | **10** | **100.0%** |
+| | STORYBOARD | 1 | 1 | 100.0% |
+| | TRANSFORM | 6 | 6 | 100.0% |
+| | ANNOTATION | 1 | 1 | 100.0% |
+| | VIEW | 1 | 1 | 100.0% |
+| | PUBLISH | 1 | 1 | 100.0% |
 
 ## Not in Fission 180 yet
 
@@ -330,7 +336,7 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 - accounts are out of scope (2 entries, 0 present): APPLICATION BAR > Profile menu > My Profile, APPLICATION BAR > Profile menu > Autodesk Account
 - cloud collaboration is out of scope (5 entries, 0 present): APPLICATION BAR > Job Status, APPLICATION BAR > Notifications, FILE MENU > Share > Public Link, FILE MENU > Share > Collaboration, FILE MENU > View > Show/Hide Comments
 - electronics is out of scope (2 entries, 0 present): FILE MENU > New Electronics Design, SOLID > CREATE > Create PCB
-- animation is out of scope (2 entries, 0 present): FILE MENU > New Drawing > From Animation, WORKSPACES > Animation
+- animation is out of scope (1 entries, 0 present): FILE MENU > New Drawing > From Animation
 - generative design is out of scope (1 entries, 0 present): WORKSPACES > Generative Design
 - rendering is out of scope (1 entries, 0 present): WORKSPACES > Render
 - sculpting (T-spline) is out of scope (48 entries, 0 present): SOLID > CREATE > Create Form, FORM > CREATE > Box, FORM > CREATE > Plane, FORM > CREATE > Cylinder, FORM > CREATE > Sphere, FORM > CREATE > Torus, FORM > CREATE > Quadball, FORM > CREATE > Pipe, FORM > CREATE > Face, FORM > CREATE > Extrude, FORM > CREATE > Revolve, FORM > CREATE > Sweep, FORM > CREATE > Loft, FORM > MODIFY > Edit Form, FORM > MODIFY > Insert Edge, FORM > MODIFY > Subdivide, FORM > MODIFY > Insert Point, FORM > MODIFY > Merge Edge, FORM > MODIFY > Bridge, FORM > MODIFY > Fill Hole, FORM > MODIFY > Erase and Fill, FORM > MODIFY > Weld Vertices, FORM > MODIFY > UnWeld Edges, FORM > MODIFY > Crease, FORM > MODIFY > UnCrease, FORM > MODIFY > Bevel Edge, FORM > MODIFY > Slide Edge, FORM > MODIFY > Smooth, FORM > MODIFY > Pull, FORM > MODIFY > Flatten, FORM > MODIFY > Straighten, FORM > MODIFY > Match, FORM > MODIFY > Interpolate, FORM > MODIFY > Thicken, FORM > MODIFY > Freeze, FORM > MODIFY > UnFreeze, FORM > SYMMETRY > Mirror - Internal, FORM > SYMMETRY > Circular - Internal, FORM > SYMMETRY > Mirror - Duplicate, FORM > SYMMETRY > Circular - Duplicate, FORM > SYMMETRY > Clear Symmetry, FORM > SYMMETRY > Isolate Symmetry, FORM > UTILITIES > Display Mode, FORM > UTILITIES > Repair Body, FORM > UTILITIES > Make Uniform, FORM > UTILITIES > Convert, FORM > UTILITIES > Enable Better Performance, FORM > FINISH FORM > Finish Form
@@ -361,6 +367,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `quick`: Menu, New, Open
 - `nav`: Theme, Ground Plane, Show All, Two Views Horizontal, Two Views Vertical
 - `marking`: Set Orbit Center, Reset Orbit Center
+- `sketch-marking`: Toggle Driven
 - `browser:sheet_metal_rule`: Sheet Metal Rules
 - `browser:plastic_rule`: Assign Plastic Rule, Manage Plastic Rules
 - `browser:settings`: Change Active Units
@@ -368,7 +375,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `browser:origin`: Create Sketch
 - `browser:component`: Move/Copy, Create Drawing, Move to Component
 - `browser:body`: Activate Body, Rebuild with Timeline (AI)..., Ground, Paste, Move to Component
-- `browser:joint`: Rename
+- `browser:joint`: Animate Joint Relationships, Rename
 - `browser:rigid_group`: Rename
 - `browser:motion_link`: Edit Motion Link, Suppress, Find in Timeline, Rename, Delete
 - `browser:contact_set`: Edit Contact Set, Suppress, Rename, Delete

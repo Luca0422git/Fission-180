@@ -9,9 +9,16 @@ or a given length from one end. Two ways to show it, like Fusion's Modeled check
   cosmetic (Modeled off)  the part is not changed; the thread is recorded (size, length,
                           class, hand) and drawn as a dashed helix on the face (thread_ui).
   modeled  (Modeled on)   the real thread is cut: an ISO 68-1 groove swept along a helix
-                          (thread_core.py has the numbers). A shaft wider than the thread's
-                          major diameter is turned down to it, a hole narrower than the minor
-                          diameter is bored up to it, as Fusion's modeled threads do.
+                          (thread_core.py has the numbers). The thread has its standard
+                          size whatever the cylinder was, as Fusion's modeled threads have: a
+                          shaft is turned down (or built up) to the thread's major diameter,
+                          a hole bored up (or filled in) to its minor diameter. A pipe thread
+                          (ISO pipe "G": the 55 degree form; NPT: on a cone of 1 in 16) is
+                          cut the same way.
+
+The picked faces are always faces of the step right before the thread (its BaseFeature). When
+that step changes (the step before the thread deleted, the thread dragged to another place in
+the timeline, a face's name lost) the same cylinder is found again by where it is (refind()).
 
 The feature is a PartDesign::FeaturePython, so later steps build on it and editing earlier
 steps recomputes it. Saved documents store "fission180.thread.ThreadFeature": keep that name.
@@ -28,6 +35,7 @@ from . import thread_tables as tables
 TYPE = "PartDesign::FeaturePython"
 KIND = "Thread"
 TOL = 1e-7
+SIZE_TOL = 1e-3  # mm: a cylinder this near the thread's own diameter is left as it is
 
 DEFAULTS = {
     "standard": "iso",
@@ -223,58 +231,175 @@ def _sweep(spine, profile):
     return spine.makePipeShell([profile], True, True)
 
 
-def cutter(cylinder, designation, z0, z1, left_hand=False, thread_class=""):
-    """The solid a modeled thread removes from the part (shape coordinates). The tolerance
-    class sets where the thread lies (thread_tables.class_zone: the profile moved out or in,
-    the shaft turned / the hole bored to the middle of the class's diameters, like Fusion's
-    modeled threads follow the class)."""
+def _round(r0, r1, z0, z1):
+    """A solid of revolution around z from z0 to z1: a cylinder (r0 == r1) or a cone."""
+    import Part
+
+    if abs(r0 - r1) < 1e-9:
+        return Part.makeCylinder(r0, z1 - z0, App.Vector(0, 0, z0))
+    return Part.makeCone(r0, r1, z1 - z0, App.Vector(0, 0, z0))
+
+
+def _taper_start(designation, internal):
+    """(major radius, minor radius) of a taper pipe thread where it starts: an external
+    thread at the pipe's end (its small end: ASME B1.20.1's E0, the pitch diameter there,
+    is D - (0.05 D + 1.1) P), an internal one at the opening (its large end: the pitch
+    diameter E1 one hand-tight engagement in from the pipe's end, hole_tables)."""
+    d, p = designation.diameter, designation.pitch
+    depth = core.thread_depth(p, designation.form)
+    e0 = d - (0.05 * d / tables.INCH + 1.1) * p
+    if not internal:
+        return (e0 + depth) / 2.0, (e0 - depth) / 2.0
+    from . import hole_tables
+
+    row = hole_tables.taper_thread("npt", designation.size)
+    if row is not None:
+        return row.major / 2.0, row.minor / 2.0
+    return (e0 + depth) / 2.0, (e0 - depth) / 2.0
+
+
+def parts(
+    cylinder,
+    designation,
+    z0,
+    z1,
+    left_hand=False,
+    thread_class="",
+    from_end=False,
+    grooves=True,
+):
+    """(add, cut): what a modeled thread adds to the part and what it removes from it
+    (shape coordinates; `add` is None when nothing is added). The thread has its standard
+    size whatever the cylinder was (Fusion: a threaded hole gets the thread's minor diameter,
+    a shaft its major diameter): a hole wider than the minor diameter is filled in to it,
+    a shaft narrower than the major diameter is built up to it. The tolerance class sets
+    where the thread lies (thread_tables.class_zone: the profile moved out or in, the shaft
+    turned / the hole bored to the middle of the class's diameters, like Fusion's modeled
+    threads follow the class). A taper thread (NPT) starts at the end the thread starts
+    from (`from_end`: the face's far end) and follows its cone of 1 in 16. `grooves` off:
+    only the cylinder brought to the thread's diameter (`cut` is then None when nothing is
+    turned or bored): the part under the thread (blank())."""
     import Part
 
     if z1 - z0 <= TOL:
         raise ThreadError("The thread length must be more than 0.")
     pitch = designation.pitch
     internal = cylinder.internal
-    zone = tables.class_zone(designation, thread_class, internal)
-    major, limit = core.class_radii(designation.diameter, internal, zone)
-    corners = core.groove(major, pitch, internal)
-    # Start one pitch early and end one late: inside [z0, z1] every turn is complete.
-    start = z0 - pitch
-    height = (z1 - z0) + 2.0 * pitch
-    helix = Part.makeLongHelix(pitch, height, major, 0.0, bool(left_hand))
-    profile = Part.makePolygon([App.Vector(r, 0, z) for r, z in corners + [corners[0]]])
-    sweep = _sweep(Part.Wire(helix), profile)
-    if sweep.isNull() or not sweep.Solids:
-        raise ThreadError("This thread could not be built. Try another size or untick Modeled.")
-    sweep.translate(App.Vector(0, 0, start))
-    h = core.fundamental_height(pitch)
-    reach = major + h + cylinder.radius + 1.0
-    bound = Part.makeCylinder(reach, z1 - z0, App.Vector(0, 0, z0))
-    tool = sweep.common(bound)
-    extra = None
+    form = designation.form
+    taper = math.radians(designation.taper)
+    length = z1 - z0
+    # Built in a frame of its own: z = 0 at the thread's small end, running up to its large
+    # end at z = length (a parallel thread: its start). `grow`: radius gained per length.
+    upward = True  # the build frame's z runs along the cylinder's own z
+    z_small = z0
+    if taper:
+        grow = math.tan(taper)
+        major, minor = _taper_start(designation, internal)
+        if internal:  # the start (the opening) is its large end
+            major, minor = major - grow * length, minor - grow * length
+            if minor <= TOL:
+                raise ThreadError("This taper thread is too long for its size. Make it shorter.")
+        limit = minor if internal else major
+        # the thread runs from z0 up, or from z1 down (`from_end`); a hole's small end is
+        # where the thread ends, a pipe's where it starts
+        small_at_start = not internal
+        upward = small_at_start != bool(from_end)
+        z_small = z0 if upward else z1
+    else:
+        zone = tables.class_zone(designation, thread_class, internal)
+        major, limit = core.class_radii(designation.diameter, internal, zone)
+        grow = 0.0
+    end_limit = limit + grow * length
+    tool = None
+    if grooves:
+        corners = core.groove(major, pitch, internal, form)
+        # Start one pitch early and end one late, so inside the span every turn is complete.
+        height = length + 2.0 * pitch
+        start_major = major - grow * pitch
+        try:
+            helix = Part.makeLongHelix(
+                pitch, height, start_major, designation.taper, bool(left_hand)
+            )
+        except Exception as exc:
+            raise ThreadError("This thread could not be built (%s). Try another size." % exc)
+        shift = start_major - major  # the profile sits on the helix's start
+        profile = Part.makePolygon([App.Vector(r + shift, 0, z) for r, z in corners + [corners[0]]])
+        sweep = _sweep(Part.Wire(helix), profile)
+        if sweep.isNull() or not sweep.Solids:
+            raise ThreadError("This thread could not be built. Try another size or untick Modeled.")
+        sweep.translate(App.Vector(0, 0, -pitch))
+        h = core.fundamental_height(pitch)
+        reach = major + grow * length + h + cylinder.radius + 1.0
+        tool = sweep.common(Part.makeCylinder(reach, length))
+
+    def also(more):
+        return more if tool is None else tool.fuse(more)
+
+    add = None
+    # A cylinder within SIZE_TOL of the thread's size is at that size already (a layer that
+    # thin is not a solid the kernel can add or remove). A taper thread never adds material:
+    # where its cone leaves the pipe or the hole the thread runs out, as a cut one does.
     if internal:
-        if cylinder.radius < limit - TOL:  # bore the hole up to the minor diameter
-            extra = Part.makeCylinder(limit, z1 - z0, App.Vector(0, 0, z0))
-    elif cylinder.radius > limit + TOL:  # turn the shaft down to the major diameter
-        outer = Part.makeCylinder(cylinder.radius + 1.0, z1 - z0, App.Vector(0, 0, z0))
-        inner = Part.makeCylinder(limit, z1 - z0, App.Vector(0, 0, z0))
-        extra = outer.cut(inner)
-    if extra is not None:
-        tool = tool.fuse(extra)
-    tool.Placement = _frame(cylinder).multiply(tool.Placement)
-    return tool
+        if cylinder.radius < max(limit, end_limit) - SIZE_TOL:  # bore the hole up to the minor
+            tool = also(_round(limit, end_limit, 0.0, length))
+        if not taper and cylinder.radius > limit + SIZE_TOL:  # fill it in down to the minor
+            add = Part.makeCylinder(cylinder.radius, length).cut(
+                _round(limit, end_limit, 0.0, length)
+            )
+    else:
+        if cylinder.radius > min(limit, end_limit) + SIZE_TOL:  # turn the shaft to the major
+            outer = Part.makeCylinder(max(cylinder.radius, limit, end_limit) + 1.0, length)
+            tool = also(outer.cut(_round(limit, end_limit, 0.0, length)))
+        if not taper and cylinder.radius < limit - SIZE_TOL:  # build it up to the major
+            add = _round(limit, end_limit, 0.0, length).cut(
+                Part.makeCylinder(cylinder.radius, length)
+            )
+    if add is not None and (add.isNull() or not add.Solids or add.Volume < 1e-9):
+        add = None
+    # into place: the small end at z_small of the cylinder's frame, running up or down (a
+    # half turn about an axis across the thread keeps its hand)
+    if upward:
+        local = App.Placement(App.Vector(0, 0, z_small), App.Rotation())
+    else:
+        local = App.Placement(App.Vector(0, 0, z_small), App.Rotation(App.Vector(1, 0, 0), 180.0))
+    place = _frame(cylinder).multiply(local)
+    if tool is not None:
+        tool.Placement = place.multiply(tool.Placement)
+    if add is not None:
+        add.Placement = place.multiply(add.Placement)
+    return add, tool
+
+
+def cutter(cylinder, designation, z0, z1, left_hand=False, thread_class="", from_end=False):
+    """The solid a modeled thread removes from the part (shape coordinates): parts()[1]."""
+    return parts(cylinder, designation, z0, z1, left_hand, thread_class, from_end)[1]
 
 
 def build(
-    base_shape, cylinders, designation, z_spans, left_hand=False, refine=True, thread_class=""
+    base_shape,
+    cylinders,
+    designation,
+    z_spans,
+    left_hand=False,
+    refine=True,
+    thread_class="",
+    from_end=False,
+    grooves=True,
 ):
     """base_shape with modeled threads cut (one cylinder and span per face); `thread_class`
     is the class asked for (the right one for a hole or a shaft is used, see
-    thread_class())."""
-    tools = []
+    thread_class()). `grooves` off: the cylinders at the thread's diameter only."""
+    adds, tools = [], []
     for c, (z0, z1) in zip(cylinders, z_spans):
         wanted = thread_class_for(designation.standard, thread_class, c.internal)
-        tools.append(cutter(c, designation, z0, z1, left_hand, wanted))
+        add, tool = parts(c, designation, z0, z1, left_hand, wanted, from_end, grooves)
+        if add is not None:
+            adds.append(add)
+        if tool is not None:
+            tools.append(tool)
     result = base_shape
+    for add in adds:
+        result = result.fuse(add)
     for tool in tools:
         result = result.cut(tool)
     if refine:
@@ -337,28 +462,45 @@ class ThreadFeature:
         if base is None or base.Shape.isNull() or not base.Shape.Solids:
             raise ThreadError("A thread needs a solid before it in the timeline.")
         link = obj.Faces
-        if not link or not link[1]:
-            raise ThreadError("Pick a cylindrical face to thread.")
-        source, names = link[0], list(link[1])
-        shape = source.Shape
         before = computed(obj).get("threads", [])
+        # The faces are faces of the step right before the thread. The link can point
+        # elsewhere, or nowhere: the step it was picked on was deleted (FreeCAD empties the
+        # link: the book's chamfer deleted under its thread) or the thread was moved in the
+        # timeline. The same cylinders are then found again on the step before it.
+        source = link[0] if link else None
+        names = list(link[1]) if link and link[1] else []
+        moved = source is not base
+        if not names and not before:
+            raise ThreadError("Pick a cylindrical face to thread.")
+        shape = base.Shape
         cylinders, found_names = [], []
-        for i, name in enumerate(names):
-            try:
-                cylinders.append(cylinder_of(shape, name))
-                found_names.append(name)
-            except ThreadError:
-                # An earlier step changed the part and FreeCAD lost the face's name: find
-                # the same cylinder again by where it is (Fusion keeps the thread on it).
-                found = refind(shape, before[i] if i < len(before) else None)
-                if found is None:
-                    raise
-                cylinders.append(found[0])
-                found_names.append(found[1])
-        if found_names != names:
+        for i in range(max(len(names), len(before)) if moved else len(names)):
+            name = names[i] if i < len(names) else None
+            record = before[i] if i < len(before) else None
+            found = None
+            if moved and record is not None:
+                found = refind(shape, record)  # by where it is: the name is another step's
+            if found is None and name is not None and not (moved and record is not None):
+                try:
+                    found = (cylinder_of(shape, name), name)
+                except ThreadError:
+                    # An earlier step changed the part and FreeCAD lost the face's name:
+                    # find the same cylinder again by where it is (Fusion keeps the thread
+                    # on it).
+                    found = refind(shape, record)
+            if found is None:
+                raise ThreadError(
+                    "The face of this thread is gone (an earlier step changed the part). "
+                    "Edit the thread and pick the face again."
+                )
+            cylinders.append(found[0])
+            found_names.append(found[1])
+        if not cylinders:
+            raise ThreadError("Pick a cylindrical face to thread.")
+        if moved or found_names != names:
             # Point the link at the face found, so FreeCAD stops reporting the lost name on
             # every recompute (changes made inside execute() are not a new change).
-            obj.Faces = (source, found_names)
+            obj.Faces = (base, found_names)
         options = read(obj)
         designation = resolve(options, cylinders[0])
         spans = [
@@ -389,6 +531,10 @@ class ThreadFeature:
                     "z0": z0,
                     "z1": z1,
                     "internal": c.internal,
+                    # the whole face (the thread is found again by it when it is not full
+                    # length: the face may be longer than the thread)
+                    "f0": c.z0,
+                    "f1": c.z1,
                 }
             )
         record = {
@@ -407,6 +553,7 @@ class ThreadFeature:
                 obj.LeftHanded,
                 refine=obj.Refine,
                 thread_class=obj.ThreadClass,
+                from_end=obj.FromEnd,
             )
         else:
             obj.Shape = base.Shape.copy()
@@ -426,6 +573,57 @@ class ThreadFeature:
 
 def is_thread(obj):
     return getattr(obj, "Fission180Type", "") == KIND
+
+
+def blank(obj, base_shape=None):
+    """The part under a modeled Thread step: its base (or `base_shape`, the same part) with
+    the threaded cylinders at the thread's diameter, but without the grooves. A fillet or
+    chamfer after the thread is built on it and the grooves are cut again
+    (fillet_robust.py): the kernel cannot blend an edge the grooves cut through."""
+    shape = base_shape if base_shape is not None else obj.BaseFeature.Shape
+    record = computed(obj)
+    designation = tables.find(obj.Standard or "iso", record.get("designation", ""))
+    if designation is None or not record.get("threads"):
+        raise ThreadError("This thread has not been computed yet.")
+    cylinders, spans = [], []
+    for one in record["threads"]:
+        found = refind(shape, one)
+        if found is None:
+            raise ThreadError("The face of this thread is gone.")
+        cylinders.append(found[0])
+        spans.append((one["z0"], one["z1"]))
+    return build(
+        shape,
+        cylinders,
+        designation,
+        spans,
+        obj.LeftHanded,
+        refine=True,
+        thread_class=obj.ThreadClass,
+        from_end=obj.FromEnd,
+        grooves=False,
+    )
+
+
+def slack(obj):
+    """How far (mm) a modeled Thread step moved the surface of its cylinders (a shaft turned
+    to the thread's major diameter, a hole brought to its minor diameter): an edge of the
+    part before the thread is found again on the threaded part within this distance."""
+    record = computed(obj)
+    designation = tables.find(obj.Standard or "iso", record.get("designation", ""))
+    if designation is None:
+        return 0.0
+    most = 0.0
+    for one in record.get("threads", []):
+        internal = bool(one.get("internal"))
+        if designation.taper:
+            most = max(most, 2.0 * designation.pitch)
+            continue
+        wanted = thread_class_for(designation.standard, obj.ThreadClass, internal)
+        zone = tables.class_zone(designation, wanted, internal)
+        _major, limit = core.class_radii(designation.diameter, internal, zone)
+        most = max(most, abs(float(one["radius"]) - limit))
+    return most
 
 
 def computed(obj):

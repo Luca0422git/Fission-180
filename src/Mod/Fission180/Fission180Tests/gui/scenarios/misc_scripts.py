@@ -124,9 +124,11 @@ def p1_list():
     h.check("P1 the Scripts and Add-Ins window", d is not None, h.popups())
     if d is None:
         return
-    h.check("P1 the scripts listed", names() == ["AddBox", "Broken"], names())
+    # "SpurGear" comes with Fission 180 (it opens the Gear tool: wave 7, the book's Gear
+    # Train starts Fusion's sample of that name from this window); then the user's own
+    h.check("P1 the scripts listed", names() == ["SpurGear", "AddBox", "Broken"], names())
     kinds = [d.list.topLevelItem(r).text(1) for r in range(d.list.topLevelItemCount())]
-    h.check("P1 as scripts", kinds == ["Script", "Script"], kinds)
+    h.check("P1 as scripts", kinds == ["Script", "Script", "Script"], kinds)
     h.check("P1 the folders are shown", s["scripts"] in d.where.text(), d.where.text())
     h.shot("1-list")
 
@@ -320,7 +322,7 @@ def p7_filter():
     QtTest.QTest.keyClick(d.filter, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
     QtTest.QTest.keyClick(d.filter, QtCore.Qt.Key_Delete)
     m.process()
-    h.check("P7 all again", names() == ["AddBox", "Broken", "Greeter"], names())
+    h.check("P7 all again", names() == ["SpurGear", "AddBox", "Broken", "Greeter"], names())
 
 
 # -- P8 ----------------------------------------------------------------------------------------

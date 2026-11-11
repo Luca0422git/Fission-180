@@ -1835,23 +1835,12 @@ def evaluate(doc, text, unit=None):
     when it is no value."""
     from . import parameters, parameters_core
 
-    text = (text or "").strip().lstrip("=").strip()
-    expr = parameters_core.to_freecad(text, parameters.user_names(doc))
-    host = parameters.container(doc)
-    if host is None:
-        if not doc.Objects:
-            raise ExtrudeError("%s is not a value." % text)
-        host = doc.Objects[0]
+    # (wave 7, params: one reader for every value box. A number without a unit is in the
+    # design's units also inside a formula, as in Fusion: parameters.read)
     try:
-        value = host.evalExpression(expr)
-    except Exception as exc:
-        raise ExtrudeError("'%s' is not a value here: %s" % (text, exc))
-    if unit is not None:
-        check_kind(value, unit, text)
-    try:
-        return float(getattr(value, "Value", value))
-    except Exception:
-        raise ExtrudeError("'%s' is not a number." % text)
+        return parameters.read(doc, text, unit).value
+    except parameters_core.ParameterError as exc:
+        raise ExtrudeError(str(exc))
 
 
 def hide_sketches(profiles):

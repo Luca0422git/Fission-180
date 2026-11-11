@@ -57,8 +57,36 @@ def _manufacture_browser(doc=None):
         return None
 
 
+# The ANIMATION workspace's rows (animation_browser.py, wave 7 animation): their kinds start
+# with "sim_anim_", so they take the SIMULATION hooks below, which hand them to
+# animation_browser (like MANUFACTURE's).
+SIM_RENAMABLE += ("sim_anim_storyboard", "sim_anim_document")
+
+
+def _animation_browser(doc=None):
+    """animation_browser while the design is in the ANIMATION workspace, else None."""
+    try:
+        from . import animation_ui
+
+        if not animation_ui.in_workspace(doc):
+            return None
+        from . import animation_browser
+
+        return animation_browser
+    except Exception as exc:
+        warn("animation browser: %s" % exc)
+        return None
+
+
 def _simulation_tree(doc):
     """The study tree while the design is in the SIMULATION workspace, else None."""
+    anim = _animation_browser(doc)  # ANIMATION workspace: storyboards and components
+    if anim is not None:
+        try:
+            return anim.tree(doc)
+        except Exception as exc:
+            warn("animation browser: %s" % exc)
+            return None
     cam = _manufacture_browser(doc)  # MANUFACTURE workspace: its setups tree (wave 7 cam)
     if cam is not None:
         try:
@@ -85,6 +113,7 @@ def _simulation_call(name, *args):
         from . import simulation_browser
 
         simulation_browser = _manufacture_browser() or simulation_browser  # (wave 7 cam)
+        simulation_browser = _animation_browser() or simulation_browser  # (wave 7 animation)
 
         return getattr(simulation_browser, name)(*args)
     except Exception as exc:
@@ -340,6 +369,7 @@ def _objects(doc):
                     else None
                 ),
                 "role": getattr(obj, "Role", None),
+                "helper": getattr(obj, "Fission180Role", ""),  # made for a step (a Hole's sketch)
                 "fission180_type": getattr(obj, "Fission180Type", ""),
                 # The component the row is in (None: the root); a component's own row
                 # carries its parent component, like any other member.
@@ -1704,6 +1734,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             node = core.find(self._tree, key) if self._tree is not None else None
             if node is None or node["visible"] is None:
                 return
+            if str(node["kind"]).startswith("sim_anim_"):  # ANIMATION workspace: Show/Hide
+                _simulation_call("toggle_eye", self, node)
+                return
             rows = self._eye_targets(node)
             if len(rows) > 1:
                 self._set_visible_rows(rows, not node["visible"])
@@ -2183,6 +2216,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Edit Joint Limits": lambda: _joint_action("edit_joint_limits", obj),
             "Drive Joints": lambda: _joint_action("drive", obj),
             "Animate Joint": lambda: _joint_action("animate", obj),
+            "Animate Joint Relationships": lambda: _joint_action("animate_relationships", obj),
             "Suppress": lambda: self._toggle_suppress(obj),
             "Open Drawing": lambda: _open_drawing(obj),
             "Copy": lambda: _clipboard_action("copy", node, obj, selected_nodes, self),
@@ -2644,12 +2678,12 @@ class UnitsPanel:
 
 
 def set_units(doc, schema, as_default=False):
-    """Units of a design (FreeCAD keeps them per document since 1.0)."""
-    names = doc.getEnumerationsOfProperty("UnitSystem")
-    doc.UnitSystem = names[schema]
-    App.Units.setSchema(schema)
-    if as_default:
-        App.ParamGet("User parameter:BaseApp/Preferences/Units").SetInt("UserSchema", schema)
+    """Units of a design (FreeCAD keeps them per document since 1.0). design_units holds the
+    design to them from here on (FreeCAD's window code carried other documents' units over:
+    bug 2 of the book parity report)."""
+    from . import design_units
+
+    design_units.set_units(doc, schema, as_default)
     try:
         Gui.updateGui()
     except Exception:
@@ -2740,7 +2774,9 @@ class _OverlayGuard(QtCore.QObject):
     def eventFilter(self, obj, event):
         try:
             if event.type() == QtCore.QEvent.ParentChange and _state.get("dock") is obj:
-                QtCore.QTimer.singleShot(0, lambda: _state.get("dock") is obj and _out_of_overlay(obj))
+                QtCore.QTimer.singleShot(
+                    0, lambda: _state.get("dock") is obj and _out_of_overlay(obj)
+                )
         except Exception:
             pass
         return False
@@ -2774,7 +2810,9 @@ def _give_back_overlays():
     kept = _state.pop("overlays", None) or {}
     for area, names in kept.items():
         try:
-            App.ParamGet(OVERLAY_PARAMS + area).SetString("Widgets", "".join(n + "," for n in names))
+            App.ParamGet(OVERLAY_PARAMS + area).SetString(
+                "Widgets", "".join(n + "," for n in names)
+            )
         except Exception as exc:
             warn("browser: overlay %s: %s" % (area, exc))
 

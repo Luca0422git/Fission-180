@@ -316,9 +316,71 @@ class GearPanel(PlacedPanel):
         self.options["thickness"] = value
         self.set_field(self.thickness, value)
 
+    # -- values that do not make a gear -----------------------------------------------------------
+    def _apply_once(self):
+        """The Operation picked stays picked while the values do not make a gear. (The
+        shared code shows the operation of the last gear that worked instead: New Component
+        picked while the root fillet did not fit went back to New Body without a word, and
+        the gear was then made as a body. Book parity report, Gear Train.)"""
+        wanted = self.options.get("operation")
+        super()._apply_once()
+        if self.error and wanted and self.options.get("operation") != wanted:
+            self.options["operation"] = wanted
+            self._quiet = True
+            try:
+                set_combo(self.operation, wanted)
+            finally:
+                self._quiet = False
+
+    def accept(self):
+        """OK with values that do not make a gear is refused, and says so next to the
+        pointer too: the gear still shown is the last one that worked (with the values
+        of the gear made before, when nothing else worked yet), which looked like OK had
+        made a copy of the previous gear (book parity report, bug 19)."""
+        done = super().accept()
+        try:
+            reason = self.error or self.formula_error
+            if not done and reason and self.target is not None:
+                from . import commands
+
+                commands.tell(
+                    "Gear not made: %s (the gear shown is the last one that worked)" % reason
+                )
+        except Exception as exc:
+            warn("Gear OK: %s" % exc)
+        return done
+
     # -- OK ---------------------------------------------------------------------------------------
     def _finishing(self, feature):
         GearPanel.remembered = {k: self.options[k] for k in REMEMBERED if k in self.options}
+        self._name_component(feature)
+
+    def _name_component(self, feature):
+        """A gear made as a New Component: the component is named like Fusion's SpurGear
+        sample names its component, "Spur Gear (20 teeth)" (a name the user gave stays)."""
+        try:
+            import re
+
+            from . import components
+
+            if self.options.get("operation") != "new_component":
+                return
+            body = gear.primitives.owner_body(feature)
+            part = components.container_of(body) if body is not None else None
+            if part is None or len(components_bodies(part)) != 1:
+                return
+            label = part.Label or ""
+            if re.match(r"^Component\d*$", label) or gear_core.is_component_name(label):
+                wanted = gear_core.component_name(self.options)
+                if label != wanted:
+                    part.Label = wanted
+        except Exception as exc:
+            warn("could not name the gear's component: %s" % exc)
+
+
+def components_bodies(part):
+    """The bodies directly in a component (a gear's own component holds only the gear)."""
+    return [o for o in part.Group if o.TypeId == "PartDesign::Body"]
 
 
 def edit(feature):

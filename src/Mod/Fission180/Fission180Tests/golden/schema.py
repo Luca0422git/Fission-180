@@ -1830,3 +1830,4 @@ STEP_KEYS["sketch_offset_expect"] = (
     {"curves", "side", "block", "edit", "comment"},
 )
 from . import manufacture_schema  # noqa: E402,F401  (MANUFACTURE steps; it wraps validate)
+from . import animation_schema  # noqa: E402,F401  (ANIMATION steps; it wraps validate)

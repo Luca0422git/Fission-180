@@ -85,7 +85,7 @@ WORKSPACES [in=workspace]
   Design
   Generative Design [out=generative design is out of scope]
   Render [out=rendering is out of scope]
-  Animation [out=animation is out of scope]
+  Animation
   Simulation
   Manufacture
   Drawing
@@ -777,7 +777,7 @@ TIMELINE
     Delete
     Find in Browser
     Find in Window
-    Group Features
+    Create Group
   Group [in=timeline:group]
     Expand Group
     Suppress Features?
@@ -905,3 +905,22 @@ MANUFACTURE MILLING [in=tab:cam_milling]
     Setup Sheet
   MANAGE
     Tool Library
+
+# ANIMATION workspace (wave 7, builder animation; docs/fission180/parity/animation.md). SELECT
+# is as in DESIGN (listed once, under SOLID).
+ANIMATION [in=tab:anim_animation]
+  STORYBOARD
+    New Storyboard
+  TRANSFORM
+    Transform Components
+    Restore Home
+    Auto Explode: One Level
+    Auto Explode: All Levels
+    Manual Explode
+    Show/Hide
+  ANNOTATION
+    Create Callout
+  VIEW
+    View
+  PUBLISH
+    Publish Video

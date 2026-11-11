@@ -60,5 +60,5 @@ Done: AI: Components from bodies. Its id is 'Component' (shown as 'Block'). Bodi
 ## See also
 
 - Recipe: [a pair of meshing spur gears](fission180://docs/recipes/gear-pair.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `comp_move_captured_roll`, `comp_move_rotate_pivot`, `comp_paste_instance_follows`, `comp_paste_new_independent`, `comp_pattern_circular_6`, `comp_pattern_rect_extent`, `export_report_design`, `pattern_bodies_in_moved_component`
+- Golden models built with its steps (read one with docs_read golden/<id>): `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `comp_move_captured_roll`, `comp_move_rotate_pivot`, `comp_paste_instance_follows`, `comp_paste_new_independent`, `comp_pattern_circular_6`, `comp_pattern_rect_extent`, `export_report_design`, `pattern_bodies_in_moved_component`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

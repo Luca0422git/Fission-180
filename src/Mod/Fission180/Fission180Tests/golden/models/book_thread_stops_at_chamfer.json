@@ -1,0 +1,71 @@
+{
+  "id": "book_thread_stops_at_chamfer",
+  "title": "Geocache screw: chamfer 3, then a modeled M33x3.5 thread (it stops at the chamfer)",
+  "tags": [
+    "thread",
+    "chamfer",
+    "book"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            0,
+            16.5
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 40
+    },
+    {
+      "op": "blend_chamfer",
+      "id": "c1",
+      "distance": 3,
+      "edges": {
+        "on_faces": {
+          "type": "plane",
+          "normal": [
+            0,
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 16.5,
+        "count": 1
+      },
+      "modeled": true
+    }
+  ],
+  "expect": {
+    "volume": 29567.909329097598,
+    "solids": 1,
+    "bbox": [
+      -16.5,
+      -16.5,
+      0,
+      16.5,
+      16.5,
+      40
+    ],
+    "rel_tol": 2e-05,
+    "source": "analytic",
+    "note": "V = pi 16.5^2 40 - the bevel's ring pi 3 (16.5^2 - (16.5^2 + 16.5 13.5 + 13.5^2) / 3) - the M33x3.5 6g thread over the 37 mm the cylinder keeps: thread_core.class_removed_volume(M33x3.5, 6g, external, 16.5, 37). rel_tol 2e-5: the swept grooves"
+  }
+}

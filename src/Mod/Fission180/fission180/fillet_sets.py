@@ -128,6 +128,28 @@ def renamed(shape, scratch_tag, tag):
 
 
 def kernel(kind, shape, items, tag=None):
+    """`shape` blended along each (edge index, size 1, size 2) of `items`: in one OpenCASCADE
+    run (kernel_once), and when that fails by another route that gives the same solid
+    (fillet_robust.retry: through a modeled thread, on the refined part, group by group).
+    Raises KernelError (fillet_robust.Refused, which names the edges in the way when they
+    were found)."""
+    from . import fillet_robust
+
+    fillet_robust.reset()
+    try:
+        return kernel_once(kind, shape, items, tag)
+    except KernelError as exc:
+        if not items:
+            raise
+        try:
+            return fillet_robust.retry(kind, shape, items, tag, kernel_once, exc)
+        except fillet_robust.Refused as refused:
+            error = KernelError(str(refused))
+            error.way = fillet_robust.in_the_way(shape, refused.blockers, len(items), kind)
+            raise error
+
+
+def kernel_once(kind, shape, items, tag=None):
     """`shape` blended along each (edge index, size 1, size 2) of `items` in one OpenCASCADE
     run. Fillet: radius 1 at the edge's first vertex, radius 2 at its last (a straight law in
     between, smoothed through every edge). Chamfer: distance 1 on the edge's first face,
@@ -877,8 +899,9 @@ def _with_rows(build, shape, spec, groups):
         alone = [g if j == i else [] for j, g in enumerate(groups)]
         try:
             build(shape, spec, alone)
-        except KernelError:
-            text = _too_big(spec, i)
+        except KernelError as exc:
+            # (the edges in the way, when building group by group found them)
+            text = _too_big(spec, i) + getattr(exc, "way", "")
             raise core.SetError(text if len(filled) == 1 else "Set %d: %s" % (i + 1, text))
         except (core.SetError, blend.BlendError) as exc:
             raise core.SetError("Set %d: %s" % (i + 1, exc))
@@ -1093,7 +1116,10 @@ class FilletSetsFeature:
             )
         features = [f for f in (obj.RuleFeatures or []) if f is not None]
         features2 = [f for f in (obj.RuleFeatures2 or []) if f is not None]
-        result = compute(base.Shape, spec, refs, refs2, features, features2)
+        from . import fillet_robust
+
+        with fillet_robust.source(base):
+            result = compute(base.Shape, spec, refs, refs2, features, features2)
         if obj.Refine:
             try:
                 refined = result.removeSplitter()
@@ -1207,6 +1233,54 @@ def replace(old, build):
     old.Document.removeObject(old.Name)
     body.Tip = new if (was_tip or tip is None) else tip
     return new, expressions
+
+
+def rescue(feature):
+    """A FreeCAD Fillet / Chamfer that fails where Fission 180's own step builds the same
+    blend by another route than the kernel's one run (after a modeled thread, on a part
+    with split faces: fillet_robust): replaced by that step, in the same place of the
+    timeline and under the same label. Returns the new step, or None when the plain step
+    is fine, or nothing builds it."""
+    from . import fillet_robust
+
+    kind = blend.kind_of(feature)
+    if kind is None:
+        return None
+    base = getattr(feature, "BaseFeature", None)
+    link = feature.Base
+    if base is None or not link or link[0] is not base or not link[1]:
+        return None
+    refs = [(s or "").split(".")[-1] for s in link[1]]
+    if any(r.startswith("?") or not r for r in refs):
+        return None
+    options = blend.read(feature)
+    info = blend.ShapeInfo(base.Shape)
+    with fillet_robust.source(base):
+        try:
+            blend.check_build(kind, info, refs, options)
+        except blend.BlendError:
+            return None
+        if not fillet_robust.used():
+            return None
+    spec = core.default_spec(kind)
+    row = spec["sets"][0]
+    row.update({k: v for k, v in options.items() if k in row})
+    row["count"] = len(refs)
+    label = feature.Label
+    custom = True
+    try:
+        from . import timeline_core
+
+        custom = not timeline_core.is_default_label(label, feature.Name)
+    except Exception:
+        pass
+    new, _expressions = replace(feature, lambda body: make(body, base, spec, refs))
+    if custom:  # a name the user gave stays; "Chamfer 1" is numbered again by its kind
+        try:
+            new.Label = label
+        except Exception:
+            pass
+    return new
 
 
 # -- Press Pull on a face of the step -----------------------------------------------------------

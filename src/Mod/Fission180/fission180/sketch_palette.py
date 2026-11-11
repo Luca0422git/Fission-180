@@ -99,7 +99,26 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         self.construction.setCheckable(True)
         self.construction.setChecked(sketch_mode.construction_mode())
         self.construction.clicked.connect(self._construction_clicked)
-        form.addRow("Linetype", self.construction)
+        # Fusion's third line type (sketch_centerline.py): the selected lines, or the
+        # lines drawn from now on
+        self.centerline = self._tool_button(
+            "dw_centerline",
+            "Centerline: turn the selected lines into centerlines (dashed), or (nothing "
+            "selected) draw new lines as centerlines. A dimension to a centerline is a "
+            "diameter; Revolve takes a sketch's one centerline as its axis.",
+        )
+        self.centerline.setObjectName("Fission180PaletteCenterline")
+        self.centerline.setCheckable(True)
+        self.centerline.setChecked(sketch_mode.centerline_mode())
+        self.centerline.clicked.connect(self._centerline_clicked)
+        linetype = QtWidgets.QWidget()
+        row = QtWidgets.QHBoxLayout(linetype)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(4)
+        row.addWidget(self.construction)
+        row.addWidget(self.centerline)
+        row.addStretch(1)
+        form.addRow("Linetype", linetype)
         self._mode = self.construction.isChecked()
         self._mode_timer = QtCore.QTimer(self)
         self._mode_timer.setInterval(300)
@@ -188,6 +207,11 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         self.construction.setChecked(self._mode)
         self._later("Sketcher_ToggleConstruction")
 
+    def _centerline_clicked(self, *_):
+        # (the button shows the drawing mode; the timer below shows the result)
+        self.centerline.setChecked(sketch_mode.centerline_mode())
+        QtCore.QTimer.singleShot(0, sketch_mode.toggle_centerline)
+
     def _refresh_freedom(self):
         """The "left to define" note, from what the solver last found (no solve)."""
         from . import sketch_explain, sketch_explain_core
@@ -216,6 +240,11 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
             except Exception as exc:
                 self._freedom_off = True  # said once, not every 0.3 s
                 warn("sketch palette: left to define: %s" % exc)
+        try:
+            if self.centerline.isChecked() != sketch_mode.centerline_mode():
+                self.centerline.setChecked(sketch_mode.centerline_mode())
+        except Exception as exc:
+            warn("sketch palette: centerline: %s" % exc)
         try:
             mode = sketch_mode.construction_mode()
             if self.construction.isChecked() != mode:

@@ -132,7 +132,20 @@ class Geometry:
         # (geo, curve) for "which curve is under the pointer" (axes -1, -2 first)
         self.hits = [(-1, curves[0]), (-2, curves[1])]
         items = [("point", -1, (0.0, 0.0))]  # snap point descriptions (sketch_infer_core)
+        from . import sketch_draw_helpers
+
+        # a shape's helper curves that are not drawn (a polygon's corner circle, a fit
+        # point spline's control circles) are nothing to snap to or to pick
+        hidden = set(sketch_draw_helpers.hidden(sketch))
+        try:
+            from . import sketch_helpers
+
+            hidden |= set(sketch_helpers.hidden(sketch))  # (hidden helper lines: pattern ties)
+        except Exception:
+            pass
         for i, geo in enumerate(sketch.Geometry):
+            if i in hidden:
+                continue
             try:
                 construction = bool(sketch.getConstruction(i))
             except Exception:
@@ -423,6 +436,7 @@ class Field:
         self.high = high
         self.value = None  # what the pointer gives now (mm, radians, count, ratio)
         self.typed = None  # the value typed and taken (holds until the shape is made)
+        self.formula = None  # the parameter / formula typed for it (FreeCAD's spelling)
         self.anchor = None  # sketch point the box sits beside
 
     def shown(self):
@@ -450,21 +464,15 @@ class Field:
             if self.kind == COUNT:
                 value = int(round(value))
         else:
-            try:
-                q = App.Units.Quantity(text)
-            except Exception:
-                raise ValueError("Not a value: %s" % text)
-            unit = "deg" if self.kind == ANGLE else "mm"
-            if q.Unit == App.Units.Quantity(1.0).Unit:  # a plain number: the design's units
-                value = q.Value if self.kind == ANGLE else _plain_length(q.Value)
-                q = App.Units.Quantity("%r %s" % (value, unit))
-            if q.Unit != App.Units.Quantity("1 %s" % unit).Unit:
-                raise ValueError(
-                    "Type %s" % ("an angle, e.g. 30" if self.kind == ANGLE else "a length, e.g. 25")
-                )
-            value = q.getValueAs(unit).Value
-            if self.kind == ANGLE:
-                value = math.radians(value)
+            # read the one way every value box reads (parameters.read, wave 7): a plain
+            # number in the design's units, a parameter or a formula (Fusion's way:
+            # "Head_Diam", "Support_Width / 2"; the dimension made from it then follows the
+            # parameter, parameters.bind_typed in Tool.make), `Name = value` makes Name
+            from . import parameters
+
+            got = parameters.read_typed(App.ActiveDocument, text, self.kind)
+            self.formula = None if got.plain else got.freecad
+            value = math.radians(got.value) if self.kind == ANGLE else got.value
         if self.kind == LENGTH and value <= 1e-7:
             raise ValueError("The value must be more than 0.")
         if self.low is not None and value < self.low:
@@ -680,8 +688,11 @@ class Boxes:
             return True
         if key in UP_DOWN:
             return self.typing is not None  # nothing to step through: kept off the view
-        value_char = text and (text.isdigit() or text in ".,-+*/()")
-        unit_char = text and text.isalpha() and self.typing
+        # "=" starts a parameter name or a formula (wave 7: =Head_Diam, =Support_Width / 2;
+        # a letter typed first is still its shortcut: L, C, X...); once something is typed,
+        # letters and _ go into the box (a unit, a name), ";" separates arguments
+        value_char = text and (text.isdigit() or text in ".,-+*/()=")
+        unit_char = text and (text.isalpha() or text in "_;") and self.typing
         if value_char or unit_char or (text == " " and self.typing):
             if self.typing is None:
                 self.typing = ""
@@ -897,6 +908,7 @@ class DrawTool:
         self.acquired = []  # hovered sketch points (guides), newest last
         self._geometry = None
         self._pressed = None
+        self._double = False  # the press being followed was a double-click's second one
         self.press_pos = None  # widget position of the last left press
         self.drag_pixels = 0  # how far the pointer went since the press (pixels)
         self._busy = False
@@ -1152,6 +1164,7 @@ class DrawTool:
             snap = self.snap_for(view, event)
             self.last = snap
             self._pressed = (event.position(), snap)
+            self._double = kind == QtCore.QEvent.MouseButtonDblClick
             self.drag_pixels = 0
             self.pressed(snap, view)
             return True
@@ -1159,14 +1172,52 @@ class DrawTool:
             if event.button() != QtCore.Qt.LeftButton:
                 return False
             pressed, self._pressed = self._pressed, None
+            double, self._double = self._double, False
             if pressed is None:
                 return True
             view = self._view(obj, event)
             snap = self.snap_for(view, event) if view is not None else pressed[1]
             moved = (event.position() - pressed[0]).manhattanLength() if view is not None else 0
+            if double and moved <= 4 and self.chain_double_click():
+                return True
             self.released(pressed[1], snap, moved)
             return True
         return False
+
+    def chain_double_click(self):
+        """A double-click on a curve while the tool's Objects selection is on: Fusion takes
+        the whole chain of curves joined to it, as it does outside a command (parity/
+        selection.md; the book's "double-click a line of the triangle" in Circular
+        Pattern). True when this was one (the release is then no second click).
+
+        For the tools that keep their curves in `objects`, add or drop one with
+        toggle(geo) and note the curve under a press in `_press_hit` (the patterns, Mirror,
+        Move/Copy, Scale). Before, the second click of the double-click was a click like
+        the first: the curve was picked and dropped again."""
+        try:
+            objects = getattr(self, "objects", None)
+            hit = getattr(self, "_press_hit", None)
+            toggle = getattr(self, "toggle", None)
+            if getattr(self, "field", None) != "objects" or not isinstance(objects, list):
+                return False
+            if isinstance(hit, bool) or not isinstance(hit, int) or toggle is None:
+                return False
+            from . import sketch_select, sketch_select_core
+
+            chain = sketch_select_core.chain(sketch_select.curves_of(self.sketch), hit)
+            self._press_hit = None
+            if getattr(self, "_box", None) is not None:
+                self._box = None
+            added = 0
+            for geo in chain:
+                if geo not in self.objects:
+                    toggle(geo)
+                    added += 1
+            log("%s: double-click took a chain of %d curve(s)" % (self.title, len(chain)))
+            return True
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            return False
 
     def pressed(self, snap, view):
         """A left press (the click happens at the release, as in FreeCAD's tools)."""
@@ -1261,6 +1312,7 @@ class DrawTool:
             diag_deg=sketch_infer.setting("DiagonalDegrees"),
             parallel=False,
             grid=sketch_infer._grid_size(self.session),
+            grid_reach=sketch_infer.grid_reach(px),
         )
         enabled = sketch_infer.setting("Enabled")
         on_curve = geo.curve_at(raw, pick)
@@ -1288,8 +1340,10 @@ class DrawTool:
             result = icore.infer(raw, start, acquired, geo.lines, [], [], px, opt, (), anchors)
             if result is not None:
                 return Snap(result.point, raw, result=result)
-        grid = opt.grid
-        return Snap((icore.grid_snap(raw[0], grid), icore.grid_snap(raw[1], grid)), raw)
+        grid, reach = opt.grid, opt.grid_reach
+        return Snap(
+            (icore.grid_snap(raw[0], grid, reach), icore.grid_snap(raw[1], grid, reach)), raw
+        )
 
     def snap_point(self, raw, px):
         """The end, middle, centre, quadrant or crossing (sketch or projected curves) the
@@ -1348,10 +1402,10 @@ class DrawTool:
         mods = event.modifiers() & ~(QtCore.Qt.KeypadModifier | QtCore.Qt.ShiftModifier)
         if mods != QtCore.Qt.NoModifier or not text:
             return False
-        if text.isdigit() or text in ".,-+*/()":
+        if text.isdigit() or text in ".,-+*/()=":
             return bool(self.boxes.fields)
-        if text.isalpha() and self.boxes.typing:
-            return True  # a unit after a typed value ("12 mm")
+        if (text.isalpha() or text in "_; ") and self.boxes.typing:
+            return True  # a unit after a typed value ("12 mm"), a name after "="
         return self.wants_letter(text)
 
     def wants_letter(self, text):
@@ -1396,6 +1450,13 @@ class DrawTool:
             first = len(sketch.Constraints)
             ours = self.build(construction) or []
             kept = self._add_checked(ours)
+            try:  # a parameter or formula typed in a value box drives its dimension
+                from . import parameters
+
+                if parameters.bind_typed(sketch, first, self.boxes.fields):
+                    sketch.recompute()
+            except Exception as exc:
+                warn("%s: the typed formula was not kept: %s" % (self.title, exc))
             sketch.solve()
         except Exception as exc:
             doc.abortTransaction()
@@ -1477,7 +1538,7 @@ class DrawTool:
                     out.append(Sketcher.Constraint("Vertical", line))
                 elif result.kind == icore.PERPENDICULAR and result.other is not None:
                     out.append(Sketcher.Constraint("Perpendicular", line, result.other))
-                elif result.kind == icore.DIAGONAL:
+                elif result.kind == icore.DIAGONAL and sketch_infer.setting("DiagonalConstraint"):
                     try:
                         geo = self.sketch.Geometry[line]
                         out.append(sketch_infer.diagonal_constraint(geo, line))
