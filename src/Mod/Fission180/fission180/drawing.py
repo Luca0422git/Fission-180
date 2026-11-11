@@ -700,28 +700,48 @@ def tangent_of(view):
 
 
 def model_extent(sources, axes):
-    """(width, height, depth) of the sources seen along a view's axes (mm at 1:1)."""
-    lo = [float("inf")] * 3
-    hi = [-float("inf")] * 3
-    for src in sources:
-        try:
-            shape = src.Shape
-            for vertex in shape.Vertexes:
-                p = vertex.Point
-                for i, axis in enumerate(axes):
-                    d = p.x * axis[0] + p.y * axis[1] + p.z * axis[2]
-                    lo[i] = min(lo[i], d)
-                    hi[i] = max(hi[i], d)
-        except Exception:
-            continue
-    if lo[0] == float("inf"):
-        return 10.0, 10.0, 10.0
-    return tuple(max(1e-3, hi[i] - lo[i]) for i in range(3))
+    """(width, height, depth) of the sources seen along a view's axes (mm at 1:1): the box
+    of the parts where they stand in the design, turned into the view.
+
+    (It measured the corner points of each body where the body sits inside its component:
+    a disc, which has two corner points on its seam, counted as a line, and a component
+    that was moved counted where it was made. The automatic scale came out too big and the
+    automatic views lay on one another: book parity report, chapter 10.)"""
+    try:
+        import Part
+
+        from . import bodies
+
+        shapes = []
+        for src in sources:
+            if not alive(src):
+                continue
+            try:
+                shape = bodies.global_shape(src)
+            except Exception:
+                shape = src.Shape.copy()
+            if not shape.isNull():
+                shapes.append(shape)
+        if shapes:
+            x, y, d = axes
+            matrix = App.Matrix(
+                x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, d[0], d[1], d[2], 0, 0, 0, 0, 1
+            )
+            box = Part.makeCompound(shapes).transformed(matrix, True).optimalBoundingBox(False)
+            return (
+                max(1e-3, box.XLength),
+                max(1e-3, box.YLength),
+                max(1e-3, box.ZLength),
+            )
+    except Exception as exc:
+        log("model extent: %s" % exc)
+    return 10.0, 10.0, 10.0
 
 
 def automatic_scale(page, sources, orientation="Front"):
-    """Fusion's Automatic scale: the largest standard scale at which the base view and a
-    projected view beside and above it fit the sheet."""
+    """The scale a new base view starts at: the largest standard scale at which the view
+    and a projected view beside and above it fit the sheet. (The Automatic views take
+    automatic_plan's scale: with the isometric view counted in.)"""
     direction, xdir = orientation_axes(orientation)
     axes = core.view_axes(direction, xdir)
     width, height, depth = model_extent(sources, axes)
@@ -730,6 +750,31 @@ def automatic_scale(page, sources, orientation="Front"):
     return core.fit_scale(
         (width + depth) * (1 + gap), (height + depth) * (1 + gap), x1 - x0, y1 - y0
     )
+
+
+def automatic_plan(page, sources, orientation="Front"):
+    """core.automatic_layout for this sheet and these parts: the scale and the places of
+    the base view and the three views Automatic adds (core.AUTO_KINDS)."""
+    direction, xdir = orientation_axes(orientation)
+    axes = core.view_axes(direction, xdir)
+    width, height, depth = model_extent(sources, axes)
+    iso_axes = core.view_axes(*core.projected_axes(axes, "FrontTopRight"))
+    iso_w, iso_h, _iso_d = model_extent(sources, iso_axes)
+    return core.automatic_layout(
+        (width, height),
+        (width, depth),
+        (depth, height),
+        (iso_w, iso_h),
+        core.drawing_area(standard_of(page), sheet_of(page)),
+        _get(page, "ProjectionType", "") or core.projection_of(standard_of(page)),
+    )
+
+
+def view_rect(view, margin=0.0):
+    """(x0, y0, x1, y1) of what a view draws on the page (mm)."""
+    x, y = view_position(view)
+    half_w, half_h = view_extent(view)
+    return (x - half_w - margin, y - half_h - margin, x + half_w + margin, y + half_h + margin)
 
 
 def orientation_axes(name):
@@ -844,6 +889,10 @@ def add_projected(parent, kind_name, x, y):
         # Fusion: an isometric view made from a view with a breakout shows its cut
         _add(view, "App::PropertyLinkListGlobal", "Fission180CutSources", _view_sources(parent))
         view.Source = [clip]
+    else:
+        from . import drawing_exploded
+
+        drawing_exploded.inherit(parent, view)  # (an exploded view's projections too)
     view.Direction = V(*direction)
     view.XDirection = V(*xdir)
     view.ScaleType = "Custom"
@@ -977,7 +1026,7 @@ def add_section(parent, p1, p2, side, position, label=None, scale=None, points=N
         if depth[0] not in DEPTH_MODES:
             raise DrawingError("Choose Full, Slice or Distance.")
         if depth[0] == "Distance" and (depth[1] if len(depth) > 1 else 0.0) <= 0:
-            raise DrawingError("Type how far behind the cut the section shows (more than 0 mm).")
+            raise DrawingError("Type how far behind the cut the section shows (more than 0).")
         if complex_cut:
             raise DrawingError(
                 "Section depth works with a straight cut line: choose Full for a line "
@@ -1007,7 +1056,9 @@ def add_section(parent, p1, p2, side, position, label=None, scale=None, points=N
     _add(section, "App::PropertyString", "Fission180Points", json.dumps([list(p) for p in pts]))
     _add(section, "App::PropertyString", "Fission180SectionKind", section_kind)
     px, py = view_position(parent)
-    _add(section, "App::PropertyFloatList", "Fission180Offset", [position[0] - px, position[1] - py])
+    _add(
+        section, "App::PropertyFloatList", "Fission180Offset", [position[0] - px, position[1] - py]
+    )
     # Fusion's section views show no hidden edges by default
     style = {"Visible and Hidden Edges": "Visible Edges", "Shaded with Hidden Edges": "Shaded"}
     _style(section, style.get(style_of(parent), style_of(parent)), tangent_of(parent))
@@ -1096,13 +1147,16 @@ def set_section_depth(section, mode, value=0.0):
     if mode not in DEPTH_MODES:
         raise DrawingError("Choose Full, Slice or Distance.")
     if mode == "Distance" and value <= 0:
-        raise DrawingError("Type how far behind the cut the section shows (more than 0 mm).")
+        raise DrawingError("Type how far behind the cut the section shows (more than 0).")
     if section.TypeId == COMPLEX and mode != "Full":
         raise DrawingError(
             "Section depth works with a straight cut line: this section's line has bends."
         )
     _add(
-        section, "App::PropertyString", "Fission180Depth", json.dumps({"mode": mode, "value": value})
+        section,
+        "App::PropertyString",
+        "Fission180Depth",
+        json.dumps({"mode": mode, "value": value}),
     )
     drawing_depth.refresh(section, force=True)
     return section
@@ -1579,13 +1633,13 @@ def round_features(view):
     outer ones (a fillet is only part of a round and is left out)."""
     import Part
 
-    from . import bodies
-
     groups = {}
     for src in _view_sources(view):
         try:
-            shape = bodies.global_shape(src)
+            shape = shape_shown(view, src)
         except Exception:
+            continue
+        if shape is None:
             continue
         for face in shape.Faces:
             surface = face.Surface
@@ -1705,7 +1759,9 @@ def refresh_auto_marks(view, force=False):
     for x1, y1, x2, y2 in geometry["lines"]:
         tags.append(view.makeCosmeticLine(V(x1, y1, 0), V(x2, y2, 0), LINE_DASHDOT, 0.18))
     _add(view, "App::PropertyStringList", "Fission180AutoTags", tags)
-    _add(view, "App::PropertyString", "Fission180AutoGeometry", json.dumps(geometry, sort_keys=True))
+    _add(
+        view, "App::PropertyString", "Fission180AutoGeometry", json.dumps(geometry, sort_keys=True)
+    )
     try:
         view.recompute()
     except Exception as exc:
@@ -1860,8 +1916,28 @@ def add_text(page, lines, position, size=3.5, width=None):
     return note
 
 
+def add_balloon_at(view, origin, position, text):
+    """A balloon whose arrow points at the page point `origin` and whose circle is at the
+    page point `position` (mm on the sheet), whatever the view's scale.
+
+    TechDraw keeps a balloon's two points in its view's own units (it draws them at
+    X * the view's scale from the view's middle). Page offsets were written there as they
+    were, so in a 1:2 view every balloon stood at half its distance, its arrow off its
+    part and the balloons on one another (book parity report, chapter 10)."""
+    x, y = view_position(view)
+    s = scale_of(view) or 1.0
+    return add_balloon(
+        view,
+        (x + (origin[0] - x) / s, y + (origin[1] - y) / s),
+        (x + (position[0] - x) / s, y + (position[1] - y) / s),
+        text,
+    )
+
+
 def add_balloon(view, origin, position, text):
-    """A balloon pointing at `origin` (page) with its circle at `position` (page)."""
+    """A balloon given TechDraw's way: `origin` (the arrow's tip) and `position` (the
+    circle) are the view's position plus offsets in the view's own, unscaled units (a bend
+    identifier, flatpattern_drawing.py). For points on the sheet: add_balloon_at."""
     page = page_of(view)
     doc = view.Document
     balloon = doc.addObject(BALLOON, "Balloon")
@@ -1880,11 +1956,13 @@ def add_balloon(view, origin, position, text):
 
 
 def balloon_page_points(balloon):
+    """(the arrow's tip, the circle's middle) of a balloon on the sheet (page mm)."""
     view = balloon.SourceView
     x, y = view_position(view) if view is not None else (0.0, 0.0)
+    s = (scale_of(view) or 1.0) if view is not None else 1.0
     return (
-        (x + _value(balloon.OriginX), y + _value(balloon.OriginY)),
-        (x + _value(balloon.X), y + _value(balloon.Y)),
+        (x + _value(balloon.OriginX) * s, y + _value(balloon.OriginY) * s),
+        (x + _value(balloon.X) * s, y + _value(balloon.Y) * s),
     )
 
 
@@ -1972,26 +2050,76 @@ def refresh_parts_list(table):
     view = _get(table, "Fission180View", None)
     if not alive(view):
         return False
-    rows = _plain_rows(parts_rows_for(view))
-    if rows == table_rows(table):
+    rows = numbered_rows(table, parts_rows_for(view))
+    if _plain_rows(rows) == table_rows(table):
         return False
     corner = list(table.Fission180Corner)
-    _draw_table(table, parts_rows_for(view), corner)
+    _draw_table(table, rows, corner)
     return True
 
 
+def numbered_rows(table, rows):
+    """The rows with the item numbers TABLES > Renumber gave them (kept on the table by
+    each row's first body), in item order. A row that came later takes the next free
+    number. Without a Renumber: the rows as they are."""
+    try:
+        given = json.loads(_get(table, "Fission180Items", "") or "{}")
+    except ValueError:
+        given = {}
+    if not given:
+        return rows
+    used, out, later = set(), [], []
+    for row in rows:
+        row = dict(row)
+        key = (row.get("bodies") or [str(row.get("PartNumber", ""))])[0]
+        number = given.get(key)
+        if isinstance(number, int) and number not in used:
+            row["Item"] = number
+            used.add(number)
+            out.append(row)
+        else:
+            later.append(row)
+    n = 1
+    for row in later:
+        while n in used:
+            n += 1
+        row["Item"] = n
+        used.add(n)
+        out.append(row)
+    return sorted(out, key=lambda r: r["Item"])
+
+
 def add_row_balloons(view, rows):
-    made = []
-    half_w, half_h = view_extent(view)
-    centre = view_position(view)
+    """A balloon per parts-list row on `view`, none on another and none on a neighbouring
+    view (core.balloon_layout: they stood on a ray from the view's middle through each
+    component, so the balloons of parts on one axle lay on one another)."""
     middle = centre_of(view)  # (once: it measures every part the view shows)
-    for i, row in enumerate(rows):
+    found = []
+    for row in rows:
         anchor = component_anchor(view, row.get("bodies", []), middle)
-        if anchor is None:
-            continue
-        spot = core.balloon_spot(centre, anchor, half_w, half_h, i)
-        made.append(add_balloon(view, anchor, spot, row["Item"]))
-    return made
+        if anchor is not None:
+            found.append((row, anchor))
+    if not found:
+        return []
+    page = page_of(view)
+    blocked = [view_rect(v) for v in all_views(page) if not same(v, view)]
+    try:
+        blocked += [view_rect_of_symbol(o) for o in annotations(page) if kind(o) == "PartsList"]
+    except Exception:
+        pass
+    if _get(page, "Fission180TitleBlock", False):
+        blocked.append(core.title_block_rect(standard_of(page), sheet_of(page)))
+    area = core.frame_rect(standard_of(page), sheet_of(page))
+    spots = core.balloon_layout(view_rect(view), [anchor for _row, anchor in found], blocked, area)
+    return [
+        add_balloon_at(view, anchor, spot, row["Item"]) for (row, anchor), spot in zip(found, spots)
+    ]
+
+
+def view_rect_of_symbol(table):
+    """(x0, y0, x1, y1) of a parts list on the page."""
+    layout, corner = table_layout_of(table)
+    return (corner[0], corner[1] - layout["height"], corner[0] + layout["width"], corner[1])
 
 
 def component_anchor(view, body_names, middle=None):
@@ -2010,13 +2138,30 @@ def component_anchor(view, body_names, middle=None):
     s = scale_of(view) or 1.0
     candidates = []
     for edge in _visible_edges_local(view):
-        mid = edge.valueAt((edge.FirstParameter + edge.LastParameter) / 2.0)
-        candidates.append((edge.Length, (mid.x, mid.y)))
+        at = (edge.FirstParameter + edge.LastParameter) / 2.0
+        mid = edge.valueAt(at)
+        try:
+            t = edge.tangentAt(at)
+            across = (-t.y, t.x)
+        except Exception:
+            across = (0.0, 0.0)
+        candidates.append((edge.Length, (mid.x, mid.y), across))
     candidates.sort(key=lambda c: -c[0])
     fallback = None
-    for _length, (mx, my) in candidates:
-        local = (mx / s, my / s)
-        if _sight_hit(view, wanted, local, middle=middle) is None:
+    for _length, (mx, my), across in candidates:
+        # The middle of an outline edge is where the sight line only touches its part: on
+        # a round part the line lies along the round face and the measurement finds
+        # nothing (a disc standing alone in an exploded view got no balloon). A point a
+        # little to either side of the edge is looked at too.
+        local = None
+        for step in (0.0, 0.2, -0.2):
+            test = (mx / s + across[0] * step, my / s + across[1] * step)
+            if _sight_hit(view, wanted, test, middle=middle) is not None:
+                local = test
+                break
+            if across == (0.0, 0.0):
+                break
+        if local is None:
             continue  # not on these bodies at all
         if fallback is None:
             fallback = (mx, my)
@@ -2071,7 +2216,9 @@ def _sight_hit(view, bodies, local_point, tolerance=0.05, middle=None):
     for body in bodies:
         try:
             shape = body.Shape
-            place = _parent_placement(body)
+            place = _shown_placement(view, body)
+            if place is False:
+                continue  # (an exploded view whose storyboard hides this part)
             a, b = ends
             if place is not None:
                 back = place.inverse()
@@ -2098,6 +2245,40 @@ def _sight_hit(view, bodies, local_point, tolerance=0.05, middle=None):
         if best is None or depth > best[1] + 1e-6:
             best = (body, depth)
     return best
+
+
+def _shown_placement(view, body):
+    """Where a view shows the component a body sits in: the design's placement, or for an
+    exploded view the storyboard's (None: not moved at all; False: not shown)."""
+    place = _parent_placement(body)
+    try:
+        from . import drawing_exploded
+
+        if not drawing_exploded.shows(view, body):
+            return False
+        move = drawing_exploded.body_move(view, body)
+    except Exception:
+        move = None
+    if move is None:
+        return place
+    return move.multiply(place) if place is not None else move
+
+
+def shape_shown(view, body):
+    """A body's shape where `view` shows it, in the design's coordinates (an exploded view
+    shows its parts where the storyboard puts them), or None when the view hides it."""
+    from . import bodies
+
+    shape = bodies.global_shape(body)
+    try:
+        from . import drawing_exploded
+
+        if not drawing_exploded.shows(view, body):
+            return None
+        move = drawing_exploded.body_move(view, body)
+    except Exception:
+        move = None
+    return shape.transformed(move.toMatrix(), True) if move is not None else shape
 
 
 def _parent_placement(obj):
@@ -2140,6 +2321,27 @@ def component_at(view, local_point, sources=None, middle=None):
     to the viewer along the sight line through it (where two touch, the one in front)."""
     hit = _sight_hit(view, sources or _view_sources(view), local_point, middle=middle)
     return hit[0] if hit is not None else None
+
+
+def component_near(view, local_point, reach, sources=None, middle=None):
+    """component_at for a click: the part at the point, or at one of eight points `reach`
+    (view units) round it. A click on an outline edge lands a hair outside the part as
+    often as inside, and exactly on a round part's outline the sight line only touches."""
+    if middle is None:
+        middle = centre_of(view)
+    found = component_at(view, local_point, sources, middle)
+    if found is not None or reach <= 0:
+        return found
+    for k in range(8):
+        angle = math.pi * k / 4.0
+        test = (
+            local_point[0] + reach * math.cos(angle),
+            local_point[1] + reach * math.sin(angle),
+        )
+        found = component_at(view, test, sources, middle)
+        if found is not None:
+            return found
+    return None
 
 
 def item_for_body(page, body):
@@ -2236,6 +2438,12 @@ def refresh(page):
                 changed |= refresh_depth(view)
         except Exception as exc:
             warn("section depth / breakout of %s: %s" % (view.Label, exc))
+    try:
+        from . import drawing_exploded  # exploded views follow their storyboards
+
+        changed |= drawing_exploded.refresh(page)
+    except Exception as exc:
+        warn("exploded views: %s" % exc)
     table = parts_list_of(page)
     if table is not None:
         try:
@@ -2253,6 +2461,12 @@ def refresh(page):
             changed |= follow_center_marks(view)
         except Exception as exc:
             warn("centre marks of %s: %s" % (view.Label, exc))
+        try:
+            from . import drawing_tools
+
+            changed |= drawing_tools.follow_mark_patterns(view)
+        except Exception as exc:
+            warn("centre mark patterns of %s: %s" % (view.Label, exc))
         try:
             changed |= refresh_auto_marks(view)
         except Exception as exc:
@@ -2323,6 +2537,12 @@ def delete_objects(doc, objects):
             ):
                 if alive(helper) and helper.Name not in names:
                     names.append(helper.Name)
+            # an exploded view's copy goes when no view that stays draws it
+            copy = _get(obj, "Fission180Exploded", None)
+            if alive(copy) and copy.Name not in names:
+                users = [u for u in copy.InList if is_view(u) and u.Name not in names]
+                if not users:
+                    names.append(copy.Name)
     rank = {DIMENSION: 0, BALLOON: 0, SYMBOL: 0, ANNOTATION: 0}
     order = [doc.getObject(n) for n in names if doc.getObject(n) is not None]
     order.sort(key=lambda o: (rank.get(o.TypeId, 1), -o.ID))

@@ -21,7 +21,8 @@ the dialog, which then stays open.
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import bodies_row_ui, commands, curve_pick, curves, extrude, log, preview
+from . import bodies_row_ui, commands, curve_pick, curves, extrude, extrude_finish, log
+from . import preview
 from . import profile_pick, sweep, ui_icon_path, warn
 from .compat import QtCore, QtWidgets
 from .hole_common import SelectionField
@@ -105,7 +106,7 @@ def newest_single_region(body):
 
 
 # -- the dialog ----------------------------------------------------------------------------------
-class SweepPanel(Panel):
+class SweepPanel(extrude_finish.SaysWhy, Panel):
     title = "Sweep"
     icon = "sweep"
     last = None
@@ -522,6 +523,8 @@ class SweepPanel(Panel):
                 occluder=self._occluder,
                 skip=self._not_an_area,
             )
+            # a shown sketch's profile wins over the body in front of it (Fusion)
+            self.picker.set_through()
         except Exception as exc:
             warn("sweep: profile shading unavailable: %s" % exc)
 
@@ -535,10 +538,8 @@ class SweepPanel(Panel):
         return curve_pick.line_under_mouse(self.doc, position)
 
     def _occluder(self):
-        base = self._base_feature()
-        if base is None or base.Shape.isNull():
-            return None
-        return curves.to_global(base.Shape, base)
+        """The part before this step; None while its body is hidden."""
+        return profile_pick.shown_part(self._base_feature(), curves.to_global)
 
     def _unwatch(self):
         if self.observer is not None:
@@ -875,7 +876,9 @@ class SweepPanel(Panel):
         self.bodies_row.built(self.target)
         self.bodies_row.show_cut(self.options["operation"], bool(self.error))
         self._show_bodies_row()
-        if self.error and self.target is not None:
+        # (never over the person's own choice: that stays as picked, with the reason
+        # it cannot be built beside it; extrude_ui does the same)
+        if self.error and self.target is not None and not self.user_picked_operation:
             actual = self._feature_operation()
             if actual != self.options["operation"]:
                 self.options["operation"] = actual
@@ -1029,6 +1032,7 @@ class SweepPanel(Panel):
         self._changed()
 
     # -- OK / Cancel ----------------------------------------------------------------------------------
+    @extrude_finish.speaking
     def accept(self):
         if self._closed:
             return True
@@ -1070,12 +1074,8 @@ class SweepPanel(Panel):
         if body is not None:
             extrude.show_tip(body)
             if body is not self.body:
-                try:
-                    from . import components
-
-                    components.activate_body(body)  # and its (new) component
-                except Exception as exc:
-                    warn("could not activate %s: %s" % (body.Label, exc))
+                # its (new) body and component; never another component's body a Cut changed
+                extrude_finish.activate_result(body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
 

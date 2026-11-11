@@ -343,7 +343,16 @@ def g_made():
 
 # -- Path H: delete, undo, redo --------------------------------------------------------------------
 def h_delete():
-    t.row_menu(state["b2_label"], "Delete")
+    # The component's own row, by its place: Bracket's body, the component made from the
+    # root's body and that body are all called "Body1" now (bodies are numbered per
+    # component from the first one on, at the root too).
+    from Fission180Tests.gui import widget_input as w
+
+    tree, item = cs.row_item([state["b2_label"]])
+    if h.check("the component's row", item is not None, cs.top_labels()):
+        tree.scrollToItem(item)
+        ok = w.right_click(tree.viewport(), tree.label_point(item), "Delete")
+        h.check("browser menu %s > Delete" % state["b2_label"], ok)
 
 
 def h_deleted():

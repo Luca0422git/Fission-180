@@ -29,7 +29,7 @@ RIGHT = V(40, 15, 5)
 
 def pick_body_in_browser():
     Gui.Selection.clearSelection()
-    sd.click_browser_row("Body")
+    sd.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def body_selected_then_shell():
@@ -128,7 +128,7 @@ def second_waits():
         "no error while waiting", p is not None and p.message.text() == "", p and p.message.text()
     )
     sd.no_popups("a second Shell")
-    sd.click_browser_row("Body")
+    sd.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def second_too_thick():

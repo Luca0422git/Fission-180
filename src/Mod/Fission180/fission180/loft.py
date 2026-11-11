@@ -7,6 +7,7 @@ Profiles, in the order they are lofted through, a list of (object, sub-element):
   (sketch, "")                the whole sketch
   (feature, "Face6")          a flat face of a body
   (sketch, "Vertex3")         a point (only as the first or the last profile: a dome / cone)
+  (origin / construction point, "")   the same, a point of its own
 Rails and the centerline are curve references (sketch or part edges, see curves.py).
 
 Options (dict, see DEFAULTS):
@@ -123,8 +124,29 @@ def normalize(profiles):
     return found
 
 
+def is_point_object(obj):
+    """The origin point or a construction point (CONSTRUCT > Point ...)."""
+    from . import profile_pick
+
+    return profile_pick.is_point_object(obj)
+
+
 def is_point(profile):
-    return profile[1].startswith("Vertex")
+    """A profile that is a point: a vertex of a sketch or of the part, the origin point or
+    a construction point (the book's surfboard lofts to the origin: wave 7)."""
+    return profile[1].startswith("Vertex") or is_point_object(profile[0])
+
+
+def point_of(profile):
+    """Where a point profile is (design coordinates), or None when it is gone."""
+    obj, sub = profile
+    try:
+        if is_point_object(obj):
+            return App.Vector(obj.getGlobalPlacement().Base)
+        vertex = obj.Shape.getElement(sub)
+        return curves.to_global(vertex, obj).Point
+    except Exception:
+        return None
 
 
 # -- sections ---------------------------------------------------------------------------------
@@ -138,11 +160,9 @@ class Section:
         self.wires = []
         self.face = None
         if is_point(profile):
-            try:
-                vertex = obj.Shape.getElement(sub)
-            except Exception:
+            self.point = point_of(profile)
+            if self.point is None:
                 raise LoftError("A point picked as a profile is gone. Pick it again.")
-            self.point = curves.to_global(vertex, obj).Point
             return
         faces = [extrude._to_global(f, obj) for f in extrude.local_faces(obj, sub)]
         if not faces:
@@ -603,7 +623,9 @@ def _save_meta(feature, meta):
 
 
 def is_own(obj):
-    return obj is not None and getattr(obj, "Fission180Type", "") == "Loft" and obj.TypeId == FP_TYPE
+    return (
+        obj is not None and getattr(obj, "Fission180Type", "") == "Loft" and obj.TypeId == FP_TYPE
+    )
 
 
 def is_loft(obj):
@@ -777,7 +799,7 @@ def _native_section(profile, body):
     if owner_body(obj) is not body or obj is body:
         return None
     if is_point(profile):
-        return (obj, [sub]) if is_sketch(obj) else None
+        return (obj, [sub]) if is_sketch(obj) and sub.startswith("Vertex") else None
     if is_sketch(obj):
         try:
             whole = {extrude.key(p) for p in extrude.expand_whole([(obj, "")])}

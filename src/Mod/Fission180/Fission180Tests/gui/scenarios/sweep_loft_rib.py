@@ -2,7 +2,7 @@
 """Rib like a Fusion user, only real input.
 
 An L bracket: a sketch on XZ, the L outline (legs 40 long, 5 thick), Extrude 20 (it goes
-to y -20). A sketch on XZ again with a line from (5, 25) to (25, 5) across the inside
+away from the front, to y 20, like Fusion; it went to y -20 before wave 7). A sketch on XZ again with a line from (5, 25) to (25, 5) across the inside
 corner. Click the line, then CREATE > Rib: the line is taken; To Next fills the corner triangle (a gusset), 2 thick
 about the sketch plane. Thickness 4; One Side (into the bracket's side); Flip Side would
 turn it out of the side face, where only edges touch the part: the dialog says why; back;
@@ -14,7 +14,7 @@ Cancel keeps the rib. Esc cancels a new Rib (nothing selected: the Curve box wai
 Hand-derived: L area 40 * 5 + 35 * 5 = 375, times 20 = 7500. The gusset triangle has legs 20
 (from the corner (5, 5) to the line): area 200, times the thickness. Depth d: a strip 20
 sqrt(2) long and d wide; where it runs into the legs (only on the half of the thickness
-inside the bracket, y < 0) two triangles of area d^2 / 2 each are already material, less the
+inside the bracket, y > 0) two triangles of area d^2 / 2 each are already material, less the
 tips that poke out past the 5 thick legs once d > 5 sqrt(2).
 """
 
@@ -155,7 +155,7 @@ def thick4():
     p = panel()
     h.check("thickness 4", st.near(h.solid_volume(), L + TRI * 4), h.solid_volume())
     bb = st.bbox(h.body().Shape)
-    h.check("symmetric: 2 out of the bracket's face", st.near(bb[4], 2.0), bb)
+    h.check("symmetric: 2 out of the bracket's face", st.near(bb[1], -2.0), bb)
     h.check("choose One Side", ui.choose(p.side, "One Side"))
 
 
@@ -164,7 +164,7 @@ def one_side():
     h.check("Flip Side shown", p.flip_side.isVisible())
     h.check("one side: same volume", st.near(h.solid_volume(), L + TRI * 4), h.solid_volume())
     bb = st.bbox(h.body().Shape)
-    h.check("one side goes into the bracket's side", st.near(bb[4], 0.0), bb)
+    h.check("one side goes into the bracket's side", st.near(bb[1], 0.0), bb)
     hole_steps.click_checkbox(p.flip_side)
 
 
@@ -186,7 +186,7 @@ def unflipped_side():
     p = panel()
     h.check("message gone", p.message.text() == "", p.message.text())
     bb = st.bbox(h.body().Shape)
-    h.check("back into the bracket's side", st.near(bb[4], 0.0), bb)
+    h.check("back into the bracket's side", st.near(bb[1], 0.0), bb)
     h.check("choose Symmetric", ui.choose(p.side, "Symmetric"))
 
 
