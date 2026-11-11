@@ -26,6 +26,7 @@ Values: "distance" (mm), "angle" (degrees), "distance_type" ("proportional" /
 "physical") with "fraction" (0..1) or "distance" for the Along Path entries.
 Problems raise ConstructError with a sentence for the dialog.
 """
+
 try:
     import FreeCAD as App
 
@@ -1170,14 +1171,21 @@ def helper_of(datum):
 
 # -- making and editing --------------------------------------------------------------------
 def target_body(refs, fallback=None):
-    """The body the construction goes in: the one its first pick belongs to (Fusion puts
-    construction geometry in the component of what it is built on), else `fallback`."""
+    """The body the construction goes in. Fusion puts construction geometry in the ACTIVE
+    component, whatever it is built on (book parity report, bugs 7 and 8: an offset plane
+    from a gasket's face went into the gasket, an axis through a pin into the pin's
+    component). FreeCAD keeps it inside a body: the body its first pick belongs to when
+    that body is in the active component (components.host_body), else `fallback`, the
+    active component's own body. Its frame then follows the picks across the components
+    (ConstructionFrame works in design coordinates)."""
+    from . import components
+
     for ref in refs:
         if ref is None:
             continue
         body = owner_body(ref[0])
         if body is not None:
-            return body
+            return components.host_body(body, fallback)
     return fallback
 
 

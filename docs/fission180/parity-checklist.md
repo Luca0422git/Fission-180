@@ -9,9 +9,9 @@ file is out of date.
 
 ## Headline
 
-**Fusion commands present: 519 / 677 (76.7%)**
+**Fusion commands present: 520 / 677 (76.8%)**
 
-In the areas Fission 180 builds (without the 70 entries left out on purpose, see the end): **519 / 607 (85.5%)**.
+In the areas Fission 180 builds (without the 70 entries left out on purpose, see the end): **520 / 607 (85.7%)**.
 
 What the number means:
 
@@ -122,14 +122,14 @@ What the number means:
 | | Ring | 9 | 9 | 100.0% |
 | | Overflow list | 8 | 7 | 87.5% |
 | | While a command runs | 2 | 2 | 100.0% |
-| **BROWSER** | all | **121** | **94** | **77.7%** |
+| **BROWSER** | all | **121** | **95** | **78.5%** |
 | | Design (top node) | 13 | 9 | 69.2% |
 | | Units | 1 | 1 | 100.0% |
 | | Named Views | 1 | 1 | 100.0% |
 | | Named view | 3 | 3 | 100.0% |
 | | Origin | 1 | 1 | 100.0% |
 | | Folder (Bodies, Sketches, Construction...) | 1 | 1 | 100.0% |
-| | Component | 30 | 17 | 56.7% |
+| | Component | 30 | 18 | 60.0% |
 | | Body | 20 | 14 | 70.0% |
 | | Mesh body | 5 | 5 | 100.0% |
 | | Sketch | 11 | 8 | 72.7% |
@@ -238,7 +238,7 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 
 - Overflow list > Fix/Unfix (not sure)
 
-### BROWSER (27)
+### BROWSER (26)
 
 - Design (top node) > Show All Components (not sure)
 - Design (top node) > Physical Material (not sure)
@@ -251,7 +251,6 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 - Component > Physical Material
 - Component > Appearance
 - Component > Texture Map Controls
-- Component > Properties
 - Component > Save Copy As
 - Component > Open (not sure)
 - Component > Edit In Place
@@ -353,7 +352,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `browser:settings`: Change Active Units
 - `browser:view`: Go to View
 - `browser:origin`: Create Sketch
-- `browser:component`: Move to Component
+- `browser:component`: Move/Copy, Create Drawing, Move to Component
 - `browser:body`: Activate Body, Rebuild with Timeline (AI)..., Ground, Paste, Move to Component
 - `browser:joint`: Animate Joint Relationships, Rename
 - `browser:rigid_group`: Rename

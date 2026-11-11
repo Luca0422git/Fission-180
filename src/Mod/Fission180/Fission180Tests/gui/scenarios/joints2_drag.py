@@ -222,7 +222,7 @@ def g3_undone():
 
 # -- G4 grounded --------------------------------------------------------------------------------
 def g4_ground():
-    j.browser_menu(j.plate().Label, "Ground")
+    j.browser_menu(j.plate().Label, "Ground to Parent")
 
 
 def g4_drag_plate():
@@ -254,7 +254,7 @@ def g4_turned_back():
 
 
 def g4_unground():
-    j.browser_menu(j.plate().Label, "Unground")
+    j.browser_menu(j.plate().Label, "Unground From Parent")
 
 
 def g4_free():

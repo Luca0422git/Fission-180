@@ -544,15 +544,14 @@ def insert_helper(body, feature, type_id, name, role):
 
 
 def new_body(src, component=False):
-    """A new body beside `src` (New Body), or a new body inside a new component under the
-    active component (New Component, Fusion's fifth operation)."""
-    if component:
-        from . import components
+    """A new body in the active component (New Body; beside `src` without a GUI), or a new
+    body inside a new component under the active component (New Component, Fusion's fifth
+    operation): components.body_for_new."""
+    from . import components
 
-        return components.body_for_new(src, True)
-    from . import bodies
-
-    return bodies.new_body(src.Document, like=src)
+    # (wave 7) New Body too: in the ACTIVE component, standing where `src` stands (a box
+    # put on another component's face went into that component)
+    return components.body_for_new(src, bool(component))
 
 
 def remove_step(feature, keep_body=True, prop=META):

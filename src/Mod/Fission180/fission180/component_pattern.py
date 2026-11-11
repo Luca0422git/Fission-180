@@ -7,6 +7,13 @@ Fusion repeats the component: every copy is an occurrence of it ("Bracket:2", ":
 so a change to the component shows in every copy, and the pattern is one step in the
 timeline that can be edited, suppressed, rolled back and deleted (its copies go with it).
 
+Mirror with Pattern Type Components (wave 7; it was "not built yet"): Fusion makes a
+mirrored component, a left-handed version of the part that follows the original
+(Autodesk forum, a Fusion community manager: "Mirror in Fusion is for producing true
+'mirrored' components ... a 'left' and 'right' handed version of a component"; joints are
+not mirrored). Here it is one Mirror step with one copy whose solids are the original's
+mirrored across the plane (``MirrorBase`` / ``MirrorNormal`` on the step, design coordinates).
+
 On FreeCAD: one ``ComponentPattern`` step (an ``App::FeaturePython`` outside the bodies,
 Fission180Type RectangularPattern / CircularPattern / PatternOnPath like the other patterns,
 plus "Fission180Rolls" so it rolls back with the marker) keeps the dialog's choices and works
@@ -81,6 +88,13 @@ def global_axis(ref):
     return frame.multVec(point), frame.Rotation.multVec(axis)
 
 
+def global_plane(ref):
+    """(point, unit normal) of a mirror plane in design coordinates."""
+    point, normal = pattern.plane_of(ref)
+    frame = frame_of(ref[0])
+    return frame.multVec(point), frame.Rotation.multVec(normal)
+
+
 def source_center(source):
     shapes = []
     for body in components.bodies_in(source.Document, source, recursive=True):
@@ -99,6 +113,11 @@ def source_center(source):
 
 def all_moves(kind, options, source):
     """Every copy's movement in design coordinates, suppressed copies included."""
+    if kind == "mirror":
+        # one copy, standing on the original: its solids are then mirrored across the plane
+        # (ComponentPatternFeature.execute keeps the plane, instances.InstanceCopy mirrors)
+        global_plane(options["plane"])
+        return [App.Placement()]
     core.check_total(pattern.total_instances(kind, options))
     if kind == "rectangular":
         _p, u1 = global_direction(options["direction"])
@@ -173,6 +192,11 @@ class ComponentPatternFeature:
         if add("App::PropertyAngle", "Angle", "Total angle of a circular pattern"):
             obj.Angle = 360.0
         add("App::PropertyIntegerList", "SuppressedCopies", "Copies left out (Suppression)")
+        # a mirror's plane, design coordinates (worked out here, read by the copy)
+        if "MirrorBase" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyVector", "MirrorBase", "Pattern", "", 4)
+        if "MirrorNormal" not in obj.PropertiesList:
+            obj.addProperty("App::PropertyVector", "MirrorNormal", "Pattern", "", 4)
         if "Moves" not in obj.PropertiesList:
             # each copy's movement, design coordinates (worked out here, read by the copies)
             obj.addProperty("App::PropertyPlacementList", "Moves", "Pattern", "", 4)
@@ -190,7 +214,14 @@ class ComponentPatternFeature:
                 "this step, or undo the delete."
             )
         kind = pattern.kind_of(obj)
-        found = moves(kind, read(obj), source)
+        options = read(obj)
+        found = moves(kind, options, source)
+        if kind == "mirror":
+            point, normal = global_plane(options["plane"])
+            if (obj.MirrorBase - point).Length > 1e-12:
+                obj.MirrorBase = point
+            if (obj.MirrorNormal - normal).Length > 1e-12:
+                obj.MirrorNormal = normal
         current = list(obj.Moves)
         if len(current) != len(found) or any(
             not a.isSame(b, 1e-12) for a, b in zip(current, found)
@@ -236,20 +267,22 @@ def _components(options):
 def check(kind, options):
     """Raise pattern.NeedsPick / PatternError when the pattern cannot be built yet (the
     references are checked by pattern.check)."""
-    if kind == "mirror":
-        raise PatternError("Mirror of components is not built yet: use a body or features.")
     found = _components(options)
+    verb = "mirror" if kind == "mirror" else "pattern"
     if not found:
-        raise pattern.NeedsPick("Select the component to pattern.")
+        raise pattern.NeedsPick("Select the component to %s." % verb)
     if len(found) > 1:
-        raise PatternError("Select one component: each component gets its own pattern.")
+        raise PatternError("Select one component: each component gets its own %s." % verb)
     source = found[0]
     if instances.is_instance(source):
         raise PatternError(
             "%s is a copy of %s: pattern the original component."
             % (source.Label, (instances.source_of(source) or source).Label)
         )
-    if pattern.quantity_formulas(options):
+    if kind == "mirror":
+        if options.get("plane") is None:
+            raise pattern.NeedsPick("Select the mirror plane: a plane or a flat face.")
+    elif pattern.quantity_formulas(options):
         raise PatternError("A pattern of components takes a plain number as its quantity.")
     if not instances.source_bodies(source):
         raise PatternError("%s has no body to repeat yet." % source.Label)
@@ -305,8 +338,34 @@ def build(kind, options, feature=None, name=None):
         components.remove(doc, part, _top=False)
     for index in range(len(made), count):
         instances.make_instance(source, pattern=feature, index=index)
+    if kind == "mirror":
+        _set_plane(feature, options)
     log("%s of %s: %d copies" % (pattern.TITLES[kind], source.Label, count))
     return feature
+
+
+def _set_plane(feature, options):
+    """The mirror plane on the step right away (its copy reads it on its first recompute)."""
+    try:
+        point, normal = global_plane(options["plane"])
+        feature.MirrorBase = point
+        feature.MirrorNormal = normal
+    except Exception as exc:
+        warn("mirror of components: %s" % exc)
+
+
+def mirror_plane(feature):
+    """(point, unit normal) a Mirror of components mirrors across (design coordinates), or
+    None for any other step."""
+    try:
+        if pattern.kind_of(feature) != "mirror":
+            return None
+        normal = App.Vector(feature.MirrorNormal)
+        if normal.Length < 1e-9:
+            return None
+        return App.Vector(feature.MirrorBase), normal
+    except Exception:
+        return None
 
 
 def _set_props(obj, kind, options, source):

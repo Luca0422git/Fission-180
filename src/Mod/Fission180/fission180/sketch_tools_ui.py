@@ -220,7 +220,13 @@ class WatchedTool:
                 return
             if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
                 return  # panning or orbiting: FreeCAD shows another pointer meanwhile
-            if not session.tool_running() or self._cursor_key() != self.cursor:
+            key = self._cursor_key()
+            if key[0] == QtCore.Qt.ForbiddenCursor:
+                # (wave 7) FreeCAD's no-entry pointer after a click on something its tool
+                # does not take (another body or component: sketch_project_across projects
+                # that): the tool still runs
+                return
+            if not session.tool_running() or key != self.cursor:
                 self.stop()  # FreeCAD's tool ended (or another one took the view)
         except Exception as exc:
             warn("%s: %s" % (self.title, exc))
@@ -307,6 +313,9 @@ class SketchProject(_SketchCommand):
             "Click edges or faces of the part: they are projected onto the sketch (purple, "
             "they follow the part).",
         )
+        from . import sketch_project_across  # (wave 7) other bodies and components too
+
+        sketch_project_across.watch(self.title)
 
 
 class SketchInclude3D(_SketchCommand):
@@ -338,6 +347,9 @@ class SketchInclude3D(_SketchCommand):
             "INCLUDE 3D GEOMETRY",
             "Click edges or points of the part: they come into the sketch as reference curves.",
         )
+        from . import sketch_project_across  # (wave 7) other bodies and components too
+
+        sketch_project_across.watch(self.title, defining=False)
 
 
 class SketchIntersect(_SketchCommand):
