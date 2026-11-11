@@ -822,6 +822,15 @@ def section_offset(line, dx, dy):
     return n[0] * along, n[1] * along
 
 
+def section_position(parent_at, line, point):
+    """Where a section view goes while it follows the pointer: under the pointer along its
+    viewing side, lined up with the parent view's middle across it. (Measured from the cut
+    line's middle instead, a cut near one end of a long part put the view that far beside
+    the pointer: on top of its parent.)"""
+    ox, oy = section_offset(line, point[0] - parent_at[0], point[1] - parent_at[1])
+    return parent_at[0] + ox, parent_at[1] + oy
+
+
 # ------------------------------------------------------------------ dimensions
 LINEAR_TYPES = ("Distance", "DistanceX", "DistanceY")
 _PARALLEL = math.radians(1.0)

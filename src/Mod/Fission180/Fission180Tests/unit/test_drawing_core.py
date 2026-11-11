@@ -250,6 +250,10 @@ class SectionTests(unittest.TestCase):
     def test_offset_moves_along_the_side_only(self):
         line = core.section_line((0, -20), (0, 20), (50, 0), "Third angle")
         self.assertTrue(vclose(core.section_offset(line, 60, 13) + (0,), (60, 0, 0)))
+        # the view follows the pointer along its viewing side, wherever the cut line is on
+        # the parent (a cut 80 mm left of a long part's middle, the pointer left of the part)
+        at = core.section_position((190.0, 110.0), line, (46.0, 123.0))
+        self.assertTrue(vclose(at + (0,), (46.0, 110.0, 0)))
 
 
 class DimensionTests(unittest.TestCase):

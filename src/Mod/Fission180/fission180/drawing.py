@@ -2827,15 +2827,21 @@ def section_faces(section):
         return []
     normal = section.SectionNormal
     origin = section.SectionOrigin
-    wires = Part.makeCompound(shapes).slice(normal, normal.dot(origin))
-    if not wires:
-        return []
-    face = Part.makeFace(wires, "Part::FaceMakerBullseye")
     x, y, d = axes_of(section)
     c = centre_of(section)
     matrix = App.Matrix(x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, d[0], d[1], d[2], 0)
     matrix.move(matrix.multVec(V(-c[0], -c[1], -c[2])))
-    return face.transformed(matrix).Faces
+    faces = []
+    # Each body is cut by itself: two parts that touch (a sleeve on a stick) give the same
+    # outline twice, and one face made of all the outlines together was "invalid" (an error
+    # in the Report view at Export DXF; replay of the book's Drawings chapter).
+    for shape in shapes:
+        wires = shape.slice(normal, normal.dot(origin))
+        if not wires:
+            continue
+        face = Part.makeFace(wires, "Part::FaceMakerBullseye")
+        faces.extend(face.transformed(matrix).Faces)
+    return faces
 
 
 def section_hatch(section, spacing=HATCH_SPACING):

@@ -2014,10 +2014,7 @@ class SectionPanel(DrawingPanel):
             >= 0
             else -1
         )
-        px, py = drawing.view_position(self.parent)
-        mx, my = drawing.local_to_page(self.parent, line["mid"])
-        ox, oy = core.section_offset(line, point[0] - mx, point[1] - my)
-        position = (px + ox, py + oy)
+        position = core.section_position(drawing.view_position(self.parent), line, point)
         if self.section is None or side != self.side:
             label = self.label.text().strip() if self.section is not None else ""
             self._drop()
