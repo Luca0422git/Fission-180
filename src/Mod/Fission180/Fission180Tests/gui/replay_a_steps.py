@@ -375,3 +375,31 @@ def drag_look(label, target, from_design=False, widget=None):
     _drag["timer"] = timer
     timer.start()
     return True
+
+
+def wheel(point, notches):
+    """Turn the mouse wheel `notches` times (positive: zoom in) with the pointer on the 3D
+    point, as a person zooms in on a small face before clicking it."""
+    from PySide import QtGui
+
+    gl = h.gl_widget()
+    target = gl
+    while target is not None and target.metaObject().className() != "Gui::View3DInventorViewer":
+        target = target.parentWidget()
+    target = target or gl
+    for _ in range(abs(notches)):
+        spot = h.screen_point(point)
+        h.move(spot)
+        event = QtGui.QWheelEvent(
+            QtCore.QPointF(gl.mapTo(target, spot)),
+            QtCore.QPointF(gl.mapToGlobal(spot)),
+            QtCore.QPoint(0, 0),
+            QtCore.QPoint(0, 120 if notches > 0 else -120),
+            QtCore.Qt.NoButton,
+            QtCore.Qt.NoModifier,
+            QtCore.Qt.NoScrollPhase,
+            False,
+        )
+        QtWidgets.QApplication.sendEvent(target, event)
+        QtWidgets.QApplication.processEvents()
+    h.view_still()

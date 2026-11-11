@@ -574,7 +574,7 @@ def g_wheel():
     target = target or gl
     middle = QtCore.QPoint(gl.width() // 2, gl.height() // 2)
     h.move(middle)
-    pos = QtCore.QPointF(target.mapFrom(gl, middle))
+    pos = QtCore.QPointF(gl.mapTo(target, middle))
     for _ in range(3):
         event = QtGui.QWheelEvent(
             pos,
