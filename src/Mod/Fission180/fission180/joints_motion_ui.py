@@ -82,6 +82,16 @@ class MotionLinkPanel(_JointsPanel):
 
     def build_form(self):
         self.form_box(self.layout, "joints", "Joints", "Select")
+        # Fusion: Link with Same Joint ties one joint's turn to its own slide (a screw: a
+        # Cylindrical joint that moves its thread's pitch for each turn)
+        self.same = QtWidgets.QCheckBox("Link with Same Joint")
+        self.same.setObjectName("Fission180MotionLink_same")
+        self.same.setToolTip(
+            "Tie one joint's rotation to its own slide (a screw): pick a joint that both "
+            "turns and slides (Cylindrical, Pin-Slot)"
+        )
+        self.same.toggled.connect(lambda on: self._guarded(lambda: self._same_toggled(on)))
+        self.layout.addRow(QtWidgets.QLabel(""), self.same)
         self.rows = []
         for index in (0, 1):
             caption = QtWidgets.QLabel("")
@@ -130,12 +140,17 @@ class MotionLinkPanel(_JointsPanel):
                 widget = row[key].widget if key == "field" else row[key]
                 widget.setVisible(shown)
             motions = joints.motions_of(joint) if joint is not None else []
-            both = len(motions) > 1
+            both = len(motions) > 1 and not self._same()
             row["motion"].setVisible(both)
             row["motion_caption"].setVisible(both)
             if joint is None:
                 continue
-            row["caption"].setText("%s %d: %s" % ("Joint", index + 1, joint.Label))
+            if self._same():
+                row["caption"].setText(
+                    "%s: its %s" % (joint.Label, "rotation" if index == 0 else "slide")
+                )
+            else:
+                row["caption"].setText("%s %d: %s" % ("Joint", index + 1, joint.Label))
             motion = self.motions[index] or joints.default_motion(joint)
             self.motions[index] = motion
             self._quiet = True
@@ -147,6 +162,45 @@ class MotionLinkPanel(_JointsPanel):
         two = len(self.picked) == 2
         self.reverse.setVisible(two)  # Fusion shows Reverse once the second joint is picked
         self.animate.setVisible(two)
+
+    def _same(self):
+        """True while one joint's own two motions are being linked."""
+        return len(self.picked) == 2 and self.picked[0] is self.picked[1]
+
+    def _same_toggled(self, on):
+        """Link with Same Joint ticked: the one picked joint is linked with itself (its
+        rotation with its slide); unticked: it waits for a second joint again."""
+        self.stop_animation()
+        if on:
+            first = self.picked[0] if self.picked else None
+            if first is None or len(joints.motions_of(first)) < 2:
+                self.same.blockSignals(True)
+                self.same.setChecked(False)
+                self.same.blockSignals(False)
+                self.refuse(
+                    "Link with Same Joint needs one joint that both turns and slides "
+                    "(Cylindrical, Pin-Slot): click it first."
+                    if first is None
+                    else "%s has one motion only: Link with Same Joint needs a joint that "
+                    "both turns and slides (Cylindrical, Pin-Slot)." % first.Label
+                )
+                return
+            self.picked = [first, first]
+            self.motions = ["angle", "slide"]
+            self._set_unit(0, "angle", value=None)
+            self._set_unit(1, "slide", value=None)
+            self.fields["joints"].set_text(first.Label)
+            self.took()
+        elif self._same():
+            self.picked = self.picked[:1]
+            self.motions = [joints.default_motion(self.picked[0]), ""]
+            self._set_unit(0, self.motions[0], value=None)
+            self.fields["joints"].set_text(self.picked[0].Label)
+        for index, row in enumerate(self.rows):
+            if index < len(self.picked):
+                row["field_caption"].setText(_motion_label(self.motions[index]))
+        self._show_rows()
+        self.changed()
 
     def _set_unit(self, index, motion, value=None):
         """The value box of joint `index` in the unit of its motion (degrees or mm), with
@@ -190,7 +244,10 @@ class MotionLinkPanel(_JointsPanel):
                 )
                 self._set_unit(index, motion or "angle", value=data[key])
             self.reverse.setChecked(bool(data["reverse"]))
-            self.fields["joints"].set_text(", ".join(j.Label for j in self.picked))
+            same = len(self.picked) == 2 and self.picked[0] is self.picked[1]
+            self.same.setChecked(same)
+            names = [self.picked[0].Label] if same else [j.Label for j in self.picked]
+            self.fields["joints"].set_text(", ".join(names))
         finally:
             self._quiet = False
         self._show_rows()
@@ -209,6 +266,13 @@ class MotionLinkPanel(_JointsPanel):
             return
         if joints.fusion_type(joint) == "rigid":
             self.refuse("%s is rigid: it has no motion to link." % joint.Label)
+            return
+        if self._same():
+            if joint is not self.picked[0]:
+                self.refuse(
+                    "Link with Same Joint is ticked: untick it to link two joints, or clear "
+                    "the joint to pick another."
+                )
             return
         if joint in self.picked:
             index = self.picked.index(joint)
@@ -233,6 +297,9 @@ class MotionLinkPanel(_JointsPanel):
         self.picked = []
         self.motions = ["", ""]
         self.fields["joints"].set_text("")
+        self.same.blockSignals(True)
+        self.same.setChecked(False)
+        self.same.blockSignals(False)
         self._show_rows()
         if self.link is not None and not self.editing:
             self.link = None
@@ -273,7 +340,8 @@ class MotionLinkPanel(_JointsPanel):
         if len(self.picked) < 2:
             raise NeedsPick(
                 "Click two joints (their rows in the browser or timeline, or a jointed "
-                "component): when the first moves, the second follows."
+                "component): when the first moves, the second follows. For a screw, click "
+                "one joint that turns and slides and tick Link with Same Joint."
             )
         values = [row["field"].value() for row in self.rows]
         if abs(values[0]) < 1e-12:
@@ -310,6 +378,14 @@ class MotionLinkPanel(_JointsPanel):
         data = joints.link_data(self.link)
         ratio = motion_core.link_ratio(data["value1"], data["value2"], data["reverse"])
         units = [_unit(data["motion1"]), _unit(data["motion2"])]
+        if self._same():
+            self.note.setText(
+                "%s slides %.4g mm for each turn (%.4g mm for each degree it turns)."
+                % (self.picked[0].Label, ratio * 360.0, ratio)
+                if data["motion1"] == "angle"
+                else "%s turns %.4g deg for each mm it slides." % (self.picked[0].Label, ratio)
+            )
+            return
         self.note.setText(
             "%s moves %.4g %s for each %s %s moves."
             % (self.picked[1].Label, ratio, units[1], units[0], self.picked[0].Label)
@@ -446,10 +522,10 @@ def set_contact(mode):
     try:
         joints.set_contact_mode(doc, mode)
     except Exception as exc:
-        doc.abortTransaction()
+        joints_ui._close_step(doc, abort=True)
         commands.tell(str(exc))
         return False
-    doc.commitTransaction()
+    joints_ui._close_step(doc)  # (also when the mode was that already: no name left pending)
     log("contact: %s" % labels[mode])
     joints_ui._refresh_browser()
     return True

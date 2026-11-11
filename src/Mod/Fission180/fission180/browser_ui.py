@@ -2125,6 +2125,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Edit Joint Limits": lambda: _joint_action("edit_joint_limits", obj),
             "Drive Joints": lambda: _joint_action("drive", obj),
             "Animate Joint": lambda: _joint_action("animate", obj),
+            "Animate Joint Relationships": lambda: _joint_action("animate_relationships", obj),
             "Suppress": lambda: self._toggle_suppress(obj),
             "Open Drawing": lambda: _open_drawing(obj),
             "Copy": lambda: _clipboard_action("copy", node, obj, selected_nodes, self),

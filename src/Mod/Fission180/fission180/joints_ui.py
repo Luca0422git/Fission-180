@@ -610,11 +610,17 @@ class Animator:
     the Animate button, Animate Joint). Every frame starts from where the parts stood when
     the animation began, so nothing drifts; stop() puts them back exactly."""
 
-    def __init__(self, joint, on_done=None, loop=False):
+    def __init__(self, joint, on_done=None, loop=False, alone=False, motions=None):
+        """`alone`: only the joint's own component moves, as if nothing else held it (no
+        other joint, no motion link, no contact: Fusion's Animate Joint and Preview Motion);
+        else everything tied to it follows (Animate Joint Relationships). `motions`: the
+        degrees of motion played ("angle", "slide"); None plays all the joint has."""
         self.joint = joint
         self.doc = joint.Document
         self.on_done = on_done
         self.loop = loop
+        self.alone = bool(alone)
+        self.motions = tuple(motions) if motions else None
         self.error = ""
         self.start_places = joints.placements(self.doc)
         self.angle0, self.slide0 = joints.value(joint)
@@ -631,7 +637,8 @@ class Animator:
         if joints.fusion_type(self.joint) == "rigid":
             return False
         try:
-            joints.driven_part(self.joint)
+            if not self.alone:
+                joints.driven_part(self.joint)
         except Exception as exc:
             self.error = str(exc)
             return False
@@ -654,17 +661,24 @@ class Animator:
             kind = joints.fusion_type(self.joint)
             lim = joints.limits(self.joint)
             if kind in ("ball", "planar"):
-                joints.wobble(self.joint, phase, self.span)
-                joints.solve(self.doc)
+                joints.wobble(self.joint, phase, self.span, alone=self.alone)
+                if not self.alone:
+                    joints.solve(self.doc)
             else:
                 angle = slide = None
-                if kind in core.HAS_ANGLE:
+                wanted = self.motions
+                if kind in core.HAS_ANGLE and (wanted is None or "angle" in wanted):
                     a = lim["angle"]
                     angle = core.sweep(phase, self.angle0, a["min"], a["max"], 90.0)
-                if kind in core.HAS_DISTANCE:
+                if kind in core.HAS_DISTANCE and (wanted is None or "slide" in wanted):
                     s = lim["slide"]
                     slide = core.sweep(phase, self.slide0, s["min"], s["max"], self.span)
-                joints.drive(self.joint, angle=angle, slide=slide)
+                if self.alone:
+                    joints.drive_alone(self.joint, angle=angle, slide=slide)
+                elif joints.contact_mode(self.doc) != "off":
+                    joints.drive_until_contact(self.joint, angle=angle, slide=slide)
+                else:
+                    joints.drive(self.joint, angle=angle, slide=slide)
         except Exception as exc:
             warn("joint animation: %s" % exc)
             self.stop()
@@ -693,15 +707,38 @@ class Animator:
 _STANDALONE = {"animator": None, "shortcut": None}
 
 
-def animate(joint, loop=True):
-    """Animate Joint (browser right-click): plays until Esc or another command."""
+def animate_relationships(joint, loop=True):
+    """Fusion's Animate Joint Relationships (browser right-click): the joint plays with
+    everything that affects its components: the other joints, motion links, grounds and
+    contact sets. Until Esc or another command."""
+    return animate(joint, loop, alone=False)
+
+
+def animate(joint, loop=True, alone=True):
+    """Fusion's Animate Joint (browser right-click): this joint alone, as if no other joint
+    or relationship held its components (`alone`; Animate Joint Relationships passes
+    False). Plays until Esc or another command; the components then stand where they
+    were."""
     stop_animation()
     if not commands.finish_open_dialog():  # a command in progress ends (and its Esc with it)
         return None
     if joint is None or joints.fusion_type(joint) == "rigid":
         commands.tell("A rigid joint has no motion to animate.")
         return None
-    animator = Animator(joint, on_done=stop_animation, loop=loop)
+    if joints.rolled_back(joint) or joints.lost_reference(joint):
+        commands.tell(
+            "%s cannot move now: %s"
+            % (
+                joint.Label,
+                (
+                    "the history marker stands before it."
+                    if joints.rolled_back(joint)
+                    else "it lost the face or edge it was made on (Edit Joint, pick it again)."
+                ),
+            )
+        )
+        return None
+    animator = Animator(joint, on_done=stop_animation, loop=loop, alone=alone)
     if not animator.start():
         if animator.error:
             commands.tell(animator.error)
@@ -713,7 +750,10 @@ def animate(joint, loop=True):
         _STANDALONE["shortcut"] = shortcut
     except Exception:
         pass
-    log("animating %s (Esc stops it)" % joint.Label)
+    log(
+        "animating %s %s (Esc stops it)"
+        % (joint.Label, "alone" if alone else "with its relationships")
+    )
     return animator
 
 
@@ -972,6 +1012,57 @@ class _JointsPanel(BodyPanel):
         if animator is not None:
             animator.on_done = None
             animator.stop()
+        for limits in (getattr(self, "angle_limits", None), getattr(self, "slide_limits", None)):
+            if limits is not None:
+                limits.stop_preview()
+
+    def preview_motion(self, limits, on):
+        """A limits group's Preview Motion button (Fusion): its motion plays between its
+        limits, alone, or with all the joint's motions and what is tied to it when With All
+        Limits is ticked. Pressed again (or Esc, OK, any change) it stops and the
+        components stand where they were."""
+        mine = self.animator is not None and getattr(self.animator, "limits", None) is limits
+        if not on:
+            if mine:
+                self.stop_animation()
+            return
+        self.stop_animation()
+        if self._closed:
+            return
+        if self.dirty:  # what was just typed goes onto the joint first
+            self._timer.stop()
+            self._recompute()
+        joint = getattr(self, "joint", None)
+        if joint is None or joints.fusion_type(joint) == "rigid" or self.error:
+            limits.stop_preview()
+            self.info.setText("Pick the joint's components (and its position) first.")
+            return
+        everything = limits.all_limits.isChecked()
+        motion = "angle" if limits.unit == "deg" else "slide"
+        animator = Animator(
+            joint,
+            on_done=self._preview_done,
+            loop=True,
+            alone=not everything,
+            motions=None if everything else (motion,),
+        )
+        animator.limits = limits
+        self.animator = animator
+        if not animator.start():
+            self.animator = None
+            limits.stop_preview()
+            if animator.error:
+                self.message.setText("⚠ " + animator.error)
+            return
+        limits.preview.blockSignals(True)
+        limits.preview.setChecked(True)
+        limits.preview.blockSignals(False)
+
+    def _preview_done(self):
+        self.animator = None
+        for limits in (getattr(self, "angle_limits", None), getattr(self, "slide_limits", None)):
+            if limits is not None:
+                limits.stop_preview()
 
     def changed(self):
         self.stop_animation()
@@ -1093,7 +1184,15 @@ class _Limits:
         font = self.caption.font()
         font.setBold(True)
         self.caption.setFont(font)
-        layout.addRow(self.caption)
+        # Fusion: Flip swaps the minimum and maximum values (there when one of them is on)
+        self.flip = QtWidgets.QPushButton("Flip")
+        self.flip.setObjectName("Fission180Joint_%s_flip" % unit)
+        self.flip.setToolTip(
+            "Swap the Minimum and Maximum: the motion is then limited on the other side"
+        )
+        self.flip.setEnabled(False)
+        self.flip.clicked.connect(lambda *_: self._flip())
+        layout.addRow(self.caption, self.flip)
         for key, label in (("min", "Minimum"), ("max", "Maximum"), ("rest", "Rest")):
             check = QtWidgets.QCheckBox(label)
             check.setObjectName("Fission180Joint_%s_%s" % (unit, key))
@@ -1102,6 +1201,64 @@ class _Limits:
             check.toggled.connect(lambda on, k=key: self._toggled(k, on))
             layout.addRow(check, field.widget)
             self.rows[key] = (check, field)
+        # Fusion: Preview Motion plays this degree of motion alone, without the other
+        # relationships; With All Limits plays the joint with all its motions and limits
+        self.preview = QtWidgets.QPushButton("Preview Motion")
+        self.preview.setObjectName("Fission180Joint_%s_preview" % unit)
+        self.preview.setCheckable(True)
+        self.preview.setToolTip(
+            "Play this motion between its limits (press again or Esc to stop). Alone: "
+            "nothing else holds the component back."
+        )
+        self.preview.toggled.connect(lambda on: self._preview(on))
+        self.all_limits = QtWidgets.QCheckBox("With All Limits")
+        self.all_limits.setObjectName("Fission180Joint_%s_all" % unit)
+        self.all_limits.setToolTip(
+            "Play the joint with all its motions and limits, and everything tied to it"
+        )
+        self.all_limits.toggled.connect(lambda *_: self._preview(self.preview.isChecked()))
+        layout.addRow(self.preview, self.all_limits)
+
+    def _flip(self):
+        """Swap Minimum and Maximum (values and ticks), as Fusion's Flip does. The limit
+        values are measured along the joint's own direction, so a stop that turned out to
+        be on the wrong side goes to the other with one click."""
+        try:
+            panel = self.panel
+            (cmin, fmin), (cmax, fmax) = self.rows["min"], self.rows["max"]
+            on_min, on_max = cmin.isChecked(), cmax.isChecked()
+            low, high = fmin.value(), fmax.value()
+            was, panel._quiet = panel._quiet, True
+            try:
+                cmin.setChecked(on_max)
+                cmax.setChecked(on_min)
+                if on_max:
+                    fmin.set_value(high)
+                if on_min:
+                    fmax.set_value(low)
+                fmin.widget.setEnabled(on_max)
+                fmax.widget.setEnabled(on_min)
+            finally:
+                panel._quiet = was
+            self.on_change()
+        except Exception as exc:
+            warn("joint limits: %s" % exc)
+
+    def _preview(self, on):
+        try:
+            self.panel.preview_motion(self, bool(on))
+        except Exception as exc:
+            warn("joint limits: %s" % exc)
+
+    def stop_preview(self):
+        """The preview stopped (by the panel): the button comes up without playing again."""
+        try:
+            if self.preview.isChecked():
+                self.preview.blockSignals(True)
+                self.preview.setChecked(False)
+                self.preview.blockSignals(False)
+        except Exception:
+            pass
 
     def _toggled(self, key, on):
         """A limit switched on starts at the joint's value now, so switching it on moves
@@ -1109,8 +1266,11 @@ class _Limits:
         try:
             _check, field = self.rows[key]
             field.widget.setEnabled(on)
+            self.flip.setEnabled(self.rows["min"][0].isChecked() or self.rows["max"][0].isChecked())
+            if self.panel._quiet:
+                return
             joint = getattr(self.panel, "joint", None)
-            if on and joint is not None and not self.panel._quiet:
+            if on and joint is not None:
                 angle, slide = joints.value(joint)
                 field.set_value(round(angle if self.unit == "deg" else slide, 6))
             self.on_change()
@@ -1122,6 +1282,8 @@ class _Limits:
         for check, field in self.rows.values():
             check.setVisible(shown)
             field.widget.setVisible(shown)
+        for widget in (self.flip, self.preview, self.all_limits):
+            widget.setVisible(shown)
 
     def values(self):
         out = {}
@@ -1136,6 +1298,7 @@ class _Limits:
             field.widget.setEnabled(value is not None)
             if value is not None:
                 field.set_value(value)
+        self.flip.setEnabled(data.get("min") is not None or data.get("max") is not None)
 
 
 # -- Joint (J) -------------------------------------------------------------------------------------

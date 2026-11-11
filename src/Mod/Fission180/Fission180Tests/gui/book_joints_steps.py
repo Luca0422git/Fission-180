@@ -158,3 +158,67 @@ def told():
 def angle_between(a, b):
     c = max(-1.0, min(1.0, App.Vector(a).normalize().dot(App.Vector(b).normalize())))
     return math.degrees(math.acos(c))
+
+
+# -- hovering and clicking round edges -------------------------------------------------------------
+def edge_pixel(point):
+    """The widget pixel nearest a 3D point on an edge where an edge is under the mouse (a
+    person aims until the edge lights up), or the point's own pixel."""
+    from PySide import QtCore
+
+    h.uncover(point)
+    widget = h.gl_widget()
+    ratio = widget.devicePixelRatioF()
+    centre = h.screen_point(point)
+    for radius in range(0, h.AIM + 1):
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                if max(abs(dx), abs(dy)) != radius:
+                    continue
+                qx, qy = centre.x() + dx, centre.y() + dy
+                info = h.view().getObjectInfo((qx * ratio, (widget.height() - qy) * ratio))
+                if info and str(info.get("Component", "")).startswith("Edge"):
+                    return QtCore.QPoint(qx, qy)
+    return centre
+
+
+def hover_edge(point):
+    """Move the mouse onto an edge at a 3D point on it and wait for the snap hover."""
+    h.move(edge_pixel(point))
+    h.settle("the snap hover to look under the pointer")
+
+
+def hover_point(point):
+    h.move(h.screen_point(point))
+    h.settle("the snap hover to look under the pointer")
+
+
+def hover_of(panel):
+    return getattr(panel, "hover", None) if panel is not None else None
+
+
+def hot(panel):
+    hov = hover_of(panel)
+    return hov.hot if hov is not None else None
+
+
+def kinds(panel):
+    hov = hover_of(panel)
+    return sorted({c["kind"] for c in hov.candidates}) if hov is not None else []
+
+
+def rim(centre, radius, z, degrees):
+    """A point on a circle of `radius` about `centre` (x, y) at height z."""
+    a = math.radians(degrees)
+    return App.Vector(centre[0] + radius * math.cos(a), centre[1] + radius * math.sin(a), z)
+
+
+def xy_length(point):
+    return math.hypot(point.x, point.y)
+
+
+def box_centre(obj):
+    box = jm().part_shape(obj).BoundBox
+    return App.Vector(
+        0.5 * (box.XMin + box.XMax), 0.5 * (box.YMin + box.YMax), 0.5 * (box.ZMin + box.ZMax)
+    )

@@ -545,7 +545,137 @@ def _shape_snaps(shape, element):
     element (hole_snaps: an index of the shape, Fission 180's hole centres)."""
     from . import hole_snaps
 
-    return hole_snaps.snaps(shape, element)
+    try:
+        kept = hole_snaps.index_for(shape).__dict__.setdefault("_keypoints", {})
+    except Exception:
+        kept = {}
+    if element not in kept:
+        kept[element] = _keypoints(shape, element, hole_snaps.snaps(shape, element))
+    return kept[element]
+
+
+# What Fusion shows as snap points are the keypoints a person sees. The modelling kernel adds
+# points of its own: a full circle has one "corner" where it starts and ends (its seam vertex)
+# and a "middle" opposite it, a full cylinder has a seam line with a middle and two ends.
+# Offered as snaps they were the dots nearest the pointer on a round edge or face, so a click
+# there took "(corner)" or "(midpoint)" and the part landed off the axis (the book parity
+# report: Fire Piston, Hot End, Pizza Cutter). They are left out: a round edge offers its
+# centre, wherever on it the pointer is, as Fusion does; an arc keeps its ends and middle and
+# offers its centre unless the pointer is right on one of those.
+ROUND_FACES = ("Part::GeomCylinder", "Part::GeomCone")
+
+
+def _closed(edge):
+    try:
+        return bool(edge.Closed) or len(edge.Vertexes) < 2
+    except Exception:
+        return False
+
+
+def _keypoints(shape, element, snaps):
+    try:
+        el = shape.getElement(element)
+    except Exception:
+        return snaps
+    try:
+        if element.startswith("Edge"):
+            return _edge_keypoints(shape, el, snaps)
+        if element.startswith("Face"):
+            return _face_keypoints(shape, el, snaps)
+    except Exception as exc:
+        warn("joint snap points: %s" % exc)
+    return snaps
+
+
+def _edge_keypoints(shape, edge, snaps):
+    out = []
+    round_edge = _is_circle(edge)
+    closed = _closed(edge)
+    for snap in snaps:
+        kind = snap["kind"]
+        if closed and kind in ("midpoint", "vertex"):
+            continue  # the circle's seam and the point opposite it: not corners one sees
+        if kind == "circle" and round_edge:
+            snap = dict(snap, reach=float(edge.Curve.Radius))  # lit from all along the edge
+        elif kind == "loop":
+            snap = _true_loop(shape, snap)
+        out.append(snap)
+    return out or snaps
+
+
+def _point_key(point):
+    return (round(point.x, 6), round(point.y, 6), round(point.z, 6))
+
+
+def _face_keypoints(shape, face, snaps):
+    ghosts = set()  # seam ends and seam middles of this face, the lone corner of a full circle
+    real = set()  # corners an open edge (not a seam) ends at
+    round_face = face.Surface.TypeId in ROUND_FACES
+    try:
+        for edge in face.Edges:
+            if _closed(edge):
+                ghosts.update(_point_key(v.Point) for v in edge.Vertexes)
+            elif round_face and edge.isSeam(face):
+                ghosts.update(_point_key(v.Point) for v in edge.Vertexes)
+                middle = 0.5 * (edge.FirstParameter + edge.LastParameter)
+                ghosts.add(_point_key(edge.valueAt(middle)))
+            else:
+                real.update(_point_key(v.Point) for v in edge.Vertexes)
+    except Exception:
+        ghosts = set()
+    ghosts -= real
+    out = []
+    for snap in snaps:
+        kind = snap["kind"]
+        if ghosts and kind in ("vertex", "midpoint") and _point_key(snap["point"]) in ghosts:
+            continue
+        if kind == "loop":
+            snap = _true_loop(shape, snap)
+        out.append(snap)
+    return out or snaps
+
+
+def _true_loop(shape, snap):
+    """A hole's centre (the centre of area of its outline on the face) put on the hole's
+    axis when the hole is round but its outline is not quite: a modelled thread runs out
+    through the rim and pulls the centre of area off the axis (0.37 mm on the book's pizza
+    cutter bolt hole). Round = every arc of the outline is of one circle, it has no straight
+    side, and that circle's centre is near the centre of area."""
+    loop = snap.get("loop") or {}
+    try:
+        face = shape.getElement(loop.get("face") or "")
+        first = shape.getElement(loop.get("edge") or "")
+        wire = None
+        for candidate in face.Wires:
+            if any(e.isSame(first) for e in candidate.Edges):
+                wire = candidate
+                break
+        if wire is None:
+            return snap
+        centre = radius = None
+        other = False
+        for edge in wire.Edges:
+            kind = edge.Curve.TypeId
+            if kind == "Part::GeomCircle":
+                c, r = App.Vector(edge.Curve.Center), float(edge.Curve.Radius)
+                if centre is None:
+                    centre, radius = c, r
+                elif (c - centre).Length > 1e-6 or abs(r - radius) > 1e-6:
+                    return snap  # arcs of different circles (a slot): the centre of area
+            elif kind in ("Part::GeomLine", "Part::GeomLineSegment"):
+                return snap
+            else:
+                other = True
+        if centre is None or not other:
+            return snap  # a plain circle is its own centre already
+        normal = App.Vector(*loop["n"])
+        on_face = App.Vector(snap["point"])
+        centre = centre - normal * (centre - on_face).dot(normal)  # in the face's plane
+        if (centre - on_face).Length > 0.5 * max(radius, 1e-9):
+            return snap
+        return dict(snap, point=centre)
+    except Exception:
+        return snap
 
 
 HOLE_KINDS = ("loop", "hole_top", "hole_mid", "hole_bottom")
@@ -583,6 +713,8 @@ def _find_snap(shape, element, kind, at, record=None):
                 found = hole_snaps.stored_snap(record, shape)
                 if found is not None:
                     log("a joint's hole is gone: it stays where the hole was")
+            elif found.get("kind") == "loop":
+                found = _true_loop(shape, found)
             chosen = found
     return chosen
 
@@ -630,7 +762,7 @@ def snap_candidates(pick):
         snaps = [snaps[0]] + [snaps[i] for i in sorted(kept)]
     from . import hole_snaps_core
 
-    radii = [float((s.get("loop") or {}).get("r", 0.0)) for s in snaps]
+    radii = [float((s.get("loop") or {}).get("r", 0.0) or s.get("reach", 0.0)) for s in snaps]
     keep, reach = hole_snaps_core.dedupe_with_reach(
         [_tuple(s["point"]) for s in snaps], radii, 1e-7
     )
@@ -1658,6 +1790,10 @@ class JointProxy(_JointBase):
             axis = motion_axis(joint)
             if axis != "z":
                 f = core.to_motion_axis(f, axis)
+            if index == 0 and _HOLD:
+                held = _HOLD.get(joint.Name)
+                if held is not None:
+                    f = core.compose(f, held)  # held at its value for this solve (_holding)
             return from_frame(f)
         except Exception as exc:
             warn("joint %s: could not place its joint origin: %s" % (joint.Label, exc))
@@ -2477,17 +2613,92 @@ def _run_solver(asm, doc):
             set_global_placement(p, solved[p.Name])
 
 
-def solve(doc, keep=None):
+# -- a joint held at its value while the solver closes a loop --------------------------------------
+# Driving or dragging one joint of a closed loop (a four-bar linkage) moves its component;
+# the other links have to follow. FreeCAD's solver is free to satisfy the loop by turning
+# the driven joint back instead (the nearest solution), and it did: the crank went nowhere,
+# or two links moved and the rocker stayed (the book parity report, Strandbeest). So for
+# that solve the driven joint is held where it was put: it counts as rigid at its present
+# value (its type Fixed, its joint origin 1 turned back by what the joint reads now), and
+# the solver can only move the rest of the loop.
+_HOLD = {}  # joint name -> the frame joint origin 1 is composed with while it is held
+HOLDABLE = ("Revolute", "Slider", "Cylindrical")
+
+
+def in_loop(joint):
+    """True when the joint's two components are also tied through other joints (a closed
+    loop: a four-bar linkage)."""
+    try:
+        p1, p2 = part1(joint), part2(joint)
+        if p1 is None or p2 is None:
+            return False
+        reached = _reach(_graph(joint.Document), p1, cut=joint)
+        return any(p is p2 for p in reached)
+    except Exception:
+        return False
+
+
+class _holding:
+    """While entered, each of `held` (joints in a closed loop) is rigid at its present
+    value for FreeCAD's solver."""
+
+    def __init__(self, held):
+        self.held = []
+        for joint in held or ():
+            try:
+                if (
+                    joint is not None
+                    and getattr(joint, "JointType", "") in HOLDABLE
+                    and not getattr(joint, PROPS["role"], "")
+                    and in_loop(joint)
+                ):
+                    self.held.append((joint, joint.JointType))
+            except Exception:
+                continue
+
+    def __enter__(self):
+        for joint, _kind in self.held:
+            try:
+                rel = core.relative(to_frame(jcs_global(joint, 0)), to_frame(jcs_global(joint, 1)))
+                _HOLD[joint.Name] = core.inverse(rel)
+                joint.JointType = "Fixed"
+                # (FreeCAD's solve reads the stored joint origin; findPlacement adds the
+                # same turn should anything work it out again meanwhile)
+                joint.Placement1 = from_frame(
+                    core.compose(to_frame(joint.Placement1), _HOLD[joint.Name])
+                )
+            except Exception as exc:
+                _HOLD.pop(joint.Name, None)
+                warn("joint %s: could not be held: %s" % (joint.Label, exc))
+        return self
+
+    def __exit__(self, *exc):
+        for joint, kind in self.held:
+            try:
+                _HOLD.pop(joint.Name, None)
+                if joint.JointType != kind:
+                    joint.JointType = kind
+                refresh_placements(joint)
+            except Exception as exc:
+                warn("joint %s: %s" % (getattr(joint, "Label", "?"), exc))
+        return False
+
+
+def solve(doc, keep=None, hold=None):
     """Run FreeCAD's solver; 0 when it worked (see solve_message): -2 when it said it did
     but the joints are not all satisfied. A group of jointed parts that nothing grounds is
-    held by one of its parts for the solve (`keep`, or its oldest joint's component 2)."""
+    held by one of its parts for the solve (`keep`, or its oldest joint's component 2).
+    `hold`: a joint (or joints) just driven: in a closed loop it stays at its value and
+    the rest of the loop follows (see _holding)."""
     asm = assembly(doc)
     if asm is None:
         return 0
     pool = []
+    held = hold if isinstance(hold, (list, tuple)) else ([hold] if hold is not None else [])
     try:
         pool = _hold_free_groups(doc, keep)
-        code = _run_solver(asm, doc)
+        with _holding(held):
+            code = _run_solver(asm, doc)
     except Exception as exc:
         warn("joints: solve failed: %s" % exc)
         return -1
@@ -2642,17 +2853,88 @@ def driven_part(joint):
     return (part1(joint) if side == 0 else part2(joint)), side
 
 
-def clamp_values(joint, angle=None, slide=None):
-    """(angle, slide) kept inside the joint's limits; None for a motion it does not have."""
+def own_link(joint):
+    """The active motion link that ties this joint's turn to its own slide (Fusion's Link
+    with Same Joint: a Cylindrical joint that screws), or None."""
+    try:
+        for link in motion_links(joint.Document):
+            if link.Joint1 is joint and link.Joint2 is joint:
+                if not getattr(link, "Suppressed", False) and not rolled_back(link):
+                    return link
+    except Exception:
+        pass
+    return None
+
+
+def own_ratio(joint):
+    """(leading motion, following motion, ratio, offset) of a joint whose own motions are
+    tied (following = ratio x leading + offset), or None."""
+    link = own_link(joint)
+    if link is None:
+        return None
+    data = link_data(link)
+    first = data["motion1"] or "angle"
+    second = data["motion2"] or ("slide" if first == "angle" else "angle")
+    if first == second:
+        return None
+    ratio = motion_core.link_ratio(data["value1"], data["value2"], data["reverse"])
+    return first, second, ratio, data["offset"]
+
+
+def tie_own_motions(joint, angle=None, slide=None, lead=None):
+    """A joint whose turn and slide are tied (a screw): the motion asked for takes the other
+    along. Both asked for: `lead` ("angle" / "slide") says which one counts, else the
+    link's first. Returns (angle, slide); unchanged for any other joint."""
+    tied = own_ratio(joint)
+    if tied is None or (angle is None and slide is None):
+        return angle, slide
+    first, second, ratio, offset = tied
+    values = {"angle": angle, "slide": slide}
+    if lead not in values or values[lead] is None:
+        lead = first if values[first] is not None else second
+    if lead == first:
+        values[second] = motion_core.linked_value(values[first], ratio, offset)
+    else:
+        back = motion_core.unlinked_value(values[second], ratio, offset)
+        if back is not None:
+            values[first] = back
+    return values["angle"], values["slide"]
+
+
+def clamp_values(joint, angle=None, slide=None, lead=None):
+    """(angle, slide) kept inside the joint's limits; None for a motion it does not have. A
+    joint whose own motions are tied (tie_own_motions) keeps them tied: a limit reached by
+    one stops the other too."""
     lim = limits(joint)
-    if angle is not None:
-        angle = core.clamp(angle, lim["angle"]["min"], lim["angle"]["max"])
-        if not has_angle(joint):
-            angle = None
-    if slide is not None:
-        slide = core.clamp(slide, lim["slide"]["min"], lim["slide"]["max"])
-        if not has_slide(joint):
-            slide = None
+    tied = own_ratio(joint) is not None and (angle is not None or slide is not None)
+    if tied:
+        angle, slide = tie_own_motions(joint, angle, slide, lead)
+
+    def inside(a, s):
+        if a is not None:
+            a = core.clamp(a, lim["angle"]["min"], lim["angle"]["max"])
+        if s is not None:
+            s = core.clamp(s, lim["slide"]["min"], lim["slide"]["max"])
+        return a, s
+
+    wanted = (angle, slide)
+    angle, slide = inside(angle, slide)
+    if tied and (angle, slide) != wanted:
+        # a limit cut one motion short: the other stops with it
+        for held in ("slide", "angle"):
+            got = {"angle": angle, "slide": slide}
+            asked = {"angle": wanted[0], "slide": wanted[1]}
+            if got[held] is not None and asked[held] is not None and got[held] != asked[held]:
+                kept = {held: got[held]}
+                angle, slide = tie_own_motions(
+                    joint, kept.get("angle"), kept.get("slide"), lead=held
+                )
+                angle, slide = inside(angle, slide)
+                break
+    if not has_angle(joint):
+        angle = None
+    if not has_slide(joint):
+        slide = None
     return angle, slide
 
 
@@ -2666,7 +2948,29 @@ def drive(joint, angle=None, slide=None, do_solve=True, links=True, keep=None):
     if links:
         follow_links(joint)
     if do_solve:
-        solve(joint.Document, keep=keep)
+        if solve(joint.Document, keep=keep, hold=joint) != 0:
+            # the loop cannot follow that far: the solver brings the joint back to where
+            # everything still fits
+            solve(joint.Document, keep=keep)
+    return value(joint)
+
+
+def lone_side(joint):
+    """(part, side) that moves when the joint plays alone (Fusion's Animate Joint, Preview
+    Motion): component 1, or component 2 when component 1 is grounded."""
+    p1, p2 = part1(joint), part2(joint)
+    if is_grounded(p1) and not is_grounded(p2):
+        return p2, 1
+    return p1, 0
+
+
+def drive_alone(joint, angle=None, slide=None):
+    """Put the joint at an angle and / or slide (within its limits) by moving only its own
+    component, as if nothing else held it: no other joint, no motion link, no solve.
+    Returns (angle, slide) as the joint reads then."""
+    angle, slide = clamp_values(joint, angle, slide)
+    part, side = lone_side(joint)
+    place_joint(joint, angle, slide, side, movers=[part])
     return value(joint)
 
 
@@ -2702,7 +3006,8 @@ def drive_until_contact(joint, angle=None, slide=None):
             return blocked(doc, pairs) is not None
 
         put(motion_core.last_free(stuck))
-    solve(doc)
+    if solve(doc, hold=joint) != 0:
+        solve(doc)
     got = value(joint)
     return got[0], got[1], hit
 
@@ -2817,7 +3122,14 @@ def _check_link(joint1, joint2, motion1, motion2):
     if joint1 is None or joint2 is None:
         raise JointError("Pick two joints to link.")
     if joint1 is joint2:
-        raise JointError("Pick two different joints.")
+        # Fusion's Link with Same Joint: one joint's turn tied to its own slide (a screw)
+        if len(motions_of(joint1)) < 2:
+            raise JointError(
+                "%s has one motion only: Link with Same Joint needs a joint that both turns "
+                "and slides (Cylindrical, Pin-Slot)." % joint1.Label
+            )
+        if motion1 == motion2:
+            raise JointError("Link the joint's turn with its slide (two different motions).")
     for joint, motion in ((joint1, motion1), (joint2, motion2)):
         if fusion_type(joint) == "rigid":
             raise JointError("%s is rigid: it has no motion to link." % joint.Label)
@@ -2830,6 +3142,8 @@ def set_motion_link(link, joint1, joint2, value1, value2, reverse=False, motion1
     """(Re)define a motion link; both joints keep where they are now."""
     motion1 = motion1 or default_motion(joint1)
     motion2 = motion2 or default_motion(joint2)
+    if joint1 is joint2 and motion1 == motion2:
+        motion2 = "slide" if motion1 == "angle" else "angle"
     _check_link(joint1, joint2, motion1, motion2)
     ratio = motion_core.link_ratio(value1, value2, reverse)
     offset = motion_core.link_offset(
@@ -2853,12 +3167,11 @@ def set_motion_link(link, joint1, joint2, value1, value2, reverse=False, motion1
 
 
 def create_motion_link(doc, joint1, joint2, value1, value2, reverse=False, motion1="", motion2=""):
-    _check_link(
-        joint1,
-        joint2,
-        motion1 or (default_motion(joint1) if joint1 is not None else ""),
-        motion2 or (default_motion(joint2) if joint2 is not None else ""),
-    )
+    first = motion1 or (default_motion(joint1) if joint1 is not None else "")
+    second = motion2 or (default_motion(joint2) if joint2 is not None else "")
+    if joint1 is not None and joint1 is joint2 and first == second:
+        second = "slide" if first == "angle" else "angle"
+    _check_link(joint1, joint2, first, second)
     joint_group(doc, create=True)
     link = doc.addObject("App::FeaturePython", "MotionLink")
     link.Label = "Motion Link %d" % core.label_number(
@@ -2887,6 +3200,8 @@ def follow_links(joint, seen=None):
     turn); nothing is solved here."""
     seen = set(seen or ()) | {joint.Name}
     for link in links_of(joint):
+        if link.Joint1 is link.Joint2:
+            continue  # its own two motions: tied where its values are set (clamp_values)
         data = link_data(link)
         ratio = motion_core.link_ratio(data["value1"], data["value2"], data["reverse"])
         if link.Joint1 is joint:
@@ -2942,10 +3257,63 @@ def go_to_rest(joint):
     return True
 
 
-def wobble(joint, phase, span):
-    """Move a Ball (pitch / yaw) or Planar (slide in its plane) joint for the preview."""
+def rest_values(doc):
+    """{joint name: (angle, slide)} of the active joints that have a Rest value, as they
+    read now (taken when a drag starts: see settle_rest)."""
+    out = {}
+    for joint in joints(doc):
+        try:
+            if getattr(joint, "Suppressed", False) or rolled_back(joint) or lost_reference(joint):
+                continue
+            lim = limits(joint)
+            if lim["angle"]["rest"] is None and lim["slide"]["rest"] is None:
+                continue
+            out[joint.Name] = value(joint)
+        except Exception:
+            continue
+    return out
+
+
+def settle_rest(doc, before=None):
+    """Fusion's Rest: a joint with a Rest value goes back to it once nothing moves its
+    component any more (a drag is let go). `before` (rest_values at the start of the move):
+    only the joints that moved since go back; None: every joint that is away from its rest.
+    Returns the joints put back."""
+    moved = []
+    for joint in joints(doc):
+        try:
+            if getattr(joint, "Suppressed", False) or rolled_back(joint) or lost_reference(joint):
+                continue
+            lim = limits(joint)
+            angle = lim["angle"]["rest"] if has_angle(joint) else None
+            slide = lim["slide"]["rest"] if has_slide(joint) else None
+            if angle is None and slide is None:
+                continue
+            now = value(joint)
+            if before is not None:
+                was = before.get(joint.Name)
+                if was is not None and all(abs(a - b) < 1e-6 for a, b in zip(was, now)):
+                    continue  # this drag did not move it: it stays (it was driven there)
+            away = (angle is not None and abs(now[0] - angle) > 1e-6) or (
+                slide is not None and abs(now[1] - slide) > 1e-6
+            )
+            if not away:
+                continue
+            drive(joint, angle=angle, slide=slide, do_solve=False)
+            moved.append(joint)
+        except JointError as exc:
+            log("rest of %s: %s" % (getattr(joint, "Label", "?"), exc))
+    if moved:
+        solve(doc)
+        log("back to rest: %s" % ", ".join(j.Label for j in moved))
+    return moved
+
+
+def wobble(joint, phase, span, alone=False):
+    """Move a Ball (pitch / yaw) or Planar (slide in its plane) joint for the preview;
+    `alone`: only its own component (see drive_alone)."""
     kind = fusion_type(joint)
-    part, side = driven_part(joint)
+    part, side = lone_side(joint) if alone else driven_part(joint)
     jcs1 = to_frame(jcs_global(joint, 0))
     jcs2 = to_frame(jcs_global(joint, 1))
     t = 2.0 * math.pi * phase
@@ -2957,7 +3325,10 @@ def wobble(joint, phase, span):
         return
     if side == 1:
         T = core.inverse(T)  # component 2 moves instead
-    move_part(part, from_frame(T), joint)
+    if alone:
+        move_parts([part], from_frame(T))
+    else:
+        move_part(part, from_frame(T), joint)
 
 
 def part_size(part):
@@ -3225,9 +3596,12 @@ def set_motion_study(study, data):
 def study_pose(doc, data, step):
     """Put every joint of a study at its value for `step` (the links follow), then solve.
     Returns the solver's code."""
+    driven = []
     for name in data.get("joints", []):
         joint = doc.getObject(name)
         if joint is None or not is_joint(joint) or getattr(joint, "Suppressed", False):
+            continue
+        if rolled_back(joint) or lost_reference(joint):
             continue
         target = motion_core.study_value(data.get("keys", {}).get(name, []), step)
         if target is None:
@@ -3238,9 +3612,13 @@ def study_pose(doc, data, step):
                 drive(joint, angle=target, do_solve=False)
             elif motion == "slide":
                 drive(joint, slide=target, do_solve=False)
+            driven.append(joint)
         except JointError as exc:
             log("motion study: %s" % exc)
-    return solve(doc)
+    code = solve(doc, hold=driven)
+    if code != 0 and driven:
+        code = solve(doc)
+    return code
 
 
 ANGLES_KEY = "Fission 180:angles"  # in a placements record: the joints' counted angles

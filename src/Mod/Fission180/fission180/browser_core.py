@@ -647,6 +647,7 @@ MENUS = {
         "Edit Joint Limits",
         "Drive Joints",
         "Animate Joint",
+        "Animate Joint Relationships",
         "-",
         "Show/Hide",
         "Suppress",
