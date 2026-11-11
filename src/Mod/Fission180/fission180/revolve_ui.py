@@ -1359,6 +1359,7 @@ class RevolvePanel(Panel):
             pass
         self.profiles = profiles
         self.axis = axis
+        self._centerline_axis()
         self._refresh_picks()
         self._next_field()
         self._collect()
@@ -1961,7 +1962,22 @@ class RevolvePanel(Panel):
         self.message.setText("")
         return ""
 
+    def _centerline_axis(self):
+        """(wave 7, sketch-a) Fusion: the profile sketch's one Centerline is the axis by
+        itself (sketch_centerline.py; the Sketch Palette's Linetype)."""
+        if self.axis is not None or not self.profiles or self.editing:
+            return
+        try:
+            from . import sketch_centerline
+
+            ref = sketch_centerline.revolve_axis(self.profiles)
+            if ref is not None:
+                self.axis = revolve.axis_from_pick(*ref)
+        except Exception as exc:
+            warn("revolve: centerline axis: %s" % exc)
+
     def _picks_changed(self):
+        self._centerline_axis()
         self._refresh_picks()
         if not self.profiles or self.axis is None:
             if self.target is not None and not self.editing:

@@ -261,6 +261,14 @@ def e_drawn():
     h.check("E: the chain goes on from the end", c.active and c.current is not None, c.current)
     s["e_end"] = line_at(4)[1]  # where the line really ended (FreeCAD snaps to its grid)
     h.double_click(s["e_end"])
+    # ...and the release a real mouse sends after it (Qt's test double-click sends none).
+    # Since wave 7 the chain ends at that release: a press on the chain's end that drags
+    # instead is Fusion's tangent arc, also inside the double-click time (the book parity
+    # report: "press and drag at a line's end draws no arc")
+    QtTest.QTest.mouseRelease(
+        h.gl_widget(), QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, h.screen_point(s["e_end"])
+    )
+    QtWidgets.QApplication.processEvents()
 
 
 def e_after_dbl():

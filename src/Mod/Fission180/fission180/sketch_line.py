@@ -98,9 +98,8 @@ class LineChain:
         last = recent.last()
         if last is not None and last[0] not in ("Fission180_SketchLine", COMMAND):
             return False
-        gl = self.session.gl
         try:
-            return gl is not None and gl.cursor().shape() != QtCore.Qt.ArrowCursor
+            return self.session.drawing_cursor()
         except Exception:
             return False
 
@@ -149,6 +148,13 @@ class LineChain:
                 self.chain_start = None
                 self.current = None
                 log("line: ended on existing geometry; the next click starts a new chain")
+                from . import commands
+
+                # said, not silent: the rubber band is gone and the next click starts
+                # a line somewhere else (the book parity report took it for a failure)
+                commands.tell(
+                    "Line: this chain ends on the geometry it met. Click to start the next line."
+                )
                 return
             if self._click_at(end):
                 self.current = end
