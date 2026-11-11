@@ -1365,7 +1365,7 @@ def build(profiles, axis, options, name="Revolve", feature=None, hide=True):
     )
     if participants is not None and not participants:
         if options["operation"] != "join":
-            raise RevolveError(nothing_touched(options, "revolve"))
+            raise RevolveError(nothing_touched(options, "revolve", doc))
         options = dict(options, operation="new_body")  # a Join touching nothing
         participants = None
     elif (

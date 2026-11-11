@@ -302,7 +302,44 @@ def participants_for(feature, profiles, options):
     return sorted(result, key=lambda b: b.ID)
 
 
-def nothing_touched(options, what="extrusion"):
+def nothing_touched(options, what="extrusion", doc=None):
+    """Why a Cut or Intersect that goes through no body is refused. With `doc`: when the
+    design has hidden bodies, the text says that they are left out and which to show
+    (wave 7, replay-d: the Hot End's bore revolved as a Cut with the Nozzle's body hidden
+    read "does not go through any body", though the bore is drawn right in it; Fusion also
+    leaves hidden bodies out of the bodies to cut, Autodesk Extrude reference: "Auto-Select
+    re-computes the bodies to cut based on the current visibility state")."""
+    text = _nothing_touched(options, what)
+    hidden = hidden_solids(doc) if doc is not None else []
+    if hidden:
+        names = ", ".join(hidden[:3]) + (" ..." if len(hidden) > 3 else "")
+        text += " Hidden bodies are not cut (%s %s hidden): show it, then start again." % (
+            names,
+            "is" if len(hidden) == 1 else "are",
+        )
+    return text
+
+
+def hidden_solids(doc):
+    """The names (as the browser shows them) of the hidden bodies that hold a solid."""
+    found = []
+    try:
+        used = set(bodies.consumers(doc))  # combined into another: not a body any more
+        for body in bodies.list_bodies(doc):
+            if bodies.is_shown(body) or body.Name in used:
+                continue
+            try:
+                if body.Shape.isNull() or not body.Shape.Solids:
+                    continue
+            except Exception:
+                continue
+            found.append(body.Label)
+    except Exception:
+        return []
+    return found
+
+
+def _nothing_touched(options, what="extrusion"):
     if what != "extrusion":
         # a revolve, sweep or loft
         if options["operation"] == "intersect":
