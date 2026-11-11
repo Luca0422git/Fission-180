@@ -464,6 +464,25 @@ when a dialog closes (and before the next command).
 | A construction built on another component does not move with that component's later moves (39, Guess) | Same as a sketch's reference: the frame is worked out with the picked bodies where they stood, for the construction's own body, when it was made (`ConstructionFrame.Home / Frames`); it follows the other part's CHANGES, not later MOVES of either component. Constructions saved before this freeze at their first recompute |
 | New Component: Internal / External (38) | "Saved: Internal / External"; External is greyed, with the reason and what to do instead in its tooltip (one design per file; linked designs are locked until Break Link, so an empty one could not be modelled in) |
 
+### A row inside a copy: one predicate, and who sees what
+
+`components.is_holder(obj)`: a component inside a copy that stands for a component nested
+in the copy's original. `components.stands_for(obj)`: the component it is the same PART as
+(a holder: the original's nested component; an occurrence "Screw:2": its original; else
+itself). A holder is a browser row and nothing more.
+
+| Where components are listed or counted | Sees | How |
+|---|---|---|
+| A drawing's parts list and balloons (`drawing.components_of`) | parts: a body in a holder counts as the component the holder stands for, once per occurrence (a motor inserted twice: Case 2, Cartridge 2, Cap 2) | `_nested_source` |
+| Joints, Component Drag, Duplicate With Joints (`joints.is_part` / `part_of`) | the copy as ONE part, as when it held its bodies flat; a holder is no part | `is_part` |
+| Move/Copy of components | the row clicked; a holder is refused with the reason | `component_move.refusal` |
+| Patterns and Mirror of components | a holder is refused ("... is part of a copy: pattern the original's Bolt") | `component_pattern.check` |
+| New Component's Parent list | no holders (a row inside a copy is no place of its own) | `components_ui` |
+| The ring on a holder's row | activates the original's part | `components.editable` |
+| STEP export, the export report (`exchange._units`, `export_report`) | an occurrence is written as one more occurrence of its original; its inside is not walked | unchanged (`instances.is_instance`) |
+| Properties, mass totals, Manufacture's model bodies | bodies (the same bodies as when a copy was flat) | unchanged |
+| The browser, Isolate, Find in Window, Selectable, Opacity, the Animation workspace's component rows, the AI's design listing, component colours, Derive's list, Assign Plastic Rule's list | occurrences as the person sees them: a holder is a row like any nested component | unchanged |
+
 ## Known gaps (honest list)
 
 - Wave 7: snapping and inference to another component's geometry while drawing, and a
