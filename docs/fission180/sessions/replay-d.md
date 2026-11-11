@@ -72,6 +72,25 @@ extrusion lies beside the block: Join is right, and Cut is refused with that mes
 is then true. The report's tester most likely had only that half picked (the profile
 question, not the message).
 
+## Results
+
+- `replay_10_fire_piston`: PASS, 527 checks, from the first step (19 min on the shared,
+  loaded machine; the knurl's OK alone 260 s).
+- `replay_11_hot_end`: PASS, 98 checks (run_tests.sh).
+- `replay_d_section_root`: PASS, 10 checks.
+- Older scenarios of the files changed, one batch at a time: book_joints_snap (41),
+  book_sketch_c_scale (26), book_components2_cancel (29), book_modifyc_section (28),
+  book_extrude_operation (74), book_modify_thread_chamfer (52), book_modify_fillet_limit_note
+  (18), book_modifyb_draft (31), inspect_construct (69), book_extrude_across (43): PASS.
+  book_components_active FAILS at H ("still New Body, not Cut"): its check predates the
+  extrude-2 merge (a5033375), which made a push into another component's body a Cut on
+  purpose (Fusion, forum "Tool behaviour - unexpected"); not caused by this branch, the check
+  needs the components owner's update.
+- Unit tests: all pass but the known `test_vex_qa_freecad` (another builder's).
+  New: `test_value_limits` (typing pause), `test_fillet_robust` (clean verdict kept),
+  `test_ring_snap_freecad` (13 checks in real FreeCAD).
+- Golden models: 649 pass, 2 xfail (as before).
+
 ## Hitches found and NOT fixed
 
 - **A construction plane is drawn as large as its whole part.** The Offset Plane inside the
@@ -91,6 +110,10 @@ question, not the message).
   now says "show it, then start again".
 - **Section Analysis's undo step is named "Add a Body"** when it made the empty body (the
   two steps merged); Ctrl+Z works (the section goes, no body is left).
+- **Typing a chamfer size right after a pick on a threaded part can still wait** behind
+  one trial build of the size search (2 - 5 s each on this machine; 26 s in the full run
+  under load, when the hand's way from the view to the box let builds start). Would take:
+  the search in a worker process, as the knurl's build is.
 - A slider dragged by hand stops a hair short of the pointer (0.997 in for 1 in): the
   Minimum box shows 1.00 in (two decimals) when ticked.
 
