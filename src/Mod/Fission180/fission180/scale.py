@@ -509,19 +509,37 @@ def scale_sketch(sketch, factor, center=None):
     dims = []
     kept = []
     for i, con in enumerate(sketch.Constraints):
-        if con.Type in DIMENSIONS and con.Driving:
-            if _expression_bound(sketch, i, con.Name):
-                kept.append(con.Name or "#%d" % (i + 1))
-                continue
-            dims.append((i, con.Value))
-    # The curves first, then each dimension: FreeCAD solves after every new value, and
-    # with the curves already scaled each solve only confirms them (setting the curves
-    # with the dimensions as references and solving moved the corners half way).
+        if con.Type not in DIMENSIONS:
+            continue
+        if con.Driving and _expression_bound(sketch, i, con.Name):
+            kept.append(con.Name or "#%d" % (i + 1))
+            continue
+        # (a reference dimension too: FreeCAD solves its value with the curves, so one left
+        # at its old value pulled the free curves of a sketch not fully constrained half way
+        # back)
+        dims.append((i, con.Value, bool(con.IsActive)))
+    # The curves first, then every dimension's new value, the dimensions switched off
+    # (inactive) meanwhile and switched on again together. FreeCAD solves after every new
+    # value: with the other dimensions still at their old value in that solve, the mix
+    # need not fit (an ellipse halved: its major axis 6 while the minor one is still 6;
+    # a triangle's 10 side doubled while the 6 sides are still 6), FreeCAD refused the value
+    # ("conflicting constraints") and the Scale dialog stayed open with the sketch half
+    # scaled (wave 7, fix-7: sketch_geometry_keep S, scaling back the preview on OK). An
+    # inactive dimension takes no part in a solve, so each solve only confirms the scaled
+    # curves; the last one, with all of them on, too. (A dimension made a reference instead
+    # still takes part: its value moves with the curves, which went half way back.)
     # (sketch_geometry: assigning sketch.Geometry made construction points normal ones
     # with new ids)
-    sketch_geometry.set_geometry(sketch, changes)
-    for i, value in dims:
-        sketch.setDatum(i, App.Units.Quantity(value * factor, App.Units.Unit("mm")))
+    off = [i for i, _value, active in dims if active]
+    try:
+        for i in off:
+            sketch.setActive(i, False)
+        sketch_geometry.set_geometry(sketch, changes)
+        for i, value, _active in dims:
+            sketch.setDatum(i, App.Units.Quantity(value * factor, App.Units.Unit("mm")))
+    finally:
+        for i in off:
+            sketch.setActive(i, True)
     try:
         sketch.solve()
     except Exception:
