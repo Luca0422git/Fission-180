@@ -640,6 +640,40 @@ def blank(obj, base_shape=None):
     )
 
 
+def groove_tools(obj, base_shape=None):
+    """The solids a modeled Thread step cuts from the part under it (its base, or
+    `base_shape`): what turns the cylinders to the thread's size and cuts the grooves, as
+    build() cuts them. (Wave 7, the book replay: the Metric Bolt's chamfer after its thread;
+    fillet_robust took the grooves as the blank minus the threaded part, and that boolean
+    gave the whole blank back for the bolt revolved on the Front plane.)"""
+    shape = base_shape if base_shape is not None else obj.BaseFeature.Shape
+    record = computed(obj)
+    designation = tables.find(obj.Standard or "iso", record.get("designation", ""))
+    if designation is None or not record.get("threads"):
+        raise ThreadError("This thread has not been computed yet.")
+    tools = []
+    for one in record["threads"]:
+        found = refind(shape, one)
+        if found is None:
+            raise ThreadError("The face of this thread is gone.")
+        cylinder = found[0]
+        wanted = thread_class_for(designation.standard, obj.ThreadClass, cylinder.internal)
+        _add, tool = parts(
+            cylinder,
+            designation,
+            one["z0"],
+            one["z1"],
+            obj.LeftHanded,
+            wanted,
+            obj.FromEnd,
+            True,
+            face_offset(obj),
+        )
+        if tool is not None:
+            tools.append(tool)
+    return tools
+
+
 def slack(obj):
     """How far (mm) a modeled Thread step moved the surface of its cylinders (a shaft turned
     to the thread's major diameter, a hole brought to its minor diameter): an edge of the

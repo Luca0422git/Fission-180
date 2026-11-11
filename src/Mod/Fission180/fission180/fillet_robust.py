@@ -383,7 +383,17 @@ def thread_twin(feature):
         for one in reversed(chain):
             blank = thread.blank(one, blank)
         grooves = blank.cut(shape)
-        if blank.isNull() or not blank.Solids or grooves.isNull() or not grooves.Solids:
+        if blank.isNull() or not blank.Solids:
+            return None
+        if not _grooves_plausible(grooves, blank, shape) and len(chain) == 1:
+            # (wave 7, the book replay: the Metric Bolt revolved on the Front plane) the
+            # boolean gave the whole blank back as the "grooves": the thread's own tools
+            tools = thread.groove_tools(chain[0], step.Shape)
+            if tools:
+                import Part
+
+                grooves = Part.Compound(tools) if len(tools) > 1 else tools[0]
+        if grooves.isNull() or not grooves.Solids:
             return None
     except Exception:
         return None
@@ -391,6 +401,18 @@ def thread_twin(feature):
     _STATE["twins"].insert(0, (key, shape, twin))
     del _STATE["twins"][_KEEP_TWINS:]
     return twin
+
+
+def _grooves_plausible(grooves, blank, shape):
+    """True when `grooves` (blank minus the threaded part) holds what the thread took away:
+    as much volume as the blank has more than the threaded part."""
+    try:
+        if grooves.isNull() or not grooves.Solids:
+            return False
+        want = blank.Volume - shape.Volume
+        return abs(grooves.Volume - want) <= max(1e-6, 0.02 * abs(want))
+    except Exception:
+        return False
 
 
 def _through_thread(kind, shape, items, tag, once):
