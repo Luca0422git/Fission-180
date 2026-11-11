@@ -226,6 +226,8 @@ def k4_setup():
 def k4_first():
     p = rpanel()
     h.check("K4 two areas: nothing picked by itself", not p.profiles, p.profiles)
+    h.check("K4 the sketch stays shown while Revolve waits for its picks",
+            s["sk"].ViewObject.Visibility)
     h.click(V(3, 0, 10))  # the wide area
 
 

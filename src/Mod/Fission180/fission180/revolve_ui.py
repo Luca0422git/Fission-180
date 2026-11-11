@@ -1489,23 +1489,21 @@ class RevolvePanel(extrude_finish.SaysWhy, Panel):
         new_area = self._new_area_at(position)
         if not new_area and self.axes is not None and self.axes.line_at(position) is not None:
             return True
+        if new_area and not self._new_area_wins(position):
+            return True  # right on a drawn axis
         try:
             info = Gui.ActiveDocument.ActiveView.getObjectInfo((int(position[0]), int(position[1])))
         except Exception:
             info = None
-        if new_area:
-            # An area not picked yet: the lines beside the mouse are its outline (or an
-            # axis it lies along), and the area is meant unless the click is right on one.
-            if not self._new_area_wins(position):
-                return True  # right on a drawn axis
-            return self._right_on(position, info)
         if info and not str(info.get("Component", "")).startswith("Edge"):
             info = self._edge_near(position) or info
         if not info or not str(info.get("Component", "")).startswith("Edge"):
             return False
         obj = self.doc.getObject(str(info.get("Object", "")))
         if extrude.is_sketch(obj):
-            return True
+            # An area not picked yet: the sketch lines beside the mouse are its outline, and
+            # the area is meant unless the click is right on one.
+            return self._right_on(position, info) if new_area else True
         return self._edge_on_border(position, info)
 
     def _right_on(self, position, info):
