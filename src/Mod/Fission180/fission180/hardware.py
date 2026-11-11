@@ -435,19 +435,25 @@ def _set_more(feature, meta, picks, options):
     have = list(meta.get("more", []))
     wanted = core.hole_options(options)
     kept = []
-    for i, pick in enumerate(picks):
-        place = spot(*pick)
-        record = have[i] if i < len(have) else {}
-        part = _named(doc, record.get("part"), components.is_component)
-        if part is None:
-            part = _new_occurrence(component, place)
-        else:
-            _place_component(part, place)
-        old = _named(doc, record.get("hole"), hole.is_hole)
-        made = _place_hole(place, wanted, old)
-        kept.append(
-            dict(_pick_json(pick), part=part.Name, hole=made.Name if made is not None else None)
-        )
+    try:
+        for i, pick in enumerate(picks):
+            place = spot(*pick)
+            record = have[i] if i < len(have) else {}
+            part = _named(doc, record.get("part"), components.is_component)
+            if part is None:
+                part = _new_occurrence(component, place)
+            else:
+                _place_component(part, place)
+            old = _named(doc, record.get("hole"), hole.is_hole)
+            now = dict(_pick_json(pick), part=part.Name, hole=old.Name if old is not None else None)
+            kept.append(now)
+            made = _place_hole(place, wanted, old)
+            now["hole"] = made.Name if made is not None else None
+    except Exception:
+        # what was made so far stays known to the step (the next change or Cancel finds it)
+        meta["more"] = kept + have[len(kept) :]
+        _save_meta(feature, meta)
+        raise
     for record in have[len(picks) :]:
         _drop_occurrence(doc, record)
     meta["more"] = kept

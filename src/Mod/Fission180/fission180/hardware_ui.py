@@ -116,7 +116,7 @@ class HardwarePanel(Panel):
         self.picks = []  # (object, sub, point): the first place, then the further ones
         self.place0 = None  # what the first place is (hardware_place.spot)
         self.manual_sink = False
-        self.auto_hole_off = False  # "Make the hole too" was unticked by a click on a hole
+        self.hole_wanted = True  # "Make the hole too" as the person left it (not a click)
         self.note = ""
         self.user_system = None  # the Units the person chose by hand in this dialog
         self.last_click = None
@@ -139,6 +139,7 @@ class HardwarePanel(Panel):
                     self.place0 = None
             # Head sunk in set by hand stays the person's; else the hole keeps setting the seat
             self.manual_sink = bool(self.options.get("manual_sink"))
+            self.hole_wanted = bool(self.options["make_hole"])
         else:
             self.options = core.with_defaults(dict(HardwarePanel.remembered))
             if not HardwarePanel.remembered and design_is_inch(doc):
@@ -275,8 +276,9 @@ class HardwarePanel(Panel):
         self.size.currentIndexChanged.connect(self._size_changed)
         for box in (self.thread, self.length, self.variant, self.fit, self.hole_depth):
             box.currentIndexChanged.connect(self._changed)
-        for box in (self.flip, self.make_hole, self.modeled, self.joint):
+        for box in (self.flip, self.modeled, self.joint):
             box.toggled.connect(self._changed)
+        self.make_hole.toggled.connect(self._hole_toggled)
         self.sink.toggled.connect(self._sink_toggled)
         self.similar.toggled.connect(self._similar_toggled)
 
@@ -443,6 +445,10 @@ class HardwarePanel(Panel):
     def _switch(self, standard):
         self.options = core.change_standard(self.options, standard)
         self.manual_sink = False
+        on_hole = self.place0 is not None and self.place0["rim"]
+        if self.options["kind"] in core.HOLE_KINDS and not on_hole:
+            # (an O-ring in between gets no hole: the screw chosen after it does again)
+            self.options["make_hole"] = self.hole_wanted
         self._refit()
         self._show_options()
         self._rebuild()
@@ -499,6 +505,13 @@ class HardwarePanel(Panel):
         self._reseat()
         self._update_visibility()
         self._rebuild()
+
+    @_safe
+    def _hole_toggled(self, on):
+        if self._quiet:
+            return
+        self.hole_wanted = bool(on)  # the person's own choice: kept for the next flat face
+        self._changed()
 
     @_safe
     def _sink_toggled(self, *_):
@@ -710,9 +723,10 @@ class HardwarePanel(Panel):
             self.picks = [(obj, short, App.Vector(point) if point is not None else None)]
             self.place0 = place
             self.options["seat"] = None
-            if self.auto_hole_off and self.options["kind"] in core.HOLE_KINDS:
-                # a flat face has no hole yet: the part's hole is made again
-                self.auto_hole_off = False
+            wants = self.hole_wanted and self.options["kind"] in core.HOLE_KINDS
+            if wants and not self.options["make_hole"]:
+                # a flat face has no hole yet: the part's hole is made again (a click on a
+                # hole before had switched it off)
                 self.options["make_hole"] = True
                 self.options["sink_head"] = core.default_sink(self.options["standard"])
                 self._show_options()
@@ -763,9 +777,7 @@ class HardwarePanel(Panel):
             o["thread"] = ""
             if core.has_length(o["standard"]):
                 o["length"] = core.fit_length(o["standard"], size, o.get("length"))
-        if o["make_hole"]:
-            self.auto_hole_off = True
-        o["make_hole"] = False
+        o["make_hole"] = False  # (not the person's choice: hole_wanted stays)
         self._reseat()
         self._show_options()
 
