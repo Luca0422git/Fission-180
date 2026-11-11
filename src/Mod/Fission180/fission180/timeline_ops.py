@@ -235,35 +235,24 @@ def _clear_empty_bodies(doc):
 class RecomputeGuard:
     """Document observer.
 
-    - While a design has steps in error or suppressed (shown red or greyed in the
-      timeline), or a step whose base just changed (it is repaired right after),
-      FreeCAD would print errors on every recompute, flooding the Report view: mute it
-      during those recomputes only.
-    - After every recompute (a feature dialog's preview, an undo...), settle() the
-      design, deferred with ``defer`` (the GUI passes a Qt timer): nothing may change
-      the document inside FreeCAD's own recompute signal."""
+    After every recompute (a feature dialog's preview, an undo...), settle() the design,
+    deferred with ``defer`` (the GUI passes a Qt timer): nothing may change the document
+    inside FreeCAD's own recompute signal.
+
+    (Until wave 7 this class also had a slotBeforeRecomputeDocument that muted the Report
+    view while a design with steps in error, suppressed steps or a step whose base had just
+    changed was recomputed. FreeCAD 1.1.4 never calls that method on a Python observer
+    (only slotRecomputedDocument arrives: measured, book-modify session log), so it never
+    ran and was removed. The recomputes Fission 180 starts itself are muted where they are
+    started (recompute() here, preview.recompute, settle()); a recompute FreeCAD starts on
+    its own in a design with a red step still prints that step's reason to the Report
+    view, as it always did.)"""
 
     def __init__(self, defer=None):
-        self._active = {}
         self.defer = defer
         self._pending = set()
 
-    def slotBeforeRecomputeDocument(self, doc):
-        try:
-            if doc.Name in _settling or _has_known_problems(doc) or references_pending(doc):
-                q = quiet()
-                q.__enter__()
-                self._active[doc.Name] = q
-        except Exception:
-            pass
-
     def slotRecomputedDocument(self, doc):
-        q = self._active.pop(doc.Name, None)
-        if q is not None:
-            try:
-                q.__exit__(None, None, None)
-            except Exception:
-                pass
         try:
             name = doc.Name
             if self.defer is None or name in _settling or name in self._pending:
@@ -308,16 +297,6 @@ def _recomputing(doc):
         return False
 
 
-def _has_known_problems(doc):
-    for obj in doc.Objects:
-        if getattr(obj, "Suppressed", False) is True or getattr(obj, SUPPRESSED, False):
-            return True
-        state = getattr(obj, "State", [])
-        if "Invalid" in state or "Error" in state:
-            return True
-    return False
-
-
 _guard = {"observer": None}
 
 
@@ -348,8 +327,6 @@ def remove_guard():
             App.removeDocumentObserver(observer)
         except Exception:
             pass
-        for q in list(observer._active.values()):
-            q.__exit__(None, None, None)
 
 
 # -- a new step goes in at the history marker -----------------------------------------
