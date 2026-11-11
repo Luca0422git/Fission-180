@@ -155,6 +155,10 @@ def enter_workspace(tab=None):
             return False
         if not _finish_open():
             return False
+        from . import workspace_switch  # (wave 7: one workspace at a time, whatever the route)
+
+        if not workspace_switch.leave_others("simulation"):
+            return False
         try:
             Gui.Selection.clearSelection()
         except Exception:
@@ -310,25 +314,10 @@ DESIGN_KEYS = (
 
 def _hold_design_keys(on):
     """In SIMULATION the design's keys are off (Fusion does not change the design from
-    Simulation); they are on again when it is left."""
-    try:
-        from . import shortcuts
+    there); one rule for every workspace (workspace_switch, wave 7)."""
+    from . import workspace_switch
 
-        if on:
-            for key in DESIGN_KEYS:
-                entry = shortcuts._bound.get(shortcuts.normalise(key))
-                if entry is not None and entry[1].isEnabled():
-                    entry[1].setEnabled(False)
-                    STATE["held"].append(entry[1])
-        else:
-            held, STATE["held"] = STATE["held"], []
-            for shortcut in held:
-                try:
-                    shortcut.setEnabled(True)
-                except RuntimeError:
-                    pass  # (rebound meanwhile: the new one is on)
-    except Exception as exc:
-        warn("simulation workspace: keys: %s" % exc)
+    workspace_switch.hold_design_keys("simulation", on)
 
 
 def _results_tab():
@@ -374,29 +363,11 @@ def open_marking_menu(global_pos):
 
 
 def _timeline(on):
-    """Fusion's Simulation workspace has no timeline: hidden while it shows, back after."""
-    try:
-        from . import shell, timeline_ui
+    """Fusion's Simulation workspace has no timeline: away while it shows, back after (one
+    rule for every workspace, Home and drawings: workspace_switch, wave 7)."""
+    from . import workspace_switch
 
-        dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
-        if on:
-            if dock is not None and dock.isVisible():
-                STATE["timeline"] = True
-                timeline_ui.hide()
-        elif STATE["timeline"]:
-            STATE["timeline"] = False
-            if shell.is_on():
-                drawing = False
-                try:
-                    from . import drawing_ui
-
-                    drawing = drawing_ui.is_on()
-                except Exception:
-                    pass
-                if not drawing:
-                    timeline_ui.show()
-    except Exception as exc:
-        warn("simulation workspace timeline: %s" % exc)
+    workspace_switch.hold_timeline("simulation", on)
 
 
 def _refresh_browser():
