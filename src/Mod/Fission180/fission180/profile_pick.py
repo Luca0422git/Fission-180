@@ -223,6 +223,8 @@ class ProfilePicker:
         self.unpickable = []  # (sketch's root node, pick style) put in while offered
         self.last_click = 0.0  # time of the last click that picked a region
         self.last_click_at = None  # ...and where on the screen it was (Coin pixels)
+        self.presses = 0  # presses of the left button in the view while offered
+        self.region_press = -1  # ...the one that picked a region
         self.paused = False  # a dialog's other selection box takes the clicks now
         self.root = coin.SoSeparator()
         pick = coin.SoPickStyle()
@@ -636,6 +638,7 @@ class ProfilePicker:
         try:
             if info.get("Button") != "BUTTON1" or info.get("State") != "DOWN" or self.paused:
                 return
+            self.presses += 1
             # (On the press: FreeCAD's selection takes the release and stops it there.)
             position = tuple(info["Position"])
             if handle_at(self.view, position):
@@ -654,6 +657,7 @@ class ProfilePicker:
             if hit is not None:
                 self.last_click = time.time()
                 self.last_click_at = position
+                self.region_press = self.presses
                 self.on_pick(hit[0], hit[1])
         except Exception as exc:
             warn("profile pick: %s" % exc)
@@ -672,6 +676,8 @@ class ProfilePicker:
             at = getattr(self, "last_click_at", None)
             if at is None or point is None or time.time() - self.last_click >= seconds:
                 return False
+            if self.region_press != self.presses:
+                return False  # a later click at the same spot (a face to end on) is its own
             x, y = self.view.getPointOnViewport(App.Vector(point))[:2]
             return abs(float(x) - at[0]) <= pixels and abs(float(y) - at[1]) <= pixels
         except Exception:
