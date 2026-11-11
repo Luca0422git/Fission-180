@@ -35,7 +35,7 @@ s = {}
 
 def copies():
     """The copy bodies (every body but the first), by their lowest X."""
-    found = [x for x in ps.bodies() if x.Label != "Body"]
+    found = [x for x in ps.bodies() if x.Name != "Body"]
     return sorted(found, key=lambda x: x.Shape.BoundBox.XMin)
 
 

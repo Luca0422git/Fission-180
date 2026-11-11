@@ -336,7 +336,8 @@ def g_body():
     h.check("G: Arm shows Origin, Bodies, Sketches", rows == ["Origin", "Bodies", "Sketches"], rows)
     listed = cs.children_of(["Arm", "Bodies"]) or []
     h.check("G: Arm > Bodies > Body1", listed == ["Body1"], listed)
-    arm_body = cs.body_labelled("Body1")
+    # (Arm's own Body1: the root's first body is called Body1 too, since wave 7)
+    arm_body = ([b for b in cs.bodies() if cs.container_label(b) == "Arm"] or [None])[0]
     h.check("G: 20 x 20 x 5", t.near(cs.volume(arm_body), SMALL), cs.volume(arm_body))
     root = cs.children_of(["Bodies"])
     h.check("G: the root's Body still listed", root == [doc().getObject(s["body"]).Label], root)

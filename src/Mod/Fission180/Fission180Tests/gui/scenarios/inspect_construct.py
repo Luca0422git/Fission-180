@@ -4,8 +4,11 @@ the construction plane and an extrude from it.
 
 Part: box 40 x 30 x 10 from the origin (real input). Hand-derived expectations:
   Offset Plane on the top face (z = 10): the plane is at z = 10 + distance, normal +Z.
-  A 10 x 10 square sketched on the plane at z = 15 and extruded 10 down joins the box
-  (z = 5 to 15 overlaps it from 5 to 10): 12000 + 10 * 10 * 5 = 12500.
+  A 10 x 10 square sketched on the plane at z = 15 and extruded 10 down starts in the
+  air and reaches into the box (z = 5 to 15 overlaps it from 5 to 10): a Cut by
+  itself, like Fusion ("If the Extrude intersects a solid, it will default to Cut",
+  parity/extrude-presspull.md, the Operation rule, row 3; it was a Join before wave 7):
+  12000 - 10 * 10 * 5 = 11500.
 
 Paths: nothing selected (the dialog waits, the origin squares are drawn), a click on the top
 face, the blue arrow dragged, a typed value, OK; undo / redo; double-click in the timeline
@@ -328,7 +331,7 @@ def extrude_ok():
 
 def cut_from_plane():
     v = h.solid_volume()
-    h.check("the square joined the box: 12500", s.close(v, 12500.0), v)
+    h.check("the square cut the box: 11500", s.close(v, 11500.0), v)
     h.shot("5-cut")
 
 

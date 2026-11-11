@@ -80,6 +80,29 @@ def tapered(face, vec, taper_deg):
     return solid
 
 
+def merged_faces(faces):
+    """`faces` (flat, in one plane) with the ones that touch joined into one outline. Fusion
+    treats profiles that touch as one region (forum: adjacent squares picked together are
+    extruded "like one giant square"), so a taper leans the outline of the whole, not each
+    profile by itself: the book's thruster is a circle the rocket's projected edge splits
+    in two, and its two halves tapered one by one could not take the -11 degrees the cone
+    needs ("limited to -6.8"). Faces that do not touch stay as they are; on any doubt the
+    faces are returned unchanged."""
+    faces = list(faces)
+    if len(faces) < 2:
+        return faces
+    try:
+        fused = faces[0].fuse(faces[1:]).removeSplitter()
+        found = list(fused.Faces)
+        before = sum(f.Area for f in faces)
+        after = sum(f.Area for f in found)
+        if found and len(found) < len(faces) and abs(after - before) <= 1e-6 * max(1.0, before):
+            return found
+    except Exception:
+        pass
+    return faces
+
+
 # -- thin walls ------------------------------------------------------------------------------
 class Wall:
     """One piece of a thin extrude's cross-section: the band along one closed loop of a
@@ -603,6 +626,9 @@ def build(faces, normal, spec, reach=(), wires=()):
     thin = spec.get("thin")
     if not faces and not (thin and wires):
         raise PrismError("The profile has no closed area to extrude.")
+    tapers = (spec.get("taper", 0.0), spec.get("taper2", 0.0))
+    if not thin and len(faces) > 1 and any(abs(float(t or 0.0)) > 1e-9 for t in tapers):
+        faces = merged_faces(faces)  # touching profiles taper as one outline (Fusion)
 
     def sections(second=False):
         if not thin:

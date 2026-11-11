@@ -303,6 +303,15 @@ class RibPanel(Panel):
             self.error = text if self.editing else ""
             self.message.setText(("⚠ " + text) if self.editing else "")
             return
+        if not self.editing:
+            # A sketch on the Front plane used for the first time: One Side goes away from
+            # the front from now on, like an extrude of such a sketch (Fusion's Front plane
+            # looks the other way than FreeCAD's; extrude.adopt_fusion_side).
+            try:
+                if extrude.adopt_fusion_side(self.refs[0][0], lead=self.target):
+                    log("%s: its sketch goes Fusion's way on the Front plane" % self.title)
+            except Exception as exc:
+                warn("%s side: %s" % (self.title, exc))
         self._changed(new_geometry=True)
 
     # -- changes ------------------------------------------------------------------------------------
