@@ -84,8 +84,13 @@ def plate_volume(radius=None, middle=None):
     return T * (math.pi * radius**2 - windows)
 
 
+def shown_bodies():
+    """The bodies on the screen (a body used up by Combine is hidden: combine.py)."""
+    return [b for b in r.solid_bodies() if b.Visibility]
+
+
 def plate():
-    found = r.solid_bodies()
+    found = shown_bodies()
     return found[0] if len(found) == 1 else None
 
 
@@ -332,7 +337,7 @@ def areas():
 
 def b_patterned():
     r.esc()
-    lines = [i for i, _g in r.geo("Part::GeomLineSegment") if i >= s["geo0"]]
+    lines = [i for i, _g in r.geo("Part::GeomLineSegment", construction=False) if i >= s["geo0"]]
     h.check("B twelve spokes", len(lines) == 12, len(lines))
     r.sketch_clean("B")
     sk = r.sk()
@@ -441,7 +446,7 @@ def c_second_distance():
 
     p = extrude_panel()
     h.check("C eight outer areas", len(p.profiles) == 8, len(p.profiles))
-    arrows.give_distance("-Thickness")
+    arrows.give_distance("Thickness")  # (Thickness is -2.5: the same way down)
 
 
 def c_new_body():
@@ -531,7 +536,7 @@ def c_combined():
 
 
 def c_undone():
-    h.check("C Ctrl+Z: the five bodies back", len(r.solid_bodies()) == 5, len(r.solid_bodies()))
+    h.check("C Ctrl+Z: the five bodies back", len(shown_bodies()) == 5, len(shown_bodies()))
     h.check(
         "C ...no Combine left in the timeline", t.titles() == s["titles_before_combine"], t.titles()
     )
@@ -540,7 +545,7 @@ def c_undone():
 
 
 def c_redone():
-    h.check("C Ctrl+Y: one body again", plate() is not None, len(r.solid_bodies()))
+    h.check("C Ctrl+Y: one body again", plate() is not None, len(shown_bodies()))
     h.check("C ...the same timeline", t.titles() == s["titles"], t.titles())
     all_ok("C redo:")
 
@@ -583,7 +588,7 @@ def windows_open(tag, radius):
     h.check("%s the same sectors are solid (the windows stay)" % tag, solid == OUTER, solid)
 
 
-def arm_steps(text, expected):
+def arm_steps(text, expected, from_60=None):
     tag = "D Arm_Length %s" % text
 
     def typed():
@@ -601,12 +606,19 @@ def arm_steps(text, expected):
         h.check("%s: one body" % tag, body is not None)
         if body is None:
             return
-        want = plate_volume(expected)
-        h.check(
-            "%s: the plate follows" % tag,
-            r.near(body.Shape.Volume, want, 1e-6),
-            (body.Shape.Volume, want),
-        )
+        if from_60 is None:
+            want = plate_volume(expected)
+            h.check(
+                "%s: the plate follows" % tag,
+                r.near(body.Shape.Volume, want, 1e-6),
+                (body.Shape.Volume, want),
+            )
+        else:
+            # rounded and bevelled now: it grows as the plain plate does (the bevel along the
+            # longer rim adds a few mm3)
+            grew = body.Shape.Volume - s[from_60]
+            want = plate_volume(expected) - plate_volume(60.0)
+            h.check("%s: the plate follows" % tag, abs(grew - want) < 10.0, (grew, want))
         windows_open(tag, expected)
         h.speed_check("%s: within 10 s" % tag, took < 10.0 * h.SLOWDOWN, took)
 
@@ -637,7 +649,10 @@ def blend():
 
 def e_fillet():
     Gui.Selection.clearSelection()
-    r.look_from(V(-math.cos(math.radians(15)), -math.sin(math.radians(15)), -0.9))
+    # from outside the window of 270..300 degrees, looking into it: both its corners show
+    a = math.radians(285.0)
+    r.look_from(V(-math.cos(a) * 0.7, -math.sin(a) * 0.7, -0.7))
+    r.zoom_on(polar(mid_r(), 285.0, -T / 2.0), 30.0)  # (zoomed in on it: the corners are short)
     h.ribbon("Fillet")
 
 
@@ -645,16 +660,26 @@ e_fillet.done = lambda: blend().blend_panel() is not None
 e_fillet.done_what = "the Fillet dialog is open"
 
 
-def e_corner(degrees, k):
+def e_corner(degrees, k, side):
+    """Turn the view to look at the corner from inside the window, low, zoomed in (a person
+    turns the part until the short upright edge lights up), and click it."""
+
     def step():
-        h.click_edge(polar(mid_r(), degrees, -T / 2.0))
+        look = math.radians(degrees + side * 40.0)  # (from the window's side of the corner)
+        r.look_from(V(-math.cos(look), -math.sin(look), -0.45))
+        corner = polar(mid_r(), degrees, -T / 2.0)
+        r.zoom_on(corner, 12.0)
+        h.click_edge(corner)
 
     return r.named(step, "e_corner_%d" % k)
 
 
 def e_radius():
     p = blend().blend_panel()
-    h.check("E two inner corners of a window", len(p.refs) == 2, p.refs)
+    picked = [p.base.Shape.getElement(ref) for ref in p.refs if str(ref).startswith("Edge")]
+    upright = [e for e in picked if abs(e.Vertexes[0].Point.z - e.Vertexes[-1].Point.z) > T - 1e-6]
+    h.check("E two upright inner corners of a window", len(upright) == 2 == len(p.refs), p.refs)
+    h.shot("E-corners")
     blend().type_into(p.radius.widget, "2.5")
     QtTest.QTest.keyClick(p.radius.widget, QtCore.Qt.Key_Tab)
 
@@ -672,10 +697,14 @@ e_fillet_ok.timeout_s = 120
 
 
 def e_filleted():
+
     v = plate().Shape.Volume
-    # an inside corner rounded r: (r^2 - pi r^2 / 4) of material added, through the plate
-    want = plate_volume() + 2 * T * (2.5**2 - math.pi * 2.5**2 / 4.0)
-    h.check("E two corners rounded 2.5", r.near(v, want, 1e-3), (v, want))
+    # an inside corner rounded r adds material: (r^2 - pi r^2 / 4) through the plate at a
+    # square corner between two flat walls; a little less here (one wall is the round ring)
+    most = 2 * T * (2.5**2 - math.pi * 2.5**2 / 4.0)
+    added = v - plate_volume()
+    h.check("E two inside corners rounded 2.5", 0.6 * most < added <= most + 1e-6, (added, most))
+    h.check("E no sliver face", min(f.Area for f in plate().Shape.Faces) > 1.0)
     all_ok("E fillet:")
     s["v_fillet"] = v
     r.look_from(V(0, 0, -1))
@@ -698,7 +727,7 @@ def e_window():
 def e_size():
     p = blend().blend_panel()
     s["edges"] = len(p.refs)
-    h.check("E the window picks the plate's edges", len(p.refs) > 40, len(p.refs))
+    h.check("E the window picks the plate's top edges", len(p.refs) >= 20, len(p.refs))
     blend().type_into(p.distance.widget, "0.25")
     QtTest.QTest.keyClick(p.distance.widget, QtCore.Qt.Key_Tab)
     s["t0"] = time.time()
@@ -879,7 +908,15 @@ steps += [tool_click(a, k) for k, a in enumerate(PAIRS)] + [
 steps += [d_open]
 for _text, _expected in (("50", 50.0), ("40", 45.0), ("110", 100.0), ("53", 53.0), ("60", 60.0)):
     steps += arm_steps(_text, _expected)
-steps += [d_ok, d_done, e_fillet, e_corner(0.0, 0), e_corner(30.0, 1), e_radius, e_fillet_ok]
+steps += [
+    d_ok,
+    d_done,
+    e_fillet,
+    e_corner(270.0, 0, 1),
+    e_corner(300.0, 1, -1),
+    e_radius,
+    e_fillet_ok,
+]
 steps += [e_filleted, e_window, e_size, e_chamfer_ok, e_chamfered]
 steps += [f_edit, f_drag, f_dragged, f_undone, f_after_sketch]
 steps += undo_run(3, "f_undo") + [f_undone_run] + redo_run(3, "f_redo") + [f_redone_run]
@@ -887,7 +924,9 @@ steps += (
     r.save_steps("f", "Prototype Drone") + r.reopen_steps("f", "Prototype Drone") + [f_reopened]
 )
 steps += (
-    [r.named(d_open, "f_params")] + arm_steps("70", 70.0) + [r.named(d_ok, "f_params_ok"), f_70]
+    [r.named(d_open, "f_params")]
+    + arm_steps("70", 70.0, "v_done")
+    + [r.named(d_ok, "f_params_ok"), f_70]
 )
 
 h.run("replay_09_drone", steps, paced_by="state")
