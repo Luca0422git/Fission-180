@@ -17,8 +17,9 @@ other components is in that sketch.
      typed: the two centres are 30 apart
   C  a constraint tool, tool first: Parallel, a slanted sketch line, then the Nozzle's right
      edge: projected, and the line is parallel to it (upright)
-  D  Fission 180's own 2-Point Circle: its first click on a corner of the Nozzle: the corner
-     is projected as a point and the circle starts on it
+  D  Fission 180's own 2-Point Circle: its first click on a corner of the Nozzle that lies
+     over the sketch's X axis: the corner is projected as a point and the circle starts
+     on it (not just somewhere on the axis)
   E  Preferences > Design > "Auto project edges on reference" off: a line ended on the
      Nozzle's left edge projects nothing (the end stays where it was clicked, free)
 """
@@ -269,14 +270,16 @@ def d_tool():
 
 def d_corner():
     h.check("D 2-Point Circle runs", st.tool_title() == "2-Point Circle", st.tool_title())
-    st.click(V(30, 20, 10))  # the Nozzle's back left corner
+    # the Nozzle's front left corner: on the sketch's X axis, where the point would
+    # otherwise only land somewhere on the axis
+    st.click(V(30, 0, 10))
 
 
 def d_second():
     points = [d for d in describe() if d[0] == "point"]
     h.check(
         "D the corner was projected as a point",
-        len(points) == 1 and points[0][1] == (30.0, 20.0),
+        len(points) == 1 and points[0][1] == (30.0, 0.0),
         describe(),
     )
     st.click(V(18, 32, 0))
@@ -289,7 +292,7 @@ def d_check():
     h.check("D one circle was drawn", len(circles) == 1, circles)
     if circles:
         g = sk().Geometry[circles[0]]
-        d = ((g.Center.x - 30) ** 2 + (g.Center.y - 20) ** 2) ** 0.5
+        d = ((g.Center.x - 30) ** 2 + (g.Center.y - 0) ** 2) ** 0.5
         h.check("D ...through the projected corner", abs(d - g.Radius) < 1e-6, (d, g.Radius))
         h.check("D ...held on it", bool(on_external(circles[0])), on_external(circles[0]))
     end_tool()

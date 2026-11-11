@@ -345,6 +345,8 @@ class Inference:
 
             if sketch_reference.project_under(session, event.position(), "Sketch"):
                 result, grid = self._infer(view, start)
+                if result is None:
+                    result = self._on_projected(view)
         if result is None and tool != "spline":
             # a free point: the grid alone places it, within a reach on the screen. (Not
             # a spline's points: FreeCAD's spline tool keeps each clicked point loose until
@@ -368,6 +370,29 @@ class Inference:
         self.overlay.show(result, view.px)
         nogrid = core.grid_off(result, grid, view.px)
         return (pos, False, nogrid, result, view.px)
+
+    def _on_projected(self, view):
+        """The Result for a point on the projected curve under the pointer (just
+        projected: FreeCAD has not lit it yet, so its own tool would leave the point free):
+        the point goes onto the curve and is kept on it after the click."""
+        _verts, curves, _lines, _keyed = self._geometry()
+        geos = self._curve_geos
+        pick = max(_pick_pixels(view.ratio), 6.0) * view.px
+        best = None
+        for i, curve in enumerate(curves):
+            if i >= len(geos) or geos[i] is None or geos[i] > -3:
+                continue
+            if not core.near_curve(view.raw, curve, pick):
+                continue
+            q = core.nearest_on_curve(view.raw, curve)
+            if q is not None and (best is None or core.dist(q, view.raw) < best[0]):
+                best = (core.dist(q, view.raw), q, i)
+        if best is None:
+            return None
+        result = core.Result(best[1])
+        result.on_curve = best[2]
+        result.on_curve_geo = geos[best[2]]
+        return result
 
     def _grid_only(self, view, grid):
         """The Result for a free point where FreeCAD's grid rule (a fifth of the spacing)

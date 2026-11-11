@@ -678,6 +678,9 @@ class Dimension(draw.DrawTool):
             return
         try:
             self.session.edit_dimension(index)
+            if self.session.editor is not None:
+                # (its first value: "Scale entire sketch at first dimension")
+                self.session.editor.just_placed = True
         except Exception as exc:
             warn("%s: the value box: %s" % (self.title, exc))
 

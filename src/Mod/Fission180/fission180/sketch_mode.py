@@ -1475,6 +1475,28 @@ class SketchSession:
                 pos = self.last_press or self.gl.mapFromGlobal(QtGui.QCursor.pos())
         self.editor = DimensionEditor(self, index, pos, centred)
 
+    def show_all_if_outside(self):
+        """After the whole sketch was scaled: when part of it is outside the view now, the
+        view shows all of it (Fusion fits the view then; Autodesk community manager:
+        "auto-fit will get invoked when ... the sketch goes outside the canvas")."""
+        if self.closed or self.gl is None:
+            return
+        try:
+            box = self.sketch.Shape.BoundBox
+            if not box.isValid():
+                return
+            ratio = self.gl.devicePixelRatioF() or 1.0
+            w, h = self.gl.width() * ratio, self.gl.height() * ratio
+            place = self.sketch.getGlobalPlacement()
+            for corner in range(8):
+                p = place.multVec(box.getPoint(corner))
+                x, y = self.view.getPointOnViewport(p)
+                if x < 0 or y < 0 or x > w or y > h:
+                    self.view.fitAll()
+                    return
+        except Exception as exc:
+            warn("sketch view: %s" % exc)
+
     def label_pixel(self, index):
         """Where a dimension's text is on screen (view pixels), or None."""
         try:
@@ -2744,6 +2766,7 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         self.sketch = session.sketch
         self.index = index
         self._done = False
+        self.just_placed = False  # Sketch Dimension placed it a moment ago (its first value)
         try:  # which dimension this is, to find it again if the sketch changes meanwhile
             self.identity = _constraint_key(self.sketch.Constraints[index])
         except Exception:
@@ -2803,6 +2826,30 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
             return sketch_named_dimensions.owned(self.sketch, self.index)
         except Exception:
             return None
+
+    def _scale_at_first(self, q):
+        """Fusion's "Scale entire sketch at first dimension": the value typed into the
+        dimension Sketch Dimension has just placed, when it is the sketch's first size,
+        scales the whole sketch (sketch_first_dimension.py). Inside apply()'s undo step.
+        True when it scaled."""
+        if not self.just_placed:
+            return False
+        from . import sketch_first_dimension as first
+
+        if not first.applies(self.sketch, self.index):
+            return False
+        old = self.sketch.getDatum(self.index).getValueAs("mm").Value
+        k = first.factor(old, q.getValueAs("mm").Value)
+        if k is None:
+            return False
+        first.scale(self.sketch, k)
+        from . import commands
+
+        commands.tell(
+            "The whole sketch was scaled to this first dimension (Preferences > Design > "
+            "Scale entire sketch at first dimension)."
+        )
+        return True
 
     def _show_owner(self):
         name = self.owner()
@@ -3037,6 +3084,7 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         from . import sketch_explain_core as explain_core
 
         culprits = []
+        scaled = False
         broken_before = _broken_state(self.sketch)
         owner = self.owner()
         if owner is not None and expression is not None:
@@ -3106,6 +3154,7 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                     # book_sketch_c_dimension: the formula stayed bound under the number,
                     # and the next recompute put the parameter's value back)
                     parameters.set_expression(self.sketch, path, None)
+                scaled = self._scale_at_first(q)
                 self.sketch.setDatum(self.index, q)
             if self.sketch.solve() != 0:
                 raise ValueError(CONFLICT)
@@ -3134,6 +3183,8 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
             return False
         doc.commitTransaction()
         log("dimension set to %s" % text.strip())
+        if scaled:
+            QtCore.QTimer.singleShot(0, self.session.show_all_if_outside)
         return True
 
     def _error(self, text):

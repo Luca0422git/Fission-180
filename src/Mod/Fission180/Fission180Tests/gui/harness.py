@@ -1788,6 +1788,11 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
             from fission180 import sketch_infer
 
             App.ParamGet(sketch_infer.PARAMS).SetBool("GridSnapFull", False)
+            # ...and Fusion's "Scale entire sketch at first dimension" (on by default)
+            # scales everything drawn so far when the first dimension gets its value: the
+            # scenarios written before it type a first dimension and then click the other
+            # curves where they were. book_sketch_c_scale turns it on and tests it.
+            App.ParamGet(sketch_infer.PARAMS).SetBool("ScaleAtFirstDimension", False)
         except Exception as exc:
             print("[Fission 180] grid snap reset failed: %s" % exc, flush=True)
         try:  # the first-start welcome line on Home shows once per profile: a fresh profile

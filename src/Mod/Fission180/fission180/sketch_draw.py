@@ -964,6 +964,11 @@ class Hint(QtWidgets.QLabel):
             pass
 
 
+def no_point(snap):
+    """True when `snap` sits on no point of the sketch (it may be on a curve)."""
+    return snap is not None and snap.key is None and snap.mid_of is None and snap.target is None
+
+
 def unsnapped(snap):
     """True when `snap` sits on nothing of the sketch (no point, curve or crossing)."""
     return (
@@ -1257,13 +1262,16 @@ class DrawTool:
             if view is None:
                 return True
             snap = self.snap_for(view, event)
-            if self.references_model and unsnapped(snap):
+            if self.references_model and no_point(snap):
                 # Fusion's "Auto project edges on reference": a click on an edge or corner
                 # of the model that is not in the sketch projects it (purple), and the
-                # point or pick lands on it (sketch_reference.py)
+                # point or pick lands on it (sketch_reference.py). A point that is only on
+                # a sketch curve there (an axis) still takes a corner of the model.
                 from . import sketch_reference
 
-                if sketch_reference.project_under(session, event.position(), self.title):
+                if sketch_reference.project_under(
+                    session, event.position(), self.title, corners_only=not unsnapped(snap)
+                ):
                     self._geometry = None
                     snap = self.snap_for(view, event)
             self.last = snap

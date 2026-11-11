@@ -42,33 +42,60 @@ def enabled():
         return True
 
 
-def element_under(session, pos):
-    """(object, "EdgeN" / "VertexN") of the model under widget pixel `pos`, or None: an
-    edge or a corner that is not sketch geometry (a face is nothing to snap to)."""
+# An edge is a pixel or two wide and an outline edge is often picked as the face next to
+# it (renderers round differently): like the sketch's own curves, a model edge or corner
+# counts as clicked within a few pixels. The pixels looked at round the click, nearest first.
+AIM = [(0, 0)] + [
+    (dx * r, dy * r)
+    for r in (2, 4)
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+]
+
+
+def element_under(session, pos, corners_only=False):
+    """(object, "EdgeN" / "VertexN") of the model at widget pixel `pos` (or a few pixels
+    from it), or None: an edge or a corner that is not sketch geometry (a face is nothing
+    to snap to). A corner comes before an edge. `corners_only`: the point already sits on
+    a sketch curve there (an axis); only a corner of the model is more exact than that."""
     from . import sketch_project_across
+    from .compat import QtCore
 
     try:
         point = pos.toPoint() if hasattr(pos, "toPoint") else pos
-        found = sketch_project_across.element_at(session.view, session.gl, point)
     except Exception:
         return None
-    if found is None:
-        return None
-    obj, sub = found
-    if obj is None or obj is session.sketch or not sub.startswith(("Edge", "Vertex")):
-        return None
-    if getattr(obj, "TypeId", "") == "Sketcher::SketchObject":
-        return None  # another sketch's curve: Project (P) takes those
-    return obj, sub
+    edge = None
+    for dx, dy in AIM:
+        try:
+            found = sketch_project_across.element_at(
+                session.view, session.gl, QtCore.QPoint(point.x() + dx, point.y() + dy)
+            )
+        except Exception:
+            return None
+        if found is None:
+            continue
+        obj, sub = found
+        if obj is None or obj is session.sketch:
+            continue
+        if getattr(obj, "TypeId", "") == "Sketcher::SketchObject":
+            continue  # another sketch's curve: Project (P) takes those
+        if sub.startswith("Vertex"):
+            return obj, sub
+        if sub.startswith("Edge") and edge is None and not corners_only:
+            edge = (obj, sub)
+            if (dx, dy) == (0, 0):
+                # (an edge right under the pointer: only a corner 2 pixels away beats it)
+                continue
+    return edge
 
 
-def project_under(session, pos, title="Sketch"):
+def project_under(session, pos, title="Sketch", corners_only=False):
     """Project the model edge or corner under widget pixel `pos` into the open sketch.
     Returns how many curves came in (0: nothing there, already projected, switched off, or
     it could not be done, which is said next to the mouse)."""
     if session is None or session.closed or not enabled():
         return 0
-    found = element_under(session, pos)
+    found = element_under(session, pos, corners_only)
     if found is None:
         return 0
     obj, sub = found
