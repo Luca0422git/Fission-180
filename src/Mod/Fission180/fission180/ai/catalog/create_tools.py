@@ -890,14 +890,32 @@ _HARDWARE_STANDARDS = (
 
 
 def _extra_hardware(args, problems):
-    if ("face" in args) == ("edge" in args):
-        problems.append("give face + at (a click on a flat face) or edge (a hole's round rim)")
+    places = [key for key in ("face", "edge", "wall") if key in args]
+    if len(places) != 1:
+        problems.append(
+            "give one place: face + at (a click on a flat face), edge (a round edge: a "
+            "hole's rim, the edge of a countersink, a shaft's end) or wall (a hole's wall, "
+            "its countersink or chamfer, a shaft's side)"
+        )
     if "face" in args:
         if "at" not in args:
             problems.append("face needs at: the clicked point [x, y, z]")
         kit.check_selector(args["face"], "face", "faces", problems)
     if "edge" in args:
         kit.check_selector(args["edge"], "edge", "edges", problems)
+    if "wall" in args:
+        kit.check_selector(args["wall"], "wall", "faces", problems)
+
+
+def _steps_hardware(a, sid):
+    """On a hole the part behaves as in the dialog unless told otherwise: its size from the
+    hole, no second hole, the head seated, and a rigid joint to what it is placed on."""
+    step = {"op": "sf_hardware", "id": sid}
+    for key, value in a.items():
+        step[key] = copy.deepcopy(value)
+    step.setdefault("auto", True)
+    step.setdefault("joint", True)
+    return [step]
 
 
 define(
@@ -905,9 +923,15 @@ define(
     "Insert hardware",
     "assemble",
     "INSERT > Hardware (McMaster-Carr / fasteners in Fusion)",
-    "Insert a standard part with the hole it needs: click a flat face of the current body at "
-    "at ([x, y, z], design coordinates) or a round edge (a hole's rim: the part sits on its "
-    "axis). standard: metric screws iso4762 (socket head cap), iso7380 (button), iso10642 "
+    "Insert a standard part: on a flat face of the current body at at ([x, y, z], design "
+    "coordinates; the hole it needs is made too), or into a hole that is there: any part of "
+    "it, as in the dialog: edge (its rim, the edge of its countersink, a shaft's end) or "
+    "wall (its wall, its countersink or chamfer, a shaft's side; at says where when the hole "
+    "is open at both ends). On a hole the part takes its size from the hole unless size is "
+    "given, no second hole is made, the head sits in the counterbore or countersink, similar: "
+    "true fills every hole like it on that face, and a rigid joint holds the part to what it "
+    "is on (joint: false for none). standard: metric screws iso4762 (socket head cap), "
+    "iso7380 (button), iso10642 "
     "(countersunk), din7984 (low head), iso4017 (hex head), iso7045 / iso1580 (pan head, "
     "Phillips / slotted); inch screws asme_shcs, asme_bhcs, asme_fhcs, asme_lhcs, asme_hex, "
     "asme_pan_ph, asme_pan_sl; set screws iso4029 / iso4026 / iso4027 / iso4028 (cup / flat / "
@@ -930,6 +954,12 @@ define(
             "face": kit.selector("the flat face clicked"),
             "at": kit.point3("where on it"),
             "edge": kit.selector("instead: a round edge (a hole's rim)", "edges"),
+            "wall": kit.selector("instead: a hole's wall, countersink or chamfer; a shaft"),
+            "similar": boolean("fill every hole like the one given on that face", default=False),
+            "joint": boolean("a rigid joint to what it is placed on", default=True),
+            "auto": boolean(
+                "on a hole: size from the hole, no second hole, the head seated", default=True
+            ),
             "standard": enum(list(_HARDWARE_STANDARDS), default="iso4762"),
             "size": string("e.g. 3 (M3), 1/4, #10, 012 (AS568), 6202 (a bearing) or 6x3"),
             "length": positive("mm"),
@@ -948,7 +978,8 @@ define(
             "clearance": number("mm", minimum=0),
         },
     ),
-    op="sf_hardware",
+    ops=["sf_hardware"],
+    steps=_steps_hardware,
     extra=_extra_hardware,
     needs=("solid",),
     id_base="Hardware",
