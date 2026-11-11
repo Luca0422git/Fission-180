@@ -684,8 +684,23 @@ def d_lines_done():
     r.esc()
     lines = [g for i, g in r.geo("Part::GeomLineSegment") if i >= s["geo0"]]
     h.check("D six lines", len(lines) == 6, len(lines))
-    kinds = [c.Type for _i, c in r.cons(("Horizontal", "Vertical"))]
-    h.check("D each line is level or upright by inference", len(kinds) == 6, kinds)
+    # Each line is held level or upright by what the Line tool inferred: its own Horizontal /
+    # Vertical, or both of its ends put on the same sketch axis (a short line drawn along the
+    # Y axis: on GitHub's renderer the tool inferred "on the axis" for both ends instead of
+    # Vertical, which holds it upright just the same; fix-5's reading of CI run #76)
+    held = []
+    on_axis = {}
+    for _i, c in r.cons(("PointOnObject",)):
+        if c.Second in (-1, -2):
+            on_axis.setdefault(c.First, set()).add((c.FirstPos, c.Second))
+    kinds = {c.First: c.Type for _i, c in r.cons(("Horizontal", "Vertical"))}
+    for i, g in r.geo("Part::GeomLineSegment"):
+        if i < s["geo0"]:
+            continue
+        axes = on_axis.get(i, set())
+        both = any((1, a) in axes and (2, a) in axes for a in (-1, -2))
+        held.append(kinds.get(i) or ("on an axis" if both else None))
+    h.check("D each line is level or upright by inference", all(held) and len(held) == 6, held)
     r.sketch_clean("D drawn:")
     s["lines"] = [i for i, _g in r.geo("Part::GeomLineSegment") if i >= s["geo0"]]
     h.press("d")

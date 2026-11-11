@@ -729,7 +729,10 @@ def g_done():
     if not h.check("G two bodies", len(found) == 2, [x.Label for x in found]):
         return
     volumes = sorted(x.Shape.Volume for x in found)
-    h.check("G together they are the donut", r.rel(sum(volumes), TORUS, 1e-6), volumes)
+    # (1e-5: the split's two volumes add up to the torus within OpenCASCADE's own
+    # integration noise, which differs between builds: 1.2e-6 on GitHub's runner, CI #76;
+    # the golden models allow 2e-5 on curved solids)
+    h.check("G together they are the donut", r.rel(sum(volumes), TORUS, 1e-5), volumes)
     h.check("G two halves of about the same size", volumes[0] > 0.4 * TORUS, volumes)
     top, bottom = top_and_bottom()
     h.check(
