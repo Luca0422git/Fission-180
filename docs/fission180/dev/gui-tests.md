@@ -231,3 +231,14 @@ compiled again (an artifact of attempt 1 is there for attempt 2: the scenario de
   `h.press_pace` also waits until `handles3d.just_used()` is over: the app's state, measured
   from the release (the gap from the drag's press was not enough: inspect_qa L, a click 0.2 s
   after the drag was let go stayed unpicked under load).
+- **FreeCAD's sketch solver does not settle a sketch that is not fully constrained the same
+  way every time.** It orders the sketch's unknowns by where they lie in memory, which
+  changes from run to run: the same Equal on the same four lines gave a different shape in 38
+  of 40 tries (the Pizza Cutter's handle: its flats 0.16 to 0.20 in long, once 0.01 in, and
+  the click on that flat took its corner; wave 7, fix-4). Fission 180 sets FreeCAD's
+  least-norm solver step (`sketch_mode.PARAMS`, DogLegGaussStep), which takes most of that
+  away; a new Equal between circles or arcs, Horizontal / Vertical between two points or a
+  Coincident still start from either of the two values. So a check on a sketch that is not
+  fully constrained yet must not depend on how the solver settled it, and a click on a piece
+  whose size the solver chose must still find it (a person zooms in on a piece too small to
+  click: `replay_12_handle_steps`, `handle_flat_zoom`).
