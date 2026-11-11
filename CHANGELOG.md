@@ -215,6 +215,9 @@ Home view with the Layout Grid on; and Undo pressed while a dialog is open cance
   Scale entire sketch at first dimension).
 - **Sketch axes have the origin's colours**: on the Front plane the upright axis is blue (Z), as
   in Fusion; it was green.
+- **A sketch that is not fully dimensioned yet settles the same way every time.** When a
+  constraint is added, the curves that are still free move as little as they can; before, the
+  same steps could leave a short line a hair long or twice as long, depending on the run.
 - **A new design opens like Fusion's**: Home view, Layout Grid on, with a red X line, a green Y
   line and an origin dot. Fit (F6) frames the design or the open sketch, never the grid.
 - **Undo while a dialog is open cancels the dialog** (key, toolbar or menu, in every dialog);
