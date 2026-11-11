@@ -28,7 +28,14 @@ Hitches found and fixed:
 | Report line | What happened | Fusion (source) | Root cause | Fix |
 |---|---|---|---|---|
 | 1224 ("OK" in the report) | The stud's second "3.9 from the origin", put to the left of the two points at half height, became the slanted distance: the circle ended at (3.9, 0) | Straight left or right of two points is the vertical distance, straight above or below the horizontal one; the aligned zone of a nearly upright line is small (Autodesk forum "Dimension diagonal line"; the exact zones: Guess) | `sketch_dimension_core.linear_kind` gave the aligned length everywhere between the two perpendiculars through the points, also outside their box | `linear_kind`: outside the points' box on one side only is VERTICAL / HORIZONTAL; aligned inside the box and in the corners square to the line. Unit tests `test_sketch_dimension_core` |
-| 1231-1236 | The first edge clicked became Direction 1, the second edge was not taken: the dialog had gone back to Objects, Direction 2 stayed the one worked out | Fusion's Rectangular Pattern has one Axes box that takes two picks (Autodesk help "Rectangular Pattern": "Axes: select up to two") | `pattern_ui.PatternPanel._reference_picked` always went back to the Objects box | After the first direction the second direction's box is the active one (once; not when editing). `patterns_rect` updated: it checked "Objects box active again" |
+| 1231-1236 | The two edges clicked one after the other: the first became Direction 1, the second was taken by the Objects box (the dialog goes back to it), so Direction 2 stayed the one Fission 180 works out | Fusion's one Axes field takes the second edge with the next click (Autodesk help "Create a rectangular pattern": "Select a second edge to change the angle of the second direction") | `pattern_ui.PatternPanel._reference_picked` goes back to the Objects box | NOT FIXED (see below); the replay clicks the second Direction box first |
+
+The second direction, tried and taken back: advancing to the second Direction box after the
+first pick (as Fusion's single Axes field does) made `patterns_qa_paths` fail (P4: OK pressed
+by Enter while the second box, with its origin axes drawn, was still the active one; Ctrl+Z
+then took back more than the pattern and Ctrl+Y did not bring it back: reproduced twice,
+gone with the change undone). The cause is in the pattern dialog's handling of the axis
+overlay at finish; left to the modify builder with this evidence.
 
 Not hitches, but facts a replay has to know:
 
@@ -152,10 +159,31 @@ the STEP motors, board and battery from CADclass.org (Data Panel Upload, Insert 
 Design, Move with parameters), Copy / Paste of a component, Rigid Group, Physical Material
 and Properties, the appearance.
 
+## Results
+
+- Replays (run_tests.sh, one at a time): replay_06_play_brick 199, replay_07_geocache 192,
+  replay_08_metric_bolt 118, replay_09_drone 155 checks, PASS.
+- Unit tests: all pass but `test_vex_qa_freecad` "parts_list_assembly_twice" (known on
+  develop, another builder's) once the generated docs were regenerated (the new golden
+  model); new `test_replay_c_freecad` (9 checks in real FreeCAD), `test_sketch_dimension_core`
+  (two new cases).
+- Golden models: 650 pass, 2 XFAIL (as before); new `pattern_circ_after_primitive_off_origin`.
+- Older scenarios run after the fixes, all PASS: patterns_rect, patterns_qa_paths,
+  patterns_path, book_sketch_b_dimension_edge, sketch_dim_box_closes, book_sketch_b_dimension (its "beside the
+  line" spot moved inside the box of the line's ends), book_components2_structure,
+  book_components_pattern, components2_pattern, fixpattern_marker, gaps_edit_rollback,
+  gaps_formula_units, modify2_bodies, modify2_pattern_adjust, pattern_several_bodies,
+  patterns_qa, patterns_qa_edit, patterns_qa_features, patterns_qa_more, patterns_qa_part,
+  patterns_suppress, patterns_params, pattern_handles_bodies, book_modify_split_pattern,
+  fixpattern_rect, pi5_case, surface4_pattern, value_box_dialogs_2, book_sketch_a_dimension,
+  book_sketch_c_dimension, book_modify_thread_chamfer, book_extrude_primitives,
+  primitives_coil, primitives_qa, emboss_cylinder, emboss_flat, timeline_browser,
+  polish2_timeline_groups, book_modifyc_knurl, book_modifyc_section, book_extrude2_across,
+  book_modifyb_thread_offset, fillet2_sets.
+
 ## Changelog lines
 
 - A dimension between two points that you place straight to the left or right of them is the vertical distance, and straight above or below them the horizontal one, however near you place it.
-- In Rectangular Pattern, after you click the first direction the next click sets the second direction, so you can click two edges one after the other as in Fusion.
 - A number typed right after placing a Box, Cylinder or other shape goes into its Height, also when the Height arrow is outside the view.
 - A pattern of features made after a Box or Cylinder that is not at the origin repeats the features in the right place (the Geocache knurl had only half its grooves).
 - Emboss takes the face behind a construction plane when you click through the plane.
@@ -174,8 +202,8 @@ and Properties, the appearance.
 - A dimension placed beside a slanted pair of points, inside the box they span, is the
   aligned length; to get the horizontal or vertical one place it straight above / below or
   beside the box (or right-click: Horizontal / Vertical).
-- The Rectangular Pattern's second direction takes the click after the first only once per
-  dialog; to change Direction 1 again later, click its box first.
+- Rectangular Pattern: after the first direction, click the second Direction box before the
+  second edge (Fusion takes two edges in a row in one Axes field).
 - Not replayed: the Drone's motors, board and battery (CADclass.org STEP files), Copy and
   Paste of a component, Rigid Group, Properties; the Geocache's STL export; the Play Brick's
   twelve small rectangles and the ribs; the Metric Bolt's 40 knurls.
