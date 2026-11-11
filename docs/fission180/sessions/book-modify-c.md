@@ -87,7 +87,7 @@ stop it. The Fire Piston's "preview kept the app busy for more than 30 s" is the
 
 | case | the dialog answers after the quantity is typed | OK to closed dialog | what it was before |
 |---|---|---|---|
-| Geocache knurl with the thread, 25 | 0.6 - 0.9 s, 24 shaded copies | 55 - 65 s wall under the other builders' load, 38 s of processor (the same one boolean, in the other program) | 30 - 40 s for every value shown, in the window's process |
+| Geocache knurl with the thread, 25 | 0.6 - 0.9 s, 24 shaded copies | 32 s on a quiet machine (the build outside 25 s), 55 - 65 s under the other builders' load; 38 s of processor (the same one boolean, in the other program) | 30 - 40 s for every value shown, in the window's process |
 | Fire Piston knurl as the book lays it (along X, X axis), 6 | 0.8 s, 5 shaded copies | 29 s (the build outside 22 s; 47 s of processor) | every value shown built: "> 30 s" in the report |
 | Metric Bolt, 40 straight knurls | 1.6 s, built live | at once | the same |
 

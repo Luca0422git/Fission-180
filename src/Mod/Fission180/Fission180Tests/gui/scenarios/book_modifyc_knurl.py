@@ -18,8 +18,8 @@ What is checked:
 * OK builds them once, outside the window's process, with a window that says so; Cancel in
   that window stops the build, the dialog stays with "Cancelled" and the light preview;
 * OK again builds the knurl: 25 pairs of grooves, one valid solid, nothing red; Ctrl+Z and
-  Ctrl+Y do not build anything again; Edit Feature and Cancel leave it as it is, without a
-  rebuild.
+  Ctrl+Y do not build anything again; Edit Feature, another quantity (light again) and
+  Cancel leave it as it is, without a rebuild.
 
 Metric Bolt (pp 86-93): the 40 straight knurls on the head: a V groove cut along the head
 d8.5 x 5 and a Circular Pattern of it, Z axis, 40: FreeCAD's own pattern step, built live.
@@ -238,16 +238,29 @@ redone.done = lambda: ps.panel() is not None
 redone.done_what = "the pattern's dialog is open"
 
 
-def edit_cancel():
+def edit_change():
     p = ps.panel()
     h.check("the dialog shows 25", p.options["quantity"] == 25, p.options["quantity"])
+    ps.type_quantity(p.quantity, 26)
+
+
+def edit_cancel():
+    p = ps.panel()
+    h.check("26 copies are previewed light", p.light and p.ghosts.count == 25, p.info.text())
     h.task_button("Cancel")
+
+
+edit_cancel.timeout_s = 600
 
 
 def edit_cancelled():
     h.check("dialog closed", ps.panel() is None)
     h.check("the knurl is as it was", abs(vol() - S["knurl"]) < 1e-6, vol())
-    h.check("Edit and Cancel built nothing", len(S["builds"]) == S["count"], S["builds"])
+    h.check(
+        "Edit, another quantity and Cancel built nothing",
+        len(S["builds"]) == S["count"],
+        S["builds"],
+    )
     h.check("nothing is red", all(v[1] == "ok" for v in t.states().values()), t.states())
 
 
@@ -317,6 +330,7 @@ h.run(
         knurled,
         undone,
         redone,
+        edit_change,
         edit_cancel,
         edit_cancelled,
         bolt,

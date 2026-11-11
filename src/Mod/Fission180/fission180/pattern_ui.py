@@ -2122,6 +2122,8 @@ class PatternPanel(Panel):
             pattern.set_light(target, on)
             target.touch()
         self.light = bool(on)
+        if on:
+            self._went_light = True
 
     def _show_ghosts(self):
         if not self.light or self.body is None or self._closed:
@@ -2512,8 +2514,18 @@ class PatternPanel(Panel):
             return True
         self._timer.stop()
         body = self.body
+        edited = self.target if self.editing else None
         self.cleanup()
         preview.end_transaction(self.doc, abort=True)
+        if edited is not None and getattr(self, "_went_light", False):
+            # An edit that was previewed light: Cancel put the step's values and its solid
+            # back as they were before the dialog, so there is nothing to build again (the
+            # knurl would be built for half a minute to give the same solid).
+            try:
+                if pattern.alive(edited) and not edited.Shape.isNull():
+                    edited.purgeTouched()
+            except Exception as exc:
+                warn("%s: %s" % (self.title, exc))
         preview.recompute(self.doc)
         self._close()
         if body is not None and pattern.alive(body):
