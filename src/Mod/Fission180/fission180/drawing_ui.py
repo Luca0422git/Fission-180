@@ -3305,7 +3305,7 @@ class NewDrawingCommand(_Base):
             return
         storyboard = None
         if self.from_animation:
-            storyboard = drawing_exploded.storyboards(doc)[0]
+            storyboard = drawing_exploded.front_storyboard(doc)
         CreateDrawingPanel(doc, picked, storyboard)
         Gui.Control.showDialog(CreateDrawingPanel.last)
 
@@ -3362,7 +3362,8 @@ class ExplodedViewCommand(_Base):
             return
         boards = drawing_exploded.storyboards(page.Document)
         wanted = drawing._get(page, "Fission180Storyboard", "")
-        _start(BaseViewPanel, None, wanted if wanted in boards else boards[0])
+        front = drawing_exploded.front_storyboard(page.Document)
+        _start(BaseViewPanel, None, wanted if wanted in boards else front)
 
 
 class BaseViewCommand(_Base):

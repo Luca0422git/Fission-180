@@ -94,6 +94,24 @@ def storyboards(doc):
         return []
 
 
+def front_storyboard(doc):
+    """The storyboard a new exploded view starts on: the one in front in the ANIMATION
+    workspace (its tab was the last one shown), else the first. None without any. (It was
+    always the first: a person who had just made Storyboard2 got a drawing of Storyboard1.)"""
+    names = storyboards(doc)
+    if not names:
+        return None
+    try:
+        from . import animation_ui
+
+        name = animation_ui.current(doc)
+        if name in names:
+            return name
+    except Exception as exc:
+        log("front storyboard: %s" % exc)
+    return names[0]
+
+
 def why_none(doc):
     """Why no exploded view can be made now, as a sentence with what to do (or "")."""
     if animation() is None:
