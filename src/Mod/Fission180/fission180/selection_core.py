@@ -56,8 +56,12 @@ MODE_LABELS = {
 }
 MODE_KEYS = {"1": "window", "2": "freeform", "3": "paint"}  # Fusion's hotkeys
 
-DEFAULT_SELECT_THROUGH = False  # Fusion: hidden geometry needs Select Through turned on
-# (forum answers tell people to turn it on; the default itself is not documented)
+# Fusion's Select Through is on in a new install (Autodesk support, "How to select only
+# visible faces in Autodesk Fusion": "Fusion by default has the 'select through' selection
+# filter enabled"; forum threads complain that a window takes internal parts). Before wave 7
+# it was off here, so the book's "window-select the whole part, Chamfer" (Tensegrity Tower)
+# took only the edges the view showed (replay-b).
+DEFAULT_SELECT_THROUGH = True
 LONG_PRESS_S = 1.0  # Select Other: Fusion "about a second"; FreeCAD's LongPressTimeout too
 CLICK_SLOP = 5  # pixels: moving further ends the long press and starts a box
 LASSO_STEP = 3.0  # pixels: a freeform point closer than this to the last one is not kept

@@ -40,7 +40,7 @@ import FreeCADGui as Gui
 from . import blend, commands, fillet_core as core, fillet_sets, log, shape_checks, ui_icon
 from . import ui_icon_path, value_limits, warn
 from .blend_field import SaveFinishes, ValueField
-from .compat import QtCore, QtWidgets
+from .compat import QtCore, QtGui, QtWidgets
 from . import taskui
 from .taskui import ArrowDragger, Panel, ValueBoxes, _end_transaction, handle_size_at
 
@@ -211,6 +211,35 @@ def _carry_label(label, name, new):
         new.Label = label
     except Exception:
         pass
+
+
+class _GlyphRelease(QtCore.QObject):
+    """The release of a click whose press found an edge or face behind a construction plane
+    (BlendPanel._behind_glyph): Qt's own event, seen before FreeCAD handles it; the pick is
+    made once FreeCAD has (a timer of 0)."""
+
+    def __init__(self, panel, widget):
+        super().__init__()
+        self.panel = panel
+        self.widget = widget
+        widget.installEventFilter(self)
+
+    def remove(self):
+        try:
+            self.widget.removeEventFilter(self)
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event):
+        try:
+            if (
+                event.type() == QtCore.QEvent.MouseButtonRelease
+                and event.button() == QtCore.Qt.LeftButton
+            ):
+                self.panel._released(QtGui.QCursor.pos())
+        except Exception as exc:
+            warn("fillet: %s" % exc)
+        return False
 
 
 class _Observer:
@@ -971,10 +1000,13 @@ class BlendPanel(Panel):
 
     def _mouse_event(self, info):
         """A press on the edge of a Variable row: remembered, so the click adds a radius point
-        there instead of dropping the edge (nothing is built here: rule 2)."""
+        there instead of dropping the edge (nothing is built here: rule 2). A press on an
+        origin or construction plane's square or axis: the edge or face behind it is picked
+        (_behind_glyph)."""
         try:
             if self._closed or info.get("State") != "DOWN" or info.get("Button") != "BUTTON1":
                 return
+            self._behind_glyph(info.get("Position"))
             if self._variable_row() is None:
                 return
             found = self.view.getObjectInfo(tuple(info.get("Position")))
@@ -988,6 +1020,68 @@ class BlendPanel(Panel):
             self._click = (time.time(), name, placement.inverse().multVec(point))
         except Exception as exc:
             warn("%s click: %s" % (self.title, exc))
+
+    def _behind_glyph(self, position):
+        """Fusion lets a command pick only what it takes: a click on an edge or a face behind
+        a construction plane's square reaches the edge (the surfboard's fin edges lay behind
+        the offset planes, and every click took a plane: replay-b, wave 7). On the press the
+        edge or face behind is found; FreeCAD's own click then selects the plane (or
+        nothing); once the button is let go (_GlyphRelease) the edge or face is picked, or
+        dropped when it was picked already."""
+        self._behind = None
+        try:
+            from . import profile_pick
+
+            pixel = tuple(position)
+            hits = profile_pick.under(self.view, pixel)
+            if not hits or not profile_pick.is_glyph(hits[0][0]):
+                return
+            base = self.base
+
+            def usable(obj, short):
+                return obj.Name == base.Name and short.startswith(("Edge", "Face"))
+
+            found = profile_pick.behind_glyphs(self.view, pixel, usable)
+            # an edge a few pixels away comes before the face it bounds (a person aims at
+            # the edge; the pixel itself is often on the face beside it)
+            near = [
+                hit
+                for hit in profile_pick.under(self.view, pixel, 4)
+                if usable(hit[0], hit[1]) and hit[1].startswith("Edge")
+            ]
+            if near:
+                found = near[0]
+            if found is None:
+                return
+            if getattr(self, "_release", None) is None:
+                widget = taskui.view_widget()
+                if widget is not None:
+                    self._release = _GlyphRelease(self, widget)
+            self._behind = (QtGui.QCursor.pos(), base.Name, found[1])
+        except Exception as exc:
+            warn("%s click: %s" % (self.title, exc))
+
+    def _released(self, at):
+        behind, self._behind = getattr(self, "_behind", None), None
+        if behind is None or self._closed:
+            return
+        pressed, obj_name, name = behind
+        if (at - pressed).manhattanLength() > 4:
+            return  # a drag (an orbit), not a click
+        doc = self._doc_name
+
+        def pick():
+            if self._closed:
+                return
+            try:
+                if name in self._shown:
+                    Gui.Selection.removeSelection(doc, obj_name, name)
+                else:
+                    Gui.Selection.addSelection(doc, obj_name, name)
+            except Exception as exc:
+                warn("%s pick behind a plane: %s" % (self.title, exc))
+
+        QtCore.QTimer.singleShot(0, pick)
 
     def _escape(self):
         try:
@@ -2591,6 +2685,9 @@ class BlendPanel(Panel):
                 except Exception:
                     pass
         self._keys = self._mouse = None
+        release, self._release = getattr(self, "_release", None), None
+        if release is not None:
+            release.remove()
         if self.observer is not None:
             try:
                 Gui.Selection.removeObserver(self.observer)

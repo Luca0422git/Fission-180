@@ -27,7 +27,7 @@ class FilterTests(unittest.TestCase):
             self.assertTrue(f.allows(kind))
         self.assertTrue(f.allows(None))
         self.assertTrue(f.allows("something_else"))
-        self.assertFalse(f.select_through, "Select Through is off until the user turns it on")
+        self.assertTrue(f.select_through, "Select Through is on in a new install (Fusion)")
 
     def test_set_toggle_and_encode(self):
         f = core.Filters()
