@@ -92,10 +92,18 @@ gasket_key.done_what = "the Extrude dialog is open"
 
 
 def gasket_face():
-    print("[Fission 180] replay gasket under %s | active %s" % (h.under_mouse(FRONT), r.active_label()), flush=True)
+    print(
+        "[Fission 180] replay gasket under %s | active %s"
+        % (h.under_mouse(FRONT), r.active_label()),
+        flush=True,
+    )
     r.xclick(FRONT)
     p = r.panel()
-    print("[Fission 180] replay gasket took %s | %s | %s" % (p.profiles, p.message.text(), p.info.text()), flush=True)
+    print(
+        "[Fission 180] replay gasket took %s | %s | %s"
+        % (p.profiles, p.message.text(), p.info.text()),
+        flush=True,
+    )
     h.shot("gasket-click")
 
 
@@ -346,6 +354,17 @@ def plane_made():
     h.check("on the back gasket's face", r.near(y, HALF + GASKET, 1e-5), y)
 
 
+def wall_plane():
+    if S.get("wall_plane"):
+        return r.doc().getObject(S["wall_plane"])
+    found = [
+        o
+        for o in r.doc().Objects
+        if o.TypeId == "PartDesign::Plane" and r.comps().container_of(o) is r.component(POWER)
+    ]
+    return found[-1] if found else None
+
+
 def wall_sketch():
     Gui.Selection.clearSelection()
     h.ribbon("Create Sketch")
@@ -354,7 +373,7 @@ def wall_sketch():
 def wall_sketch_plane():
     from Fission180Tests.gui import bodies_steps
 
-    plane = r.doc().getObject(S["wall_plane"])
+    plane = wall_plane()
     label = None
     for row_label in ti.labels():
         if row_label.replace(" ", "") == plane.Label.replace(" ", ""):
@@ -511,15 +530,21 @@ wall_extrude_key.done = lambda: r.panel() is not None
 wall_extrude_key.done_what = "the Extrude dialog is open"
 
 
+def wall_sketch_obj():
+    if S.get("wall_sketch"):
+        return r.doc().getObject(S["wall_sketch"])
+    found = [
+        o
+        for o in r.doc().Objects
+        if o.TypeId == "Sketcher::SketchObject" and r.comps().container_of(o) is r.component(POWER)
+    ]
+    return sorted(found, key=lambda o: o.Name)[-1]
+
+
 def wall_profile():
     p = r.panel()
     if not p.profiles:
-        r.xclick(
-            r.doc()
-            .getObject(S["wall_sketch"])
-            .getGlobalPlacement()
-            .multVec(V(2.0 * IN, 2.0 * IN, 0))
-        )
+        r.xclick(wall_sketch_obj().getGlobalPlacement().multVec(V(2.0 * IN, 2.0 * IN, 0)))
 
 
 def wall_values():
@@ -555,7 +580,7 @@ def wall_made():
 
 
 def hide_plane():
-    plane = r.doc().getObject(S["wall_plane"])
+    plane = wall_plane()
     for row_label in ti.labels():
         if row_label.replace(" ", "") == plane.Label.replace(" ", ""):
             ti.click_eye(row_label)
@@ -567,7 +592,7 @@ WALL_CENTRE = r.gp(0.0, HALF + GASKET + WALL, 0.0)
 
 
 def counterbore_key():
-    plane = r.doc().getObject(S["wall_plane"])
+    plane = wall_plane()
     h.check("the plane is hidden", not plane.Visibility)
     Gui.Selection.clearSelection()
     h.press("h")
@@ -616,7 +641,9 @@ def counterbored():
     centre = hole_steps.centre_of(holes[-1]) if holes else None
     h.check(
         "at X 0, Y 0 of the face",
-        centre is not None and abs(centre.x) < 1e-6 and abs(centre.z) < 1e-6,
+        # (within 0.01 mm: the plane on the gasket, and so the wall's sketch, has its origin at
+        # the gasket face's centre of area, a few micrometres off the design's axis: Known issues)
+        centre is not None and abs(centre.x) < 0.01 and abs(centre.z) < 0.01,
         centre,
     )
     S["wall_vol"] = got
@@ -689,10 +716,11 @@ def steam_plane_box():
     from Fission180Tests.gui import pattern_steps
 
     p = mirror_panel()
+    picked = [o[0] if isinstance(o, tuple) else o for o in p.options["objects"]]
     h.check(
-        "Components: the Power Side Wall",
-        [o.Label for o in p.options["objects"]] == [POWER],
-        [getattr(o, "Label", o) for o in p.options["objects"]],
+        "Components: the Power Side Wall (picked by its browser row)",
+        [getattr(o, "Label", o) for o in picked] == [POWER],
+        [getattr(o, "Label", o) for o in picked],
     )
     pattern_steps.click_box("plane")
 
@@ -793,7 +821,8 @@ def steps():
     out += [r.named("wall_remember", lambda: S.__setitem__("wall_sketch", r.sk().Name))]
     out += [r.finish_sketch("wall_finish")]
     out += [wall_extrude_key, wall_profile, wall_values, r.ok("wall_extrude_ok"), wall_made]
-    out += [hide_plane, counterbore_key, counterbore_face, counterbore_values]
+    out += [hide_plane, r.view_from(-0.4, 1, 0.3, "wall_from_back_again"), counterbore_key]
+    out += [counterbore_face, counterbore_values]
     out += [counterbore_sizes, r.ok("wall_hole_ok", 120), counterbored]
     out += [r.view_from(1, 1, 1, "wall_from_outside"), r.menu("CREATE", "Thread", "wall_thread")]
     out += [thread_click(k) for k in range(4)]

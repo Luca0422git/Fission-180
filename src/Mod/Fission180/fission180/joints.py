@@ -3524,6 +3524,12 @@ def part_shape(part):
         shapes = []
         for obj in part.OutListRecursive:
             try:
+                if not _owned_by(obj, part):
+                    # another component's body the part only refers to (a plane or a sketch
+                    # of it made on that body's face): not this part's solid (the book's
+                    # Tesla Turbine: the Power Side Wall, its plane on the gasket's face,
+                    # counted the gasket as its own)
+                    continue
                 if obj.TypeId == "PartDesign::Body" or (
                     obj.isDerivedFrom("Part::Feature")
                     and obj.getParentGeoFeatureGroup() is not None
@@ -3537,6 +3543,21 @@ def part_shape(part):
                 continue
         return Part.makeCompound(shapes) if shapes else Part.Shape()
     return bodies.global_shape(part)
+
+
+def _owned_by(obj, part):
+    """True when `obj` lies in the component `part` (directly, or in a component inside it)."""
+    try:
+        holder = obj.getParentGeoFeatureGroup()
+        seen = 0
+        while holder is not None and seen < 64:
+            if holder is part:
+                return True
+            holder = holder.getParentGeoFeatureGroup()
+            seen += 1
+    except Exception:
+        return True
+    return False
 
 
 def _volume(shape):

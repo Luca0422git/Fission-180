@@ -195,7 +195,7 @@ def ok(name="ok", timeout_s=None):
 
 def type_field(widget, text, end=QtCore.Qt.Key_Tab):
     """Click into a dialog's field, replace its text by typing, leave it with Tab."""
-    h.pointer_to(widget, widget.rect().center())
+    widget.setFocus()
     QtTest.QTest.mouseClick(widget, QtCore.Qt.LeftButton)
     QtTest.QTest.keyClick(widget, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
     QtTest.QTest.keyClicks(widget, text)
