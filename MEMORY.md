@@ -15,11 +15,28 @@ stays out), Python first and C++ only where there is no other route, helper agen
 version written `0.1.0-beta.4.0.0`. Thirteen builders, briefs
 `docs/fission180/dev/briefs/book-common.md` + `book-<area>.md`, branches `sf/book-<area>`:
 params, components, joints, looks, sketch-a, sketch-b, extrude, modify, shell, drawings,
-animation, cam, hardware. Status: [x] briefs [ ] builders done and merged (each with the merge
-routine) [ ] a replay of every book project with real input (the acceptance test) [ ] VERSION
-/ `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [ ] "Fission 180
-tests" green [ ] **Luca: release** (quick route if no compiled file changed, else the full
-build). 3.3.10 is published (`Release` = `7813ef69`).
+animation, cam, hardware. Status: [x] briefs [x] builders done and merged (each with the merge
+routine; plus follow-ups and fix-1..4) [x] a replay of every book project with real input (the
+acceptance test: replay-a..g, scenarios `replay_<nn>_*`, all PASS on the merged code; partly
+replayed: the Hot End about a third, the Carabiner up to its path, the Football's laces) [x]
+VERSION / `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [ ] "Fission
+180 tests" green [ ] **Luca: release**: QUICK route (no compiled file changed since 3.3.10:
+`git diff 7813ef69..develop` touches only `src/Mod/Fission180`, `docs`, `tools`): Actions >
+Fission 180 patch release once the tests are green on the release commit. 3.3.10 is published
+(`Release` = `7813ef69`). Model: Fable 5.2 ran the wave until its usage credits ran out
+(twice); Luca switched the session to Opus 5.5 ("finish the job") at the replay stage.
+Decisions taken in the wave (Luca can overrule): Select Through ON by default (Autodesk
+support article); Layout Grid ON in new designs; full grid snap ON; "Auto project edges on
+reference" and "Scale entire sketch at first dimension" ON (Fusion's defaults not
+documented); first component grounded ON; Extrude Cut by itself only when the new solid is
+more than half inside a shown body of another component (threshold a guess); Join only
+within the active component (Autodesk forum); Joint limits' Flip mirrors about zero (guess);
+sketch pattern Symmetric Quantity = total, solid patterns per side (no source for solids).
+Lessons for the next wave: run the unit suite with `run_tests.sh --only unit` (plain
+unittest skips the FreeCAD-backed tests: components-2 missed a failure that way); merging
+twenty branches that each passed alone broke 18 scenarios (two builders' fillet changes
+collided): budget an integration round after every batch of merges; keep pushes to develop
+rare while GitHub's full run (~75 min) is in progress (each push cancels it).
 Wave 7 progress (2026-11-11, orchestrator): merged into `develop`, each after unit + base:
 **cam** (b449d601: Manufacture workspace, `manufacture*.py`, 21 `Fission180_Cam*` commands on
 FreeCAD's CAM engine run headless, own height-field Simulate, 9 posts; AI tools not built:

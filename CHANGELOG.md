@@ -8,6 +8,318 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.0.0
+
+**The fourth beta: the Fusion tutorial book, replayed.** Fission 180 0.1.0-beta.3.3.9 was taken
+through *Mastering Autodesk Fusion* (2nd edition) chapter by chapter, with a real mouse and
+keyboard, and every step that did not go the way the book says was written down: 123 hiccups,
+63 workarounds and 44 failures, among them 20 reproducible bugs. Every one of the 20 is fixed,
+or explained below where the report had Fusion wrong; much of the rest is smoothed out; and
+the two workspaces the book needs that Fission 180 did not have are here: **Animation**
+(exploded views and assembly animations, saved as a video) and **Manufacture** (CNC milling
+programs). Render is still not part of Fission 180. This version was then checked the same
+way: every project of the book except the Render chapter was replayed step by step with real
+mouse and keyboard input and a new user's settings, and every hitch found was fixed (the Hot
+End was replayed about a third of the way, the Carabiner up to its path, the Football without
+its laces).
+
+**What you will notice first** (details under Changed): new sketches, bodies and planes always
+go into the active component; Extrude chooses Cut, Join or New Body by one rule and never
+changes the one you picked; on the Front plane a positive distance now goes away from you, for
+new sketches and shapes; a design's first body is called Body1 and its first component is
+grounded; with Snap on, every sketch point you click lands on a grid crossing, and the first
+dimension you type scales the whole sketch; sketch axes have the origin's colours; **Select
+Through is now on**, so a window selection takes hidden edges too; a new design opens in the
+Home view with the Layout Grid on; and Undo pressed while a dialog is open cancels that dialog.
+
+### New workspace: Animation
+
+- **Workspace > Animation makes exploded views and assembly animations** of a design's
+  components without changing the design; only the parts are drawn there (no sketches, planes
+  or joint symbols). Storyboards are tabs under the ANIMATION TIMELINE: new (empty, or
+  starting where the last one ends), rename, duplicate, reverse, delete, reorder.
+- **The ANIMATION TIMELINE records at the playhead.** Drag a bar or its ends, double-click it to
+  type its times, Delete removes it; play, pause and loop (Space, wherever the pointer is). The
+  scratch zone at the start moves things without recording them, as in Fusion.
+- **Transform Components** (manipulator or typed values, Set Pivot, trail lines; click a part
+  inside a subassembly twice to take it alone), **Auto Explode** (One Level or All Levels,
+  Explosion Scale, One-Step or Sequential), **Manual Explode**, **Show/Hide** (at once or as a
+  fade), **Restore Home**, **Create Callout**, and **View** (camera moves are recorded).
+- **Publish Video** saves one storyboard or all of them as an AVI video (plays in VLC and
+  Windows' players), as an MP4 when the free ffmpeg program is installed (the greyed MP4 entry
+  says where to get it), or as PNG pictures, at the size and speed you choose.
+- **The AI assistant can animate too**: storyboards, explosions, callouts, the video.
+
+### New workspace: Manufacture
+
+- **Workspace > Manufacture turns a design into a CNC milling program**, with Fusion's names and
+  dialogs, without leaving Fission 180 (FreeCAD's CAM engine does the computing). Toolpaths are
+  kept in the design and say "needs regenerating" when the design changes.
+- **Setup**: how the part sits on the machine (origin and axes) and the stock it is cut from (a
+  margin round the part, a fixed size, a solid, or From preceding setup for the other side).
+- **Milling operations** with Fusion's five-tab dialogs: Face, 2D Adaptive Clearing, 2D Pocket,
+  2D Contour (with holding tabs, spread out or where you click), Slot, Trace, Engrave, 2D
+  Chamfer, Bore, Circular, Drill, and the 3D Adaptive Clearing, Pocket Clearing, Parallel and
+  Contour. The **Tool Library** has sample metric and inch tools and room for your own.
+- **Simulate** shows the tool cutting the stock, the machining time and any rapid move into
+  material. **Post Process** writes G-code for Grbl, LinuxCNC, Mach3 / Mach4, Fanuc, Marlin and
+  four more controllers, checked before you see it; **Setup Sheet** lists tools, steps and times.
+- **The AI assistant can do it too**: setups, operations, generate, simulate and post process.
+
+### New: sketches and parameters
+
+- **Sketch constraints work both ways**: select the things and click the constraint, or click
+  the constraint and then the things. One that cannot be added says why, next to the pointer,
+  and shows what is in the way. Collinear works on two vertical lines, Symmetry on two lines,
+  circles or arcs, Tangent on the corner two splines share.
+- **Sketch Dimension (D) is Fission 180's own tool.** The click that places a dimension is never
+  taken as another pick, and a sketch line is taken before an axis under the pointer. A
+  slanted line gives its length beside it; placed straight beside two points, a dimension is
+  their vertical distance, above or below them the horizontal one (or right-click > Aligned /
+  Horizontal / Vertical). A dimension the sketch already fixes is added as driven, in brackets.
+- **New linetype Centerline**: a dimension to it is a diameter, and Revolve takes it as its axis.
+- **Clicking an edge or corner of the model while you draw, constrain or dimension projects it
+  into the sketch**, also from another body or component, and a click in the middle of a pin's
+  round end or of a hole lands on its centre. Project (P) and Include 3D Geometry take other
+  components too (Preferences > General > Design > Auto project edges on reference).
+- **Sketch patterns stay tied to the original**: the copies follow it and its dimensions,
+  Suppression leaves copies out, a typed Quantity counts without Enter. Mirror closes the
+  outline on the mirror line; Offset hides its helper lines.
+- **Drawing**: press on a line's end and drag for a tangent arc; a chain that ends on something
+  already drawn stops, with a note. Polygons, splines and ellipses no longer show FreeCAD's
+  helper circles, points and labels.
+- **Change Parameters is rebuilt**: "+ User Parameter", a filter, Favorites, rename by typing
+  over a name (formulas follow), a unit per parameter (in, ft, deg, none...), every step's sizes
+  in the design's units; all of it is one Undo step, and Cancel puts it back.
+- **Parameters are typed as in Fusion**: a name on its own in any value box (with a list of
+  matching names as you type); "Thickness = -2.5 mm" in Extrude or "Width=5mm" in a slot's box
+  makes the parameter and uses it; a number without a unit is in the design's units;
+  "min(100; max(45; Arm_Length))" works; a typo gets "Did you mean Arm_Length?". A pattern of
+  bodies follows a parameter as its Quantity.
+
+### New: modelling
+
+- **Extrude picks profiles the way Fusion does**: a profile behind a face is clicked through the
+  part (faint blue); a hidden body's sketch can be used; a click beside a thin slot counts;
+  plane squares, value boxes and the taper handle no longer catch the click; the only profile
+  in view is picked by itself. Touching profiles taper as one, and **Bodies to Cut** has a check
+  box per body.
+- **Box, Cylinder, Torus and Coil have size boxes on the canvas**: type a size, Tab to the next,
+  Enter to place, then the height; the boxes keep out of the pointer's way. Loft can end in the
+  origin (click its dot) or a construction point.
+- **Thread**: ISO pipe (G) and NPT threads; the size of the clicked face (a 6 mm hole is M6, not
+  M7); Unified sizes in inch designs. A thread can be dragged before its chamfer (the book's
+  Geocache, Metric Bolt and Pizza Cutter), a chamfer or fillet can follow a modeled thread, and
+  Offset Face / Press Pull move a whole thread.
+- **Fillet and Chamfer build the book's sizes**: the Tensegrity Tower's 20 mm corner chamfer
+  (held at 1.79 mm before), the Carabiner's two 4 mm rounds on its 8 mm face (held at 3.99), a
+  window-picked part. A size that does not fit is said within a second or two, with how many
+  edges are in the way, instead of freezing the window.
+- **Heavy patterns no longer freeze Fission 180**: a knurl shows shaded copies while you type
+  and builds the real ones once, on OK, in the background, with progress and Cancel. Hole >
+  From Sketch with modeled threads cuts them once, on OK.
+- **Split Face stays split** under later features, also while the next Extrude is being changed,
+  and a pattern of features can include it.
+- **Spur Gear**: Scripts and Add-Ins lists SpurGear; each gear becomes a component of its own at
+  the top of the design, named like Fusion's ("Spur Gear (20 teeth)"), and takes root fillets
+  as large as Fusion's sample does (the book's 0.88 mm on 100 teeth).
+
+### New: assemblies and joints
+
+- **Mirror of components**; patterned, mirrored or pasted subassemblies keep their parts as rows
+  in the browser. A mirrored component is called "Name (Mirror)" and can be renamed on its own.
+  A click on a part inside a subassembly picks that part for Move/Copy and patterns.
+- **Ground to Parent / Unground From Parent.** The first component you make is grounded, as in
+  Fusion (Preferences > General > Design); Joint ungrounds the first part you click if needed.
+- **The component right-click menu** has Move/Copy, Create Drawing and Properties. Move/Copy
+  turns a component about its own origin; a paste starts where the copy came from, and Esc
+  right after it takes the paste away again.
+- **Joints**: limits with Flip, Preview Motion and With All Limits; a Rest position the part goes
+  back to when let go; Link with Same Joint (a cap that turns as it slides); a closed linkage
+  moves as one when dragged; Animate Joint plays one joint, the new Animate Joint Relationships
+  everything connected; Motion Study draws a graph. A subassembly's joint can sit on any part
+  inside it.
+- **A step that changes a body outside the active component** says so next to the pointer, and
+  dialogs name such bodies with their component: "Body1 (Bracket)" (Interference too).
+
+### New: appearances, materials and hardware
+
+- **200 appearances in 12 categories** (woods, leather, metals, anodized colours, ABS, rubber,
+  glass, carbon fibre, LEDs...) with search and favourites; wood grain and other patterns are
+  drawn on the part (MODIFY > Texture Map Controls). Double-click a look to edit it; In This
+  Design starts with the editable default look; looks can be dropped on a browser row.
+- **A look given to a body whose faces have their own** asks Keep, Remove or Cancel, inside the
+  Appearance dialog, as Fusion does.
+- **Physical materials**: Brass, Bronze, Gold, Silver, Carbon Fibre, anodized aluminium, woods,
+  rubber and more, with search; double-click one for a copy with its own name and density. A
+  material of your own can be called Brass or Gold (it was refused as taken).
+- **Properties** (INSPECT, or right-click a body or component): mass, volume, area, centre of
+  mass, moments of inertia, and a component's Part Number and Description for the parts list.
+  A selected face shows its area at the bottom right, an edge its length.
+- **Component Color Swatch** (the timeline's gear menu) marks each component's colour in the
+  browser and the timeline; right-click a component > Cycle Component Color.
+- **INSERT > Hardware is a full standard-parts library**, metric and inch: screws of every common
+  head, set and shoulder screws, nuts, washers, O-rings, ball bearings, retaining rings, dowel
+  pins, keys, standoffs, inserts, magnets, with a Search box ("set screw m3", "6202").
+- **A hardware part goes on any part of a hole** (rim, wall, countersink, chamfer), takes its
+  size (a threaded hole's thread size) and seats its head; "All holes like it" fills every such
+  hole. Parts are named as you would order them, have a mass and follow their hole when it
+  moves. **Insert Catalogue Part** opens a supplier's site (McMaster-Carr...) and inserts the
+  STEP file you download there.
+
+### New: drawings
+
+- **TABLES > Parts List, Renumber and Align Balloons; EXPORT > Export CSV** and **Export DWG**
+  (with a DWG converter program installed; otherwise it says so and writes a DXF). New: Move,
+  Rotate and Center Mark Pattern.
+- **Exploded views**: CREATE > Exploded View, or New Drawing > From Animation, draws the design
+  as the storyboard in front leaves it, with its trail lines. Right-click a component, or the
+  design's own row, > Create Drawing.
+
+### New: the window, the Data Panel and export
+
+- **The Data Panel works like Fusion's**: New Project; New Folder and Rename type the name on the
+  card; folders can be moved, copied and deleted (to the computer's trash); a right-click
+  anywhere has a menu. Save puts a new design in the folder open there and shows your projects.
+- **A "+" beside the design tabs** makes a new design; a profile button at the top right opens
+  Preferences, and so does Edit > Preferences.
+- **Export USDZ** (a design in AR on a phone, with its colours); **Save As Mesh** is Fusion's
+  dialog, with Send to 3D Print Utility; Export, Save As DXF and Insert start in the design's
+  folder.
+
+### Changed
+
+- **New things go into the active component**, whatever you click: a sketch on another
+  component's face, a New Body, planes, axes, points, primitives. A command aimed at another
+  component's part (Shell, Hole, Thread, Fillet, a Cut) no longer makes it the active one. With
+  the design's top row active, a sketch on a component's face is made at the top, as in Fusion:
+  activate the component first to add to its body.
+- **Extrude's operation follows one rule and keeps your choice**: Cut when the new shape starts
+  in, or goes mostly into, a visible body of any component; Join when it builds on a body of the
+  active component; New Body otherwise. Symmetric no longer turns a Cut into a Join, and an
+  operation you picked is never changed.
+- **On the Front plane a positive distance goes away from you**, as in Fusion: Extrude of a new
+  sketch, Box, Cylinder, Coil and Offset Plane. What you made before keeps its side.
+- **A design's first body is called Body1**, and **the first component you make is grounded**:
+  to drag it, right-click > Unground From Parent (a joint ungrounds it by itself).
+- **Select Through is on by default**, as in Fusion: a window drawn round a part takes its hidden
+  edges too (switch it off under SELECT > Selection Filters).
+- **Sketch selection**: a click selects only what you click; Ctrl+click adds or removes (it
+  selected nothing before), Shift+click adds.
+- **Sketch Snap works like Fusion's**: with Snap ticked, every point you click freely lands on a
+  grid crossing, in every drawing tool (ends, middles, centres and guides come first); untick it
+  for no pull. It used to pull from far away towards 50 mm lines. A line near 45 degrees gets no
+  angle dimension.
+- **The first dimension you type scales the whole sketch** (also when typed as a sum or a
+  parameter), so a shape drawn by eye keeps its proportions (Preferences > General > Design >
+  Scale entire sketch at first dimension).
+- **Sketch axes have the origin's colours**: on the Front plane the upright axis is blue (Z), as
+  in Fusion; it was green.
+- **A new design opens like Fusion's**: Home view, Layout Grid on, with a red X line, a green Y
+  line and an origin dot. Fit (F6) frames the design or the open sketch, never the grid.
+- **Undo while a dialog is open cancels the dialog** (key, toolbar or menu, in every dialog);
+  Redo there does nothing. In a sketch one Ctrl+Z takes back one line and never leaves it.
+- **New bodies are drawn in the default look, Steel satin**, as In This Design lists it; plain
+  grey bodies of older designs take it when opened.
+- **Typing a number into a named dimension changes its parameter**: name it with "Width = 12",
+  type 40 into it later and Width is 40 everywhere.
+- **An inch design stays inches everywhere**: sketch grid, snap and drag steps, Thread, Fillet,
+  Chamfer, Hardware, Motion Link, the "too big here" messages, the Insert dialogs and drawings;
+  a tapped Hole starts as a Unified thread (1/4-20 UNC, not M6).
+- **Smaller changes**: double-click a body's name to rename it (its icon makes it active); a
+  Hole adds no sketch row to the browser; Group Features is now Create Group; the toolbar is in
+  Fusion's order (ASSEMBLE after MODIFY); the command search lists each command once.
+
+### Fixed: the 20 bugs of the book report
+
+1. **Change Parameters' "+" did nothing** (a red "'bool' object" error): fixed, and the + and −
+   buttons are no longer blank squares.
+2. **An inch design went back to millimetres.** Not Undo's fault: rebuilding a chamfer or fillet
+   with several sizes used a hidden helper design whose units FreeCAD copied into yours. Fixed.
+3. **Deleting a sketch dimension moved formulas onto the wrong dimensions**: fixed; a dimension
+   that follows a parameter is marked (ƒx).
+4. **A negative parameter became 0**: fixed.
+5. **A sketch on another component's face switched the active component**: fixed.
+6. **Extrude's New Body went into the clicked face's component**: fixed.
+7. **Offset Plane went into the clicked face's component**: fixed.
+8. **Axis Through Cylinder went into the cylinder's component**: fixed.
+9. **New Component ticked From Bodies by itself** when a step or face was selected (or, in a new
+   design, offered its empty body): fixed; it says which bodies will move when you tick it.
+10. **A new component's first extrude cut another component's body**: fixed. Fusion proposes Cut
+    only when the shape lies mostly inside a body; the book's link barely overlaps the pin, so
+    it is a New Body there.
+11. **Edit Joint on an as-built joint was lost**: OK was silently refused, because joints made
+    later were checked against parts the edit had rolled back. Later joints now wait during the
+    edit, and a refused OK says why.
+12. **Edit Joint Limits showed Rigid**: the same cause (the edit had just been cancelled); fixed.
+13. **An as-built Slider without an axis became Rigid**: OK was refused, but a Rigid preview
+    stayed that looked finished. No joint is kept until the type has what it needs.
+14. **Joint references went stale ("Broken link", "?Face5")**: three causes fixed; a joint whose
+    face is really gone says so and keeps its parts in place.
+15. **A component inside a subassembly could not be picked from the browser** in As-built Joint
+    and Rigid Group (the whole subassembly was taken): fixed.
+16. **A body turned grey while its look was still listed**: FreeCAD reset the colours when the
+    body's material was touched; the look is now put back at once, and dropping it again works.
+17. **A face look dropped on an edge coloured the whole body**: it goes to the face next to the
+    pointer now.
+18. **Undo left an orphan "Combine 1"**: Combine was not the cause; Undo from the toolbar with a
+    dialog open left the half-made step for Redo. Undo now cancels an open dialog.
+19. **Gear with the book's 0.88 mm root fillet was refused, and OK "made a copy of the previous
+    gear"**: the limit was stricter than Fusion's Spur Gear; it is now the same, so the book's
+    gears build. A size that really does not fit is said next to the pointer.
+20. **Edit Feature on a Gear step deleted it**: only while the Gear dialog was still open on
+    that step; the timeline now asks you to finish the dialog first.
+
+### Fixed: everything else the book ran into
+
+- **A construction plane or a joint's symbol in front of a part no longer catches the click**:
+  Project, Include 3D Geometry, Sketch Dimension, Fillet, Chamfer, Split Face, Emboss,
+  As-built Joint, Physical Material and Appearance take the part behind it. Intersect on a
+  construction plane brings in the line where it cuts the sketch (it showed an error).
+- **Extrude**: "Sub shape not found: Sketch.InternalFace..." after a parameter changed a sketch
+  (the areas are kept now); hair-thin slivers offered as profiles; a sketch pushed through All
+  into a part after Flip came up as Join; a fin touching the board only along a curve made a
+  second body; a profile was picked together with its face on a busy computer; a cut that only
+  reached a hidden body said nothing about it; slow changes on lofted parts.
+- **Box and Cylinder**: the height typed right after placing went into another size (the knob's
+  -8 became its diameter); moving the mouse onto a size box froze the outline.
+- **Commands that did nothing without a word now say why** next to the pointer (features,
+  joints, Gear, the timeline, sketch constraints), and a dialog cancelled by another command
+  says the change was not kept. A browser right-click no longer ends the command you are in.
+- **Sketches**: one Ctrl+Z too many left the sketch, and Ctrl+Y closed it; a finished sketch was
+  hidden after undo and redo; deleted projected edges came back; Fit zoomed out to 24 m; a
+  dimension placed over an axis became an angle; Tangent popped up FreeCAD's "Constraint
+  Substitution" box; pressing X stopped the Line chain; a click on the first corner did not
+  always close the outline; a line with a typed length was not always exactly upright;
+  "Width=5mm" typed in a slot's box ran its letters as shortcuts.
+- **Fillet and Chamfer**: a size held at the largest that fits is always said; a fillet that
+  cannot be built is refused at once instead of after many seconds; a size typed right after a
+  click no longer waits behind the size search; "1/8" typed and OK clicked made a 1 in fillet;
+  a part left slightly out of true by earlier steps can be chamfered.
+- **Patterns and the timeline**: a pattern of features after a Box or Cylinder off the origin
+  missed half its copies (the Geocache knurl); Create Group made the next change rebuild every
+  step; after a timeline drag the part showed an unfinished step; CREATE > Pattern could vanish
+  from the menu; Redo rebuilt a step (40 s for a knurl); a fast timeline drag did nothing.
+- **Joints**: a round edge offered its seam as "(corner)"; a threaded hole's centre was 0.37 mm
+  off; an O-ring's centre was inside the rubber; a bolt could go into its hole head first; a
+  hover could keep another hole's rim; the lit dot was not always the one clicked; Rest did
+  nothing after a drag; Enter closed Motion Study; copies of a patterned subassembly stayed
+  bent after a Motion Study; moved parts loosened rigid groups.
+- **Small things**: Draft dropped its pull direction; Section Analysis pressed twice made two
+  sections, and with the design's top row active lost its section at OK; a hole dragged by its
+  dot showed "-55 um"; a cancelled Create Sketch left an empty body; PLASTIC > Rest built on the
+  wrong body; a cosmetic thread could turn the whole body a quarter turn; a gear placed on the
+  origin landed a hair off it; Combine of mesh bodies sometimes made a body with holes.
+- **Drawings**: a corner click beside a long view made no projected view; automatic views
+  overlapped (a long assembly got none); balloons sat on one another; a section view landed on
+  its base view; long part numbers ran into the next column; a circle clicked where its centre
+  mark crosses gave no diameter; Export DXF of a section through two parts printed an error.
+- **Export**: 3MF and OBJ files carry the colours you gave bodies and faces.
+- **FreeCAD showing through**: its second recovery dialog after a crash, its pixels-per-inch
+  question on SVG import, its "Bad base feature" box when Offset Plane started with a step
+  selected and its "Solve failed" lines while a joint was previewed are gone; "&" no longer
+  vanishes from names on buttons, and a long names button no longer pushes OK off the screen.
+
 ## 0.1.0-beta.3.3.10
 
 ### Fixed
