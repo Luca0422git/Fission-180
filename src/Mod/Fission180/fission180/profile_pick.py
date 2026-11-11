@@ -893,6 +893,38 @@ def is_point_object(obj):
         return False
 
 
+def origin_dot_point(view, pixel, body, reach=8):
+    """The origin point of `body` (the Origin folder's O in the browser) when the Coin
+    `pixel` is on the dot drawn at the origin: the layout grid's dot (Grid and Snaps >
+    Layout Grid, on in a new design) or the point itself while the Origin folder is shown.
+    None otherwise.
+
+    For a dialog that takes points: with the Origin folder hidden (a new design) the point
+    itself cannot be clicked although its dot shows, and a construction plane's square drawn
+    over the dot takes the click (the book's surfboard lofts four ellipses and then "the
+    origin": replay-b, wave 7)."""
+    try:
+        point = next((o for o in body.Origin.OutList if o.TypeId == "App::Point"), None)
+        if point is None:
+            return None
+        at = point.getGlobalPlacement().Base
+        drawn = False
+        if at.Length < 1e-7:
+            from . import grid_ui
+
+            drawn = bool(grid_ui.get("LayoutGrid"))
+        if not drawn:
+            drawn = bool(point.ViewObject.Visibility and body.Origin.ViewObject.Visibility)
+        if not drawn:
+            return None
+        x, y = view.getPointOnViewport(at)
+        if abs(x - pixel[0]) <= reach and abs(y - pixel[1]) <= reach:
+            return point
+    except Exception:
+        return None
+    return None
+
+
 def coin_pixel(widget, pos):
     """The Coin pixel (x, y from the bottom left) of a Qt position in the view's widget."""
     ratio = widget.devicePixelRatioF() or 1.0

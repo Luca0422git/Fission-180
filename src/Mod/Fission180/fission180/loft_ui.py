@@ -17,6 +17,8 @@ into material switches to Cut, unless you picked the operation yourself. Problem
 in the dialog, which then stays open.
 """
 
+import time
+
 import FreeCAD as App
 import FreeCADGui as Gui
 
@@ -53,16 +55,32 @@ END_PROPS = {
 }
 
 
+def shown_label(obj):
+    """The name the browser and the timeline show for `obj` ("Sketch 4" for the sketch
+    FreeCAD calls Sketch003, "Origin" for the origin point): a dialog names things as the
+    person sees them named."""
+    try:
+        if obj.TypeId == "App::Point" and getattr(obj, "Role", "") == "Origin":
+            return "Origin"
+        from . import timeline_ops
+
+        names = timeline_ops.display_names(obj.Document, obj.Document.Objects)
+        return names.get(obj.Name) or obj.Label
+    except Exception:
+        return obj.Label
+
+
 def profile_text(index, profile):
     obj, sub = profile
+    name = shown_label(obj)
     if loft.is_point_object(obj):
-        what = "%s (point)" % obj.Label
+        what = "%s (point)" % name
     elif sub.startswith("Vertex"):
-        what = "point of %s" % obj.Label
+        what = "point of %s" % name
     elif extrude.is_sketch(obj):
-        what = "%s (area)" % obj.Label if sub else "%s (whole sketch)" % obj.Label
+        what = "%s (area)" % name if sub else "%s (whole sketch)" % name
     else:
-        what = "face of %s" % obj.Label
+        what = "face of %s" % name
     return "%d   %s" % (index + 1, what)
 
 
@@ -511,12 +529,54 @@ class LoftPanel(extrude_finish.SaysWhy, Panel):
                 ),
                 occluder=self._occluder,
                 skip=lambda position: self.active == "bodies"
+                or self._origin_dot(position) is not None
                 or curve_pick.line_under_mouse(self.doc, position),
             )
             # a shown sketch's profile wins over the body in front of it (Fusion)
             self.picker.set_through()
         except Exception as exc:
             warn("loft: profile shading unavailable: %s" % exc)
+        try:
+            self._press_callback = view.addEventCallback("SoMouseButtonEvent", self._pressed)
+            self._press_view = view
+        except Exception as exc:
+            warn("loft: origin pick unavailable: %s" % exc)
+
+    def _origin_dot(self, position):
+        """The origin point when the press at the Coin `position` is on the origin's dot
+        and the Profiles box is the one filling (profile_pick.origin_dot_point)."""
+        if self.active != "profiles" or position is None:
+            return None
+        try:
+            view = Gui.ActiveDocument.ActiveView
+            if profile_pick.handle_at(view, tuple(position)):
+                return None
+            return profile_pick.origin_dot_point(view, tuple(position), self.body)
+        except Exception:
+            return None
+
+    def _pressed(self, info):
+        """A press on the origin's dot is a pick of the origin point (the dot shows while
+        the Origin folder is hidden, and a plane's square over it would take the click)."""
+        try:
+            if self._closed or info.get("Button") != "BUTTON1" or info.get("State") != "DOWN":
+                return
+            point = self._origin_dot(info.get("Position"))
+            if point is None:
+                return
+            self._origin_press = time.time()
+            QtCore.QTimer.singleShot(0, lambda: self._origin_clicked(point))
+        except Exception as exc:
+            warn("loft pick: %s" % exc)
+
+    def _origin_clicked(self, point):
+        if self._closed:
+            return
+        try:
+            Gui.Selection.clearSelection()
+            self._toggle_profile((point, ""))
+        except Exception as exc:
+            warn("loft pick: %s" % exc)
 
     def _occluder(self):
         """The part before this step; None while its body is hidden."""
@@ -526,6 +586,12 @@ class LoftPanel(extrude_finish.SaysWhy, Panel):
         if self.observer is not None:
             Gui.Selection.removeObserver(self.observer)
             self.observer = None
+        if getattr(self, "_press_callback", None) is not None:
+            try:
+                self._press_view.removeEventCallback("SoMouseButtonEvent", self._press_callback)
+            except Exception:
+                pass
+            self._press_callback = None
         if self.picker is not None:
             self.picker.remove()
             self.picker = None
@@ -554,6 +620,8 @@ class LoftPanel(extrude_finish.SaysWhy, Panel):
             Gui.Selection.clearSelection()
             if self.picker is not None and self.picker.clicked_region_recently():
                 return
+            if time.time() - getattr(self, "_origin_press", 0.0) < 0.6:
+                return  # the click was on the origin's dot: taken as the origin point
             if self.active == "bodies":
                 said = self.bodies_row.picked(picks[-1][0], self.options.get("operation"))
                 self.message.setText(said)
@@ -581,7 +649,7 @@ class LoftPanel(extrude_finish.SaysWhy, Panel):
             if found is None:
                 self.message.setText(
                     "⚠ %s is no profile. Click a sketch area, a flat face or a point; hide "
-                    "the plane if it is in the way." % obj.Label
+                    "the plane if it is in the way." % shown_label(obj)
                 )
                 return
             obj, short = found
