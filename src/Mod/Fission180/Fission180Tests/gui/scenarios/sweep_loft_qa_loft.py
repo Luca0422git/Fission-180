@@ -29,6 +29,7 @@ Hand-derived: a loft between two coaxial circles r1 and r2, h apart, is a frustu
 pi h (r1^2 + r1 r2 + r2^2) / 3 (FreeCAD's loft and Fission 180's centerline loft are both
 straight between two sections); the boss is pi r^2 5.
 """
+
 import math
 import os
 import tempfile
@@ -83,6 +84,25 @@ def bottom(faces):
 
 def list_texts(p):
     return [p.list.item(i).text() for i in range(p.list.count())]
+
+
+def shown_name(obj):
+    """The name the browser shows for `obj` ("Sketch 2" for FreeCAD's Sketch001)."""
+    from fission180 import timeline_ops
+
+    return timeline_ops.shown_label(obj)
+
+
+def in_order(texts, first, second):
+    """Loft's list shows `first` then `second` (sketch areas, by their shown names).
+    (wave 7, replay-b: the list names the sketches as the browser does, "Sketch 2" for
+    FreeCAD's Sketch001, loft_ui.shown_label: Fusion's dialogs name things as its browser
+    does; the check compared FreeCAD's labels before.)"""
+    return (
+        len(texts) == 2
+        and texts[0].endswith(" %s (area)" % first)
+        and texts[1].endswith(" %s (area)" % second)
+    )
 
 
 # == the two circles ==============================================================================
@@ -188,6 +208,8 @@ def hide_plane():
         (centre, s["rb"]),
     )
     s["sa_label"], s["sb_label"] = s["sa"].Label, s["sb"].Label
+    # the names the browser shows ("Sketch 1", "Sketch 2"), which Loft's list shows too
+    s["sa_shown"], s["sb_shown"] = shown_name(s["sa"]), shown_name(s["sb"])
     h.check("the plane's eye clicked", ti.click_eye(s["plane"].Label))
 
 
@@ -230,9 +252,14 @@ def p1_lofted():
         return
     texts = list_texts(p)
     h.check(
+        "P1 the profiles keep the click order (top first)",
+        [obj for obj, _sub in p.profiles] == [s["sb"], s["sa"]],
+        p.profiles,
+    )
+    h.check(
         "P1 the list keeps the click order (top first)",
-        len(texts) == 2 and s["sb"].Label in texts[0] and s["sa"].Label in texts[1],
-        texts,
+        in_order(texts, s["sb_shown"], s["sa_shown"]),
+        (texts, s["sb_shown"], s["sa_shown"]),
     )
     h.check("P1 top to bottom: the same frustum", near(vol(), frustum(), 1e-6), (vol(), frustum()))
     h.check("P1 no message", msg() == "", msg())
@@ -464,7 +491,9 @@ def p3_centerline():
     h.check("P3 no message", msg() == "", msg())
     h.check(
         "P3 Fission 180's loft follows the line",
-        p is not None and p.target is not None and getattr(p.target, "Fission180Type", "") == "Loft",
+        p is not None
+        and p.target is not None
+        and getattr(p.target, "Fission180Type", "") == "Loft",
         p and p.target and p.target.TypeId,
     )
     # the boss waits while the loft is edited (Fusion)
@@ -562,8 +591,8 @@ def p4_editing():
     texts = list_texts(p)
     h.check(
         "P4 its two profiles in their order",
-        len(texts) == 2 and s["sb_label"] in texts[0] and s["sa_label"] in texts[1],
-        texts,
+        in_order(texts, s["sb_shown"], s["sa_shown"]),
+        (texts, s["sb_shown"], s["sa_shown"]),
     )
     b.choose(p.guide, "Centerline")
 
@@ -683,7 +712,7 @@ h.run(
             p3_line_typed,
             p3_line_done,
             p3_line_first,
-        p3_edit,
+            p3_edit,
             p3_editing,
             p3_centerline_box,
             p3_centerline,
