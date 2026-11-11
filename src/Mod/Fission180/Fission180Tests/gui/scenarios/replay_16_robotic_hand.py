@@ -36,7 +36,7 @@ import tempfile
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore, QtWidgets
+from PySide import QtCore
 from PySide6 import QtTest
 
 from Fission180Tests.gui import blend_steps as bl
