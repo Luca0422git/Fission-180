@@ -327,3 +327,27 @@ edges are covered by the selection fall-through (`parity/selection.md`).
 - A PartDesign feature inserted in the middle of a body (marker rolled back) or an edit that
   trims an edge breaks later dress-ups whose element name no longer resolves. Keep their
   edges as geometry before the change and find them again after it (`blend.References`).
+
+## Wave 7, the book parity report: blends the kernel refuses in one run (2026-11-11)
+
+- **Fusion fails the whole fillet / chamfer when one edge fails**, and its message does not
+  say which edge (Forum: "Fillet Error on Body with Multiple Edges", "Why can't I fillet
+  this edge?"; users fillet the edges one by one or in another order). So a whole-body
+  selection does **not** skip edges here either. What Fission 180 adds: when the one run of
+  OpenCASCADE fails, `fillet_robust.retry` builds the same solid by another route (through a
+  modeled thread, on the refined part, group by group of edges that do not touch), and when
+  nothing works the refusal says how many edges are in the way and how short the shortest
+  is ("3 of the 71 edges cannot be bevelled at this size (the shortest of them is 0.0004 mm
+  long); the other 68 can").
+- **A chamfer / fillet after a modeled thread** (Forum + Book, see hole-thread.md): built on
+  the part under the thread (`thread.blank`), the grooves cut again. FreeCAD's own Fillet /
+  Chamfer step cannot do that, so the dialog (and a timeline move: `fillet_sets.rescue`)
+  uses Fission 180's step.
+- Not reproduced on stand-in parts (the book's models are not ours): the 20 mm chamfer
+  "limited to 1.79 mm" (Tensegrity), 0.5 mm on all 71 edges, the 0.04 in chamfer on two
+  flat faces. On stand-ins built from the report's text the kernel builds them in one run.
+  The benchmark `Fission180Tests/headless/blend_benchmark.py` holds the stand-ins.
+- Still the kernel's: a fillet along an edge whose two faces become tangent somewhere (the
+  Tesla Turbine's tube leaving the housing at a tangent: no size works, and the kernel takes
+  20 s to say so); a face that two rounds use up exactly (4 mm on both sides of an 8 mm
+  face: held at 3.99 mm, and the dialog says so in its blue note).
