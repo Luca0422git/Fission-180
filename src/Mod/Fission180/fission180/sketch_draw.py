@@ -565,6 +565,7 @@ class Boxes:
         self.typing = None  # text being typed into the current box (None: not typing)
         self.caret = 0  # where in `typing` the next character goes
         self.widgets = {}
+        self._names = []  # the parameter names offered under the box being typed in
 
     def set_fields(self, fields):
         """The boxes of a new step (the old ones go)."""
@@ -658,6 +659,9 @@ class Boxes:
         if mods != QtCore.Qt.NoModifier:
             return False
         if key == QtCore.Qt.Key_Tab or key == QtCore.Qt.Key_Backtab:
+            if key == QtCore.Qt.Key_Tab and self.fill_name():
+                return True  # (Tab filled the lit parameter name in: the box stays)
+            self.close_names()
             if self.typing is not None and not self.take():
                 return True
             step = -1 if key == QtCore.Qt.Key_Backtab else 1
@@ -669,6 +673,7 @@ class Boxes:
                 self.typing = self.typing[: self.caret - 1] + self.typing[self.caret :]
                 self.caret -= 1
                 self.refresh()
+                self.offer_names()
             return True
         if key == QtCore.Qt.Key_Delete:
             if self.typing is None:
@@ -681,12 +686,21 @@ class Boxes:
             self.move_caret(key)
             return True
         if key in UP_DOWN:
+            if self.typing is not None and self._names:
+                from . import parameters_complete
+
+                parameters_complete.step(1 if key == QtCore.Qt.Key_Down else -1)
             return self.typing is not None  # nothing to step through: kept off the view
-        # "=" starts a parameter name or a formula (wave 7: =Head_Diam, =Support_Width / 2;
-        # a letter typed first is still its shortcut: L, C, X...); once something is typed,
-        # letters and _ go into the box (a unit, a name), ";" separates arguments
+        # A parameter name or a formula is typed like a number (wave 7, sketch-c: Head_Diam,
+        # Support_Width / 2; "=" in front still works). A letter typed into an empty box
+        # starts a name when a parameter of the design starts with it (Fusion: the keys go to
+        # the value box while one is shown); any other letter is still its tool's shortcut
+        # (L, C, X...). Once something is typed, letters and _ go into the box (a unit, a
+        # name), ";" separates arguments.
         value_char = text and (text.isdigit() or text in ".,-+*/()=")
         unit_char = text and (text.isalpha() or text in "_;") and self.typing
+        if not value_char and not unit_char and self.starts_name(text):
+            unit_char = True
         if value_char or unit_char or (text == " " and self.typing):
             if self.typing is None:
                 self.typing = ""
@@ -696,8 +710,79 @@ class Boxes:
             self.caret += len(text)
             self._bad(False)
             self.refresh()
+            self.offer_names()
             return True
         return False
+
+    # -- parameter names while typing (the list of parameters_complete.py) -------------------
+    def starts_name(self, text):
+        """A letter typed into an empty box that starts a parameter's name."""
+        if self.typing is not None or not self.fields or not text:
+            return False
+        if self.fields[self.current].kind in (COUNT, RATIO):
+            return False
+        try:
+            from . import parameters_complete
+
+            return parameters_complete.starts_a_name(text)
+        except Exception:
+            return False
+
+    def offer_names(self):
+        """The matching parameter names under the box being typed in."""
+        try:
+            from . import parameters_complete
+
+            box = None
+            if self.typing is not None and self.fields:
+                field = self.fields[self.current]
+                if field.kind not in (COUNT, RATIO):
+                    box = self.widgets.get(field.name)
+            if box is None or not box.isVisible():
+                if self._names:
+                    parameters_complete.hide()
+                self._names = []
+                return
+            self._names = parameters_complete.offer(box, self.typing, self.caret)
+        except Exception as exc:
+            warn("parameter names: %s" % exc)
+
+    def fill_name(self):
+        """Enter / Tab while the list is open: the lit name goes into the box. False when
+        there is nothing to fill in (no list, or the name is typed in full)."""
+        if not self._names or self.typing is None:
+            return False
+        try:
+            from . import parameters_complete
+
+            name = parameters_complete.lit()
+            if name is None:
+                self._names = []
+                return False
+            _start, word = parameters_complete.fragment(self.typing, self.caret)
+            if word == name:
+                self.close_names()
+                return False
+            self.typing, self.caret = parameters_complete.complete(self.typing, self.caret, name)
+            self.close_names()
+            self.refresh()
+            return True
+        except Exception as exc:
+            warn("parameter names: %s" % exc)
+            return False
+
+    def close_names(self):
+        """Hide the list; True when it was open (Esc closes only the list)."""
+        was = bool(self._names)
+        self._names = []
+        if was:
+            try:
+                from . import parameters_complete
+
+                parameters_complete.hide()
+            except Exception:
+                pass
+        return was
 
     def move_caret(self, key):
         """Left / Right / Home / End in the current box. A box showing the pointer's value
@@ -733,6 +818,7 @@ class Boxes:
             return False
         field.typed = value
         self.typing = None
+        self.close_names()
         self._bad(False)
         self.refresh()
         return True
@@ -762,6 +848,7 @@ class Boxes:
         self.widgets = {}
         self.fields = []
         self.typing = None
+        self.close_names()
 
 
 def remove_stray_boxes(gl):
@@ -1373,9 +1460,14 @@ class DrawTool:
                 return False
             if kind != QtCore.QEvent.KeyPress:
                 return False
+            if event.key() == QtCore.Qt.Key_Escape and self.boxes.close_names():
+                return True  # (Esc closed only the list of parameter names)
             if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
                 if event.isAutoRepeat():
                     return True
+                if self.boxes.fill_name():
+                    return True  # (Enter filled the lit parameter name in)
+                self.boxes.close_names()
                 return self.enter()
             if self.extra_key(event):
                 return True
@@ -1386,6 +1478,8 @@ class DrawTool:
 
     def _wants_key(self, event):
         key = event.key()
+        if key == QtCore.Qt.Key_Escape:
+            return bool(self.boxes._names)  # (Esc closes the list of parameter names first)
         if key in (QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab, QtCore.Qt.Key_Backspace):
             return bool(self.boxes.fields)
         if key in CARET_KEYS:
@@ -1400,7 +1494,9 @@ class DrawTool:
             return bool(self.boxes.fields)
         if (text.isalpha() or text in "_; ") and self.boxes.typing:
             return True  # a unit after a typed value ("12 mm"), a name after "="
-        return self.wants_letter(text)
+        if self.wants_letter(text):
+            return True
+        return self.boxes.starts_name(text)  # the first letter of a parameter's name
 
     def wants_letter(self, text):
         return False

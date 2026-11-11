@@ -1003,6 +1003,10 @@ class SketchSession:
 
         # the diameter sign on dimensions to a centerline
         self.signs = sketch_dimension_signs.DiameterSigns(self)
+        from . import sketch_field_names
+
+        # parameter names typed into the value boxes of FreeCAD's own drawing tools
+        self.names = sketch_field_names.FieldNames(self)
         self.right_angles = None  # the 90 degree marks at corners (sketch_right_angles.py)
         try:
             from .sketch_right_angles import RightAngleMarks
@@ -1113,6 +1117,7 @@ class SketchSession:
                 self.infer.commit_signal(kind)
             except Exception as exc:
                 warn("sketch inference: %s" % exc)
+        self.names.settled(kind)
         if kind in ("undo", "redo", "abort"):
             try:
                 self._tidy_seen = len(self.sketch.Geometry)
@@ -1942,6 +1947,7 @@ class SketchSession:
         if self.closed or editing_sketch() is not self.sketch:
             return
         self._typed_since_commit = False
+        self.names.close()
         self.stop_tool()  # Fission 180's own tool: the half-drawn shape goes with it
         self.line.stop()
         if self.infer is not None:
@@ -2019,6 +2025,13 @@ class SketchSession:
             if not self._finishes_on_enter():
                 return False
             self._accept_fields(field)
+            return True
+        if self.names.feeding:
+            return False  # (our own keys: the number a typed name stands for, with its unit)
+        if self.names.wants(field, event):
+            # Fusion: a parameter's name (or a formula) typed into the box of the shape
+            # being drawn; FreeCAD's box takes numbers only (sketch_field_names.py)
+            self.names.start(field, event.text()[:1])
             return True
         if _is_value_key(event) or key in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Delete):
             self._typed = field  # the user is typing a value here
@@ -3085,6 +3098,14 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                         % explain_core._number(got)
                     )
             else:
+                from . import parameters
+
+                path = ".Constraints[%d]" % self.index
+                if path in parameters.expressions_of(self.sketch):
+                    # a number typed over a formula takes its place (found by
+                    # book_sketch_c_dimension: the formula stayed bound under the number,
+                    # and the next recompute put the parameter's value back)
+                    parameters.set_expression(self.sketch, path, None)
                 self.sketch.setDatum(self.index, q)
             if self.sketch.solve() != 0:
                 raise ValueError(CONFLICT)

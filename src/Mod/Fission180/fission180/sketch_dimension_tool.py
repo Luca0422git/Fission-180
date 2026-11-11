@@ -166,7 +166,7 @@ class Dimension(draw.DrawTool):
     def pick_at(self, snap):
         """The thing the click at `snap` picks, or None when it is the placing click."""
         kinds = [self.kind_of(p) for p in self.picks]
-        for item in self.candidates(snap):
+        for item in self._first_through(self.candidates(snap)):
             if item in self.picks:
                 continue
             if not core.is_pick(kinds, self.kind_of(item)):
@@ -175,6 +175,31 @@ class Dimension(draw.DrawTool):
                 continue  # the same spot as the first pick: the next thing under the pointer
             return item
         return None
+
+    def _first_through(self, items):
+        """A second click on the spot of the first pick (a point) means the next thing
+        there: the sketch's own curves that pass through that point come before an axis
+        that happens to be a hair nearer to the pointer (an arc that starts on the origin:
+        the click picked the Y axis)."""
+        if len(self.picks) != 1 or self.picks[0][1] == 0:
+            return items
+        p0 = ctools.point_of(self.sketch, self.picks[0])
+        if p0 is None:
+            return items
+        curves = dict(self.geometry().hits)
+        through = [
+            item
+            for item in items
+            if item[1] == 0
+            and item[0] >= 0
+            and item[0] in curves
+            and icore.curve_distance(p0, curves[item[0]]) <= 1e-6
+        ]
+        if not through:
+            return items
+        points = [item for item in items if item[1] != 0]
+        rest = [item for item in items if item[1] == 0 and item not in through]
+        return points + through + rest
 
     def _same_place(self, a, b):
         """Two picked POINTS at the same place (an arc's end on the origin): no dimension
