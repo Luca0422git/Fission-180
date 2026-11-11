@@ -618,6 +618,13 @@ def _hold_design_keys(on):
                     STATE["held"].append(entry[1])
         else:
             held, STATE["held"] = STATE["held"], []
+            other = _other_workspace()
+            if other is not None:
+                # another workspace took over while these were off (it found nothing to
+                # switch off itself): it holds them now and switches them on when it is left
+                module = __import__("fission180.%s_ui" % other, fromlist=["STATE"])
+                module.STATE["held"].extend(held)
+                return
             for shortcut in held:
                 try:
                     shortcut.setEnabled(True)
