@@ -82,7 +82,7 @@ def striped():
     p = a.panel()
     objs = a.analyses(KIND)
     h.check("Zebra1 made", len(objs) == 1 and objs[0].Label == "Zebra1", [o.Label for o in objs])
-    h.check("the box says Body", p is not None and p.box.button.text() == "Body")
+    h.check("the box says Body1", p is not None and p.box.button.text() == "Body1")
     h.check("the model's own faces are off under the stripes", not a.model_faces_shown())
     counts = a.colors()
     st["counts"] = counts

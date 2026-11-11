@@ -162,7 +162,7 @@ def check_structure():
         labels == ["Document Settings", "Named Views", "Origin", "Bodies", "Sketches"],
         labels,
     )
-    body = row("Body")
+    body = row(App.ActiveDocument.getObject("Body").Label)
     h.check("active body is bold", body is not None and body.font(1).bold())
     h.check(
         "features are not in the browser",
@@ -190,14 +190,14 @@ def check_eye_off():
 
 
 def eye_body_off():
-    click_eye("Body")
+    click_eye(App.ActiveDocument.getObject("Body").Label)
 
 
 def check_body_hidden():
     h.check(
         "body eye hides the body", not App.ActiveDocument.getObject("Body").ViewObject.Visibility
     )
-    click_eye("Body")
+    click_eye(App.ActiveDocument.getObject("Body").Label)
 
 
 def check_body_shown():
@@ -205,7 +205,7 @@ def check_body_shown():
 
 
 def select_body_row():
-    click_row("Body")
+    click_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def check_body_selected():
@@ -236,7 +236,7 @@ def check_synced():
 
 def hover_body():
     h.click_empty()
-    t, pos = _row_point("Body")
+    t, pos = _row_point(App.ActiveDocument.getObject("Body").Label)
     if pos is not None:
         w.move(t.viewport(), pos + QtCore.QPoint(5, 0))
         w.move(t.viewport(), pos)
@@ -254,7 +254,7 @@ def check_hover():
 
 # -- rename --------------------------------------------------------------------------------
 def rename_body():
-    menu("Body", "Rename")
+    menu(App.ActiveDocument.getObject("Body").Label, "Rename")
 
 
 def type_name():

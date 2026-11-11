@@ -372,7 +372,7 @@ def edit_steps(kind, height, prefix, then_undo=True):
 def delete_steps(kind, height):
     def select():
         h.click_empty()
-        s.click_browser_row("Body")
+        s.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
     def delete():
         h.check("the original is selected", "Body" in s.selected_names(), s.selected_names())

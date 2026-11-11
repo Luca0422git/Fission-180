@@ -356,11 +356,12 @@ def ensure_body():
     try:
         # FreeCAD's Body command uses its own "part" slot, which can lag behind the active
         # component (a body-less component was just activated): put the body where it goes.
-        # Inside a component the body is numbered per component, like Fusion (Body1); at
-        # the root FreeCAD's own label stays, as before components.
+        # Bodies are numbered per component from the first one on, like Fusion (Body1,
+        # Body2 ...), at the root too (wave 7: the first body was FreeCAD's "Body" while
+        # Box made "Body1": the book report's "inconsistent").
         if component is not None:
             components.place(body, component, keep_position=False)  # a new, empty body
-            body.Label = components.body_label_in(doc, component, exclude=body)
+        body.Label = components.body_label_in(doc, component, exclude=body)
     except Exception as exc:
         warn("could not place the new body: %s" % exc)
     components.activate_body(body)

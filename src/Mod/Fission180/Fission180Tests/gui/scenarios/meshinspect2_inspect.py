@@ -105,7 +105,7 @@ def tall_steps():
 
     def made():
         h.check(
-            "Body is an L of 18000", near(volume(body("Body")), 18000.0), volume(body("Body"))
+            "Body1 is an L of 18000", near(volume(body("Body1")), 18000.0), volume(body("Body1"))
         )
         h.fit()
 
@@ -207,7 +207,7 @@ def b_pick():
 
 def b_sharp():
     p = a.panel()
-    h.check("Body picked", [o.Label for o, _n in p.entries] == ["Body"], p.entries)
+    h.check("Body1 picked", [o.Label for o, _n in p.entries] == ["Body1"], p.entries)
     a.tick(p.field("IncludeSharpCurves"), True)
 
 
@@ -233,7 +233,7 @@ def b_kept():
     h.check("Minimum Radius1 kept", len(found) == 1, found)
     h.check("with Include Sharp Curves", bool(found and found[0].IncludeSharpCurves))
     h.click_empty()
-    t.row_menu("Body", "Create Components from Bodies")
+    t.row_menu("Body1", "Create Components from Bodies")
 
 
 # -- C ------------------------------------------------------------------------------------------
@@ -244,8 +244,8 @@ def c_second_component():
 def c_measure():
     from fission180 import components
 
-    parts = [components.container_of(body(x)) for x in ("Body", "Body3")]
-    h.check("Body and Body3 in components", all(p is not None for p in parts), parts)
+    parts = [components.container_of(body(x)) for x in ("Body1", "Body3")]
+    h.check("Body1 and Body3 in components", all(p is not None for p in parts), parts)
     h.check("Body2 at the top", components.container_of(body("Body2")) is None)
     h.click_empty()
     h.fit()

@@ -65,8 +65,18 @@ class ClickTests(unittest.TestCase):
 
 
 class AutoOperationTests(unittest.TestCase):
+    """The table of parity/extrude-presspull.md, "The Operation rule"."""
+
     def test_starting_inside_a_body_cuts(self):
         self.assertEqual(core.auto_operation(True, True), "cut")
+        self.assertEqual(core.auto_operation(True, False, starts_on=True, overlaps=True), "cut")
+
+    def test_starting_on_a_face_joins_whatever_it_runs_into(self):
+        # a face extruded away, next to a column that leans over it
+        self.assertEqual(core.auto_operation(False, True, starts_on=True, overlaps=True), "join")
+
+    def test_from_the_air_into_a_body_cuts(self):
+        self.assertEqual(core.auto_operation(False, True, overlaps=True), "cut")
 
     def test_touching_joins(self):
         self.assertEqual(core.auto_operation(False, True), "join")
@@ -74,8 +84,28 @@ class AutoOperationTests(unittest.TestCase):
     def test_nothing_touched_is_a_new_body(self):
         self.assertEqual(core.auto_operation(False, False), "new_body")
 
-    def test_symmetric_never_cuts_by_itself(self):
-        self.assertEqual(core.auto_operation(True, True, symmetric=True), "join")
+    def test_symmetric_follows_the_same_rule(self):
+        # (it never cut by itself before wave 7: the book's donut bite became a Join)
+        self.assertEqual(core.auto_operation(True, True, symmetric=True), "cut")
+        self.assertEqual(core.auto_operation(False, True, symmetric=True), "join")
+
+
+class ScopeTests(unittest.TestCase):
+    def test_root_active_counts_every_body_for_a_cut(self):
+        self.assertEqual(core.scope(None, ["A"], ["B"], ["B"]), (True, False))
+
+    def test_a_join_needs_a_body_of_the_active_component_itself(self):
+        self.assertEqual(core.scope(None, ["A"], [], ["A", "B"]), (False, True))
+        self.assertEqual(core.scope(None, ["A"], [], ["B"]), (False, False))
+
+    def test_a_body_of_another_component_never_decides(self):
+        # the active component holds C only; the extrusion goes through B of another one
+        self.assertEqual(core.scope(["C"], ["C"], ["B"], ["B"]), (False, False))
+        self.assertEqual(core.scope(["C"], ["C"], ["B", "C"], ["B", "C"]), (True, True))
+
+    def test_a_component_with_no_solid_yet_gives_a_new_body(self):
+        overlaps, touches = core.scope([], [], ["B"], ["B"])
+        self.assertEqual(core.auto_operation(False, touches, overlaps=overlaps), "new_body")
 
 
 class FollowerPlanTests(unittest.TestCase):

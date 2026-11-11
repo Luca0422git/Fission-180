@@ -328,7 +328,7 @@ def p17_delete_body():
 
     t = browser_ui.widget()
     t.refresh()
-    item = t.row("Body")
+    item = t.row(App.ActiveDocument.getObject("Body").Label)
     if h.check("the body in the browser", item is not None, t.labels()):
         h.check("Delete in its menu", w.right_click(t.viewport(), t.label_point(item), "Delete"))
 

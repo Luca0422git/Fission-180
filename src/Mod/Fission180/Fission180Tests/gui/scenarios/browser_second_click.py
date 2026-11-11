@@ -9,7 +9,7 @@ passed; a double-click instead keeps doing its own thing. Only real input.
 A 40 x 30 x 10 box (Body: Sketch 1, Extrude 1).
 
   A  Body: the first click on its name selects it, no field. The second click: no field at
-     once (the double-click time runs), then the name field over the row, holding "Body"
+     once (the double-click time runs), then the name field over the row, holding "Body1"
      selected. The 3D view takes the keyboard a moment (as after a selection change): the
      field takes it back, and "Bracket" typed then replaces the name (Enter): the body is
      Bracket, the browser shows it, one undo step.
@@ -115,13 +115,13 @@ def sketch():
 
 # -- A: the body -------------------------------------------------------------------------------
 def a_first():
-    click_at("Body")
+    click_at("Body1")
 
 
 def a_selected_only():
-    h.check("A: the first click selects the body's row", selected() == ["Body"], selected())
+    h.check("A: the first click selects the body's row", selected() == ["Body1"], selected())
     h.check("A: ... and opens no field", no_field())
-    second_click("Body")
+    second_click("Body1")
 
 
 a_selected_only.done = field_open
@@ -129,7 +129,7 @@ a_selected_only.done_what = "the name field to open after the second click"
 
 
 def a_field():
-    opened_after_wait("A", "Body")
+    opened_after_wait("A", "Body1")
     # the 3D view takes the keyboard a moment, as after a selection change (MEMORY, "Typing
     # right after Rename"): the field keeps its selection and takes the keyboard back
     h.gl_widget().setFocus()
@@ -141,7 +141,7 @@ a_field.done_what = "the name field to take the keyboard back"
 
 def a_type():
     f = field()
-    h.check("A: the field kept its selection", f.selectedText() == "Body", f.selectedText())
+    h.check("A: the field kept its selection", f.selectedText() == "Body1", f.selectedText())
     QtTest.QTest.keyClicks(QtWidgets.QApplication.focusWidget(), "Bracket")
     QtTest.QTest.keyClick(QtWidgets.QApplication.focusWidget(), QtCore.Qt.Key_Return)
 
@@ -151,7 +151,7 @@ def a_renamed():
     h.check("A: the browser shows it", t.tree().row("Bracket") is not None, t.labels())
     h.check("A: the field closed", field() is None)
     names = App.ActiveDocument.UndoNames
-    h.check("A: one undo step, Rename", names[:1] == ["Rename Body"], names[:3])
+    h.check("A: one undo step, Rename", names[:1] == ["Rename Body1"], names[:3])
 
 
 # -- B: the sketch -------------------------------------------------------------------------------

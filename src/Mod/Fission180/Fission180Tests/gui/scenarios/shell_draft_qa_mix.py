@@ -194,7 +194,7 @@ def p2_done():
 # -- Path 3: Scale with the body picked in the browser -----------------------------------------
 def p3_pick():
     Gui.Selection.clearSelection()
-    sd.click_browser_row("Body")
+    sd.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def p3_scale():

@@ -75,15 +75,50 @@ def excluded_for_edit(touched, stored):
     return {b for b in touched if b not in stored}
 
 
-def auto_operation(starts_inside, touches_any, symmetric=False):
-    """Fusion's own choice of operation: Cut when the extrusion starts inside a body, Join
-    when it touches one, else New Body. A symmetric extrude never turns into a Cut by
-    itself (it goes both ways)."""
-    if starts_inside and not symmetric:
+def auto_operation(starts_inside, touches, symmetric=False, starts_on=False, overlaps=False):
+    """The operation the dialog shows until the person picks one (Fusion's rule; sources in
+    parity/extrude-presspull.md, "The Operation rule"), in this order:
+
+      starts_inside  the extrusion starts in the material of a body of the active
+                     component: a face pushed in, a profile on a plane through the part
+                     (a symmetric extrude: on both sides of the profile)         -> Cut
+      starts_on      it starts on a face of a body that belongs to the active component and
+                     goes away from it (also when it runs into another part of the body
+                     further on: the person is building on that face)            -> Join
+      overlaps       it starts in the air and reaches into a body of the active component
+                     further on (a profile beside a step, To Object the underside; a sliver
+                     along an edge is no overlap)                                -> Cut
+      touches        it only touches a body that belongs to the active component  -> Join
+      none of them   (also: the active component has no solid yet)                -> New Body
+
+    A symmetric extrude follows the same rule (before wave 7 it never cut by itself: the
+    book's donut bite came out as five cylinders joined on). `symmetric` is kept for
+    callers of the old signature and changes nothing."""
+    if starts_inside:
         return "cut"
-    if touches_any:
+    if starts_on:
+        return "join"
+    if overlaps:
+        return "cut"
+    if touches:
         return "join"
     return "new_body"
+
+
+def scope(names_inside, names_direct, through, touching):
+    """What of the bodies in the extrusion's way counts for the automatic operation:
+    (overlaps, touches). An automatic Cut looks at the bodies inside the active component
+    (`names_inside`, the components in it included; None: every body, the root is active),
+    an automatic Join at the bodies that belong to the active component itself
+    (`names_direct`; Fusion joins only bodies of the active component, forum "Recurring
+    problem with Join vs New Body"). A body of another component never turns the extrude
+    into a Cut or a Join by itself (the report's bug 10: a new component's first extrude cut
+    the body of another component)."""
+    inside = None if names_inside is None else set(names_inside)
+    direct = None if names_direct is None else set(names_direct)
+    overlaps = any(inside is None or b in inside for b in through)
+    touches = any(direct is None or b in direct for b in touching)
+    return overlaps, touches
 
 
 def follower_plan(operation, home, others, have):

@@ -94,3 +94,11 @@ def install():
     if _filler["observer"] is None:
         _filler["observer"] = Filler()
         App.addDocumentObserver(_filler["observer"])
+    try:  # the steps that use the areas follow them when their numbers change
+        from . import sketch_area_id
+
+        sketch_area_id.install()
+    except Exception as exc:
+        from . import warn
+
+        warn("sketch areas: %s" % exc)

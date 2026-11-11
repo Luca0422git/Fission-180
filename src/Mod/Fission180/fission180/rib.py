@@ -99,11 +99,13 @@ def sketch_of(refs):
 
 
 def plane_of(sketch):
-    """(a point, unit normal) of a sketch's plane, global."""
+    """(a point, unit normal) of a sketch's plane, global. A sketch on the Front plane that
+    counts Fusion's way (extrude.fusion_side) has its normal turned round, as for Extrude:
+    One Side goes away from the front, where a positive extrude of such a sketch went."""
     placement = sketch.getGlobalPlacement()
     normal = placement.Rotation.multVec(App.Vector(0, 0, 1))
     normal.normalize()
-    return App.Vector(placement.Base), normal
+    return App.Vector(placement.Base), normal * extrude.fusion_side(sketch)
 
 
 def base_shape(feature_or_body, before=None):

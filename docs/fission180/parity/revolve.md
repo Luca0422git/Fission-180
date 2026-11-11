@@ -7,6 +7,28 @@ dialog, the clickable axes and planes, the angle handles, the command) and
 and `PartDesign::Groove` with Refine on, plus Fission 180's own Intersect feature). Status:
 **first pass plus one QA round (branch `sf/revolve-qa`), not yet signed off**.
 
+## Wave 7: picking profiles and the axis (branch `sf/book-extrude`, 2026-11-11)
+
+The book parity report (Donut, Hot End nozzle). Sources: **Forum** ("Unable to select
+multiple Profiles in Revolve?", Autodesk Community): after the first profile Fusion's
+Revolve moves on to the Axis box, and more profiles need the Profile box clicked again;
+**Forum**: "if only one profile is available when the Revolve command starts, that profile is
+selected automatically, and you then just select an axis"; **Autodesk** help (Revolve a
+T-Spline body): "select the profile, then click Axis". **Guess**: rows marked so.
+
+| Fusion (source) | Fission 180 |
+|---|---|
+| After the first profile the Axis box waits (Forum) | Same, as before (the report: "as Fusion does") |
+| More profiles: click the Profile box again (Forum) | Not needed: while the Axis box waits, a click inside an area that is not picked yet adds it, also where the area is only a few pixels wide along the axis (the nozzle's bore: every click there went to the axis). The axis wins when the click is right on it (1.5 pixels), on a line that is not the area's own outline, or along an area that is picked already; a part edge on an area's border is the axis, as before |
+| The one profile in view is picked by itself (Forum) | Same, whichever body or component its sketch is in (`profile_pick.only_visible_profiles`), as in Extrude |
+| A sketch's profiles can be picked while its body is hidden (Book: the nozzle's revolve cut "with the body hidden") | Same (nothing could be clicked: the hidden body still counted as "in front" of them) |
+| A profile behind a face of the part is picked through it (the report; Fusion draws sketches through bodies) | Same: drawn as a faint blue through the part (`ProfilePicker(through=True)`) |
+| The sketch stays shown while the axis is picked | Same (the report's "the profile sketch disappears as soon as Revolve starts" did not reproduce on develop; scenario `book_extrude_picking` K4 checks it) |
+| OK that cannot finish says why; an operation the person picked stays (Guess, as Extrude) | Same: the reason is said next to the mouse, a change another command had to drop is said, and a failed build no longer puts the old operation back over the picked one (`extrude_finish`) |
+| A revolve keeps its sketch areas when the sketch changes | Same as Extrude: `parity/extrude-presspull.md`, "Sketch areas keep their identity" |
+
+Tests: `book_extrude_picking` K3, K4, K11; `sketch_area_id_check` (revolved).
+
 ## Values past what fits stop at the limit (Luca's decision, 2026-10-21)
 
 **This deliberately differs from Fusion.** Fusion refuses a value that does not fit (a
