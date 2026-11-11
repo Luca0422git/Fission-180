@@ -2081,8 +2081,25 @@ class AsBuiltPanel(_JointsPanel):
 
     def allow_pick(self, pick):
         if self.slot_of(self.active) is not None:
-            return pick.part in self.parts if self.parts else True
+            return self._chosen_part(pick) is not None if self.parts else True
         return True
+
+    def _chosen_part(self, pick):
+        """The chosen component `pick` lies on: its own part, or the chosen subassembly its
+        part is inside (the position of a joint of a subassembly is picked on a part in
+        it: a compound gear's hole is a hole of one of its two gears). Fusion takes the
+        snap point on any geometry of the two components. None: on neither. Before (wave
+        7, replay-f) only a body directly in a chosen component counted: "Pick the
+        position on one of the two components" on a gear of the Compound Gear."""
+        part = pick.part if pick is not None else None
+        if part is None:
+            return None
+        if part in self.parts:
+            return part
+        for chosen in self.parts:
+            if joints._inside(part, chosen):
+                return chosen
+        return None
 
     def allow_click(self, pick):
         return pick.part is not None
@@ -2094,13 +2111,18 @@ class AsBuiltPanel(_JointsPanel):
             return
         slot_box = self.active if self.slot_of(self.active) is not None else None
         if slot_box and pick is not None and (pick.element or pick.is_datum()):
-            if self.parts and part not in self.parts:
+            owner = self._chosen_part(pick) if self.parts else part
+            if self.parts and owner is None:
                 self.refuse("Pick the position on one of the two components.")
                 return
             taken = self.take_position("position", slot_box, pick, point)
             if taken is None:
                 return
             pick, snap = taken
+            if owner is not pick.part:
+                # (the place is on a part inside the chosen subassembly: the joint holds
+                # the subassembly there)
+                pick = joints.Pick(owner, pick.obj, pick.element, pick.point)
             self.position_pick, self.position_snap = pick, snap
             if self.slots["position"].mode != "twoedges":
                 self.fields["position"].set_text(_label(pick, snap))

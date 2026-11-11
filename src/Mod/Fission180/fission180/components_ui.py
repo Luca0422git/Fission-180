@@ -368,9 +368,17 @@ class NewComponentPanel(taskui.Panel):
         """The bodies selected AS bodies (a body's browser row, a body picked with the
         Bodies selection priority). A face, an edge, a sketch or a step selected in the
         timeline is not a body selected: Fusion fills From Bodies only from bodies."""
+        from . import bodies as bodies_module
+
         found = []
         for sel in selection:
             if components.is_body(sel.Object) and not any(sel.SubElementNames or ()):
+                # a body without a solid is nothing a person selected: a new design's
+                # own empty body stays selected until the first click, and New Component
+                # as the first command of a design ticked From Bodies for it ("1 body
+                # will move into the new component: Body1"; wave 7, replay-f)
+                if not bodies_module.has_solid(sel.Object):
+                    continue
                 if sel.Object not in found:
                     found.append(sel.Object)
         return found

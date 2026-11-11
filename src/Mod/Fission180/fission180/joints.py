@@ -3532,6 +3532,13 @@ def part_shape(part):
         shapes = []
         for obj in part.OutListRecursive:
             try:
+                # only what lies INSIDE the part: a pasted or patterned copy links to the
+                # component it repeats, whose bodies are in its OutListRecursive too, so a
+                # copy's shape held the original's solids as well (a copy "ran into"
+                # everything its original touches, and into the original itself; wave 7,
+                # replay-f)
+                if not _inside(obj, part):
+                    continue
                 if obj.TypeId == "PartDesign::Body" or (
                     obj.isDerivedFrom("Part::Feature")
                     and obj.getParentGeoFeatureGroup() is not None
@@ -3545,6 +3552,21 @@ def part_shape(part):
                 continue
         return Part.makeCompound(shapes) if shapes else Part.Shape()
     return bodies.global_shape(part)
+
+
+def _inside(obj, part):
+    """True when `obj` lies in `part` (directly, or in a component inside it)."""
+    try:
+        group = obj.getParentGeoFeatureGroup()
+        for _ in range(64):
+            if group is None:
+                return False
+            if group is part:
+                return True
+            group = group.getParentGeoFeatureGroup()
+    except Exception:
+        pass
+    return False
 
 
 def _volume(shape):
