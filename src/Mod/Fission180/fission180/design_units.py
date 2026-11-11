@@ -115,11 +115,17 @@ def put_back_count():
     return _state["put_back"]
 
 
-def _asked_for(frame):
-    """True when the Python statement that is running sets a document's UnitSystem itself
+def _asked_for(frame, doc=None):
+    """True when the Python statement that is running sets this document's UnitSystem itself
     (`doc.UnitSystem = ...`): the person's or a script's own choice, not FreeCAD carrying
     another document's units over. `frame`: the Python frame FreeCAD was called from when
-    it sent the change (the statement being executed there is looked at)."""
+    it sent the change (the statement being executed there is looked at).
+
+    A statement that sets ANOTHER document's units (a throw-away document made in mm while
+    an inch design is active) changes the active design's too, through FreeCAD's window
+    code, while that statement runs: that is no choice for this design (fix-2:
+    book_params_units C, the design went to mm and was not put back). When the statement's
+    document cannot be told, it is taken as this one's, as before."""
     import dis
 
     if frame is None:
@@ -133,7 +139,15 @@ def _asked_for(frame):
             if ins.offset > frame.f_lasti:
                 break
             last = ins
-        return last is not None and last.opname == "STORE_ATTR" and last.argval == "UnitSystem"
+        if not (last is not None and last.opname == "STORE_ATTR" and last.argval == "UnitSystem"):
+            return False
+        if doc is not None:
+            from . import design_units_core
+
+            known, target = design_units_core.store_target(frame)
+            if known and target is not doc and getattr(target, "Name", None) != doc.Name:
+                return False
+        return True
     except Exception:
         return False
 
@@ -185,7 +199,7 @@ def _changed(doc, frame):
     held = _units.get(doc.Name)
     if now is None:
         return
-    if held is None or now == held or getattr(doc, "Restoring", False) or _asked_for(frame):
+    if held is None or now == held or getattr(doc, "Restoring", False) or _asked_for(frame, doc):
         _units[doc.Name] = now
         return
     # nobody asked: FreeCAD wrote another document's units into this one
