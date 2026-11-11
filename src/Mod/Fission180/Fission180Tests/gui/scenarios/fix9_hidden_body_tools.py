@@ -4,7 +4,8 @@ fix9_hidden_body_sketch_extrude, gone on with). Real input only, a person's defa
 
   P  New design: a 100 x 100 rectangle on XY extruded 100 (Body1, a cube).
   A  A sketch on the cube's top face (a circle, 40 across): it goes into Body1. Body1's eye:
-     the cube goes, the sketch stays (3.3.8).
+     the cube goes, the sketch stays (3.3.8). Isolate on Body1 shows it (it stayed
+     invisible: the body is kept on for its sketch, its solid off); hidden again.
   B  The sketch edited from the timeline: while it is open Body1 stays hidden (its solid was
      shown while the sketch was edited), Finish Sketch: the sketch still shows, Body1 hidden.
   C  Extrude of that circle, upwards out of the hidden cube: New Body (it proposed Join into
@@ -158,6 +159,26 @@ def a_hidden():
     h.check("A the sketch stays shown (Sketch 2's eye)", eye("Sketch 2") is True, eye("Sketch 2"))
     h.check("A ... and drawn", sk.ViewObject.Visibility and sk.ViewObject.isVisible())
     h.shot("A-sketch-on-hidden-body")
+
+
+def a_isolate():
+    ti.row_menu("Body1", "Isolate")
+
+
+a_isolate.done = lambda: drawn(body("Body1"))
+a_isolate.done_what = "Isolate shows Body1 (it stayed invisible: kept on for its sketch)"
+
+
+def a_isolated():
+    """(Body1 is the only body: Isolate hides nothing else, so there is nothing to exit.)"""
+    h.check("A Isolate: Body1's eye is open", eye("Body1") is True, eye("Body1"))
+    h.check("A ... the sketch still shows", eye("Sketch 2") is True, eye("Sketch 2"))
+    h.shot("A-isolated")
+    h.check("A Body1's eye (hide it again)", ti.click_eye("Body1"))
+
+
+a_isolated.done = lambda: not drawn(body("Body1"))
+a_isolated.done_what = "Body1 is hidden again"
 
 
 # == B =========================================================================================
@@ -404,6 +425,7 @@ steps += [r.named(r.finish_sketch, "p_finish")]
 steps += one_extrude("p_e", V(CUBE * 0.5, CUBE * 0.5, 0), CUBE)
 steps += [p_check, r.named(ok, "p_ok"), p_made]
 steps += [a_sketch, a_top_face, a_circle_tool, a_centre, a_radius, a_finish, a_hide, a_hidden]
+steps += [a_isolate, a_isolated]
 steps += [b_edit, b_editing, b_done]
 steps += one_extrude("c_e", V(CUBE / 2, CUBE / 2, CUBE), TALL)
 steps += [c_check, c_cut, c_back, r.named(ok, "c_ok"), c_made]
