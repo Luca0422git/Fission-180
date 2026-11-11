@@ -336,7 +336,7 @@ def p8_new_body_done():
     from fission180 import commands
 
     h.check("two bodies", len(bodies()) == 2, [b.Label for b in bodies()])
-    first = body_named("Body")
+    first = body_named("Body1")
     second = commands.active_body()
     s["first"], s["second"] = first, second
     h.check("the new body is active", second is not None and second is not first)

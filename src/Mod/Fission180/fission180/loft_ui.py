@@ -20,9 +20,10 @@ in the dialog, which then stays open.
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import bodies_row_ui, commands, curve_pick, curves, extrude, log, loft, loft_ends_core
-from . import preview, profile_pick, ui_icon_path, warn
-from .compat import QtCore, QtWidgets
+from . import bodies_row_ui, commands, curve_pick, curves, extrude, extrude_finish, log
+from . import loft, loft_ends_core
+from . import preview, profile_pick, taskui, ui_icon_path, warn
+from .compat import QtCore, QtGui, QtWidgets
 from .hole_common import SelectionField
 from .taskui import DistanceField, Panel
 
@@ -54,7 +55,9 @@ END_PROPS = {
 
 def profile_text(index, profile):
     obj, sub = profile
-    if sub.startswith("Vertex"):
+    if loft.is_point_object(obj):
+        what = "%s (point)" % obj.Label
+    elif sub.startswith("Vertex"):
         what = "point of %s" % obj.Label
     elif extrude.is_sketch(obj):
         what = "%s (area)" % obj.Label if sub else "%s (whole sketch)" % obj.Label
@@ -69,6 +72,8 @@ def selected():
     for obj, short in profile_pick.picks():
         if extrude.is_sketch(obj) and short.startswith("InternalFace"):
             found.append((obj, short))
+        elif loft.is_point_object(obj):
+            found.append((obj, ""))
         elif short.startswith("Vertex"):
             found.append((obj, short))
         elif short.startswith("Face") and not extrude.is_sketch(obj):
@@ -95,7 +100,7 @@ def _picked_points():
     return points
 
 
-class LoftPanel(Panel):
+class LoftPanel(extrude_finish.SaysWhy, Panel):
     title = "Loft"
     icon = "loft"
     last = None
@@ -315,7 +320,7 @@ class LoftPanel(Panel):
         if len(self.profiles) < 2:
             return None
         obj, sub = self.profiles[0] if end == "start" else self.profiles[-1]
-        if sub.startswith("Vertex"):
+        if loft.is_point((obj, sub)):
             return "point"
         return "sketch" if extrude.is_sketch(obj) else "face"
 
@@ -508,14 +513,14 @@ class LoftPanel(Panel):
                 skip=lambda position: self.active == "bodies"
                 or curve_pick.line_under_mouse(self.doc, position),
             )
+            # a shown sketch's profile wins over the body in front of it (Fusion)
+            self.picker.set_through()
         except Exception as exc:
             warn("loft: profile shading unavailable: %s" % exc)
 
     def _occluder(self):
-        base = self._base_feature()
-        if base is None or base.Shape.isNull():
-            return None
-        return curves.to_global(base.Shape, base)
+        """The part before this step; None while its body is hidden."""
+        return profile_pick.shown_part(self._base_feature(), curves.to_global)
 
     def _unwatch(self):
         if self.observer is not None:
@@ -545,6 +550,7 @@ class LoftPanel(Panel):
             if not picks:
                 return
             self._points = _picked_points()
+            self._clicked_at = QtGui.QCursor.pos()  # (where the click was, for _behind)
             Gui.Selection.clearSelection()
             if self.picker is not None and self.picker.clicked_region_recently():
                 return
@@ -561,6 +567,24 @@ class LoftPanel(Panel):
 
     def _picked(self, obj, short):
         base = self._base_feature()
+        if loft.is_point_object(obj):
+            # the origin point or a construction point: a point to loft to (Fusion)
+            if self.active in ("rails", "centerline"):
+                self.message.setText("⚠ A rail or centerline is a curve. Click a line or an edge.")
+                return
+            self._toggle_profile((obj, ""))
+            return
+        if profile_pick.is_glyph(obj):
+            # An origin or construction plane / axis is no profile: the click was meant
+            # for what is behind its square (a sketch point at the origin, a face).
+            found = self._behind(obj)
+            if found is None:
+                self.message.setText(
+                    "⚠ %s is no profile. Click a sketch area, a flat face or a point; hide "
+                    "the plane if it is in the way." % obj.Label
+                )
+                return
+            obj, short = found
         if short.startswith("Edge"):
             ref = (obj, short)
             if not extrude.is_sketch(obj) and self._own_body(obj):
@@ -601,6 +625,42 @@ class LoftPanel(Panel):
                 self.message.setText("⚠ Only flat faces can be lofted. Pick a flat face.")
                 return
             self._toggle_profile(ref)
+
+    def _behind(self, glyph):
+        """(object, element) of what lies behind the origin / construction plane or axis
+        that took the last click, when this dialog can use it (a point, a face, an edge, a
+        sketch area); None when nothing usable is there."""
+        try:
+            widget = taskui.view_widget()
+            at = getattr(self, "_clicked_at", None)
+            if widget is None or at is None:
+                return None
+            pos = widget.mapFromGlobal(at)
+            view = Gui.ActiveDocument.ActiveView
+
+            def usable(obj, short):
+                if profile_pick.is_glyph(obj):
+                    return False
+                if loft.is_point_object(obj):
+                    return True
+                return short.startswith(("Vertex", "Face", "Edge", "InternalFace"))
+
+            found = profile_pick.behind_glyphs(view, profile_pick.coin_pixel(widget, pos), usable)
+            if found is None:
+                # a point is small: look a few pixels around the click too
+                near = [
+                    hit
+                    for hit in profile_pick.under(view, profile_pick.coin_pixel(widget, pos), 6)
+                    if loft.is_point_object(hit[0]) or hit[1].startswith("Vertex")
+                ]
+                found = near[0] if near else None
+            if found is None:
+                return None
+            obj, short = found[0], found[1]
+            return (obj, "") if loft.is_point_object(obj) else (obj, short)
+        except Exception as exc:
+            warn("loft pick: %s" % exc)
+            return None
 
     def _edge_beside(self, obj, short, point):
         """The name of the edge of face `short` of `obj` within 6 pixels of the clicked
@@ -910,6 +970,7 @@ class LoftPanel(Panel):
         self.message.setText("⚠ " + text if text else "")
 
     # -- OK / Cancel ------------------------------------------------------------------------------------
+    @extrude_finish.speaking
     def accept(self):
         if self._closed:
             return True
@@ -951,13 +1012,8 @@ class LoftPanel(Panel):
         if body is not None:
             extrude.show_tip(body)
             if body is not self.body:
-                try:
-                    from . import components
-
-                    # (wave 7, components-2) not a body of another component that was cut
-                    components.activate_result(body, feature)
-                except Exception as exc:
-                    warn("could not activate %s: %s" % (body.Label, exc))
+                # its (new) body and component; never another component's body a Cut changed
+                extrude_finish.activate_result(body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
 

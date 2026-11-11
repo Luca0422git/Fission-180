@@ -210,7 +210,7 @@ def x1_done():
     h.check("X1 kept", not dialog_open())
     h.check("X1 two bodies", len(bodies()) == 2, [b.Label for b in bodies()])
     h.check("X1 plate + lid", near(shown_volume(), PLATE + LID), shown_volume())
-    lid = [b for b in bodies() if b.Label != "Body"]
+    lid = [b for b in bodies() if b.Name != "Body"]
     s["lid"] = lid[0] if lid else None
     if s["lid"] is not None:
         box = s["lid"].Shape.BoundBox
@@ -345,7 +345,7 @@ def x3_values():
 def x3_check():
     p = xpanel()
     h.check("X3 a New Body", p.operation.currentText() == "New Body", p.operation.currentText())
-    new = [b for b in bodies() if b.Label not in ("Body", s["lid"].Label)]
+    new = [b for b in bodies() if b.Name not in ("Body", s["lid"].Name)]
     want = cone_frustum(5.0, 10.0, 5.0) + cone_frustum(5.0, 6.0, -10.0)
     got = new[0].Shape.Volume if new else 0.0
     h.check("X3 side one widens, side two narrows", near(got, want), (got, want))

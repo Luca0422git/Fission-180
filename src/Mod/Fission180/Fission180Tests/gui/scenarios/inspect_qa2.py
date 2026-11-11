@@ -579,12 +579,12 @@ def n_pin_cut_too():
     h.check("the cut face is drawn", drawn_caps(a) > 0, drawn_caps(a))
     h.check("sketches are not cut", not clipped_elsewhere(), clipped_elsewhere())
     h.shot("N-pin-cut")
-    s.eye("Body")
+    s.eye("Body1")
 
 
 def n_body_hidden():
     h.check("body hidden: no cut on it", not clips(), clips())
-    s.eye("Body")
+    s.eye("Body1")
 
 
 def n_body_shown():

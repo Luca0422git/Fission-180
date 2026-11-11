@@ -35,7 +35,7 @@ import FreeCADGui as Gui
 
 from . import commands, cut_preview, drag_guard, extrude, log, preview, profile_pick, taskui
 from . import bodies, extrude_bodies, extrude_to_face, protractor, text, ui_icon_path, warn
-from . import live_shapes, value_limits
+from . import extrude_finish, live_shapes, value_limits
 from . import extrude_bodies_core as bodies_core
 from . import extrude_to_face_core as to_face
 from . import plastic  # plastic rule defaults (plastic-1)
@@ -83,6 +83,9 @@ ACTIVE_STYLE = "QPushButton { background: #1f6fbf; color: white; border: 1px sol
 # An arrow drag rebuilds the preview many times a second: when testing the bodies in the
 # way took longer than this (seconds; a detailed part), a drag reuses the last answer.
 DRAG_TEST_BUDGET = 0.05
+
+
+NO_PROFILE = "Pick a profile first: click inside a sketch area or on a flat face."
 
 
 def _combo(pairs, current):
@@ -583,7 +586,9 @@ def newest_single_region(body):
 
 
 # -- the dialog -------------------------------------------------------------------------------
-class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
+class ExtrudePanel(
+    extrude_finish.SaysWhy, Panel, value_limits.LimitedValues, live_shapes.LivePanel
+):
     title = "Extrude"
     icon = "extrude"
     last = None
@@ -1189,6 +1194,10 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             picked = selected_profiles(self.body)
         if not picked and self.auto_pick and self.from_sketch is None:
             picked = newest_single_region(self.body)
+            if not picked:
+                # Fusion's rule: the one profile that is in view, whichever body or
+                # component its sketch is in
+                picked = profile_pick.only_visible_profiles(self.body)
         try:
             Gui.Selection.clearSelection()
         except Exception:
@@ -1287,6 +1296,7 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
                 ),
                 occluder=self._occluder,
                 clicks_through=True,  # the sketch stays in view: its arrows stay grabbable
+                through=True,  # a shown sketch's profile wins over the body in front of it
                 on_curve=(
                     (
                         lambda sketch, sub: QtCore.QTimer.singleShot(
@@ -1301,11 +1311,10 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             warn("profile shading unavailable: %s" % exc)
 
     def _occluder(self):
-        """The part as it was before this extrude (global): it hides regions behind it."""
-        base = self._base_feature()
-        if base is None or base.Shape.isNull():
-            return None
-        return extrude._to_global(base.Shape, base)
+        """The part as it was before this extrude (global): what is in front of a region
+        (a picked region behind it gives the click to the face). None while its body is
+        hidden."""
+        return profile_pick.shown_part(self._base_feature(), extrude._to_global)
 
     def _unwatch(self):
         self._pause_body_sync(False)
@@ -1395,6 +1404,9 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             if taskui.box_click_taken():
                 return  # the click that left an arrow's value box: not a pick
             recent = self.picker is not None and self.picker.clicked_region_recently()
+            # (a window selection brings a face together with its edges: only a single
+            # click on an edge can stand for the face next to it)
+            self._one_pick = len(picks) == 1
             for obj, short, point in picks:
                 self._picked(obj, short, recent, point)
         except Exception as exc:
@@ -1420,6 +1432,36 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             # A face in a profile's plane is a profile pick, as before.
             if self.profiles and self._end_at(obj, short, point):
                 return
+            if profile_pick.is_glyph(obj):
+                # An origin or construction plane the extrusion cannot end on: the click
+                # was meant for the face behind its square (the book's rocket: the offset
+                # plane's square took the clicks meant for the face behind it).
+                found = self._behind_glyph()
+                if found is None:
+                    if not self.profiles:
+                        self.message.setText(
+                            "%s is no profile. Click inside a sketch area or on a flat face "
+                            "(hide the plane if it is in the way)." % obj.Label
+                        )
+                    return
+                obj, short, point = found
+                if self.profiles and self._end_at(obj, short, point):
+                    return
+            if short.startswith("Edge"):
+                # A small face in a fitted view (the rocket's top, 10 pixels wide) is mostly
+                # edge under the mouse: an edge with one flat face toward the viewer is a
+                # click on that face.
+                if not getattr(self, "_one_pick", True):
+                    return  # one of the edges a selection window took along with a face
+                face = self._face_at_edge(obj, short)
+                if face is None:
+                    if not self.profiles:
+                        self.message.setText(
+                            "That is an edge. Click inside a flat face or a sketch area "
+                            "(zoom in when the face is small)."
+                        )
+                    return
+                short = face
             if not short.startswith("Face"):
                 return
             ref = self._base_face(obj, short)
@@ -1447,6 +1489,47 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         self.fields[self.active].set_text(_ref_text(ref))
         self.activate("profiles")
         self._changed()
+
+    def _behind_glyph(self):
+        """(object, element, point) of the face behind the origin / construction plane or
+        axis that took the last click; None when there is none."""
+        try:
+            gl = taskui.view_widget()
+            view = self._view()
+            if gl is None or view is None or self._mouse is None:
+                return None
+            pixel = profile_pick.coin_pixel(gl, self._mouse)
+            return profile_pick.behind_glyphs(
+                view,
+                pixel,
+                lambda obj, short: short.startswith("Face") and not extrude.is_sketch(obj),
+            )
+        except Exception as exc:
+            warn("extrude pick: %s" % exc)
+            return None
+
+    def _face_at_edge(self, obj, short):
+        """ "FaceN": the one flat face next to the edge `short` of `obj` that looks toward
+        the viewer; None when there is none or more than one (a box's edge between two
+        faces one sees: which was meant cannot be told)."""
+        try:
+            shape = obj.Shape
+            edge = shape.getElement(short)
+            toward = self._view().getViewDirection()
+            body = extrude.owner_body(obj)
+            if body is not None and body is not obj:
+                toward = body.getGlobalPlacement().Rotation.inverted().multVec(toward)
+            found = []
+            for i, face in enumerate(shape.Faces, start=1):
+                if face.Surface.TypeId != "Part::GeomPlane":
+                    continue
+                if not any(e.isSame(edge) for e in face.Edges):
+                    continue
+                if extrude.face_normal(face).dot(toward) < -1e-6:
+                    found.append("Face%d" % i)
+            return found[0] if len(found) == 1 else None
+        except Exception:
+            return None
 
     def _object_ref(self, obj, short):
         """A pick for Start / To Object: a plane, a face or a whole body."""
@@ -1853,6 +1936,12 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             self.picker.show_faces(faces)
 
     def _profiles_changed(self):
+        if not self.editing:
+            # A sketch on the Front plane used for the first time: plus is away from the
+            # front from now on, like Fusion's (extrude.adopt_fusion_side).
+            for obj in {id(o): o for o, _sub in self.profiles}.values():
+                if extrude.adopt_fusion_side(obj, lead=self.target):
+                    log("extrude: %s goes Fusion's way on the Front plane" % obj.Label)
         self._refresh_profiles()
         if not self.profiles:
             if not self.editing:
@@ -2014,8 +2103,9 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         self._changed(live=True)
 
     def _auto_operation(self):
-        """Fusion: extruding into material (of any body) becomes a cut; touching a body, a
-        join; touching none, a new body."""
+        """The operation shown until the person picks one (parity/extrude-presspull.md, "The
+        Operation rule"; extrude_bodies_core.auto_operation). Once the person picked an
+        operation in the list it never changes by itself."""
         if self.user_picked_operation or not self.profiles:
             return
         try:
@@ -2028,18 +2118,38 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         if cached is not None and cached[0] == key:
             wanted = cached[1]
         else:
-            into = self._starts_inside(options)
+            inside, direct = self._auto_scope()
+            into, on = self._start_state(options)
             way = self._in_the_way()
-            touches = bool(way[1]) if way is not None else self._base_has_solid()
-            wanted = bodies_core.auto_operation(
-                into, touches, symmetric=options["direction"] == "symmetric"
-            )
+            if way is not None:
+                overlaps, touches = bodies_core.scope(inside, direct, way[2], way[1])
+            else:
+                overlaps, touches = False, self._base_joinable()
+            wanted = bodies_core.auto_operation(into, touches, starts_on=on, overlaps=overlaps)
             self._auto_cache = (key, wanted)
+            # A Cut because the extrusion reaches into a body further on (it does not start
+            # in one): a drag on the same side keeps it (_live_operation).
+            self._auto_reach = (
+                self._way_signature(side_only=True) if wanted == "cut" and not into else None
+            )
+        self._show_operation(wanted)
+
+    def _auto_scope(self):
+        """The bodies that decide the automatic operation (extrude_bodies.auto_scope), read
+        once: the active component does not change while the dialog is open."""
+        found = getattr(self, "_scope", None)
+        if found is None:
+            found = self._scope = extrude_bodies.auto_scope(self.doc)
+        return found
+
+    def _show_operation(self, wanted):
         if wanted != self.options["operation"]:
             self.options["operation"] = wanted
             self._quiet = True
-            _set_combo(self.operation, wanted)
-            self._quiet = False
+            try:
+                _set_combo(self.operation, wanted)
+            finally:
+                self._quiet = False
 
     def _changed(self, new_geometry=False, live=False):
         """Something changed: rebuild the preview shortly (coalesces drags). `live`: a handle
@@ -2079,37 +2189,37 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         self.schedule()
 
     def _live_operation(self):
-        """While an arrow is dragged: the automatic Cut at once. Its test depends only on
-        which way the extrusion goes (cached per side), so the live picture turns into the
-        red of a cut as soon as the arrow goes into the part; it stayed a Join, hidden
+        """While an arrow is dragged: the automatic Cut at once. Its quick test depends only
+        on which way the extrusion goes (cached per side), so the live picture turns into
+        the red of a cut as soon as the arrow goes into the part; it stayed a Join, hidden
         inside the part, until the mouse rested (Luca, 2026-11-10: "i have to stop dragging
-        for fission to catch up for me to see the live view"). Join or New Body is told
-        apart when the mouse rests (_auto_operation), as before."""
+        for fission to catch up for me to see the live view"). Join or New Body, and a Cut
+        that only reaches a body further on, are told apart when the mouse rests
+        (_auto_operation), as before."""
         if self.user_picked_operation or not self.profiles:
             return
         try:
             options = extrude.options_with_defaults(self._build_options() or self.options)
-            if options["direction"] == "symmetric":
-                return
             into = self._starts_inside(options)
+            side = self._way_signature(side_only=True)
         except Exception:
             return
         current = self.options.get("operation")
         if into:
             wanted = "cut"
         elif current == "cut":
+            if getattr(self, "_auto_reach", None) == side:
+                return  # it reached into a body on this side when the mouse last rested
             way = self._way
-            touches = bool(way[1]) if way is not None else self._base_has_solid()
+            _inside, direct = self._auto_scope()
+            if way is not None:
+                touches = bodies_core.scope(None, direct, [], way[1])[1]
+            else:
+                touches = self._base_joinable()
             wanted = "join" if touches else "new_body"
         else:
             return
-        if wanted != current:
-            self.options["operation"] = wanted
-            self._quiet = True
-            try:
-                _set_combo(self.operation, wanted)
-            finally:
-                self._quiet = False
+        self._show_operation(wanted)
 
     # -- the live picture (live_shapes.ExtrudePicture) --------------------------------------------
     def _live_options(self):
@@ -2322,12 +2432,16 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             self.error = str(exc)
         except Exception as exc:
             self.error = "This extrude cannot be built: %s" % exc
-        if self.error and self.options["operation"] != self._feature_operation():
-            # Show the operation that is really in place.
-            self.options["operation"] = self._feature_operation()
-            self._quiet = True
-            _set_combo(self.operation, self.options["operation"])
-            self._quiet = False
+        if (
+            self.error
+            and not self.user_picked_operation
+            and self.options["operation"] != self._feature_operation()
+        ):
+            # Show the operation that is really in place. Never over the person's own
+            # choice: that stays as picked, with the reason it cannot be built beside it
+            # (an edit to Cut that failed showed Join again and OK then kept the Join:
+            # the book report's Hot End flats).
+            self._show_operation(self._feature_operation())
 
     def _feature_operation(self):
         if self.target is None:
@@ -2400,6 +2514,8 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         self._way_cost = 0.0  # seconds the last test of the bodies in the way took
         self._way_side = None  # _way_signature(side_only=True) of that test
         self._auto_cache = None  # (signature, automatic operation) of the last decision
+        self._auto_reach = None  # the side on which the automatic Cut reached into a body
+        self._scope = None  # (bodies inside, bodies of) the active component: _auto_scope
         self._inside_cache = None  # (signature by side, starts inside a body) of the last test
         self._sync_paused = False
         self._bodies_problem = ""  # e.g. a cut that goes through no body (OK refused)
@@ -2469,9 +2585,10 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             self.target.Name if self.target is not None else None,
         )
 
-    def _starts_inside(self, options):
-        """Fusion's automatic Cut test (the extrusion starts inside a body). It depends only
-        on where the extrusion starts and which way it goes: typing 5 then 6 tests once."""
+    def _start_state(self, options):
+        """(starts inside a body, starts on a body's face): extrude_bodies.start_state. It
+        depends only on where the extrusion starts and which way it goes: typing 5 then 6
+        tests once."""
         try:
             # Which sides the preview leaves out at 0 counts too: Two Sides with side one
             # still at 0 is built as side two alone, the other way (review finding).
@@ -2482,15 +2599,22 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         cached = getattr(self, "_inside_cache", None)
         if key is not None and cached is not None and cached[0] == key:
             return cached[1]
-        into = extrude_bodies.starts_in_material(self.profiles, options, lead=self.target)
-        self._inside_cache = (key, into)
-        return into
+        inside, direct = self._auto_scope()
+        state = extrude_bodies.start_state(
+            self.profiles, options, lead=self.target, inside=inside, on=direct
+        )
+        self._inside_cache = (key, state)
+        return state
+
+    def _starts_inside(self, options):
+        """Fusion's automatic Cut test (the extrusion starts inside a body)."""
+        return self._start_state(options)[0]
 
     def _in_the_way(self):
         """(names it cuts through, names it touches) for the extrusion as it is set now
         (cached until the profiles or the values change); None when it cannot be told."""
         if not self.profiles:
-            return ([], [])
+            return ([], [], [])
         try:
             key = self._way_signature()
             if key == self._way_key:
@@ -2540,6 +2664,16 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
     def _base_has_solid(self):
         base = self._base_feature()
         return base is not None and not base.Shape.isNull() and bool(base.Shape.Solids)
+
+    def _base_joinable(self):
+        """What stands in for "touches a body" while the bodies in the way cannot be told
+        (no distance yet): the profile's own body has a solid and belongs to the active
+        component (a face of another component's body is no reason to show Join)."""
+        if not self._base_has_solid():
+            return False
+        _inside, direct = self._auto_scope()
+        body = self._source_body()
+        return direct is None or (body is not None and body.Name in direct)
 
     def _bodies_for_build(self):
         """options["bodies"] for extrude.build: the bodies in the way minus those clicked
@@ -2816,8 +2950,39 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
                 )
                 self._attach_box("distance2")
             self._make_taper_handle(faces, start, normal, size)
+            # The value boxes keep off the areas that can still be clicked (the book's
+            # thruster: the box sat on the circle's other half and took the click meant
+            # for it).
+            keep_off = self._areas_to_keep_free(start)
+            if keep_off:
+                for handle in self.draggers.values():
+                    handle.box_avoid = lambda parts=keep_off: parts
         except Exception as exc:
             warn("extrude handles unavailable: %s" % exc)
+
+    KEEP_FREE = 6  # so many of the nearest areas not picked yet
+
+    def _areas_to_keep_free(self, anchor):
+        """[(anchor, tail, tip, radius)] (3D, as BoxCarrier.box_avoid): a disc on each of the
+        nearest offered areas that is not picked, for the value boxes to stay clear of."""
+        import math
+
+        picker = self.picker
+        if picker is None:
+            return []
+        picked = {extrude.key(p) for p in self.profiles}
+        found = []
+        for sketch, sub, face, _material in picker.regions:
+            if (sketch.Name, sub) in picked:
+                continue
+            try:
+                centre = App.Vector(face.CenterOfMass)
+                radius = 0.8 * math.sqrt(max(float(face.Area), 0.0) / math.pi)
+            except Exception:
+                continue
+            found.append(((centre - anchor).Length, centre, radius))
+        found.sort(key=lambda item: item[0])
+        return [(c, c, c, r) for _d, c, r in found[: self.KEEP_FREE]]
 
     # -- the value boxes next to the handles --------------------------------------------------
     BOX_FIELDS = {
@@ -2958,13 +3123,9 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
     # -- OK / Cancel ----------------------------------------------------------------------------
     def accept(self):
         if not self.profiles:
-            self.message.setText(
-                "⚠ Pick a profile first: click inside a sketch area or on a flat face."
-            )
-            return False
+            return self.refuse(NO_PROFILE)
         if self.formula_error:  # Enter right after a typo: Fusion keeps the dialog open
-            self.message.setText("⚠ " + self.formula_error)
-            return False
+            return self.refuse(self.formula_error)
         self._timer.stop()
         if self.dirty:  # a value typed and Enter at once: build it before deciding
             self.dirty = False
@@ -2978,24 +3139,18 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             except Exception as exc:
                 warn("extrude preview: %s" % exc)
             self.info.setText(ZERO_HINT)
-            self.message.setText("⚠ " + self._zero_message())
-            return False
+            return self.refuse(self._zero_message())
         if self.error:
             self.info.setText("")
-            self.message.setText("⚠ " + self.error)
-            return False
+            return self.refuse(self.error)
         if self.target is None:
-            self.message.setText(
-                "⚠ Pick a profile first: click inside a sketch area or on a flat face."
-            )
-            return False
+            return self.refuse(NO_PROFILE)
         preview.recompute(self.doc)
         self._settle_limits()
         text = _plain(preview.failure(self.target)) or self._followers_failure()
         text = text or self._bodies_problem
         if text:
-            self.message.setText("⚠ " + self.limit_hint(text))  # with the limit, if known
-            return False
+            return self.refuse(self.limit_hint(text))  # with the limit, if known
         feature = self.target
         # separate areas: a body each, made now in this undo step (not during the preview)
         extrude._sync_pieces(feature, self.options)
@@ -3011,15 +3166,15 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
         self._close()
         new_body = extrude.owner_body(feature)
         if new_body is not None and new_body is not self.body:
-            try:
-                from . import components
-
-                # (wave 7, components-2) not a body of another component that was only cut
-                components.activate_result(new_body, feature)
-            except Exception as exc:
-                warn("could not activate %s: %s" % (new_body.Label, exc))
+            # its (new) body and component; never another component's body a Cut changed
+            extrude_finish.activate_result(new_body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
+
+    def worth_saying(self):
+        """A command started while this dialog could not finish: worth a word when there is
+        something to lose (an edit, or a new extrude that was given a distance)."""
+        return bool(self.profiles) and (self.editing or not self._zero_sides())
 
     def reject(self):
         self._timer.stop()

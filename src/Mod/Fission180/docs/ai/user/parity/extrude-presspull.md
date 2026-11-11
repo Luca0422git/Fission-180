@@ -8,6 +8,176 @@ negative taper narrows) and everyday Fusion behaviour. Implemented in
 `profile_pick.py` picking, `presspull_core.py` geometry, `presspull_ui.py` dialog, `preview.py`
 dialog helpers). Status: **built and tested with real clicks, not yet signed off by Luca**.
 
+## The Operation rule (wave 7, branch `sf/book-extrude`, 2026-11-11)
+
+The book parity report's third pattern: "The Extrude Operation keeps changing" (Symmetric
+turned a Cut into a Join, a new component's first extrude cut another component, an edit to
+Cut showed Join again, OK "did nothing"). The rule, as one table. Sources: **Autodesk**: Jeff
+Strater (Autodesk) on the forum, thread "extrude - what happened": "If the Extrude intersects
+a solid, it will default to Cut. If not, it will default to Join/New Body. But, at any time,
+you can change this by changing the 'Operation' setting in the tool"; Autodesk Learn, "Create
+solids from sketches": a profile that touches nothing is a New Body "in the active
+component", a face extruded away from its body a Join, and "when the new extrusion overlaps an
+existing solid body, the Operation type automatically switches to Cut". **Forum**: "Recurring
+problem with Join vs New Body" (accepted answer): Join only joins bodies of the active
+component ("without that activation, has to be New Body, as there is nothing in the other
+Component ... to join to"); "Cannot Join Bodies with Extrude": the same; IdeaStation "Stop
+automatically changing the operation from New Body to Cut": the operation used to change
+after the person had chosen one, and people asked for that to stop. **Forum** "Tool
+behaviour - unexpected" gives another reading (mostly inside a body: Cut; mostly outside
+but touching or overlapping: Join); the book contradicts it (its thruster cone, 46 % inside
+the rocket, comes up as Cut in Fusion, "exactly as the book says"), so Fission 180 follows
+Autodesk's own sentence. **Book**: the report quoting *Mastering Autodesk Fusion*. **Guess**:
+rows marked so.
+
+| # | Situation (the first row that fits decides) | The dialog shows | Source |
+|---|---|---|---|
+| 1 | The extrusion **starts inside** a body: its first 0.01 mm lies in material (at least 1 % of it). A face pushed in, a profile on a plane through the part. One Side / Two Sides: side one; **Symmetric: both sides** (a profile on a middle plane) | **Cut** | Autodesk (Strater; Learn); Book (the thruster cone pushed up into the rocket "was set to Cut automatically ... exactly as the book says"; the donut bite) |
+| 2 | It **starts on a face** of a body and goes away from it (the profile is the face, or a sketch on it), also when it runs into another part of the body further on (a column next to it that leans over the face) | **Join** | Autodesk Learn ("when you extrude a face in a direction away from the existing body, the Operation type is set to Join") |
+| 3 | It starts in the air and **reaches into** a body further on, by at least 1 % of its own volume (a profile beside a step, a sketch on a plane above the part extruded down into it, To Object the underside; a sliver along an edge does not count) | **Cut** | Autodesk (Strater: "intersects a solid"); the report (Hot End flats: "the dialog chose Join") |
+| 4 | It only **touches** a body, face to face | **Join** | Autodesk (Strater: "Join/New Body") |
+| 5 | None of these: it touches nothing; the first solid; the active component has no solid yet, whatever body of another component it goes through or touches | **New Body** | Autodesk Learn ("a New Body in the active component"); the report's bug 10 |
+| | Direction Symmetric, Two Sides, Extent All, To Object, Flip, a typed or dragged distance, a negative distance | The same rows, decided again with each preview (60 ms after the last change; while an arrow is dragged, row 1 shows at once) | Autodesk (the rule names no direction); **before wave 7 a symmetric extrude never cut by itself**, which made the book's donut bite a Join |
+| | The person picks an operation in the list | That operation, from then on, whatever changes in the dialog (`user_picked_operation`); a build that fails keeps the picked operation shown with the reason beside it (it used to show the old one again) | Forum (IdeaStation); Luca's brief |
+| | An extrude edited from the timeline | The saved operation; it never changes by itself | as above |
+| | Enter in the distance box | OK: what the dialog shows is made (the automatic choice is settled for the typed value first) | Fusion (everyday use); the report |
+| | OK cannot finish (distance 0, nothing to cut, a failed build) | The dialog stays open with the reason, and the reason is said next to the mouse ("Extrude is not finished: ..."), so the click is answered | the report's pattern 1 (silent failures); **Guess** for the wording |
+| | Another command is started while the dialog cannot finish | The dialog is cancelled (as before) and says so next to the mouse: "The change to Extrude was not kept: ..." (it was dropped without a word) | the report (Hot End: "feature edits that end with a warning were silently not saved") |
+
+Which bodies count (`extrude_bodies.auto_scope`, the components builder's
+`components.may_change`): **only the bodies that belong to the active component**. A body of
+another component, or of a component inside the active one, never turns an extrude into a
+Cut or a Join by itself. A Join the person picks joins only those bodies too (Forum: Fusion
+joins "when you activate the component you want to join to"). **Deliberate difference from
+what Fusion probably does for a Cut:** Fusion's Cut reaches bodies of other components (forum
+"extrude-cut through all problem" asks for an "Active Component" option), so with component
+A active an extrude through a body of component B most likely comes up as Cut there too. In
+Fission 180 the *automatic* choice never changes a body outside the active component (the
+report's bug 10: "it overlapped a body in another component and cut it, silently changing
+that component"). Picking Cut by hand works as in Fusion: the Bodies to Cut row lists every
+shown body in the way, other components' too, and each can be clicked away.
+
+**A hand-chosen Cut, Intersect or To Object across components** (found by builder
+"components" during the wave; scenario `book_extrude_across`, 43 checks). Sources:
+**Autodesk** support, "How to extrude from one component to cut another component" (set
+Objects to Cut to the component to cut) and the Extrude reference ("Objects To Cut ...
+Auto-Select re-computes the bodies to cut based on the current visibility state");
+**Forum**, "extrude-cut through all problem".
+
+| Situation (Axle active; the Nozzle is another component, standing 30 mm off) | Fission 180 | Source |
+|---|---|---|
+| A sketch on the Nozzle's top face, E | The sketch and the extrude belong to Axle; the dialog proposes New Body (row 5) | Autodesk Learn; the report's bug 10 |
+| Operation Cut by hand, -4 | The Nozzle is listed under Bodies to Cut and is cut; nothing is made in Axle | Autodesk support; Forum |
+| Operation Cut by hand, +4 (up into the air) | "The cut does not go through any body", which is then true | - |
+| Operation Intersect by hand | The Nozzle keeps what the extrusion and it share | **Guess** (the same list of bodies as Cut) |
+| Extent To Object, a face of the Nozzle | Ends on that face, wherever the Nozzle stands | Autodesk (To Object takes any face) |
+| After OK | **Axle is still the active component.** Before wave 7 the changed body, and with it the Nozzle, became active, so the next sketch and extrude went into the Nozzle (and came up as Cut). Only a body the step made (New Body, New Component), or a body of the active component, becomes the active body (`extrude_finish.activate_result`; Extrude, Revolve, Sweep, Loft, the primitives) | **Guess**: no source says an extrude changes the active component; in Fusion it changes through Activate |
+
+Where the two readings of Fusion's rule part (Strater's "intersects a solid" against the
+forum's "mostly inside / mostly outside"), rows 2 and 3 are Fission 180's reading: building
+on a face stays a Join whatever it runs into (the forum's reading, and what a person means),
+reaching into a body from the air is a Cut (Strater's). The report's fin on the Front plane,
+overlapping the rocket by 8 % of its profile, comes up as Cut by row 1, as it did before; the
+report calls that friction, Autodesk's sentence says Fusion does the same.
+
+What changed against the rule before wave 7 ("Cut when the first 0.01 mm starts inside a
+body; a symmetric extrude never cuts by itself; any shown body counts; a failed build shows
+the old operation again"): row 1 for Symmetric, row 3, the active component, and the picked
+operation staying put. Code: `extrude_bodies_core.auto_operation` / `scope` (unit
+`test_extrude_bodies_core`), `extrude_bodies.start_state` / `in_the_way` (its third list) /
+`auto_scope`, `extrude_ui._auto_operation` / `_live_operation`, `extrude_finish.SaysWhy` and
+`speaking` (also in Revolve, Sweep, Loft and the primitives). Scenario
+`book_extrude_operation` (ten rows, 72 checks).
+
+## Direction and sign (wave 7)
+
+A positive distance goes along the profile's normal, a negative one against it, in every
+case (scenario `book_extrude_direction`, 41 checks; the arrow stands where the extrusion
+ends). The normal is:
+
+| The profile | Plus goes | Source |
+|---|---|---|
+| A sketch on the Top plane (XY) | up, +Z | Fusion (Autodesk: "along the positive normal of the sketch plane") |
+| A sketch on the Front plane (XZ), or on a plane offset from it | **away from someone looking at the front, +Y**; the book's "Extrude -6" comes towards you | Book (Strandbeest: "towards you"); a third-party Fusion reference: on the XZ plane sketch X is world +X and sketch Y world -Z, so the normal is +Y. FreeCAD's Front plane looks the other way (-Y) |
+| A sketch on the Right plane (YZ) | to the right, +X | Fusion |
+| A sketch on a face, or the face picked itself | out of the solid; minus goes into it (and is a Cut by itself) | Fusion |
+
+The Front plane: a sketch on it that Extrude is used on for the first time is marked
+(`Fission180FrontNormal`, `extrude.adopt_fusion_side`); `extrude.profile_normal` turns the
+normal of a marked sketch round, so the arrow, a Start offset, Two Sides, a click on a face to
+end the extrusion and the edit dialog all agree. A sketch an extrude already used (a design
+made before wave 7, a script, a golden model) has no mark and keeps FreeCAD's way: nothing
+that exists changes. A Rib or Web drawn on a Front plane sketch reads the same mark for its
+One Side (`parity/sweep-loft-rib.md`). **Not built:** the same for Box / Cylinder placed on the Front plane
+(their height still goes FreeCAD's way there) and for CONSTRUCT > Offset Plane from the Front
+plane (components' area: a positive offset should go to +Y in Fusion).
+
+The report's two other sign cases: "Cylinder Height -8 came out going +8 into the first
+body" was the typed -8 landing in the box of another arrow (the one the mouse rested on);
+the height is now the next typed value after placing (`parity/primitives.md`). "-8 grew INTO
+the body" is that same entry in the report's summary.
+
+## Sketch areas keep their identity (wave 7)
+
+The report's drone: "Not changed: with Arm_Length = 60, Extrude 1 would break: Sub shape
+not found: Sketch.InternalFace56. The extrude stores sketch areas by number and the numbers
+change." What really happens (FreeCAD 1.1.4): a link to a sketch area holds FreeCAD's
+internal name for it, made from the corners of its curves; when the curves around the area
+change that name is gone, FreeCAD marks the link "?InternalFace56" and the step fails, though
+the area is still there, often under the same number. In other cases FreeCAD renames the
+link by itself and picks the wrong area without a word (a square of a grid with a hole moved
+onto its edge: 17 of 18 squares extruded, no error). Plain scaling (every dimension following
+one parameter) FreeCAD gets right.
+
+Fission 180 now notes, for every step that links to sketch areas (Extrude, Revolve, Sweep,
+Loft, their hidden profile helpers), what bounds each area: the sketch curves by their
+stable ids (FreeCAD's `GeometryFacade.Id`, which survives deleting other curves and
+reopening the file) and the side of each curve the area is on, plus a point inside
+(`sketch_area_id_core`, property `Fission180AreaIds`). Right after a sketch is computed, and
+before the steps that use it, the areas FreeCAD lost or renamed wrongly are found again and
+the links written with the numbers they have now (`sketch_area_id.follow`). A curve drawn
+across an area, or one deleted, falls back on the most similar bounds, then on the point. A
+design made before gets its notes before its first change after opening (kept in memory:
+opening a design does not change it). Slivers of next to no area, left where pattern copies
+or tangent arcs lie on each other, are never offered as profiles (`extrude.sliver_areas`; the
+report's carabiner: "27 regions, many of them zero-area slivers").
+
+Tests: `sketch_area_id_check` (headless, 64 checks, run by `test_sketch_area_id_freecad`): two
+overlapping circles moved past each other five times; a 6 x 6 grid with a hole (37 areas),
+the 18 squares of a checkerboard extruded, the pitch changed four times, then the hole moved
+onto lines and corners six times; the same through Start: Offset's helper; a revolve; a
+design saved without the notes; undo / redo. Unit `test_sketch_area_id_core` (16).
+
+## Picking profiles (wave 7)
+
+| Fusion (source) | Fission 180 |
+|---|---|
+| A click where a shown sketch's profile lies behind a body face takes the profile (the report: "Fusion prefers the sketch profile"; Fusion draws sketches through bodies) | Same in Extrude, Revolve, Sweep and Loft (`ProfilePicker(through=True)`): the area behind the part is drawn as a faint blue through it and lights up under the mouse. Only an area that is already picked leaves the click to the face in front (so a click on a face further on still ends the extrusion there). It used to pick the face |
+| A sketch's profiles can be picked while its body is hidden (Book: the nozzle's revolve cut "with the body hidden") | Same: a hidden body is in front of nothing (`profile_pick.shown_part`). Nothing could be clicked |
+| "If there is one visible sketch, and if that sketch contains one profile, Extrude will auto-select that profile" (Forum, an Autodesk community manager; Autodesk help: "only one profile visible in your design") | Extrude and Revolve take the newest unused sketch's single area as before, and now also the one profile in view whichever body or component its sketch is in (`profile_pick.only_visible_profiles`) |
+| Small things can be clicked in a fitted view (Guess: Fusion's pick radius) | A click up to 4 pixels beside an area takes it (a slot 0.4 mm wide); the rim of a small flat face takes the face (an edge with exactly one flat face toward the viewer); an edge that could mean two faces says so instead of doing nothing. Only a single click counts: the edges a selection window takes along with a face are ignored, as before |
+| A box that wants faces or profiles does not take a construction plane (Guess from Fusion's selection filters) | A click on an origin or construction plane's square or axis, in a box that cannot use it, goes to the face behind it (`profile_pick.behind_glyphs`): Extrude's Profiles, Loft's Profiles. (Split Face, where the report met it, is the modify builder's) |
+| The value boxes do not hide what is to be clicked next (Guess) | The boxes keep off the six nearest areas not picked yet (`ExtrudePanel._areas_to_keep_free`); the book's thruster: the box sat on the circle's other half |
+| Zero-area slivers are no profiles | Never offered (above) |
+
+Not reproduced on develop (0.1.0-beta.3.3.10), and now checked by `book_extrude_picking`:
+"starting Extrude hides the shown sketch again" (it stays shown), "Start: Offset lets no
+profile be picked" (it does), "the first clicks right after the dialog opens are lost" (the
+first click in the same breath is taken), "profiles over a void go to the face behind"
+(three circles over a bore are each picked). Scenario `book_extrude_picking` (eleven paths,
+49 checks).
+
+## Touching profiles taper as one outline (wave 7)
+
+Forum: adjacent profiles picked together are extruded "like one giant square" and "all
+combine into one body, even though the taper angle should cause them to not be connected".
+Book: the thruster's circle, split in two by the rocket's projected edge, becomes one cone.
+Fission 180 tapered each profile by itself (FreeCAD's Pad does) and so held -11 degrees at
+-6.8. Now the profiles that touch are joined into one outline before the taper
+(`extrude_prism.merged_faces`); such an extrude is Fission 180's own extrude feature
+(`extrude.tapers_as_one`). Profiles that do not touch stay separate. Scenario
+`book_extrude_taper` (22 checks).
+
 ## Values past what fits stop at the limit (Luca's decision, 2026-10-21)
 
 **This deliberately differs from Fusion.** Fusion refuses a value that does not fit (a
