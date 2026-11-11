@@ -586,3 +586,50 @@ def tube(outer, inner, length):
 
 def cyl(diameter, length):
     return math.pi * diameter**2 / 4.0 * length
+
+
+# -- drawings ---------------------------------------------------------------------------------
+def free_spot(width, height):
+    """A free place on the active sheet for something width x height mm (not on a view, not
+    on the title block), as a person looks for one: its top-left corner in sheet
+    coordinates, or None."""
+    from fission180 import drawing
+    from fission180 import drawing_core as core
+
+    from Fission180Tests.gui import drawing_input as d
+
+    page = d.page()
+    standard, sheet = drawing.standard_of(page), drawing.sheet_of(page)
+    x0, y0, x1, y1 = core.frame_rect(standard, sheet)
+    taken = [drawing.view_rect(v, 8.0) for v in drawing.all_views(page)]
+    taken.append(core.title_block_rect(standard, sheet))
+    y = y1 - 4.0
+    while y - height > y0 + 4.0:
+        x = x0 + 4.0
+        while x + width < x1 - 4.0:
+            rect = (x, y - height, x + width, y)
+            if not any(core.rects_overlap(rect, other) for other in taken):
+                return (x, y)
+            x += 5.0
+        y -= 5.0
+    return None
+
+
+def export_dialog():
+    from fission180 import drawing_ui
+
+    dlg = drawing_ui.ExportDialog.last
+    return dlg if dlg is not None and dlg.isVisible() else None
+
+
+def out_dir(name):
+    """A folder of this scenario's own in the test's output folder (emptied)."""
+    import os
+    import shutil
+
+    from Fission180Tests.gui import drawing_input as d
+
+    path = os.path.join(d.ensure_out(), name)
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path)
+    return path

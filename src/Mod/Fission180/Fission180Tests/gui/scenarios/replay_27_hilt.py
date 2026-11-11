@@ -2,12 +2,17 @@
 """Probe (not committed)."""
 
 import math
+import os
 
 import FreeCAD as App
+from PySide import QtCore
+from PySide6 import QtTest
 
+from Fission180Tests.gui import animation_steps as a
 from Fission180Tests.gui import blend_steps as b
 from Fission180Tests.gui import book_components_steps as k
 from Fission180Tests.gui import book_hardware_steps as bh
+from Fission180Tests.gui import drawing_input as d
 from Fission180Tests.gui import fillet2_steps as f2
 from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import hole_steps as hs
@@ -740,6 +745,371 @@ ASSEMBLY_STEPS = (
 )
 
 
+# -- The drawing: right-click the design's row > Create Drawing (report 2575) ----------------
+def root_label():
+    return t.tree().topLevelItem(0).data(1, QtCore.Qt.UserRole)["label"]
+
+
+def drawing_right_click():
+    S["drawings"] = len(d.drawing_module().drawings(k.doc()))
+    S["home"] = a.design_placements()
+    entries = [e[0] for e in t.row_menu_entries(root_label())]
+    h.check("Drawing: the design's row offers Create Drawing", "Create Drawing" in entries, entries)
+    t.row_menu(root_label(), "Create Drawing")
+
+
+drawing_right_click.done = lambda: d.panel_of("CreateDrawingPanel") is not None
+drawing_right_click.done_what = "the Create Drawing dialog is open"
+
+
+def drawing_dialog():
+    p = d.panel_of("CreateDrawingPanel")
+    print(
+        "DRAWING",
+        p.contents.currentText(),
+        p.sheet.currentText(),
+        p.views.currentText(),
+        p.standard.currentText(),
+        flush=True,
+    )
+    h.check(
+        "Drawing: the whole design is drawn (Full Assembly)",
+        p.contents.currentText() == "Full Assembly",
+        p.contents.currentText(),
+    )
+    d.ok()
+
+
+drawing_dialog.done = lambda: d.panel_of("BaseViewPanel") is not None
+drawing_dialog.done_what = "the Base View dialog follows"
+
+
+def drawing_place():
+    h.check(
+        "Drawing: a new drawing", len(d.drawing_module().drawings(k.doc())) == S["drawings"] + 1
+    )
+    h.check("Drawing: the DRAWING workspace shows", d.page() is not None)
+    d.move_to(110, 150)
+    d.click_at(100, 140)
+
+
+def drawing_base_ok():
+    p = d.panel_of("BaseViewPanel")
+    if h.check("Drawing: Base View dialog", p is not None, d.panel()):
+        print("BASE", p.scale.currentText(), p.orientation.currentText(), flush=True)
+    d.ok()
+
+
+drawing_base_ok.done = lambda: d.panel() is None
+drawing_base_ok.done_what = "the Base View dialog closed"
+
+
+def drawing_made():
+    found = d.bases()
+    if not h.check("Drawing: one base view", len(found) == 1, found):
+        return
+    view = found[0]
+    h.check(
+        "Drawing: it draws the six bodies (four parts, two screws)",
+        len(view.Source) == 6,
+        [o.Label for o in view.Source],
+    )
+    h.check("Drawing: it has lines", d.visible_edge_count(view) > 0)
+    S["page"] = d.page().Name
+    S["page_label"] = d.page().Label
+    h.shot("drawing")
+    d.workspace("Design")
+
+
+drawing_made.done = lambda: d.page() is None
+drawing_made.done_what = "the Design workspace is back"
+
+
+# -- The exploded animation (report 2577, chapter 10) -----------------------------------------
+def animation_enter():
+    a.enter()
+
+
+def animation_playhead():
+    a.click_time(3.0)
+
+
+def animation_explode():
+    h.ribbon("Auto Explode: One Level")
+
+
+animation_explode.done = lambda: a.panel() is not None
+animation_explode.done_what = "the Auto Explode dialog is open"
+
+
+def animation_trails():
+    a.tick("trails")
+
+
+def animation_ok():
+    a.ok()
+
+
+animation_ok.done = a.panel_closed
+animation_ok.done_what = "the Auto Explode dialog closed"
+
+
+def animation_made():
+    anim = a.anim()
+    names = anim.storyboards(k.doc())
+    if not h.check("Animation: one storyboard", len(names) == 1, names):
+        return
+    S["board"] = names[0]
+    world = anim.global_placements_at(k.doc(), names[0])
+    moved = sorted(
+        c.Label
+        for c in (k.part(x) for x in k.labels())
+        if (world[c.Name].Base - c.getGlobalPlacement().Base).Length > 1.0
+    )
+    print(
+        "EXPLODED",
+        {k.doc().getObject(n).Label: tuple(round(v, 1) for v in p.Base) for n, p in world.items()},
+        flush=True,
+    )
+    h.check("Animation: the parts fly apart at the storyboard's end", len(moved) >= 4, moved)
+    h.check("Animation: the Grip stays (it is grounded)", "Grip" not in moved, moved)
+    from fission180 import animation_view
+
+    off = animation_view.hidden_extras(k.doc())
+    plane = k.doc().getObject(S["plane"])
+    h.check(
+        "Animation: the Switch's offset plane is not drawn here (Fusion shows bodies only)",
+        plane.Name in off and plane.ViewObject.Visibility,
+        sorted(off),
+    )
+    marks = [x.Name for x in j.joint_list()]
+    h.check("Animation: nor are the joints' marks", all(n in off for n in marks), marks)
+    h.shot("exploded")
+    a.leave()
+
+
+def animation_left():
+    h.check("Animation: the design itself did not move", a.design_placements() == S["home"])
+    for label, box in S["boxes"].items():
+        k.box_is("Animation: %s is where it was modelled" % label, r.body_in(label), box)
+    h.check("Animation: the design's timeline is back", t.tl().isVisible())
+    plane = k.doc().getObject(S["plane"])
+    h.check(
+        "Animation: back in Design the offset plane is drawn again",
+        int(plane.ViewObject.SwitchNode.whichChild.getValue()) >= 0,
+    )
+
+
+# -- The exploded diagram: CREATE > Exploded View on the drawing (report 2530) ------------------
+def diagram_open():
+    h.check(
+        "Diagram: the drawing has a row in the browser", S["page_label"] in t.labels(), t.labels()
+    )
+    t.double_click_row(S["page_label"])
+
+
+diagram_open.done = lambda: d.page() is not None and d.page().Name == S["page"]
+diagram_open.done_what = "the drawing is open again"
+
+
+def diagram_command():
+    d.group_menu("CREATE", "Exploded View")
+
+
+diagram_command.done = lambda: d.panel_of("BaseViewPanel") is not None
+diagram_command.done_what = "Base View opens for the exploded view"
+
+
+def diagram_place():
+    p = d.panel_of("BaseViewPanel")
+    h.check(
+        "Diagram: Representation is the storyboard",
+        p.representation.currentText() == S["board"],
+        p.representation.currentText(),
+    )
+    d.choose(p.orientation, "Home")  # (an exploded diagram is drawn from the corner view)
+    d.move_to(290, 150)
+    d.click_at(280, 140)
+
+
+def diagram_ok():
+    d.ok()
+
+
+diagram_ok.done = lambda: d.panel() is None
+diagram_ok.done_what = "the Base View dialog closed"
+
+
+def drawing_overlaps():
+    from fission180 import drawing
+    from fission180 import drawing_core as core
+
+    rects = [(v.Label, drawing.view_rect(v, 0.0)) for v in drawing.all_views(d.page())]
+    return [
+        (n1, n2)
+        for i, (n1, r1) in enumerate(rects)
+        for n2, r2 in rects[i + 1 :]
+        if core.rects_overlap(r1, r2)
+    ]
+
+
+def diagram_made():
+    from fission180 import drawing, drawing_exploded
+
+    page = d.page()
+    found = [v for v in drawing.base_views(page) if drawing_exploded.is_exploded(v)]
+    if not h.check("Diagram: an exploded view beside the plain one", len(found) == 1, found):
+        return
+    h.check("Diagram: it has lines", d.visible_edge_count(found[0]) > 0)
+    tags = list(getattr(found[0], "Fission180TrailTags", []) or [])
+    h.check("Diagram: its five trail lines are drawn", len(tags) == 5, tags)
+    S["exploded_view"] = found[0].Name
+    h.check("Diagram: no view on another", not drawing_overlaps(), drawing_overlaps())
+
+
+def parts_list_command():
+    d.group_menu("TABLES", "Parts List")
+
+
+parts_list_command.done = lambda: d.panel_of("PartsListPanel") is not None
+parts_list_command.done_what = "the Parts List dialog is open"
+
+
+def parts_list_place():
+    p = d.panel_of("PartsListPanel")
+    h.check("Parts list: with two views it asks which one", "Click the view" in p.hint.text())
+    view = k.doc().getObject(S["exploded_view"])
+    d.click_at(view.X.Value + 2.0, view.Y.Value + 2.0)
+
+
+def parts_list_spot():
+    spot = r.free_spot(165.0, 45.0)
+    h.check("Parts list: there is a free place on the sheet", spot is not None)
+    spot = spot or (20.0, 260.0)
+    d.move_to(spot[0] + 6.0, spot[1] - 6.0)
+    d.click_at(*spot)
+
+
+def parts_list_ok():
+    p = d.panel_of("PartsListPanel")
+    if h.check("Parts list: dialog", p is not None, d.panel()):
+        print("PARTS", p.hint.text(), flush=True)
+    d.ok()
+
+
+parts_list_ok.done = lambda: d.panel() is None
+parts_list_ok.done_what = "the Parts List dialog closed"
+
+
+def parts_list_made():
+    from fission180 import drawing
+
+    table = drawing.parts_list_of(d.page())
+    if not h.check("Parts list: on the sheet", table is not None):
+        return
+    rows = drawing.table_rows(table)
+    print("ROWS", rows, flush=True)
+    by = {row["PartNumber"]: row for row in rows}
+    h.check("Parts list: five rows (the two screws are one row)", len(rows) == 5, list(by))
+    h.check(
+        "Parts list: the screw, quantity 2",
+        str((by.get(SCREW) or {}).get("Qty")) == "2",
+        by.get(SCREW),
+    )
+    for part, material in (("Emitter", "Brass"), ("Pommel", "Gold"), ("Switch", "ABS Plastic")):
+        h.check(
+            "Parts list: the %s is %s" % (part, material),
+            (by.get(part) or {}).get("Material") == material,
+            by.get(part),
+        )
+    marks = [o for o in drawing.annotations(d.page()) if o.TypeId == drawing.BALLOON]
+    h.check("Parts list: five balloons", len(marks) == 5, [m.Text for m in marks])
+    h.shot("diagram")
+
+
+def pdf_command():
+    S["out"] = r.out_dir("replay_27_hilt")
+    S["opened"] = d.record_opener()
+    d.group_menu("EXPORT", "Export PDF")
+
+
+pdf_command.done = lambda: r.export_dialog() is not None
+pdf_command.done_what = "the Export PDF dialog is open"
+
+
+def pdf_export():
+    dlg = r.export_dialog()
+    d.type_into(dlg.name, "hilt")
+    d.type_into(dlg.folder, S["out"])
+    QtTest.QTest.mouseClick(dlg.export_button, QtCore.Qt.LeftButton)
+
+
+pdf_export.done = lambda: os.path.isfile(os.path.join(S["out"], "hilt.pdf"))
+pdf_export.done_what = "the PDF is written"
+
+
+def pdf_written():
+    from fission180 import drawing_pdf
+
+    with open(os.path.join(S["out"], "hilt.pdf"), "rb") as handle:
+        data = handle.read()
+    h.check(
+        "PDF: a PDF of one page", data.startswith(b"%PDF-") and drawing_pdf.page_count(data) == 1
+    )
+    h.check("PDF: more than an empty sheet", len(data) > 20000, len(data))
+    d.workspace("Design")
+
+
+pdf_written.done = lambda: d.page() is None
+pdf_written.done_what = "the Design workspace is back"
+
+
+def the_end():
+    h.check(
+        "At the end: the Design workspace, SOLID tab", d.current_tab() == "solid", d.current_tab()
+    )
+    want = ["Grip", "Emitter", "Pommel", "Switch", SCREW, SCREW + ":2"]
+    h.check("At the end: six components", k.labels() == want, k.labels())
+    for label, box in S["boxes"].items():
+        k.box_is("At the end: %s is where it was modelled" % label, r.body_in(label), box)
+    h.check("At the end: the Grip as chamfered", r.near(r.vol("Grip"), GRIP_CHAMFERED, 1e-6))
+    r.nothing_broken("At the end")
+    h.check("At the end: no undo step left open", not h.open_undo_step(), h.open_undo_step())
+    h.fit()
+    h.shot("end")
+
+
+DOCUMENT_STEPS = [
+    drawing_right_click,
+    drawing_dialog,
+    drawing_place,
+    drawing_base_ok,
+    drawing_made,
+    # (the book's Render part of this project is out of scope: no Render workspace)
+    animation_enter,
+    animation_playhead,
+    animation_explode,
+    animation_trails,
+    animation_ok,
+    animation_made,
+    animation_left,
+    diagram_open,
+    diagram_command,
+    diagram_place,
+    diagram_ok,
+    diagram_made,
+    parts_list_command,
+    parts_list_place,
+    parts_list_spot,
+    parts_list_ok,
+    parts_list_made,
+    pdf_command,
+    pdf_export,
+    pdf_written,
+    the_end,
+]
+
+
 steps = (
     r.new_design_steps("hilt")
     + r.new_component("Grip", grounded=True)
@@ -775,6 +1145,7 @@ steps = (
     + POMMEL_STEPS
     + SWITCH_STEPS
     + ASSEMBLY_STEPS
+    + DOCUMENT_STEPS
 )
 
 h.run("replay_27_hilt", steps, paced_by="state")

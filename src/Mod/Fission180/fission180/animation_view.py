@@ -36,6 +36,8 @@ class _Shown:
         self.moved = {}  # component name -> the matrix elements its view has now
         self.hidden = {}  # component name -> its switch's child before we hid it
         self.faded = {}  # component name -> our material node
+        self.extras = {}  # sketch / plane / joint mark name -> its switch's child before
+        self.extras_key = None
         self.overlay = None
         self.overlay_key = None
         self.callouts = []  # [(action id, text, point)] drawn now (tests)
@@ -82,6 +84,7 @@ def show(doc, board, t, camera=False):
             _place(state, comp, vobj, local[comp.Name])
             value = opacity.get(comp.Name)
             _visible(state, comp, vobj, 1.0 if value is None else value)
+        _hide_extras(doc, state)
         _overlay(doc, state, board, t)
         if camera:
             cam = core.camera_at(board, t)
@@ -90,6 +93,70 @@ def show(doc, board, t, camera=False):
                 set_camera(view, cam)
     except Exception as exc:
         warn("animation view: %s" % exc)
+
+
+def is_extra(obj):
+    """What the ANIMATION workspace does not draw: sketches, construction geometry, the
+    origins and the joints' marks. Fusion shows the components' bodies only there (Autodesk
+    forum: Animation, Simulation and CAM "do not display default construction geometry on
+    the canvas"); a storyboard is what the published video shows, and an offset plane or a
+    joint's mark standing in it was a hitch of the book's final project."""
+    try:
+        if obj.isDerivedFrom("Sketcher::SketchObject") or obj.isDerivedFrom("Part::Datum"):
+            return True
+        if obj.TypeId in ("App::Plane", "App::Line", "App::Point"):
+            return True
+        if obj.TypeId == "App::FeaturePython":
+            from . import joints
+
+            return (
+                joints.is_joint(obj)
+                or joints.is_helper(obj)
+                or joints.is_joint_origin(obj)
+                or "ObjectToGround" in obj.PropertiesList
+            )
+    except Exception:
+        pass
+    return False
+
+
+def _hide_extras(doc, state):
+    """Switch the display of every extra off (its Visibility stays: nothing of the design
+    changes). Looked at again only when the design gained or lost an object."""
+    key = len(doc.Objects)
+    if state.extras_key == key:
+        return
+    state.extras_key = key
+    for obj in doc.Objects:
+        if obj.Name in state.extras or not is_extra(obj):
+            continue
+        try:
+            switch = obj.ViewObject.SwitchNode
+            child = int(switch.whichChild.getValue())
+            if child >= 0:
+                state.extras[obj.Name] = child
+                switch.whichChild = -1
+        except Exception:
+            continue
+
+
+def _show_extras(doc, state):
+    for name, child in list(state.extras.items()):
+        obj = doc.getObject(name)
+        try:
+            vobj = obj.ViewObject if obj is not None else None
+            if vobj is not None and vobj.Visibility:
+                vobj.SwitchNode.whichChild = child
+        except Exception as exc:
+            warn("animation view: %s" % exc)
+    state.extras = {}
+    state.extras_key = None
+
+
+def hidden_extras(doc):
+    """Names of the sketches, planes and joint marks switched off for the workspace (tests)."""
+    state = _STATE.get(doc.Name) if doc is not None else None
+    return set(state.extras) if state is not None else set()
 
 
 def _place(state, comp, vobj, placement):
@@ -281,6 +348,7 @@ def restore(doc):
         comp = doc.getObject(name)
         _take_out(_vobj(comp) if comp is not None else None, node)
     _drop_overlay(state)
+    _show_extras(doc, state)
 
 
 def invalidate(doc):

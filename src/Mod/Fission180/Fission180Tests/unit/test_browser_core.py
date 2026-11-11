@@ -309,6 +309,15 @@ class HoverTests(unittest.TestCase):
         self.assertIn("Opacity Control", core.menu_for(core.find(tree, "component:Part")))
         self.assertNotIn("Opacity Control", core.menu_for(core.find(tree, "sketch:Sketch")))
 
+    def test_create_drawing_on_components_and_the_design_itself(self):
+        # Fusion: "Select any component in the browser, right-click it, and select Create
+        # Drawing"; the design's own row is its top component (the book's final project
+        # draws the whole hilt from it).
+        tree = self.tree()
+        self.assertIn("Create Drawing", core.menu_for(core.find(tree, "component:Part")))
+        self.assertIn("Create Drawing", core.menu_for({"kind": "document", "visible": None}))
+        self.assertNotIn("Create Drawing", core.menu_for(core.find(tree, "body:Body")))
+
     def test_selectable_unselectable_on_bodies_and_components(self):
         tree = self.tree()
         for key in ("body:Body", "component:Part"):
