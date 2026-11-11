@@ -43,7 +43,8 @@ def _pairs(rows):
 
 WAITING = hardware_place.WAITING
 AT_ORIGIN = "Nothing clicked yet: OK puts it at the origin and opens Move."
-NOT_KEPT = ("flip", "make_hole", "sink_head", "seat", "offset")  # start fresh on every insert
+# start fresh on every insert
+NOT_KEPT = ("flip", "make_hole", "sink_head", "seat", "offset", "manual_sink")
 
 
 def _safe(method):
@@ -136,7 +137,8 @@ class HardwarePanel(Panel):
                     self.place0 = hardware.spot(*pick)
                 except Exception:
                     self.place0 = None
-            self.manual_sink = True  # as it was left
+            # Head sunk in set by hand stays the person's; else the hole keeps setting the seat
+            self.manual_sink = bool(self.options.get("manual_sink"))
         else:
             self.options = core.with_defaults(dict(HardwarePanel.remembered))
             if not HardwarePanel.remembered and design_is_inch(doc):
@@ -393,6 +395,7 @@ class HardwarePanel(Panel):
         o["hole_depth"] = self.hole_depth.currentData()
         o["clearance"] = abs(float(self.clearance.value()))
         o["joint"] = self.joint.isChecked()
+        o["manual_sink"] = bool(self.manual_sink)
 
     # -- search ---------------------------------------------------------------------------------
     @_safe

@@ -113,7 +113,9 @@ class CataloguePanel(Panel):
         self.add_button = QtWidgets.QToolButton()
         self.add_button.setText("+")
         self.add_button.setObjectName("Fission180Catalogue_add")
-        self.add_button.setToolTip("Add a supplier of your own: type its name and web address below")
+        self.add_button.setToolTip(
+            "Add a supplier of your own: type its name and web address below"
+        )
         self.remove_button = QtWidgets.QToolButton()
         self.remove_button.setText("−")
         self.remove_button.setObjectName("Fission180Catalogue_remove")

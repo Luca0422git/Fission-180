@@ -3,16 +3,16 @@
 
 A  INSERT > Hardware...: the dialog waits for a place (Socket head cap screw ISO 4762,
    M3, 10 mm, Make the hole too and Head sunk in ticked). Click the top face at (12, 8):
-   a new component "M3 x 10 Socket Head Cap Screw" with the screw appears at once, and the box gets a
-   counterbored clearance hole there (measured on the box's shape: 3.4 through, 6.5 x 3.4
+   a new component "M3 x 10 Socket Head Cap Screw" with the screw appears at once, and the
+   box gets a counterbored clearance hole there (measured on the box's shape: 3.4 through, 6.5 x 3.4
    counterbore); the screw's head sits on the counterbore's floor. OK.
 B  Undo (application bar) removes the screw's component and the hole together; Redo brings
    both back.
 C  Type Heat-set insert, click (30, 20): an M3 insert flush in a 4.0 x 6.7 hole. OK.
 D  Type Magnet (6 x 3 first), click (30, 8): a 6.2 x 3 pocket, the magnet flush. OK.
 E  Double-click the Hardware step of the screw in the timeline: the dialog shows it as
-   left; Length 16 mm: the screw grows, the component is renamed "M3 x 16 Socket Head Cap Screw", the
-   hole stays. OK.
+   left; Length 16 mm: the screw grows, the component is renamed "M3 x 16 Socket Head Cap
+   Screw", the hole stays. OK.
 F  Hardware..., Heat-set insert, click the rim of the magnet's pocket (a hole that is there
    already): the insert goes on that hole's axis, "Make the hole too" goes off by itself
    and the size is read off the hole (6.2 wide: the M5 insert's 6.4 hole is the nearest),

@@ -305,6 +305,14 @@ def _hole_base(body, own_hole):
     if own_hole is not None and hole.owner_body(own_hole) is body:
         return own_hole.BaseFeature
     tip = body.Tip
+    if tip is not None and tip.Shape.isNull() and hole.is_hole(tip):
+        # the hole made a moment ago for another place of this part: worked out now, so the
+        # next hole goes into what it left
+        try:
+            first = [o for o in (hole.helper_sketch(tip), tip) if o is not None]
+            body.Document.recompute(first)
+        except Exception as exc:
+            warn("hardware: %s" % exc)
     if tip is None or tip.Shape.isNull() or not tip.Shape.Solids:
         return None
     return tip
@@ -536,12 +544,28 @@ def update(feature, pick=None, options=None, more=None):
         more = []
     _set_more(feature, meta, more, merged)
     _save_meta(feature, meta)
+    if component is not None:
+        _rename_occurrences(feature, component)
     if before["kind"] != merged["kind"]:
         _material(body_of(feature), merged)
         _look(body_of(feature), merged)
     if place is not None:
         hole.show_tip(place["body"])
     return feature
+
+
+def _rename_occurrences(feature, component):
+    """The occurrences are named after the part ("...:2", ":3"): they follow its name at
+    once (instances.sync does it too, at the next recompute with the window up)."""
+    try:
+        from . import components_core
+
+        for part in occurrences(feature)[1:]:
+            base, number = components_core.split_instance_label(part.Label)
+            if number is not None and base != component.Label:
+                part.Label = components_core.instance_label(component.Label, number)
+    except Exception as exc:
+        log("hardware: occurrence names (%s)" % exc)
 
 
 def remove(feature):

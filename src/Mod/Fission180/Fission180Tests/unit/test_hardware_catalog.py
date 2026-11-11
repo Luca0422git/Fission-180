@@ -45,7 +45,9 @@ class SupplierTests(unittest.TestCase):
 
     def test_address_for_a_part_number(self):
         mcmaster = "https://www.mcmaster.com/{}"
-        self.assertEqual(cat.address_for(mcmaster, "91390A098"), "https://www.mcmaster.com/91390A098")
+        self.assertEqual(
+            cat.address_for(mcmaster, "91390A098"), "https://www.mcmaster.com/91390A098"
+        )
         self.assertEqual(cat.address_for(mcmaster, ""), "https://www.mcmaster.com/")
         search = "https://shop.example/result/?Keyword={}"
         self.assertEqual(
