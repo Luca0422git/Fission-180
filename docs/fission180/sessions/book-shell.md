@@ -86,6 +86,23 @@ checks and the items the params builder handed over.
   by `export.py` and `exchange.py`); "mm" texts in `browser_ui`, `insert_ui`, `export_ui`;
   `export_report._parameter_count` counts by the property a parameter is kept in.
 
+- **From hardware**: `insert.design_unit` called `int()` on the unit system's name and so
+  always answered Millimeter: Insert Mesh's Unit Type now starts on the design's unit (Inch in
+  an inch design). STEP carries its own units and DXF its `$INSUNITS` (else millimetres):
+  neither read `design_unit`.
+- **One Fit**: sketch-a put the layout grid in `SoSkipBoundingGroup` on develop while this
+  branch did the same; the merge keeps this branch's `grid_ui.draw` (the same group, plus the
+  axis lines, the dot and the numbers). `Fission180_Fit` is the one Fit command; sketch-a's
+  scenario `book_sketch_a_fit` passes with it.
+- **No second read-out**: the selection read-out under the 3D view is looks'
+  (`properties_readout_ui.py`); nothing of the kind was built here.
+- **Other builders' scenarios and tests updated for a new rule**: `insert_step` (a sketch on
+  an inserted part's face goes to the active component: components), `navbar_grid` (a sketch's
+  GridSize is the distance between two lines, Major Grid Spacing / subdivisions: sketch-a),
+  `timeline_browser_2` and `timeline_browser_qa3` (a body is activated by a double-click on
+  its icon), `exchange2_export` (Save As Mesh's own dialog), `misc_preferences` (orientation on
+  General), and the unit tests of the ribbon order, the General page's groups and F6.
+
 ## The harness (`Fission180Tests/gui/harness.py`)
 
 After every step of every scenario, beside the Report view's errors:
