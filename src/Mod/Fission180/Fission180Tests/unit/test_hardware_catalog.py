@@ -116,6 +116,11 @@ class GoldenListTests(unittest.TestCase):
             tuple(v for v, _label in core.VARIANTS), tuple(hardware_schema.CHOICES["variant"])
         )
 
+    def test_the_ai_tool_knows_every_standard(self):
+        from fission180.ai.catalog import create_tools
+
+        self.assertEqual(tuple(create_tools._HARDWARE_STANDARDS), tuple(core.STANDARD_ORDER))
+
 
 if __name__ == "__main__":
     unittest.main()

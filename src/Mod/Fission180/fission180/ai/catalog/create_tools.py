@@ -874,10 +874,19 @@ define(
 
 
 # -- Hardware -----------------------------------------------------------------------------------
-def _hardware_standards():
-    from ... import hardware_core
-
-    return hardware_core.STANDARD_ORDER
+# (fission180/hardware_core.STANDARD_ORDER, typed again: the catalogue ships without the
+# rest of Fission 180 in the MCP extension; a unit test keeps the two alike)
+_HARDWARE_STANDARDS = (
+    "iso4762", "iso7380", "iso10642", "din7984", "iso4017", "iso7045", "iso1580",
+    "asme_shcs", "asme_bhcs", "asme_fhcs", "asme_lhcs", "asme_hex", "asme_pan_ph",
+    "asme_pan_sl", "iso4029", "iso4026", "iso4027", "iso4028", "asme_ss_cup",
+    "asme_ss_flat", "asme_ss_cone", "asme_ss_dog", "iso7379", "asme_shoulder", "iso4032",
+    "iso4035", "iso7040", "asme_nut", "asme_jam", "asme_locknut", "iso7089", "din127",
+    "asme_washer_sae", "asme_washer_uss", "asme_lockwasher", "as568", "oring_metric",
+    "bearing", "bearing_inch", "din471", "din472", "asme_ring_ext", "asme_ring_int",
+    "iso2338", "asme_dowel", "din6885", "asme_key", "standoff_hex", "spacer_round",
+    "insert", "magnet",
+)  # fmt: skip
 
 
 def _extra_hardware(args, problems):
@@ -921,7 +930,7 @@ define(
             "face": kit.selector("the flat face clicked"),
             "at": kit.point3("where on it"),
             "edge": kit.selector("instead: a round edge (a hole's rim)", "edges"),
-            "standard": enum(list(_hardware_standards()), default="iso4762"),
+            "standard": enum(list(_HARDWARE_STANDARDS), default="iso4762"),
             "size": string("e.g. 3 (M3), 1/4, #10, 012 (AS568), 6202 (a bearing) or 6x3"),
             "length": positive("mm"),
             "thread": string('"" = the coarse thread, or a fine one, e.g. 1/4-28 UNF'),
