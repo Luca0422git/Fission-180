@@ -344,18 +344,18 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 Fission 180's own additions (beyond Fusion), entries Fusion has in a place the list does
 not cover, or a name the alias file should map. Greyed entries are left out.
 
-- `tab:solid`: Gear, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis
-- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Design Advice, Insert Component, Insert STEP
+- `tab:solid`: Gear, Texture Map Controls, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP
+- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP
+- `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties
+- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP
+- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Design Advice, Insert Component, Insert STEP
 - `tab:utilities`: Export, Export Everything, Add-on Manager, AI, Add an AI App, AI Chat, AI Activity, Rebuild with Timeline (AI)..., Compare with Reference, Finish Rebuild, Stop Rebuild..., FreeCAD Tools, Project and Recovery Settings, Version History, Recover Documents, Save As, Fission 180 Diagnostics, Report a Problem, Command Search
-- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Insert Component, Insert STEP, Toggle Construction
+- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Toggle Construction
 - `tab:drawing`: Bend Note, Bend Table
-- `tab:flat_pattern`: Environmental Map Analysis
-- `tab:sim_setup`: Environmental Map Analysis
+- `tab:flat_pattern`: Environmental Map Analysis, Component Color Swatch, Properties
+- `tab:sim_setup`: Environmental Map Analysis, Component Color Swatch, Properties
 - `tab:sim_results`: Legend Min/Max, Undeformed Model, Loads and Constraints
-- `tab:cam_milling`: Environmental Map Analysis
+- `tab:cam_milling`: Environmental Map Analysis, Component Color Swatch, Properties
 - `file`: Home, Version History, Export Everything, Insert Mesh, Insert STEP, Insert SVG, Insert DXF, Canvas, Insert Design, Project and Recovery Settings, Connect a Cloud or NAS, AI Panel, Add an AI App, AI Activity, AI Chat, FreeCAD Tools
 - `quick`: Menu, New, Open
 - `nav`: Theme, Ground Plane, Show All, Two Views Horizontal, Two Views Vertical
