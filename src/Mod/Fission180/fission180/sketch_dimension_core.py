@@ -47,22 +47,35 @@ def _cross(a, b):
 def linear_kind(a, b, cursor):
     """ALIGNED, HORIZONTAL or VERTICAL for the distance between points a and b with the
     pointer at `cursor`. Points level with or upright above each other: always ALIGNED (it
-    is the same number). Else ALIGNED while the pointer is beside the stretch between the
-    two points (between the two perpendiculars through them), HORIZONTAL when it is past
-    them and above or below their box, VERTICAL when left or right of it."""
+    is the same number). Straight above or below the box of the two points: HORIZONTAL;
+    straight left or right of it: VERTICAL. Else ALIGNED while the pointer is beside the
+    stretch between the two points (inside their box, or in a corner between the two
+    perpendiculars through them), and past them HORIZONTAL or VERTICAL by the farther side."""
     d = _sub(b, a)
     length = _len(d)
     if length < EPS:
         return ALIGNED
     if abs(d[0]) <= 1e-7 * max(1.0, length) or abs(d[1]) <= 1e-7 * max(1.0, length):
         return ALIGNED
+    out_x = max(min(a[0], b[0]) - cursor[0], cursor[0] - max(a[0], b[0]), 0.0)
+    out_y = max(min(a[1], b[1]) - cursor[1], cursor[1] - max(a[1], b[1]), 0.0)
+    # (wave 7, the book replay: the Play Brick's stud, "3.9 from the origin" twice) Straight
+    # to the left or right of the two points, at a height between them, is the VERTICAL
+    # distance, and straight above or below is the HORIZONTAL one, however near: that is
+    # where a person puts those two dimensions. (It was the aligned length until the pointer
+    # was past the perpendiculars through the points, so the brick's second 3.9 became a
+    # slanted 3.9. Autodesk forum "Dimension diagonal line": the aligned zone of a nearly
+    # upright line "can be quite small", as this one is: the box of the two points and the
+    # corners square to the line.)
+    if out_x > 0.0 and out_y == 0.0:
+        return VERTICAL
+    if out_y > 0.0 and out_x == 0.0:
+        return HORIZONTAL
     u = (d[0] / length, d[1] / length)
     mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
     along = _dot(_sub(cursor, mid), u)
     if abs(along) <= length / 2.0:
         return ALIGNED
-    out_x = max(min(a[0], b[0]) - cursor[0], cursor[0] - max(a[0], b[0]), 0.0)
-    out_y = max(min(a[1], b[1]) - cursor[1], cursor[1] - max(a[1], b[1]), 0.0)
     if out_x == 0.0 and out_y == 0.0:
         return ALIGNED
     return HORIZONTAL if out_y >= out_x else VERTICAL

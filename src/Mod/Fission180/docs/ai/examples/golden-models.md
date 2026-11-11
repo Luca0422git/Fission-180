@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180's golden models are 653 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
+Fission 180's golden models are 654 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
 
 ## By feature
 
@@ -346,7 +346,7 @@ Each model is listed under its first tag; its other tags follow it.
 - `bodies_split_two_planes`: Split Body with two splitting tools at once (YZ and XZ planes): four bodies, one step [split]
 - `bodies_split_yz`: A box centred on the origin split by the YZ origin plane into two bodies [split]
 
-### pattern (26)
+### pattern (27)
 
 - `book_pattern_bodies_follow_quantity`: Metric Bolt: a pattern of bodies whose Quantity is a parameter; the parameter changed from 3 to 5, then to 2 [rectangular, bodies, parameter, book]
 - `book_pattern_repeats_split_face`: Saturn V: a feature pattern with a Split Face among its features [split, book]
@@ -359,6 +359,7 @@ Each model is listed under its first tag; its other tags follow it.
 - `pattern_bodies_in_moved_component`: A body in a component turned 90 degrees and moved 100 along X, patterned along its own X: the copy lands beside it [rectangular, bodies, new-body, components, fusion-dialog]
 - `pattern_bodies_move_original_after`: A body patterned along X (Spacing 50, Quantity 3), then the original moved 20 up: the copies stay [rectangular, bodies, new-body, move, fusion-dialog]
 - `pattern_bodies_rect_new`: A 20x10x5 body patterned along X (Spacing 30, Quantity 3): two new bodies [rectangular, bodies, new-body, fusion-dialog]
+- `pattern_circ_after_primitive_off_origin`: A box primitive centred on the origin (its corner at -20, -20), a hole r2 at (12, 0) cut through it, a Circular Pattern of the hole about Z, 4: the copies are where the holes go (wave 7, the book replay: a feature made after a primitive that is not at the origin) [circular, primitive, book-replay]
 - `pattern_circ_faces_bolt_circle`: Disc r40x10: the wall of a hole r4 patterned around Z, Full, 6 (Pattern Type Faces) [circular, faces, fusion-dialog]
 - `pattern_circ_suppressed_bodies`: A 4x4x4 body patterned around Z (Full, 4) into new bodies, one copy suppressed [circular, bodies, suppression, fusion-dialog]
 - `pattern_circ_symmetric_holes`: Disc r40x10, a hole r4 at (30, 0) patterned Symmetric, 2 per side over 60 degrees [circular, symmetric, fusion-dialog]
@@ -828,7 +829,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `cam_setup` | `cam_setup` | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `chamfer` | (a test helper) | 2 | `chamfer_one_edge`, `chamfer_top_edges` |
 | `check` | (a test helper) | 89 | `blend_edit_keeps_later_chamfer`, `blend_fillet_edit_radius`, `blend_insert_chamfer_before_fillet`, `bodies_combine_edit_operation`, `bodies_combine_follows_tool` |
-| `circular_pattern` | `circular_pattern` | 3 | `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes` |
+| `circular_pattern` | `circular_pattern` | 4 | `pattern_circ_after_primitive_off_origin`, `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes` |
 | `com_expect` | (a test helper) | 2 | `inspect_com_interference`, `inspect_com_materials` |
 | `combine` | `combine` | 10 | `bodies_combine_cut`, `bodies_combine_cut_cylinder`, `bodies_combine_edit_operation`, `bodies_combine_follows_tool`, `bodies_combine_intersect` |
 | `component_move` | `move_copy` | 5 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `comp_move_captured_roll`, `comp_move_rotate_pivot`, `pattern_bodies_in_moved_component` |
@@ -848,7 +849,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `expect_move_refused` | (a test helper) | 1 | `extrude_multi_move` |
 | `expect_radius` | (a test helper) | 1 | `sf_sweep_guide_surface` |
 | `export_report_expect` | (a test helper) | 2 | `export_report_design`, `export_report_sketch_dxf` |
-| `extrude` | `extrude` | 445 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `extrude` | `extrude` | 446 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `fillet` | (a test helper) | 23 | `bodies_delete_face_fillet`, `bracket_inner_fillet`, `edit_fillet_radius`, `edit_width_after_fillet_and_hole`, `fillet_all_edges` |
 | `fillet_sets` | `fillet_sets` | 14 | `fillet2_chamfer_sets_angle_flip`, `fillet2_chord_90_120`, `fillet2_face_and_its_edge_in_two_sets`, `fillet2_presspull_set_radius`, `fillet2_sets_tangent_chain_each` |
 | `full_round` | `full_round_fillet` | 1 | `fillet2_full_round_rib` |
@@ -908,7 +909,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_path_sketch` | (a test helper) | 9 | `sf_join_away_new_body`, `sf_pipe_hollow_half`, `sf_pipe_old_upgraded`, `sf_pipe_param_driven`, `sf_pipe_ring_hollow` |
 | `sf_pipe` | `pipe` | 14 | `sf_join_away_new_body`, `sf_pipe_corner_hollow_cut`, `sf_pipe_corner_intersect`, `sf_pipe_corner_mitre_join`, `sf_pipe_edge_auto_join` |
 | `sf_plastic_rule` | `plastic_rule` | 2 | `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss` |
-| `sf_primitive` | `primitive` | 35 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere` |
+| `sf_primitive` | `primitive` | 36 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere` |
 | `sf_primitive_edit` | `edit_step` | 3 | `sf_box_pocket_edit_join`, `sf_coil_edit_turns`, `sf_pipe_triangle_edit` |
 | `sf_refold` | `refold` | 1 | `sm_flat_unfold_cut_refold` |
 | `sf_rest` | `rest` | 3 | `plastic_rest_closed_box`, `plastic_rest_cut`, `plastic_rest_cylinder` |
@@ -946,7 +947,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_unfold` | `unfold` | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
 | `shell` | `shell` | 28 | `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain` |
 | `silhouette_split` | `silhouette_split` | 3 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
-| `sketch` | `create_sketch` | 555 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `sketch` | `create_sketch` | 556 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `sketch_extras` | (a test helper) | 1 | `export_report_sketch_dxf` |
 | `sketch_offset_expect` | (a test helper) | 4 | `sketch_offset_circle_symmetric`, `sketch_offset_rect_edit`, `sketch_offset_rounded_fixed_out`, `sketch_offset_slot_fixed_in` |
 | `sketch_polygon` | `sketch_polygon` | 2 | `sketch_inscribed_pentagon`, `sketch_nut_trap_polygon` |

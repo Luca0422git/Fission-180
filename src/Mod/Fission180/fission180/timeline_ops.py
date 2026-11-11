@@ -1951,6 +1951,13 @@ def move(doc, name, slot):
             item = timeline(doc).find(name)
             what = item.display if item is not None else name
             raise TimelineError(_fails_there(doc, name, what))
+        # (wave 7, the book replay: the Metric Bolt's Thread dragged before its Chamfer) the
+        # recompute showed the moved step again: the view drew the thread without the
+        # chamfer and the browser's eye said the body was hidden. Its Tip is what shows.
+        for body_name in tips:
+            body = doc.getObject(body_name)
+            if body is not None and getattr(body, "Tip", None) is not None:
+                _show_only_tip(body, body.Tip)
     except Exception:
         doc.abortTransaction()
         recompute(doc)
@@ -2447,10 +2454,38 @@ def _set_group(obj, gid, name):
         return
     if not gid and GROUP not in obj.PropertiesList:
         return
-    _add_prop(obj, "App::PropertyString", GROUP, "Timeline group")
-    _add_prop(obj, "App::PropertyString", GROUP_NAME, "Timeline group name")
-    setattr(obj, GROUP, gid)
-    setattr(obj, GROUP_NAME, name if gid else "")
+    with _untouched(obj):
+        _add_prop(obj, "App::PropertyString", GROUP, "Timeline group")
+        _add_prop(obj, "App::PropertyString", GROUP_NAME, "Timeline group name")
+        setattr(obj, GROUP, gid)
+        setattr(obj, GROUP_NAME, name if gid else "")
+
+
+class _untouched:
+    """A timeline note on a step (its group) changes nothing of its shape: the step stays
+    as it was for the next recompute. (Wave 7, the book replay: after Create Group of the
+    Geocache's whole timeline the next recompute, a Section Analysis', built every step
+    again, the 25-copy knurl too: 35 s. Adding the properties touched the steps, their
+    Output flag notwithstanding.)"""
+
+    def __init__(self, obj):
+        self.obj = obj
+        self.was = True
+
+    def __enter__(self):
+        try:
+            self.was = "Touched" in list(self.obj.State)
+        except Exception:
+            self.was = True
+        return self
+
+    def __exit__(self, *_exc):
+        try:
+            if not self.was and "Touched" in list(self.obj.State):
+                self.obj.purgeTouched()
+        except Exception:
+            pass
+        return False
 
 
 def group(doc, names, title=None):
@@ -2500,7 +2535,9 @@ def rename_group(doc, gid, text):
     _transaction(doc, "Rename Group")
     try:
         for n in members:
-            setattr(doc.getObject(n), GROUP_NAME, text)
+            obj = doc.getObject(n)
+            with _untouched(obj):
+                setattr(obj, GROUP_NAME, text)
     except Exception:
         doc.abortTransaction()
         raise

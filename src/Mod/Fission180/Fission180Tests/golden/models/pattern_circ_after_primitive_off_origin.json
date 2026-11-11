@@ -1,0 +1,72 @@
+{
+  "id": "pattern_circ_after_primitive_off_origin",
+  "title": "A box primitive centred on the origin (its corner at -20, -20), a hole r2 at (12, 0) cut through it, a Circular Pattern of the hole about Z, 4: the copies are where the holes go (wave 7, the book replay: a feature made after a primitive that is not at the origin)",
+  "tags": [
+    "pattern",
+    "circular",
+    "primitive",
+    "book-replay"
+  ],
+  "steps": [
+    {
+      "op": "sf_primitive",
+      "id": "b1",
+      "kind": "box",
+      "plane": "XY",
+      "x": -20,
+      "y": -20,
+      "length": 40,
+      "width": 40,
+      "height": 10,
+      "operation": "new_body"
+    },
+    {
+      "op": "sketch",
+      "id": "s2",
+      "plane": "XY",
+      "offset": 10,
+      "geometry": [
+        {
+          "circle": [
+            12,
+            0,
+            2
+          ],
+          "name": "hole"
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "c1",
+      "profile": "s2",
+      "operation": "cut",
+      "extent": "through_all",
+      "flip": true
+    },
+    {
+      "op": "circular_pattern",
+      "id": "p1",
+      "features": [
+        "c1"
+      ],
+      "axis": "Z",
+      "quantity": 4
+    }
+  ],
+  "expect": {
+    "volume": 15497.345175425633,
+    "area": 5202.123859659494,
+    "faces": 10,
+    "bbox": [
+      -20,
+      -20,
+      0,
+      20,
+      20,
+      10
+    ],
+    "source": "analytic",
+    "note": "Holes at 0, 90, 180 and 270 degrees, 12 from the axis. V = 40*40*10 - 4*pi*2^2*10; A = 2*1600 + 4*400 - 2*4*4pi + 4*40pi; faces: the box's 6 and 4 hole walls. FreeCAD keeps a feature's tool solid (AddSubShape) in the feature's own coordinates, here the box's (-20, -20, 0): taken as they were, the copies were 20 mm off (Geocache knob: the coil's copies cut nothing)."
+  }
+}

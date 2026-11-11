@@ -988,6 +988,12 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
             return None
         if self.state in ("plane", "place"):
             keys = [k for k in self.TYPE_ORDER if k not in self.locked] or list(self.TYPE_ORDER)
+        elif self._just_placed():
+            # (wave 7, the book replay: the Geocache's knob, "-8" typed right after Enter
+            # placed the circle) the READY_KEY's box was off the screen (the Height arrow of
+            # a tall first preview): the number went into the Diameter, the last size typed.
+            # Right after placing the next number is the height, box shown or not (Fusion).
+            keys = [self.READY_KEY, self._last_handle] + list(self.TYPE_ORDER)
         else:
             keys = [self._last_handle, self.READY_KEY] + list(self.TYPE_ORDER)
         for key in keys:
@@ -1405,20 +1411,30 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         the mouse may have been left on another arrow (the Width's, where the rectangle
         ended), and "31.8, Tab, 15.8, Enter, 9.6" then put the 9.6 into the Width."""
         box = super().typing_box()
-        at = getattr(self, "_placed_at", None)
-        if at is None:
+        if not self._just_placed():
             return box
         try:
-            if QtGui.QCursor.pos() != at:
-                self._placed_at = None
-                return box
             ready = self.value_boxes.boxes.get(self.READY_KEY)
             if ready is not None and ready.isVisible():
                 self.value_boxes.used(self.READY_KEY)
                 return ready
+            return None  # its box is off the screen: its field (typing_field)
         except Exception:
             pass
         return box
+
+    def _just_placed(self):
+        """True right after the shape was placed, until the mouse moves."""
+        at = getattr(self, "_placed_at", None)
+        if at is None:
+            return False
+        try:
+            if QtGui.QCursor.pos() != at:
+                self._placed_at = None
+                return False
+        except Exception:
+            return False
+        return True
 
     def _show_hint(self):
         self.info.setText(self.HINTS[min(len(self.points), len(self.HINTS) - 1)])

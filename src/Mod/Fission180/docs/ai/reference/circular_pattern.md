@@ -72,5 +72,5 @@ Done: AI: Circular pattern. Its id is 'Pattern1'. Bodies now: Body1: 25570.8 mm3
 
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes`
+- Golden models built with its steps (read one with docs_read golden/<id>): `pattern_circ_after_primitive_off_origin`, `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)
