@@ -99,6 +99,9 @@ class Options:
         self.diag_deg = 4.0  # 45 / 135 / 225 / 315 degrees within this angle snaps
         self.min_len_px = 10.0  # shorter lines have no direction to infer from
         self.grid = None  # grid spacing (mm) when grid snap is on, else None
+        # how far (mm) a grid line pulls a coordinate: a distance on the screen (the
+        # sketch's GridSnapPixels), never a share of the spacing alone (grid_snap)
+        self.grid_reach = None
         for name, value in values.items():
             if not hasattr(self, name):
                 raise AttributeError(name)
@@ -148,6 +151,9 @@ class Result:
         # degrees from the line it starts on, onto an arc): the index of that curve in the
         # `curves` given to infer(), or None
         self.on_curve = None
+        # a free point the grid alone placed (grid_capped): the (axis, value) pairs of
+        # the coordinates on a grid line, [] when none is; None for every other result
+        self.grid = None
 
     def __repr__(self):
         return "Result(%r, guides=%r, kind=%r, other=%r)" % (
@@ -302,13 +308,37 @@ def grid_line(value, grid):
     return (math.ceil(q - 0.5) if q < 0 else math.floor(q + 0.5)) * grid
 
 
-def grid_snap(value, grid):
-    """FreeCAD's grid snap of one coordinate: to the nearest grid line when closer
-    than a fifth of the spacing."""
+def grid_snap(value, grid, reach=None):
+    """The grid snap of one coordinate: to the nearest grid line when closer than a fifth
+    of the spacing (FreeCAD's rule) and, with `reach` (mm), closer than that too.
+
+    FreeCAD's rule alone is a distance in the model that grows with the grid: on a grid
+    of 50 mm lines a click 8 mm (40 pixels) off the X axis landed on it (the book parity
+    report, 2026-11-10). `reach` is a distance on the screen (a few pixels, as for the
+    points of curves), so a coarse grid pulls no harder than a fine one."""
     if not grid or grid <= 0:
         return value
     nearest = grid_line(value, grid)
-    return nearest if abs(value - nearest) < grid / 5.0 else value
+    tol = grid / 5.0
+    if reach is not None:
+        tol = min(tol, reach)
+    return nearest if abs(value - nearest) < tol else value
+
+
+def grid_capped(raw, grid, reach):
+    """Where the grid puts the free point `raw` when a grid line's pull ends at `reach`
+    (mm) before FreeCAD's fifth of the spacing, as a Result (its `grid`: the coordinates
+    that snapped); None when both rules agree on this point (FreeCAD's own snap then
+    places it, exactly)."""
+    if not grid or grid <= 0 or reach is None or reach >= grid / 5.0:
+        return None
+    mine = (grid_snap(raw[0], grid, reach), grid_snap(raw[1], grid, reach))
+    theirs = (grid_snap(raw[0], grid), grid_snap(raw[1], grid))
+    if mine == theirs:
+        return None
+    result = Result(mine)
+    result.grid = [(axis, mine[axis]) for axis in (0, 1) if mine[axis] != raw[axis]]
+    return result
 
 
 def segment_within(p, a, b, tol):
@@ -878,17 +908,17 @@ def _combine(raw, start, direction, guide_x, guide_y, px, opt):
             t = dot(sub(raw, start), d)
             point = add(start, mul(d, t))
             if kind == HORIZONTAL:
-                point = (grid_snap(point[0], opt.grid), point[1])
+                point = (grid_snap(point[0], opt.grid, opt.grid_reach), point[1])
             elif kind == VERTICAL:
-                point = (point[0], grid_snap(point[1], opt.grid))
+                point = (point[0], grid_snap(point[1], opt.grid, opt.grid_reach))
             result = Result(point, [], kind, d, other)
         if kind == PERPENDICULAR:
             result.corner, result.along = corner, along
         return result
     if guide_x is None and guide_y is None:
         return None
-    x = guide_x.anchor[0] if guide_x else grid_snap(raw[0], opt.grid)
-    y = guide_y.anchor[1] if guide_y else grid_snap(raw[1], opt.grid)
+    x = guide_x.anchor[0] if guide_x else grid_snap(raw[0], opt.grid, opt.grid_reach)
+    y = guide_y.anchor[1] if guide_y else grid_snap(raw[1], opt.grid, opt.grid_reach)
     return Result((x, y), [g for g in (guide_x, guide_y) if g is not None])
 
 
@@ -911,11 +941,13 @@ def grid_off(result, grid, px):
     point is exact already (the grid must not pull it off)."""
     if result.snap is not None or result.kind in (PERPENDICULAR, PARALLEL, DIAGONAL):
         return True
-    if result.on_line:
+    if result.on_line or result.grid is not None:
         return True
     if not grid or grid <= 0:
         return False
-    for _axis, value in locked_values(result):
+    # a coordinate FreeCAD's rule (a fifth of the spacing) would still move: a fixed one
+    # off the grid, or a free one that the screen reach left where the pointer is
+    for value in result.point:
         off = abs(value - grid_line(value, grid))
         if 1e-6 < off < grid / 5.0 + px:
             return True
@@ -932,6 +964,14 @@ def exact_point(result, placed, px, start=None):
     start = start if start is not None else result.start
     if result.snap is not None:
         return result.point if dist(placed, result.point) <= tol else None
+    if result.grid is not None:
+        # a free point: only its coordinates on a grid line are made exact
+        point = list(placed)
+        for axis, value in result.grid:
+            if abs(placed[axis] - value) > tol:
+                return None
+            point[axis] = value
+        return tuple(point)
     if (
         result.on_line
         or result.on_curve is not None

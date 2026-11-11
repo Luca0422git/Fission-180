@@ -9,6 +9,13 @@ chain through Gui.Selection, so FreeCAD's sketch shows it selected and every com
 it. The double-click and the release after it never reach FreeCAD (its own handling
 toggled the clicked curve off again).
 
+A click (sketch_select_core.click_plan): FreeCAD's sketch toggles what is clicked,
+whatever the keys; Fusion's plain click replaces the selection, Ctrl toggles, Shift adds.
+FreeCAD still handles the click (its drag of a curve starts with the same press); right
+after it the selection is set to what Fusion's rule gives, from what was selected when
+the button went down and what FreeCAD had lit under the pointer. Only while no tool runs:
+a running tool takes the clicks itself.
+
 FreeCAD's sketch box (window from left to right, crossing from right to left) adds to
 the selection whatever the keys; Fusion's plain box replaces it: before FreeCAD sees the
 release of a box drag the selection is cleared (plain) or put aside (Ctrl, to be toggled
@@ -21,6 +28,7 @@ from . import sketch_select_core as core
 from .compat import QtCore
 
 BOX_PIXELS = 4  # a press and release further apart than this were a box drag
+CLICK_PIXELS = 4  # ...or the drag of a curve, not a click on it
 CLOSED = (
     "Part::GeomCircle",
     "Part::GeomEllipse",
@@ -88,6 +96,14 @@ class SketchSelect:
         self.session = session
         self.swallow_release = False
         self._box = None  # {"pos", "far"} of a left press on empty space
+        self._click = None  # {"pos", "far", "before"} of a left press (a click, or a drag)
+        self.last_click = None  # (plan, clicked names, selection after): for the tests
+        self._watching = False  # FreeCAD is handling a click: its selection messages count
+        self._events = []
+        try:
+            Gui.Selection.addObserver(self)
+        except Exception as exc:
+            warn("sketch selection: %s" % exc)
 
     # -- double-click -------------------------------------------------------------------
     def curve_at(self, pos):
@@ -157,23 +173,113 @@ class SketchSelect:
     def pressed(self, event):
         """A left press with no tool running (before FreeCAD sees it)."""
         self._box = None
+        pos = event.position().toPoint()
+        self._click = {"pos": pos, "far": 0, "before": selected_names(self.session.sketch)}
         try:
             pre = Gui.Selection.getPreselection()
             if getattr(pre, "ObjectName", ""):
                 return  # on a curve, point or dimension: FreeCAD drags it
         except Exception:
             pass
-        self._box = {"pos": event.position().toPoint(), "far": 0}
+        self._box = {"pos": pos, "far": 0}
 
     def moved(self, event):
-        if self._box is None:
+        for held in (self._box, self._click):
+            if held is not None:
+                d = (event.position().toPoint() - held["pos"]).manhattanLength()
+                held["far"] = max(held["far"], d)
+
+    def collecting(self):
+        """A command waits for curves to be clicked one after the other (the patterns'
+        "click the curves, then press Enter"): a plain click adds there."""
+        try:
+            from . import sketch_pick_ui
+
+            return sketch_pick_ui._state.get("waiter") is not None
+        except Exception:
+            return False
+
+    # What FreeCAD's sketch does with a click is read from the selection's own messages
+    # (never from what it lit under the pointer, which FreeCAD's selection can still name
+    # after the pointer left it): it adds or removes exactly the clicked name, or clears
+    # everything for a click on empty space.
+    def addSelection(self, _doc, _obj, sub, *_rest):
+        if self._watching:
+            self._events.append(("add", str(sub).rsplit(".", 1)[-1]))
+
+    def removeSelection(self, _doc, _obj, sub, *_rest):
+        if self._watching:
+            self._events.append(("remove", str(sub).rsplit(".", 1)[-1]))
+
+    def clearSelection(self, *_args):
+        if self._watching:
+            self._events.append(("clear", ""))
+
+    def setSelection(self, *_args):
+        if self._watching:
+            self._events.append(("clear", ""))
+
+    def remove(self):
+        """The sketch closed."""
+        self._watching = False
+        try:
+            Gui.Selection.removeObserver(self)
+        except Exception:
+            pass
+
+    def _clicked(self, click, event):
+        """The release of a click (no drag), before FreeCAD handles it: Fusion's rule is
+        applied to what FreeCAD's click turns out to have been on."""
+        mods = event.modifiers()
+        plan = core.click_plan(
+            bool(mods & QtCore.Qt.ShiftModifier),
+            bool(mods & QtCore.Qt.ControlModifier),
+            self.collecting(),
+        )
+        self._events = []
+        self._watching = True
+        QtCore.QTimer.singleShot(0, lambda: self._settle(plan, click["before"]))
+
+    def _settle(self, plan, before):
+        events, self._events = self._events, []
+        self._watching = False
+        session = self.session
+        if session.closed:
             return
-        d = (event.position().toPoint() - self._box["pos"]).manhattanLength()
-        self._box["far"] = max(self._box["far"], d)
+        try:
+            if any(kind == "clear" for kind, _name in events):
+                return  # a click on empty space: FreeCAD cleared the selection (Fusion too)
+            clicked = [name for _kind, name in events if name]
+            if not clicked:
+                return  # the click was on nothing FreeCAD selects
+            wanted = core.after_click(before, clicked, plan)
+            sketch = session.sketch
+            now = selected_names(sketch)
+            if set(now) != set(wanted):
+                # FreeCAD toggled where Fusion replaces or keeps. Set afresh: FreeCAD
+                # keeps a sketch element under the object the sketch is edited through
+                # (the body, "Sketch.Edge1"), so taking one name out by the sketch's own
+                # name removes nothing
+                doc = sketch.Document.Name
+                Gui.Selection.clearSelection()
+                for name in wanted:
+                    Gui.Selection.addSelection(doc, sketch.Name, name)
+            self.last_click = (plan, list(clicked), list(wanted))
+        except Exception as exc:
+            warn("sketch selection: %s" % exc)
 
     def released(self, event):
-        """The release of a left press: when it ends a box drag, set the selection up so
-        that FreeCAD's box (it adds what it encloses) gives Fusion's result."""
+        """The release of a left press: a click gets Fusion's rule; when it ends a box
+        drag, set the selection up so that FreeCAD's box (it adds what it encloses) gives
+        Fusion's result."""
+        click, self._click = self._click, None
+        if click is not None:
+            d = (event.position().toPoint() - click["pos"]).manhattanLength()
+            if max(click["far"], d) <= CLICK_PIXELS:
+                try:
+                    self._clicked(click, event)
+                except Exception as exc:
+                    warn("sketch selection: %s" % exc)
         box, self._box = self._box, None
         if box is None or box["far"] <= BOX_PIXELS:
             return

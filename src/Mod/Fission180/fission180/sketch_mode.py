@@ -823,6 +823,7 @@ class SketchSession:
         self.editor = None
         self.palette = None
         self.last_press = None
+        self._drawing_cursor = False  # what the view's cursor said last (drawing_cursor)
         self._enter_follow = False
         self.shading = ProfileShading(self)
         from .sketch_areas import AreaPicker, ensure_areas
@@ -1212,9 +1213,27 @@ class SketchSession:
             return False
         if self.line.active or (self.tool is not None and self.tool.active):
             return True
+        return self.drawing_cursor()
+
+    def drawing_cursor(self):
+        """FreeCAD's drawing cursor is on the 3D view: one of its sketch tools runs.
+
+        While the left button is down the view shows a pointing hand whatever runs
+        (View3DInventorViewer::setCursorRepresentation, the navigation's SELECTION mode),
+        and it keeps it after the release for as long as Ctrl stays held (Revit style:
+        Ctrl alone changes no mode). The hand therefore says nothing: the answer is what
+        the cursor said last. (Taking the hand for a tool sent the release of a Ctrl+click
+        on a curve through the inference's "Ctrl frees the point" path, with FreeCAD's
+        pick radius shrunk to nothing: the click selected nothing. Book parity report,
+        2026-11-10: "Ctrl+click does not add to a sketch selection".)"""
         try:
             gl = self.gl
-            return gl is not None and _is_valid(gl) and gl.cursor().shape() != QtCore.Qt.ArrowCursor
+            if gl is None or not _is_valid(gl):
+                return False
+            shape = gl.cursor().shape()
+            if shape != QtCore.Qt.PointingHandCursor:
+                self._drawing_cursor = shape != QtCore.Qt.ArrowCursor
+            return self._drawing_cursor
         except Exception:
             return False
 
@@ -1249,7 +1268,11 @@ class SketchSession:
             sketch_pick_ui.stop_waiting()
         except Exception as exc:
             warn("sketch tool: %s" % exc)
-        if not self.tool_running() and not self._spline_in_progress() and not self._spline_panel_shown():
+        if (
+            not self.tool_running()
+            and not self._spline_in_progress()
+            and not self._spline_panel_shown()
+        ):
             return
         kept = []
         try:
@@ -1349,7 +1372,11 @@ class SketchSession:
             if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
                 return
             cursor_on = self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
-            if cursor_on or self._spline_panel_shown() or (self.tool is not None and self.tool.active):
+            if (
+                cursor_on
+                or self._spline_panel_shown()
+                or (self.tool is not None and self.tool.active)
+            ):
                 self._orphan_ticks = 0
                 return
             points = self._spline_points()
@@ -1476,7 +1503,10 @@ class SketchSession:
             QtWidgets.QApplication.processEvents()
         if _count_splines(sketch) > splines:
             made = "freecad"
-            log("spline: made from the points clicked (%d curve(s) added)" % (len(sketch.Geometry) - before))
+            log(
+                "spline: made from the points clicked (%d curve(s) added)"
+                % (len(sketch.Geometry) - before)
+            )
         else:
             left = self._spline_points() or points
             if len(left) >= 2:
@@ -1840,6 +1870,7 @@ class SketchSession:
         self.close_editor(commit=True)
         remove_stray_editors(self.gl)
         parts = [self.polygon, self.areas, self.shading, self.display, self.fixed, self.check]
+        parts.append(self.select)
         parts.append(self.right_angles)
         if self.sketch3d is not None:
             parts.append(self.sketch3d)
@@ -1950,6 +1981,7 @@ class _ViewFilter(QtCore.QObject):
         self.session = session
         self.right_pressed = None
         self.refused_release = False  # the release of a refused Project click
+        self.chain_double = False  # a double-click's press on the line chain's end
 
     def eventFilter(self, obj, event):
         try:
@@ -1986,11 +2018,46 @@ class _ViewFilter(QtCore.QObject):
             if kind == QtCore.QEvent.MouseButtonDblClick and event.button() == QtCore.Qt.LeftButton:
                 if session.line.at_current(event.position().toPoint()):
                     # Fusion: a double-click on the end of the line being drawn ends the
-                    # chain; the Line tool stays on. Before the inference sees it: its
-                    # tangent-arc gesture also starts with a press on that point, and
-                    # FreeCAD must not get this second press as another click there.
-                    QtCore.QTimer.singleShot(0, session.line.break_chain)
+                    # chain; the Line tool stays on. But a second press that comes soon
+                    # after the click and then DRAGS is Fusion's tangent arc (press and
+                    # drag on the line's end), which a hand does without waiting out the
+                    # double-click time (the book's Carabiner: "no arc" with a real
+                    # mouse): the press goes to the inference like any press there, and
+                    # only a release without a drag ends the chain. FreeCAD must never
+                    # get this second press as another click on that point.
+                    self.chain_double = True
+                    taken = session.infer is not None and session.infer.mouse(obj, event)
+                    if not taken:
+                        self.chain_double = False
+                        QtCore.QTimer.singleShot(0, session.line.break_chain)
                     return True
+            if self.chain_double and (
+                (kind == QtCore.QEvent.MouseMove and not (event.buttons() & QtCore.Qt.LeftButton))
+                or kind == QtCore.QEvent.MouseButtonPress
+            ):
+                # the release of that double-click never came (a test's double-click
+                # sends none; a release outside the window): it was a double-click
+                self.chain_double = False
+                try:
+                    session.infer.arc.reset()
+                except Exception as exc:
+                    warn("sketch view: %s" % exc)
+                session.line.break_chain()
+            if (
+                kind == QtCore.QEvent.MouseButtonRelease
+                and event.button() == QtCore.Qt.LeftButton
+                and self.chain_double
+            ):
+                self.chain_double = False
+                dragged = False
+                try:
+                    dragged = session.infer.arc.state == "dragging"
+                    session.infer.mouse(obj, event)  # places the arc, or lets go
+                except Exception as exc:
+                    warn("sketch view: %s" % exc)
+                if not dragged:
+                    QtCore.QTimer.singleShot(0, session.line.break_chain)
+                return True
             if kind in _PRESSES and event.button() == QtCore.Qt.LeftButton:
                 if session.projection_refused(event.position().toPoint()):
                     self.refused_release = True
@@ -2207,7 +2274,9 @@ def paste():
         # said once the tool's panel has settled (its start hid an earlier tip)
         QtCore.QTimer.singleShot(
             150,
-            lambda: commands.tell("Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."),
+            lambda: commands.tell(
+                "Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."
+            ),
         )
 
     QtCore.QTimer.singleShot(0, place)

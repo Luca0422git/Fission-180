@@ -12,6 +12,13 @@ a chain of its own.
 A box drag in the sketch (FreeCAD's own window / crossing box): Fusion's modifiers, the
 same as on the part (parity/selection.md): a plain box replaces the selection, Shift adds,
 Ctrl adds what was not selected and removes what was.
+
+A click on a curve, point or dimension (Autodesk "Selection in Fusion", the book parity
+report of 2026-11-10): a plain click makes it the selection, replacing what was selected;
+Ctrl adds what was not selected and removes what was; Shift only adds. FreeCAD's sketch
+toggles on every click, whatever the keys (a plain click on a second curve added it). While
+a command collects curves (Rectangular Pattern waiting for its curves and Enter) a plain
+click adds, as in Fusion's selection boxes.
 """
 
 TOL = 1e-6
@@ -64,3 +71,24 @@ def toggled(before, boxed):
     boxed_set = set(boxed)
     before_set = set(before)
     return [k for k in before if k not in boxed_set] + [k for k in boxed if k not in before_set]
+
+
+def click_plan(shift, ctrl, collecting):
+    """What a click on something does with the selection: "replace", "add" or "toggle"."""
+    if ctrl:
+        return "toggle"
+    if shift:
+        return "add"
+    return "toggle" if collecting else "replace"
+
+
+def after_click(before, clicked, plan):
+    """The selection after a click: `before` what was selected when the button went down,
+    `clicked` what the click was on (one curve or point; several dimensions drawn on one
+    another), in a stable order (what stays first)."""
+    clicked = list(dict.fromkeys(clicked))
+    if plan == "replace":
+        return clicked
+    if plan == "add":
+        return list(before) + [k for k in clicked if k not in before]
+    return toggled(before, clicked)

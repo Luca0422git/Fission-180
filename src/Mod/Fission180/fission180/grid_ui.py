@@ -246,6 +246,15 @@ def apply_to_sketch(sketch):
         if bool(vp.GridAuto) != adaptive:
             vp.GridAuto = adaptive
         spacing = float(get("MajorSpacing"))
+        try:
+            # (wave 7, sketch-a) FreeCAD's GridSize is the distance between two grid
+            # LINES, Major Grid Spacing the distance between two major ones; an inch
+            # design gets an inch grid: sketch_grid.py
+            from . import sketch_grid
+
+            spacing = sketch_grid.line_spacing(sketch, adaptive, spacing, int(get("Subdivisions")))
+        except Exception as exc:
+            warn("sketch grid: %s" % exc)
         current = float(getattr(vp.GridSize, "Value", vp.GridSize))
         if abs(current - spacing) > 1e-9:
             vp.GridSize = spacing

@@ -897,6 +897,7 @@ class DrawTool:
         self.acquired = []  # hovered sketch points (guides), newest last
         self._geometry = None
         self._pressed = None
+        self._double = False  # the press being followed was a double-click's second one
         self.press_pos = None  # widget position of the last left press
         self.drag_pixels = 0  # how far the pointer went since the press (pixels)
         self._busy = False
@@ -1152,6 +1153,7 @@ class DrawTool:
             snap = self.snap_for(view, event)
             self.last = snap
             self._pressed = (event.position(), snap)
+            self._double = kind == QtCore.QEvent.MouseButtonDblClick
             self.drag_pixels = 0
             self.pressed(snap, view)
             return True
@@ -1159,14 +1161,52 @@ class DrawTool:
             if event.button() != QtCore.Qt.LeftButton:
                 return False
             pressed, self._pressed = self._pressed, None
+            double, self._double = self._double, False
             if pressed is None:
                 return True
             view = self._view(obj, event)
             snap = self.snap_for(view, event) if view is not None else pressed[1]
             moved = (event.position() - pressed[0]).manhattanLength() if view is not None else 0
+            if double and moved <= 4 and self.chain_double_click():
+                return True
             self.released(pressed[1], snap, moved)
             return True
         return False
+
+    def chain_double_click(self):
+        """A double-click on a curve while the tool's Objects selection is on: Fusion takes
+        the whole chain of curves joined to it, as it does outside a command (parity/
+        selection.md; the book's "double-click a line of the triangle" in Circular
+        Pattern). True when this was one (the release is then no second click).
+
+        For the tools that keep their curves in `objects`, add or drop one with
+        toggle(geo) and note the curve under a press in `_press_hit` (the patterns, Mirror,
+        Move/Copy, Scale). Before, the second click of the double-click was a click like
+        the first: the curve was picked and dropped again."""
+        try:
+            objects = getattr(self, "objects", None)
+            hit = getattr(self, "_press_hit", None)
+            toggle = getattr(self, "toggle", None)
+            if getattr(self, "field", None) != "objects" or not isinstance(objects, list):
+                return False
+            if isinstance(hit, bool) or not isinstance(hit, int) or toggle is None:
+                return False
+            from . import sketch_select, sketch_select_core
+
+            chain = sketch_select_core.chain(sketch_select.curves_of(self.sketch), hit)
+            self._press_hit = None
+            if getattr(self, "_box", None) is not None:
+                self._box = None
+            added = 0
+            for geo in chain:
+                if geo not in self.objects:
+                    toggle(geo)
+                    added += 1
+            log("%s: double-click took a chain of %d curve(s)" % (self.title, len(chain)))
+            return True
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            return False
 
     def pressed(self, snap, view):
         """A left press (the click happens at the release, as in FreeCAD's tools)."""
@@ -1261,6 +1301,7 @@ class DrawTool:
             diag_deg=sketch_infer.setting("DiagonalDegrees"),
             parallel=False,
             grid=sketch_infer._grid_size(self.session),
+            grid_reach=sketch_infer.grid_reach(px),
         )
         enabled = sketch_infer.setting("Enabled")
         on_curve = geo.curve_at(raw, pick)
@@ -1288,8 +1329,10 @@ class DrawTool:
             result = icore.infer(raw, start, acquired, geo.lines, [], [], px, opt, (), anchors)
             if result is not None:
                 return Snap(result.point, raw, result=result)
-        grid = opt.grid
-        return Snap((icore.grid_snap(raw[0], grid), icore.grid_snap(raw[1], grid)), raw)
+        grid, reach = opt.grid, opt.grid_reach
+        return Snap(
+            (icore.grid_snap(raw[0], grid, reach), icore.grid_snap(raw[1], grid, reach)), raw
+        )
 
     def snap_point(self, raw, px):
         """The end, middle, centre, quadrant or crossing (sketch or projected curves) the
@@ -1477,7 +1520,7 @@ class DrawTool:
                     out.append(Sketcher.Constraint("Vertical", line))
                 elif result.kind == icore.PERPENDICULAR and result.other is not None:
                     out.append(Sketcher.Constraint("Perpendicular", line, result.other))
-                elif result.kind == icore.DIAGONAL:
+                elif result.kind == icore.DIAGONAL and sketch_infer.setting("DiagonalConstraint"):
                     try:
                         geo = self.sketch.Geometry[line]
                         out.append(sketch_infer.diagonal_constraint(geo, line))

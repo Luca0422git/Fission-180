@@ -77,15 +77,24 @@ DEFAULTS = {
     "PerpendicularDegrees": ("Float", 4.0),
     "Parallel": ("Bool", False),  # Fusion: unconfirmed
     "ParallelDegrees": ("Float", 3.0),
-    # a line within this angle of 45, 135, 225 or 315 degrees snaps there and gets a 45
-    # degree Angle (beyond Fusion, which infers level and upright only); 0: off
+    # a line within this angle of 45, 135, 225 or 315 degrees snaps there while it is
+    # drawn (beyond Fusion, which infers level and upright only: Luca's wish); 0: off
     "DiagonalDegrees": ("Float", 4.0),
+    # ...and what the click leaves behind. Off (wave 7, the book parity report): nothing,
+    # as every snap in Fusion that is no constraint of its own. On, the line got a driving
+    # 45 degree Angle nobody asked for: the next dimension came out driven "(13 mm)" and a
+    # Parallel on that line was refused as redundant
+    "DiagonalConstraint": ("Bool", False),
     "TangentArc": ("Bool", True),  # press-and-drag from the line's start makes an arc
     "DragPixels": ("Float", 6.0),  # a press that moves less is a click
     # how close (screen pixels) the pointer must be to an end, middle, centre, quadrant
     # or crossing for the point to land exactly on it (never less than FreeCAD's own
     # pick radius, which counts device pixels on a scaled screen)
     "SnapPixels": ("Float", 8.0),
+    # how close (screen pixels) the pointer must be to a grid line for the coordinate to
+    # land on it, whatever the spacing (FreeCAD alone: a fifth of the spacing, which on a
+    # coarse grid is dozens of pixels); 0: FreeCAD's rule alone
+    "GridSnapPixels": ("Float", 8.0),
 }
 SNAP_OFF_MARK = "SnapSwitchedOff"  # set while FreeCAD's Snap is off for a Ctrl event
 
@@ -306,15 +315,18 @@ class Inference:
             return (event.position(), True, False, None, None)
         if tool is None or not setting("Enabled"):
             self.overlay.clear()
-            return None
+            return self._grid_plan(obj, event)
         if step is None:  # the tool asks for a size now (a radius, a width): no guides
             self.overlay.clear()
             self.last, self.last_step = None, None
-            return None
+            return self._grid_plan(obj, event)
         view = _ViewMap(session, obj, event.position())
         if not view.ok:
             return None
         result, grid = self._infer(view, start)
+        if result is None:
+            # a free point: the grid alone places it, within a reach on the screen
+            result = self._grid_only(view, grid)
         self.last, self.last_px, self.last_step = result, view.px, step
         if kind in PRESSES:
             self._remember_press(result, view.px, step, view, False)
@@ -332,10 +344,45 @@ class Inference:
         nogrid = core.grid_off(result, grid, view.px)
         return (pos, False, nogrid, result, view.px)
 
-    def _drawing(self):
-        """A sketch tool is drawing (FreeCAD's drawing cursor is on the view)."""
+    def _grid_only(self, view, grid):
+        """The Result for a free point where FreeCAD's grid rule (a fifth of the spacing)
+        reaches further than GridSnapPixels on the screen and would put this point
+        somewhere else; None where both agree, or where FreeCAD snaps the point onto a
+        curve or point under the pointer anyway."""
+        result = core.grid_capped(view.raw, grid, grid_reach(view.px))
+        if result is None or self._freecad_snap(view) is not None:
+            return None
+        return result
+
+    def _grid_plan(self, obj, event):
+        """The plan (see _plan) for an event of a tool, or of a step, that has no guides:
+        only the grid's reach on the screen is kept (the point is placed to the pixel:
+        it is no vertex whose place could be made exact after the click, a radius or a
+        width comes from it). None: FreeCAD's own snap does the same."""
         try:
-            return self.session.gl.cursor().shape() != QtCore.Qt.ArrowCursor
+            session = self.session
+            grid = _grid_size(session)
+            if not grid:
+                return None
+            view = _ViewMap(session, obj, event.position())
+            if not view.ok:
+                return None
+            result = self._grid_only(view, grid)
+            if result is None:
+                return None
+            pos = view.pixel_for(result.point)
+            if pos is None:
+                return None
+            return (pos, False, True, None, None)
+        except Exception as exc:
+            warn("sketch inference: %s" % exc)
+            return None
+
+    def _drawing(self):
+        """A sketch tool is drawing (FreeCAD's drawing cursor is on the view; while a
+        button is held the view shows its own cursor: SketchSession.drawing_cursor)."""
+        try:
+            return self.session.drawing_cursor()
         except Exception:
             return False
 
@@ -434,6 +481,7 @@ class Inference:
             parallel_deg=setting("ParallelDegrees"),
             diag_deg=setting("DiagonalDegrees"),
             grid=_grid_size(self.session),
+            grid_reach=grid_reach(view.px),
         )
         # hovering a point acquires it (Fusion keeps the last 3), a line likewise
         keep = max(0, int(setting("MaxHovered")))
@@ -503,7 +551,9 @@ class Inference:
             except Exception:
                 continue
         helper_circles = {
-            i for i in helpers if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
+            i
+            for i in helpers
+            if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
         }
         for i, geo in enumerate(sketch.Geometry):
             if i in helper_circles:
@@ -655,7 +705,10 @@ class Inference:
             self._spline_pending = None
             i = count - 1
             g = sketch.Geometry[i]
-            if not sketch.getConstruction(i) or g.TypeId not in ("Part::GeomPoint", "Part::GeomCircle"):
+            if not sketch.getConstruction(i) or g.TypeId not in (
+                "Part::GeomPoint",
+                "Part::GeomCircle",
+            ):
                 return
             pos = 1 if g.TypeId == "Part::GeomPoint" else 3
             at = (g.X, g.Y) if pos == 1 else (g.Center.x, g.Center.y)
@@ -955,7 +1008,7 @@ class Inference:
                     constraints.append(Sketcher.Constraint("Perpendicular", line, result.other))
                 elif result.kind == core.PARALLEL and result.other is not None:
                     constraints.append(Sketcher.Constraint("Parallel", line, result.other))
-                elif result.kind == core.DIAGONAL:
+                elif result.kind == core.DIAGONAL and setting("DiagonalConstraint"):
                     constraints.append(diagonal_constraint(geos[line], line))
         constraints = [c for c in constraints if c is not None]
         if not moves and not constraints and not drops:
@@ -1247,13 +1300,19 @@ class TangentArc:
             guide_px=setting("GuidePixels"),
             pick_px=_pick_pixels(view.ratio),
             grid=_grid_size(infer.session),
+            grid_reach=grid_reach(view.px),
         )
         keys = list(infer.tool_points) + [k for k in infer.acquired if k not in infer.tool_points]
         acquired = [(k, keyed[k]) for k in keys if k in keyed]
         result = core.infer(raw, None, acquired, [], [], [], view.px, opt, (), [self.start])
         if result is not None and result.guides:
             return result.point, None, list(result.guides)
-        return (core.grid_snap(raw[0], opt.grid), core.grid_snap(raw[1], opt.grid)), None, []
+        reach = opt.grid_reach
+        return (
+            (core.grid_snap(raw[0], opt.grid, reach), core.grid_snap(raw[1], opt.grid, reach)),
+            None,
+            [],
+        )
 
     def _place(self, arc, prev, end_key, guides):
         """Add the arc with its tangency (and the constraints of its free end) in one
@@ -1314,6 +1373,11 @@ class TangentArc:
             if session.line._click_at(App.Vector(point[0], point[1], 0)):
                 # the chain's point, for a press there before any move (no preview then)
                 self.infer.last_start = (point[0], point[1])
+                if session.line.active:
+                    # ...and the point Fission 180's chain goes on from: a double-click
+                    # there ends the chain, the floating check stands beside it (it was
+                    # left on the end of the line before the arc)
+                    session.line.current = App.Vector(point[0], point[1], 0)
             else:
                 from . import commands
 
@@ -1451,6 +1515,19 @@ def snap_pixels(ratio=1.0):
     except Exception:
         wanted = 8.0
     return max(wanted, _pick_pixels(ratio))
+
+
+def grid_reach(px):
+    """How far (mm) a grid line pulls a coordinate onto it at `px` mm per screen pixel:
+    GridSnapPixels on the screen; None for FreeCAD's rule alone (a fifth of the
+    spacing)."""
+    try:
+        pixels = float(setting("GridSnapPixels"))
+    except Exception:
+        pixels = 8.0
+    if pixels <= 0 or not px:
+        return None
+    return pixels * px
 
 
 def _grid_size(session):
@@ -1613,7 +1690,9 @@ class SnapDot:
         """The dot at sketch point `point`; px: mm per screen pixel there. in_glyph: a snap
         glyph is drawn round the point: the small dot."""
         self.small = bool(in_glyph)
-        for (coords, faces), radius in zip(self.parts, DOT_PIXELS_IN_GLYPH if in_glyph else DOT_PIXELS):
+        for (coords, faces), radius in zip(
+            self.parts, DOT_PIXELS_IN_GLYPH if in_glyph else DOT_PIXELS
+        ):
             pts = core.disc(point, radius * px)
             coords.point.setNum(0)
             coords.point.setValues(0, len(pts), [(x, y, 0.0) for x, y in pts])
