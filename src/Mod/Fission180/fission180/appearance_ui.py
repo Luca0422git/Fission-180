@@ -24,8 +24,8 @@ faces have looks of their own asks first, as Fusion does: Keep them over the new
 Remove them.
 
 The document side is appearance.py. This module also keeps the looks on screen: its watch
-puts a body's stored look back whenever anything else has written the colours FreeCAD draws
-from (book parity report, bug 16).
+puts a body's stored look back whenever FreeCAD has rewritten the colours it draws the body
+in (it does when the body's material is touched; book parity report, bug 16).
 """
 
 import FreeCAD as App
@@ -172,6 +172,42 @@ class _DropTaker(QtCore.QObject):
                 position = event.position().toPoint()
                 QtCore.QTimer.singleShot(
                     0, lambda: panel._guarded(lambda: panel.dropped(look, position))
+                )
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+            return True
+        except Exception as exc:
+            warn("appearance drop: %s" % exc)
+            return False
+
+
+class _RowDropTaker(QtCore.QObject):
+    """Event filter on the browser's rows: a swatch dropped on a body's or a component's row
+    goes to that body, or to every body of the component (Fusion drops appearances onto
+    browser rows too). Anything else dragged there is the browser's own business."""
+
+    def __init__(self, panel, tree):
+        super().__init__()
+        self.panel = panel
+        self.tree = tree
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            if kind not in (QtCore.QEvent.DragEnter, QtCore.QEvent.DragMove, QtCore.QEvent.Drop):
+                return False
+            panel = self.panel
+            if panel is None or panel._closed:
+                return False
+            look = look_of(event.mimeData())
+            if look is None:
+                return False
+            if kind == QtCore.QEvent.Drop:
+                item = self.tree.itemAt(event.position().toPoint())
+                node = item.data(1, QtCore.Qt.UserRole) if item is not None else None
+                name = (node or {}).get("object")
+                QtCore.QTimer.singleShot(
+                    0, lambda: panel._guarded(lambda: panel.dropped_on_row(look, name))
                 )
             event.setDropAction(QtCore.Qt.CopyAction)
             event.accept()
@@ -545,6 +581,12 @@ class AppearancePanel(BodyPanel):
         to the edge or corner it landed on. (object, name) or None (said in the dialog)."""
         if short.startswith("Face"):
             return obj, short
+        if not short:  # a whole body (a row of the browser): which face is not said
+            self.message.setText(
+                "⚠ Apply To is Faces: click a face in the 3D view, or set Apply To to "
+                "Bodies/Components to give the whole body the look. No look was changed."
+            )
+            return None
         found = self.face_near(
             position if position is not None else self._pointer(), bodies.body_of(obj)
         )
@@ -574,7 +616,13 @@ class AppearancePanel(BodyPanel):
 
     def _give(self, obj, short, position=None):
         body = bodies.body_of(obj)
-        if body is None or self.look is None:
+        if self.look is None:
+            return False
+        if body is None:
+            self.message.setText(
+                "⚠ %s is not a body: looks go on bodies and their faces. No look was changed."
+                % getattr(obj, "Label", "That")
+            )
             return False
         look = appearance.adopt(self.doc, self.look)
         if self.apply_to.currentData() == "faces":
@@ -607,6 +655,9 @@ class AppearancePanel(BodyPanel):
     def _take_away(self, obj, short):
         body = bodies.body_of(obj)
         if body is None:
+            self.message.setText(
+                "⚠ %s is not a body: there is no look to take away." % getattr(obj, "Label", "That")
+            )
             return
         if self.apply_to.currentData() == "faces":
             found = self._face_of(obj, short, None)
@@ -799,6 +850,19 @@ class AppearancePanel(BodyPanel):
             widget.installEventFilter(self._drop_filter)
         except Exception as exc:
             warn("appearance drag and drop unavailable: %s" % exc)
+        self._row_filter = None
+        try:  # the browser's rows take a swatch too
+            from . import browser_ui
+
+            tree = browser_ui.widget()
+            if tree is not None:
+                self._row_tree = tree
+                self._row_accepted = tree.viewport().acceptDrops()
+                tree.viewport().setAcceptDrops(True)
+                self._row_filter = _RowDropTaker(self, tree)
+                tree.viewport().installEventFilter(self._row_filter)
+        except Exception as exc:
+            warn("appearance: no drop on the browser's rows (%s)" % exc)
 
     def remove_handles(self):
         if self.editor is not None:
@@ -815,6 +879,48 @@ class AppearancePanel(BodyPanel):
             except Exception:
                 pass
             self._drop_widget = None
+        if getattr(self, "_row_filter", None) is not None:
+            try:
+                self._row_tree.viewport().removeEventFilter(self._row_filter)
+                self._row_tree.viewport().setAcceptDrops(self._row_accepted)
+            except Exception:
+                pass
+            self._row_filter = None
+
+    def dropped_on_row(self, look, name):
+        """A swatch dropped on a browser row: its body takes the look, or every body of its
+        component."""
+        from . import components
+
+        obj = self.doc.getObject(name) if name else None
+        if components.is_component(obj):
+            targets = components.bodies_in(self.doc, obj, recursive=True)
+            what = obj.Label
+        else:
+            body = bodies.body_of(obj)
+            targets = [body] if body is not None else []
+            what = body.Label if body is not None else ""
+        if not targets:
+            self.message.setText(
+                "⚠ Drop the look on a body's or a component's row (or on the part in the 3D "
+                "view): that row has no body."
+            )
+            return False
+        if self.apply_to.currentData() == "faces":
+            self.message.setText(
+                "⚠ Apply To is Faces: drop the look on a face in the 3D view. A row of the "
+                "browser is a whole body. No look was changed."
+            )
+            return False
+        self.message.setText("")
+        self._choose(look)
+        given = [body for body in targets if self._give(body, "")]
+        if given and components.is_component(obj):
+            self.note.setText(
+                "%s: %s on %d bod%s"
+                % (what, self.look["label"], len(given), "y" if len(given) == 1 else "ies")
+            )
+        return bool(given)
 
     def dropped(self, look, position):
         """A swatch dropped at widget pixel `position`: the body or face there takes it."""
@@ -863,72 +969,20 @@ COMMANDS = {"Fission180_Appearance": AppearanceCommand}
 
 # -- the looks stay on screen ---------------------------------------------------------------------
 class _Watch:
-    """FreeCAD rewrites the colours it draws a body's steps in on its own (whenever the
-    body's material is written, or even only read through Python, every step goes back to
-    the material's grey), and other code may too. Whenever the colours of anything were
-    written by something else than appearance.apply(), the bodies that have a stored look are
-    looked at a moment later and put right; a step that comes into view gets its pattern.
-    Every slot only schedules work (nothing is done inside FreeCAD's callbacks)."""
+    """FreeCAD rewrites the colours it draws a body's steps in on its own: whenever the
+    body's material is written, or a physical value of it is only read through Python, every
+    step goes back to the material's grey. Whenever a body with a stored look had its
+    material touched, the look is put back a moment later; a step that comes into view gets
+    its pattern. Every slot only schedules work (nothing is done inside FreeCAD's callbacks).
+
+    Only the design side is watched (App.addDocumentObserver). A Python observer of the
+    views (Gui.addDocumentObserver with slotChangedObject) must not be used: FreeCAD 1.1 then
+    builds a view's Python object while the view is still being made, and it stays an object
+    of the base type for good ("Gui.ViewProviderGeometryObject"): every step made afterwards
+    has lost PartDesign's makeTemporaryVisible, and reading such a view's Object crashes."""
 
     def __init__(self):
         self.pending = {}  # document name -> names of the bodies to look at
-        self.all_pending = False
-
-    def colours_written(self):
-        if self.all_pending or appearance.writing():
-            return
-        self.all_pending = True
-        QtCore.QTimer.singleShot(0, self._run_all)
-
-    def later(self, body):
-        doc_name = body.Document.Name
-        names = self.pending.setdefault(doc_name, set())
-        first = not names
-        names.add(body.Name)
-        if first:
-            QtCore.QTimer.singleShot(0, lambda: self._run(doc_name))
-
-    def _run_all(self):
-        self.all_pending = False
-        try:
-            for doc_name, names in list(appearance.managed_names().items()):
-                self._apply(doc_name, names)
-        except Exception as exc:
-            warn("appearance: %s" % exc)
-
-    def _run(self, doc_name):
-        names = self.pending.pop(doc_name, set())
-        try:
-            self._apply(doc_name, names)
-        except Exception as exc:
-            warn("appearance: %s" % exc)
-
-    def _apply(self, doc_name, names):
-        if doc_name not in App.listDocuments():
-            return
-        doc = App.getDocument(doc_name)
-        if getattr(doc, "Recomputing", False) or getattr(doc, "Restoring", False):
-            return  # (bodies_gui's sync follows the recompute; _opened the restore)
-        for name in list(names):
-            body = doc.getObject(name)
-            if body is not None and bodies.alive(body):
-                appearance.apply(body)
-
-
-class _ViewWatch:
-    """Gui.addDocumentObserver: a view's colours were written. The view object itself is
-    never touched here: FreeCAD tells of changes to a view that has no object yet (one being
-    made), and reading its Object then crashes FreeCAD 1.1."""
-
-    def slotChangedObject(self, vobj, prop):
-        if prop == "ShapeAppearance":
-            _WATCH["work"].colours_written()
-
-
-class _DesignWatch:
-    """App.addDocumentObserver: a body's material was written (FreeCAD then rewrites its
-    steps' colours), a step came into view; a design opened (its looks are put on once it
-    has loaded) or closed."""
 
     def slotChangedObject(self, obj, prop):
         try:
@@ -938,7 +992,7 @@ class _DesignWatch:
             if body is None or (obj is body and prop == "Visibility"):
                 return
             if _has_look(body):
-                _WATCH["work"].later(body)
+                self.later(body)
         except Exception:
             pass
 
@@ -952,9 +1006,32 @@ class _DesignWatch:
     def slotDeletedDocument(self, doc):
         try:
             appearance.forget(doc.Name)
-            _WATCH["work"].pending.pop(doc.Name, None)
+            self.pending.pop(doc.Name, None)
         except Exception:
             pass
+
+    def later(self, body):
+        doc_name = body.Document.Name
+        names = self.pending.setdefault(doc_name, set())
+        first = not names
+        names.add(body.Name)
+        if first:
+            QtCore.QTimer.singleShot(0, lambda: self._run(doc_name))
+
+    def _run(self, doc_name):
+        names = self.pending.pop(doc_name, set())
+        try:
+            if doc_name not in App.listDocuments():
+                return
+            doc = App.getDocument(doc_name)
+            if getattr(doc, "Recomputing", False) or getattr(doc, "Restoring", False):
+                return  # (bodies_gui's sync follows the recompute; _opened the restore)
+            for name in list(names):
+                body = doc.getObject(name)
+                if body is not None and bodies.alive(body):
+                    appearance.apply(body)
+        except Exception as exc:
+            warn("appearance: %s" % exc)
 
 
 def _has_look(body):
@@ -991,16 +1068,43 @@ def _opened(name, tries=0):
         warn("appearance: %s" % exc)
 
 
-_WATCH = {"work": None, "view": None, "design": None}
+_WATCH = {"observer": None}
+_LATER = {}  # key -> the timer that lays a big part's pattern after its last change
+
+
+def _pattern_later(key, fn):
+    """appearance_draw.LATER: run `fn` 0.4 s after the last call for `key`."""
+    timer = _LATER.get(key)
+    if timer is None:
+        timer = QtCore.QTimer()
+        timer.setSingleShot(True)
+        timer.setInterval(400)
+        _LATER[key] = timer
+    else:
+        timer.stop()
+        try:
+            timer.timeout.disconnect()
+        except Exception:
+            pass
+
+    def run():
+        _LATER.pop(key, None)
+        try:
+            fn()
+        except Exception as exc:
+            warn("appearance: %s" % exc)
+
+    timer.timeout.connect(run)
+    timer.start()
 
 
 def install_watch():
-    if _WATCH["work"] is None and App.GuiUp:
-        _WATCH["work"] = _Watch()
-        _WATCH["view"] = _ViewWatch()
-        Gui.addDocumentObserver(_WATCH["view"])
-        _WATCH["design"] = _DesignWatch()
-        App.addDocumentObserver(_WATCH["design"])
+    if _WATCH["observer"] is None and App.GuiUp:
+        from . import appearance_draw
+
+        appearance_draw.LATER = _pattern_later
+        _WATCH["observer"] = _Watch()
+        App.addDocumentObserver(_WATCH["observer"])
 
 
 try:

@@ -198,8 +198,29 @@ class PropertiesDialog(QtWidgets.QDialog):
                 panel._timer.start()
 
         self._observer = Observer()
-        Gui.Selection.addObserver(self._observer)
+        self._watching = False
         self.fill()
+
+    def showEvent(self, event):
+        # (the selection is followed only while the list is on screen: a dialog closed by
+        # Esc or by another window's reject() is hidden, not destroyed)
+        if not self._watching:
+            Gui.Selection.addObserver(self._observer)
+            self._watching = True
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        self._unwatch()
+        super().hideEvent(event)
+
+    def _unwatch(self):
+        if self._watching:
+            self._watching = False
+            try:
+                Gui.Selection.removeObserver(self._observer)
+            except Exception:
+                pass
+            self._timer.stop()
 
     def _guarded(self, fn):
         try:
@@ -209,7 +230,11 @@ class PropertiesDialog(QtWidgets.QDialog):
 
     def fill(self):
         doc = self.doc
-        if doc is None or doc.Name not in App.listDocuments():
+        try:
+            gone = doc is None or doc.Name not in App.listDocuments()
+        except Exception:
+            gone = True  # (the design was closed under the dialog)
+        if gone:
             self.close()
             return
         title, found = targets_of_selection(doc)
@@ -257,10 +282,7 @@ class PropertiesDialog(QtWidgets.QDialog):
         return text
 
     def closeEvent(self, event):
-        try:
-            Gui.Selection.removeObserver(self._observer)
-        except Exception:
-            pass
+        self._unwatch()
         if _STATE.get("dialog") is self:
             _STATE["dialog"] = None
         try:

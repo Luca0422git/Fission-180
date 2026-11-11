@@ -19,6 +19,11 @@ from . import appearance_textures as textures
 from . import warn
 
 NODE = "Fission180LookTexture"
+# A step drawn with more triangles than this gets its pattern a moment after its last change
+# (LATER) instead of at once: working out a big part's pattern takes a noticeable moment, and
+# a dialog's live preview changes the part at every step of a drag.
+BIG = 6000
+LATER = None  # set by appearance_ui: LATER(key, fn) runs fn shortly after the last call for key
 _STAMPS = {}  # (document, step) -> what the step's pattern was last built from
 _TEXTURES = {}  # pattern name -> its Coin texture node (shared by every step that shows it)
 
@@ -52,13 +57,9 @@ def _flat_root(vobj):
         return None
 
 
-def _display(vobj):
-    """(points, corner indices, triangles per face) of the triangles FreeCAD draws for the
-    step, or None. Points are (x, y, z) in the step's own coordinates."""
+def _display_nodes(vobj, flat):
+    """(the coordinates node, the faces node) FreeCAD draws the step with, or None."""
     root = vobj.RootNode
-    flat = _flat_root(vobj)
-    if flat is None:
-        return None
     coords = None
     for index in range(root.getNumChildren()):
         child = root.getChild(index)
@@ -73,6 +74,13 @@ def _display(vobj):
             break
     if coords is None or faces is None:
         return None
+    return coords, faces
+
+
+def _display(nodes):
+    """(points, corner indices, triangles per face) of the triangles FreeCAD draws for the
+    step. Points are (x, y, z) in the step's own coordinates."""
+    coords, faces = nodes
     points = [p.getValue() for p in coords.point.getValues()]
     corners = list(faces.coordIndex.getValues())
     parts = list(faces.partIndex.getValues())
@@ -92,10 +100,37 @@ def _face_kinds(shape):
             elif name == "Part::GeomCylinder":
                 c, a = surface.Center, surface.Axis
                 kind = ("cylinder", (c.x, c.y, c.z), (a.x, a.y, a.z), float(surface.Radius))
+            elif name == "Part::GeomToroid":
+                c, a = surface.Center, surface.Axis
+                kind = (
+                    "torus",
+                    (c.x, c.y, c.z),
+                    (a.x, a.y, a.z),
+                    float(surface.MajorRadius),
+                    float(surface.MinorRadius),
+                )
+            elif name in ("Part::GeomCone", "Part::GeomSphere", "Part::GeomSurfaceOfRevolution"):
+                kind = _turned(face, surface, name)
         except Exception:
             kind = None
         kinds.append(kind)
     return kinds
+
+
+def _turned(face, surface, name):
+    """A face turned round an axis (a cone, a ball, a lathe shape) wraps like a cylinder of
+    the radius it has at its middle: ("cylinder", point on the axis, direction, radius)."""
+    if name == "Part::GeomSurfaceOfRevolution":
+        origin, axis = surface.Location, surface.Direction
+    else:
+        origin, axis = surface.Center, surface.Axis
+    u0, u1, v0, v1 = face.ParameterRange
+    middle = face.valueAt((u0 + u1) / 2.0, (v0 + v1) / 2.0)
+    away = middle - origin
+    radius = (away - axis * away.dot(axis)).Length
+    if radius < 1e-6:
+        return None
+    return ("cylinder", (origin.x, origin.y, origin.z), (axis.x, axis.y, axis.z), float(radius))
 
 
 def _texture(name):
@@ -233,13 +268,14 @@ def clear(step):
         warn("look texture: %s" % exc)
 
 
-def update(step, groups, stamp):
+def update(step, groups, stamp, now=False):
     """Draw the patterns `groups` on a step, or none.
 
     groups: [{"texture": name, "scale": %, "rotation": degrees, "faces": None (all) or a set
     of face numbers, "map": the body's Texture Map Controls, "transparency": 0..1}].
     stamp: anything that changes when the groups or the step's solid do; the same stamp as
-    last time does nothing. Returns True when something is drawn."""
+    last time does nothing. now: also a big part's pattern at once. Returns True when
+    something is drawn."""
     key = (step.Document.Name, step.Name)
     if not groups:
         if key in _STAMPS or _has_node(step):
@@ -251,12 +287,23 @@ def update(step, groups, stamp):
     flat = _flat_root(vobj)
     if flat is None:
         return False
-    display = _display(vobj)
-    if display is None:
+    nodes = _display_nodes(vobj, flat)
+    if nodes is None:
         return False
-    stamp = (stamp, len(display[0]), len(display[1]))
+    # (the counts are read first: reading every point of a big part takes a moment, and
+    # nearly every call finds the pattern drawn already)
+    asked = stamp
+    stamp = (stamp, nodes[0].point.getNum(), nodes[1].coordIndex.getNum())
     if _STAMPS.get(key) == stamp and _existing(flat) >= 0:
         return True
+    if not now and LATER is not None and nodes[1].coordIndex.getNum() // 4 > BIG:
+        index = _existing(flat)
+        if index >= 0:  # the old pattern no longer fits: plain until the new one is laid
+            flat.removeChild(index)
+        _STAMPS.pop(key, None)
+        LATER(key, lambda: _update_later(key, groups, asked))
+        return False
+    display = _display(nodes)
     from pivy import coin
 
     try:
@@ -287,6 +334,21 @@ def update(step, groups, stamp):
     flat.addChild(holder)
     _STAMPS[key] = stamp
     return True
+
+
+def _update_later(key, groups, stamp):
+    """A big part's pattern, a moment after its last change (LATER)."""
+    try:
+        import FreeCAD as App
+
+        if key[0] not in App.listDocuments():
+            return
+        step = App.getDocument(key[0]).getObject(key[1])
+        if step is None or step.ViewObject is None or not step.ViewObject.Visibility:
+            return
+        update(step, groups, stamp, now=True)
+    except Exception as exc:
+        warn("look texture: %s" % exc)
 
 
 def _has_node(step):

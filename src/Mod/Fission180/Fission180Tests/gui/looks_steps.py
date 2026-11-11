@@ -55,10 +55,10 @@ def design_labels():
     return [i.data(QtCore.Qt.UserRole)["label"] for i in p.items(p.design)]
 
 
-def drop_events(mime, pos):
-    """What the window system delivers when a drag is let go over the 3D view at `pos`
-    (enter, move, drop), as data_panel_fusion's drop does."""
-    widget = h.gl_widget()
+def drop_events(mime, pos, widget=None):
+    """What the window system delivers when a drag is let go over the 3D view (or `widget`)
+    at `pos` (enter, move, drop), as data_panel_fusion's drop does."""
+    widget = widget if widget is not None else h.gl_widget()
     actions = QtCore.Qt.CopyAction
     left, none = QtCore.Qt.LeftButton, QtCore.Qt.NoModifier
     enter = QtGui.QDragEnterEvent(pos, actions, mime, left, none)
@@ -298,24 +298,30 @@ def library_labels():
 
 def roughness(point, half=18):
     """How busy the screen is round a 3D point: the mean step in brightness between pixels
-    next to each other. A flat colour on a curved face shades smoothly (well under 1); a
-    pattern's light and dark give a few units."""
+    next to each other (across and down, so a grain running either way counts). A flat
+    colour on a curved face shades smoothly (well under 1); a pattern's light and dark give
+    a few units."""
     h.view_drawn()
     gl = h.gl_widget()
     pos = point if isinstance(point, QtCore.QPoint) else h.screen_point(point)
     g = gl.mapToGlobal(pos)
     image = QtWidgets.QApplication.primaryScreen().grabWindow(0).toImage()
     ratio = image.devicePixelRatio()
-    total, count = 0.0, 0
-    for dy in range(-half, half + 1):
-        last = None
-        for dx in range(-half, half + 1):
+    side = range(-half, half + 1)
+    light = {}
+    for dy in side:
+        for dx in side:
             c = image.pixelColor(int((g.x() + dx) * ratio), int((g.y() + dy) * ratio))
-            light = (c.red() + c.green() + c.blue()) / 3.0
-            if last is not None:
-                total += abs(light - last)
+            light[(dx, dy)] = (c.red() + c.green() + c.blue()) / 3.0
+    total, count = 0.0, 0
+    for dy in side:
+        for dx in side:
+            if dx + 1 in side:
+                total += abs(light[(dx + 1, dy)] - light[(dx, dy)])
                 count += 1
-            last = light
+            if dy + 1 in side:
+                total += abs(light[(dx, dy + 1)] - light[(dx, dy)])
+                count += 1
     return total / max(1, count)
 
 
@@ -348,3 +354,19 @@ def pattern_transparency(step):
 
     value = appearance_draw.transparency(step)
     return -1.0 if value is None else value
+
+
+def drop_look_on_row(label, row):
+    """Drag the library swatch called `label` onto the browser row called `row`."""
+    from Fission180Tests.gui import timeline_input as t
+
+    p = panel()
+    item = library_item(label)
+    if not h.check("a swatch called %s" % label, p is not None and item is not None):
+        return False
+    tree, pos = t.row_point(row)
+    if pos is None:
+        return False
+    ok = drop_events(p.library.mimeData([item]), pos, tree.viewport())
+    h.settle("the look to land")
+    return ok

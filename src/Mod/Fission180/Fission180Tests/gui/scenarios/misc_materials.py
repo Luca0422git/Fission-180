@@ -136,7 +136,9 @@ def p1_check():
     groups = [
         t.tree.topLevelItem(2).child(i).text(0) for i in range(t.tree.topLevelItem(2).childCount())
     ]
-    h.check("P1 the Library by group", groups == ["Metal", "Plastic", "Other"], groups)
+    # (wave 7 added Fission 180's own materials: composites and woods are groups now)
+    want = ["Metal", "Plastic", "Other", "Composite", "Wood"]
+    h.check("P1 the Library by group", groups == want, groups)
     h.shot("1-browser")
 
 

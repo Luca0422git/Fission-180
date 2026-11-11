@@ -244,8 +244,11 @@ class Reach(unittest.TestCase):
     def test_materials_are_material_py_s(self):
         from fission180.ai.catalog import modify_tools
 
-        rows = ast.literal_eval(_literal(os.path.join(ROOT, "fission180", "material.py"), "LIBRARY"))
+        # (wave 7: FreeCAD's cards, LIBRARY, and the materials material.py states itself, OWN)
+        path = os.path.join(ROOT, "fission180", "material.py")
+        rows = ast.literal_eval(_literal(path, "LIBRARY")) + ast.literal_eval(_literal(path, "OWN"))
         self.assertEqual(set(modify_tools.MATERIALS), {r[0] for r in rows})
+        self.assertEqual(len(modify_tools.MATERIALS), len(rows))
 
     def test_surface_kinds_are_surface_core_s(self):
         from fission180.ai.catalog import more_tools

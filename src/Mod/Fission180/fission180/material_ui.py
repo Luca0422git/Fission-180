@@ -132,6 +132,9 @@ class MaterialPanel(BodyPanel):
         self.design = QtWidgets.QListWidget()
         self.design.setFixedHeight(90)
         self.design.itemClicked.connect(lambda item: self._guarded(lambda: self._clicked(item)))
+        self.design.itemDoubleClicked.connect(
+            lambda item: self._guarded(lambda: self.edit_copy(item.data(QtCore.Qt.UserRole)))
+        )
         self.layout.addRow(self.design)
         self.layout.addRow(QtWidgets.QLabel("<b>Library</b>"))
         self.search = QtWidgets.QLineEdit()

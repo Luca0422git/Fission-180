@@ -143,6 +143,52 @@ class Library(unittest.TestCase):
             self.assertGreater(look["emissive"], 0.5)
 
 
+class MaterialLooks(unittest.TestCase):
+    """material.py needs FreeCAD: its two lists are read as text."""
+
+    def lists(self):
+        import ast
+
+        with open(os.path.join(PKG, "material.py"), encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+        found = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                name = getattr(node.targets[0], "id", "")
+                if name in ("LIBRARY", "OWN"):
+                    found[name] = ast.literal_eval(node.value)
+        return found
+
+    def test_every_material_brings_a_look_the_library_has(self):
+        lists = self.lists()
+        self.assertEqual(sorted(lists), ["LIBRARY", "OWN"])
+        for row in lists["LIBRARY"] + lists["OWN"]:
+            self.assertIsNotNone(library.find(row[3]), "%s -> %s" % (row[0], row[3]))
+
+    def test_the_materials_the_book_needs(self):
+        lists = self.lists()
+        names = {row[1] for row in lists["LIBRARY"] + lists["OWN"]}
+        for name in ("Brass", "Gold", "ABS Plastic", "Carbon Fibre", "Aluminium, anodized red"):
+            self.assertIn(name, names)
+        keys = [row[0] for row in lists["LIBRARY"] + lists["OWN"]]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(len(names), len(keys))
+
+    def test_own_materials_state_sensible_values(self):
+        library_keys = {row[0] for row in self.lists()["LIBRARY"]}
+        for key, label, base, _look, _group, values in self.lists()["OWN"]:
+            density, youngs, poisson, yield_strength, tensile = values
+            self.assertIn(base, library_keys, key)
+            self.assertTrue(0.01 < density < 25.0, key)  # g/cm^3
+            self.assertTrue(0.0 < youngs < 500.0, key)  # GPa
+            self.assertTrue(0.0 < poisson < 0.5, key)
+            self.assertGreater(tensile, 0.0, key)
+            if yield_strength is not None:
+                self.assertLessEqual(yield_strength, tensile, key)
+        brass = [row for row in self.lists()["OWN"] if row[0] == "brass"][0]
+        self.assertEqual(brass[5][0], 8.5)
+
+
 class Patterns(unittest.TestCase):
     def test_every_pattern_has_a_size_and_a_name(self):
         for name in textures.names():
@@ -276,6 +322,20 @@ class Mapping(unittest.TestCase):
         self.assertAlmostEqual(uvs[1][1], uvs[0][1])
         # a quarter turn of a whole number of repeats round (2 pi 5 / 10 = 3.14 -> 3)
         self.assertAlmostEqual(uvs[2][1] - uvs[0][1], 3.0 / 4.0)
+
+    def test_automatic_wraps_a_ring_both_ways(self):
+        """A torus (ring radius 20, tube 10): once round the ring is a whole number of
+        repeats, and so is once round the tube."""
+        face = ("torus", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 20.0, 10.0)
+        size = 10.0
+        outer = [(30.0, 0.0, 0.0), (0.0, 30.0, 0.0), (20.0, 0.0, 10.0)]
+        uvs = mapping.triangle_uvs(outer, {}, size, face=face)
+        # a quarter of the ring: 2 pi 20 / 10 = 12.57 -> 13 repeats round, a quarter of them
+        self.assertAlmostEqual(uvs[1][0] - uvs[0][0], 13.0 / 4.0)
+        self.assertAlmostEqual(uvs[1][1], uvs[0][1])
+        # a quarter round the tube: 2 pi 10 / 10 = 6.28 -> 6 repeats round, a quarter of them
+        self.assertAlmostEqual(uvs[2][1] - uvs[0][1], 6.0 / 4.0)
+        self.assertAlmostEqual(uvs[2][0], uvs[0][0])
 
     def test_no_seam_jump_inside_a_triangle(self):
         face = ("cylinder", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 5.0)

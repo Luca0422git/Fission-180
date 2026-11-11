@@ -6,8 +6,10 @@ Points and directions are (x, y, z) tuples in the body's own coordinates, length
 texture coordinate (u, v) counts repeats of the pattern: 1.0 is one whole repeat.
 
 Projections (Fusion's list; "3D Texture" needs a solid texture and is not offered):
-  automatic    a flat face is mapped flat on its own plane, a cylinder face round its own
-               axis with the grain along the axis, any other face like Box
+  automatic    a flat face is mapped flat on its own plane, a round face (a cylinder, a
+               cone, a ball, anything turned on a lathe) round its own axis with the grain
+               along the axis, a ring (a torus) round the ring and round its tube, any
+               other face like Box
   box          each triangle is mapped flat along the design axis it faces most
   planar       everything is mapped flat along one axis (stretched on the faces beside it)
   cylindrical  wrapped round one axis through the body's middle
@@ -157,6 +159,17 @@ def _around(points, origin, axis, radius, size, along_u):
     return pairs
 
 
+def _ring(points, origin, axis, major, minor, size):
+    """A torus: u runs round the ring, v round its tube, a whole number of repeats each way
+    (no seam anywhere on a doughnut)."""
+    polar = _round_axis(points, origin, axis)
+    ring = _unwrapped([p[0] for p in polar])
+    tube = _unwrapped([math.atan2(p[1], p[2] - major) for p in polar])
+    turns = max(1, int(round(TWO_PI * max(major, 1e-6) / size)))
+    rounds = max(1, int(round(TWO_PI * max(minor, 1e-6) / size)))
+    return [(a / TWO_PI * turns * size, b / TWO_PI * rounds * size) for a, b in zip(ring, tube)]
+
+
 def _globe(points, origin, axis, radius, size):
     axis = _unit(axis)
     polar = _round_axis(points, origin, axis)
@@ -178,7 +191,8 @@ def triangle_uvs(points, options, size, rotation=0.0, face=None, middle=(0.0, 0.
     size      mm one repeat covers (repeat_mm)
     rotation  the look's own Rotation, degrees
     face      what the triangle's face is, for Automatic: ("plane", normal), ("cylinder",
-              point on the axis, axis direction, radius) or None
+              point on the axis, axis direction, radius), ("torus", centre, axis direction,
+              ring radius, tube radius) or None
     middle    the middle of the body's box; reach: half its diagonal (cylindrical, spherical)
     """
     options = with_defaults(options)
@@ -197,5 +211,8 @@ def triangle_uvs(points, options, size, rotation=0.0, face=None, middle=(0.0, 0.
             return _finish(_flat(points, face[1]), size, options, turn)
         if face[0] == "cylinder":
             pairs = _around(points, face[1], face[2], face[3], size, True)
+            return _finish(pairs, size, options, turn)
+        if face[0] == "torus":
+            pairs = _ring(points, face[1], face[2], face[3], face[4], size)
             return _finish(pairs, size, options, turn)
     return _finish(_flat(points, snapped(normal)), size, options, turn)

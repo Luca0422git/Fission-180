@@ -23,7 +23,7 @@ step's view and rewrites them on its own (a step added later starts grey; whenev
 body's material is written, or even only read through Python, every step of the body goes
 back to the material's grey): apply() puts the stored looks on every step again, comparing
 with what FreeCAD draws from each time, and appearance_ui's watch calls it as soon as
-anything else has written a step's colours. sync() runs after each recompute, undo and redo
+a body's material was touched. sync() runs after each recompute, undo and redo
 (bodies_gui.Watch). A face keeps its look while it survives later steps: faces are found
 again by a point on them and their direction (Fusion keeps a face's appearance the same way
 across edits), and a look given to the body leaves the faces' own looks alone when asked
@@ -836,10 +836,12 @@ def _patterns(whole, per_face, mapped, see_through):
     return out, stamp
 
 
-def apply(body, force=False):
+def apply(body, force=False, patterns=True):
     """Put the stored looks on every step of the body (GUI only). What FreeCAD draws from is
     compared with the stored looks each time, so colours anything else wrote are put right;
-    force: written again even when they look right (a look dropped on the body again)."""
+    force: written again even when they look right (a look dropped on the body again).
+    patterns=False: only the colours (a pattern only changes with the solid, the look or
+    the eye)."""
     if not App.GuiUp or not bodies.alive(body):
         return
     doc = body.Document
@@ -892,7 +894,8 @@ def apply(body, force=False):
                 wanted = [_cleared(m, see_through) for m in wanted]
             if force or not _same_materials(list(vobj.ShapeAppearance), wanted):
                 _write(vobj, wanted)
-            _draw_patterns(step, vobj, shape, whole, per_face, mapped, see_through)
+            if patterns:
+                _draw_patterns(step, vobj, shape, whole, per_face, mapped, see_through)
         except (ReferenceError, RuntimeError):
             continue  # (a step going away under us: the next sync has the design as it is)
         except Exception as exc:
@@ -954,11 +957,6 @@ def managed(body):
         return body.Name in _COLORED.get(body.Document.Name, ())
     except Exception:
         return False
-
-
-def managed_names():
-    """{document name: names of the bodies whose colours come from a stored look}."""
-    return {name: set(found) for name, found in _COLORED.items() if found}
 
 
 def reset_view(body):

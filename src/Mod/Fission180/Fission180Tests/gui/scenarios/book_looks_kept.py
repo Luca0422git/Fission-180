@@ -16,7 +16,8 @@ Handle = a root body 40 x 30 x 10; Bracket = a component with a body 40 x 30 x 1
   F  a boss on the Handle (a new step), Undo, Redo: brown each time.
   G  Appearance again. FreeCAD overwrites the Handle's colours (the body's material read, then
      written): the look is back at once. The same look dragged onto the Handle again is put
-     on again (the dialog says so).
+     on again (the dialog says so). A look dragged onto the Bracket's row of the browser
+     goes to the Bracket's body.
   H  save, close, reopen: brown.
 """
 
@@ -338,6 +339,21 @@ def g_taken():
     brown("G dropped again")
 
 
+def g_drop_on_row():
+    """A look dragged onto a component's row of the browser goes to its bodies (Fusion)."""
+    h.check("the browser takes the swatch", k.drop_look_on_row("Brass", "Bracket"))
+
+
+def g_row_taken():
+    bracket_body = s.bodies()[1]
+    h.check("the Bracket's body is brass", k.body_look_label(bracket_body) == "Brass")
+    cols = k.shown_colors(bracket_body.Tip)
+    h.check("and drawn brass", bool(cols) and k.same(cols[0], (0.78, 0.62, 0.30)), cols[:1])
+    p = k.panel()
+    h.check("the dialog says so", "Bracket: Brass on 1 body" in p.note.text(), p.note.text())
+    h.check("the Handle keeps its look", k.body_look_label(handle()) == LOOK)
+
+
 def g_ok():
     h.task_button("OK")
 
@@ -416,6 +432,8 @@ h.run(
         g_put_back,
         g_drop_again,
         g_taken,
+        g_drop_on_row,
+        g_row_taken,
         g_ok,
         h_save,
         h_reopen,
