@@ -581,8 +581,11 @@ def camera_near(a, b, tol=1e-4):
         return False
     if abs(a["height"] - b["height"]) > tol * size or abs(a["angle"] - b["angle"]) > tol:
         return False
-    dot = abs(sum(x * y for x, y in zip(a["orientation"], b["orientation"])))
-    return dot > 1.0 - tol * tol
+    # (normalised first: a camera's quaternion comes in single precision, and the product
+    # of one with itself is then a hair under 1)
+    qa, qb = q_norm(tuple(a["orientation"])), q_norm(tuple(b["orientation"]))
+    dot = abs(sum(x * y for x, y in zip(qa, qb)))
+    return dot >= 1.0 - tol * tol
 
 
 def callouts_at(storyboard, t):

@@ -225,6 +225,21 @@ def avi_info(path):
     return info
 
 
+def avi_frames(path):
+    """The frames of a Motion JPEG AVI as JPEG bytes, in order."""
+    with open(path, "rb") as handle:
+        data = handle.read()
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"AVI ":
+        raise VideoError("%s is not an AVI file." % path)
+    frames = []
+    for tag, at, size in _chunks(data, 12, len(data)):
+        if tag == b"LIST" and data[at : at + 4] == b"movi":
+            for sub, sat, ssize in _chunks(data, at + 4, at + size):
+                if sub[2:] in (b"dc", b"db"):
+                    frames.append(data[sat : sat + ssize])
+    return frames
+
+
 def even(value):
     """A pixel size encoders accept: even, at least 2."""
     value = max(2, int(value))

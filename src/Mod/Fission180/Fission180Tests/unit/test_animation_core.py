@@ -258,6 +258,12 @@ class Cameras(unittest.TestCase):
 
     def test_near(self):
         self.assertTrue(core.camera_near(self.cam(1), self.cam(1)))
+        # a single-precision quaternion (as a camera gives it) is near itself
+        rough = self.cam(1)
+        rough["orientation"] = [0.3826834261417389, 0.0, 0.0, 0.9238795042037964]
+        self.assertTrue(core.camera_near(rough, dict(rough)))
+        rough["orientation"] = [0.38268, 0.0, 0.0, 0.92387]
+        self.assertTrue(core.camera_near(rough, dict(rough)))
         self.assertFalse(core.camera_near(self.cam(1), self.cam(2)))
         self.assertFalse(core.camera_near(self.cam(1), self.cam(1, 5.0)))
         self.assertFalse(core.camera_near(self.cam(1), None))
@@ -572,6 +578,7 @@ class Avi(unittest.TestCase):
             self.assertTrue(info["jpeg"])
             self.assertTrue(info["riff_ok"])
             self.assertEqual(info["sizes"], [len(JPEG)] * 7)
+            self.assertEqual(video.avi_frames(path), [JPEG] * 7)
 
     def test_refusals(self):
         with tempfile.TemporaryDirectory() as folder:
