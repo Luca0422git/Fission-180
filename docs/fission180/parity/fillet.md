@@ -349,3 +349,31 @@ edges are covered by the selection fall-through (`parity/selection.md`).
   Tesla Turbine's tube leaving the housing at a tangent: no size works, and the kernel takes
   20 s to say so); a face that two rounds use up exactly (4 mm on both sides of an 8 mm
   face: held at 3.99 mm, and the dialog says so in its blue note).
+
+## Wave 7, second builder (branch `sf/book-modify-b`, 2026-11-11)
+
+The entries above marked "not reproduced on stand-in parts" were reproduced on the book's
+own parts, rebuilt from the report's step lists (`sessions/book-modify-b.md` says how each
+dimension was found), and fixed:
+
+| What | Fusion (source) | Fission 180 now |
+|---|---|---|
+| A chamfer / fillet that runs past where a face next to its edge narrows (the Tensegrity Tower's 20 mm chamfer in the arm's inner corner) | Builds it: the book's step (**Book**) | Built from its cross-section swept along the edge (`fillet_section.py`) when OpenCASCADE's own blend stops (it stopped at 1.79 mm: where the frame's top face narrows to the spoke). Only where both strips it lands on lie on the edge's two faces: nothing hangs in the air |
+| Two rounds that use up the face between them exactly (the Carabiner: 4 mm on both edges of an 8 mm face) | Builds it; the book's step uses 4 mm (**Book**) | Builds as typed (the same route): the rounds meet in a line. It was held at 3.99 mm. Still held just under, and said, when the picked edges also include the face's short end edges (three rounds meeting in a ball corner) |
+| Window-pick the whole part, then Chamfer (the Tensegrity, the Drone) | "Select Through: selects hidden objects in Window or Freeform selection" (**Autodesk**, selection filters help); a window drag outside a command takes faces, not edges (**Forum**, an Autodesk engineer in "Can't select edges and vertices with window selection"). So the chamfer gets every edge. Whether Select Through starts on: the book's step only works if it does (**Book**) | The window drag takes what the view shows (Select Through starts off: `parity/selection.md`, shell's). On such a pick OpenCASCADE fails at every size, where a filled inside corner and a bevelled outside edge meet beside an unpicked edge; Fission 180 builds such a group in two runs, inside corners first (`fillet_robust._in_turn`). What exactly Fusion's corner looks like there: **Guess** (ours differs from OpenCASCADE's one-run corner by 0.08 mm3 at 0.5 mm) |
+| A size that does not fit | Fails the feature (**Forum**, see above) | Held at the largest that fits, and said (Luca, 2026-10-21). The note is no longer lost when another route than the kernel's one run builds the held size |
+| How long a refusal takes | - | A second or two: `fillet_robust.first` refuses before the kernel is asked what has nowhere to land (the blend would run past a face's end or over a hole's rim: OpenCASCADE builds no such blend, `.probe` experiment in the session log) and edges whose faces run into each other at an end; the kernel took 2 to 25 s to give up on those |
+| An edge whose two faces become tangent at one end (a tube leaving a round housing level with its top) | Not found. The book's fillet on the Tesla Turbine's inlet works, but the report does not give the tube's size, so whether its edge is of this kind is not known (**Guess**) | Refused at once, with its own words (no size will do; not "too big", so no search for a limit starts). OpenCASCADE builds none at any size |
+| A part that is not clean (edges off their faces after a boolean of faces that touch along a line: the Tesla housing with a tube wider than the ring) | Its kernel does not leave such parts | The blend is built on a copy with tolerances widened to 0.001 mm (`fillet_robust._loosened`): the 0.04 in chamfer on the housing's flat faces builds |
+
+Benchmark (`Fission180Tests/headless/blend_benchmark.py`, the book's parts added): built by
+OpenCASCADE's one run 7 of 21, with the routes 17 of 21. The four that are refused: the first
+builder's two stand-ins (micro-steps of 0.5 micrometre: "the bevel would run past the end of a
+face" on 20 of 116 edges; a tangent tube), the Tesla housing with the tube's top level with
+the ring's (tangent), and the junction fillet on the Tesla housing with a tube wider than the
+ring (1 of its 3 edges; that part is not clean).
+
+Scenarios: `book_modifyb_tensegrity` (25 checks), `book_modifyb_carabiner` (22),
+`book_modify_fillet_limit_note` (18, changed: 4 mm builds, 5 mm is held at 4 and said).
+Golden: `book_tensegrity_corner_chamfer_20` (analytic), `book_carabiner_full_round_4`.
+
