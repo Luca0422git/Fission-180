@@ -1240,8 +1240,9 @@ def h_fit():
 FIN = [(30.5, 0.0), (58.5, 0.0), (58.5, 12.5), (30.5, 30.0)]
 # by eye, the bottom line 8 mm above the axis (Snap puts each point on a crossing of the
 # 10 mm grid lines)
-# (the root's corners clicked between the seam lines of the rocket, x 29, and of the
-# thruster's cone: a click on a model edge projects it, Auto project edges on reference)
+# (the root's corners clicked beside the line where the thruster cone's two halves meet:
+# a click on a model edge projects it, Auto project edges on reference; see the session
+# log, Known issues)
 FIN_DRAWN = [V(31.5, 8, 0), V(61, 9, 0), V(59, 21, 0), V(31, 41, 0)]
 
 
