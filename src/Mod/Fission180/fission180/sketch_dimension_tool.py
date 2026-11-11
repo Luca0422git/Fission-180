@@ -49,6 +49,15 @@ ARC = "Part::GeomArcOfCircle"
 PICKABLE_CURVES = (LINE, CIRCLE, ARC)
 TITLE = "Sketch Dimension"
 CENTERLINE = "Centerline diameter"  # a Spec's kind: the diameter about a centerline
+# Fusion's right-click menu while a length follows the pointer (Autodesk blog "Mastering
+# Sketch Dimensions: 5 Essential Right-Click Tricks": "right-click before placing it and
+# select horizontal, vertical or aligned": the dimension keeps that orientation wherever
+# the pointer goes)
+ORIENTATIONS = {
+    "Aligned": core.ALIGNED,
+    "Horizontal": core.HORIZONTAL,
+    "Vertical": core.VERTICAL,
+}
 ZERO_HELP = (
     "a dimension cannot be 0 (Fusion refuses it too). To make them meet use Coincident; to "
     "line them up Horizontal/Vertical or Collinear."
@@ -102,6 +111,7 @@ class Dimension(draw.DrawTool):
         draw.DrawTool.__init__(self, session)
         self.cursor = None  # the pointer in sketch coordinates
         self.last_index = None  # the dimension placed last (tests)
+        self.forced = None  # the orientation chosen with a right click, until it is placed
 
     def steps(self):
         return 3
@@ -115,7 +125,10 @@ class Dimension(draw.DrawTool):
         spec = self._spec(self.cursor) if self.cursor is not None else None
         if isinstance(spec, Spec):
             more = "" if len(self.picks) >= 2 else ", or click a second thing"
-            return "%s: click to place it%s." % (spec.text(), more)
+            turn = ""
+            if self.can_force():
+                turn = " Right-click: Aligned, Horizontal or Vertical."
+            return "%s: click to place it%s.%s" % (spec.text(), more, turn)
         if len(self.picks) == 1:
             return "click the second point or line (or an empty spot: from the origin)."
         return "click to place the dimension."
@@ -248,9 +261,66 @@ class Dimension(draw.DrawTool):
             return "click the point or line to measure from the axis."
         return "that cannot be dimensioned."
 
+    # -- the orientation chosen with a right click ------------------------------------------
+    def can_force(self):
+        """A length between two points follows the pointer: it can be aligned, horizontal
+        or vertical (a radius, an angle or a distance to a line has one way only)."""
+        if not self.picks:
+            return False
+        try:
+            return self._ends() is not None
+        except Exception:
+            return False
+
+    def _ends(self):
+        """The two sketch points the length that follows the pointer runs between, or
+        None when the picks give another kind of dimension."""
+        picks = self.picks
+        if len(picks) == 1:
+            item = picks[0]
+            kind = self.kind_of(item)
+            if kind == core.LINE:
+                g = build.geometry(self.sketch, item[0])
+                return (g.StartPoint.x, g.StartPoint.y), (g.EndPoint.x, g.EndPoint.y)
+            if kind == core.POINT and item != (-1, 1):
+                return (0.0, 0.0), self._point(item)
+            return None
+        k1, k2 = self.kind_of(picks[0]), self.kind_of(picks[1])
+        pointy = (core.POINT, core.CIRCLE, core.ARC)
+        if k1 in pointy and k2 in pointy:
+            a, b = self._point(picks[0]), self._point(picks[1])
+            if a is None or b is None or math.hypot(a[0] - b[0], a[1] - b[1]) <= 1e-7:
+                return None
+            return a, b
+        return None
+
+    def force(self, name):
+        """Right-click > Aligned / Horizontal / Vertical while the dimension follows the
+        pointer. Returns False (and says why) when nothing can be turned."""
+        kind = ORIENTATIONS.get(name)
+        if kind is None or not self.can_force():
+            self.say(
+                "%s: pick a line or two points first; the dimension that follows the pointer "
+                "can then be made %s." % (name, name.lower())
+            )
+            return False
+        a, b = self._ends()
+        if core.measure(kind, a, b) <= core.ZERO:
+            self.say(
+                "%s: the two points are lined up that way already (it would be 0). %s"
+                % (name, ZERO_HELP)
+            )
+            return False
+        self.forced = kind
+        log("%s: the dimension is %s (right click)" % (self.title, name.lower()))
+        if self.cursor is not None and self.last is not None:
+            self.moved(self.last)
+        self._tell()
+        return True
+
     def _linear(self, ia, ib, a, b, cursor, whole_line=None):
         """A length between two points (items ia, ib at a, b)."""
-        kind = core.linear_kind(a, b, cursor)
+        kind = self.forced or core.linear_kind(a, b, cursor)
         value = core.measure(kind, a, b)
         if value <= core.ZERO:
             if core.measure(core.ALIGNED, a, b) <= core.ZERO:
@@ -609,6 +679,7 @@ class Dimension(draw.DrawTool):
 
     def _reset(self):
         self.picks = []
+        self.forced = None
         self.step = 0
         self._geometry = None
         self.preview.clear()
@@ -616,6 +687,7 @@ class Dimension(draw.DrawTool):
 
     def undone(self):
         self._geometry = None
+        self.forced = None
         self.picks = []
         self.step = 0
         self.preview.clear()

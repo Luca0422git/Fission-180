@@ -2752,9 +2752,18 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         self.message = QtWidgets.QLabel("", self)
         self.message.setWordWrap(True)
         self.message.hide()
+        # a dimension that was given a name (`Width = 12`) IS that parameter: the hint says
+        # what a number typed here will do (sketch_named_dimensions.py)
+        self.hint = QtWidgets.QLabel("", self)
+        self.hint.setObjectName("Fission180DimensionHint")
+        self.hint.setStyleSheet("color: #444444;")
+        self.hint.setWordWrap(True)
+        self.hint.hide()
         layout.addWidget(self.edit)
+        layout.addWidget(self.hint)
         layout.addWidget(self.message)
         self.edit.setText(self._current_text())
+        self._show_owner()
         self.edit.selectAll()
         self.edit.returnPressed.connect(lambda: self.finish(True))
         self.adjustSize()
@@ -2771,6 +2780,38 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         self._fresh = True
         self.edit.textEdited.connect(self._edited)
         log("dimension: type a value and press Enter")
+
+    def owner(self):
+        """The user parameter this dimension IS (it was named here: `Width = 12`), or
+        None."""
+        try:
+            from . import sketch_named_dimensions
+
+            return sketch_named_dimensions.owned(self.sketch, self.index)
+        except Exception:
+            return None
+
+    def _show_owner(self):
+        name = self.owner()
+        if name is None:
+            return
+        try:
+            q = self.sketch.getDatum(self.index)
+            if self.is_angle():
+                now = "%g deg" % round(abs(q.getValueAs("deg").Value), 6)
+            else:
+                from . import browser_core
+
+                unit = browser_core.doc_length_unit(self.sketch.Document)
+                per = browser_core.MM_PER_UNIT.get(unit, 1.0)
+                now = "%g %s" % (round(abs(q.getValueAs("mm").Value) / per, 6), unit)
+            self.hint.setText(
+                "%s = %s. This dimension is %s: type a number to change %s."
+                % (name, now, name, name)
+            )
+            self.hint.show()
+        except Exception as exc:
+            warn("dimension box: %s" % exc)
 
     def _edited(self, _text):
         self._fresh = False
@@ -2984,9 +3025,40 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
 
         culprits = []
         broken_before = _broken_state(self.sketch)
+        owner = self.owner()
+        if owner is not None and expression is not None:
+            from . import parameters_core
+
+            if parameters_core.split_assignment(expression)[0] is not None:
+                owner = None  # `Other = value`: the dimension gets a new name, as typed
         doc.openTransaction("Edit Dimension")
         try:
-            if expression is not None:
+            if owner is not None:
+                # Fusion: the dimension IS the parameter it was named (`Width = 12`): what
+                # is typed into it later is Width's new value, and everything that uses
+                # Width follows (it used to unlink the dimension: params' known issue)
+                from . import parameters
+
+                kind = "angle" if self.is_angle() else "length"
+                if expression is not None:
+                    parameters.read(doc, expression, kind, skip=owner)  # (not itself)
+                    new = expression
+                else:
+                    new = "%r %s" % (abs(q.Value), "deg" if kind == "angle" else "mm")
+                parameters.set_user(doc, owner, new)
+                holder = parameters.container(doc)
+                if holder is not None:
+                    holder.recompute()
+                self.sketch.recompute()
+                kind = self._constraint().Type
+                got = self.sketch.getDatum(self.index).getValueAs("mm").Value
+                if kind != "Angle" and explain_core.bad_size(kind, got):
+                    raise ValueError(
+                        "The value must be more than 0 (%s would be %s mm)."
+                        % (owner, explain_core._number(got))
+                    )
+                log("dimension: %s is now %s" % (owner, text.strip()))
+            elif expression is not None:
                 from . import parameters
 
                 # Fusion's formula (width*2, Arm_Length + 5, Name = value) in FreeCAD's
@@ -2994,7 +3066,12 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                 # parameter here, inside this undo step. A formula that cannot be computed
                 # (an unknown name) is said, not kept (parameters.read raises).
                 kind = "angle" if self.is_angle() else "length"
-                formula = parameters.read(doc, expression, kind, create=True).freecad
+                made = parameters.read(doc, expression, kind, create=True)
+                formula = made.freecad
+                if made.created:
+                    from . import sketch_named_dimensions
+
+                    sketch_named_dimensions.remember(self.sketch, made.created)
                 # (bound the way FreeCAD renumbers it when a constraint before it is
                 # deleted: parameters.set_expression, bug 3 of the book parity report)
                 parameters.set_expression(self.sketch, ".Constraints[%d]" % self.index, formula)
