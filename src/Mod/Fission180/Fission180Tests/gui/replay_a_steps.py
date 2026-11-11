@@ -229,3 +229,51 @@ def told():
     from Fission180Tests.gui import misc_steps as m
 
     return m.told()
+
+
+# -- Grid Settings ------------------------------------------------------------------------------
+def grid_dialog():
+    from fission180 import grid_ui
+
+    d = grid_ui._DIALOG["widget"]
+    return (
+        d if d is not None and d.isVisible() and isinstance(d, grid_ui.GridSettingsDialog) else None
+    )
+
+
+def grid_values(major, subdivisions):
+    """Type Major Grid Spacing and Minor Subdivisions into the open Grid Settings, then OK."""
+    d = grid_dialog()
+    field = d.major.widget
+    w.click(field)
+    QtTest.QTest.keyClick(field, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+    QtTest.QTest.keyClicks(field, str(major))
+    QtTest.QTest.keyClick(field, QtCore.Qt.Key_Tab)
+    QtWidgets.QApplication.processEvents()
+    spin = d.minor
+    spin.setFocus()
+    QtTest.QTest.keyClick(spin, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+    QtTest.QTest.keyClicks(spin, str(subdivisions))
+    QtTest.QTest.keyClick(spin, QtCore.Qt.Key_Tab)
+    QtWidgets.QApplication.processEvents()
+    ok = d.findChild(QtWidgets.QDialogButtonBox).button(QtWidgets.QDialogButtonBox.Ok)
+    w.click(ok)
+
+
+def reddish(colours):
+    """One of the screen colours (sketch_input.screen_colours) is clearly red."""
+    from Fission180Tests.gui import sketch_input as si
+
+    return any(c[0] > c[1] + 40 and c[0] > c[2] + 40 for c in map(si.rgb, colours.values()))
+
+
+def greenish(colours):
+    from Fission180Tests.gui import sketch_input as si
+
+    return any(c[1] > c[0] + 40 and c[1] > c[2] + 40 for c in map(si.rgb, colours.values()))
+
+
+def bluish(colours):
+    from Fission180Tests.gui import sketch_input as si
+
+    return any(c[2] > c[0] + 40 and c[2] > c[1] + 20 for c in map(si.rgb, colours.values()))

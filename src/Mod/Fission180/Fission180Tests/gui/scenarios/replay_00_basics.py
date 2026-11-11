@@ -511,13 +511,7 @@ def e_groups():
 
 
 # == F: the grid ===============================================================================
-def grid_dialog():
-    from fission180 import grid_ui
-
-    d = grid_ui._DIALOG["widget"]
-    return (
-        d if d is not None and d.isVisible() and isinstance(d, grid_ui.GridSettingsDialog) else None
-    )
+grid_dialog = r.grid_dialog
 
 
 def f_menu():
@@ -541,20 +535,7 @@ def f_fixed():
 def f_values():
     d = grid_dialog()
     h.check("F Fixed: the spacing can be typed", d.fixed.isChecked() and d.major.widget.isEnabled())
-    field = d.major.widget
-    w.click(field)
-    QtTest.QTest.keyClick(field, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
-    QtTest.QTest.keyClicks(field, "50")
-    QtTest.QTest.keyClick(field, QtCore.Qt.Key_Tab)
-    QtWidgets.QApplication.processEvents()
-    spin = d.minor
-    spin.setFocus()
-    QtTest.QTest.keyClick(spin, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
-    QtTest.QTest.keyClicks(spin, "5")
-    QtTest.QTest.keyClick(spin, QtCore.Qt.Key_Tab)
-    QtWidgets.QApplication.processEvents()
-    ok = d.findChild(QtWidgets.QDialogButtonBox).button(QtWidgets.QDialogButtonBox.Ok)
-    w.click(ok)
+    r.grid_values(50, 5)
 
 
 f_values.done = lambda: grid_dialog() is None
