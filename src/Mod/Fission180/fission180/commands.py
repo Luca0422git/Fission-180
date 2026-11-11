@@ -291,6 +291,8 @@ def make_way_for(name):
             from . import preview
 
             if preview.dialog_takes(name):
+                if name == "Std_Redo":
+                    tell("Nothing to redo while a command is open: finish or cancel it first.")
                 return False
         except Exception as exc:
             warn("%s with a dialog open: %s" % (name, exc))
