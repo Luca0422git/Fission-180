@@ -27,6 +27,23 @@ from .compat import QtCore, QtGui, QtWidgets, Signal
 from .inline_edit import InlineEditor
 
 ICON = 24  # step icon size, as in Fusion's timeline
+# (wave 7, library-2) Colour marks along a step's foot, one per component it belongs to
+# (Fusion's Component Color Swatch): component_colors_ui registers a function here.
+STEP_COLORS = []  # functions(item) -> ["#rrggbb", ...]
+
+
+def step_colors(item):
+    """The colour marks of a step (STEP_COLORS), or []."""
+    for fn in STEP_COLORS:
+        try:
+            colors = fn(item)
+        except Exception:
+            colors = None
+        if colors:
+            return list(colors)
+    return []
+
+
 _dock = None
 
 STYLE = """
@@ -334,11 +351,15 @@ class _ItemButton(QtWidgets.QToolButton):
     def paintEvent(self, event):
         super().paintEvent(event)
         item = self.item
-        if not (item.suppressed or item.status != "ok" or item.locked):
+        marks = step_colors(item)  # (library-2: Component Color Swatch)
+        if not (marks or item.suppressed or item.status != "ok" or item.locked):
             return
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         w, h = self.width(), self.height()
+        for i, color in enumerate(marks):  # a bar per component along the foot
+            each = (w - 6) / float(len(marks))
+            painter.fillRect(QtCore.QRectF(3 + i * each, h - 3, each, 3), QtGui.QColor(color))
         if item.locked:  # Fusion: a padlock on a fully constrained sketch's icon
             try:
                 from . import sketch_explain

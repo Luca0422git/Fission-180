@@ -487,13 +487,20 @@ def _part_name(unit):
         if instances.is_instance(unit):
             source = instances.source_of(unit)
             if source is not None:
-                return source.Label
+                return _number_of(source)
             base, number = components_core.split_instance_label(unit.Label)
             if number is not None and base:
                 return base
     except Exception:
         pass
-    return unit.Label
+    return _number_of(unit)
+
+
+def _number_of(part):
+    """(wave 7, library-2) The Part Number typed in Properties (properties_ui.NUMBER_PROP,
+    stored on the component), else the component's name, which is what a part number
+    starts as."""
+    return (_get(part, "Fission180PartNumber", "") or "").strip() or part.Label
 
 
 # ------------------------------------------------------------------ the sheet

@@ -126,5 +126,5 @@ Done: AI: Extrude 5 mm. Its id is 'Extrude2'. Bodies now: Body1: 36446 mm3, 61.7
 - Recipe: [cantilever snap-fit hook](fission180://docs/recipes/snap-fit.md)
 - Recipe: [is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md)
 - Recipe: [threaded fastener (hex bolt M8 x 30)](fission180://docs/recipes/threaded-fastener.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain`, `blend_fillet_top_face`, `blend_insert_chamfer_before_fillet`, `bodies_combine_cut`, `bodies_combine_cut_cylinder` and 430 more
+- Golden models built with its steps (read one with docs_read golden/<id>): `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain`, `blend_fillet_top_face`, `blend_insert_chamfer_before_fillet`, `bodies_combine_cut`, `bodies_combine_cut_cylinder` and 431 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

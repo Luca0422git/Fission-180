@@ -6,7 +6,7 @@ Fusion: SOLID > MODIFY > Appearance (A). Category: Modify. Changes the design (o
 
 ## What it does
 
-Fusion's Appearance: colour a body, or some faces of it, without changing its material. body: a step of it (default: the current body); faces: a selector (only these faces); look: a library key (list_materials) or color [r, g, b] (0..1) with shininess (0..1) and transparency (0..1). clear: true removes the body's own appearance.
+Fusion's Appearance: colour a body, or some faces of it, without changing its material. body: a step of it (default: the current body); faces: a selector (only these faces); look: a library key (list_materials) or color [r, g, b] (0..1) with shininess (0..1) and transparency (0..1). When the body has faces with looks of their own, keep_face_looks must be given: true keeps them over the new look, false gives the whole body the new look (Fusion asks Keep / Remove).
 
 ## Arguments
 
@@ -18,6 +18,7 @@ Fusion's Appearance: colour a body, or some faces of it, without changing its ma
 | `color` | array of 3 numbers | 0..1 |  |  | [r, g, b] 0..1 |
 | `shininess` | number |  | `0.5` | >= 0, <= 1 |  |
 | `transparency` | number |  | `0` | >= 0, <= 1 |  |
+| `keep_face_looks` | boolean |  |  |  | faces that have looks of their own keep them (true) or take the new look too (false); needed when the body has such faces |
 
 ## Answer
 

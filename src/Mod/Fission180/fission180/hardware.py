@@ -25,9 +25,11 @@ What one insert makes (one undo step, the dialog's transaction):
                   hole with the counterbore or countersink of the head, a set screw's tapped
                   hole, an insert's hole or a magnet's pocket. Its options are Fission 180's
                   Hole options, so the Hole dialog can edit it like any other hole.
-  a rigid joint   per place (join(), an as-built joint: joints.py) between the part and the
-                  component it was put on, so it moves with it. Fusion's Insert Fastener
-                  places fasteners with joints.
+  a rigid joint   per place (join(): joints.py) between the part and what it was put on, on
+                  the round edge of its hole, so the part moves with the component AND
+                  follows its hole when the hole moves (Fusion's Insert Fastener places
+                  fasteners with joints on the hole's edge). On a flat face with no round
+                  edge it is an as-built joint to the component.
 
 The step remembers its options and where it was clicked as JSON (property
 "Fission180Hardware"); double-clicking it in the timeline opens the dialog again.
@@ -74,6 +76,85 @@ def solid(options):
         # (a copy of the geometry moved, so circles stay circles)
         shape.transformShape(place.toMatrix(), True)
     return shape
+
+
+# -- the cosmetic thread ---------------------------------------------------------------------------
+# A part whose threads are not modeled shows its thread as the dashed helix the Thread tool
+# draws for a cosmetic thread (Fusion's fasteners carry the Thread feature, cosmetic unless
+# modeled). thread_ui.cosmetic_spots draws what a step says in the hidden property
+# "Fission180CosmeticThreads" (JSON, in the step's own coordinates): the Hardware step says
+# it, and so does the base step of every occurrence's body.
+COSMETIC = "Fission180CosmeticThreads"
+
+
+def cosmetic_threads(options):
+    """[{"base", "axis", "radius", "pitch", "z0", "z1", "internal", "left"}] of a part's
+    thread while it is not modeled, in its component's coordinates; [] for a part without a
+    thread or with a modeled one."""
+    from . import thread
+
+    o = core.with_defaults(options)
+    if o["modeled"] or not hardware_shapes.can_thread(o):
+        return []
+    chosen = core.designation(o)
+    if chosen is None:
+        return []
+    dm = core.dims(o["standard"], o["size"])
+    internal = o["kind"] in ("nut", "standoff")
+    raw = hardware_shapes.raw_solid(o)
+    face = hardware_shapes._thread_face(raw, dm["d"] / 2.0, lowest=not internal)
+    if face is None:
+        return []
+    cylinder = thread.Cylinder(face)
+    z0, z1 = cylinder.z0, cylinder.z1
+    if not internal:  # from the tip over the standard thread length, as threaded() cuts it
+        long = min(core.thread_length(o), cylinder.length)
+        if cylinder.axis.z > 0:
+            z1 = z0 + long
+        else:
+            z0 = z1 - long
+    place = local_placement(o)
+    base = place.multVec(cylinder.base)
+    axis = place.Rotation.multVec(cylinder.axis)
+    return [
+        {
+            "base": [base.x, base.y, base.z],
+            "axis": [axis.x, axis.y, axis.z],
+            "radius": cylinder.radius,
+            "pitch": float(chosen.pitch),
+            "z0": z0,
+            "z1": z1,
+            "internal": internal,
+            "left": False,
+        }
+    ]
+
+
+def _say_threads(step, text):
+    if COSMETIC not in step.PropertiesList:
+        if not text:
+            return
+        step.addProperty("App::PropertyString", COSMETIC, "Fission180", "Cosmetic threads", 4)
+    if getattr(step, COSMETIC) != text:
+        setattr(step, COSMETIC, text)
+
+
+def mark_threads(feature):
+    """Keep what the part's steps say about its cosmetic thread in line with its options:
+    the Hardware step and the base step of each occurrence's body."""
+    try:
+        rows = cosmetic_threads(load_meta(feature).get("options", {}))
+    except Exception as exc:
+        log("hardware: no cosmetic thread (%s)" % exc)
+        rows = []
+    text = json.dumps(rows, sort_keys=True) if rows else ""
+    _say_threads(feature, text)
+    doc = feature.Document
+    for part in occurrences(feature)[1:]:
+        for body in components.bodies_in(doc, part):
+            for step in body.Group:
+                if step.TypeId == "PartDesign::FeatureBase":
+                    _say_threads(step, text)
 
 
 # -- the step --------------------------------------------------------------------------------------
@@ -300,6 +381,49 @@ def _place_component(component, place):
         component.Placement = wanted
 
 
+def fit_to_place(options, place, given=()):
+    """The options a part takes from the hole (or shaft, or round edge) it is put on, as the
+    dialog does (Fusion's Size and Length: Automatic): a retaining ring turns into the kind
+    that fits, the size is read off the diameter, no second hole is made, and the head sits
+    in the hole's counterbore or countersink. `given`: the options the caller set itself
+    (kept as they are). A flat face changes nothing."""
+    o = core.with_defaults(options)
+    if not place.get("rim"):
+        return o
+    standard = core.standard_for_place(o["standard"], place["is_hole"])
+    if standard != o["standard"]:
+        o = core.change_standard(o, standard)
+    if "size" not in given:
+        size = None
+        for diameter in (place.get("hole_diameter"), place.get("diameter")):
+            if diameter is None or size is not None:
+                continue
+            size = core.size_for_hole(
+                o["standard"], diameter, current=o["size"], is_hole=place["is_hole"]
+            )
+        if size is not None and size != o["size"]:
+            o["size"] = size
+            if "thread" not in given:
+                o["thread"] = ""
+            if core.has_length(o["standard"]):
+                o["length"] = core.fit_length(o["standard"], size, o.get("length"))
+    if "make_hole" not in given:
+        o["make_hole"] = False
+    if not o["make_hole"] and "sink_head" not in given:
+        o["sink_head"], o["seat"] = core.seat_for_hole(
+            o,
+            {
+                "is_hole": place["is_hole"],
+                "diameter": place["diameter"],
+                "hole_diameter": place["hole_diameter"],
+                "cbore_depth": place["cbore_depth"],
+                "cone": place["cone"],
+                "shoulder": place.get("shoulder", False),
+            },
+        )
+    return core.check(o)
+
+
 # -- the hole --------------------------------------------------------------------------------------
 def _hole_base(body, own_hole):
     if own_hole is not None and hole.owner_body(own_hole) is body:
@@ -369,25 +493,38 @@ def _pick_json(pick):
     }
 
 
-def _pick_from(doc, data):
+def _pick_from(doc, data, own_hole=None):
+    """(object, sub, point) of a stored place. `own_hole`: the name of the Hole step made
+    with the part there: when that hole was moved since (its dialog, its sketch), the place
+    is where the hole is now, so an edit of the part does not put the hole back."""
     data = data or {}
     obj = doc.getObject(data.get("object") or "")
     if obj is None:
         return None
     point = data.get("point")
-    return obj, data.get("sub", ""), App.Vector(*point) if point else None
+    point = App.Vector(*point) if point else None
+    made = _named(doc, own_hole, hole.is_hole) if own_hole else None
+    if made is not None and point is not None:
+        try:
+            now = hole.centres(made)
+            if len(now) == 1 and (now[0][0] - point).Length > 1e-6:
+                point = App.Vector(now[0][0])
+        except Exception as exc:
+            log("hardware: where its hole is now could not be read (%s)" % exc)
+    return obj, data.get("sub", ""), point
 
 
 def pick_of(feature):
     """(object, sub, point) where the part was placed, or None (at the origin, or the object
     is gone)."""
-    return _pick_from(feature.Document, load_meta(feature).get("pick"))
+    meta = load_meta(feature)
+    return _pick_from(feature.Document, meta.get("pick"), meta.get("hole"))
 
 
 def more_of(feature):
     """[(object, sub, point)] of the further places of the part (its occurrences)."""
     doc = feature.Document
-    found = [_pick_from(doc, m) for m in load_meta(feature).get("more", [])]
+    found = [_pick_from(doc, m, m.get("hole")) for m in load_meta(feature).get("more", [])]
     return [p for p in found if p is not None]
 
 
@@ -500,6 +637,7 @@ def make(doc, pick, options, more=None):
         _save_meta(feature, meta)
     _material(body, options)
     _look(body, options)
+    mark_threads(feature)
     if body_target is not None:
         hole.show_tip(body_target)
     log(
@@ -549,7 +687,12 @@ def update(feature, pick=None, options=None, more=None):
     if place is None:
         more = []
     _set_more(feature, meta, more, merged)
+    try:
+        _drop_moved_joints(feature, meta)
+    except Exception as exc:
+        warn("hardware: %s" % exc)
     _save_meta(feature, meta)
+    mark_threads(feature)
     if component is not None:
         _rename_occurrences(feature, component)
     if before["kind"] != merged["kind"]:
@@ -592,6 +735,17 @@ def remove(feature, own_step=True):
 
 
 # -- joints ----------------------------------------------------------------------------------------
+# Fusion's Insert Fastener holds a fastener with a joint on the hole's own edge, so a hole
+# that moves takes its fastener along. So does this: a rigid joint whose side on the holed
+# part is the round edge the part was put on (the hole's rim, a shaft's end), found again
+# after every change of that part (joints.repair_references: by its name, else by likeness),
+# and whose side on the hardware part keeps the place it has. When the hole moves, the joints
+# watch solves and the part goes with it. A part on a flat face with no round edge under it
+# keeps the older joint, "as built" to the component (it moves with the component only).
+EDGE_ON_AXIS = 1e-4  # mm a round edge's centre may be off the place's axis
+EDGE_AT_PLACE = 1e-3  # mm along the axis: "at the place" (its own hole's rim)
+
+
 def _relative(part, target):
     """Where `part` stands seen from `target`, as numbers (to see whether it moved)."""
     from . import joints
@@ -599,6 +753,77 @@ def _relative(part, target):
     plc = joints.global_placement(target).inverse().multiply(joints.global_placement(part))
     q = plc.Rotation.Q
     return [round(v, 6) for v in (plc.Base.x, plc.Base.y, plc.Base.z) + tuple(q)]
+
+
+def hole_edge(place):
+    """The round edge a part's joint is made on: the one on the place's axis nearest the
+    place (the hole's rim, the end of a shaft), as (body, "Edge12"), or None when there is
+    none (a flat face without a hole)."""
+    from . import joints
+
+    body = place.get("body")
+    if body is None:
+        return None
+    try:
+        shape, _to_local = joints.geometry(body)
+        to_body = body.getGlobalPlacement().inverse()
+    except Exception:
+        return None
+    centre = to_body.multVec(App.Vector(place["center"]))
+    axis = to_body.Rotation.multVec(App.Vector(place["normal"]))
+    wanted = place.get("diameter")
+    reach = None if place.get("rim") else EDGE_AT_PLACE
+    best = None
+    for i, edge in enumerate(shape.Edges):
+        try:
+            curve = edge.Curve
+            if curve.TypeId != "Part::GeomCircle":
+                continue
+            if abs(abs(App.Vector(curve.Axis).dot(axis)) - 1.0) > 1e-6:
+                continue
+            off = App.Vector(curve.Center) - centre
+            if off.cross(axis).Length > EDGE_ON_AXIS:
+                continue
+            gap = abs(off.dot(axis))
+            if reach is not None and gap > reach:
+                continue
+            radius = float(curve.Radius)
+        except Exception:
+            continue
+        fit = abs(2.0 * radius - wanted) if wanted else radius
+        key = (round(gap, 4), round(fit, 4), i)
+        if best is None or key < best[0]:
+            best = (key, "Edge%d" % (i + 1))
+    return (body, best[1]) if best is not None else None
+
+
+def _edge_origin(target, place):
+    """(pick, snap) of the joint origin on the holed part: the centre of the place's round
+    edge; (None, None) when it has none."""
+    from . import joints
+
+    found = hole_edge(place)
+    if found is None:
+        return None, None
+    body, name = found
+    pick = joints.Pick(target, body, name, App.Vector(place["center"]))
+    centres = [c for c in joints.snap_candidates(pick) if c["kind"] == "circle"]
+    for snap in centres:
+        if snap.get("at") == name:
+            return pick, snap
+    return (pick, centres[0]) if centres else (None, None)
+
+
+def _on_place(joint, place):
+    """True when a joint's origin on the holed part lies on the place's axis."""
+    from . import joints
+
+    try:
+        base = joints.jcs_global(joint, 1).Base
+    except Exception:
+        return False
+    off = base - App.Vector(place["center"])
+    return off.cross(App.Vector(place["normal"])).Length < 1e-3
 
 
 def _drop_joints(feature, meta, keep):
@@ -622,12 +847,56 @@ def _drop_joints(feature, meta, keep):
     meta["joints"] = left
 
 
+def _still_holds(doc, record):
+    """True when a part still stands where its joint holds it."""
+    from . import joints
+
+    joint = _named(doc, record.get("joint"))
+    if joint is None:
+        return False
+    try:
+        if joints.lost_reference(joint):
+            return False
+        return bool(joints.satisfied(joint))
+    except Exception:
+        return False
+
+
+def _drop_moved_joints(feature, meta):
+    """Take away the joints of the occurrences a change has just moved (another hole
+    clicked): left in, the joints watch would pull the part back onto its old hole while the
+    dialog is still open. join() makes them again at OK."""
+    doc = feature.Document
+    keep = [r for r in meta.get("joints", []) if _still_holds(doc, r)]
+    if len(keep) != len(meta.get("joints", [])):
+        _drop_joints(feature, meta, keep)
+        return True
+    return False
+
+
+def _places(feature):
+    """[(occurrence, pick, place)] of a part: every place it stands on (place None when it
+    can no longer be read)."""
+    found = []
+    picks = [pick_of(feature)] + more_of(feature)
+    for part, pick in zip(occurrences(feature), picks):
+        if pick is None:
+            continue
+        try:
+            found.append((part, pick, spot(*pick)))
+        except Exception as exc:
+            log("hardware: a place of %s cannot be read (%s)" % (part.Label, exc))
+            found.append((part, pick, None))
+    return found
+
+
 def join(feature):
-    """Hold every occurrence of the part to the component it was placed on with a rigid
-    as-built joint (Fusion's Insert Fastener places fasteners with joints), when the part's
-    "joint" option is on; joints of places that are gone or changed are removed. Nothing
-    moves. A part put on a body of its own parent component moves with that component
-    already and gets no joint. Returns the joints made now."""
+    """Hold every occurrence of the part to what it was placed on with a rigid joint (Fusion's
+    Insert Fastener places fasteners with joints), when the part's "joint" option is on: on
+    the round edge of its hole where there is one, so the part follows the hole (see above),
+    else as built to the component. Joints of places that are gone or changed are removed,
+    the others kept. Nothing moves. A part put on a body of its own parent component moves
+    with that component already and gets no joint. Returns the joints made now."""
     from . import joints
 
     doc = feature.Document
@@ -635,35 +904,45 @@ def join(feature):
     options = core.with_defaults(meta.get("options", {}))
     wanted = []
     if options["joint"]:
-        picks = [pick_of(feature)] + more_of(feature)
-        for part, pick in zip(occurrences(feature), picks):
-            if pick is None:
-                continue
+        for part, pick, place in _places(feature):
             target = joints.part_of(pick[0])
             if target is None or target is part or components.is_inside(part, target):
                 continue
-            wanted.append((part, target))
+            wanted.append((part, target, place))
     keep, todo = [], []
-    for part, target in wanted:
+    for part, target, place in wanted:
         match = None
         for record in meta.get("joints", []):
-            if (
-                record.get("part") == part.Name
-                and record.get("target") == target.Name
-                and record.get("at") == _relative(part, target)
-                and _named(doc, record.get("joint")) is not None
-            ):
-                match = record
+            if record.get("part") != part.Name or record.get("target") != target.Name:
+                continue
+            joint = _named(doc, record.get("joint"))
+            if joint is None:
+                continue
+            if record.get("edge"):
+                # on its hole's edge: kept while the part stands where the joint holds it
+                # and the joint is on this hole (a place that cannot be read is left alone)
+                if place is None or (_still_holds(doc, record) and _on_place(joint, place)):
+                    match = record
+            elif record.get("at") == _relative(part, target):
+                if place is None or hole_edge(place) is None:
+                    match = record  # as built, and no round edge to do better
+            if match is not None:
                 break
         if match is not None:
             keep.append(match)
         else:
-            todo.append((part, target))
+            todo.append((part, target, place))
     _drop_joints(feature, meta, keep)
     made = []
-    for part, target in todo:
+    for part, target, place in todo:
+        pick = snap = None
+        if place is not None:
+            try:
+                pick, snap = _edge_origin(target, place)
+            except Exception as exc:
+                log("hardware: no round edge for the joint of %s (%s)" % (part.Label, exc))
         try:
-            joint = joints.create_as_built_joint(doc, "rigid", part, target)
+            joint = joints.create_as_built_joint(doc, "rigid", part, target, pick, snap)
         except Exception as exc:
             log("hardware: no joint between %s and %s (%s)" % (part.Label, target.Label, exc))
             continue
@@ -673,6 +952,7 @@ def join(feature):
                 "part": part.Name,
                 "target": target.Name,
                 "at": _relative(part, target),
+                "edge": pick.element if pick is not None else "",
             }
         )
         made.append(joint)

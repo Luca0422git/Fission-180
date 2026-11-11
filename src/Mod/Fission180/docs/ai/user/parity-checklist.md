@@ -11,9 +11,9 @@ file is out of date.
 
 ## Headline
 
-**Fusion commands present: 565 / 714 (79.1%)**
+**Fusion commands present: 566 / 714 (79.3%)**
 
-In the areas Fission 180 builds (without the 71 entries left out on purpose, see the end): **565 / 643 (87.9%)**.
+In the areas Fission 180 builds (without the 71 entries left out on purpose, see the end): **566 / 643 (88.0%)**.
 
 What the number means:
 
@@ -124,14 +124,14 @@ What the number means:
 | | Ring | 9 | 9 | 100.0% |
 | | Overflow list | 8 | 7 | 87.5% |
 | | While a command runs | 2 | 2 | 100.0% |
-| **BROWSER** | all | **121** | **96** | **79.3%** |
+| **BROWSER** | all | **121** | **97** | **80.2%** |
 | | Design (top node) | 13 | 9 | 69.2% |
 | | Units | 1 | 1 | 100.0% |
 | | Named Views | 1 | 1 | 100.0% |
 | | Named view | 3 | 3 | 100.0% |
 | | Origin | 1 | 1 | 100.0% |
 | | Folder (Bodies, Sketches, Construction...) | 1 | 1 | 100.0% |
-| | Component | 30 | 18 | 60.0% |
+| | Component | 30 | 19 | 63.3% |
 | | Body | 20 | 15 | 75.0% |
 | | Mesh body | 5 | 5 | 100.0% |
 | | Sketch | 11 | 8 | 72.7% |
@@ -244,7 +244,7 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 
 - Overflow list > Fix/Unfix (not sure)
 
-### BROWSER (25)
+### BROWSER (24)
 
 - Design (top node) > Show All Components (not sure)
 - Design (top node) > Physical Material (not sure)
@@ -260,7 +260,6 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 - Component > Save Copy As
 - Component > Open (not sure)
 - Component > Edit In Place
-- Component > Cycle Component Color (not sure)
 - Component > Display Detail Control (not sure)
 - Body > Move/Copy
 - Body > Create Selection Set

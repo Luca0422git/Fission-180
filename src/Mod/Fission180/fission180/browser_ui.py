@@ -28,6 +28,11 @@ from .inline_edit import InlineEditor
 ROLE_NODE = QtCore.Qt.UserRole
 EYE = 18  # width of the eye area at the start of a row
 RADIO = 14  # the activate mark at the end of a component row (Fusion's radio button)
+# (wave 7, library-2) A colour mark on a component's row, before its activate ring
+# (Fusion's Component Color Swatch): component_colors_ui registers a function here.
+ROW_COLORS = []  # functions(node) -> "#rrggbb" or None
+MARK = 9  # the mark's size
+CYCLE_COLOR_COMMAND = "Fission180_CycleComponentColor"
 META_VIEW = "Fission180.NamedView."
 # Rows that can be dragged onto a component (or the design's row) to move them there, and
 # the rows they can be dropped on.
@@ -884,6 +889,28 @@ def _later(fn, *args):
     QtCore.QTimer.singleShot(0, run)
 
 
+def row_color(node):
+    """The colour mark of a row (ROW_COLORS), or None."""
+    for fn in ROW_COLORS:
+        try:
+            color = fn(node)
+        except Exception:
+            color = None
+        if color:
+            return color
+    return None
+
+
+def _cycle_color_offered():
+    """Cycle Component Color shows while component colours do (Fusion)."""
+    try:
+        from . import component_colors_ui
+
+        return bool(component_colors_ui.can_cycle())
+    except Exception:
+        return False
+
+
 class _RowDelegate(QtWidgets.QStyledItemDelegate):
     """Draws the eye between the expand arrow and the icon, like Fusion, and turns a
     click on it into show/hide."""
@@ -908,6 +935,13 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
         (Autodesk's API help: "the radio button to the right of a component node")."""
         return QtCore.QRect(
             rect.right() - RADIO - 6, rect.top() + (rect.height() - RADIO) // 2, RADIO, RADIO
+        )
+
+    def mark_rect(self, rect):
+        """The colour mark of a component's row: a small square before the ring."""
+        ring = self.radio_rect(rect)
+        return QtCore.QRect(
+            ring.left() - MARK - 4, rect.top() + (rect.height() - MARK) // 2, MARK, MARK
         )
 
     def units_rect(self, rect):
@@ -970,8 +1004,10 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             finally:
                 painter.restore()
         radio = self.has_radio(node)
+        mark = row_color(node) if radio else None  # (library-2: Component Color Swatch)
         shifted = QtWidgets.QStyleOptionViewItem(option)
-        shifted.rect = option.rect.adjusted(EYE + 2, 0, -(RADIO + 10) if radio else 0, 0)
+        room = (RADIO + 10 + (MARK + 4 if mark else 0)) if radio else 0
+        shifted.rect = option.rect.adjusted(EYE + 2, 0, -room, 0)
         if node["status"] == "error":
             shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#ff8a80"))
         elif node["status"] == "warning":
@@ -988,6 +1024,8 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             self._padlock(painter, shifted, index)
         if node.get("unselectable"):
             self._no_pick(painter, shifted, index)
+        if mark:
+            painter.fillRect(self.mark_rect(option.rect), QtGui.QColor(mark))
         if radio or node["key"] == self.tree._drop_key:
             painter.save()
             try:
@@ -2295,6 +2333,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Move/Copy": lambda: self._run_with(obj, "Fission180_Move"),
             "Create Drawing": lambda: self._run_with(obj, "Fission180_NewDrawing"),
             "Properties": lambda: self._run_with(obj, PROPERTIES_COMMAND),
+            "Cycle Component Color": lambda: self._run_with(obj, CYCLE_COLOR_COMMAND),
             "Edit Joint": lambda: _edit_object(obj),
             "Edit Rigid Group": lambda: _edit_object(obj),
             "Edit Joint Origin": lambda: _edit_object(obj),
@@ -2364,6 +2403,8 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 continue
             if entry == "Properties" and PROPERTIES_COMMAND not in Gui.listCommands():
                 continue  # (the Properties dialog is the appearance work's)
+            if entry == "Cycle Component Color" and not _cycle_color_offered():
+                continue  # (library-2: only while component colours show, as in Fusion)
             if entry in ("Paste", "Paste New") and not _can_paste(doc, entry == "Paste New"):
                 continue  # nothing copied (Paste New: no component copied)
             if entry == "Rebuild with Timeline (AI)..." and obj is not None and _rebuilt_body(obj):

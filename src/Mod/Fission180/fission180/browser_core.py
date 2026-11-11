@@ -640,6 +640,7 @@ MENUS = {
         "-",
         "Create Drawing",  # (wave 7: the DRAWING workspace's Create Drawing)
         "Properties",  # (wave 7: shown when the Properties command exists)
+        "Cycle Component Color",  # (wave 7, library-2: while component colours show)
         "-",
         "Show/Hide",
         "Selectable/Unselectable",

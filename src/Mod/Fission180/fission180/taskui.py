@@ -35,9 +35,23 @@ _OPEN = {"dialog": None}
 def current():
     """The Fission 180 task dialog that is open now (it has finish()), or None."""
     dialog = _OPEN["dialog"]
-    if dialog is None or getattr(dialog, "_closed", False) or not Gui.Control.activeDialog():
+    if dialog is None or getattr(dialog, "_closed", False):
         _OPEN["dialog"] = None
         return None
+    if not Gui.Control.activeDialog():
+        # (wave 7, library-2) Not on screen. A dialog that was on screen before is gone
+        # behind our back: forgotten. One that never was is still being built: it registers
+        # itself, runs its first preview and only then is shown (Gui.Control.showDialog), and
+        # a timer that asked in that gap (the selection read-out, the joints watch: a slow
+        # first preview lets timers run) made it forgotten for good, a dialog on screen that
+        # nothing knew of (body_pick_many, 1 run in 10: "Move/Copy held no body").
+        if getattr(dialog, "_seen_on_screen", False):
+            _OPEN["dialog"] = None
+        return None
+    try:
+        dialog._seen_on_screen = True
+    except Exception:
+        pass
     return dialog
 
 

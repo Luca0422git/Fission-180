@@ -885,7 +885,9 @@ define(
     "Fusion's Appearance: colour a body, or some faces of it, without changing its material. "
     "body: a step of it (default: the current body); faces: a selector (only these faces); "
     "look: a library key (list_materials) or color [r, g, b] (0..1) with shininess (0..1) and "
-    "transparency (0..1). clear: true removes the body's own appearance.",
+    "transparency (0..1). When the body has faces with looks of their own, keep_face_looks "
+    "must be given: true keeps them over the new look, false gives the whole body the "
+    "new look (Fusion asks Keep / Remove).",
     schema(
         {
             "body": step_id("a step of the body"),
@@ -894,6 +896,10 @@ define(
             "color": array(number(minimum=0, maximum=1), "[r, g, b] 0..1", 3, 3),
             "shininess": number(default=0.5, minimum=0, maximum=1),
             "transparency": number(default=0, minimum=0, maximum=1),
+            "keep_face_looks": boolean(
+                "faces that have looks of their own keep them (true) or take the new "
+                "look too (false); needed when the body has such faces"
+            ),
         },
     ),
     extra=_extra_appearance,

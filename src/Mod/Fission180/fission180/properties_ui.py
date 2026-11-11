@@ -2,6 +2,10 @@
 """Properties (Fusion: right-click a component or a body > Properties): what the selected
 components and bodies weigh and measure.
 
+  General         Part Number, Part Name, Description of the one component selected: typed
+                  here, stored on the component (an occurrence: on its original), one undo
+                  step each. The drawing's parts list shows the Part Number and the
+                  Description (drawing._part_name, Label2).
   Physical        Area, Density, Mass, Volume, Physical Material, Appearance
   Bounding Box    Length (along X), Width (Y), Height (Z)
   Center of Mass  X, Y, Z in the design
@@ -22,6 +26,74 @@ from . import properties_core as core
 from .compat import QtCore, QtWidgets
 
 _STATE = {"dialog": None}
+NUMBER_PROP = "Fission180PartNumber"  # on a component: its Part Number ("" = its name)
+FIELDS = (("number", "Part Number"), ("name", "Part Name"), ("description", "Description"))
+
+
+def subject_of_selection(doc):
+    """The one component Properties is about: the selected component (its original when an
+    occurrence is selected), or None when nothing, a body or several things are selected."""
+    try:
+        selected = [sel.Object for sel in Gui.Selection.getSelectionEx(doc.Name)]
+    except Exception:
+        return None
+    if len(selected) != 1 or not components.is_component(selected[0]):
+        return None
+    part = selected[0]
+    try:
+        from . import instances
+
+        if instances.is_instance(part):
+            part = instances.source_of(part) or part
+    except Exception:
+        pass
+    return part
+
+
+def part_number(part):
+    """A component's Part Number: the one given in Properties, else its name (Fusion starts
+    a component's part number as its name)."""
+    return (getattr(part, NUMBER_PROP, "") or "").strip() or part.Label
+
+
+def general_of(part):
+    """{"number", "name", "description"} of a component."""
+    return {
+        "number": part_number(part),
+        "name": part.Label,
+        "description": getattr(part, "Label2", "") or "",
+    }
+
+
+def set_general(part, key, text):
+    """Change a component's Part Number, Part Name or Description (one undo step). Returns
+    what it is now. Raises ValueError with what to do when the text cannot be taken."""
+    text = (text or "").strip()
+    doc = part.Document
+    now = general_of(part)
+    if key not in now:
+        raise ValueError("Unknown property %r." % (key,))
+    if text == now[key]:
+        return now[key]
+    if key == "name":
+        if not text:
+            raise ValueError("A component needs a name: the old one is kept.")
+        components.rename(doc, part, text)
+        return general_of(part)[key]
+    doc.openTransaction("Properties")
+    try:
+        if key == "number":
+            if NUMBER_PROP not in part.PropertiesList:
+                part.addProperty("App::PropertyString", NUMBER_PROP, "Fission180", "Part number", 4)
+            # the name itself (or nothing) means "as the name": it follows a rename again
+            setattr(part, NUMBER_PROP, "" if text in ("", part.Label) else text)
+        else:
+            part.Label2 = text
+        doc.commitTransaction()
+    except Exception:
+        doc.abortTransaction()
+        raise
+    return general_of(part)[key]
 
 
 def _unit(doc):
@@ -153,6 +225,18 @@ class PropertiesDialog(QtWidgets.QDialog):
         self.title = QtWidgets.QLabel("")
         self.title.setObjectName("Fission180PropertiesTitle")
         layout.addWidget(self.title)
+        self.subject = None  # the one component the General fields are about
+        self.general = QtWidgets.QGroupBox("General")
+        self.general.setObjectName("Fission180PropertiesGeneral")
+        form = QtWidgets.QFormLayout(self.general)
+        self.fields = {}
+        for key, label in FIELDS:
+            edit = QtWidgets.QLineEdit()
+            edit.setObjectName("Fission180Properties_%s" % key)
+            edit.editingFinished.connect(lambda k=key: self._guarded(lambda: self._field_edited(k)))
+            form.addRow(label, edit)
+            self.fields[key] = edit
+        layout.addWidget(self.general)
         self.tree = QtWidgets.QTreeWidget()
         self.tree.setObjectName("Fission180PropertiesTree")
         self.tree.setColumnCount(2)
@@ -167,11 +251,14 @@ class PropertiesDialog(QtWidgets.QDialog):
         layout.addWidget(self.message)
         row = QtWidgets.QHBoxLayout()
         self.copy = QtWidgets.QPushButton("Copy to Clipboard")
+        # (Enter in a General field commits that field: it must not press a button too)
+        self.copy.setAutoDefault(False)
         self.copy.setObjectName("Fission180PropertiesCopy")
         self.copy.clicked.connect(lambda *_: self._guarded(self.copy_text))
         row.addWidget(self.copy)
         row.addStretch(1)
         close = QtWidgets.QPushButton("Close")
+        close.setAutoDefault(False)
         close.setObjectName("Fission180PropertiesClose")
         close.clicked.connect(self.close)
         self.close_button = close
@@ -242,6 +329,7 @@ class PropertiesDialog(QtWidgets.QDialog):
         self.result, self.counted = result, counted
         unit = _unit(doc)
         self.sections = core.rows(result, unit, material_name, look_name)
+        self._fill_general(doc, title)
         count = len(counted)
         self.name = title
         self.title.setText(
@@ -250,6 +338,8 @@ class PropertiesDialog(QtWidgets.QDialog):
         self.values = {}
         self.tree.clear()
         for section, entries in self.sections:
+            if section == "General":
+                continue  # (shown in the fields above the list; part of the copied text)
             top = QtWidgets.QTreeWidgetItem(self.tree, [core.pretty(section), ""])
             font = top.font(0)
             font.setBold(True)
@@ -272,7 +362,60 @@ class PropertiesDialog(QtWidgets.QDialog):
                 names += " and %d more" % (len(counted) - 6)
             self.message.setText("Counted: %s." % names)
 
+    def _fill_general(self, doc, title):
+        """The General fields: the one selected component's, to edit; else what is shown
+        (the design's or the selection's name), greyed, with why."""
+        part = self.subject = subject_of_selection(doc)
+        if part is not None:
+            shown = general_of(part)
+            tip = "Type and press Enter: stored on the component %s" % part.Label
+        else:
+            shown = {"number": title, "name": title, "description": ""}
+            tip = "Select one component (in the browser) to give it a part number or a description"
+        self.general_values = dict(shown)
+        for key, _label in FIELDS:
+            edit = self.fields[key]
+            edit.blockSignals(True)
+            try:
+                if not edit.hasFocus() or part is None:
+                    edit.setText(shown[key])
+                edit.setEnabled(part is not None)
+                edit.setToolTip(tip)
+            finally:
+                edit.blockSignals(False)
+        if part is not None:
+            self.sections = [("General", [(label, shown[key]) for key, label in FIELDS])] + list(
+                self.sections
+            )
+
+    def _field_edited(self, key):
+        part = self.subject
+        edit = self.fields[key]
+        try:
+            alive = part is not None and part.Document is not None
+        except Exception:
+            alive = False
+        if not alive:
+            return
+        text = edit.text()
+        if text.strip() == general_of(part)[key]:
+            return
+        label = dict(FIELDS)[key]
+        try:
+            now = set_general(part, key, text)
+        except ValueError as exc:
+            edit.setText(general_of(part)[key])
+            self.message.setText("⚠ %s" % exc)
+            return
+        edit.setText(now)
+        log("Properties: %s of %s is %s" % (label, part.Label, now or "(empty)"))
+        self.fill()
+        self.message.setText("%s: %s." % (label, now or "(empty)"))
+
     def value(self, section, name):
+        if section == "General":
+            key = {label: k for k, label in FIELDS}.get(name)
+            return self.general_values.get(key) if key else None
         return self.values.get((section, name))
 
     def copy_text(self):

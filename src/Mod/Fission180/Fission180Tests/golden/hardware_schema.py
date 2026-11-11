@@ -43,7 +43,9 @@ TEXTS = ("size", "thread")
 
 schema.STEP_KEYS["sf_hardware"] = (
     {"id"},
-    {"face", "at", "edge", "wall", "hardware_bbox", "comment"} | OPTIONS,
+    {"face", "at", "edge", "wall", "auto", "similar", "joint", "hardware_count"}
+    | {"hardware_bbox", "comment"}
+    | OPTIONS,
 )
 schema.STEP_KEYS["sf_hardware_edit"] = ({"target", "set"}, {"hardware_bbox", "comment"})
 
@@ -95,6 +97,16 @@ def check_steps(model):
                     schema._fail(here, "'at' is [x, y, z]: where the face is clicked")
             _check_values(here, {k: v for k, v in step.items() if k in OPTIONS})
             _check_bbox(here, step)
+            for key in ("auto", "similar", "joint"):
+                if key in step and not isinstance(step[key], bool):
+                    schema._fail(here, "'%s' is true or false" % key)
+            count = step.get("hardware_count")
+            if count is not None and (isinstance(count, bool) or not isinstance(count, int)):
+                schema._fail(here, "'hardware_count' is a whole number of places")
+            if count is not None and count < 1:
+                schema._fail(here, "'hardware_count' is 1 or more")
+            if step.get("similar") and not places:
+                schema._fail(here, "'similar' needs a place: 'edge' or 'wall' of a hole")
         if op == "sf_hardware_edit":
             if seen.get(step["target"]) != "sf_hardware":
                 schema._fail(here, "'target' must name an earlier sf_hardware step")

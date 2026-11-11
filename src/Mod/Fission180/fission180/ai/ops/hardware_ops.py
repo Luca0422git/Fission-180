@@ -17,6 +17,13 @@ format is checked by Fission180Tests/golden/hardware_schema.py.
       length (mm), thread ("" = coarse, or "1/4-28 UNF"), modeled (threads), variant (a
       bearing: open | zz | 2rs), flip, offset (along the axis), make_hole, fit (close |
       normal | loose), sink_head, hole_depth (all | length), clearance (a magnet's pocket).
+      "auto": true: on a hole, a shaft or a round edge the part takes what the dialog
+      takes from the place (Fusion's Size Automatic): its size from the diameter (unless
+      "size" is given), no second hole (unless "make_hole" is given), the head seated in the
+      counterbore or countersink (unless "sink_head" is given). "similar": true fills every
+      hole like the one clicked on the same face (occurrences of the one part). "joint":
+      true holds each to what it is placed on with a rigid joint on its hole's edge.
+      "hardware_count": how many places the part ended up on.
       "hardware_bbox": [xmin, ymin, zmin, xmax, ymax, zmax] checks where the part ended up
       (design coordinates). The measured body stays the clicked one; expect_bodies with the
       step's id measures the part's own body.
@@ -122,12 +129,35 @@ def op_sf_hardware(self, step):
             raise BuildError("sf_hardware %r: 'face' must select one face" % step["id"])
         pick = (tip, names[0], App.Vector(*step["at"]))
     try:
-        feature = hardware.make(self.doc, pick, _options(step))
+        options = _options(step)
+        more = []
+        if step.get("auto") or step.get("similar"):
+            from fission180 import hardware_place
+
+            place = hardware.spot(*pick)
+            if step.get("auto"):
+                options = hardware.fit_to_place(options, place, given=set(step))
+            if step.get("similar"):
+                more = [(pick[0], sub, c) for sub, c in hardware_place.similar(pick[0], place)]
+        feature = hardware.make(self.doc, pick, options, more=more)
     except hardware_core.HardwareError as exc:
         raise BuildError("sf_hardware %r: %s" % (step["id"], exc))
     self.objects[step["id"]] = feature
     self.ops[step["id"]] = "sf_hardware"
-    return _settle(self, step, feature)
+    _settle(self, step, feature)
+    if step.get("joint"):
+        try:
+            hardware.join(feature)
+            self.doc.recompute()
+        except Exception as exc:
+            raise BuildError("sf_hardware %r: no joint: %s" % (step["id"], exc))
+    want = step.get("hardware_count")
+    if want is not None and len(hardware.occurrences(feature)) != want:
+        raise BuildError(
+            "sf_hardware %r: the part stands on %d places, expected %d"
+            % (step["id"], len(hardware.occurrences(feature)), want)
+        )
+    return feature
 
 
 def op_sf_hardware_edit(self, step):

@@ -24,6 +24,9 @@ NODE = "Fission180LookTexture"
 # a dialog's live preview changes the part at every step of a drag.
 BIG = 6000
 LATER = None  # set by appearance_ui: LATER(key, fn) runs fn shortly after the last call for key
+# (tests, diagnostics) how often a big part's pattern was put off, and how often a pattern
+# was worked out: while a big part is dragged the first grows, the second does not
+COUNTS = {"later": 0, "laid": 0}
 _STAMPS = {}  # (document, step) -> what the step's pattern was last built from
 _TEXTURES = {}  # pattern name -> its Coin texture node (shared by every step that shows it)
 
@@ -301,8 +304,10 @@ def update(step, groups, stamp, now=False):
         if index >= 0:  # the old pattern no longer fits: plain until the new one is laid
             flat.removeChild(index)
         _STAMPS.pop(key, None)
+        COUNTS["later"] += 1
         LATER(key, lambda: _update_later(key, groups, asked))
         return False
+    COUNTS["laid"] += 1
     display = _display(nodes)
     from pivy import coin
 

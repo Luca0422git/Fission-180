@@ -183,29 +183,58 @@ def edge_pixel(point):
 
 
 def question():
-    """The open "keep or remove the faces' looks" question, or None."""
-    for box in QtWidgets.QApplication.topLevelWidgets():
-        if box.objectName() == "Fission180KeepFaceLooks" and box.isVisible():
-            return box
-    return None
+    """The Appearance dialog while its "keep or remove the faces' looks" question is open
+    (a row of the dialog, never a box of its own), or None."""
+    p = panel()
+    row = getattr(p, "ask_row", None) if p is not None else None
+    return p if row is not None and row.isVisible() and p.question_open() else None
+
+
+def no_question():
+    return question() is None
+
+
+def asked():
+    """How many questions the open Appearance dialog has put."""
+    p = panel()
+    return p.asked if p is not None else 0
 
 
 def answer(button_text, record=None):
-    """Set up before the drop that asks: click the question's button once it shows."""
+    """Click a button of the open question (Keep / Remove / Cancel), as a person does. The
+    step before waits for the question by state (its `done` is `question`)."""
+    p = question()
+    if not h.check("the keep-or-remove question is open", p is not None):
+        return False
+    if record is not None:
+        record["text"] = p.ask_text.text()
+        record["buttons"] = sorted(p.ask_buttons)
+    button = p.ask_buttons.get(button_text)
+    if not h.check("the question has a %s button" % button_text, button is not None):
+        return False
+    modal = [x for x in QtWidgets.QApplication.topLevelWidgets() if x.isModal() and x.isVisible()]
+    h.check("the question is not a modal box", not modal, [x.objectName() for x in modal])
+    w.click(button)
+    return True
 
-    def click():
-        box = question()
-        if record is not None:
-            record["text"] = box.text()
-            record["buttons"] = [b.text().replace("&", "") for b in box.buttons()]
-        for button in box.buttons():
-            if button.text().replace("&", "") == button_text:
-                w.click(button)
-                return
-        h.check("the question has a %s button" % button_text, False)
-        box.reject()
 
-    return h.when(lambda: question() is not None, click, "the keep-or-remove question to show")
+def asks(step, what="the keep-or-remove question is open"):
+    """Mark a step as one that ends with the question open."""
+    step.done = lambda: question() is not None
+    step.done_what = what
+    return step
+
+
+def answers(button_text, name, record=None):
+    """A step that answers the open question and ends once it is gone."""
+
+    def step():
+        answer(button_text, record)
+
+    step.__name__ = name
+    step.done = no_question
+    step.done_what = "the question is answered"
+    return step
 
 
 def face_colors(body):

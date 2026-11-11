@@ -291,6 +291,7 @@ class AppearancePanel(BodyPanel):
         )
         self.remove.toggled.connect(lambda on: self._guarded(lambda: self._remove_toggled(on)))
         self.layout.addRow("", self.remove)
+        self._build_question()
         self.layout.addRow(QtWidgets.QLabel("<b>In This Design</b>"))
         self.design = self._list(rows=2)
         self.design.setObjectName("Fission180LooksInDesign")
@@ -635,15 +636,12 @@ class AppearancePanel(BodyPanel):
             appearance.set_faces(body, feature, [name], look)
             what = "a face of %s" % body.Label
         else:
-            keep = False
-            count = appearance.face_count(body)
-            if count:
-                answer = self._ask_faces(body, count)
-                if answer is None:
-                    self.note.setText("%s: nothing changed" % body.Label)
-                    return False
-                keep = answer == "keep"
-            appearance.set_body(body, look, keep_faces=keep)
+            if appearance.face_count(body):
+                # some of its faces have looks of their own: Keep / Remove / Cancel decides
+                # (answer_faces); nothing changes before
+                self._ask_faces(body, look)
+                return False
+            appearance.set_body(body, look, keep_faces=False)
             what = body.Label
         # (force: a look dropped on something that has it already is put on again)
         appearance.apply(body, force=True)
@@ -680,40 +678,123 @@ class AppearancePanel(BodyPanel):
         bodies_gui.sync(self.doc)
         self._fill_design()
 
-    def _ask_faces(self, body, count):
-        """Fusion's question when a look goes on a body whose faces have looks of their own:
-        "keep", "remove" or None (Cancel)."""
-        box = QtWidgets.QMessageBox(Gui.getMainWindow())
-        box.setObjectName("Fission180KeepFaceLooks")
-        box.setIcon(QtWidgets.QMessageBox.Question)
-        box.setWindowTitle("Appearance")
-        box.setText(
-            "%s has %d face%s with a look of %s own."
-            % (body.Label, count, "" if count == 1 else "s", "its" if count == 1 else "their")
+    # -- the faces' own looks under a body's new look: Keep / Remove / Cancel -------------------
+    # Fusion asks this in a box of its own. Here the question is a row of the Appearance
+    # dialog (no modal box: nothing waits inside FreeCAD's event handling, so a script, a
+    # remote hand or the AI is never frozen by it). One drop or click asks once, however
+    # many bodies it gave the look to (a component's row); until it is answered nothing is
+    # changed.
+    def _build_question(self):
+        self.asking = None  # {"look": the look, "bodies": [bodies waiting for the answer]}
+        self.asked = 0  # how many questions were put (tests: one per drop)
+        self.ask_row = QtWidgets.QFrame()
+        self.ask_row.setObjectName("Fission180KeepFaceLooks")
+        self.ask_row.setStyleSheet(
+            "QFrame#Fission180KeepFaceLooks { border: 1px solid #f2c440; border-radius: 3px; }"
         )
-        box.setInformativeText(
-            "Keep: those faces keep their looks over the new one.\n"
-            "Remove: the whole body gets the new look."
-        )
-        keep = box.addButton("Keep", QtWidgets.QMessageBox.AcceptRole)
-        remove = box.addButton("Remove", QtWidgets.QMessageBox.DestructiveRole)
-        box.addButton(QtWidgets.QMessageBox.Cancel)
-        box.setDefaultButton(keep)
-        box.exec()
-        clicked = box.clickedButton()
-        try:
-            from . import preferences_ui
+        box = QtWidgets.QVBoxLayout(self.ask_row)
+        box.setContentsMargins(6, 6, 6, 6)
+        self.ask_text = QtWidgets.QLabel("")
+        self.ask_text.setWordWrap(True)
+        box.addWidget(self.ask_text)
+        line = QtWidgets.QHBoxLayout()
+        self.ask_buttons = {}
+        for key, text, tip in (
+            ("keep", "Keep", "Those faces keep their looks over the new one"),
+            ("remove", "Remove", "The whole body gets the new look"),
+            (None, "Cancel", "Nothing changes"),
+        ):
+            button = QtWidgets.QPushButton(text)
+            button.setObjectName("Fission180KeepFaceLooks_%s" % text)
+            button.setToolTip(tip)
+            button.setAutoDefault(False)
+            button.clicked.connect(
+                lambda _checked=False, k=key: self._guarded(lambda: self.answer_faces(k))
+            )
+            line.addWidget(button)
+            self.ask_buttons[text] = button
+        box.addLayout(line)
+        self.layout.addRow(self.ask_row)
+        self.ask_row.hide()
 
-            QtCore.QTimer.singleShot(0, preferences_ui.refocus_main)
-        except Exception:
-            pass
-        if clicked is keep:
-            return "keep"
-        if clicked is remove:
-            return "remove"
-        return None
+    def question_open(self):
+        return self.asking is not None
+
+    def _ask_faces(self, body, look):
+        """Put Fusion's question for a look that goes on a body whose faces have looks of
+        their own (or add the body to the question that is open for the same look)."""
+        asking = self.asking
+        if asking is not None and appearance.identical(asking["look"], look):
+            if not any(body is b for b in asking["bodies"]):
+                asking["bodies"].append(body)
+        else:
+            if asking is not None:
+                self.note.setText("%s: nothing changed" % self._ask_names(asking))
+            asking = self.asking = {"look": look, "bodies": [body]}
+            self.asked += 1
+        self._show_question()
+
+    @staticmethod
+    def _ask_names(asking):
+        names = [b.Label for b in asking["bodies"] if bodies.alive(b)]
+        return ", ".join(names) if names else "the body"
+
+    def _show_question(self):
+        asking = self.asking
+        waiting = [b for b in asking["bodies"] if bodies.alive(b)]
+        if len(waiting) == 1:
+            count = appearance.face_count(waiting[0])
+            text = "%s has %d face%s with a look of %s own." % (
+                waiting[0].Label,
+                count,
+                "" if count == 1 else "s",
+                "its" if count == 1 else "their",
+            )
+        else:
+            text = "%d bodies (%s) have faces with looks of their own." % (
+                len(waiting),
+                self._ask_names(asking),
+            )
+        self.ask_text.setText(
+            "%s <b>Keep</b>: those faces keep their looks over %s. <b>Remove</b>: the whole "
+            "body gets it." % (text, asking["look"]["label"])
+        )
+        self.ask_row.show()
+        self.message.setText("")
+
+    def answer_faces(self, answer):
+        """The question's answer: "keep", "remove" or None (Cancel). True when a look was
+        given."""
+        asking, self.asking = self.asking, None
+        self.ask_row.hide()
+        if asking is None:
+            return False
+        waiting = [b for b in asking["bodies"] if bodies.alive(b)]
+        if answer not in ("keep", "remove") or not waiting:
+            self.note.setText("%s: nothing changed" % self._ask_names(asking))
+            return False
+        look = asking["look"]
+        for body in waiting:
+            appearance.set_body(body, look, keep_faces=answer == "keep")
+            appearance.apply(body, force=True)
+        self.look = look
+        self._fill_design()
+        self.note.setText(
+            "%s: %s%s"
+            % (
+                self._ask_names(asking),
+                look["label"],
+                " (the faces keep their looks)" if answer == "keep" else "",
+            )
+        )
+        return True
 
     def can_finish(self):
+        if self.asking is not None:
+            return (
+                "Answer the question first: Keep (the faces keep their looks), Remove "
+                "(the whole body gets the new look) or Cancel."
+            )
         return ""
 
     # -- the looks of the design: edit, duplicate, rename, delete ----------------------------------
@@ -1056,14 +1137,16 @@ def _opened(name, tries=0):
             if tries < 100:
                 QtCore.QTimer.singleShot(100, lambda: _opened(name, tries + 1))
             return
+        gdoc = Gui.getDocument(name)
+        was = bool(gdoc.Modified) if gdoc is not None else False
         if any(getattr(b, appearance.PROP, "") for b in bodies.list_bodies(doc)) or (
             appearance.edited_default(doc) is not None
         ):
-            gdoc = Gui.getDocument(name)
-            was = bool(gdoc.Modified) if gdoc is not None else False
             appearance.sync(doc)
-            if gdoc is not None and not was:
-                gdoc.Modified = False  # the design is as it was saved
+        # (library-2) bodies without a look saved in FreeCAD's old grey show the default look
+        appearance.adopt_default(doc)
+        if gdoc is not None and not was:
+            gdoc.Modified = False  # the design is as it was saved
     except Exception as exc:
         warn("appearance: %s" % exc)
 
@@ -1109,5 +1192,7 @@ def install_watch():
 
 try:
     install_watch()
+    if App.GuiUp:
+        appearance.use_default_look()
 except Exception as _exc:  # pragma: no cover - only without a GUI
     warn("appearance watch not installed: %s" % _exc)

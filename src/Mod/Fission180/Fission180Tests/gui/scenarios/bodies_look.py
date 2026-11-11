@@ -25,6 +25,7 @@ from PySide import QtCore
 
 from Fission180Tests.gui import bodies_steps as s
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import looks_steps
 from Fission180Tests.gui import pattern_steps as ps
 from Fission180Tests.gui import widget_input as w
 
@@ -304,13 +305,17 @@ def f_click_body():
     # The body's top face has a look of its own (D): Fusion asks whether the faces keep
     # theirs or the whole body takes the new look (wave 7, book parity report bug 17; before,
     # a body look silently replaced them). Remove: the whole body, as this path checks.
-    from Fission180Tests.gui import looks_steps
-
-    looks_steps.answer("Remove")
+    # The question is a row of the Appearance dialog: the click ends with it open, the next
+    # step clicks Remove (library-2: it was a modal box, answered before it was up on a slow
+    # machine: GitHub's run of 049c500b).
     h.click(V(35, 25, 10))
 
 
+looks_steps.asks(f_click_body)
+
+
 def f_custom():
+    h.check("F one question for the one click", looks_steps.asked() == 1, looks_steps.asked())
     cols = colors()
     h.check("body is #3366CC", cols and all(same(c, (0.2, 0.4, 0.8)) for c in cols), cols)
 
@@ -347,9 +352,8 @@ def g_drop_rubber():
     h.check("a swatch drag carries its look", appearance_ui.look_of(mime) is not None)
     widget = h.gl_widget()
     pos = h.screen_point(V(35, 25, 10))
-    from Fission180Tests.gui import looks_steps
-
-    looks_steps.answer("Remove")  # (the top face has its own look again after F's Cancel)
+    # (the top face has its own look again after F's Cancel: the drop ends with the
+    # question open, the next step clicks Remove)
     actions = QtCore.Qt.CopyAction
     enter = QtGui.QDragEnterEvent(pos, actions, mime, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
     QtWidgets.QApplication.sendEvent(widget, enter)
@@ -361,7 +365,11 @@ def g_drop_rubber():
     QtWidgets.QApplication.processEvents()
 
 
+looks_steps.asks(g_drop_rubber)
+
+
 def g_black():
+    h.check("G one question for the one drop", looks_steps.asked() == 1, looks_steps.asked())
     cols = colors()
     h.check(
         "dropped: body is black rubber",
@@ -422,11 +430,13 @@ h.run(
         f_open,
         f_type_hex,
         f_click_body,
+        looks_steps.answers("Remove", "f_answer"),
         f_custom,
         f_cancel,
         f_cancelled,
         g_open,
         g_drop_rubber,
+        looks_steps.answers("Remove", "g_answer"),
         g_black,
         g_ok,
         g_kept,

@@ -39,12 +39,36 @@ def is_on(doc=None):
     return doc is not None and doc.Name in _STATE["on"]
 
 
+COLOR_PROP = "Fission180ColorIndex"  # on a component: how often its colour was cycled
+
+
+def _cycled(obj):
+    try:
+        return int(getattr(obj, COLOR_PROP, 0) or 0)
+    except Exception:
+        return 0
+
+
+def component_color(doc, component):
+    """The colour of a component (None: the design itself, its top component): one of the
+    palette in turn, moved on by Cycle Component Color."""
+    index = 0
+    if component is not None:
+        parts = components.list_components(doc)
+        try:
+            index = 1 + parts.index(component) + _cycled(component)
+        except ValueError:
+            index = 1 + _cycled(component)
+    return PALETTE[index % len(PALETTE)]
+
+
 def color_of(doc, owner):
     """The colour of the component `owner` (a body or loose solid) is in."""
-    parts = components.list_components(doc)
-    component = components.container_of(owner)
-    index = 0 if component is None else 1 + parts.index(component)
-    return PALETTE[index % len(PALETTE)]
+    return component_color(doc, components.container_of(owner))
+
+
+def hex_of(color):
+    return "#%02x%02x%02x" % tuple(int(round(c * 255)) for c in color)
 
 
 def owners(doc):
@@ -253,16 +277,19 @@ class ComponentColorsCommand:
 
 
 # -- Component Color Swatch -------------------------------------------------------------------
-# Fusion (timeline Settings > Component Color Swatch): a small swatch of each component's
-# colour, shown even when the canvas colours are off, so the colours can be told apart
-# without recolouring the model. Fission 180 shows them as a small list at the bottom left of
-# the 3D view: each component's name beside its colour (the same colours Display Component
-# Colors draws). Remembered between sessions. The swatch command is in the timeline's
-# Settings menu (the gear, as in Fusion) and under INSPECT.
+# Fusion (Autodesk, "Color code components and features"): with the timeline's Settings >
+# Component Color Swatch ticked, every component's colour is shown as a small mark on its row
+# in the Browser and on its steps in the Timeline; a step that belongs to several components
+# (a joint) shows a mark for each. The marks show whether the colours are drawn in the canvas
+# or not. Right-click a component > Cycle Component Color gives it the next colour.
+#
+# browser_ui and timeline_ui draw the marks: each asks the functions registered here
+# (browser_ui.ROW_COLORS, timeline_ui.STEP_COLORS) for a row's or a step's colours. The
+# setting is remembered between sessions.
 SWATCH_PREF = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
 SWATCH_KEY = "ComponentColorSwatch"
-SWATCH_NAME = "Fission180ComponentColorSwatch"
-_SWATCH = {"label": None, "observer": None, "timer": None}
+CYCLE_COMMAND = "Fission180_CycleComponentColor"
+_SWATCH = {"hooked": False}
 
 
 def swatch_on():
@@ -273,143 +300,181 @@ def swatch_on():
 
 
 def swatch_rows(doc=None):
-    """[(component name, (r, g, b))]: the design's own bodies first (its top component),
-    then every component, each with the colour Display Component Colors gives it."""
+    """[(component name, (r, g, b))]: the design itself first (its top component), then
+    every component, each with the colour Display Component Colors gives it."""
     doc = doc or App.ActiveDocument
     if doc is None:
         return []
-    rows = [(doc.Label, PALETTE[0])]
-    for index, part in enumerate(components.list_components(doc)):
-        rows.append((part.Label, PALETTE[(index + 1) % len(PALETTE)]))
+    rows = [(doc.Label, component_color(doc, None))]
+    for part in components.list_components(doc):
+        rows.append((part.Label, component_color(doc, part)))
     return rows
 
 
-def swatch_shown():
-    """The rows the swatch list shows now ([] when it is hidden): tests."""
-    label = _SWATCH.get("label")
+def row_color(node):
+    """browser_ui's hook: the colour mark ("#rrggbb") of a browser row, or None. Component
+    rows and the design's row carry one while the swatch is on and the design has a
+    component (with none there is nothing to tell apart)."""
+    if not swatch_on():
+        return None
+    kind = node.get("kind")
+    if kind not in ("component", "document"):
+        return None
+    doc = App.ActiveDocument
+    if doc is None:
+        return None
+    parts = components.list_components(doc)
+    if not parts:
+        return None
+    if kind == "document":
+        return hex_of(component_color(doc, None))
+    obj = doc.getObject(node.get("object") or "")
+    if obj is None or obj not in parts:
+        return None
+    return hex_of(component_color(doc, obj))
+
+
+def _joint_parts(obj):
+    """The components a joint step holds together ([] for anything else)."""
     try:
-        if label is None or not label.isVisible():
+        from . import joints
+
+        if not joints.is_joint(obj):
             return []
-    except RuntimeError:
+        found = []
+        for part in (joints.part1(obj), joints.part2(obj)):
+            if part is None:
+                continue
+            owner = part if components.is_component(part) else components.container_of(part)
+            if owner not in found:
+                found.append(owner)
+        return found
+    except Exception:
         return []
-    return swatch_rows()
 
 
-def _swatch_label():
+def _step_owner(doc, item, obj):
+    """The component a timeline step belongs to (None: the design itself): the component it
+    made, else the one its body is in now (a body moved into a component takes its steps
+    along)."""
+    if obj is None:
+        return doc.getObject(getattr(item, "component", "") or "")
+    if components.is_component(obj):
+        return obj
+    try:
+        body = components.body_of(obj)
+    except Exception:
+        body = None
+    try:
+        return components.container_of(body if body is not None else obj)
+    except Exception:
+        return None
+
+
+def step_colors(item):
+    """timeline_ui's hook: the colour marks (["#rrggbb", ...]) of a timeline step: its
+    component's colour; a joint's two components' colours. [] while the swatch is off or the
+    design has no component."""
+    if not swatch_on():
+        return []
+    doc = App.ActiveDocument
+    if doc is None:
+        return []
+    parts = components.list_components(doc)
+    if not parts:
+        return []
+    obj = doc.getObject(getattr(item, "name", "") or "")
+    owners = _joint_parts(obj) if obj is not None else []
+    if not owners:
+        owners = [_step_owner(doc, item, obj)]
+    colors = []
+    for owner in owners:
+        color = hex_of(component_color(doc, owner if owner in parts else None))
+        if color not in colors:
+            colors.append(color)
+    return colors
+
+
+def marks_shown(doc=None):
+    """What the browser and the timeline mark now: {"rows": [(name, "#rrggbb")], "steps":
+    {step name: ["#rrggbb"]}} as their widgets hold them (tests)."""
     from .compat import QtWidgets
 
-    label = _SWATCH.get("label")
+    doc = doc or App.ActiveDocument
+    found = {"rows": [], "steps": {}}
+    window = Gui.getMainWindow()
     try:
-        if label is not None:
-            label.objectName()
-            return label
-    except RuntimeError:
-        label = None
-    label = QtWidgets.QLabel(Gui.getMainWindow())
-    label.setObjectName(SWATCH_NAME)
-    label.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-    label.setTextFormat(QtCore.Qt.RichText)
-    label.setStyleSheet(
-        "QLabel#%s { background: rgba(30, 36, 44, 215); color: #e8edf3; border: 1px solid "
-        "#55657a; border-radius: 3px; padding: 4px 8px; }" % SWATCH_NAME
-    )
-    label.hide()
-    _SWATCH["label"] = label
-    return label
+        from . import browser_ui
 
-
-def update_swatch():
-    """Show the swatch list as the design is now (or hide it)."""
-    try:
-        label = _swatch_label()
-        rows = swatch_rows() if swatch_on() else []
-        if len(rows) < 2:  # no components: nothing to tell apart
-            label.hide()
-            return
-        lines = []
-        for name, color in rows[:24]:
-            code = "#%02x%02x%02x" % tuple(int(round(c * 255)) for c in color)
-            safe = name.replace("&", "&amp;").replace("<", "&lt;")
-            lines.append('<span style="color:%s;">&#9632;</span>&nbsp;%s' % (code, safe))
-        if len(rows) > 24:
-            lines.append("... and %d more" % (len(rows) - 24))
-        label.setText("<br>".join(lines))
-        label.adjustSize()
-        window = label.parentWidget()
-        area = window.centralWidget()
-        if area is not None:
-            corner = area.mapTo(window, QtCore.QPoint(0, area.height()))
-        else:
-            corner = QtCore.QPoint(0, window.height())
-        label.move(corner.x() + 10, max(0, corner.y() - label.height() - 10))
-        label.show()
-        label.raise_()
+        tree = window.findChild(QtWidgets.QTreeWidget, "Fission180Browser")
+        items = [tree.topLevelItem(i) for i in range(tree.topLevelItemCount())] if tree else []
+        while items:
+            item = items.pop(0)
+            items[0:0] = [item.child(i) for i in range(item.childCount())]
+            node = item.data(1, browser_ui.ROLE_NODE)
+            color = browser_ui.row_color(node) if node else None
+            if color:
+                found["rows"].append((node.get("label"), color))
     except Exception as exc:
-        warn("component colour swatch: %s" % exc)
+        warn("component colour marks: %s" % exc)
+    try:
+        from . import timeline_ui
+
+        for button in window.findChildren(QtWidgets.QToolButton):
+            item = getattr(button, "item", None)
+            if button.property("role") == "step" and item is not None and button.isVisible():
+                colors = timeline_ui.step_colors(item)
+                if colors:
+                    found["steps"][item.name] = colors
+    except Exception as exc:
+        warn("component colour marks: %s" % exc)
+    return found
 
 
-class _SwatchWatch:
-    """Components made, renamed or removed, another design shown: the list follows a moment
-    later (nothing is done inside FreeCAD's callbacks)."""
+def refresh_marks():
+    """Have the browser and the timeline draw their rows and steps again."""
+    from .compat import QtWidgets
 
-    def _later(self):
-        timer = _SWATCH.get("timer")
-        if timer is not None and swatch_on():
-            timer.start()
-
-    def slotCreatedObject(self, obj):
-        try:
-            if obj.TypeId == "App::Part":
-                self._later()
-        except Exception:
-            pass
-
-    def slotDeletedObject(self, obj):
-        self.slotCreatedObject(obj)
-
-    def slotChangedObject(self, obj, prop):
-        try:
-            if prop == "Label" and obj.TypeId == "App::Part":
-                self._later()
-        except Exception:
-            pass
-
-    def slotActivateDocument(self, doc):
-        self._later()
-
-    def slotDeletedDocument(self, doc):
-        self._later()
-
-    def slotUndoDocument(self, doc):
-        self._later()
-
-    def slotRedoDocument(self, doc):
-        self._later()
+    try:
+        window = Gui.getMainWindow()
+        tree = window.findChild(QtWidgets.QTreeWidget, "Fission180Browser")
+        if tree is not None:
+            tree.viewport().update()
+        for button in window.findChildren(QtWidgets.QToolButton):
+            if button.property("role") == "step":
+                button.update()
+    except Exception as exc:
+        warn("component colour marks: %s" % exc)
 
 
-def _install_swatch():
-    if _SWATCH["observer"] is not None or not App.GuiUp:
+def _hook():
+    """Register the two functions the browser and the timeline ask (once)."""
+    if _SWATCH["hooked"] or not App.GuiUp:
         return
-    timer = QtCore.QTimer(Gui.getMainWindow())
-    timer.setSingleShot(True)
-    timer.setInterval(120)
-    timer.timeout.connect(update_swatch)
-    _SWATCH["timer"] = timer
-    _SWATCH["observer"] = _SwatchWatch()
-    App.addDocumentObserver(_SWATCH["observer"])
+    try:
+        from . import browser_ui, timeline_ui
+
+        if row_color not in browser_ui.ROW_COLORS:
+            browser_ui.ROW_COLORS.append(row_color)
+        if step_colors not in timeline_ui.STEP_COLORS:
+            timeline_ui.STEP_COLORS.append(step_colors)
+        _SWATCH["hooked"] = True
+    except Exception as exc:
+        warn("component colour marks not hooked in: %s" % exc)
 
 
 def toggle_swatch():
     on = not swatch_on()
     App.ParamGet(SWATCH_PREF).SetBool(SWATCH_KEY, on)
-    _install_swatch()
-    update_swatch()
+    _hook()
+    refresh_marks()
     if on and len(swatch_rows()) < 2:
         from . import commands
 
         commands.tell(
-            "Component Color Swatch is on. This design has no components yet: the swatches "
-            "show once it has one (ASSEMBLE > New Component)."
+            "Component Color Swatch is on. This design has no components yet: the colour "
+            "marks show in the browser and the timeline once it has one (ASSEMBLE > New "
+            "Component)."
         )
     log("component colour swatch %s" % ("on" if on else "off"))
     return on
@@ -419,7 +484,8 @@ class ComponentColorSwatchCommand:
     def GetResources(self):
         return {
             "MenuText": "Component Color Swatch",
-            "ToolTip": "Show each component's colour beside its name (again: hide them)",
+            "ToolTip": "Mark each component's colour on its browser row and its timeline "
+            "steps (again: hide the marks)",
             "Pixmap": ui_icon_path("component_colors"),
         }
 
@@ -433,14 +499,121 @@ class ComponentColorSwatchCommand:
             warn("Component Color Swatch: %s" % exc)
 
 
+# -- Cycle Component Color ---------------------------------------------------------------------
+def can_cycle(doc=None):
+    """Cycle Component Color is offered while the colours show somewhere: in the canvas
+    (Display Component Colors) or as marks (Component Color Swatch)."""
+    doc = doc or App.ActiveDocument
+    return doc is not None and (is_on(doc) or swatch_on())
+
+
+def cycle(component):
+    """Give a component the next colour of the palette (stored in the design, one undo
+    step). Returns its new colour."""
+    doc = component.Document
+    doc.openTransaction("Cycle Component Color")
+    try:
+        if COLOR_PROP not in component.PropertiesList:
+            component.addProperty(
+                "App::PropertyInteger", COLOR_PROP, "Fission180", "Component colour", 4
+            )
+        # the next colour no other component has (while the palette has one left)
+        taken = {component_color(doc, None)}
+        taken |= {
+            component_color(doc, p) for p in components.list_components(doc) if p is not component
+        }
+        for _try in range(len(PALETTE)):
+            setattr(component, COLOR_PROP, (_cycled(component) + 1) % len(PALETTE))
+            if component_color(doc, component) not in taken:
+                break
+        doc.commitTransaction()
+    except Exception:
+        doc.abortTransaction()
+        raise
+    if is_on(doc):
+        schedule(doc)
+    refresh_marks()
+    return component_color(doc, component)
+
+
+def _selected_components(doc):
+    found = []
+    try:
+        for obj in Gui.Selection.getSelection(doc.Name):
+            part = obj if components.is_component(obj) else None
+            if part is not None and part not in found:
+                found.append(part)
+    except Exception:
+        pass
+    return found
+
+
+class CycleComponentColorCommand:
+    def GetResources(self):
+        return {
+            "MenuText": "Cycle Component Color",
+            "ToolTip": "Give the selected component the next colour",
+            "Pixmap": ui_icon_path("component_colors"),
+        }
+
+    def IsActive(self):
+        try:
+            return can_cycle()
+        except Exception:
+            return False
+
+    def Activated(self):
+        from . import commands
+
+        try:
+            doc = App.ActiveDocument
+            if doc is None:
+                commands.tell("Open or start a design first.")
+                return
+            if not can_cycle(doc):
+                commands.tell(
+                    "Component colours are off. Turn on INSPECT > Display Component Colors "
+                    "(Shift+N) or Component Color Swatch first."
+                )
+                return
+            parts = _selected_components(doc)
+            if not parts:
+                commands.tell(
+                    "Right-click a component in the browser and choose Cycle Component Color."
+                )
+                return
+            for part in parts:
+                color = cycle(part)
+                log("%s takes the colour %s" % (part.Label, hex_of(color)))
+        except Exception as exc:
+            warn("Cycle Component Color: %s" % exc)
+
+
+class _MarkWatch:
+    """A design changed under the marks in a way the browser and the timeline do not draw
+    again for by themselves (an undo of Cycle Component Color)."""
+
+    def slotChangedObject(self, obj, prop):
+        if prop == COLOR_PROP:
+            QtCore.QTimer.singleShot(0, refresh_marks)
+            try:
+                if is_on(obj.Document):
+                    schedule(obj.Document)
+            except Exception:
+                pass
+
+
 COMMANDS = {
     "Fission180_ComponentColors": ComponentColorsCommand,
     "Fission180_ComponentColorSwatch": ComponentColorSwatchCommand,
+    CYCLE_COMMAND: CycleComponentColorCommand,
 }
 
 try:
-    if App.GuiUp and swatch_on():
-        _install_swatch()
-        QtCore.QTimer.singleShot(0, update_swatch)
+    if App.GuiUp:
+        # after the window's parts are imported (this module is one of them)
+        QtCore.QTimer.singleShot(0, _hook)
+        _SWATCH["watch"] = _MarkWatch()
+        App.addDocumentObserver(_SWATCH["watch"])
 except Exception as _exc:  # pragma: no cover - only without a GUI
     warn("component colour swatch not installed: %s" % _exc)

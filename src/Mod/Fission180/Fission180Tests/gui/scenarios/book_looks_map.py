@@ -20,7 +20,8 @@ Body = box 0..40 x 0..30 x 10.
   F  Appearance, Faces, "Leather, brown" dragged onto the top face: two patterns on one body.
   G  INSPECT > Display Component Colors: the patterns are off under the colours; again: on.
   H  the timeline's gear > Component Color Swatch: no component yet, it says so; with a
-     component the swatches list the design and the component; the gear's entry is ticked;
+     component its row and the design's row are marked in the browser, its steps in the
+     timeline; the gear's entry is ticked;
      once more: off.
   I  save, close, reopen: the map and both patterns are back.
 """
@@ -386,7 +387,7 @@ def gear(entry):
 def swatch_rows():
     from fission180 import component_colors_ui
 
-    return component_colors_ui.swatch_shown()
+    return component_colors_ui.marks_shown()["rows"]
 
 
 def h_swatch_on():
@@ -399,7 +400,7 @@ def h_no_components():
     from fission180 import component_colors_ui
 
     h.check("the swatch is on", component_colors_ui.swatch_on())
-    h.check("no component yet: nothing to list", swatch_rows() == [], swatch_rows())
+    h.check("no component yet: nothing to mark", swatch_rows() == [], swatch_rows())
 
 
 def h_component():
@@ -419,13 +420,17 @@ def h_listed():
     rows = swatch_rows()
     names = [name for name, _color in rows]
     h.check(
-        "the swatches list the design and the component",
+        "the design's row and the component's row are marked in the browser",
         names == [App.ActiveDocument.Label, "Lid"],
         names,
     )
     h.check("each in a colour of its own", len(rows) == 2 and rows[0][1] != rows[1][1], rows)
+    from fission180 import component_colors_ui
+
+    steps = component_colors_ui.marks_shown()["steps"]
+    h.check("and the steps in the timeline", bool(steps), steps)
     label = Gui.getMainWindow().findChild(QtWidgets.QLabel, "Fission180ComponentColorSwatch")
-    h.check("shown at the bottom left of the 3D view", label is not None and label.isVisible())
+    h.check("no list in the 3D view any more", label is None or not label.isVisible())
     h.shot("H-swatch")
     _ok, ticked = gear(None)
     h.check("the gear's entry is ticked now", ticked is True, ticked)
@@ -439,7 +444,7 @@ def h_hidden():
     from fission180 import component_colors_ui
 
     h.check("the swatch is off", not component_colors_ui.swatch_on())
-    h.check("the list is gone", swatch_rows() == [])
+    h.check("the marks are gone", swatch_rows() == [])
 
 
 # -- I ---------------------------------------------------------------------------------------------

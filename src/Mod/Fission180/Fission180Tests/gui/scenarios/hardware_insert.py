@@ -360,8 +360,10 @@ def f_type():
 
 
 def f_rim():
-    # the rim of the magnet's pocket: a 6.2 round edge on the top face
-    h.check("click the pocket's rim", h.click_edge(V(30 + 3.1, 8, 10)), h.state.get("last_click"))
+    # the rim of the magnet's pocket: a 6.2 round edge on the top face. The magnet's own edge
+    # (6.0) is a pixel inside it and cannot be clicked: aimed from just outside the rim, the
+    # way a person comes at it (library-2: the joints' marks at the holes changed the fit).
+    h.check("click the pocket's rim", h.click_edge(V(30 + 3.4, 8, 10)), h.state.get("last_click"))
 
 
 def f_on_rim():
