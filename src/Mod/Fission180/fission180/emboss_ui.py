@@ -62,6 +62,39 @@ def remember_depth(value):
         pass
 
 
+PLANE_TYPES = ("PartDesign::Plane", "App::Plane")
+
+
+def _is_plane(obj):
+    return getattr(obj, "TypeId", "") in PLANE_TYPES
+
+
+def _face_behind(point):
+    """(object, "FaceN", point) of the first face of a solid behind a construction plane
+    at the 3D `point` the plane was clicked at (what the line of sight meets next), or
+    None."""
+    if point is None:
+        return None
+    try:
+        view = Gui.ActiveDocument.ActiveView
+        pixel = view.getPointOnViewport(point)
+        infos = view.getObjectsInfo((int(round(pixel[0])), int(round(pixel[1])))) or []
+    except Exception:
+        return None
+    for info in infos:
+        try:
+            obj = App.getDocument(info["Document"]).getObject(info["Object"])
+        except Exception:
+            continue
+        short = str(info.get("Component", "") or "")
+        if obj is None or _is_plane(obj) or not short.startswith("Face"):
+            continue
+        if extrude.is_sketch(obj) or text.is_text(obj):
+            continue
+        return obj, short, App.Vector(info["x"], info["y"], info["z"])
+    return None
+
+
 class _Observer:
     def __init__(self, panel):
         self.panel = panel
@@ -356,6 +389,14 @@ class EmbossPanel(Panel):
             if short.startswith("InternalFace"):
                 self._toggle_profile((obj, short))
             return
+        if not short.startswith("Face") and self.active == "faces" and _is_plane(obj):
+            # (wave 7, the book replay: the Geocache's words, report line 1346) a construction
+            # plane drawn in front of the part took the click meant for the face behind it.
+            # Fusion's Faces box takes faces only: the click goes through to the face.
+            behind = _face_behind(point)
+            if behind is None:
+                return
+            obj, short, point = behind
         if not short.startswith("Face"):
             return
         name = self._base_face(obj, short, point)

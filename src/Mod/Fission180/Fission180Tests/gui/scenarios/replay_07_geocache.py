@@ -634,6 +634,710 @@ def c_knurled():
     h.shot("C-knurl")
 
 
+# == D: the Top Cap =================================================================================
+CAP_IN, CAP_OUT = 16.5, 19.5  # the cap's wall: 33 inside (on the screw), 3 thick
+CAP_Z0, CAP_TOP, CAP_INSIDE = 30.0, 54.0, 51.0  # (made above the screw, as a separate body)
+# the profile in the Front sketch (x along X, y along Z), drawn freehand a little off
+ROUGH = [(17.2, 31.3), (20.4, 31.3), (20.4, 55.2), (0.0, 55.2), (0.0, 51.8), (17.2, 51.8)]
+
+
+def cap():
+    return r.doc().getObject(s["cap"]) if s.get("cap") else None
+
+
+def d_sketch():
+    Gui.Selection.clearSelection()
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+def d_front():
+    pl.pick_in_browser("XZ_Plane")  # Front
+
+
+d_front.done = lambda: h.in_sketch() is not None
+d_front.done_what = "the sketch on the Front plane is open"
+
+
+def d_line():
+    sk = r.sk()
+    s["cap_sketch"] = sk.Name
+    h.check(
+        "D the sketch is on the Front (XZ) plane", sk.AttachmentSupport[0][0].Role == "XZ_Plane"
+    )
+    r.zoom_on(r.g(V(10, 43, 0)), 40.0)
+    s["geo0"] = len(sk.Geometry)
+    h.press("l")
+
+
+def line_click(k):
+    def step():
+        x, y = ROUGH[k % len(ROUGH)]
+        r.sclick(V(x, y, 0))
+
+    return r.named(step, "d_line_%d" % k)
+
+
+def d_lines_done():
+    r.esc()
+    r.esc()
+    lines = [g for i, g in r.geo("Part::GeomLineSegment") if i >= s["geo0"]]
+    h.check("D six lines", len(lines) == 6, len(lines))
+    kinds = [c.Type for _i, c in r.cons(("Horizontal", "Vertical"))]
+    h.check("D each line is level or upright by inference", len(kinds) == 6, kinds)
+    r.sketch_clean("D drawn:")
+    s["lines"] = [i for i, _g in r.geo("Part::GeomLineSegment") if i >= s["geo0"]]
+    h.press("d")
+
+
+def cap_line(k):
+    return r.sk().Geometry[s["lines"][k]]
+
+
+def mid(g):
+    return V((g.StartPoint.x + g.EndPoint.x) / 2.0, (g.StartPoint.y + g.EndPoint.y) / 2.0, 0)
+
+
+def corner(k):
+    g = cap_line(k)
+    return V(g.StartPoint.x, g.StartPoint.y, 0)
+
+
+def dim_line(k, value, offset):
+    """D on line k, placed `offset` from its middle, the value typed."""
+
+    def pick():
+        r.sclick(mid(cap_line(k)))
+
+    def place():
+        r.sclick(mid(cap_line(k)) + offset)
+
+    def typed():
+        h.check("D the value box is open (line %d)" % k, r.value_editor() is not None)
+        r.keyboard(value)
+        r.enter()
+
+    return [
+        r.named(pick, "d_dim_line_%d_pick" % k),
+        r.named(place, "d_dim_line_%d_place" % k),
+        r.named(typed, "d_dim_line_%d_type" % k),
+    ]
+
+
+def dim_origin(name, value, across):
+    """D from the origin to the profile's first corner: across (placed below) or up
+    (placed to the left)."""
+
+    def pick():
+        r.sclick(corner(0))
+
+    def origin():
+        r.sclick(V(0, 0, 0))
+
+    def place():
+        c = corner(0)
+        if across:
+            r.sclick(V(c.x / 2.0, -4.0, 0))
+        else:
+            r.sclick(V(-4.0, c.y / 2.0, 0))
+
+    def typed():
+        h.check("D the value box is open (%s)" % name, r.value_editor() is not None)
+        r.keyboard(value)
+        r.enter()
+
+    return [
+        r.named(pick, "d_dim_%s_pick" % name),
+        r.named(origin, "d_dim_%s_origin" % name),
+        r.named(place, "d_dim_%s_place" % name),
+        r.named(typed, "d_dim_%s_type" % name),
+    ]
+
+
+def d_profile_done():
+    r.esc()
+    want = [
+        (CAP_IN, CAP_Z0),
+        (CAP_OUT, CAP_Z0),
+        (CAP_OUT, CAP_TOP),
+        (0.0, CAP_TOP),
+        (0.0, CAP_INSIDE),
+        (CAP_IN, CAP_INSIDE),
+    ]
+    got = [(round(corner(k).x, 6), round(corner(k).y, 6)) for k in range(6)]
+    h.check("D the profile has the cap's sizes", got == want, got)
+    r.sketch_clean("D")
+    h.check("D the profile is fully constrained", r.dof() == 0, r.dof())
+    h.shot("D-profile")
+    h.ribbon("Finish Sketch")
+
+
+d_profile_done.done = lambda: h.in_sketch() is None
+d_profile_done.done_what = "Finish Sketch closed the sketch"
+
+
+def revolve_panel():
+    from fission180 import revolve_ui
+
+    p = revolve_ui.RevolvePanel.last
+    return p if p is not None and not p._closed else None
+
+
+def d_revolve():
+    h.fit()
+    Gui.Selection.clearSelection()
+    h.ribbon("Revolve")
+
+
+d_revolve.done = lambda: revolve_panel() is not None
+d_revolve.done_what = "the Revolve dialog is open"
+
+
+def d_axis_box():
+    from Fission180Tests.gui import pattern_steps as ps  # noqa: F401 (click_box is generic)
+
+    p = revolve_panel()
+    h.check("D the profile is taken by itself", len(p.profiles) == 1, p.profiles)
+    if p.active != "axis":
+        from Fission180Tests.gui import widget_input as w
+
+        w.click(p.fields["axis"].button)
+
+
+def d_axis():
+    pl.pick_in_browser("Z_Axis")
+
+
+def d_revolve_ok():
+    p = revolve_panel()
+    axis = p.axis
+    h.check(
+        "D the Z axis from the browser",
+        axis is not None and getattr(axis[0], "Role", "") == "Z_Axis",
+        axis,
+    )
+    h.caught_up(p)
+    s["operation"] = p.operation.currentText()
+    h.task_button("OK")
+
+
+d_revolve_ok.done = lambda: revolve_panel() is None
+d_revolve_ok.done_what = "OK finished the Revolve"
+d_revolve_ok.timeout_s = 120
+
+
+def d_cap():
+    made = r.solid_bodies()
+    h.check("D touching nothing: a New Body", s["operation"] == "New Body", s["operation"])
+    h.check("D two bodies", len(made) == 2, [b.Label for b in made])
+    new = [b for b in made if b.Name != s["screw"]]
+    if not new:
+        return
+    s["cap"] = new[0].Name
+    want = math.pi * (CAP_OUT**2 - CAP_IN**2) * (
+        CAP_INSIDE - CAP_Z0
+    ) + math.pi * CAP_OUT**2 * (CAP_TOP - CAP_INSIDE)
+    h.check("D the cap's size", r.near(cap().Shape.Volume, want, 1e-6), (cap().Shape.Volume, want))
+    h.check("D the screw is untouched", r.near(vol(), s["v_knurl"], 1e-9), vol())
+    all_ok("D revolve:")
+    t.click_eye("Bottom Screw")  # the screw is in the way of a look into the cap
+
+
+def d_screw_hidden():
+    h.check("D the eye hides the screw", not screw().Visibility)
+    r.look_from(V(-1, 1, 1.4))  # from below: into the cap
+    Gui.Selection.clearSelection()
+    r.menu("CREATE", "Thread")
+
+
+d_screw_hidden.done = lambda: thread_panel() is not None
+d_screw_hidden.done_what = "the Thread dialog is open"
+
+
+def d_inner_wall():
+    # the far side of the inner wall, seen through the cap's open end (a click on a wall
+    # with another wall in front of it picks the front one, in Fusion too)
+    a = math.radians(135)
+    h.click(V(CAP_IN * math.cos(a), CAP_IN * math.sin(a), CAP_Z0 + 8.0))
+
+
+def d_thread_values():
+    from Fission180Tests.gui import hole_steps as hs
+
+    p = thread_panel()
+    if not h.check("D the inner wall is threaded", p.target is not None, hs.message(p)):
+        return
+    text = p.info.text()
+    h.check("D the dialog says: inside thread, 33 mm", "nside" in text and "33" in text, text)
+    s["designation"] = p.designation.currentText()
+    # Fusion starts a thread with the last one's settings: Modeled is ticked already (the
+    # book says to tick it: a person looks and leaves it)
+    h.check("D Modeled is ticked from the last thread", p.modeled.isChecked())
+    if not p.modeled.isChecked():
+        hs.click_checkbox(p.modeled)
+
+
+def d_thread_full_length():
+    from Fission180Tests.gui import hole_steps as hs
+
+    p = thread_panel()
+    h.check("D Full Length is ticked at first", p.full_length.isChecked())
+    hs.click_checkbox(p.full_length)
+
+
+def d_thread_length():
+    from Fission180Tests.gui import dialog_input as ui
+
+    p = thread_panel()
+    h.check("D Full Length unticked: Thread Length shows", p.length.widget.isVisible())
+    ui.type_into(p.length.widget, "18")
+
+
+def d_thread_ok():
+    p = thread_panel()
+    h.caught_up(p)
+    from Fission180Tests.gui import hole_steps as hs
+
+    h.check(
+        "D Modeled, 18 long",
+        p.modeled.isChecked() and not p.full_length.isChecked() and r.near(p.length.value(), 18),
+        (p.modeled.isChecked(), p.full_length.isChecked(), p.length.value(), hs.message(p)),
+    )
+    h.task_button("OK")
+
+
+d_thread_ok.done = lambda: thread_panel() is None
+d_thread_ok.done_what = "OK finished the Thread"
+d_thread_ok.timeout_s = 180
+
+
+def d_threaded():
+    shape = cap().Shape
+    h.check("D the cap is one valid solid", shape.isValid() and len(shape.Solids) == 1)
+    before = math.pi * (CAP_OUT**2 - CAP_IN**2) * (
+        CAP_INSIDE - CAP_Z0
+    ) + math.pi * CAP_OUT**2 * (CAP_TOP - CAP_INSIDE)
+    # Fusion gives a threaded hole the thread's minor diameter and cuts the thread from
+    # there (Autodesk forum "BUG thread changes the hole diameter": as designed), so the
+    # cap gains material where the 18 mm are threaded
+    h.check("D the 18 mm are threaded", shape.Volume > before + 50.0, (shape.Volume, before))
+    bb = shape.BoundBox
+    h.check(
+        "D the cap keeps its outside",
+        r.near(bb.ZMax, CAP_TOP, 1e-6) and r.near(bb.XMax, CAP_OUT, 1e-3),
+    )
+    # the nearest standard size, as Fusion offers it (Autodesk tech tip, thread_tables.closest;
+    # the report's M36x3 was the older tap-drill rule): it fits the screw's M33x3.5
+    h.check("D M33x3.5 is offered for a 33 bore", s["designation"] == "M33x3.5", s["designation"])
+    all_ok("D thread:")
+    h.shot("D-cap")
+    t.click_eye("Bottom Screw")
+
+
+def d_screw_shown():
+    h.check("D the eye shows the screw again", screw().Visibility)
+    h.fit()
+
+
+# == E: the words wrapped round the cap, the mark ===================================================
+WORDS = "UNSCREW CAP\nOFFICIAL GEOCACHE."  # (two lines: the stand-in cap is smaller)
+
+
+def construct_panel():
+    from fission180 import construct_ui, taskui
+
+    p = taskui.current()
+    return p if isinstance(p, construct_ui.ConstructPanel) else None
+
+
+def e_plane():
+    Gui.Selection.clearSelection()
+    h.fit()
+    h.ribbon("Offset Plane")
+
+
+e_plane.done = lambda: construct_panel() is not None
+e_plane.done_what = "the Offset Plane dialog is open"
+
+
+def e_plane_xz():
+    pl.pick_in_browser("XZ_Plane")
+
+
+def e_plane_distance():
+    from Fission180Tests.gui import dialog_input as ui
+
+    p = construct_panel()
+    h.check("E the Front plane is the reference", p.datum is not None)
+    ui.type_into(p.distance.widget, "-30")
+
+
+def e_plane_ok():
+    p = construct_panel()
+    h.caught_up(p)
+    place = p.datum.getGlobalPlacement()
+    s["plane_y"] = place.Base.y
+    h.check("E the plane is 30 from the Front plane", r.near(abs(place.Base.y), 30.0), place.Base)
+    h.task_button("OK")
+
+
+e_plane_ok.done = lambda: construct_panel() is None
+e_plane_ok.done_what = "OK finished the Offset Plane"
+
+
+def offset_plane():
+    found = [o for o in r.doc().Objects if o.TypeId == "PartDesign::Plane"]
+    return found[-1] if found else None
+
+
+def e_sketch():
+    h.check("E Plane 1 is in the design", offset_plane() is not None)
+    h.ribbon("Create Sketch")
+
+
+def e_sketch_plane():
+    t.click_row(offset_plane().Label)
+
+
+e_sketch_plane.done = lambda: h.in_sketch() is not None
+e_sketch_plane.done_what = "the sketch on the offset plane is open"
+
+
+def text_dialog():
+    from Fission180Tests.gui import text_input as ti
+
+    return ti.dialog()
+
+
+def e_text():
+    from Fission180Tests.gui import text_input as ti
+
+    sk = r.sk()
+    s["word_sketch"] = sk.Name
+    h.check(
+        "E the sketch is on the offset plane",
+        r.near(sk.getGlobalPlacement().Base.y, s["plane_y"], 1e-6),
+        sk.getGlobalPlacement(),
+    )
+    s["texts"] = list(ti.texts(sk))
+    r.zoom_on(r.g(V(0, 42, 0)), 60.0)
+    ti.open_text_tool()
+
+
+e_text.done = lambda: text_dialog() is not None
+e_text.done_what = "the Text dialog is open"
+
+
+def e_corner_1():
+    r.sclick(V(-50, 33, 0))  # (wide enough for each line: the frame wraps words)
+
+
+def e_corner_2():
+    r.sclick(V(50, 51, 0))
+
+
+def e_type():
+    from Fission180Tests.gui import text_input as ti
+
+    d = text_dialog()
+    h.check("E the frame is placed", d.frame_placed)
+    ti.type_text(WORDS)
+    ti.type_field(d.height, "7.5")
+    ti.press_button(d.h_buttons["center"])
+    ti.press_button(d.v_buttons["middle"])
+
+
+def e_text_ok():
+    from Fission180Tests.gui import text_input as ti
+
+    d = text_dialog()
+    h.check("E nothing is refused", not d.message.text(), d.message.text())
+    ti.ok()
+
+
+e_text_ok.done = lambda: text_dialog() is None
+e_text_ok.done_what = "OK closed the Text dialog"
+
+
+def e_finish():
+    from Fission180Tests.gui import text_input as ti
+
+    new = [o for o in ti.texts(r.sk()) if o not in s["texts"]]
+    h.check("E the text is in the sketch", len(new) == 1, new)
+    s["words"] = new[0].Name if new else None
+    if new:
+        h.check("E ...7.5 high", r.near(new[0].TextHeight.Value, 7.5), new[0].TextHeight)
+        h.check("E ...two lines", new[0].ResolvedText == WORDS, new[0].ResolvedText)
+    h.ribbon("Finish Sketch")
+
+
+e_finish.done = lambda: h.in_sketch() is None
+e_finish.done_what = "Finish Sketch closed the sketch"
+
+
+def emboss_panel():
+    from fission180 import emboss_ui
+
+    p = emboss_ui.EmbossPanel.last
+    return p if p is not None and not p._closed and Gui.Control.activeDialog() else None
+
+
+def e_emboss():
+    Gui.Selection.clearSelection()
+    r.look_from(V(0, 1, 0) if s["plane_y"] < 0 else V(0, -1, 0))  # facing the words
+    r.menu("CREATE", "Emboss")
+
+
+e_emboss.done = lambda: emboss_panel() is not None
+e_emboss.done_what = "the Emboss dialog is open"
+
+
+def e_letter():
+    from Fission180Tests.gui import text_input as ti
+
+    words = r.doc().getObject(s["words"])
+    sk = r.doc().getObject(s["word_sketch"])
+    x, y = ti.middle_of_first_letter(words)
+    h.click(sk.getGlobalPlacement().multVec(V(x, y, 0)))
+
+
+def e_face():
+    p = emboss_panel()
+    h.check("E the words are the profile", len(p.profiles) == 1, p.profiles)
+    h.check("E now it waits for the faces", p.active == "faces", p.active)
+    h.shot("E-faces")
+    s["v_cap"] = cap().Shape.Volume
+    # the cap's side beside the words, where the offset plane is in front of it (Fusion
+    # picks the face through the plane: the Faces box takes faces only)
+    side = -1.0 if s["plane_y"] < 0 else 1.0
+    a = math.radians(10.0)
+    h.click(V(CAP_OUT * math.sin(a), side * CAP_OUT * math.cos(a), CAP_Z0 + 0.8))  # below the words
+
+
+def e_depth():
+    from Fission180Tests.gui import dialog_input as ui
+
+    p = emboss_panel()
+    h.check(
+        "E the cap's side is picked (the report: the plane took the click)",
+        len(p.face_names) == 1,
+        p.face_names,
+    )
+    ui.type_into(p.depth.widget, "0.75")
+
+
+def e_emboss_ok():
+    p = emboss_panel()
+    h.caught_up(p)
+    h.check("E nothing is refused", not p.message.text(), p.message.text())
+    h.check("E the letters stand out", cap().Shape.Volume > s["v_cap"] + 5.0, cap().Shape.Volume)
+    h.shot("E-emboss")
+    h.task_button("OK")
+
+
+e_emboss_ok.done = lambda: emboss_panel() is None
+e_emboss_ok.done_what = "OK finished the Emboss"
+e_emboss_ok.timeout_s = 300
+
+
+def e_embossed():
+    shape = cap().Shape
+    h.check("E the cap is one valid solid", shape.isValid() and len(shape.Solids) == 1)
+    bb = shape.BoundBox
+    h.check(
+        "E the letters stand 0.75 off the cap's side",
+        r.near(max(abs(bb.YMin), abs(bb.YMax)), CAP_OUT + 0.75, 1e-3),
+        (bb.YMin, bb.YMax),
+    )
+    all_ok("E emboss:")
+    s["v_cap"] = shape.Volume
+    h.fit()
+
+
+def e_svg_sketch():
+    from Fission180Tests.gui import insert_steps as ins
+
+    ins.use_file(ins.fixture("replay_geocache_mark.svg"))
+    Gui.Selection.clearSelection()
+    h.ribbon("Create Sketch")
+
+
+def e_svg_plane():
+    t.click_row(offset_plane().Label)
+
+
+e_svg_plane.done = lambda: h.in_sketch() is not None
+e_svg_plane.done_what = "a second sketch on the offset plane is open"
+
+
+def svg_panel():
+    from fission180 import taskui
+
+    p = taskui.current()
+    return p if p is not None and getattr(p, "title", "") == "Insert SVG" else None
+
+
+def e_svg():
+    s["svg_sketch"] = r.sk().Name
+    r.menu("INSERT", "Insert SVG")
+
+
+e_svg.done = lambda: svg_panel() is not None
+e_svg.done_what = "the Insert SVG dialog is open"
+
+
+def e_svg_values():
+    from Fission180Tests.gui import insert_steps as ins
+
+    p = svg_panel()
+    h.check("E the curves go into the open sketch", "Sketch" in p.plane_label.text())
+    h.check("E no question about 96 dpi (FreeCAD's own box)", not h.popups(), h.popups())
+    ins.set_spin(p.scale, 0.3)
+    ins.set_check(p.flip_h, True)
+    ins.set_check(p.flip_v, True)
+    ins.type_value(p.dx, "-15")
+    ins.type_value(p.dy, "2")
+
+
+def e_svg_ok():
+    sk = r.doc().getObject(s["svg_sketch"])
+    h.check("E the mark's curves are in the sketch", sk.GeometryCount >= 4, sk.GeometryCount)
+    h.task_button("OK")
+
+
+e_svg_ok.done = lambda: svg_panel() is None and h.in_sketch() is not None
+e_svg_ok.done_what = "OK closed Insert SVG and the sketch is open again"
+
+
+def e_svg_done():
+    from Fission180Tests.gui import insert_steps as ins
+
+    box = r.sk().Shape.BoundBox
+    # the outer ring is 52 px across: at 96 per inch 13.76 mm; at 0.3: 4.13 mm
+    size = 52 * 25.4 / 96 * 0.3
+    h.check(
+        "E the mark is 0.3 of its size",
+        abs(box.XLength - size) < 0.05 and abs(box.ZLength - size) < 0.05,
+        (box.XLength, box.ZLength, size),
+    )
+    ins.no_file()
+    h.ribbon("Finish Sketch")
+
+
+e_svg_done.done = lambda: h.in_sketch() is None
+e_svg_done.done_what = "Finish Sketch closed the sketch"
+
+
+# == F: a group in the timeline, a section, undo, save, open again =================================
+def f_group_first():
+    s["titles"] = t.titles()
+    t.click(s["titles"][0])
+
+
+def f_group_last():
+    t.click(s["titles"][-1], QtCore.Qt.ShiftModifier)
+
+
+def f_group():
+    t.menu(s["titles"][-1], "Create Group")
+
+
+def f_grouped():
+    from fission180 import timeline_ops as ops
+
+    groups = {i.group for i in ops.timeline(r.doc(), deps=False).items}
+    h.check("F every step is in one group", len(groups) == 1 and "" not in groups, groups)
+    gid = groups.pop() if len(groups) == 1 else None
+    h.check("F the timeline shows the group", gid and t.tl().group_button(gid) is not None)
+    all_ok("F group:")
+    h.click_empty()
+
+
+def section_panel():
+    from fission180 import section_ui, taskui
+
+    p = taskui.current()
+    return p if isinstance(p, section_ui.SectionPanel) else None
+
+
+def f_section():
+    Gui.Selection.clearSelection()
+    h.fit()
+    h.ribbon("Section Analysis")
+
+
+f_section.done = lambda: section_panel() is not None
+f_section.done_what = "the Section Analysis dialog is open"
+
+
+def f_section_plane():
+    import time
+
+    s["section_t0"] = time.time()
+
+    pl.pick_in_browser("XZ_Plane")
+
+
+f_section_plane.timeout_s = 600
+
+
+def f_section_ok():
+    import time
+
+    took = time.time() - s["section_t0"]
+    App.Console.PrintMessage("[Fission 180] REPLAY geocache: the section took %.1f s\n" % took)
+    # (it took 35 s: Create Group had marked every step for rebuilding, the knurl too)
+    h.check("F the section shows within 10 s", took < 10.0 * h.SLOWDOWN, took)
+    p = section_panel()
+    h.caught_up(p)
+    h.task_button("OK")
+
+
+f_section_ok.done = lambda: section_panel() is None
+f_section_ok.done_what = "OK finished the Section Analysis"
+
+
+def volumes():
+    return (round(vol(), 3), round(cap().Shape.Volume, 3))
+
+
+def f_sectioned():
+    from fission180 import section
+
+    found = list(section.sections(r.doc()))
+    h.check("F one section", len(found) == 1, [o.Label for o in found])
+    h.check("F the browser has an Analysis folder", "Analysis" in " ".join(t.labels()), t.labels())
+    s["volumes"] = volumes()
+    h.shot("F-section")
+
+
+def f_undone():
+    from fission180 import section
+
+    h.check("F Ctrl+Z takes the section away", not list(section.sections(r.doc())))
+    h.check("F ...and nothing else", volumes() == s["volumes"], volumes())
+
+
+def f_redone():
+    from fission180 import section
+
+    h.check("F Ctrl+Y brings it back", len(list(section.sections(r.doc()))) == 1)
+    all_ok("F redo:")
+
+
+def f_reopened():
+    made = r.solid_bodies()
+    labels = sorted(b.Label for b in made)
+    h.check(
+        "F reopened: the screw and the cap", len(made) == 2 and "Bottom Screw" in labels, labels
+    )
+    s["screw"] = [b for b in made if b.Label == "Bottom Screw"][0].Name
+    s["cap"] = [b for b in made if b.Label != "Bottom Screw"][0].Name
+    h.check("F reopened: the same solids", volumes() == s["volumes"], (volumes(), s["volumes"]))
+    all_ok("F reopened:")
+    h.shot("F-reopened")
+
+
 steps = r.home_steps()
 steps += [a_cylinder, a_plane, a_ok_too_early, a_centre, a_diameter, a_height, a_rename]
 steps += [a_name, a_named]
@@ -644,5 +1348,23 @@ steps += [c_coil_plane, c_coil_centre, c_coil_circle, c_coil_values, c_coil_ok]
 steps += [c_mirror, c_mirror_type, c_mirror_coil, c_mirror_plane_box, c_mirror_plane, c_mirror_ok]
 steps += [c_pattern, c_pattern_coil, c_pattern_mirror, c_axis_box, c_axis, c_quantity, c_light]
 steps += [c_knurled]
+steps += [d_sketch, d_front, d_line] + [line_click(k) for k in range(7)] + [d_lines_done]
+# (the inner wall before the outer one: the first dimension scales the whole sketch, and
+# with the outer wall set first its top came below the inner top, crossing the profile;
+# the solver moves only what a dimension pulls, in Fusion too)
+steps += dim_line(0, "3", V(0, -3, 0)) + dim_line(5, "21", V(-3, 0, 0))
+steps += dim_line(1, "24", V(3, 0, 0))
+steps += dim_origin("radius", "16.5", True) + dim_origin("height", "30", False)
+steps += [d_profile_done, d_revolve, d_axis_box, d_axis, d_revolve_ok, d_cap, d_screw_hidden]
+steps += [d_inner_wall, d_thread_values, d_thread_full_length, d_thread_length, d_thread_ok]
+steps += [d_threaded, d_screw_shown]
+steps += [e_plane, e_plane_xz, e_plane_distance, e_plane_ok, e_sketch, e_sketch_plane, e_text]
+steps += [e_corner_1, e_corner_2, e_type, e_text_ok, e_finish]
+steps += [e_emboss, e_letter, e_face, e_depth, e_emboss_ok, e_embossed]
+steps += [e_svg_sketch, e_svg_plane, e_svg, e_svg_values, e_svg_ok, e_svg_done]
+steps += [f_group_first, f_group_last, f_group, f_grouped]
+steps += [f_section, f_section_plane, f_section_ok, f_sectioned]
+steps += [r.named(r.undo, "f_undo"), f_undone, r.named(r.redo, "f_redo"), f_redone]
+steps += r.save_steps("f", "Geocache Hide") + r.reopen_steps("f", "Geocache Hide") + [f_reopened]
 
 h.run("replay_07_geocache", steps, paced_by="state")

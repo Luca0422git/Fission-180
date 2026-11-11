@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
+  <!-- a stand-in for the book's logo: an original compass mark, in pixels (no units), as a
+       drawing program other than Inkscape writes it (the report: FreeCAD's importer asked
+       about 96 dpi for such a file) -->
+  <circle cx="30" cy="30" r="26" fill="none"/>
+  <circle cx="30" cy="30" r="20" fill="none"/>
+  <path d="M30 6 L36 30 L30 54 L24 30 Z" fill="none"/>
+  <path d="M6 30 L30 24 L54 30 L30 36 Z" fill="none"/>
+</svg>
