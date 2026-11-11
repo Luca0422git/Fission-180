@@ -58,6 +58,11 @@ TOOLS = {
     "Sketcher_CreateRegularPolygon": "polygon",
     # FreeCAD's spline tools: each click places a point (Luca, 2026-11-05: "spline just
     # does not snap. all the other tools do")
+    # (replay-g) CREATE > Point: one click, one point, snapped like the first click of any
+    # other tool (the book places hole centres with it; left to FreeCAD's own grid rule a
+    # point clicked at 15 on a 10 mm grid stayed at 14.82, where every other tool, and
+    # Fusion, puts it on the grid)
+    "Sketcher_CreatePoint": "point",
     "Sketcher_CreateBSpline": "spline",
     "Sketcher_CreateBSplineByInterpolation": "spline",
     "Sketcher_CreatePeriodicBSpline": "spline",
@@ -78,6 +83,7 @@ POINTS = {
     "arc3": 3,
     "slot": 2,
     "polygon": 2,
+    "point": 1,
     "spline": 10**6,  # as many points as are clicked, each snapped like any other
 }
 # shapes whose second point is the end of a direction from the first (level / upright /
@@ -1271,8 +1277,10 @@ def tool_kind(recorded, polylines):
     FreeCAD's own toolbar): then what the preview shows. No preview: the record."""
     if recorded is None:
         return None
-    if recorded == "spline":
-        return recorded  # its preview (a curve through the points) looks like anything
+    if recorded in ("spline", "point"):
+        # a spline's preview (a curve through the points) looks like anything; a point
+        # has none
+        return recorded
     shown = preview_kind(polylines)
     if shown is None or shown in PREVIEWS.get(recorded, ()):
         return recorded
