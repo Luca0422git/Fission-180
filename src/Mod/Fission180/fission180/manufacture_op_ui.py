@@ -225,7 +225,8 @@ class OpPanel(panels.CamPanel):
         self._linking_tab()
         self.finish_layout()
         self.start_picking()
-        self.box_text(GEOMETRY)
+        if GEOMETRY in self.boxes:  # (the 3D strategies machine the whole model: no box)
+            self.box_text(GEOMETRY)
         self._show_rows()
         if info["geometry"]:
             self.activate(GEOMETRY)

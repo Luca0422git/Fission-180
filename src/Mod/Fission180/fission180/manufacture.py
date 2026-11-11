@@ -1053,6 +1053,14 @@ def plan(op, fr=None):
                     "The tool (%s mm) does not fit into the %s mm hole: pick a smaller tool."
                     % (core.fmt(tool["diameter"]), core.fmt(part["diameter"]))
                 )
+    if kind == "face":
+        narrow = min(fr.stock_box[3] - fr.stock_box[0], fr.stock_box[4] - fr.stock_box[1])
+        if tool["diameter"] >= narrow - 1e-6:
+            raise CamError(
+                "The tool (%s mm) is as wide as the stock (%s mm): FreeCAD's facing needs a "
+                "narrower tool. Pick a smaller one."
+                % (core.fmt(tool["diameter"]), core.fmt(narrow))
+            )
     depth = heights["top"] - heights["bottom"]
     if kind not in ("drill", "chamfer2d") and depth > tool["flute_length"] + 1e-6:
         warnings.append(
@@ -1209,7 +1217,21 @@ def state(op, setup=None):
 def segments(op):
     """The operation's moves (manufacture_core.moves, feeds in mm/min), setup coordinates."""
     text = toolpath(op)
-    return core.moves(core.parse_gcode(text), feed_scale=60.0) if text else []
+    if not text:
+        return []
+    key = (op.Document.Name, op.Name)
+    stamp = (result(op).get("generated"), len(text))
+    found = _SEGMENTS.get(key)
+    if found is not None and found[0] == stamp:
+        return found[1]
+    made = core.moves(core.parse_gcode(text), feed_scale=60.0)
+    if len(_SEGMENTS) > 64:
+        _SEGMENTS.clear()
+    _SEGMENTS[key] = (stamp, made)
+    return made
+
+
+_SEGMENTS = {}  # (design, operation) -> (when generated, its moves): read once per toolpath
 
 
 def _engine_tool(options):
@@ -1304,6 +1326,7 @@ class Run:
             job["post"] = {
                 "post": self.post_spec["post"],
                 "args": self.post_spec.get("args") or "--no-show-editor",
+                "fixture": self.post_spec.get("fixture") or "G54",
                 "operations": items,
             }
         with open(os.path.join(self.folder, "job.json"), "w", encoding="utf-8") as handle:
@@ -1463,10 +1486,9 @@ class Run:
                 if found.get("error"):
                     text = _engine_sentence(found)
                     self.errors[name] = text
-                    log(
-                        "manufacture: %s failed: %s %s"
-                        % (op.Label, found.get("error"), found.get("trace", ""))
-                    )
+                    # (one line: the row turns red with this as its tip; FreeCAD's own
+                    # trace stays in the engine's log)
+                    log("manufacture: %s has no toolpath: %s" % (op.Label, found.get("error")))
                     _store(op, self._keys[name], "", text, planned["warnings"], None)
                     continue
                 gcode = core.with_clearance(
@@ -1618,7 +1640,12 @@ def post_process(
     opts = setup_options(setup)["post"]
     program = str(program or opts["program"])
     comment = opts["comment"] if comment is None else comment
-    spec = {"post": post, "args": core.post_args(post, units), "ops": chosen}
+    spec = {
+        "post": post,
+        "args": core.post_args(post, units),
+        "ops": chosen,
+        "fixture": "G%d" % (53 + int(opts["wcs_offset"])),  # WCS Offset 1 is G54
+    }
     run = Run(setup, [], post=spec, background=background).start()
     run.wait()
     if run.state != "done" or not run.posted:

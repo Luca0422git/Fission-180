@@ -357,6 +357,8 @@ class Engine:
                 job = self.job
                 job.PostProcessor = spec["post"]
                 job.PostProcessorArgs = spec.get("args") or "--no-show-editor"
+                if spec.get("fixture") and "Fixtures" in job.PropertiesList:
+                    job.Fixtures = [spec["fixture"]]  # the setup's WCS Offset (G54...G59)
                 try:
                     job.OrderOutputBy = "Operation"
                     job.SplitOutput = False

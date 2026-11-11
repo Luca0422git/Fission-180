@@ -427,6 +427,10 @@ class _Watch:
     def slotDeletedDocument(self, doc):
         try:
             name = doc.Name
+            run = STATE["run"]
+            if run is not None and run.doc is doc:  # its design is gone: stop the engine
+                cancel_generate()
+            STATE["queue"] = [q for q in STATE["queue"] if q[0] != name]
             for key in ("docs", "active", "shown"):
                 STATE[key].pop(name, None)
             QtCore.QTimer.singleShot(50, sync)
@@ -549,6 +553,14 @@ def _poll_run():
     run = STATE["run"]
     if run is None:
         return
+    try:  # a dialog is open: its undo step is open too, and toolpaths are kept outside the
+        # undo history (storing them would close that step). They are taken when it closes.
+        from . import taskui
+
+        if taskui.current() is not None:
+            return
+    except Exception:
+        pass
     state = run.poll()
     if state == "running":
         return

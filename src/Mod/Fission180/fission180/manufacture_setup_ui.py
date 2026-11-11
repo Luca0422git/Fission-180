@@ -279,6 +279,19 @@ class SetupPanel(panels.CamPanel):
         ):
             self.activate(None)
 
+    def activate(self, index):
+        super().activate(index)
+        self._dots_on()
+
+    def _dots_on(self):
+        """The box's dots take clicks only while no selection box does (a dot in front of
+        the edge being picked for an axis took the click)."""
+        if getattr(self, "dots", None) is not None:
+            try:
+                self.dots.set_enabled(self.active_box is None)
+            except Exception as exc:
+                warn("setup: box points: %s" % exc)
+
     def picks_updated(self, index):
         super().picks_updated(index)
         if index == ZPICK and self.box_picks[ZPICK] and not self.box_picks[XPICK]:
@@ -416,6 +429,7 @@ class SetupPanel(panels.CamPanel):
                         dots.append(((ix, iy, iz), point, colour))
             size = 0.04 * max(core.box_size(box))
             self.dots = handles3d.PointDots(self.view, dots, self._dot_picked, max(size, 0.8))
+            self._dots_on()
         except Exception as exc:
             warn("setup: box points: %s" % exc)
 
