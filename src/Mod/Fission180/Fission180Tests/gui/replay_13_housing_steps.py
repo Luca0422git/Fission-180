@@ -7,8 +7,9 @@ The report gives some of the book's sizes: the housing's diameter typed as "9 * 
 whole length 2.25, a 0.84 hole 4.17 up on the Right plane, a 0.25 fillet where the tube leaves
 the housing, a 0.04 chamfer on the two flat faces, five 1/16 holes 1.25 deep at the tube's
 end, pipe threads. The rest is a stand-in consistent with those (named at each step): the
-bore 8.50 (a 0.34 wall), the inlet a rod 1.09 across from the middle out to 4.0 (beyond the housing), its
-centerline 4.17 up; the 0.84 hole goes through the wall on the other side (an outlet). The
+bore 8.50 (a 0.34 wall), the inlet a rod 1.09 across from the middle out to 4.0 (beyond the
+housing), its centerline 4.17 up; the 0.84 hole goes through the wall on the other side (an
+outlet). The
 book's triangle in the first sketch (no size given) is left out.
 
   New design in inches (Set as Default in the Pizza Cutter: here once more, then a second
