@@ -916,6 +916,29 @@ def copied_storyboard(storyboard, name):
 
 
 # -- explode ---------------------------------------------------------------------------------
+def click_step(chain, picked):
+    """What a click in the 3D view on a part does to the picked components. `chain`: the
+    components the part lies in, outermost first (a part of a subassembly: the subassembly,
+    then the part's own component); `picked`: the ones picked now. Returns (drop, add,
+    deeper): the one to let go (or None), the one to pick (or None), and the one a further
+    click on the same part would take (or None).
+
+    The first click takes the outermost component (a subassembly moves as one, as in
+    Fusion); a click on a part of a picked subassembly takes the component one level in,
+    and a click on the innermost lets go. A component that is not in a subassembly is
+    picked and let go by turns, as before."""
+    chain = list(chain)
+    if not chain:
+        return None, None, None
+    inside = [i for i, name in enumerate(chain) if name in picked]
+    if not inside:
+        return None, chain[0], chain[1] if len(chain) > 1 else None
+    i = inside[-1]
+    if i + 1 < len(chain):
+        return chain[i], chain[i + 1], chain[i + 2] if i + 2 < len(chain) else None
+    return chain[i], None, None
+
+
 def box_centre(box):
     return ((box[0] + box[3]) / 2.0, (box[1] + box[4]) / 2.0, (box[2] + box[5]) / 2.0)
 

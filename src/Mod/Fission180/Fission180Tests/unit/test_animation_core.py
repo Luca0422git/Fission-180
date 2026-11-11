@@ -561,6 +561,32 @@ class Explode(unittest.TestCase):
             )
 
 
+class Clicks(unittest.TestCase):
+    """A click in the 3D view on a part: the top-level component first; a part inside a
+    subassembly by a second click (Fusion's own rule was not found written: the first click
+    is kept as it was, the nested part is offered by the next)."""
+
+    def test_a_component_at_the_top_is_picked_and_let_go_by_turns(self):
+        self.assertEqual(core.click_step(["Lid"], []), (None, "Lid", None))
+        self.assertEqual(core.click_step(["Lid"], ["Lid"]), ("Lid", None, None))
+        self.assertEqual(core.click_step(["Lid"], ["Base"]), (None, "Lid", None))
+
+    def test_a_part_of_a_subassembly_goes_one_level_in_with_each_click(self):
+        chain = ["Sub", "Arm", "Pin"]
+        self.assertEqual(core.click_step(chain, []), (None, "Sub", "Arm"))
+        self.assertEqual(core.click_step(chain, ["Sub"]), ("Sub", "Arm", "Pin"))
+        self.assertEqual(core.click_step(chain, ["Arm"]), ("Arm", "Pin", None))
+        self.assertEqual(core.click_step(chain, ["Pin"]), ("Pin", None, None))
+        # other picks are left alone
+        self.assertEqual(core.click_step(chain, ["Base", "Sub"]), ("Sub", "Arm", "Pin"))
+        # the deepest picked one counts (a subassembly and a part of it picked from the
+        # browser)
+        self.assertEqual(core.click_step(chain, ["Sub", "Arm"]), ("Arm", "Pin", None))
+
+    def test_nothing_to_click(self):
+        self.assertEqual(core.click_step([], ["Sub"]), (None, None, None))
+
+
 class Frames(unittest.TestCase):
     def test_frame_times_include_both_ends(self):
         self.assertEqual(core.frame_times(1.0, 4), [0.0, 0.25, 0.5, 0.75, 1.0])

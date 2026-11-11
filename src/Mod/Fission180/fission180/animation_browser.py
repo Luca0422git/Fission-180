@@ -66,10 +66,19 @@ def tree(doc):
             if not components.alive(comp):
                 continue
             value = opacity.get(comp.Name)
-            visible = animation.design_visible(comp) and (value is None or value > 0.0)
+            hidden = animation.design_hidden_by(comp)
+            visible = hidden is None and (value is None or value > 0.0)
             tip = "Click to select; the eye shows or hides it at the playhead"
-            if not animation.design_visible(comp):
-                tip = "Hidden in the design: show it in the Design workspace first"
+            if hidden is comp:
+                tip = (
+                    "Hidden in the design: a storyboard cannot show it. Show it in the "
+                    "Design workspace first (its eye in the browser there)."
+                )
+            elif hidden is not None:
+                tip = (
+                    "Hidden in the design: it is inside %s, which is hidden there. Show %s "
+                    "in the Design workspace first." % (hidden.Label, hidden.Label)
+                )
             out.append(
                 node(
                     "%s:%s" % (COMPONENT, comp.Name),

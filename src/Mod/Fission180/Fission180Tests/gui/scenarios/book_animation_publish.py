@@ -360,10 +360,15 @@ def mp4_or_not():
     s["mp4"] = None
     if not has:
         h.check("without ffmpeg the MP4 entry is greyed", not item.isEnabled())
+        tip = item.toolTip()
         h.check(
-            "and says to install ffmpeg",
-            "ffmpeg" in item.text() and "Install ffmpeg" in item.toolTip(),
-            item.text(),
+            "and its tip says where to get ffmpeg, for each system",
+            "ffmpeg" in item.text()
+            and "ffmpeg.org/download.html" in tip
+            and "winget install ffmpeg" in tip
+            and "brew install ffmpeg" in tip
+            and "AVI (Motion JPEG) needs nothing" in tip,
+            (item.text(), tip),
         )
         return
     h.check("with ffmpeg on the machine MP4 is offered", item.isEnabled(), item.text())

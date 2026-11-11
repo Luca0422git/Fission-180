@@ -385,6 +385,71 @@ def toggle_play():
     return play()
 
 
+# -- Space: play / pause ---------------------------------------------------------------------
+TEXT_BOXES = (
+    QtWidgets.QLineEdit,
+    QtWidgets.QTextEdit,
+    QtWidgets.QPlainTextEdit,
+    QtWidgets.QAbstractSpinBox,
+)
+
+
+def space_plays(focus=None, modal=None, popup=None):
+    """True when Space should play or pause now: the workspace is in front, no dialog, menu
+    or other window has the keyboard, and what has it is not a box a person types in.
+    (Fusion plays with Space wherever the pointer is; the timeline alone took it before.)"""
+    if not STATE["on"] or modal is not None or popup is not None or dialog_open():
+        return False
+    if focus is None:
+        return True
+    if isinstance(focus, TEXT_BOXES):
+        return False
+    if isinstance(focus, QtWidgets.QComboBox) and focus.isEditable():
+        return False
+    try:
+        return focus.window() is Gui.getMainWindow()
+    except Exception:
+        return False
+
+
+class _SpaceFilter(QtCore.QObject):
+    """Takes the Space key for the workspace before FreeCAD's own Space (Toggle Visibility)
+    or a button that happens to have the keyboard gets it."""
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            if kind not in (QtCore.QEvent.KeyPress, QtCore.QEvent.ShortcutOverride):
+                return False
+            if event.key() != QtCore.Qt.Key_Space:
+                return False
+            if event.modifiers() not in (QtCore.Qt.NoModifier, QtCore.Qt.KeypadModifier):
+                return False
+            app = QtWidgets.QApplication
+            if not space_plays(app.focusWidget(), app.activeModalWidget(), app.activePopupWidget()):
+                return False
+            if kind == QtCore.QEvent.KeyPress and not event.isAutoRepeat():
+                QtCore.QTimer.singleShot(0, toggle_play)
+            event.accept()
+            return True
+        except Exception as exc:
+            warn("animation workspace: space: %s" % exc)
+            return False
+
+
+def _space_key(on):
+    try:
+        app = QtWidgets.QApplication.instance()
+        if on and STATE.get("space") is None:
+            STATE["space"] = _SpaceFilter()
+            app.installEventFilter(STATE["space"])
+        elif not on and STATE.get("space") is not None:
+            app.removeEventFilter(STATE["space"])
+            STATE["space"] = None
+    except Exception as exc:
+        warn("animation workspace: space: %s" % exc)
+
+
 def set_loop(on):
     STATE["loop"] = bool(on)
     _timeline_update()
@@ -598,6 +663,7 @@ def _apply(on):
             warn("animation ribbon: %s" % exc)
     _timeline(on)
     _hold_design_keys(on)
+    _space_key(on)
     if on:
         _start_timer()
         refresh()
