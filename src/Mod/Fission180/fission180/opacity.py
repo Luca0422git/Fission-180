@@ -25,6 +25,7 @@ PROP = "Fission180Opacity"
 # for a while (Combine shows its tool bodies see-through and puts their look back after).
 HOLD = set()
 _SHOWN = {}  # document name -> names of the bodies apply() made see-through last time
+_PREVIEW = {}  # (document name, body name) -> the Transparency a dialog is trying out
 
 
 # -- reading -------------------------------------------------------------------------------------
@@ -57,6 +58,26 @@ def shown(obj):
     """The opacity `obj` shows: its own times its components' (a component: its own times
     the components it is in)."""
     return core.effective(get(obj), [get(c) for c in components.ancestors(obj)])
+
+
+def wanted(obj):
+    """The Transparency (0..100) `obj` is to show now because of Opacity Control, a Custom
+    Opacity being tried out or a dialog holding it see-through; None when nothing of the
+    kind is set (its look's own transparency then shows). appearance.apply() asks, so the
+    colours it writes never undo an opacity."""
+    try:
+        key = (obj.Document.Name, obj.Name)
+        if key in HOLD:
+            return int(obj.ViewObject.Transparency)
+        if key in _PREVIEW:
+            return _PREVIEW[key]
+        chain = [obj] + components.ancestors(obj)
+        if not _managed(chain):
+            return None
+        seen = core.effective(get(obj), [get(c) for c in chain[1:]])
+        return core.transparency(seen, _base(obj))
+    except Exception:
+        return None
 
 
 # -- changing ------------------------------------------------------------------------------------
@@ -155,6 +176,7 @@ def preview(objects, value):
             others = [get(c) for c in components.ancestors(target) if c is not obj]
             own = value if target is obj else get(target)
             seen = core.effective(own, others + ([value] if target is not obj else []))
+            _PREVIEW[(target.Document.Name, target.Name)] = core.transparency(seen, _base(target))
             _show(target, core.transparency(seen, _base(target)))
 
 
@@ -175,6 +197,8 @@ def apply(doc):
     set an opacity on (nor on a component they are in) are left as they are."""
     if not App.GuiUp or doc is None:
         return
+    for key in [k for k in _PREVIEW if k[0] == doc.Name]:
+        _PREVIEW.pop(key, None)  # a Custom Opacity tried out is over: the design's values show
     try:
         shown_now = set()
         for obj in bodies.list_bodies(doc) + _meshes(doc):
@@ -196,5 +220,7 @@ def apply(doc):
 
 def forget(doc_name):
     _SHOWN.pop(doc_name, None)
+    for key in [k for k in _PREVIEW if k[0] == doc_name]:
+        _PREVIEW.pop(key, None)
     for key in [k for k in HOLD if k[0] == doc_name]:
         HOLD.discard(key)
