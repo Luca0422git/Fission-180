@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180's golden models are 621 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
+Fission 180's golden models are 623 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
 
 ## By feature
 
@@ -725,6 +725,11 @@ Each model is listed under its first tag; its other tags follow it.
 - `export_report_design`: Export report: what STEP, IGES, STL, 3MF and OBJ leave out of a design with components, a hidden body and a material [export-report, components]
 - `export_report_sketch_dxf`: Export report: what Save As DXF leaves out of a sketch (dimensions, constraints, construction, points, reference curves, its place in 3D) [export-report, dxf, sketch]
 
+### manufacture (2)
+
+- `cam_block_side_setup`: Manufacture: a block machined from its side (Z axis picked on a side face, X on an edge), Face and 2D Contour, then the stock changed: needs regenerating [cam]
+- `cam_plate_face_contour_drill`: Manufacture: a setup on a 100 x 60 x 10 plate with two 6 mm holes, then Face, 2D Contour and Drill, posted to Grbl [cam]
+
 ### picks (2)
 
 - `picks_fillet_chamfer_kept_after_reopen`: A round and a chamfer keep their edges when the extrude under them gets a taper, after the design was saved and opened again [reference-stability, reopen]
@@ -771,6 +776,12 @@ Each model is listed under its first tag; its other tags follow it.
 | `blend_radius_expect` | (a test helper) | 2 | `fillet2_variable_points`, `live_fillet2_variable_points` |
 | `body_material` | `physical_material` | 2 | `export_report_design`, `inspect_com_materials` |
 | `body_tool_edit` | `edit_step` | 4 | `bodies_combine_edit_operation`, `bodies_move_edit`, `bodies_move_two_bodies`, `bodies_split_edit_tool` |
+| `cam_edit` | (a test helper) | 1 | `cam_block_side_setup` |
+| `cam_expect` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_generate` | (a test helper) | 1 | `cam_block_side_setup` |
+| `cam_operation` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_post` | (a test helper) | 1 | `cam_plate_face_contour_drill` |
+| `cam_setup` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `chamfer` | (a test helper) | 2 | `chamfer_one_edge`, `chamfer_top_edges` |
 | `check` | (a test helper) | 88 | `blend_edit_keeps_later_chamfer`, `blend_fillet_edit_radius`, `blend_insert_chamfer_before_fillet`, `bodies_combine_edit_operation`, `bodies_combine_follows_tool` |
 | `circular_pattern` | `circular_pattern` | 3 | `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes` |
@@ -853,7 +864,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_path_sketch` | (a test helper) | 9 | `sf_join_away_new_body`, `sf_pipe_hollow_half`, `sf_pipe_old_upgraded`, `sf_pipe_param_driven`, `sf_pipe_ring_hollow` |
 | `sf_pipe` | `pipe` | 14 | `sf_join_away_new_body`, `sf_pipe_corner_hollow_cut`, `sf_pipe_corner_intersect`, `sf_pipe_corner_mitre_join`, `sf_pipe_edge_auto_join` |
 | `sf_plastic_rule` | `plastic_rule` | 2 | `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss` |
-| `sf_primitive` | `primitive` | 31 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere`, `plastic2_lip_round_rim`, `plastic2_lip_tip_radius` |
+| `sf_primitive` | `primitive` | 33 | `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
 | `sf_primitive_edit` | `edit_step` | 3 | `sf_box_pocket_edit_join`, `sf_coil_edit_turns`, `sf_pipe_triangle_edit` |
 | `sf_refold` | `refold` | 1 | `sm_flat_unfold_cut_refold` |
 | `sf_rest` | `rest` | 3 | `plastic_rest_closed_box`, `plastic_rest_cut`, `plastic_rest_cylinder` |

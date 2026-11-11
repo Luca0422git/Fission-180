@@ -16,6 +16,9 @@ SMALL = 18  # menu / quick-access icon size
 CONTEXTUAL = ("sketch", "drawing", "flat_pattern", "sim_setup", "sim_results")
 # The SIMULATION workspace's tabs (simulation_ui): shown instead of the design's tabs.
 SIMULATION_TABS = ("sim_setup", "sim_results")
+# The MANUFACTURE workspace's tabs (manufacture_ui, wave 7 cam): shown instead of the design's.
+MANUFACTURE_TABS = ("cam_milling",)
+CONTEXTUAL += MANUFACTURE_TABS
 
 
 def resolve(command, available):
@@ -481,6 +484,11 @@ class RibbonWidget(QtWidgets.QWidget):
         for tid in SIMULATION_TABS:
             if tid in self.tab_buttons:
                 self.tab_buttons[tid].setVisible(False)
+        # The MILLING tab shows only in the MANUFACTURE workspace (manufacture_ui).
+        self._cam_mode = False
+        for tid in MANUFACTURE_TABS:
+            if tid in self.tab_buttons:
+                self.tab_buttons[tid].setVisible(False)
         self.select_tab("solid")
 
         self._timer = QtCore.QTimer(self)
@@ -632,11 +640,25 @@ class RibbonWidget(QtWidgets.QWidget):
         menu.setToolTipsVisible(True)
         design = menu.addAction(ui_icon("workspace_design"), "Design")
         design.setCheckable(True)
-        design.setChecked(not self._drawing_mode and not self._sim_mode)
+        design.setChecked(not self._drawing_mode and not self._sim_mode and not self._cam_mode)
         simulation = menu.addAction(ui_icon("workspace_simulation"), "Simulation")
         simulation.setObjectName("Fission180WorkspaceSimulation")
         simulation.setCheckable(True)
         simulation.setChecked(self._sim_mode and not self._drawing_mode)
+        # Fusion's MANUFACTURE workspace (wave 7 cam, manufacture_ui). Its leaving is
+        # connected first, so Design / Simulation find the design's own tabs to start from.
+        manufacture = menu.addAction(ui_icon("workspace_manufacture"), "Manufacture")
+        manufacture.setObjectName("Fission180WorkspaceManufacture")
+        manufacture.setCheckable(True)
+        manufacture.setChecked(self._cam_mode and not self._drawing_mode)
+        try:
+            from . import manufacture_ui
+
+            design.triggered.connect(lambda: manufacture_ui.leave_workspace())
+            simulation.triggered.connect(lambda: manufacture_ui.leave_workspace())
+            manufacture.triggered.connect(lambda: manufacture_ui.enter_workspace())
+        except Exception as exc:
+            warn("workspace menu: %s" % exc)
         drawings = menu.addMenu(ui_icon("dw_base_view"), "Drawing")
         try:
             from . import drawing_ui
@@ -773,20 +795,33 @@ class RibbonWidget(QtWidgets.QWidget):
             return
         self._drawing_mode = on
         sim = getattr(self, "_sim_mode", False)
+        cam = getattr(self, "_cam_mode", False)
         for tid, button in self.tab_buttons.items():
             if tid == "drawing":
                 button.setVisible(on)
             elif tid in SIMULATION_TABS:
                 button.setVisible(sim and not on)
+            elif tid in MANUFACTURE_TABS:
+                button.setVisible(cam and not on)
             elif tid == "sketch":
-                button.setVisible(self._sketch_mode and not on and not sim)
+                button.setVisible(self._sketch_mode and not on and not sim and not cam)
             elif tid == "flat_pattern":
-                button.setVisible(getattr(self, "_flat_mode", False) and not on and not sim)
+                button.setVisible(
+                    getattr(self, "_flat_mode", False) and not on and not sim and not cam
+                )
             else:
-                button.setVisible(not on and not getattr(self, "_flat_mode", False) and not sim)
-        self.workspace.setText("DRAWING ▾" if on else ("SIMULATION ▾" if sim else "DESIGN ▾"))
+                button.setVisible(
+                    not on and not getattr(self, "_flat_mode", False) and not sim and not cam
+                )
+        self.workspace.setText(
+            "DRAWING ▾"
+            if on
+            else ("SIMULATION ▾" if sim else ("MANUFACTURE ▾" if cam else "DESIGN ▾"))
+        )
         if on:
             self.select_tab("drawing")
+        elif cam:
+            self.select_tab(MANUFACTURE_TABS[0])
         elif sim:
             self.select_tab("sim_setup")
         elif getattr(self, "_flat_mode", False):
@@ -808,7 +843,7 @@ class RibbonWidget(QtWidgets.QWidget):
                 button.setVisible(on and not drawing)
             elif tid == "drawing":
                 button.setVisible(drawing)
-            elif tid in SIMULATION_TABS:
+            elif tid in SIMULATION_TABS or tid in MANUFACTURE_TABS:
                 button.setVisible(False)
             elif tid == "sketch":
                 button.setVisible(self._sketch_mode and not on and not drawing)
@@ -839,6 +874,8 @@ class RibbonWidget(QtWidgets.QWidget):
         for tid, button in self.tab_buttons.items():
             if tid in SIMULATION_TABS:
                 button.setVisible(on and not drawing)
+            elif tid in MANUFACTURE_TABS:
+                button.setVisible(False)
             elif tid == "drawing":
                 button.setVisible(drawing)
             elif tid == "flat_pattern":
@@ -853,6 +890,45 @@ class RibbonWidget(QtWidgets.QWidget):
         self.workspace.setText("SIMULATION ▾" if on else "DESIGN ▾")
         if on:
             self.select_tab(tab if tab in SIMULATION_TABS else "sim_setup")
+        elif flat:
+            self.select_tab("flat_pattern")
+        else:
+            back = self._user_tab if self._user_tab in self.page_index else "solid"
+            self.select_tab("sketch" if self._sketch_mode else back)
+
+    def set_manufacture_mode(self, on):
+        """Fusion's MANUFACTURE workspace (manufacture_ui): its MILLING tab is the only one
+        shown (the workspace button says MANUFACTURE); back to the design's tabs after.
+        FISSION180 wave 7 (cam)."""
+        if MANUFACTURE_TABS[0] not in self.tab_buttons or on == getattr(self, "_cam_mode", False):
+            return
+        self._cam_mode = on
+        drawing = getattr(self, "_drawing_mode", False)
+        flat = getattr(self, "_flat_mode", False)
+        sim = getattr(self, "_sim_mode", False)
+        for tid, button in self.tab_buttons.items():
+            if tid in MANUFACTURE_TABS:
+                button.setVisible(on and not drawing)
+            elif tid in SIMULATION_TABS:
+                button.setVisible(sim and not on and not drawing)
+            elif tid == "drawing":
+                button.setVisible(drawing)
+            elif tid == "flat_pattern":
+                button.setVisible(flat and not on and not drawing and not sim)
+            elif tid == "sketch":
+                button.setVisible(self._sketch_mode and not on and not drawing and not sim)
+            else:
+                button.setVisible(not on and not drawing and not flat and not sim)
+        log("ribbon: manufacture mode %s" % ("on" if on else "off"))
+        if drawing:
+            return
+        self.workspace.setText(
+            "MANUFACTURE ▾" if on else ("SIMULATION ▾" if sim else "DESIGN ▾")
+        )
+        if on:
+            self.select_tab(MANUFACTURE_TABS[0])
+        elif sim:
+            self.select_tab("sim_setup")
         elif flat:
             self.select_tab("flat_pattern")
         else:

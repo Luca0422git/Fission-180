@@ -857,3 +857,4 @@ from . import flatpattern_ops  # noqa: E402,F401  (SHEET METAL flat: Unfold, Ref
 from . import plastic_ops  # noqa: E402,F401  (PLASTIC: rules, Boss, Rest)
 from . import plastic2_ops  # noqa: E402,F401  (PLASTIC: Snap Fit, Lip)
 from . import surface3_ops  # noqa: E402,F401  (SURFACE part 3)
+from . import manufacture_ops  # noqa: E402,F401  (MANUFACTURE: setups, operations, post)

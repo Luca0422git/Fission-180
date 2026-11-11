@@ -1,0 +1,128 @@
+{
+  "id": "cam_plate_face_contour_drill",
+  "title": "Manufacture: a setup on a 100 x 60 x 10 plate with two 6 mm holes, then Face, 2D Contour and Drill, posted to Grbl",
+  "tags": [
+    "manufacture",
+    "cam"
+  ],
+  "steps": [
+    {
+      "op": "sf_primitive",
+      "id": "b1",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 100,
+      "width": 60,
+      "height": 10,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "h1",
+      "kind": "cylinder",
+      "plane": "XY",
+      "x": 20,
+      "y": 30,
+      "diameter": 6,
+      "height": 10,
+      "operation": "cut"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "h2",
+      "kind": "cylinder",
+      "plane": "XY",
+      "x": 80,
+      "y": 30,
+      "diameter": 6,
+      "height": 10,
+      "operation": "cut"
+    },
+    {
+      "op": "cam_setup",
+      "id": "s1",
+      "stock": {"mode": "relative", "offset_mode": "sides_top_bottom", "side": 2, "top": 1, "bottom": 0},
+      "wcs": {"origin": "stock_point", "box_point": [-1, -1, 1]},
+      "post": {"program": "1001", "comment": "golden plate"}
+    },
+    {
+      "op": "cam_expect",
+      "target": "s1",
+      "stock": [0, 0, -11, 104, 64, 0],
+      "model": [2, 2, -11, 102, 62, -1],
+      "origin": [-2, -2, 11],
+      "comment": "stock = the plate plus 2 mm on every side and 1 mm on top; the origin on the stock's top, at its -X -Y corner"
+    },
+    {
+      "op": "cam_operation",
+      "id": "face",
+      "setup": "s1",
+      "kind": "face",
+      "tool": {"type": "flat", "diameter": 10, "number": 1}
+    },
+    {
+      "op": "cam_expect",
+      "target": "face",
+      "state": "valid",
+      "bounds": [5, 5, -1, 99, 59, 15],
+      "min_z": -1,
+      "comment": "the 10 mm tool's edge reaches the stock's edges: its centre stays 5 mm inside the 104 x 64 stock; one pass at the model's top (Z -1); clearance = stock top + 5 + 10"
+    },
+    {
+      "op": "cam_operation",
+      "id": "contour",
+      "setup": "s1",
+      "kind": "contour2d",
+      "faces": {"normal": [0, 0, -1], "count": 1},
+      "tool": {"type": "flat", "diameter": 6, "number": 2},
+      "options": {"linking": {"lead_in": false, "lead_out": false}}
+    },
+    {
+      "op": "cam_expect",
+      "target": "contour",
+      "state": "valid",
+      "bounds": [-1, -1, -11, 105, 65, 15],
+      "min_z": -11,
+      "cut_length": 354.85,
+      "comment": "around the plate 3 mm out with rounded corners: 2 x (100 + 60) + 2 pi x 3 = 338.85 mm at Z -11, plus the 16 mm plunge from the feed height (Z 5)"
+    },
+    {
+      "op": "cam_operation",
+      "id": "drill",
+      "setup": "s1",
+      "kind": "drill",
+      "faces": {"type": "cylinder", "radius": 3, "count": 2},
+      "tool": {"type": "drill", "diameter": 6, "number": 3}
+    },
+    {
+      "op": "cam_expect",
+      "target": "drill",
+      "state": "valid",
+      "bounds": [22, 32, -11, 82, 32, 15],
+      "min_z": -11,
+      "cut_length": 30,
+      "comment": "two holes at (22, 32) and (82, 32) in setup coordinates, each fed from the feed height (hole top + 5 = Z 4) to the hole's bottom (Z -11): 2 x 15 mm"
+    },
+    {
+      "op": "cam_post",
+      "setup": "s1",
+      "post": "grbl",
+      "units": "mm"
+    },
+    {
+      "op": "cam_expect",
+      "target": "s1",
+      "gcode": {"units": "mm", "min_z": -11, "problems": 0, "lines_min": 60}
+    }
+  ],
+  "expect": {
+    "volume": 59434.51,
+    "bbox": [0, 0, 0, 100, 60, 10],
+    "abs_tol": 0.01,
+    "solids": 1,
+    "source": "analytic",
+    "note": "The design is not changed by the setup or its operations: 100 x 60 x 10 less two 6 mm holes (2 x pi x 9 x 10 = 565.49). The toolpaths' numbers are in the cam_expect steps (setup coordinates: origin on the stock's top corner)."
+  }
+}

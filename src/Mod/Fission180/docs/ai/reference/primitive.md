@@ -72,5 +72,5 @@ Done: AI: Box. Its id is 'Primitive1'. Bodies now: Body1: 8000 mm3, 40 x 20 x 10
 
 ## See also
 
-- Golden models built with its steps (read one with docs_read golden/<id>): `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere`, `plastic2_lip_round_rim`, `plastic2_lip_tip_radius`, `sf_box_basic`, `sf_box_param_driven`, `sf_box_pocket_edit_join`, `sf_box_pocket_top`, `sf_box_xz_flipped`, `sf_coil_cut_block`, `sf_coil_taper_raised_narrow_down` and 19 more
+- Golden models built with its steps (read one with docs_read golden/<id>): `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere`, `plastic2_lip_round_rim`, `plastic2_lip_tip_radius`, `sf_box_basic`, `sf_box_param_driven`, `sf_box_pocket_edit_join`, `sf_box_pocket_top`, `sf_box_xz_flipped` and 21 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)
