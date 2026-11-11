@@ -80,7 +80,22 @@ Front sketch; older sketches' helper clutter; `sketch_qa_keys` red on GitHub onl
 Tesla housing's fillet where the tube leaves tangent; a thread has one face per turn (Fusion
 4); Select Through starts off (`selection_core.DEFAULT_SELECT_THROUGH`; the book's "window
 the whole model, Chamfer" needs it on; Autodesk does not document the default); balloons do
-not follow a design change; DWG needs a converter program. **Open follow-ups for the orchestrator** (do before release):
+not follow a design change; DWG needs a converter program. Then the follow-ups merged:
+**workspaces-2** (d6a2f205: 18 AI tools for Manufacture and Animation, `workspace_switch.py`),
+**components-2** (9f3a4786: `components.active_component` is what the person chose,
+`settle_active`; the harness's ground opt-out is gone; "holder" components for copies of a
+subassembly: they made `test_vex_qa_freecad` parts_list_assembly_twice fail, being fixed by
+the same builder), **modify-c** (fa410604: report bug 18 at last = Undo from the toolbar with
+a dialog open left the half-made step on Redo, `preview.dialog_takes`; heavy patterns
+previewed light and built in a separate FreeCAD with progress, `pattern_progress.py`;
+`hole_tables.size_for_drill`), **extrude-2** (a5033375: Front-plane direction for primitives
+and Offset Plane, automatic Cut across components with a Bodies to Cut check list,
+`bodies.clear_name` "Body1 (Bracket)"), **library-2** (39fd9e9b: hardware tables checked, 11
+rows corrected; fasteners joined to their hole's edge; Keep / Remove question is a row in
+the Appearance dialog). **The acceptance test runs now:** seven builders replay-a..g, brief
+`docs/fission180/dev/briefs/book-replay.md`, branches `sf/replay-<a..g>` (a: projects 0-2, b:
+3-5, c: 6-9, d: 10-11, e: 12-13, f: 14-16, g: 17-27), each replaying its projects by real
+input with a user's defaults in scenarios `replay_<nn>_<project>` and fixing hitches. **Open follow-ups for the orchestrator** (do before release):
 (1) AI tools for Manufacture, and the cam dialog fields the engine ignores (tolerance,
 lead-in / ramp feedrates); (2) run the components / joints / journey scenarios with
 `FirstComponentGrounded` ON (users' default) and fix what breaks, then drop the harness
