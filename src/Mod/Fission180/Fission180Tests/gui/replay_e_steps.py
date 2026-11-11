@@ -13,6 +13,7 @@ The replay runs with a person's defaults: the four the harness switches off for 
 scenarios are switched back on (`user_defaults`), and an undo step left open fails it.
 """
 
+import math
 import os
 
 import FreeCAD as App
@@ -20,7 +21,9 @@ import FreeCADGui as Gui
 from PySide import QtCore, QtWidgets
 from PySide6 import QtTest
 
+from Fission180Tests.gui import component_steps as cs
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import plane_input as pl
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import sketch_tools_steps as st
 from Fission180Tests.gui import timeline_input as ti
@@ -228,6 +231,12 @@ def xclick(point, held=()):
     h.settle()
 
 
+def iso_view(name="iso_view"):
+    """A step that turns the view to the home (isometric) view and fits the design: a person
+    orbits to see a face; the view is not what is tested."""
+    return named(name, lambda: h.fit())
+
+
 def look(direction, name=None):
     """A step that looks at the design from a named side and fits it."""
 
@@ -241,7 +250,7 @@ def look(direction, name=None):
     return named(name or "look_" + direction.lower(), step)
 
 
-# -- sketching --------------------------------------------------------------------------------------
+# -- sketching ------------------------------------------------------------------------------------
 def sk():
     return h.in_sketch()
 
@@ -327,7 +336,13 @@ def sketch_view(width_in, centre=(0.0, 0.0), name="sketch_view"):
         plc = sketch.getGlobalPlacement()
         normal = plc.Rotation.multVec(V(0, 0, 1))
         target = plc.multVec(sp(*centre))
-        # look along the camera's own direction (the sketch may be seen from behind)
+        # face on, as the sketch opened (a step may have turned the view to click a face of
+        # another part), from the side it opened on (it may be seen from behind)
+        faced = S.setdefault("faced", {})
+        if sketch.Name in faced:
+            cam.orientation.setValue(faced[sketch.Name])
+        else:
+            faced[sketch.Name] = tuple(cam.orientation.getValue().getValue())
         rot = App.Rotation(*cam.orientation.getValue().getValue())
         view_dir = rot.multVec(V(0, 0, -1))
         side = -1.0 if view_dir.dot(normal) < 0 else 1.0
@@ -456,6 +471,98 @@ def finish_sketch(name="finish_sketch"):
     )
 
 
+# -- steps every part uses ------------------------------------------------------------------------
+def new_component(label):
+    def type_it():
+        cs.type_name(label)
+
+    def check():
+        h.check("%s is a component" % label, component(label) is not None)
+        h.check("%s is the active component" % label, active_label() == label, active_label())
+
+    tag = label.lower().replace(" ", "_")
+    return [
+        menu(
+            "ASSEMBLE",
+            "New Component",
+            "new_component_" + tag,
+            lambda: cs.new_component_panel() is not None,
+            "the New Component dialog is open",
+        ),
+        named("name_" + tag, type_it),
+        ok("ok_" + tag),
+        named("made_" + tag, check),
+    ]
+
+
+def create_sketch(role, name):
+    def pick():
+        pl.click_square(role)
+
+    def opened():
+        sketch = h.in_sketch()
+        S["sk"] = sketch
+        if sketch is not None:
+            cam = h.view().getCameraNode()
+            S.setdefault("faced", {})[sketch.Name] = tuple(cam.orientation.getValue().getValue())
+        h.check("%s: the sketch is open" % name, sketch is not None)
+
+    return [
+        named(name + "_create_sketch", lambda: h.ribbon("Create Sketch")),
+        named(name + "_plane", pick, lambda: h.in_sketch() is not None, "the sketch is open"),
+        named(name + "_open", opened),
+    ]
+
+
+def at(index, pos):
+    return lambda: geo_point(index, pos)
+
+
+def on(index, t=0.5):
+    return lambda: geo_mid(index, t)
+
+
+def g(index):
+    return sk().Geometry[index]
+
+
+def inch(value):
+    return value / IN
+
+
+def blend():
+    from Fission180Tests.gui import blend_steps
+
+    return blend_steps.blend_panel()
+
+
+def thread_panel():
+    from Fission180Tests.gui import hole_steps
+
+    return hole_steps.thread_panel()
+
+
+def looks():
+    from Fission180Tests.gui import looks_steps
+
+    return looks_steps
+
+
+def revolve_open():
+    h.ribbon("Revolve")
+
+
+def appearance_open():
+    h.click_empty()
+    h.press("a")
+
+
+def chamfer_ring(radius, c):
+    """What a c x c chamfer takes off the end of a round bar of `radius` (in3)."""
+    small = radius - c
+    return math.pi * c * (radius**2 - (radius**2 + radius * small + small**2) / 3.0)
+
+
 # -- checkpoints (development only) ---------------------------------------------------------------
 CHECKPOINTS = os.environ.get("FISSION180_REPLAY_CHECKPOINTS", "")
 START_AT = os.environ.get("FISSION180_REPLAY_FROM", "")
@@ -478,6 +585,8 @@ def checkpoint(tag):
         tmp = os.path.join(CHECKPOINTS, "_tmp_%s.FCStd" % tag)
         d.saveCopy(tmp)
         shutil.move(tmp, path)
+        with open(path + ".active", "w") as handle:
+            handle.write(active_label() or "")
         print("[Fission 180] replay checkpoint %s written (%s)" % (tag, was), flush=True)
 
     return named("checkpoint_" + tag, step)
@@ -496,7 +605,15 @@ def assemble(sections):
         def load():
             user_defaults()
             Gui.activateWorkbench("Fission180Workbench")
-            App.openDocument(os.path.join(CHECKPOINTS, "replay_%s.FCStd" % before))
+            path = os.path.join(CHECKPOINTS, "replay_%s.FCStd" % before)
+            App.openDocument(path)
+            from fission180 import components_ui
+
+            label = (
+                open(path + ".active").read().strip() if os.path.exists(path + ".active") else ""
+            )
+            if label:
+                components_ui.activate(component(label))
             h.fit()
 
         steps.append(named("load_checkpoint_" + before, load))

@@ -243,6 +243,45 @@ def _is_solid_feature(obj):
         return False
 
 
+# The thread of a hole is remembered for each kind of units apart, as the Thread tool does
+# (thread_ui.ThreadPanel.remembered_standard): "iso" / "ansi" design -> the thread type,
+# size, designation and class of the last hole made in a design of those units.
+_THREAD_KEYS = ("standard", "size", "designation", "thread_class")
+_THREAD_OF_UNITS = {}
+
+
+def _design_standard(doc):
+    """ "ansi" for a design in inches or feet, else "iso" (thread_ui.design_standard)."""
+    from . import design_units
+
+    try:
+        return "ansi" if design_units.design_is_inch(doc) else "iso"
+    except Exception:
+        return "iso"
+
+
+def _thread_start(doc):
+    """The thread type a new hole starts with: the one of the last hole made in a design of
+    these units, else Unified in an inch design and ISO metric otherwise (Fusion follows the
+    design's units; the book's Pizza Cutter is an inch design and its first tapped hole came
+    up as "ISO Metric profile", M6x1). A first Unified hole starts at 1/4-20 UNC, as a
+    first metric one starts at M6x1 (hole.DEFAULTS)."""
+    units = _design_standard(doc)
+    kept = _THREAD_OF_UNITS.get(units)
+    if kept:
+        return dict(kept)
+    if units == "ansi":
+        return {
+            "standard": "ansi",
+            "size": "1/4",
+            "designation": "1/4-20 UNC",
+            "thread_class": tables.default_class("ansi", True),
+        }
+    # (a millimetre design after an inch one starts metric again, not with the last hole's
+    # Unified thread)
+    return {k: hole.DEFAULTS[k] for k in _THREAD_KEYS}
+
+
 class HolePanel(Panel):
     title = "Hole"
     icon = "hole"
@@ -265,6 +304,7 @@ class HolePanel(Panel):
         self.options = dict(hole.DEFAULTS)
         if feature is None:
             self.options.update(HolePanel.remembered)
+            self.options.update(_thread_start(doc))
             self.options["placement"] = "single"
             self.options["flip"] = False
             self.options["user_flip"] = False
@@ -1741,6 +1781,9 @@ class HolePanel(Panel):
         }
         if self.options["extent"] != "to":
             HolePanel.remembered["extent"] = self.options["extent"]
+        _THREAD_OF_UNITS[_design_standard(self.doc)] = {
+            k: self.options[k] for k in _THREAD_KEYS if k in self.options
+        }
         self.cleanup()
         # Also closes the step's name when nothing changed (else the next change anywhere
         # took that name and threw away the Redo list).

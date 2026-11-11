@@ -10,9 +10,9 @@ import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtWidgets
 
-from Fission180Tests.gui import component_steps as cs
 from Fission180Tests.gui import harness as h
-from Fission180Tests.gui import plane_input as pl
+from Fission180Tests.gui import replay_12_inner2_steps as inner2
+from Fission180Tests.gui import replay_12_inner_steps as inner
 from Fission180Tests.gui import replay_e_steps as r
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import timeline_input as ti
@@ -54,93 +54,11 @@ def units_check():
     r.no_dialog("Change Active Units")
 
 
-# == shared steps ================================================================================
-def new_component(label):
-    def type_it():
-        cs.type_name(label)
-
-    def check():
-        h.check("%s is a component" % label, r.component(label) is not None)
-        h.check("%s is the active component" % label, r.active_label() == label, r.active_label())
-
-    tag = label.lower().replace(" ", "_")
-    return [
-        r.menu(
-            "ASSEMBLE",
-            "New Component",
-            "new_component_" + tag,
-            lambda: cs.new_component_panel() is not None,
-            "the New Component dialog is open",
-        ),
-        r.named("name_" + tag, type_it),
-        r.ok("ok_" + tag),
-        r.named("made_" + tag, check),
-    ]
-
-
-def create_sketch(role, name):
-    def pick():
-        pl.click_square(role)
-
-    def opened():
-        sketch = h.in_sketch()
-        S["sk"] = sketch
-        h.check("%s: the sketch is open" % name, sketch is not None)
-
-    return [
-        r.named(name + "_create_sketch", lambda: h.ribbon("Create Sketch")),
-        r.named(name + "_plane", pick, lambda: h.in_sketch() is not None, "the sketch is open"),
-        r.named(name + "_open", opened),
-    ]
-
-
-def at(index, pos):
-    return lambda: r.geo_point(index, pos)
-
-
-def on(index, t=0.5):
-    return lambda: r.geo_mid(index, t)
-
-
-def g(index):
-    return r.sk().Geometry[index]
-
-
-def inch(value):
-    return value / IN
-
-
-def blend():
-    from Fission180Tests.gui import blend_steps
-
-    return blend_steps.blend_panel()
-
-
-def thread_panel():
-    from Fission180Tests.gui import hole_steps
-
-    return hole_steps.thread_panel()
-
-
-def looks():
-    from Fission180Tests.gui import looks_steps
-
-    return looks_steps
-
-
-def revolve_open():
-    h.ribbon("Revolve")
-
-
-def appearance_open():
-    h.click_empty()
-    h.press("a")
-
-
-def chamfer_ring(radius, c):
-    """What a c x c chamfer takes off the end of a round bar of `radius` (in3)."""
-    small = radius - c
-    return PI * c * (radius**2 - (radius**2 + radius * small + small**2) / 3.0)
+new_component = r.new_component
+create_sketch = r.create_sketch
+at, on, g, inch = r.at, r.on, r.g, r.inch
+blend, thread_panel, looks = r.blend, r.thread_panel, r.looks
+revolve_open, appearance_open, chamfer_ring = r.revolve_open, r.appearance_open, r.chamfer_ring
 
 
 # == End Cap =====================================================================================
@@ -438,6 +356,6 @@ cap += [
 ]
 cap += [appearance_open, cap_look, r.ok("cap_look_ok"), cap_look_done, cap_menu]
 
-SECTIONS = [("cap", cap)]
+SECTIONS = [("cap", cap), ("inner", inner.steps()), ("inner2", inner2.steps())]
 
 h.run("replay_12_pizza_cutter", r.assemble(SECTIONS), paced_by="state")
