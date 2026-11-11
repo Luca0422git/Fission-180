@@ -178,7 +178,7 @@ class AnimPanel(taskui.Panel):
                 if kind != "add" or doc_name != self.doc.Name or busy:
                     continue
                 obj = self.doc.getObject(obj_name)
-                comp = animation.component_for(obj)
+                comp = animation.clicked_component(obj, sub)
                 where = V(*point) if point is not None else None
                 if sub and where is not None and self.point_clicked(comp, where):
                     continue

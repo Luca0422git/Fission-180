@@ -826,7 +826,11 @@ def selected_components(doc=None):
     except Exception:
         picked = []
     for sel in picked:
-        comp = animation.component_for(sel.Object)
+        try:
+            sub = any(sel.SubElementNames)
+        except Exception:
+            sub = False
+        comp = animation.clicked_component(sel.Object, sub)
         if comp is not None and comp not in out:
             out.append(comp)
     return out

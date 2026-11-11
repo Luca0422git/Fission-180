@@ -118,6 +118,24 @@ def component_for(obj):
     return components.component_of(obj)
 
 
+def outermost(comp):
+    """The top-level component a component lies in (itself when it is one): what a click in
+    the 3D view takes, as in Fusion (a part inside a subassembly is picked by its browser
+    row)."""
+    if comp is None:
+        return None
+    above = components.ancestors(comp)
+    return above[-1] if above else comp
+
+
+def clicked_component(obj, sub):
+    """The component a selection stands for: of something clicked in the 3D view (a face,
+    an edge: `sub` is set) the top-level component it lies in; of a whole object (a browser
+    row) the component itself, or the one it is in."""
+    comp = component_for(obj)
+    return outermost(comp) if sub else comp
+
+
 def children(doc, parent):
     """The components directly inside `parent` (None: the top level)."""
     return components.components_in(doc, parent)
@@ -566,16 +584,19 @@ def explode_plan(doc, board, t, selected=None, levels="one", scale=1.0):
 
 def apply_moves(board, plan, playhead, sequential=False, trails=None):
     """Record a plan [(name, move)] on a storyboard at the playhead: one move action each
-    (One-Step: all from the start to the playhead; Sequential: one after another), or the
-    start positions in the scratch zone. Returns the actions made."""
+    (One-Step: each from where the component's last action ended to the playhead;
+    Sequential: one after another), or the start positions in the scratch zone. Returns the
+    actions made."""
     made = []
     if core.in_scratch(playhead):
         for name, move in plan:
             core.record_transform(board, name, move, (0, 0, 1), 0.0, (0, 0, 0), playhead)
     else:
         starts = [core.default_start(board, name, playhead) for name, _move in plan]
-        begin = min(starts) if starts else 0.0
-        spans = core.sequence_spans(len(plan), begin, playhead, sequential)
+        if sequential:  # one after another, from where the earliest of them is free
+            spans = core.sequence_spans(len(plan), min(starts or [0.0]), playhead, True)
+        else:  # each from where its own last action ended
+            spans = [(start, float(playhead)) for start in starts]
         for (name, move), span in zip(plan, spans):
             act = core.record_transform(
                 board, name, move, (0, 0, 1), 0.0, (0, 0, 0), playhead, span=span
