@@ -92,19 +92,7 @@ gasket_key.done_what = "the Extrude dialog is open"
 
 
 def gasket_face():
-    print(
-        "[Fission 180] replay gasket under %s | active %s"
-        % (h.under_mouse(FRONT), r.active_label()),
-        flush=True,
-    )
     r.xclick(FRONT)
-    p = r.panel()
-    print(
-        "[Fission 180] replay gasket took %s | %s | %s"
-        % (p.profiles, p.message.text(), p.info.text()),
-        flush=True,
-    )
-    h.shot("gasket-click")
 
 
 def gasket_values():
