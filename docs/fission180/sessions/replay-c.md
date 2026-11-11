@@ -115,6 +115,43 @@ follows its Quantity parameter.
 Skipped as the report did: the 40 straight knurls on the head (no sizes in the report;
 `book_modifyc_knurl` builds them).
 
+## Project 9, Prototype Drone: `replay_09_drone` (155 checks, PASS)
+
+The report never rebuilt the drone with its own sketch; it is rebuilt here from its text, in
+its plainest form: a hub (20 across), a middle ring (drawn freehand, no size) and a rim whose
+diameter is "Limits_Arm_Length * 2", cut by twelve spokes made with one line and a sketch
+Circular Pattern: 36 areas (the report's "36 selected"). Replayed, in one design: ASSEMBLE >
+New Component "Drone Frame" (active, grounded: the first component), a sketch on its Top
+plane, MODIFY > Change Parameters from inside the sketch ("+" Arm_Length 53 and
+Limits_Arm_Length = min(100; max(45; Arm_Length)): 53 mm, the bare numbers taken as mm), the
+circles (20 typed; a click; the rim's formula typed in the circle's box), the spoke from the
+origin to the rim, the spoke selected, Circular Pattern about the origin, 12, Finish Sketch
+(the sketch stays shown), E with the 24 inner areas clicked, Distance "Thickness = -2.5 mm"
+(a parameter made in the box, negative), the sketch's eye, E with eight outer areas,
+"Thickness", New Body (four bodies), MODIFY > Combine (target the plate, the four the tools,
+Join: one body), Ctrl+Z / Ctrl+Y of the Combine, Change Parameters Arm_Length 50, 40, 110, 53,
+60 (the rim 50, 45, 100, 53, 60; every time the same 32 areas, the windows stay: the report's
+"Extrude 1 would break: Sub shape not found: Sketch.InternalFace56" does not happen), Fillet
+2.5 on the two inside corners of a window, a window drag over the plate in Chamfer, 0.25
+(23 edges, 1.4 s; the report: "too big here, also at 0.1"), the sketch opened from the
+timeline, the middle ring dragged and Ctrl+Z (0.4 s; the report: "One drag + undo froze the
+app for about 80 s"), Finish Sketch, three Ctrl+Z and three Ctrl+Y, save, close, open again,
+Arm_Length 70 after reopening.
+
+No hitch of Fission 180's was found in the drone: the wave's builders had fixed the report's
+items (parameters dialog, negative and `Name = value` parameters, min/max with bare numbers,
+the sketch's MODIFY menu, tied pattern copies, area references that survive a parameter
+change, Combine's undo). The replay's own mistakes on the way (all in the scenario):
+"-Thickness" for a second extrude when Thickness is already negative put the pieces above
+the plate (then Combine rightly kept five solids); edge clicks in a view where the short
+upright corner edge was not the nearest edge picked the wall's top edge (a person turns the
+part until the edge lights up: the replay looks at each corner from inside the window).
+
+Out of the replay (the report's own stand-ins; other builders' scenarios cover the tools):
+the STEP motors, board and battery from CADclass.org (Data Panel Upload, Insert into Current
+Design, Move with parameters), Copy / Paste of a component, Rigid Group, Physical Material
+and Properties, the appearance.
+
 ## Changelog lines
 
 - A dimension between two points that you place straight to the left or right of them is the vertical distance, and straight above or below them the horizontal one, however near you place it.
@@ -128,4 +165,17 @@ Skipped as the report did: the 40 straight knurls on the head (no sizes in the r
 
 ## Known issues
 
-- (filled in at the end)
+- A knurl of 25 crossing grooves takes 20 to 50 s to build once you press OK (a progress
+  window says so and can cancel); Fusion takes seconds.
+- A body used up by Combine (Join) stays in the browser, hidden; Fusion takes it away.
+- The first body's eye in the browser and what the view draws now follow the body's last
+  step after a timeline drag; a design saved before this fix with the wrong step shown keeps
+  it until the next change (click the body's eye twice).
+- A dimension placed beside a slanted pair of points, inside the box they span, is the
+  aligned length; to get the horizontal or vertical one place it straight above / below or
+  beside the box (or right-click: Horizontal / Vertical).
+- The Rectangular Pattern's second direction takes the click after the first only once per
+  dialog; to change Direction 1 again later, click its box first.
+- Not replayed: the Drone's motors, board and battery (CADclass.org STEP files), Copy and
+  Paste of a component, Rigid Group, Properties; the Geocache's STL export; the Play Brick's
+  twelve small rectangles and the ribs; the Metric Bolt's 40 knurls.
