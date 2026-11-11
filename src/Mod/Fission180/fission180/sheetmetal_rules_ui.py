@@ -448,7 +448,13 @@ class RulesDialog(QtWidgets.QDialog):
         self._opened = False
         active = App.getActiveTransaction()
         if active is not None and active[0] == "Sheet Metal Rules":
-            self.doc.commitTransaction()
+            # (fix-2) closed whether the design changed or not: a visit whose only change
+            # was refused (a component's rule kept) left the step's name open, and the next
+            # change anywhere was filed under it (FreeCAD's commitTransaction only closes a
+            # step the design has changes in; sheetmetal_qa close_rules_2)
+            from . import transactions
+
+            transactions.close(self.doc)
 
     def accept(self):
         try:

@@ -266,7 +266,9 @@ d_ai.done_what = "Extrude's dialog placed beside the AI panel"
 
 def d_check_ai():
     no_outline("extrude_ai", "Extrude's dialog beside the AI panel")
-    Gui.Control.closeDialog()
+    # Cancel, as a person closes it (fix-2: Gui.Control.closeDialog() took the dialog away
+    # without its Cancel, and Extrude's undo step stayed open: the harness's NOTE)
+    h.task_button("Cancel")
 
 
 d_check_ai.done = lambda: not Gui.Control.activeDialog() and placed()

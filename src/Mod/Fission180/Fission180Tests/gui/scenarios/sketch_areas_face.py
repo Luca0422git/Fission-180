@@ -333,8 +333,16 @@ def sketch_on_face_through_b():
 
 def idle_again():
     if s.get("sk_b") is not None:
-        App.ActiveDocument.removeObject(s["sk_b"].Name)  # (an empty sketch; not the test)
-        App.ActiveDocument.recompute()
+        # an empty sketch, taken away (not the test). In an undo step of its own and closed:
+        # FreeCAD files a removeObject made outside a step under a "Delete" step it leaves
+        # open (fix-2: the harness's NOTE "AreasOnFace has a pending undo step")
+        from fission180 import transactions
+
+        doc = App.ActiveDocument
+        doc.openTransaction("Delete")
+        doc.removeObject(s["sk_b"].Name)
+        doc.recompute()
+        transactions.close(doc)
     Gui.Selection.clearSelection()
     h.fit()
     h.click(B)
