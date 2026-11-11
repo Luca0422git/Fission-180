@@ -38,6 +38,7 @@ Changing the operation swaps the step for one of the other kind at the same plac
 timeline. Fusion-only data (the corners as clicked, the operation) is kept as JSON in the
 hidden property "Fission180Primitive", so the timeline edit shows the dialog as it was left.
 """
+
 import json
 
 import FreeCAD as App
@@ -170,9 +171,30 @@ def point_on(face):
     return None
 
 
-def frame(ref):
+# Fusion's Front plane looks the other way than FreeCAD's XZ plane (extrude.is_front_plane):
+# its normal is +Y, a sketch on it has x = X and y = -Z. A primitive or coil made in its
+# dialog since wave 7 notes "front": True in its options and then counts on such a plane in
+# Fusion's frame: a positive Height goes to +Y, as a positive Extrude distance does. Steps
+# made before, and steps made from code without the note (the AI tools, scripts), keep
+# FreeCAD's frame: the same call builds the same solid as it always did.
+FRONT_TURN = App.Placement(App.Vector(), App.Rotation(App.Vector(1, 0, 0), 180))
+
+
+def front_turned(ref, options):
+    """True when what is built on `ref` with `options` counts in Fusion's frame of the
+    Front plane."""
+    try:
+        if not options or not options.get("front"):
+            return False
+        return bool(ref) and is_plane(ref[0]) and extrude.is_front_plane(ref[0])
+    except Exception:
+        return False
+
+
+def frame(ref, options=None):
     """Placement of the plane's frame in its body's coordinates: FreeCAD's FlatFace
-    attachment (the frame a sketch on that plane gets)."""
+    attachment (the frame a sketch on that plane gets); Fusion's frame of the Front plane
+    for a step that counts that way (front_turned)."""
     import Part
 
     obj, sub = check_ref(ref)
@@ -180,9 +202,12 @@ def frame(ref):
     engine.References = [(obj, sub)]
     engine.Mode = "FlatFace"
     try:
-        return engine.calculateAttachedPlacement(App.Placement())
+        place = engine.calculateAttachedPlacement(App.Placement())
     except Exception as exc:
         raise PrimitiveError("Cannot put it on %s: %s" % (ref_label(ref), exc))
+    if front_turned((obj, sub), options):
+        place = place.multiply(FRONT_TURN)
+    return place
 
 
 def body_placement(obj):
@@ -192,9 +217,9 @@ def body_placement(obj):
     return body.getGlobalPlacement()
 
 
-def global_frame(ref):
+def global_frame(ref, options=None):
     """The plane's frame in global coordinates (what the mouse ray meets)."""
-    return body_placement(ref[0]).multiply(frame(ref))
+    return body_placement(ref[0]).multiply(frame(ref, options))
 
 
 def ref_label(ref):
@@ -278,14 +303,14 @@ def tool_shape(kind, ref, options):
     options = with_defaults(kind, options)
     check(kind, options)
     shape = local_solid(kind, options)
-    shape.Placement = global_frame(ref).multiply(shape.Placement)
+    shape.Placement = global_frame(ref, options).multiply(shape.Placement)
     return shape
 
 
 def corners(kind, ref, options):
     """Global points of the base outline (for the dialog's handles): the box's rectangle
     corners in the plane, or the circle's centre."""
-    place = global_frame(ref)
+    place = global_frame(ref, options)
     x, y = float(options["x"]), float(options["y"])
     if kind != "box":
         return [place.multVec(App.Vector(x, y, 0))]
@@ -420,7 +445,9 @@ def mark_type(obj, fission180_type):
 def mark_helper(obj, role):
     """A hidden object Fission 180 made for a step: never a timeline step of its own."""
     if ROLE not in obj.PropertiesList:
-        obj.addProperty("App::PropertyString", ROLE, "Fission180", "What Fission 180 made this for", 0)
+        obj.addProperty(
+            "App::PropertyString", ROLE, "Fission180", "What Fission 180 made this for", 0
+        )
         obj.setEditorMode(ROLE, 2)
     setattr(obj, ROLE, role)
     if TIMELINE not in obj.PropertiesList:
@@ -706,12 +733,13 @@ def _origin_plane(body, role):
     return None
 
 
-def attachment_offset(body, support, ref, offset):
+def attachment_offset(body, support, ref, offset, options=None):
     """AttachmentOffset on `support` (in `body`) that puts `offset` (given in the frame of
-    `ref`, the plane the user clicked) at the same place."""
+    `ref`, the plane the user clicked: Fusion's frame of the Front plane for a step that
+    counts that way) at the same place."""
     if support[0] is ref[0] and (support[1] or "") == (ref[1] or ""):
-        return offset
-    wanted = global_frame(ref).multiply(offset)
+        return FRONT_TURN.multiply(offset) if front_turned(ref, options) else offset
+    wanted = global_frame(ref, options).multiply(offset)
     have = body.getGlobalPlacement().multiply(frame(support))
     return have.inverse().multiply(wanted)
 
@@ -947,7 +975,7 @@ def _update(feature, body, kind, ref, options):
     helpers = []
     support = local_support(body, feature, ref, helpers, old)
     drop_helpers(doc, old_names, {h.Name for h in helpers})
-    offset = attachment_offset(body, support, ref, local_offset(kind, options))
+    offset = attachment_offset(body, support, ref, local_offset(kind, options), options)
     set_support(feature, support)
     _apply_sizes(feature, kind, options)
     if not feature.AttachmentOffset.isSame(offset, 1e-12):

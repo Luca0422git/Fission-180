@@ -586,6 +586,33 @@ def _support_objects(obj):
     return []
 
 
+def is_front_plane(plane):
+    """True for the origin's Front (XZ) plane, and for a construction plane made from it
+    and parallel to it (an offset plane, also one made from such a plane), looking
+    FreeCAD's way (-Y in its body). Fusion's Front plane looks the other way: what is
+    built on such a plane counts its distances against the plane's own normal when it
+    was made Fusion's way (a sketch: FRONT; a primitive, a coil, an offset plane: the
+    "front" they note)."""
+    try:
+        obj, depth = plane, 0
+        while depth < 6:
+            if obj.TypeId == "App::Plane":
+                return getattr(obj, "Role", "") == "XZ_Plane"
+            if obj.TypeId not in ("PartDesign::Plane", "Part::DatumPlane"):
+                return False
+            normal = obj.Placement.Rotation.multVec(Z)
+            if (normal - App.Vector(0, -1, 0)).Length > 1e-6:
+                return False
+            supports = _support_objects(obj)
+            if not supports:
+                return False
+            obj = supports[0]
+            depth += 1
+    except Exception:
+        return False
+    return False
+
+
 def on_front_plane(sketch):
     """True when the sketch lies on the origin's Front (XZ) plane or on a construction plane
     made from it and parallel to it (an offset plane), looking FreeCAD's way (-Y in its
@@ -594,20 +621,10 @@ def on_front_plane(sketch):
         normal = sketch.Placement.Rotation.multVec(Z)
         if (normal - App.Vector(0, -1, 0)).Length > 1e-6:
             return False
-        obj, depth = sketch, 0
-        while depth < 6:
-            supports = _support_objects(obj)
-            if not supports:
-                return False
-            obj = supports[0]
-            if obj.TypeId == "App::Plane":
-                return getattr(obj, "Role", "") == "XZ_Plane"
-            if obj.TypeId not in ("PartDesign::Plane", "Part::DatumPlane"):
-                return False
-            depth += 1
+        supports = _support_objects(sketch)
+        return bool(supports) and is_front_plane(supports[0])
     except Exception:
         return False
-    return False
 
 
 def fusion_side(sketch):

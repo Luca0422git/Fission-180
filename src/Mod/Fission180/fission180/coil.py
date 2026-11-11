@@ -26,6 +26,7 @@ Outside on, it keeps what is inside the coil: intersect), sweeping Fission 180's
 axis. The section is computed from the dialog's values, so the coil has no sketch of its
 own, like in Fusion. Options are kept as JSON in the hidden property "Fission180Coil".
 """
+
 import math
 
 import FreeCAD as App
@@ -99,7 +100,7 @@ def helix_points(ref, options, count=None):
     rc = section_radius(options)
     if count is None:
         count = max(24, min(400, int(36 * max(turns, 1.0))))
-    place = primitives.global_frame(ref)
+    place = primitives.global_frame(ref, options)
     angle = math.radians(float(options.get("angle", 0.0))) if options["type"] != "spiral" else 0
     sign = 1.0 if options.get("clockwise", True) else -1.0
     if height < 0:
@@ -357,7 +358,7 @@ def _update(feature, body, ref, options):
     section.Label = "%s section" % feature.Label
     primitives.set_support(section, support)
     offset = App.Placement(App.Vector(float(options["x"]), float(options["y"]), 0), UPRIGHT)
-    offset = primitives.attachment_offset(body, support, ref, offset)
+    offset = primitives.attachment_offset(body, support, ref, offset, options)
     if not section.BaseOffset.isSame(offset, 1e-12):
         section.BaseOffset = offset  # execute() adds a narrowing coil's far end (narrow_end)
     for prop, value in (

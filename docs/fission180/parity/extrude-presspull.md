@@ -106,9 +106,41 @@ normal of a marked sketch round, so the arrow, a Start offset, Two Sides, a clic
 end the extrusion and the edit dialog all agree. A sketch an extrude already used (a design
 made before wave 7, a script, a golden model) has no mark and keeps FreeCAD's way: nothing
 that exists changes. A Rib or Web drawn on a Front plane sketch reads the same mark for its
-One Side (`parity/sweep-loft-rib.md`). **Not built:** the same for Box / Cylinder placed on the Front plane
-(their height still goes FreeCAD's way there) and for CONSTRUCT > Offset Plane from the Front
-plane (components' area: a positive offset should go to +Y in Fusion).
+One Side (`parity/sweep-loft-rib.md`).
+
+### One rule on the Front plane for every command (wave 7 follow-up, `sf/book-extrude-2`)
+
+The same positive number now goes the same way on Top, Front and Right in every command that
+counts from an origin plane (scenario `book_extrude2_planes`, 114 checks: Box, Hole, Offset
+Plane, Extrude on the plane, Extrude on the offset plane, Cylinder, undo / redo, each on the
+three planes with the same keys).
+
+| Command on the Front plane (XZ) | Fusion | Source | Fission 180 |
+|---|---|---|---|
+| Extrude of a sketch | plus is +Y | Book; third-party Fusion reference (sketch x = X, y = -Z) | the sketch's mark (first builder) |
+| CONSTRUCT > Offset Plane | "Positive offset goes in the plane's normal direction. For XY: +Z. For XZ: +Y" | third-party Fusion reference (a Fusion scripting guide); Forum (Autodesk community: "XZ plane (FRONT): up and down swapped", i.e. sketch y = -Z, normal +Y) | a new plane notes `Fission180FrontNormal` and counts against FreeCAD's normal (`construct.offset_side`); its arrow points to +Y; a formula is kept as `-(formula)` on the offset and read back as typed; a plane offset from such a plane counts the same way |
+| Box, Cylinder (Height) | plus goes along the plane's normal, +Y, like an extrude and an offset from the same plane (a Box is one "Box Primitive" step in Fusion's timeline, not a sketch and an extrude: Forum) | Guess for the sign (no page found that states it; the plane's normal is the one direction Fusion's other commands count along) | a new primitive notes `"front": true` in its options and is built in Fusion's frame of the Front plane (`primitives.front_turned`, `FRONT_TURN`: x = X, y = -Z, z = +Y) |
+| Coil (Height) | as Cylinder | Guess (same construction) | the same note |
+| Sphere, Torus | lie in the plane's middle: no side | - | the note, no visible change |
+| Hole from a sketch point | drills into the part | Guess (what `hole.py` was built to in wave 3: "Fusion drills into the part"); checked in the scenario on the three planes | already so (`hole.py` turns the hole into the material); nothing changed |
+| Rib, Web (One Side) | plus is +Y | as Extrude | the sketch's mark (first builder) |
+| Revolve (angle), Sweep (distance along the path), Loft, Emboss (depth from the face), the Move triad (world axes) | do not count from a plane's normal | - | nothing to turn |
+
+Only NEW objects count Fusion's way: a primitive, coil or offset plane made in its dialog
+from now on. One made before (no note), and one made from code without the note, keeps
+FreeCAD's way; edited in its dialog it keeps its side (the scenario's last three steps: an
+older box on the Front plane lies from -10 to 0, its arrow points to -Y, a new height of 15
+gives -15 to 0).
+
+**The AI tools** (`ai/ops/core.py`, also the language of the golden models) keep their own
+documented convention: "XZ (normal -Y)", a positive distance, height or offset goes along
+that normal. Chosen because the same step list must build the same solid as before (golden
+models, saved scripts, an AI's earlier calls), and their documentation states the normal with
+every plane. Two things were done so that this stays true next to the dialogs: the extrude
+op turns its options round on a sketch that a person's Extrude marked Fusion's way
+(`_along_plane_normal`: the step still goes to -Y), and the tools' help text says that a
+number typed in a dialog for a step on XZ has the other sign. Gear (`gear*.py`, modify's)
+still counts its thickness FreeCAD's way on the Front plane.
 
 The report's two other sign cases: "Cylinder Height -8 came out going +8 into the first
 body" was the typed -8 landing in the box of another arrow (the one the mouse rested on);
