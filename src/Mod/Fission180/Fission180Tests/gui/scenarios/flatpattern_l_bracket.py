@@ -107,7 +107,10 @@ def back_folded():
     node = fs.browser_node("flat_pattern")
     h.check("Flat Pattern row in the browser", node is not None and node["label"] == "Flat Pattern")
     tip = (node or {}).get("tip") or ""
-    h.check("its tooltip gives the flat size", "98.26 x 20.00 mm, 1 bend" in tip, tip)
+    # in the design's units, each size with its unit (wave 7, shell: browser_ui gives the
+    # row's sizes through design_units.length_text, so an inch design reads inches; it
+    # read "98.26 x 20.00 mm" in every design before)
+    h.check("its tooltip gives the flat size", "98.26 mm x 20 mm, 1 bend" in tip, tip)
     h.check(
         "no timeline step for the flat pattern",
         "Flat Pattern" not in " ".join(fs.timeline_titles()),
