@@ -26,10 +26,12 @@ from Fission180Tests.gui import book_joints_steps as bj
 from Fission180Tests.gui import book_sketch_b_steps as b
 from Fission180Tests.gui import dialog_input as ui
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import looks_steps as looks
 from Fission180Tests.gui import joints_steps as j
 from Fission180Tests.gui import replay_f_steps as r
 from Fission180Tests.gui import sketch_tools_steps as st
 from Fission180Tests.gui import timeline_input as t
+from Fission180Tests.gui import widget_input as w
 
 V = App.Vector
 S = {}
@@ -534,6 +536,62 @@ steps += hole_steps("a_link", lambda: S["a_end"], a_hole_done)
 steps += [r.named(r.finish_sketch, "a_finish")]
 steps += link_extrude("a_link", lambda: S["a_end"] * 0.5, "Thickness=-2mm")
 steps += [a_made]
+
+
+# == 5b: the ABS look, found with the appearance search ===========================================
+# (the report: "Fail. No ABS look and no appearance search (known)")
+def abs_open():
+    looks.open_appearance()
+
+
+abs_open.done = lambda: looks.panel() is not None
+abs_open.done_what = "the Appearance dialog is open"
+
+
+def abs_search():
+    p = looks.panel()
+    w.click(p.search)
+    w.type_text(p.search, "ABS")
+
+
+def abs_found():
+    names = looks.library_labels()
+    h.check(
+        "5b the search lists ABS looks only",
+        bool(names) and all("abs" in n.lower() for n in names),
+        names,
+    )
+    S["abs"] = names[0] if names else ""
+    body = r.bodies("A Link")[0]
+    h.check(
+        "5b the 3D view takes the swatch", looks.drop_look(S["abs"], front(S["a_end"] * 0.5, -2))
+    )
+    h.check(
+        "5b the crank wears %s" % S["abs"],
+        looks.body_look_label(body) == S["abs"],
+        looks.body_look_label(body),
+    )
+    h.check("5b In This Design lists it", S["abs"] in looks.design_labels(), looks.design_labels())
+    h.shot("5b-abs")
+    h.task_button("OK")
+
+
+abs_found.done = lambda: looks.panel() is None
+abs_found.done_what = "the Appearance dialog closed"
+
+
+def abs_kept():
+    body = r.bodies("A Link")[0]
+    h.check(
+        "5b OK keeps the look", looks.body_look_label(body) == S["abs"], looks.body_look_label(body)
+    )
+    h.check(
+        "5b A Link is still the active component", k.active_label() == "A Link", k.active_label()
+    )
+    r.no_open_step("Appearance")
+
+
+steps += [abs_open, abs_search, abs_found, abs_kept]
 
 
 # == 6: DGF Plate (the rocker): a slot from the second pin, 30 between centres ====================
@@ -1148,5 +1206,152 @@ def stopped_all():
 
 
 steps += [animate_alone, watched_alone, stopped, animate_all, watched_all, stopped_all]
+
+
+# == 12: Drive Joints on the crank: the loop is driven to an angle ================================
+def drive_open():
+    j.browser_menu("Revolute 1", "Drive Joints")
+
+
+drive_open.done = lambda: j.panel() is not None and j.panel().title == "Drive Joints"
+drive_open.done_what = "the Drive Joints dialog is open"
+
+
+def drive_type():
+    from Fission180Tests.gui import bodies_steps
+
+    bodies_steps.type_value(j.panel().angle.widget, "90")
+
+
+def driven():
+    h.caught_up(j.panel())
+    h.check(
+        "12 the crank stands at 90 degrees",
+        abs(angle("Revolute 1") - 90) < 1e-4,
+        angle("Revolute 1"),
+    )
+    h.check("12 the rocker followed", abs(angle("Revolute 2")) > 2, angle("Revolute 2"))
+    h.check(
+        "12 the loop holds at 90", not jm().broken_joints(bj.doc()), jm().broken_joints(bj.doc())
+    )
+    h.shot("12-driven")
+    j.cancel()
+
+
+driven.done = lambda: j.panel() is None
+driven.done_what = "the Drive Joints dialog closed"
+
+
+def drive_cancelled():
+    h.check(
+        "12 Cancel puts every link back",
+        not any(bj.moved(a, c) for a, c in zip(places(), S["home"])),
+    )
+    r.no_open_step("Drive Joints")
+
+
+steps += [drive_open, drive_type, driven, drive_cancelled]
+
+
+# == 13: what the browser and the timeline show; save, close, reopen ==============================
+def summary():
+    import math
+
+    h.check(
+        "13 four components", k.labels() == ["Pins", "A Link", "DGF Plate", "B Link"], k.labels()
+    )
+    h.check("13 four joints", bj.labels() == ["Revolute %d" % i for i in (1, 2, 3, 4)], bj.labels())
+    titles = r.timeline()
+    kinds = [x.split(" ")[0] for x in titles]
+    h.check(
+        "13 the timeline: 4 components, 4 sketches, 4 extrudes, 4 joints, in the order made",
+        kinds.count("Sketch") == 4 and kinds.count("Extrude") == 4 and kinds.count("Revolute") == 4,
+        titles,
+    )
+    crank = r.bodies("A Link")[0]
+    ends = sorted(slot_ends(crank), key=lambda p: p.Length)
+    h.check(
+        "13 the crank measures 15 between its centres (the book's value)",
+        abs((ends[1] - ends[0]).Length - 15) < 1e-4,
+        ends,
+    )
+    rocker = r.bbox(r.bodies("DGF Plate")[0])
+    h.check(
+        "13 the rocker measures 30 between centres, 5 wide",
+        r.near(rocker[5] - rocker[2], 35) and r.near(rocker[3] - rocker[0], 5),
+        rocker,
+    )
+    pins = [r.bbox(x) for x in r.bodies("Pins")]
+    h.check(
+        "13 the pins are 40 apart, 3 across, 6 long",
+        r.near(pins[1][0] - pins[0][0], 40)
+        and r.near(pins[0][3] - pins[0][0], 3)
+        and r.near(pins[0][4] - pins[0][1], 6),
+        pins,
+    )
+    h.check(
+        "13 the coupler is %.3f between centres (it closes the loop)" % S["b_len"],
+        S["b_len"] > 30 and math.isfinite(S["b_len"]),
+    )
+    h.fit()
+    h.shot("13-strandbeest")
+
+
+def slot_ends(body):
+    """The centres (as Front-plane sketch points) of a link's two round ends: the centres
+    of its half-round walls."""
+    out = []
+    for face in k.global_shape(body).Faces:
+        if face.Surface.TypeId == "Part::GeomCylinder" and abs(face.Surface.Radius - 2.5) < 1e-6:
+            c = face.Surface.Center
+            p = V(c.x, c.z, 0)
+            if not any((p - q).Length < 1e-6 for q in out):
+                out.append(p)
+    return out
+
+
+def save_close():
+    import os
+    import tempfile
+
+    S["path"] = os.path.join(tempfile.mkdtemp(prefix="fission180_replay14_"), "strandbeest.FCStd")
+    bj.doc().saveAs(S["path"])
+    App.closeDocument(bj.doc().Name)
+
+
+def reopen():
+    App.openDocument(S["path"])
+    h.fit()
+
+
+def reopened():
+    from fission180 import parameters
+
+    h.settle()
+    h.check("13 reopened: the design is not marked changed", not Gui.ActiveDocument.Modified)
+    h.check("13 reopened: nothing needs solving", not jm().needs_solve(bj.doc()))
+    h.check(
+        "13 reopened: four components, four joints",
+        k.labels() == ["Pins", "A Link", "DGF Plate", "B Link"] and len(bj.labels()) == 4,
+        (k.labels(), bj.labels()),
+    )
+    h.check(
+        "13 reopened: the loop holds",
+        jm().solve(bj.doc()) == 0 and not jm().broken_joints(bj.doc()),
+    )
+    rows = {x["name"]: x["value"] for x in parameters.user_rows(App.ActiveDocument)}
+    h.check(
+        "13 reopened: Width 5 mm and Thickness -2 mm",
+        rows == {"Width": 5.0, "Thickness": -2.0},
+        rows,
+    )
+    h.check(
+        "13 reopened: the crank still wears %s" % S["abs"],
+        looks.body_look_label(r.bodies("A Link")[0]) == S["abs"],
+    )
+    r.no_open_step("reopening")
+
+
+steps += [summary, save_close, reopen, reopened]
 
 h.run("replay_14_strandbeest", steps, paced_by="state")
