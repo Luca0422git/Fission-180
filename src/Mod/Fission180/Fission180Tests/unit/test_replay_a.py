@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from fission180 import extrude_pick_core as pick  # noqa: E402
 from fission180 import origin_look  # noqa: E402
 from fission180 import sketch_axes  # noqa: E402
 
@@ -61,6 +62,31 @@ class SketchAxisColours(unittest.TestCase):
         blue = origin_look.AXIS_RGB["Z"]
         hover = (1.0, 0.83, 0.0)
         self.assertEqual(sketch_axes.shown(hover, sketch_axes.FREECAD_V, blue), hover)
+
+
+class ExtrudePieces(unittest.TestCase):
+    """A click on one of the pieces Extrude took by itself starts the person's own choice."""
+
+    def test_click_adds_and_drops(self):
+        self.assertEqual(pick.toggled(["a"], "b"), (["a", "b"], set()))
+        self.assertEqual(pick.toggled(["a", "b"], "a"), (["b"], set()))
+
+    def test_book_thruster_both_halves(self):
+        keys, auto = pick.toggled(["outer", "inner"], "inner", {"outer", "inner"})
+        self.assertEqual((keys, auto), (["inner"], set()))
+        keys, auto = pick.toggled(keys, "outer", auto)
+        self.assertEqual(keys, ["inner", "outer"])
+
+    def test_one_area_taken_by_itself_toggles(self):
+        # Fusion: the one profile it took is dropped by a click on it
+        self.assertEqual(pick.toggled(["disc"], "disc", {"disc"}), ([], set()))
+
+    def test_click_elsewhere_adds_to_the_pieces(self):
+        keys, auto = pick.toggled(["a", "b"], "c", {"a", "b"})
+        self.assertEqual((keys, auto), (["a", "b", "c"], set()))
+
+    def test_pieces_changed_already(self):
+        self.assertEqual(pick.toggled(["a"], "a", {"a", "b"}), ([], set()))
 
 
 if __name__ == "__main__":

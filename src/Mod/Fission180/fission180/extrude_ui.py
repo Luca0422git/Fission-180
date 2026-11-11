@@ -1184,15 +1184,18 @@ class ExtrudePanel(
         if self.body is None:
             self.message.setText("Create a sketch first (Create Sketch).")
             return
+        by_itself = False  # the areas were not chosen by the person
         if given:
             picked = list(given)
         elif self.from_sketch is not None:
             # Never "the newest unused sketch" instead: with several areas, the user
             # clicks the ones wanted in this sketch.
             picked = single_region(self.from_sketch)
+            by_itself = True
         else:
             picked = selected_profiles(self.body)
         if not picked and self.auto_pick and self.from_sketch is None:
+            by_itself = True
             picked = newest_single_region(self.body)
             if not picked:
                 # Fusion's rule: the one profile that is in view, whichever body or
@@ -1203,6 +1206,9 @@ class ExtrudePanel(
         except Exception:
             pass
         self._tell_lost_areas(picked)
+        # the pieces of a shape drawn over a projected edge, taken by the dialog: a click
+        # on one of them starts the person's own choice (extrude_pick_core.toggled)
+        self._auto_pieces = {extrude.key(p) for p in picked} if by_itself else set()
         if picked:
             self.profiles = picked
             self._profiles_changed()
@@ -1904,13 +1910,17 @@ class ExtrudePanel(
         return tip
 
     def _toggle(self, ref):
+        from . import extrude_pick_core
+
         if any(sub == "" and obj is ref[0] for obj, sub in self.profiles):
             self.profiles = extrude.expand_whole(self.profiles)  # whole sketch -> its areas
-        keys = [extrude.key(p) for p in self.profiles]
-        if extrude.key(ref) in keys:
-            self.profiles = [p for p in self.profiles if extrude.key(p) != extrude.key(ref)]
-        else:
-            self.profiles = self.profiles + [ref]
+        by_key = {extrude.key(p): p for p in self.profiles + [ref]}
+        keys, self._auto_pieces = extrude_pick_core.toggled(
+            [extrude.key(p) for p in self.profiles],
+            extrude.key(ref),
+            getattr(self, "_auto_pieces", ()),
+        )
+        self.profiles = [by_key[k] for k in keys]
         self._profiles_changed()
 
     def _refresh_profiles(self):
