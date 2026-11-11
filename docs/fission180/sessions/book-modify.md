@@ -205,6 +205,67 @@ body pattern takes a parameter's value), `timeline_browser`, `timeline_browser_q
   step that loses a split line is switched.
 - A body pattern's quantity typed as a parameter is taken once (the dialog says so).
 
+## Round 2 (2026-11-11, same branch, after the first merge)
+
+The orchestrator asked for ten open items again. Three were done; the builder then ran out
+of working room (this session had already read and changed about 70 files), so seven are
+handed on, each with what is known.
+
+Done:
+
+1. **Bug 18 rebuilt the report's way, with real input** (`book_modify_combine_undo`, 52
+   checks): a user parameter Thickness = 2.5 mm (made with `parameters.add_user`, as the
+   report did), one sketch with five separate strips, E with the five areas clicked,
+   Distance "-Thickness", New Body (five bodies from one extrude), Combine with the first
+   body as target and the other four as tools, Join, OK: one body of five solids. Then
+   Ctrl+Z / Ctrl+Y / Ctrl+Z; the parameter changed to 4 mm and that undone; Combine again
+   and Ctrl+Z inside the open dialog, then Ctrl+Y; Combine again, OK, Ctrl+Z twice and
+   Ctrl+Y twice with nothing in between. In every one the Combine is one undo step, no
+   Combine object or step is left behind, nothing is red. **The orphan does not happen on
+   this code.** What the rebuild does not have: the report's real sketch (36 areas of a
+   patterned frame) and its history of sketch undos before the extrude. The scenario stays
+   as a guard. One thing seen on the way: Ctrl+Z inside an open dialog puts the dialog's
+   unfinished step on the Redo list, so Ctrl+Y brings back the Combine as it was previewed
+   (valid here); a dialog whose preview is incomplete at that moment would come back
+   incomplete. That is the nearest thing to the report's orphan and is where to look next
+   (`preview.UndoCancels`: clear the Redo entry of a cancelled dialog).
+2. **The 4 mm fillet is never silent** (`book_modify_fillet_limit_note`, 15 checks): on an
+   8 x 8 bar, Fillet on the two long top edges (and on the top face), 4 typed: the size is
+   held at 3.99 and the visible blue note reads "4 mm does not fit: limited to 3.99 mm". The
+   report's "silently" was the row list ("1: 3 picks - 3.99 mm"). The kernel refuses exactly
+   4.0 (the face between the rounds is used up); building that as a full round instead is
+   the open part.
+3. **The dead recompute hook** (item 10): `RecomputeGuard.slotBeforeRecomputeDocument` and
+   `_has_known_problems` removed. It was meant to mute the Report view while a design with
+   red or suppressed steps recomputes. Fission 180's own recomputes are muted where they
+   start (`timeline_ops.recompute`, `preview.recompute`, `settle`), so what a person can
+   still see is FreeCAD's "Step: reason" line in the Report view (hidden by default) when
+   FreeCAD itself recomputes such a design. Nothing new shows; nothing was lost.
+
+Merged `develop` (cam, components) into the branch: components' change to
+`pattern_ui.start` (Mirror / patterns open on Components when the active component has no
+solid) replaces this branch's fallback, which activated a body of another component.
+
+Not done in round 2 (in the orchestrator's numbering), with what is known:
+
+- 2 (the book's own Tensegrity / Tesla housing models; another route for the tangent tube
+  and the drifted copies): not started. For the tangent tube the kernel fails on the one
+  junction edge at every size and takes 20 s for a fillet; the route to try is a blend on
+  the tube before it is fused (the thread route's idea: `fillet_robust._through_thread`).
+- 3 (thread with 4 faces; Offset Face on a thread): not started. `thread._sweep` sweeps along
+  `Part.makeLongHelix`, which is one edge per turn, hence one face per turn and flank.
+- 4 (Compute Option, progress with cancel, knurl speed): not started. Measured before: one
+  boolean of all copies is the fastest of three routes (27 s for 25 copies).
+- 5 (Hole From Sketch with 5 holes: 60 s): not profiled.
+- 6 (a body pattern following its quantity parameter): not started; the value is taken once
+  and the dialog says so.
+- 7 (Draft boxes, Section Analysis double entry): not probed with real input.
+- 8 (Mirror in an assembly): now components' code path; no scenario from this builder.
+- 9 (seams after a kept split): not started. The idea asked for (refine, then draw the kept
+  split lines again) fits `split_face.imprint`, but the steps in question are FreeCAD's own
+  C++ features, whose result cannot be changed after they are built; it needs a hidden
+  follower step after each such feature.
+
 ## Changelog lines
 
 - Dragging a Thread before the Chamfer of its end in the timeline now works: the thread runs into the chamfer, as in the book's Geocache screw.
@@ -218,7 +279,6 @@ body pattern takes a parameter's value), `timeline_browser`, `timeline_browser_q
 - A pattern or mirror of features can include a Split Face: the copies are split too.
 - A pattern direction takes the edge you click, also when the click lands a hair beside it.
 - A pattern of bodies takes a parameter as its quantity (it uses the parameter's value at that moment and says so).
-- Mirror and Pattern start in an assembly whose parts are all in sub-components.
 - The Gear tool keeps the Operation you picked while a value does not fit, and says next to the pointer why OK did nothing.
 - A gear made as a New Component is named like Fusion names it, for example "Spur Gear (20 teeth)".
 - UTILITIES > Scripts and Add-Ins lists "SpurGear", which opens the Gear tool.
