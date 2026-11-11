@@ -416,6 +416,39 @@ def keep_made_body(doc=None):
         _MADE_BODY.pop(doc.Name, None)
 
 
+def drop_unused_made_body(doc=None):
+    """A command that asked ensure_body() for a body is being OK'd without putting anything
+    in it (Section Analysis needs a body only to show the origin squares): the empty body
+    goes, inside the command's own undo step, which is still open. (wave 7, replay-d) The
+    body's step "Add a Body" was still open when the dialog opened its own, so FreeCAD made
+    them one step; the dialog's close then saw no new step, took the command for a
+    cancelled one and undid the step: the section went with the body (the Fire Piston's
+    Section Analysis with the design's row active). True when the body went."""
+    from . import components
+
+    doc = doc or App.ActiveDocument
+    if doc is None:
+        return False
+    made = _MADE_BODY.get(doc.Name)
+    if not made:
+        return False
+    try:
+        body = doc.getObject(made[0])
+        if body is None or not components.is_unused(body):
+            return False
+        if not (doc.HasPendingTransaction or App.getActiveTransaction()):
+            return False  # no open step to take it away in: drop_made_body's way then
+        _MADE_BODY.pop(doc.Name, None)
+        name = body.Name
+        body.removeObjectsFromDocument()
+        doc.removeObject(name)
+        log("the empty body made for the command is gone again")
+        return True
+    except Exception as exc:
+        warn("could not take the unused body away: %s" % exc)
+    return False
+
+
 def drop_made_body(doc=None):
     """The command that asked ensure_body() for a body was CANCELLED (Create Sketch's plane
     picker closed with Esc, a CONSTRUCT or Insert dialog cancelled): the body it made must
