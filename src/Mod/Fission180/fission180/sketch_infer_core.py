@@ -509,14 +509,25 @@ def snap_points(items):
     return out
 
 
+# A line's or arc's middle is the one snap point nothing marks until the pointer is on it,
+# and a point that lands on it by accident is held there by a constraint that fights the
+# next dimension (the book parity report, Drone: "the construction line's end snapped to the
+# MIDPOINT of the arm line ... which later fights the arm length"; Tensegrity: a Coincident
+# click on a line made the centre the line's midpoint). Its reach is the triangle drawn for
+# it, not the whole snap reach: 0.6 of it (8 screen pixels: about 5). (Guess: Autodesk gives
+# no pixel number; in Fusion the triangle appears only with the pointer on the midpoint.)
+MIDDLE_REACH = 0.6
+
+
 def nearest_snap(raw, points, tol):
-    """The snap point nearest to raw within tol, or None. Where points lie on top of
-    each other (a corner of the sketch on a projected corner, an end on a middle) a
-    sketch point (Coincident) wins, then the sketch's own curves over projected ones."""
+    """The snap point nearest to raw within tol (a middle: within MIDDLE_REACH of it), or
+    None. Where points lie on top of each other (a corner of the sketch on a projected
+    corner, an end on a middle) a sketch point (Coincident) wins, then the sketch's own
+    curves over projected ones."""
     best = None
     for s in points:
         d = dist(raw, s.point)
-        if d > tol:
+        if d > (tol * MIDDLE_REACH if s.kind == MIDDLE else tol):
             continue
         rank = (0 if s.kind in VERTEX_KINDS else 1, 0 if _own(s) else 1)
         if best is None or d < best[0] - 1e-9 or (abs(d - best[0]) <= 1e-9 and rank < best[1]):

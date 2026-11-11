@@ -110,5 +110,18 @@ class FullGridSnap(unittest.TestCase):
         self.assertEqual(core.grid_snap(11.5, 10.0, 1.2), 11.5)
 
 
+class MidpointReach(unittest.TestCase):
+    def test_a_middle_is_taken_only_close_to_it(self):
+        middle = core.SnapPoint(core.MIDDLE, (10.0, 0.0), geo=0)
+        end = core.SnapPoint(core.END, (20.0, 0.0), key=(0, 2))
+        points = [middle, end]
+        # 0.5 from the middle with a reach of 1: inside its 0.6
+        self.assertIs(core.nearest_snap((10.5, 0.0), points, 1.0), middle)
+        # 0.8 from the middle: on the line, not on its middle
+        self.assertIsNone(core.nearest_snap((10.8, 0.0), points, 1.0))
+        # an end keeps the whole reach
+        self.assertIs(core.nearest_snap((19.2, 0.0), points, 1.0), end)
+
+
 if __name__ == "__main__":
     unittest.main()

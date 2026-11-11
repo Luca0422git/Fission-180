@@ -18,7 +18,9 @@ About 0.15 mm per pixel, so a grid line every 67 pixels.
      of and 25 px below (20, 30): one line from (-30, 10) to (20, 30), exactly
   B  what the pointer infers comes first: a line from the END of that line (clicked a few
      pixels off) starts on the end exactly, not on a grid crossing ... (the end is one);
-     a line to the MIDDLE of the first line, (-5, 20), which is no grid crossing, ends there
+     a line to the MIDDLE of the first line, (-5, 20), which is no grid crossing, ends there;
+     a line ended ON the first line 7 pixels from its middle ends on the line where it was
+     clicked, not on the middle (the middle's reach is its triangle, about 5 pixels)
   C  a typed value comes first: Line, a click near (-30, -20), the pointer moved to the
      right, 37 typed: the line is 37 long (its end is on no grid line)
   D  Fission 180's own 2-Point Circle: both clicks off the crossings (-20, -40) and (10, -40):
@@ -156,6 +158,48 @@ def b_check():
             "B it ends on the MIDDLE of the first line (-5, 20): what is inferred comes first",
             near(g.EndPoint, (-5, 20)),
             g.EndPoint,
+        )
+
+
+def b2_line():
+    s["n"] = sk().GeometryCount
+    s["cons"] = len(sk().Constraints)
+    h.press("l")
+
+
+def b2_first():
+    click_px(off(V(40, 30, 0), -22, 19))
+
+
+def b2_beside_the_middle():
+    # ON the first line, 7 pixels along it from its middle: aimed at the line, not at the
+    # middle (the book parity report, Drone: such an end "snapped to the MIDPOINT")
+    g = sk().Geometry[0]
+    d = g.EndPoint - g.StartPoint
+    d.normalize()
+    s["aim"] = V(-5, 20, 0) + d * (7 * s["mm"])
+    click_px(off(s["aim"], 0, 0))
+
+
+def b2_check():
+    stop_tool()
+    lines = new("Part::GeomLineSegment")
+    h.check("B one more line", len(lines) == 1, len(lines))
+    if lines:
+        end = lines[0].EndPoint
+        first = sk().Geometry[0]
+        gap = first.toShape().distToShape(__import__("Part").Vertex(end))[0]
+        h.check("B a click on the line 7 px from its middle ends ON the line", gap < 1e-6, gap)
+        h.check(
+            "B ...where it was clicked, not on the middle",
+            (end - V(-5, 20, 0)).Length > 3 * s["mm"],
+            end,
+        )
+        kinds = [c.Type for c in sk().Constraints[s["cons"] :]]
+        h.check(
+            "B ...held by point-on-line, not by a midpoint constraint",
+            "Symmetric" not in kinds,
+            kinds,
         )
 
 
@@ -325,6 +369,10 @@ h.run(
         b_first,
         b_middle,
         b_check,
+        b2_line,
+        b2_first,
+        b2_beside_the_middle,
+        b2_check,
         c_line,
         c_first,
         c_move,
