@@ -167,14 +167,20 @@ def e_bodies():
     h.check("Apply To starts on Bodies", p.apply_to.currentText() == "Bodies/Components")
 
 
+ASKED = {}  # what the first question said (filled when it is answered)
+
+
 def e_drop_cancel():
-    state["asked"] = {}
-    k.answer("Cancel", state["asked"])
+    state["asked"] = ASKED
     k.drop_look("Brass", TOP)
+
+
+k.asks(e_drop_cancel)
 
 
 def e_cancelled():
     asked = state["asked"]
+    h.check("one question for the one drop", k.asked() == 1, k.asked())
     h.check("the question came", "text" in asked, asked)
     h.check(
         "it offers Keep, Remove and Cancel",
@@ -191,8 +197,25 @@ def e_cancelled():
 
 
 def f_drop_keep():
-    k.answer("Keep")
     k.drop_look("Brass", TOP)
+
+
+k.asks(f_drop_keep)
+
+
+def f_ok_waits():
+    h.check("a second drop asks once more", k.asked() == 2, k.asked())
+    h.task_button("OK")
+
+
+def f_still_open():
+    p = k.panel()
+    h.check("OK waits for the answer: the dialog stays", p is not None and k.question() is not None)
+    if p is not None:
+        h.check(
+            "and says to answer first", "Answer the question" in p.message.text(), p.message.text()
+        )
+    h.check("nothing changed meanwhile", k.stored(body())["body"] is None)
 
 
 def f_kept():
@@ -210,11 +233,14 @@ def f_kept():
 
 
 def g_drop_remove():
-    k.answer("Remove")
     k.drop_look("Copper", TOP)
 
 
+k.asks(g_drop_remove)
+
+
 def g_removed():
+    h.check("three drops, three questions", k.asked() == 3, k.asked())
     data = k.stored(body())
     h.check("the body is copper", (data["body"] or {}).get("label") == "Copper", data["body"])
     h.check("no face look left", data["faces"] == [], len(data["faces"]))
@@ -369,10 +395,15 @@ h.run(
         e_open,
         e_bodies,
         e_drop_cancel,
+        k.answers("Cancel", "e_answer", ASKED),
         e_cancelled,
         f_drop_keep,
+        f_ok_waits,
+        f_still_open,
+        k.answers("Keep", "f_answer"),
         f_kept,
         g_drop_remove,
+        k.answers("Remove", "g_answer"),
         g_removed,
         ok,
         h_undo,

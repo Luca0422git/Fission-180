@@ -385,12 +385,8 @@ def edited_default(doc):
     return look if isinstance(look, dict) else None
 
 
-def default_look(doc):
-    """The look bodies show until they are given one: the default physical material's (Steel,
-    satin), drawn in the grey FreeCAD draws new parts in, until it is edited in this design."""
-    edited = edited_default(doc)
-    if edited:
-        return edited
+def library_default_look():
+    """The look of the default physical material (Steel, satin), as the library has it."""
     look = None
     try:
         from . import material
@@ -401,12 +397,20 @@ def default_look(doc):
         look = None
     look = dict(look or find("steel_satin"))
     look.pop("texture", None)
+    return look
+
+
+def default_look(doc):
+    """The look bodies show until they are given one: the default physical material's (Steel,
+    satin), until it is edited in this design. A body without a look is drawn in exactly
+    this look: FreeCAD draws such a part from its "default shape colour" preferences, which
+    are set to it (use_default_look)."""
+    edited = edited_default(doc)
+    if edited:
+        return edited
+    look = library_default_look()
     look["key"] = DEFAULT_KEY
     look["label"] = look["label"] + " (default)"
-    if App.GuiUp:
-        base = _default_material()
-        if base is not None:
-            look["color"] = [round(float(c), 4) for c in base.DiffuseColor[:3]]
     return look
 
 
@@ -752,6 +756,83 @@ def _default_material():
         )
     except Exception:
         return base
+
+
+VIEW_PREFS = "User parameter:BaseApp/Preferences/View"
+OLD_GREY = (0.8, 0.8, 0.8)  # what FreeCAD drew a part without a look in until wave 7
+
+
+def _packed(color):
+    r, g, b = (max(0, min(255, int(round(float(c) * 255)))) for c in color[:3])
+    return (r << 24) | (g << 16) | (b << 8) | 255
+
+
+def use_default_look():
+    """Make FreeCAD draw a part that has no look in the default look (Steel, satin): Fusion's
+    new bodies have the default material's look, and "In This Design" lists that look for
+    them. FreeCAD takes a new part's colours from its Part colour preferences (and so does
+    _default_material): they are set to the look's, once per start, before any part is made.
+    True when a preference changed."""
+    wanted = material_of(library_default_look())
+    params = App.ParamGet(VIEW_PREFS)
+    changed = False
+    for name, color in (
+        ("DefaultShapeColor", wanted.DiffuseColor),
+        ("DefaultAmbientColor", wanted.AmbientColor),
+        ("DefaultSpecularColor", wanted.SpecularColor),
+        ("DefaultEmissiveColor", wanted.EmissiveColor),
+    ):
+        packed = _packed(color)
+        if params.GetUnsigned(name, 0) != packed or params.GetUnsigned(name, 1) != packed:
+            params.SetUnsigned(name, packed)
+            changed = True
+    for name, value in (
+        ("DefaultShapeShininess", int(round(wanted.Shininess * 100))),
+        ("DefaultShapeTransparency", 0),
+    ):
+        if params.GetInt(name, -1) != value:
+            params.SetInt(name, value)
+            changed = True
+    if params.GetBool("RandomColor", False):
+        params.SetBool("RandomColor", False)
+        changed = True
+    return changed
+
+
+def _is_old_grey(vobj):
+    try:
+        materials = list(vobj.ShapeAppearance)
+    except Exception:
+        return False
+    if len(materials) != 1:
+        return False
+    return all(abs(a - b) < 0.004 for a, b in zip(materials[0].DiffuseColor[:3], OLD_GREY))
+
+
+def adopt_default(doc):
+    """A design made before the default look was drawn: its bodies without a look were saved
+    in FreeCAD's old grey. They take the default look (bodies with a look are not touched).
+    Returns how many steps were changed."""
+    if not App.GuiUp:
+        return 0
+    base = _default_material()
+    if base is None:
+        return 0
+    changed = 0
+    for body in bodies.list_bodies(doc):
+        try:
+            if getattr(body, PROP, "") or body.Name in _COLORED.get(doc.Name, ()):
+                continue
+            for step in [body] + list(body.Group):
+                vobj = getattr(step, "ViewObject", None)
+                if vobj is None or "ShapeAppearance" not in vobj.PropertiesList:
+                    continue
+                if _is_old_grey(vobj):
+                    _write(vobj, [base])
+                    changed += 1
+        except Exception:
+            continue
+    return changed
 
 
 def writing():

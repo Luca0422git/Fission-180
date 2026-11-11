@@ -295,7 +295,22 @@ def appearance(ctx, args):
                 raise UserError("The face selector picked nothing.")
             looks.set_faces(body, tip, names, look)
         else:
-            looks.set_body(body, look)
+            # Fusion asks when faces have looks of their own (Keep / Remove): the AI
+            # says it in the call, no question is ever opened
+            count = looks.face_count(body)
+            if count and "keep_face_looks" not in args:
+                raise UserError(
+                    "%s has %d face%s with a look of %s own. Say keep_face_looks: true "
+                    "(those faces keep their looks over the new one) or false (the "
+                    "whole body gets the new look)."
+                    % (
+                        body.Label,
+                        count,
+                        "" if count == 1 else "s",
+                        "its" if count == 1 else "their",
+                    )
+                )
+            looks.set_body(body, look, keep_faces=bool(args.get("keep_face_looks", False)))
         looks.apply(body)
 
     ctx.change(work)
