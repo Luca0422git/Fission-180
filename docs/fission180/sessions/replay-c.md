@@ -87,6 +87,34 @@ Where the report was wrong about Fusion, or the stand-in differs:
   removed volume against a pair measured with 3 copies; it would also pass with half the
   grooves. Not changed: its stand-in is built by script, where the coil has no offset.)
 
+## Project 8, Metric Bolt: `replay_08_metric_bolt` (117 checks, PASS)
+
+Replayed, in one design: MODIFY > Change Parameters, "+" nine times (Head_Diam 8.5,
+Head_Length 5, Shank_Length 45, Bolt_Diam 5, Wrench_Width 4, Wrench_Depth 3, Thread_Length =
+Shank_Length / 2, Chamfer_Size 1, Quantity 6 with No Units), the half profile on Front drawn
+with L, its bottom line made a Centerline with the palette, D to the centerline giving the
+diameters, the bare names typed in the value boxes (Head_Diam, Bolt_Diam, Head_Length,
+Shank_Length), S "rev" Enter, Revolve (the centerline the axis by itself), the hex socket
+(Circumscribed Polygon on the head's end, its circle "Wrench_Width", E "-Wrench_Depth": Cut by
+itself), Chamfer with two sets (the shank's end "Chamfer_Size"; "+", both head ends 0.5),
+Thread on the shank (Modeled, Full Length off, "Thread_Length": M5x0.8, 22.5), Thread 1
+dragged in front of Chamfer 1, Change Parameters Shank_Length 25 (the bolt 30 long, the
+thread 12.5), Circular Pattern of the bolt body about Z with Quantity "Quantity" (6 bolts),
+Change Parameters Quantity 8 (8 bolts), Ctrl+Z / Ctrl+Y, save, close, open again.
+
+| Report line | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 1410-1411 (skipped there) | Thread 1 dragged in front of Chamfer 1: refused, "Chamfer 1 would fail there: Set 1: Distance 1 mm is too big here" | The thread then runs into the chamfer (Book; the report's own Geocache line) | `fillet_robust.thread_twin` takes the grooves as the blank minus the threaded part; for this bolt (revolved on the Front plane, its Revolution placed by the sketch) that boolean gave the whole blank back, and the chamfer cut by it left nothing | `thread.groove_tools` (new): the thread's own cutting tools; `fillet_robust._grooves_plausible` (new) in `thread_twin`: grooves that do not hold what the thread took away are replaced by those tools |
+| (not in the report) | After that drag the view drew the Thread step (no chamfer at the shank's end) and the browser's eye said Body1 was hidden, also after save and reopen | The body shows its last step (FreeCAD's Tip; Fusion shows the result) | the recompute in `timeline_ops.move` showed the moved step again after `_set_tips` had shown the Tip | `timeline_ops.move`: after the recompute, `_show_only_tip` for each body. Checked in both replays (`tip_shown`) |
+
+What the report said that is no longer so (fixed by the wave's builders, replayed here with
+the book's input): "+" in Change Parameters works; the Centerline linetype exists and D to it
+gives a diameter; bare parameter names work in the sketch's value boxes; a body pattern
+follows its Quantity parameter.
+
+Skipped as the report did: the 40 straight knurls on the head (no sizes in the report;
+`book_modifyc_knurl` builds them).
+
 ## Changelog lines
 
 - A dimension between two points that you place straight to the left or right of them is the vertical distance, and straight above or below them the horizontal one, however near you place it.
@@ -95,6 +123,8 @@ Where the report was wrong about Fusion, or the stand-in differs:
 - A pattern of features made after a Box or Cylinder that is not at the origin repeats the features in the right place (the Geocache knurl had only half its grooves).
 - Emboss takes the face behind a construction plane when you click through the plane.
 - Grouping steps in the timeline no longer makes the design rebuild every step afterwards (a Section Analysis after Create Group waited half a minute).
+- Dragging a modeled Thread in front of the Chamfer of its end now works on the Metric Bolt too: the thread runs into the chamfer.
+- After a step is dragged in the timeline the part shows its finished shape, and the browser's eye no longer says the body is hidden.
 
 ## Known issues
 
