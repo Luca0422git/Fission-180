@@ -978,14 +978,41 @@ class _JointsPanel(BodyPanel):
         super().changed()
 
     def accept(self):
+        """OK. A refusal is said next to the mouse too (the book parity report: an OK the
+        dialog refused in its message line went unnoticed, and the joint looked made)."""
         self.stop_animation()
-        return super().accept()
+        was_closed = self._closed
+        done = super().accept()
+        if not done and not was_closed and not getattr(self, "_finishing", False):
+            said = self.message.text().lstrip("⚠ ").strip()
+            if said:
+                commands.tell("%s is not finished: %s" % (self.title, said))
+        return done
 
     def reject(self):
         self.stop_animation()
         return super().reject()
 
-    # -- dragging the joint to set its limits (joints_limit_drag) ------------------------------------
+    def finish(self):
+        """Another command starts: this one is kept if it is complete, else cancelled, and
+        then it says so (it used to vanish without a word, with the type or the limits
+        just chosen)."""
+        if self._closed:
+            return
+        self._finishing = True
+        try:
+            done = self.accept()
+        finally:
+            self._finishing = False
+        if done:
+            return
+        said = self.message.text().lstrip("⚠ ").strip()
+        self.reject()
+        commands.tell(
+            "%s was cancelled%s" % (self.title, ": " + said if said else " (it was not finished).")
+        )
+
+    # -- dragging the joint to set its limits (joints_limit_drag) ---------------------------------
     def _start_limit_drag(self):
         try:
             from . import joints_limit_drag
@@ -1878,7 +1905,17 @@ class AsBuiltPanel(_JointsPanel):
         if len(self.parts) < 2:
             raise NeedsPick("Click two components (in the view or the browser).")
         if kind != "rigid" and self.position_snap is None:
-            raise NeedsPick("Click a snap point for the joint's position (its axis).")
+            if self.joint is not None and not self.editing:
+                # the joint the preview made while the type was still Rigid goes: it stood
+                # in the browser and the timeline as "Rigid N" and looked finished
+                self.joint = None
+                self.target = None
+                self.restart()
+                self._remake = True
+            raise NeedsPick(
+                "%s needs a position: click a snap point on one of the two components "
+                "(the joint's axis goes through it)." % core.TITLES[kind]
+            )
         position = (self.position_pick, self.position_snap) if kind != "rigid" else (None, None)
         if self.joint is None:
             self.joint = joints.create_as_built_joint(
@@ -2023,7 +2060,8 @@ class JointOriginPanel(_JointsPanel):
         offset["angle"] = self.angle.value()
         offset["flip"] = self.flip.isChecked()
         same = (
-            self.origin is not None and getattr(self.origin, "Fission180On", "") == self.pick.obj.Name
+            self.origin is not None
+            and getattr(self.origin, "Fission180On", "") == self.pick.obj.Name
         )
         if self.origin is not None and not same and not self.editing:
             self.doc.removeObject(self.origin.Name)
@@ -2371,6 +2409,23 @@ class DrivePanel(_JointsPanel):
 
 
 # -- Ground, Capture Position, Revert --------------------------------------------------------------
+def _close_step(doc, abort=False):
+    """End the undo step a command without a dialog opened. FreeCAD's commitTransaction /
+    abortTransaction leave the step's name pending when the step holds no change: the next
+    change anywhere would open a step under that name and throw the Redo list away. The
+    pending name is closed too (as preview.end_transaction does for the dialogs)."""
+    try:
+        if abort:
+            doc.abortTransaction()
+        else:
+            doc.commitTransaction()
+    finally:
+        try:
+            App.closeActiveTransaction(abort)
+        except Exception:
+            pass
+
+
 def toggle_ground(obj):
     """Ground / Unground a component (browser right-click, the Ground command)."""
     part = joints.part_of(obj) if obj is not None else None
@@ -2391,11 +2446,11 @@ def toggle_ground(obj):
         joints.solve(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         warn("Ground: %s" % exc)
         commands.tell(str(exc))
         return False
-    doc.commitTransaction()
+    _close_step(doc)
     _refresh_browser()
     return True
 
@@ -2412,10 +2467,10 @@ def capture_position(doc):
         attach_views(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         commands.tell(str(exc))
         return None
-    doc.commitTransaction()
+    _close_step(doc)
     log("position captured as %s" % obj.Label)
     return obj
 
@@ -2431,10 +2486,10 @@ def revert_position(doc):
         joints.revert_position(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         commands.tell(str(exc))
         return False
-    doc.commitTransaction()
+    _close_step(doc)
     return True
 
 
@@ -2701,15 +2756,9 @@ class Watch:
             if tidy:
                 doc.openTransaction("Remove joints of deleted components")
                 removed = joints.tidy(doc)
+                _close_step(doc, abort=not removed)
                 if removed:
-                    doc.commitTransaction()
                     preview.recompute(doc)
-                else:
-                    doc.abortTransaction()
-                    try:
-                        App.closeActiveTransaction(True)
-                    except Exception:
-                        pass
             for origin in joints.joint_origins(doc):
                 if joints.joint_origin_owner(origin) is None:
                     continue
@@ -2720,9 +2769,14 @@ class Watch:
                 and joints_drag.active() is None
             )
             # a later step on a jointed body numbered its faces anew (a fillet): the joints
-            # find their faces again before anything is solved (joints.repair_references)
-            if calm and not Gui.Control.activeDialog() and joints.repair_references(doc):
-                preview.recompute(doc)
+            # find their faces again before anything is solved (joints.repair_references),
+            # also while a dialog is open (its own joint is left to it); a joint whose face
+            # is really gone says so on its step and next to the mouse, once
+            if calm:
+                fixed = joints.repair_references(doc, skip=_dialog_joint())
+                _say_lost(doc, joints.note_lost(doc))
+                if fixed:
+                    preview.recompute(doc)
             # a geometry change moved a joint origin (an edited face, a moved body): the
             # parts follow their joints, as in Fusion (FreeCAD's own solve on recompute is
             # off: see theme.VIEWER_SETTINGS)
@@ -2733,6 +2787,35 @@ class Watch:
 
 
 _WATCH = {"observer": None}
+_LOST_SAID = {}  # document name -> names of the joints already said to be lost
+
+
+def _dialog_joint():
+    """The joint the open joint dialog makes or edits, or None."""
+    try:
+        from . import taskui
+
+        panel = taskui.current()
+        joint = getattr(panel, "joint", None) if isinstance(panel, _JointsPanel) else None
+        return joint if joint is not None and joint.Document is not None else None
+    except Exception:
+        return None
+
+
+def _say_lost(doc, lost):
+    """Say once, next to the mouse, that a joint lost what it was made on."""
+    try:
+        said = _LOST_SAID.setdefault(doc.Name, set())
+        names = {j.Name for j in lost}
+        fresh = [j for j in lost if j.Name not in said]
+        said &= names  # found again: it may be said again another time
+        said |= names
+        if fresh:
+            warn_text = joints.lost_text(fresh[0])
+            log(warn_text)
+            commands.tell(warn_text)
+    except Exception as exc:
+        warn("joints watch: %s" % exc)
 
 
 def install():
@@ -2936,10 +3019,10 @@ def edit_position(feature):
         joints.solve(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         warn("Position: %s" % exc)
         return
-    doc.commitTransaction()
+    _close_step(doc)
 
 
 def drive(joint):
