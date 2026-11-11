@@ -1610,7 +1610,7 @@ class HolePanel(Panel):
             return
         try:
             if hole.on_flat_face(self.target):
-                hole.move_to(self.target, (round(xy[0], 3), round(xy[1], 3)))
+                hole.move_to(self.target, self._drag_xy(xy))
             else:
                 self._centre_on_curved_face()
         except Exception as exc:
@@ -1618,6 +1618,20 @@ class HolePanel(Panel):
             return
         self.dirty = True
         self.schedule()
+
+    def _drag_xy(self, xy):
+        """Where a drag of the blue dot leaves the hole: on clean values, as fine as the
+        screen shows (hole_snaps_core.drag_step). It was rounded to a micrometre: a hole
+        dragged back to an axis stood -0.055 mm beside it."""
+        from . import design_units, handle_look, hole_snaps_core
+
+        try:
+            dot = self.draggers.get("centre")
+            scale = handle_look.mm_per_px(Gui.ActiveDocument.ActiveView, dot.point())
+            inch = design_units.design_is_inch(self.doc)
+            return tuple(hole_snaps_core.drag_value(v, scale, inch) for v in xy[:2])
+        except Exception:
+            return (round(xy[0], 3), round(xy[1], 3))
 
     def _centre_released(self, xy):
         self._centre_dragged(xy)
