@@ -107,6 +107,12 @@ class ViewProviderDraft:
     __setstate__ = loads
 
 
+PULL_KEPT = (
+    "That face is the pull direction: it stays, and is not drafted. To change the pull "
+    "direction, click the Pull Direction box (or its x) first."
+)
+
+
 class PullArrow(pickpanel.Arrow):
     """The blue arrow showing the pull direction, like Fusion's: clicking it flips the
     pull direction (as the flip button does). Grabbed by where it is on the screen
@@ -565,7 +571,16 @@ class DraftPanel(pickpanel.PickPanel, value_limits.LimitedValues):
                 and obj is self.plane_ref[0]
                 and short == (self.plane_ref[1] or "")
             ):
-                if short:  # a whole plane object stays (it is only shown selected)
+                if short and self.active != "plane":
+                    # The pull direction's face clicked while faces are being picked: it
+                    # stays the pull direction (the book parity report, Play Brick: "after
+                    # picking the pull face ... a face sometimes did nothing", "cleared the
+                    # pull direction": the click dropped it and made Pull Direction the
+                    # active box, so the next face clicked became the pull direction
+                    # instead of a face to draft). Fusion's two boxes are two selections: a
+                    # click for one never empties the other. Said next to the pointer.
+                    commands.tell(PULL_KEPT)
+                elif short:  # a whole plane object stays (it is only shown selected)
                     self.plane_ref = None
                     self._activate("plane", schedule=False)
                     changed = True
