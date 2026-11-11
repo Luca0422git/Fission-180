@@ -518,7 +518,9 @@ def rolls_back(obj):
     try:
         if is_component(obj) or is_mesh_step(obj):
             return True
-        return getattr(obj, "Fission180Type", "") in ROLLING_TYPES or bool(getattr(obj, ROLLS, False))
+        return getattr(obj, "Fission180Type", "") in ROLLING_TYPES or bool(
+            getattr(obj, ROLLS, False)
+        )
     except Exception:
         return False
 
@@ -627,6 +629,10 @@ def uses(obj):
             continue  # a fillet/chamfer's edges live on the step before it
         if prop == "Faces" and base is not None and objs and all(o is base for o in objs):
             continue  # Press Pull: same
+        if prop in ("Picks", "Picks2") and base is not None and all(o is base for o in objs):
+            # Fission 180's own fillet / chamfer step (fillet_sets): its picks live on the
+            # step before it too, and are found again when that step changes (move())
+            continue
         names.update(o.Name for o in objs)
     try:
         for o in obj.OutList:  # expressions (=Sketch.Constraints.width, parameters)
@@ -1868,19 +1874,78 @@ def move(doc, name, slot):
         else:
             tips = core.tips_for_count(after, p.marker_count)
         _set_tips(doc, tips)
+        _free_threads(doc, geometry)
         recompute(doc)
         _rebase(doc, p.order, geometry, tl)
+        _rescue_blends(doc, _errors(doc) - broken_before)
         newly = _errors(doc) - broken_before
         if newly:
-            item = timeline(doc).find(sorted(newly)[0])
-            what = item.display if item is not None else sorted(newly)[0]
-            raise TimelineError("%s would fail there." % what)
+            name = sorted(newly)[0]
+            item = timeline(doc).find(name)
+            what = item.display if item is not None else name
+            raise TimelineError(_fails_there(doc, name, what))
     except Exception:
         doc.abortTransaction()
         recompute(doc)
         raise
     doc.commitTransaction()
     return True
+
+
+def _is_thread(obj):
+    return getattr(obj, "Fission180Type", "") == "Thread"
+
+
+def _free_threads(doc, geometry):
+    """A Thread whose step before changes with the move lets go of its faces: they are
+    faces of the old step before it, which may now come after it (FreeCAD: "The graph must
+    be a DAG", and nothing recomputes). The thread finds the same cylinders again on its new
+    step before by where they are (thread.ThreadFeature.execute), as Fusion keeps a thread
+    on its cylinder when it is dragged before the chamfer of its end (the book's Geocache
+    screw: "drag the Thread before the Chamfer so the thread runs into the chamfer")."""
+    for name in list(geometry):
+        obj = doc.getObject(name)
+        if obj is None or not _is_thread(obj):
+            continue
+        del geometry[name]
+        try:
+            obj.Faces = None
+        except Exception:
+            pass
+
+
+def _rescue_blends(doc, names):
+    """A FreeCAD Fillet / Chamfer that fails at its new place although Fission 180's own
+    step builds the same blend there by another route (a chamfer that now comes after a
+    modeled thread: fillet_robust) becomes that step. True when one changed."""
+    from . import fillet_sets
+
+    changed = False
+    for name in sorted(names):
+        obj = doc.getObject(name)
+        if obj is None:
+            continue
+        try:
+            if fillet_sets.rescue(obj) is not None:
+                changed = True
+        except Exception:
+            continue
+    if changed:
+        recompute(doc)
+    return changed
+
+
+def _fails_there(doc, name, what):
+    """Why a moved timeline cannot be built: the step's own reason when it has one."""
+    obj = doc.getObject(name)
+    reason = ""
+    try:
+        reason = _plain(obj.getStatusString() or "") if obj is not None else ""
+    except Exception:
+        reason = ""
+    if reason and reason.lower() not in ("valid", "touched", "invalid", "error"):
+        return "%s would fail there: %s" % (what, reason)
+    return "%s would fail there." % what
 
 
 def plan_group(doc, gid, slot):
@@ -1941,13 +2006,16 @@ def move_group(doc, gid, slot):
         else:
             tips = core.tips_for_count(after, p.marker_count)
         _set_tips(doc, tips)
+        _free_threads(doc, geometry)
         recompute(doc)
         _rebase(doc, p.order, geometry, tl)
+        _rescue_blends(doc, _errors(doc) - broken_before)
         newly = _errors(doc) - broken_before
         if newly:
-            item = timeline(doc).find(sorted(newly)[0])
-            what = item.display if item is not None else sorted(newly)[0]
-            raise TimelineError("%s would fail there." % what)
+            name = sorted(newly)[0]
+            item = timeline(doc).find(name)
+            what = item.display if item is not None else name
+            raise TimelineError(_fails_there(doc, name, what))
     except Exception:
         doc.abortTransaction()
         recompute(doc)
@@ -2036,6 +2104,9 @@ def _place_followers(doc, places):
 # picked on its base (journey_plastic: deleting the Snap Fit before a Lip deleted the step
 # its edges were on, and the Lip failed)
 REBASE_PROPS = ("Base", "Faces", "Edges")
+# ... and, when a step is dragged in the timeline, the picks of Fission 180's own fillet /
+# chamfer step (fillet_sets: every set's edges and faces, and a rule fillet's second box)
+MOVE_PROPS = REBASE_PROPS + ("Picks", "Picks2")
 
 
 def _rebase_geometry(doc, tl, p, follower_bodies=()):
@@ -2052,7 +2123,7 @@ def _rebase_geometry(doc, tl, p, follower_bodies=()):
         base = getattr(obj, "BaseFeature", None) if obj is not None else None
         if base is None:
             continue
-        for prop in REBASE_PROPS:
+        for prop in MOVE_PROPS:
             if prop not in obj.PropertiesList:
                 continue
             value = getattr(obj, prop, None)
@@ -2066,8 +2137,22 @@ def _rebase_geometry(doc, tl, p, follower_bodies=()):
                 except Exception:
                     pass
             if elements:
-                found[name] = (prop, elements)
+                found.setdefault(name, []).append((prop, elements, _thread_slack(base)))
     return found
+
+
+def _thread_slack(step):
+    """How far a modeled Thread step moved the surface of its cylinders (thread.slack), 0
+    for any other step: an edge picked on the threaded part is found again on the part
+    without the thread (and the other way round) within this distance."""
+    if step is None or not _is_thread(step) or not getattr(step, "Modeled", False):
+        return 0.0
+    try:
+        from . import thread
+
+        return float(thread.slack(step))
+    except Exception:
+        return 0.0
 
 
 def _rebase(doc, order, geometry, tl):
@@ -2077,17 +2162,45 @@ def _rebase(doc, order, geometry, tl):
         if name not in geometry:
             continue
         obj = doc.getObject(name)
-        prop, elements = geometry[name]
         base = getattr(obj, "BaseFeature", None)
         title = tl.find(name).display if tl.find(name) else name
         if base is None or base.Shape.isNull():
             raise TimelineError("%s needs a solid before it." % title)
-        names = [_twin_name(base.Shape, e) for e in elements]
-        if None in names:
-            raise TimelineError("%s uses geometry made by a step it would move before." % title)
-        # Always set it again: the same "Edge2" may hide a stale internal name.
-        setattr(obj, prop, (base, names))
+        for prop, elements, slack in geometry[name]:
+            each = prop in ("Picks", "Picks2")  # one name per pick: the sets count them
+            names = _names_on(base, elements, slack, one_each=each)
+            if names is None:
+                raise TimelineError("%s uses geometry made by a step it would move before." % title)
+            # Always set it again: the same "Edge2" may hide a stale internal name.
+            setattr(obj, prop, (base, names))
         recompute(doc)
+
+
+def _names_on(base, elements, slack=0.0, one_each=False):
+    """The names on step `base` of the edges / faces `elements` (shapes from another step):
+    the one at the same place and of the same size; else the pieces of it that are left (an
+    edge another step trimmed; the end edge of a shaft a modeled thread now cuts through,
+    which the thread also moved to its own diameter: thread.slack of the new step before,
+    or `slack`, that of the old one). None when one is not there at all. `one_each`: one
+    name for each element, in their order (the picks of Fission 180's fillet step are
+    counted per set); else every piece found, each once."""
+    from . import blend
+
+    shape = base.Shape
+    slack = max(float(slack), _thread_slack(base))
+    names = []
+    for element in elements:
+        twin = _twin_name(shape, element)
+        found = [twin] if twin else blend.find_same(shape, element)
+        if not found and slack > 0.0:
+            found = blend.find_same(shape, element, slack + 1e-4)
+        if not found:
+            return None
+        if one_each:
+            names.append(found[0])
+        else:
+            names.extend(n for n in found if n not in names)
+    return names
 
 
 def _twin_name(shape, element, tol=1e-6):
@@ -2274,7 +2387,7 @@ def _set_group(obj, gid, name):
 
 
 def group(doc, names, title=None):
-    """Fusion's Group Features: neighbouring steps under one folder in the timeline.
+    """Fusion's Create Group: neighbouring steps under one folder in the timeline.
     Returns the group id."""
     tl = timeline(doc, deps=False)
     ok, reason = core.can_group(tl, names)
@@ -2282,7 +2395,7 @@ def group(doc, names, title=None):
         raise TimelineError(reason)
     gid = core.new_group_id(tl)
     title = title or core.new_group_name(tl)
-    _transaction(doc, "Group Features")
+    _transaction(doc, "Create Group")
     try:
         for n in names:
             _set_group(doc.getObject(n), gid, title)

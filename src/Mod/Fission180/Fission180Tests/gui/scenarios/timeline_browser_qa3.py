@@ -384,7 +384,7 @@ def p17_undone():
 
 
 def p17_group():
-    t.menu("Extrude 2", "Group Features")
+    t.menu("Extrude 2", "Create Group")
 
 
 def p17_group_delete():

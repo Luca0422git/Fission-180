@@ -11,6 +11,7 @@ the timeline to edit it.
 A cosmetic thread (Modeled off) leaves the part as it is and is drawn as a dashed helix on
 the face (CosmeticThreads below); so are tapped holes that are not modeled.
 """
+
 import math
 
 import FreeCAD as App
@@ -73,19 +74,53 @@ class ViewProviderThread:
     __setstate__ = loads
 
 
-def _base_face(base, body, point):
-    """'FaceN' of `base` under a clicked point (global), or None."""
+def _base_face(base, body, point, picked=()):
+    """'FaceN' of `base` under a clicked point (global), or None. A point clicked on the
+    thread being made (its grooves lie under the face they were cut into, or over a hole's
+    wall that was filled in) is on the picked face (`picked`: names) whose cylinder it is
+    within the thread's depth of: clicking the thread again drops that face, from any
+    view."""
     from . import hole
 
     local = hole.to_local(body, point)
-    return hole.base_face_at(base, local)
+    name = hole.base_face_at(base, local)
+    if name is not None:
+        return name
+    best = None
+    for face_name in picked:
+        try:
+            c = thread.cylinder_of(base.Shape, face_name)
+        except Exception:
+            continue
+        along = (local - c.base).dot(c.axis)
+        if along < c.z0 - 1e-3 or along > c.z1 + 1e-3:
+            continue
+        foot = c.base + c.axis * along
+        gap = abs((local - foot).Length - c.radius)
+        if gap <= max(1.0, 0.25 * c.radius) and (best is None or gap < best[0]):
+            best = (gap, face_name)
+    return best[1] if best else None
+
+
+def design_standard(doc):
+    """The thread standard a new thread starts with: Unified in a design in inches or feet,
+    ISO metric otherwise (Fusion follows the design's units; the book's Fire Piston and
+    Pizza Cutter are inch designs)."""
+    from . import browser_core
+
+    return "ansi" if browser_core.doc_length_unit(doc) in ("in", "ft") else "iso"
 
 
 class ThreadPanel(Panel):
     title = "Thread"
     icon = "thread"
     last = None
-    remembered = {}  # Fusion starts with the settings of the last thread
+    # Fusion starts with the settings of the last thread. The thread type is remembered
+    # for each kind of units apart ("iso" / "ansi" units -> the standard last used in a
+    # design of those units): the Unified thread of an inch design is not the start of the
+    # next thread in a millimetre design (the book's Hot End after its Fire Piston).
+    remembered = {}
+    remembered_standard = {}
 
     def __init__(self, doc, feature=None, selection=None):
         super().__init__(doc, "Thread" if feature is None else "Edit Thread")
@@ -119,6 +154,8 @@ class ThreadPanel(Panel):
                 warn("could not read %s: %s" % (feature.Label, exc))
         else:
             self.options.update(ThreadPanel.remembered)
+            units = design_standard(doc)
+            self.options["standard"] = ThreadPanel.remembered_standard.get(units, units)
             self.options.update({"size": "", "designation": "", "thread_class": ""})
         self.options["expressions"] = dict(self.options.get("expressions") or {})
         self.error = ""
@@ -164,7 +201,7 @@ class ThreadPanel(Panel):
         self.offset = DistanceField(self.options["offset"], on_change=self._typed)
         self.offset_label = QtWidgets.QLabel("Offset")
         form.addRow(self.offset_label, self.offset.widget)
-        self.standard = common.combo([(label, key) for key, label in tables.STANDARDS])
+        self.standard = common.combo([(label, key) for key, label in tables.THREAD_STANDARDS])
         form.addRow("Thread Type", self.standard)
         self.size = QtWidgets.QComboBox()
         form.addRow("Size", self.size)
@@ -231,6 +268,8 @@ class ThreadPanel(Panel):
         sizes = tables.sizes(standard)
         if size not in sizes:
             size = "6" if standard == "iso" else "1/4"
+            if size not in sizes and sizes:
+                size = sizes[0]
         common.fill_combo(self.size, [(s, s) for s in sizes], size)
         found = tables.designations(standard, self.size.currentData())
         common.fill_combo(self.designation, [(x.label, x.label) for x in found], designation)
@@ -387,7 +426,9 @@ class ThreadPanel(Panel):
             point = face.valueAt((u0 + u1) / 2.0, (v0 + v1) / 2.0)
         # A face of the part as it is before this thread is taken as it is; one clicked on the
         # preview is looked up on the part before it.
-        name = short if obj is self.source else _base_face(self.source, self.body, point)
+        name = (
+            short if obj is self.source else _base_face(self.source, self.body, point, self.faces)
+        )
         if name is None:
             self.message.setText("That face is made by this thread. Pick a face of the part.")
             return
@@ -469,9 +510,18 @@ class ThreadPanel(Panel):
         if c is None:
             self.info.setText("")
         else:
+            from . import browser_core
+
+            # in the design's units, like every value Fusion shows (it read "25.4 mm" in
+            # the book's inch designs)
             self.info.setText(
-                "%s thread, %s %.3g mm, %.3g mm long"
-                % ("Inside" if c.internal else "Outside", "⌀", c.diameter, c.length)
+                "%s thread, %s %s, %s long"
+                % (
+                    "Inside" if c.internal else "Outside",
+                    "⌀",
+                    browser_core.length_text(c.diameter, self.doc),
+                    browser_core.length_text(c.length, self.doc),
+                )
             )
         if self.base is None and self.target is None and not common.has_solid(self.doc):
             self.what.setText("Make a solid first (Create Sketch, then Extrude).")
@@ -778,8 +828,9 @@ class ThreadPanel(Panel):
             return False
         self._collect()
         ThreadPanel.remembered = {
-            k: self.options[k] for k in ("standard", "modeled", "direction", "full_length")
+            k: self.options[k] for k in ("modeled", "direction", "full_length")
         }
+        ThreadPanel.remembered_standard[design_standard(self.doc)] = self.options["standard"]
         self.cleanup()
         # Also closes the step's name when nothing changed (the Redo list survives).
         preview.end_transaction(self.doc)

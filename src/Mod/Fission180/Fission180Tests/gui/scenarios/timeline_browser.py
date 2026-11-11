@@ -547,7 +547,7 @@ def select_two():
 
 def group_them():
     h.check("Shift+click selects both", tl().selected() == [s["sk2"], s["boss"]], tl().selected())
-    menu("Boss", "Group Features")
+    menu("Boss", "Create Group")
 
 
 def check_group():
