@@ -1632,7 +1632,22 @@ class _WidthGuard(QtCore.QObject):
             window = 1280
         return int(max(300, min(PANEL_WIDTH, window * 0.4)))
 
+    def keep_ampersands(self):
+        """A name with "&" on any button or box of the dialog is drawn whole. Fission 180's
+        dialogs have no keyboard letters ("&Open"), so a single "&" in a button's text is
+        part of a name: Qt would drop it (and underline the next letter)."""
+        for child in self._form.findChildren(QtWidgets.QAbstractButton):
+            if isinstance(child, NamesButton):
+                continue
+            try:
+                text = child.text()
+                if "&" in text and "&" in text.replace("&&", ""):
+                    child.setText(shown_name(text.replace("&&", "&")))
+            except Exception:
+                continue
+
     def narrow(self):
+        self.keep_ampersands()
         form = self._form
         limit = self.limit()
         if form.minimumSizeHint().width() <= limit:

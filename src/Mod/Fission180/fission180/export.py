@@ -454,14 +454,20 @@ def body_looks(body):
     """The looks a body is drawn with: one for the whole body, or one per face when faces
     were given looks of their own (as many as the body's solid has faces). Without the
     window (a script): the default grey."""
+    vobj = None
     try:
         vobj = body.ViewObject
         materials = list(vobj.ShapeAppearance) if vobj is not None else []
     except Exception:
         materials = []
-    if not materials:
+    if materials:
+        return [_look_of(m) for m in materials]
+    try:  # a mesh body: one colour and a see-through share (0 - 100)
+        color = tuple(float(c) for c in vobj.ShapeColor[:3])
+        opacity = 1.0 - float(getattr(vobj, "Transparency", 0) or 0) / 100.0
+        return [dict(DEFAULT_LOOK, color=color, opacity=max(0.0, min(1.0, opacity)))]
+    except Exception:
         return [dict(DEFAULT_LOOK)]
-    return [_look_of(m) for m in materials]
 
 
 def _look_key(look):

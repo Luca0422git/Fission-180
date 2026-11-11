@@ -133,7 +133,9 @@ def _open(panel_class, *args, **kwargs):
 
 def _undo_half_open(doc):
     try:
-        doc.abortTransaction()
+        from . import transactions
+
+        transactions.close(doc, abort=True)
         App.closeActiveTransaction(True)
     except Exception:
         pass

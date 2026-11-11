@@ -530,6 +530,37 @@ def same_units(scratch, design):
             scratch.UnitSystem = design.UnitSystem
     except Exception:
         pass
+    try:  # (what restore_active_document compares with, see there)
+        import FreeCAD as App
+
+        _STEPS_BEFORE.append(App.getActiveTransaction())
+    except Exception:
+        pass
+
+
+_STEPS_BEFORE = []  # the open undo step when each throw-away document was made (a stack)
+
+
+def _close_scratch_step():
+    """FreeCAD's importers and exporters open undo steps of their own in the throw-away
+    document (importDXF: "DXF Post-processing") and leave them the application's open step
+    when that document is closed: the person's next change, in their design, was then filed
+    under that name and joined whatever came after (found by the test harness's undo check
+    on every DXF export, wave 7). A step that was not open before the throw-away document
+    was made, and still is after it is closed, is closed here; a dialog's own step, open
+    before, is left alone."""
+    if not _STEPS_BEFORE:
+        return
+    before = _STEPS_BEFORE.pop()
+    try:
+        import FreeCAD as App
+
+        now = App.getActiveTransaction()
+        if now and not before:
+            App.closeActiveTransaction(True)
+            log("closed the undo step a throw-away document left open (%s)" % now[0])
+    except Exception as exc:
+        warn("the throw-away document's undo step: %s" % exc)
 
 
 def _close_temp(doc, active):
@@ -546,6 +577,7 @@ def restore_active_document(name):
     """Make the design `name` the active document again (after a throw-away document)."""
     import FreeCAD as App
 
+    _close_scratch_step()
     if not name or name not in App.listDocuments():
         return
     try:

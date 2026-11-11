@@ -101,7 +101,9 @@ def _rename_mesh_body(doc, obj, text):
         mesh.rename_body(obj, text)
     except Exception as exc:
         warn("browser rename: %s" % exc)
-    doc.commitTransaction()
+    from . import transactions
+
+    transactions.close(doc)
     try:
         App.closeActiveTransaction()
     except Exception:
@@ -751,7 +753,9 @@ def _delete_drawings(doc, names):
                 drawing.delete_drawing(page)
     except Exception as exc:
         warn("browser delete: %s" % exc)
-    doc.commitTransaction()
+    from . import transactions
+
+    transactions.close(doc)
     try:
         App.closeActiveTransaction()
     except Exception:
@@ -2101,7 +2105,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                     doc.removeObject(name)
         except Exception as exc:
             warn("browser delete: %s" % exc)
-        doc.commitTransaction()
+        from . import transactions
+
+        transactions.close(doc)
         try:
             App.closeActiveTransaction()
         except Exception:

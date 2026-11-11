@@ -248,6 +248,27 @@ def b_look():
 b_look.done = lambda: panel() is None
 
 
+def b_plain_button():
+    """A dialog whose own button shows a name (not through the shared selection box):
+    Extrude's Objects To Cut and the like. The dialog's guard keeps its "&" too."""
+    p = panel()
+    plain = QtWidgets.QPushButton("Select")
+    p.layout.addRow("A plain button", plain)
+    s["plain"] = plain
+    plain.setText("Motor & Propeller")
+
+
+def b_plain_check():
+    plain = s.pop("plain")
+    h.check(
+        "B a plain button of a dialog keeps the & too",
+        plain.text() == "Motor && Propeller",
+        plain.text(),
+    )
+    plain.setText("Arm")
+    h.check("B ... and a name without one is left alone", plain.text() == "Arm", plain.text())
+
+
 def b_fit_names():
     """One long name alone is cut, a dialog that asks for more than the panel is narrowed."""
     from fission180 import taskui
@@ -497,6 +518,8 @@ def f_check():
     i.no_file()
 
 
+# an undo step left open after any step fails this scenario (harness.STRICT)
+h.STRICT["undo"] = True
 h.run(
     "book_shell_dialogs",
     [setup]
@@ -507,6 +530,8 @@ h.run(
         a_dark,
         b_select,
         b_rigid,
+        b_plain_button,
+        b_plain_check,
         b_look,
         b_fit_names,
         c_extrude,

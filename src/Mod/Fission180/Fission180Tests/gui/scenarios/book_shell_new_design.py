@@ -385,6 +385,8 @@ def f_home():
     h.check("F ... frames the circle", 30 < height() < 200, height())
 
 
+# an undo step left open after any step fails this scenario (harness.STRICT)
+h.STRICT["undo"] = True
 h.run(
     "book_shell_new_design",
     [

@@ -705,6 +705,8 @@ def i_back():
     ui().hide_panel()
 
 
+# an undo step left open after any step fails this scenario (harness.STRICT)
+h.STRICT["undo"] = True
 h.run(
     "book_shell_data_panel",
     [

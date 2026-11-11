@@ -406,9 +406,9 @@ class SaveDialog(QtWidgets.QDialog):
             not root and self._tree_root and core.same_path(os.path.dirname(path), self._tree_root)
         )
         item.setIcon(0, ui_icon("project" if project else "folder"))
-        folders, _designs = core.list_folder(path)
-        if folders:  # filled when it is opened (a NAS is not walked whole)
-            item.setChildIndicatorPolicy(QtWidgets.QTreeWidgetItem.ShowIndicator)
+        # filled when it is opened: a NAS is not walked whole, nor looked into just to know
+        # whether a folder has folders (the arrow goes once it is opened and has none)
+        item.setChildIndicatorPolicy(QtWidgets.QTreeWidgetItem.ShowIndicator)
         item.setData(0, QtCore.Qt.UserRole + 1, False)
         return item
 
@@ -421,6 +421,7 @@ class SaveDialog(QtWidgets.QDialog):
             folders, _designs = core.list_folder(item.data(0, QtCore.Qt.UserRole))
             for folder in folders:
                 self._folder_item(item, folder["name"], folder["path"])
+            item.setChildIndicatorPolicy(QtWidgets.QTreeWidgetItem.DontShowIndicatorWhenChildless)
         finally:
             self.tree.blockSignals(False)
 
@@ -2622,10 +2623,14 @@ def insert_design(path=None):
         try:
             made = [design_insert.insert_linked(doc, other, components.active_component(doc))]
         except ValueError as exc:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
             commands.tell(str(exc))
             return None
-        doc.commitTransaction()
+        from . import transactions
+
+        transactions.close(doc)
         doc.recompute()
         rel = core.relative_path(doc.FileName, path)
         log("inserted %s, linked by the relative path %s" % (core.design_name(path), rel))
@@ -2637,7 +2642,9 @@ def insert_design(path=None):
         return made
     except Exception as exc:
         try:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
         except Exception:
             pass
         warn("insert design failed: %s" % exc)
@@ -2700,10 +2707,14 @@ def insert_copy(path, doc=None, parent=ACTIVE, place=True):
         try:
             comp = design_insert.insert_copy(doc, other, parent)
         except ValueError as exc:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
             commands.tell(str(exc))
             return None
-        doc.commitTransaction()
+        from . import transactions
+
+        transactions.close(doc)
         doc.recompute()
         log("inserted a copy of %s into %s" % (core.design_name(path), doc.Label))
         if place:
@@ -2715,7 +2726,9 @@ def insert_copy(path, doc=None, parent=ACTIVE, place=True):
         return comp
     except Exception as exc:
         try:
-            doc.abortTransaction()
+            from . import transactions
+
+            transactions.close(doc, abort=True)
         except Exception:
             pass
         warn("insert copy failed: %s" % exc)

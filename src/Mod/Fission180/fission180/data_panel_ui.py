@@ -1799,7 +1799,10 @@ class DataPanel(QtWidgets.QWidget):
                 target = os.path.join(parent, new)
                 os.replace(path, target)
                 if core.inside(path, self.folder):  # (the folder shown, or one above it)
-                    self.folder = os.path.join(target, os.path.relpath(self.folder, path))
+                    self.folder = os.path.normpath(
+                        os.path.join(target, os.path.relpath(self.folder, path))
+                    )
+                    _prefs().SetString("DataPanelFolder", self.folder)
                 log("renamed the folder %s to %s" % (path, target))
             else:
                 open_doc = vui.doc_for_file(path)

@@ -2,6 +2,8 @@
 """Fit (F6, the navigation bar's Fit): view_fit.fit as a command. FreeCAD's own
 Std_ViewFitAll framed the grids too and zoomed in on a point in an empty design."""
 
+import FreeCADGui as Gui
+
 from . import commands, log, view_fit, warn
 
 
@@ -13,10 +15,14 @@ class FitCommand:
         }
 
     def IsActive(self):
-        return view_fit._view() is not None
+        return Gui.ActiveDocument is not None
 
     def Activated(self):
         try:
+            if view_fit._view() is None:
+                # not a 3D view (a drawing's sheet): FreeCAD's own fit of that view
+                Gui.SendMsgToActiveView("ViewFit")
+                return
             if view_fit.fit():
                 log("fit")
             else:
