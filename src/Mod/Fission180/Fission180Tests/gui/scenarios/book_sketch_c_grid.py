@@ -19,7 +19,7 @@ About 0.15 mm per pixel, so a grid line every 67 pixels.
   B  what the pointer infers comes first: a line from the END of that line (clicked a few
      pixels off) starts on the end exactly, not on a grid crossing ... (the end is one);
      a line to the MIDDLE of the first line, (-5, 20), which is no grid crossing, ends there;
-     a line ended ON the first line 7 pixels from its middle ends on the line where it was
+     a line ended ON that second line 7 pixels from its middle ends on the line where it was
      clicked, not on the middle (the middle's reach is its triangle, about 5 pixels)
   C  a typed value comes first: Line, a click near (-30, -20), the pointer moved to the
      right, 37 typed: the line is 37 long (its end is on no grid line)
@@ -168,16 +168,18 @@ def b2_line():
 
 
 def b2_first():
-    click_px(off(V(40, 30, 0), -22, 19))
+    click_px(off(V(-20, -10, 0), -22, 19))
 
 
 def b2_beside_the_middle():
-    # ON the first line, 7 pixels along it from its middle: aimed at the line, not at the
-    # middle (the book parity report, Drone: such an end "snapped to the MIDPOINT")
-    g = sk().Geometry[0]
+    # ON the second line (drawn in B: nothing ends on its middle), 7 pixels along it from
+    # its middle: aimed at the line, not at the middle (the book parity report, Drone: such
+    # an end "snapped to the MIDPOINT")
+    g = sk().Geometry[1]
     d = g.EndPoint - g.StartPoint
     d.normalize()
-    s["aim"] = V(-5, 20, 0) + d * (7 * s["mm"])
+    s["middle"] = (g.StartPoint + g.EndPoint) * 0.5
+    s["aim"] = s["middle"] + d * (7 * s["mm"])
     click_px(off(s["aim"], 0, 0))
 
 
@@ -189,12 +191,12 @@ def b2_check():
     h.check("B one more line", len(lines) == 1, len(lines))
     if lines:
         end = lines[0].EndPoint
-        first = sk().Geometry[0]
+        first = sk().Geometry[1]
         gap = first.toShape().distToShape(Part.Vertex(end))[0]
         h.check("B a click on the line 7 px from its middle ends ON the line", gap < 1e-6, gap)
         h.check(
             "B ...where it was clicked, not on the middle",
-            (end - V(-5, 20, 0)).Length > 3 * s["mm"],
+            (end - s["middle"]).Length > 3 * s["mm"],
             end,
         )
         kinds = [c.Type for c in sk().Constraints[s["cons"] :]]
