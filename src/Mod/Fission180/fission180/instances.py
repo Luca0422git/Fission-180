@@ -202,6 +202,14 @@ class InstanceCopy:
             if obj.Index >= len(moves):
                 return  # about to be removed (the pattern has fewer copies now)
             shape.transformShape(moves[obj.Index].toMatrix(), True)
+            try:  # a Mirror of components: the solids mirrored across its plane
+                from . import component_pattern
+
+                plane = component_pattern.mirror_plane(pattern)
+                if plane is not None:
+                    shape = shape.mirror(plane[0], plane[1])
+            except Exception as exc:
+                warn("mirrored copy %s: %s" % (obj.Label, exc))
             body = copy_body(obj)
             obj.Shape = bodies.to_local(shape, body) if body is not None else shape
             return
