@@ -56,7 +56,11 @@ from . import blend, fillet_section
 
 TOL = 1e-6
 ON_TOL = 1e-5  # an edge lies on another one when its points are this near
-CHAIN_BUDGET = 1.0  # seconds for finding the edges in the way (for the refusal's words only)
+# Finding the edges that cannot be blended even on their own (for the refusal's words only)
+# is bounded by their number, so a slow computer says the same as a fast one; seconds are
+# only a guard against a part on which every single try takes long.
+ALONE_MOST = 16
+CHAIN_BUDGET = 10.0
 
 _STATE = {
     "source": None,
@@ -70,6 +74,7 @@ _STATE = {
     "memo": [],
     "suspects": [],
     "tables": [],
+    "why": "",
 }
 _KEEP_TWINS = 3
 _KEEP_FAILS = 400
@@ -85,7 +90,9 @@ class Refused(blend.BlendError):
     def __init__(self, text, blockers=(), why=""):
         super().__init__(text)
         self.blockers = list(blockers)
-        self.why = why  # "lands": the blend would run off the face next to these edges
+        # "lands": the blend would run off the face next to these edges; "tangent": no
+        # corner left at an end; "together": each builds alone, not with the others
+        self.why = why
 
 
 @contextlib.contextmanager
@@ -678,6 +685,11 @@ def _by_groups(kind, shape, items, tag, once, ran=True):
                     fails.clear()
                 fails[key] = min(fails.get(key, float("inf")), size)
             _suspect(shape_key, kind, part, add=True)
+            if work is not shape and _group(kind, shape, shape, part, tag, once, False) is not None:
+                # it builds on its own: it is the groups before it that left it no room
+                # (four corners of a plate rounded by more than half its width). Saying
+                # "1 of the 4 edges cannot be rounded; the other 3 can" was wrong there.
+                _STATE["why"] = "together"
             return None, (blocked if len(parts) > 1 else [])
         work = result
     return work, []
@@ -892,23 +904,25 @@ def _retry(kind, shape, items, tag, once, error, ran=True):
         _STATE["used"] = "tolerance"
         return result
     _STATE["sections"] = _STATE["turns"] = 0
+    _STATE["why"] = ""
     result, blocked = _by_groups(kind, shape, items, tag, once, ran)
     if result is not None:
         _STATE["used"] = (
             "sections" if _STATE["sections"] else "turns" if _STATE["turns"] else "chains"
         )
         return result
+    why = _STATE["why"]
     if not blocked:
         blocked = _alone(kind, shape, items, tag, once)
     _STATE["blockers"] = blocked
-    raise Refused(str(error) or "command not done", blocked)
+    raise Refused(str(error) or "command not done", blocked, why if blocked else "")
 
 
 def _alone(kind, shape, items, tag, once):
     """The edges that cannot be blended even on their own (each tried alone, for the
     refusal's count only: nothing is built from it). [] when every edge works alone (they
     do not fit together), when all fail, or when there is no time to try them all."""
-    if len(items) < 2:
+    if len(items) < 2 or len(items) > ALONE_MOST:
         return []
     start = time.time()
     blocked = []
@@ -934,7 +948,7 @@ def refusal_text(shape, refused, total, kind, reason):
         count = len(refused.blockers)
         if total > 1 and count < total:
             who = "%d of the %d edges cannot be %s" % (count, total, what)
-            tail = " Leave them out (click them again): the other %d can." % (total - count)
+            tail = " Leave them out: the other %d can." % (total - count)
         else:
             who = "This edge cannot be %s" % what if total == 1 else "These edges cannot be " + what
             tail = ""
@@ -966,12 +980,24 @@ def in_the_way(shape, blocked, total, kind, why=""):
             )
         return (
             " On %d of the %d edges the %s would run past the end of a face next to the edge "
-            "(or over a hole in that face); the other %d have room. Leave those %d out "
-            "(click them again), or use a smaller size."
-            % (count, total, blend_, total - count, count)
+            "(or over a hole in that face); the other %d have room. Leave those %d out, "
+            "or use a smaller size." % (count, total, blend_, total - count, count)
         )
     if count >= total:
         return ""
+    if why == "together":
+        return (
+            " The %ss do not fit together: every edge can be %s on its own, but once the "
+            "other%s built there is no room left for %s (two %ss on one face need its whole "
+            "width between them). Use a smaller size, or leave edges out."
+            % (
+                blend_,
+                what,
+                " %d are" % (total - count) if total - count != 1 else " one is",
+                "%d of the %d" % (count, total) if count != 1 else "the last of the %d" % total,
+                blend_,
+            )
+        )
     shortest = None
     for name in blocked:
         try:
@@ -979,12 +1005,13 @@ def in_the_way(shape, blocked, total, kind, why=""):
         except Exception:
             continue
         shortest = length if shortest is None else min(shortest, length)
+    one = count == 1
     text = " %d of the %d edges cannot be %s at this size" % (count, total, what)
     if shortest is not None and shortest < 1.0:
         # a tiny edge an earlier step left (pattern copies a hair apart) is the usual cause
         text += " (the shortest of them is %.3g mm long)" % shortest
     return text + (
-        "; the other %d can. They sit where the faces leave no room for it (a tiny step or "
-        "sliver an earlier feature left is the usual cause): leave them out (click them "
-        "again), or use a smaller size." % (total - count)
+        "; the other %d can. %s where the faces leave no room for it (a tiny step or sliver an "
+        "earlier feature left is the usual cause): leave %s out, or use a smaller size."
+        % (total - count, "It sits" if one else "They sit", "it" if one else "them")
     )

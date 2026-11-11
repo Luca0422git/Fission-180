@@ -56,9 +56,7 @@ class Notes(unittest.TestCase):
         self.assertEqual(vl.note_reached(-3.2, "lo"), "Furthest that fits here: -3.20 mm")
         # review finding L6: a lower limit on a positive value, and a count without a unit
         self.assertEqual(vl.note_reached(2.5, "lo"), "Smallest that fits here: 2.50 mm")
-        self.assertEqual(
-            vl.note_typed(20.0, 9.99, ""), "20 does not fit: limited to 9.99"
-        )
+        self.assertEqual(vl.note_typed(20.0, 9.99, ""), "20 does not fit: limited to 9.99")
         self.assertEqual(vl.note_reached(9.99, "hi", ""), "Largest that fits here: 9.99")
         limiter = vl.Limiter()
         limiter.cache.store(vl.make_key("coil"), "hi", 9.99, 20.0)
@@ -264,7 +262,8 @@ class LimiterFlow(unittest.TestCase):
             now[0] += 2.0
             return works(value)
 
-        limiter = vl.Limiter()
+        # (the guard is 30 s since wave 7; 1.5 s here, to have it stop the search)
+        limiter = vl.Limiter(budget=1.5)
         limiter.search_clock = clock
         key = vl.make_key("plate", "61 edges")
         limit = limiter.find(key, slow, 50.0, 2.0, good_known=True)
@@ -278,7 +277,8 @@ class LimiterFlow(unittest.TestCase):
         self.assertEqual(limiter.clamp(key, 3.0, typed=True), 3.0)
         # past the nearest refused value: held without a build, and said
         self.assertEqual(limiter.clamp(key, 9.0, typed=True), 2.0)
-        self.assertEqual(limiter.note, "9 mm does not fit: limited to 2.00 mm")
+        # (the guard stopped that search: the value is not presented as the exact limit)
+        self.assertEqual(limiter.note, "9 mm does not fit: limited to about 2.00 mm")
         # 3.1 (under the nearest refused value) refused by its preview: the gap 2.0 .. 3.1 is
         # searched, a better limit found
         calls = len(works.calls)
@@ -783,6 +783,77 @@ class GenericBackground(unittest.TestCase):
         vl.busy(p, False)
         self.assertFalse(vl.working())
         self.assertEqual(p.value, 30.0)  # nothing set after close
+
+
+class SlowComputer(unittest.TestCase):
+    """A slow computer finds the same limit and says the same sentence as a fast one (wave
+    7: under load the same fillet answered "19.98 mm" where it answers "19.99 mm"). The
+    search ends when its gap is under the step; seconds are a far guard only."""
+
+    def search(self, seconds_per_build):
+        now = [0.0]
+
+        def works(value):
+            now[0] += seconds_per_build
+            return value <= 19.9951
+
+        return vl.search(works, 0.01, 30.0, 0.01, clock=lambda: now[0])
+
+    def test_the_same_number_whatever_a_build_takes(self):
+        fast = self.search(0.001)
+        self.assertEqual(fast, (19.99, True))
+        for seconds in (0.05, 0.5, 1.5):  # (1.5 s a build: far past the old 1.5 s budget)
+            self.assertEqual(self.search(seconds), fast)
+
+    def test_a_dozen_builds_not_seconds_end_it(self):
+        calls = []
+
+        def works(value):
+            calls.append(value)
+            return value <= 19.9951
+
+        self.assertEqual(vl.search(works, 0.01, 30.0, 0.01), (19.99, True))
+        self.assertLessEqual(len(calls), 16)
+
+    def test_the_limiter_says_the_same_sentence(self):
+        def sentence(seconds_per_build):
+            now = [0.0]
+            limiter = vl.Limiter()
+            limiter.search_clock = lambda: now[0]
+
+            def works(value):
+                now[0] += seconds_per_build
+                return value <= 19.9951
+
+            key = vl.make_key("fillet", "edges")
+            limit = limiter.find(key, works, 30.0, 0.01)
+            limiter.limited(key, 30.0, limit, True)
+            return limit, limiter.note
+
+        fast = sentence(0.001)
+        self.assertEqual(fast, (19.99, "30 mm does not fit: limited to 19.99 mm"))
+        self.assertEqual(sentence(1.5), fast)
+
+    def test_the_guard_says_about(self):
+        # a part on which one build takes a minute: the guard stops the search after
+        # MIN_TRIALS builds, and the note does not present its value as the exact limit
+        now = [0.0]
+        limiter = vl.Limiter()
+        limiter.search_clock = lambda: now[0]
+
+        def works(value):
+            now[0] += 60.0
+            return value <= 19.9951
+
+        key = vl.make_key("fillet", "edges")
+        limit = limiter.find(key, works, 30.0, 0.01)
+        self.assertIsNotNone(limit)
+        self.assertLessEqual(limit, 19.9951)
+        limiter.limited(key, 30.0, limit, True)
+        self.assertIn("limited to about ", limiter.note)
+        self.assertEqual(
+            vl.note_reached(3.47, "hi", rough=True), "Largest found that fits here: about 3.47 mm"
+        )
 
 
 if __name__ == "__main__":

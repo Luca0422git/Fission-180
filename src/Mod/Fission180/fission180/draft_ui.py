@@ -163,7 +163,7 @@ class DraftPanel(pickpanel.PickPanel, value_limits.LimitedValues):
     # with the search's usual 1.5 s budget a part whose trial drafts take 0.3 s got a
     # different, too small "largest" angle from run to run (review finding DRAFT-1-F5). The
     # search runs in the background (the budget counts only its builds) or at OK.
-    LIMIT_BUDGET = 12.0
+    LIMIT_BUDGET = value_limits.BUDGET  # (every search is exact now: value_limits)
 
     def __init__(self, doc, feature=None, picks=None, body=None):
         super().__init__(doc, "Draft" if feature is None else "Edit Draft")

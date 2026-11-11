@@ -983,9 +983,10 @@ def too_big(kind, label, size, exc=None):
     )
 
 
-def max_size(kind, info, refs, options, upper, budget=0.6):
-    """Largest size that still works (bisection with trial()), or None. Stops after
-    `budget` seconds: it is a hint for the message, not an exact limit."""
+def max_size(kind, info, refs, options, upper, budget=20.0):
+    """Largest size that still works (bisection with trial(): 14 halvings, the same on every
+    computer), or None. `budget` seconds are only a guard against a part on which a single
+    trial takes seconds (it was 0.6 s: a slow computer got another number)."""
     key = "radius" if kind == "fillet" else "distance"
     if kind == "chamfer" and options.get("chamfer_type") == "angle":
         return None

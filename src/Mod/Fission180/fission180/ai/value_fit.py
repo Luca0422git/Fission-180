@@ -25,7 +25,10 @@ import time
 
 from .. import value_limits
 
-BUDGET = 3.0  # seconds the whole search may take, every try counted (the dialogs: 1.5 s)
+# Seconds the whole search may take, every try counted: a last-resort guard (it was 3 s, and
+# under load the same call answered another number and another sentence; value_limits says
+# why the search ends by itself). A design whose single try takes half of it is not searched.
+BUDGET = 60.0
 
 # tool -> [(path into the arguments, words for the value, unit)]; "*" in a path: every item
 # of a list (fillet_sets' sets).
@@ -255,14 +258,17 @@ def sentence(words, unit, value, limit, exact=True, name=None):
             _plain(limit, unit),
         )
         if side == "lo":
-            how = "Fission 180 did not build another value in its place: give %s between %s and 0" % (
-                arg,
-                _plain(limit, unit),
+            how = (
+                "Fission 180 did not build another value in its place: give %s between %s and 0"
+                % (
+                    arg,
+                    _plain(limit, unit),
+                )
             )
         return " %s %s that fits here: %s (%s does not; %s)." % (word, words, shown, asked, how)
     return (
-        " %s %s found that fits here: %s (%s does not; the search stopped at its time limit, so "
-        "a little more may fit; Fission 180 did not build a smaller value in its place)."
+        " %s %s found that fits here: about %s (%s does not; the search stopped at its time "
+        "limit, so a little more may fit; Fission 180 did not build a smaller value in its place)."
         % (word, words, shown, asked)
     )
 
