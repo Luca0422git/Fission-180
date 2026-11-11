@@ -2439,6 +2439,12 @@ class BlendPanel(Panel):
     # -- OK / Cancel ------------------------------------------------------------------------
     def accept(self):
         try:
+            for field in list(self.fields.values()):
+                if hasattr(field, "settle"):
+                    field.settle()  # typed, not settled yet: OK takes it (blend_field)
+            for row in list(getattr(self, "point_rows", [])):
+                if len(row) > 1 and hasattr(row[1], "settle"):
+                    row[1].settle()
             self._timer.stop()
             if not self._has_picks() or self.info is None:
                 self._say(
