@@ -429,7 +429,7 @@ A body pick is "XY" | "XZ" | "YZ" (an origin plane), "X" | "Y" | "Z" (an origin 
 
 ### sketches
 
-Sketch planes are the origin planes: XY (normal +Z, sketch x/y are X/Y), XZ (normal -Y, sketch x/y are X/Z) and YZ (normal +X, sketch x/y are Y/Z). offset moves the sketch along that normal. Instead of a plane you can give face, a selector that picks exactly one flat face of the part; the sketch's x/y axes are then the ones Fission 180 gives that face. Sketch on the face when the sketch must follow it (holes in a top face whose height may change); an origin plane with an offset gives plain coordinates and stays where it is.
+Sketch planes are the origin planes: XY (normal +Z, sketch x/y are X/Y), XZ (normal -Y, sketch x/y are X/Z) and YZ (normal +X, sketch x/y are Y/Z). offset moves the sketch along that normal, and a positive extrude distance, primitive height or plane offset given to these tools goes along it too: on XZ that is towards -Y, always. (The app's own dialogs count the Front plane the way Fusion does, plus is +Y, so a number a person typed there for a step on XZ has the other sign; trust get_design's sizes and positions, not the sign.) Instead of a plane you can give face, a selector that picks exactly one flat face of the part; the sketch's x/y axes are then the ones Fission 180 gives that face. Sketch on the face when the sketch must follow it (holes in a top face whose height may change); an origin plane with an offset gives plain coordinates and stays where it is.
 
 <a id="help-geometry"></a>
 
