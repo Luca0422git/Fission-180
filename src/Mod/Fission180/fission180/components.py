@@ -376,6 +376,25 @@ def may_change(body, doc=None, lead=None):
     return False
 
 
+def whole_pick(root, sub):
+    """(object, sub) of a selection entry read unresolved (Gui.Selection.getSelectionEx("",
+    0) gives the top container and the path down from it). A whole object picked through
+    its containers, as a nested component's browser row is ("Stator", "Housing."), is that
+    object itself; anything else is returned as it came. (Book parity report, bug 15: the
+    joint dialogs read the top container, so a nested component's row picked the whole
+    subassembly, and the second row dropped it again.)"""
+    sub = sub or ""
+    if not sub.endswith("."):
+        return root, sub
+    try:
+        inner = root.getSubObject(sub, retType=1)
+    except Exception:
+        inner = None
+    if inner is not None and is_component(inner):
+        return inner, ""
+    return root, sub
+
+
 # -- a reference to something of another component -------------------------------------------
 REF_ROLE = "ComponentRef"  # timeline_ops.ROLE value: a helper, never a step or a browser row
 ROLE_PROP = "Fission180Role"

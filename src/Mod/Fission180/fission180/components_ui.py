@@ -118,6 +118,53 @@ def move_objects(doc, objs, target, transaction=True):
     return moved > 0
 
 
+def first_component_grounded():
+    """Fusion's preference "First component Ground to Parent" (Preferences > Design >
+    Assemblies; on by default): the first component made at each level of the design is
+    grounded to its parent, so the parts joined to it later move and it does not."""
+    try:
+        from . import prefs_core
+
+        return App.ParamGet(prefs_core.PREFS).GetBool("FirstComponentGrounded", True)
+    except Exception:
+        return True
+
+
+def ground_first(doc, parts, had_components):
+    """Ground the first of ``parts`` when it is the first component of its level
+    (``had_components``: its parent held one already) and the preference is on. Inside the
+    caller's undo step. Never raises: a component that cannot be grounded stays free."""
+    if had_components or not parts or not first_component_grounded():
+        return None
+    try:
+        from . import joints
+
+        if joints.is_grounded(parts[0]):
+            return None
+        ground = joints.ground(parts[0])
+        try:
+            from . import joints_ui
+
+            joints_ui.attach_views(doc)
+        except Exception:
+            pass
+        log("%s is the first component here: grounded to its parent" % parts[0].Label)
+        return ground
+    except Exception as exc:
+        warn("could not ground %s: %s" % (parts[0].Label, exc))
+        return None
+
+
+def _level_has_components(doc, parent, bodies=None):
+    """True when the level a new component goes to holds a component already."""
+    try:
+        if parent is components.KEEP:
+            parent = components.container_of(bodies[0]) if bodies else None
+        return bool(components.components_in(doc, parent))
+    except Exception:
+        return True
+
+
 def create_from_bodies(doc, bodies, parent=components.KEEP, label=None, activate_new=False):
     """Create Components from Bodies: one component per body (named after the body), each
     where its body was. The active component stays as it was unless ``activate_new``."""
@@ -128,9 +175,11 @@ def create_from_bodies(doc, bodies, parent=components.KEEP, label=None, activate
         commands.tell("Pick one or more bodies first (in the browser or the window).")
         return []
     active = components.active_component(doc)
+    had = _level_has_components(doc, parent, bodies)
     ops._transaction(doc, "Create Components from Bodies")
     try:
         parts = components.from_bodies(doc, bodies, parent=parent, label=label)
+        ground_first(doc, parts, had)
         ops.recompute(doc)
     except Exception:
         doc.abortTransaction()
@@ -222,7 +271,7 @@ class NewComponentPanel(taskui.Panel):
 
         self.observer = Observer()
         Gui.Selection.addObserver(self.observer)
-        QtCore.QTimer.singleShot(0, self._selection_changed)
+        QtCore.QTimer.singleShot(0, lambda: self._selection_changed(opening=True))
 
     def typing_field(self):
         return None
@@ -243,7 +292,9 @@ class NewComponentPanel(taskui.Panel):
 
     def _from_bodies_toggled(self, on):
         self.bodies_label.setVisible(bool(on))
-        if on:
+        if on and not self.bodies:
+            # ticked by hand: what is selected now is what the person means (a face of a
+            # body counts as its body)
             self._selection_changed(keep=True)
         self._show_bodies()
 
@@ -251,19 +302,53 @@ class NewComponentPanel(taskui.Panel):
         if not self.from_bodies.isChecked():
             return
         if self.bodies:
+            # what OK will move must be plain to see (book parity report, bug 9)
             names = ", ".join(b.Label for b in self.bodies)
-            self.bodies_label.setText("%d bodies: %s" % (len(self.bodies), names))
+            count = "1 body" if len(self.bodies) == 1 else "%d bodies" % len(self.bodies)
+            self.bodies_label.setText(
+                "%s will move into the new component: %s. Click a body to add or drop it."
+                % (count, names)
+            )
         else:
             self.bodies_label.setText("Click the bodies (in the window or the browser).")
 
-    def _selection_changed(self, keep=False):
+    def _whole_bodies(self, selection):
+        """The bodies selected AS bodies (a body's browser row, a body picked with the
+        Bodies selection priority). A face, an edge, a sketch or a step selected in the
+        timeline is not a body selected: Fusion fills From Bodies only from bodies."""
+        found = []
+        for sel in selection:
+            if components.is_body(sel.Object) and not any(sel.SubElementNames or ()):
+                if sel.Object not in found:
+                    found.append(sel.Object)
+        return found
+
+    def _selection_changed(self, keep=False, opening=False):
         if self._closed:
             return
         try:
+            selection = [
+                sel for sel in Gui.Selection.getSelectionEx() if sel.Object.Document is self.doc
+            ]
+            if not self.from_bodies.isChecked():
+                # (book parity report, bug 9) From Bodies ticked itself whenever anything
+                # of a body was selected: steps left selected in the timeline by Group, a
+                # face left selected by an earlier command. OK then moved that body into
+                # the new component without a word. Now only bodies selected as bodies
+                # when the command starts fill it; later clicks never tick it.
+                whole = self._whole_bodies(selection) if opening else []
+                if whole:
+                    self.bodies = whole
+                    self.from_bodies.setChecked(True)
+                    return
+                for sel in selection:  # Fusion's Parent box: click a component
+                    if components.is_component(sel.Object):
+                        index = self.parent_box.findData(components.editable(sel.Object).Name)
+                        if index >= 0 and not opening:
+                            self.parent_box.setCurrentIndex(index)
+                return
             picked = []
-            for sel in Gui.Selection.getSelectionEx():
-                if sel.Object.Document is not self.doc:
-                    continue
+            for sel in selection:
                 body = sel.Object if components.is_body(sel.Object) else None
                 if body is None:
                     from . import timeline_ops as ops
@@ -271,11 +356,6 @@ class NewComponentPanel(taskui.Panel):
                     body = ops.body_of(sel.Object)
                 if body is not None and body not in picked:
                     picked.append(body)
-            if not self.from_bodies.isChecked():
-                if picked:  # bodies were picked before the dialog opened: From Bodies
-                    self.bodies = picked
-                    self.from_bodies.setChecked(True)
-                return
             for body in picked:  # click again to drop a body
                 if body in self.bodies and not keep:
                     self.bodies.remove(body)
@@ -300,6 +380,7 @@ class NewComponentPanel(taskui.Panel):
         if parent is not None and not components.is_component(parent):
             parent = None
         active = components.active_component(self.doc)
+        had = _level_has_components(self.doc, parent)
         try:
             if self.from_bodies.isChecked():
                 if not self.bodies:
@@ -308,6 +389,7 @@ class NewComponentPanel(taskui.Panel):
                 parts = components.from_bodies(self.doc, self.bodies, parent=parent, label=name)
             else:
                 parts = [components.new_component(self.doc, name, parent)]
+            ground_first(self.doc, parts, had)
             if self.type_box.currentData() == "sheet_metal":
                 from . import sheetmetal_component
 

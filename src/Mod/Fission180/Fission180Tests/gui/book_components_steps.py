@@ -37,7 +37,7 @@ def container_label(obj):
     """The label of the component an object is in ("" at the root)."""
     from fission180 import components
 
-    owner = components.component_of(obj)
+    owner = components.container_of(obj)
     return owner.Label if owner is not None else ""
 
 

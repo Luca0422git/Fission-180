@@ -303,7 +303,7 @@ def e_back():
 
 # -- F --------------------------------------------------------------------------------------------
 def f_ground():
-    t.row_menu("Bracket", "Ground")
+    t.row_menu("Bracket", "Ground to Parent")
 
 
 def f_press_m():
@@ -348,7 +348,7 @@ def g_cancel():
 
 def g_unground():
     h.check("dialog closed", c.panel() is None)
-    t.row_menu("Bracket", "Unground")
+    t.row_menu("Bracket", "Unground From Parent")
 
 
 # -- H --------------------------------------------------------------------------------------------

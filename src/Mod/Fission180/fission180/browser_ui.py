@@ -2165,7 +2165,8 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             if entry == "Isolate" and isolated:
                 text = "Exit Isolate"
             if entry == "Ground":
-                text = "Unground" if node.get("grounded") else "Ground"
+                # Fusion's names since 2024 (Ground to Parent replaced Ground)
+                text = "Unground From Parent" if node.get("grounded") else "Ground to Parent"
             if entry == "Suppress":
                 text = "Unsuppress" if node.get("status") == "suppressed" else "Suppress"
             if entry in ("Activate Body", "Activate") and node["active"]:
