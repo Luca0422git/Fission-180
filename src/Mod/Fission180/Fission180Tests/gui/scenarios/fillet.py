@@ -394,15 +394,18 @@ def undo_inside_after():
 
 def redo_after_inside():
     shape = h.body().Shape
+    # Since builder modify-c (report bug 18, book_modifyc_undo_in_dialog): Ctrl+Z inside the
+    # dialog is its Cancel and the unfinished step never reaches the Redo list, so Ctrl+Y
+    # brings no half-made step back (it brought this preview back as "Fillet 3" before)
     h.check(
-        "Ctrl+Y brings that fillet back as a valid step",
-        len(b.blends()) == 3 and shape.isValid() and shape.Volume < s["v"],
+        "Ctrl+Y brings no half-made fillet back",
+        len(b.blends()) == 2 and shape.isValid() and b.close(shape.Volume, s["v"]),
         (len(b.blends()), shape.Volume),
     )
     fl = b.blends()[-1]
     h.check(
-        "the redone fillet is shown and clickable",
-        fl.ViewObject.isVisible() and fl.ViewObject.Selectable,
+        "the last fillet is shown and clickable",
+        fl.ViewObject.isVisible() and fl.ViewObject.Selectable and h.body().Tip is fl,
     )
 
 
