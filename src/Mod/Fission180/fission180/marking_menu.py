@@ -231,6 +231,13 @@ def _open_for_state(global_pos, view_widget=None):
             return sketch_marking.open_at(global_pos)
     except Exception as exc:
         warn("marking menu: %s" % exc)
+    try:  # the ANIMATION workspace's own ring (animation_ui, wave 7 animation)
+        from . import animation_ui
+
+        if animation_ui.active():
+            return animation_ui.open_marking_menu(global_pos)
+    except Exception as exc:
+        warn("marking menu: %s" % exc)
     try:  # the MANUFACTURE workspace's own ring (manufacture_ui, wave 7 cam)
         from . import manufacture_ui
 

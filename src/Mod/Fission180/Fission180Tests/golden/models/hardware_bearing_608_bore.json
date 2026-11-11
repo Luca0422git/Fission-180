@@ -1,0 +1,104 @@
+{
+  "id": "hardware_bearing_608_bore",
+  "title": "A 608 ball bearing with shields (8 x 22 x 7) clicked into a 22 x 7 bore: flush, filling it",
+  "tags": [
+    "hardware",
+    "bearing",
+    "rim"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "rect": [
+            0,
+            0,
+            40,
+            30
+          ],
+          "name": "plate"
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 10
+    },
+    {
+      "op": "hole_at",
+      "id": "h1",
+      "face": {
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "count": 1
+      },
+      "at": [
+        20,
+        15,
+        10
+      ],
+      "extent": "distance",
+      "diameter": 22.0,
+      "tap_type": "simple",
+      "drill_point": "flat",
+      "depth": 7
+    },
+    {
+      "op": "sf_hardware",
+      "id": "hw1",
+      "standard": "bearing",
+      "size": "608",
+      "variant": "zz",
+      "edge": {
+        "type": "circle",
+        "radius": 11.0,
+        "at": {
+          "axis": "z",
+          "value": "max"
+        },
+        "count": 1
+      },
+      "make_hole": false,
+      "hardware_bbox": [
+        9,
+        4,
+        3,
+        31,
+        26,
+        10
+      ]
+    },
+    {
+      "op": "expect_bodies",
+      "bodies": {
+        "hw1": {
+          "volume": 2124.344952357418,
+          "solids": 1
+        }
+      }
+    }
+  ],
+  "expect": {
+    "volume": 9339.071022409446,
+    "faces": 8,
+    "bbox": [
+      0,
+      0,
+      0,
+      40,
+      30,
+      10
+    ],
+    "solids": 1,
+    "source": "analytic",
+    "note": "608: 8 x 22 x 7 (ISO 15). Drawn simply (Fission 180's own): rings and shields in one piece, each ring 0.3 of the 7 mm section (2.1), the shields 0.1 B = 0.7 below each face: V = pi/4 (22^2 - 8^2) 7 - 2 pi/4 (17.8^2 - 12.2^2) 0.7. The plate: 12000 - pi 11^2 7 (a blind bore)."
+  }
+}

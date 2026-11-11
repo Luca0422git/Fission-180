@@ -252,4 +252,195 @@ class ComponentColorsCommand:
             warn("Display Component Colors: %s" % exc)
 
 
-COMMANDS = {"Fission180_ComponentColors": ComponentColorsCommand}
+# -- Component Color Swatch -------------------------------------------------------------------
+# Fusion (timeline Settings > Component Color Swatch): a small swatch of each component's
+# colour, shown even when the canvas colours are off, so the colours can be told apart
+# without recolouring the model. Fission 180 shows them as a small list at the bottom left of
+# the 3D view: each component's name beside its colour (the same colours Display Component
+# Colors draws). Remembered between sessions. The swatch command is in the timeline's
+# Settings menu (the gear, as in Fusion) and under INSPECT.
+SWATCH_PREF = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
+SWATCH_KEY = "ComponentColorSwatch"
+SWATCH_NAME = "Fission180ComponentColorSwatch"
+_SWATCH = {"label": None, "observer": None, "timer": None}
+
+
+def swatch_on():
+    try:
+        return bool(App.ParamGet(SWATCH_PREF).GetBool(SWATCH_KEY, False))
+    except Exception:
+        return False
+
+
+def swatch_rows(doc=None):
+    """[(component name, (r, g, b))]: the design's own bodies first (its top component),
+    then every component, each with the colour Display Component Colors gives it."""
+    doc = doc or App.ActiveDocument
+    if doc is None:
+        return []
+    rows = [(doc.Label, PALETTE[0])]
+    for index, part in enumerate(components.list_components(doc)):
+        rows.append((part.Label, PALETTE[(index + 1) % len(PALETTE)]))
+    return rows
+
+
+def swatch_shown():
+    """The rows the swatch list shows now ([] when it is hidden): tests."""
+    label = _SWATCH.get("label")
+    try:
+        if label is None or not label.isVisible():
+            return []
+    except RuntimeError:
+        return []
+    return swatch_rows()
+
+
+def _swatch_label():
+    from .compat import QtWidgets
+
+    label = _SWATCH.get("label")
+    try:
+        if label is not None:
+            label.objectName()
+            return label
+    except RuntimeError:
+        label = None
+    label = QtWidgets.QLabel(Gui.getMainWindow())
+    label.setObjectName(SWATCH_NAME)
+    label.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+    label.setTextFormat(QtCore.Qt.RichText)
+    label.setStyleSheet(
+        "QLabel#%s { background: rgba(30, 36, 44, 215); color: #e8edf3; border: 1px solid "
+        "#55657a; border-radius: 3px; padding: 4px 8px; }" % SWATCH_NAME
+    )
+    label.hide()
+    _SWATCH["label"] = label
+    return label
+
+
+def update_swatch():
+    """Show the swatch list as the design is now (or hide it)."""
+    try:
+        label = _swatch_label()
+        rows = swatch_rows() if swatch_on() else []
+        if len(rows) < 2:  # no components: nothing to tell apart
+            label.hide()
+            return
+        lines = []
+        for name, color in rows[:24]:
+            code = "#%02x%02x%02x" % tuple(int(round(c * 255)) for c in color)
+            safe = name.replace("&", "&amp;").replace("<", "&lt;")
+            lines.append('<span style="color:%s;">&#9632;</span>&nbsp;%s' % (code, safe))
+        if len(rows) > 24:
+            lines.append("... and %d more" % (len(rows) - 24))
+        label.setText("<br>".join(lines))
+        label.adjustSize()
+        window = label.parentWidget()
+        area = window.centralWidget()
+        if area is not None:
+            corner = area.mapTo(window, QtCore.QPoint(0, area.height()))
+        else:
+            corner = QtCore.QPoint(0, window.height())
+        label.move(corner.x() + 10, max(0, corner.y() - label.height() - 10))
+        label.show()
+        label.raise_()
+    except Exception as exc:
+        warn("component colour swatch: %s" % exc)
+
+
+class _SwatchWatch:
+    """Components made, renamed or removed, another design shown: the list follows a moment
+    later (nothing is done inside FreeCAD's callbacks)."""
+
+    def _later(self):
+        timer = _SWATCH.get("timer")
+        if timer is not None and swatch_on():
+            timer.start()
+
+    def slotCreatedObject(self, obj):
+        try:
+            if obj.TypeId == "App::Part":
+                self._later()
+        except Exception:
+            pass
+
+    def slotDeletedObject(self, obj):
+        self.slotCreatedObject(obj)
+
+    def slotChangedObject(self, obj, prop):
+        try:
+            if prop == "Label" and obj.TypeId == "App::Part":
+                self._later()
+        except Exception:
+            pass
+
+    def slotActivateDocument(self, doc):
+        self._later()
+
+    def slotDeletedDocument(self, doc):
+        self._later()
+
+    def slotUndoDocument(self, doc):
+        self._later()
+
+    def slotRedoDocument(self, doc):
+        self._later()
+
+
+def _install_swatch():
+    if _SWATCH["observer"] is not None or not App.GuiUp:
+        return
+    timer = QtCore.QTimer(Gui.getMainWindow())
+    timer.setSingleShot(True)
+    timer.setInterval(120)
+    timer.timeout.connect(update_swatch)
+    _SWATCH["timer"] = timer
+    _SWATCH["observer"] = _SwatchWatch()
+    App.addDocumentObserver(_SWATCH["observer"])
+
+
+def toggle_swatch():
+    on = not swatch_on()
+    App.ParamGet(SWATCH_PREF).SetBool(SWATCH_KEY, on)
+    _install_swatch()
+    update_swatch()
+    if on and len(swatch_rows()) < 2:
+        from . import commands
+
+        commands.tell(
+            "Component Color Swatch is on. This design has no components yet: the swatches "
+            "show once it has one (ASSEMBLE > New Component)."
+        )
+    log("component colour swatch %s" % ("on" if on else "off"))
+    return on
+
+
+class ComponentColorSwatchCommand:
+    def GetResources(self):
+        return {
+            "MenuText": "Component Color Swatch",
+            "ToolTip": "Show each component's colour beside its name (again: hide them)",
+            "Pixmap": ui_icon_path("component_colors"),
+        }
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        try:
+            toggle_swatch()
+        except Exception as exc:
+            warn("Component Color Swatch: %s" % exc)
+
+
+COMMANDS = {
+    "Fission180_ComponentColors": ComponentColorsCommand,
+    "Fission180_ComponentColorSwatch": ComponentColorSwatchCommand,
+}
+
+try:
+    if App.GuiUp and swatch_on():
+        _install_swatch()
+        QtCore.QTimer.singleShot(0, update_swatch)
+except Exception as _exc:  # pragma: no cover - only without a GUI
+    warn("component colour swatch not installed: %s" % _exc)
