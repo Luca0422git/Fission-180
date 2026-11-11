@@ -622,8 +622,9 @@ def fusion_side(sketch):
 
 
 def adopt_fusion_side(sketch, lead=None):
-    """Mark a sketch on the Front plane that no step uses yet (`lead`: the extrude being
-    made does not count): its extrudes go Fusion's way from now on. True when marked."""
+    """Mark a sketch on the Front plane that no step uses yet (`lead`: the extrude or rib
+    being made does not count): its extrudes, and the One Side of its ribs and webs, go
+    Fusion's way from now on. True when marked."""
     try:
         if not is_sketch(sketch) or FRONT in sketch.PropertiesList:
             return False
@@ -634,6 +635,8 @@ def adopt_fusion_side(sketch, lead=None):
                 continue
             if is_extrude(user) or getattr(user, ROLE, "") == "ExtrudeProfile":
                 return False  # an extrude (or its helper) already counts on its direction
+            if getattr(user, "Fission180Type", "") in ("Rib", "Web"):
+                return False  # a rib's One Side counts on it too (rib.plane_of)
         sketch.addProperty(
             "App::PropertyBool", FRONT, "Fission180", "Plus is away from the front, as in Fusion", 0
         )

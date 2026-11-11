@@ -34,6 +34,15 @@ Tests: scenario `book_extrude_loft` (27 checks): the cone to the origin picked i
 edit, undo / redo, save / reopen; the origin clicked in the view under its planes; a sketch
 point under the planes; a plane refused with the reason.
 
+### Rib and Web on the Front plane (wave 7)
+
+| Fusion | Fission 180 |
+|---|---|
+| The Front plane's normal is +Y (Book; `parity/extrude-presspull.md`, "Direction and sign"), so a part extruded from a Front plane sketch lies behind the plane, and a rib drawn on the same plane with Thickness One Side grows into it. **Guess** for the rib (no source names which side One Side takes) | A Rib or Web sketch on the Front plane that no step uses yet is marked like an Extrude's (`extrude.adopt_fusion_side`, called from `rib_ui._picks_changed`); `rib.plane_of` turns the normal of a marked sketch round. One Side then goes the way a positive extrude of such a sketch goes, so a rib beside a bracket extruded from the Front plane still grows into the bracket. Symmetric is the same either way. A sketch a rib or an extrude already used (older designs) keeps FreeCAD's way |
+
+Tests: scenario `sweep_loft_rib` (the bracket now lies at y 0..20; One Side goes into it, Flip
+Side out of it with the reason).
+
 ## Values past what fits stop at the limit (Luca's decision, 2026-10-21)
 
 **This deliberately differs from Fusion.** Fusion refuses a value that does not fit (a

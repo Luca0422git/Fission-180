@@ -55,6 +55,9 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
   `only_visible_profiles`, `behind_glyphs`, `under`, `is_glyph`, `is_point_object`.
 - `extrude.py`: `sliver_areas`, `tapers_as_one`, the Front plane (`on_front_plane`,
   `fusion_side`, `adopt_fusion_side`); `extrude_prism.merged_faces`.
+- `rib.plane_of` / `rib_ui._picks_changed`: a Rib or Web on a new Front plane sketch counts
+  its One Side Fusion's way, like Extrude (found by `sweep_loft_rib`: with the bracket now
+  behind the Front plane, One Side went out of it).
 - `revolve_ui.py`: an unpicked area against a line; `loft.py` / `loft_ui.py`: point objects
   as sections, `_behind`; `primitives_ui.py`: `PlacingBox`, the height next.
 - `commands.ensure_body` (shared, one line): the first body's name.
@@ -81,6 +84,12 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
   goes to the focus widget. The primitives scenario sends every key to `focusWidget()`.
 - A dialog class with a method called `_finishing` (primitives) breaks when a mixin stores a
   flag under the same name: the mixin's flag is `_ending_for_another`.
+- A selection window (box selection) hands a dialog the face together with its edges in one
+  selection change. A rule that reads an edge as "the face next to it" must only apply to a
+  single click (`ExtrudePanel._one_pick`), or one face becomes three profiles.
+- With bodies numbered per component, the root's first body and a component's first body are
+  both "Body1": a scenario that finds a browser row by its label gets the first one in the
+  tree. Use `component_steps.row_item(path)` for a row by its place.
 - The value box of whichever handle the mouse rests on takes the digits typed over the view
   (`BoxCarrier.follow_box`): a scenario that hovers "somewhere on the part" before typing can
   feed another box than it means to.
@@ -99,8 +108,22 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
   else changed: `browser_ghost`, `browser_second_click`, `extrude_presspull_qa2`,
   `gaps_extrude_taper_to`, `inspect_analysis_zebra`, `inspect_qa2`, `meshinspect2_inspect`,
   `shell_draft_hollow`, `shell_draft_scale`, `shell_draft_qa_mix`, `shell_draft_qa_shell`,
-  `selection_other`, `pattern_handles_bodies`, `patterns_qa_features`, `timeline_browser_2`
-  and the helper `fixpattern_steps.py`.
+  `selection_other`, `pattern_handles_bodies`, `patterns_qa_features`, `timeline_browser_2`,
+  `revolve_qa_to` ("Corner of Body1") and the helper `fixpattern_steps.py`.
+  `components_basic`: the root's body and Bracket's body are both "Body1" now, so the
+  component made from the root's body is deleted by its row's place, not by the first row
+  with that label.
+- `inspect_construct` (two lines and its header): a square on a plane 5 mm above the box,
+  extruded 10 down, is a Cut by itself now (row 3 of the rule), 11500 instead of the Join's
+  12500. The step was already called `cut_from_plane`.
+- `inspect_qa` (one step): the pin pushed into the boss from a plane above it is a Cut by
+  itself now; the step checks that and picks Join, which the path needs.
+  `browser_empty_body` (one line): Arm's Body1 is found by its component, the root's first
+  body has the same name now.
+- Scenarios of this area that follow a deliberate change: `sweep_loft_rib` (the bracket
+  lies at y 0..20; the three side checks read the other end of the bounding box), `extrude_presspull_presspull` and
+  `extrude_presspull_qa6` (a Front plane sketch extruded 20 lies at y 0..20 now: the clicked
+  points' y turned round), `primitives_qa_keys` (K1 reads the Length box on the canvas).
 
 ## Proof
 
@@ -130,6 +153,14 @@ FreeCAD).
   shows again the dialog now keeps the picked operation and says the reason on OK.
 - The carabiner's 27 regions were not rebuilt; slivers are filtered by their shape (thinner
   than one millionth of their outline squared, or under 1e-7 mm2).
+- The AI's extrude tool builds without the dialog, so on the Front plane it still counts
+  FreeCAD's way (its own documentation says so: "XZ (normal -Y ...)", `ai/catalog/kit.py`).
+- Not the whole suite was run (the brief forbids it): about 180 scenarios in eight batches,
+  chosen by what they touch (every `book_extrude_*`, the extrude / press pull / revolve /
+  sweep / loft / primitives scenarios, the component scenarios, every scenario that names
+  the first body's label, every scenario that extrudes a Front plane sketch, and the ones
+  that lean most on Extrude's own choices). About 120 scenarios that only use Extrude to
+  make their first box were not run.
 - Sphere has no size box on the canvas (it has one click).
 - Sweep and Loft got the see-through profile pick and the point sections; their automatic
   operation still compares "mostly inside" against their own body only.
