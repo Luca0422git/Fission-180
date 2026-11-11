@@ -1262,11 +1262,16 @@ class DrawTool:
             if view is None:
                 return True
             snap = self.snap_for(view, event)
-            if self.references_model and no_point(snap):
+            if (
+                self.references_model
+                and not snap.free
+                and (unsnapped(snap) or (self.snap_dot and no_point(snap)))
+            ):
                 # Fusion's "Auto project edges on reference": a click on an edge or corner
                 # of the model that is not in the sketch projects it (purple), and the
-                # point or pick lands on it (sketch_reference.py). A point that is only on
-                # a sketch curve there (an axis) still takes a corner of the model.
+                # point or pick lands on it (sketch_reference.py). A point being placed
+                # that is only on a sketch curve there (an axis) still takes a corner of
+                # the model; a pick tool that hit a sketch curve has what it wants.
                 from . import sketch_reference
 
                 if sketch_reference.project_under(
