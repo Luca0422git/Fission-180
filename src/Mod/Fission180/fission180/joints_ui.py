@@ -172,6 +172,8 @@ class SnapHover:
         self.allow = allow
         self.enabled = True
         self.position = None
+        self._pressed = None  # where the left button last came down (viewport pixels)
+        self._looked = None  # the pointer's place the lit dot was last chosen for
         self.key = None
         self.pick = None
         self.candidates = []
@@ -215,6 +217,7 @@ class SnapHover:
         try:
             if info.get("Button") != "BUTTON1" or info.get("State") != "DOWN":
                 return
+            self._pressed = tuple(info.get("Position") or self.position or ()) or None
             if not (self.enabled and self.holding and self.on_click is not None):
                 return
             position = tuple(info.get("Position") or self.position or ())
@@ -249,6 +252,7 @@ class SnapHover:
             if not self.candidates:
                 self.clear(keep_key=True)
                 return
+            self._looked = self.position
             hot = self._choose()
             shown = self._visible(hot)
             if hot is not self.hot or shown != self._drawn or self.switch.getNumChildren() == 0:
@@ -461,11 +465,22 @@ class SnapHover:
             and self.hot is not None
             and self.pick.part is pick.part
             and self.pick.obj is pick.obj
-            and self.pick.element == pick.element
+            and (self.pick.element == pick.element or self._pressed_where_lit())
         ):
             return self.hot
         found = self._candidates(pick)
         return joints.nearest_snap(found, point)
+
+    def _pressed_where_lit(self):
+        """True when the click came down on the pixel the lit dot was chosen for. The dot
+        that is lit is the dot a click takes: the hover looks a few pixels around the
+        pointer for an edge, FreeCAD's own selection of the same click does not, so a click
+        on a round wall next to its rim was the wall's while the rim's centre was lit, and
+        took the dot nearest in space instead (the end of the arc: the book's Strandbeest,
+        "Joint (J) to close the loop ... hovering picks the wrong one"; wave 7, replay-f)."""
+        from . import hole_snaps_core
+
+        return hole_snaps_core.same_pixel(self._pressed, self._looked)
 
     # -- drawing -----------------------------------------------------------------------------------
     def _size(self):
@@ -2073,8 +2088,25 @@ class AsBuiltPanel(_JointsPanel):
 
     def allow_pick(self, pick):
         if self.slot_of(self.active) is not None:
-            return pick.part in self.parts if self.parts else True
+            return self._chosen_part(pick) is not None if self.parts else True
         return True
+
+    def _chosen_part(self, pick):
+        """The chosen component `pick` lies on: its own part, or the chosen subassembly its
+        part is inside (the position of a joint of a subassembly is picked on a part in
+        it: a compound gear's hole is a hole of one of its two gears). Fusion takes the
+        snap point on any geometry of the two components. None: on neither. Before (wave
+        7, replay-f) only a body directly in a chosen component counted: "Pick the
+        position on one of the two components" on a gear of the Compound Gear."""
+        part = pick.part if pick is not None else None
+        if part is None:
+            return None
+        if part in self.parts:
+            return part
+        for chosen in self.parts:
+            if joints._inside(part, chosen):
+                return chosen
+        return None
 
     def allow_click(self, pick):
         return pick.part is not None
@@ -2086,13 +2118,18 @@ class AsBuiltPanel(_JointsPanel):
             return
         slot_box = self.active if self.slot_of(self.active) is not None else None
         if slot_box and pick is not None and (pick.element or pick.is_datum()):
-            if self.parts and part not in self.parts:
+            owner = self._chosen_part(pick) if self.parts else part
+            if self.parts and owner is None:
                 self.refuse("Pick the position on one of the two components.")
                 return
             taken = self.take_position("position", slot_box, pick, point)
             if taken is None:
                 return
             pick, snap = taken
+            if owner is not pick.part:
+                # (the place is on a part inside the chosen subassembly: the joint holds
+                # the subassembly there)
+                pick = joints.Pick(owner, pick.obj, pick.element, pick.point)
             self.position_pick, self.position_snap = pick, snap
             if self.slots["position"].mode != "twoedges":
                 self.fields["position"].set_text(_label(pick, snap))

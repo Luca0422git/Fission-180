@@ -6,15 +6,16 @@ input.
      Gear tool. Plane XY, centre on the origin; module 1.5, 20 teeth, 8 thick, hole 4,
      Operation New Component; OK: the component is named "Spur Gear (20 teeth)".
   B  Gear again, away from the first: the dialog starts with the last gear's values
-     (Fusion's sample remembers them). Root Fillet Radius 0.88 (fits 20 teeth), then
+     (Fusion's sample remembers them). Root Fillet Radius 0.89 (fits 20 teeth), then
      Number of Teeth 100: the dialog says it does not fit and how much does; Operation New
      Component stays chosen; OK is refused, says so next to the pointer, and no second
      gear is kept by it.
   C  While that dialog is still open (the unfinished gear shows as "Gear 2" in the
      timeline): right-click Gear 2 > Edit Feature. The step does not vanish (bug 20): the
      dialog stays and says to finish it first.
-  D  Root fillet 0.5, thickness 4, OK: 100 teeth, 4 thick, a New Component named
-     "Spur Gear (100 teeth)".
+  D  Root fillet 0.88 (the book's value: Fusion's SpurGear takes up to 0.4 x the tooth
+     thickness on the base circle, 0.8857 mm for module 1.5, whatever the teeth), thickness
+     4, OK: 100 teeth, 4 thick, a New Component named "Spur Gear (100 teeth)".
   E  Right-click Gear 2 > Edit Feature: its dialog opens with 100 teeth; Cancel leaves it;
      again, 80 teeth, OK: the gear and its component's name follow. Ctrl+Z.
 """
@@ -179,11 +180,15 @@ def b_fillet():
     if not h.check("the second gear is placed", p is not None and p.target is not None):
         return
     h.check("the dialog starts with the last gear's values", near(p.teeth.value(), 20.0))
-    ui.type_into(p.fillet.widget, "0.88")
+    # (wave 7, replay-f) 0.88, the book's value, was typed here and refused for 100 teeth
+    # ("at most 0.741 mm"). Fusion's SpurGear makes that gear (its limit is 0.8857 mm for
+    # module 1.5, whatever the teeth: the fillets of neighbouring teeth cross), and so does
+    # Fission 180 now; the refusal is tested with 0.89, which only the 20 tooth gear takes.
+    ui.type_into(p.fillet.widget, "0.89")
 
 
 def b_teeth():
-    h.check("0.88 fits 20 teeth", panel().message.text() == "", panel().message.text())
+    h.check("0.89 fits 20 teeth", panel().message.text() == "", panel().message.text())
     ui.type_into(panel().teeth.widget, "100")
 
 
@@ -192,7 +197,7 @@ def b_operation():
     text = p.message.text()
     h.check(
         "says the fillet does not fit, and what does",
-        "does not fit" in text and "0.741" in text,
+        "does not fit" in text and "0.885" in text,
         text,
     )
     h.check("New Component", ui.choose(p.operation, "New Component"))
@@ -245,11 +250,15 @@ def c_still_there():
 
 # -- D ------------------------------------------------------------------------------------------
 def d_fillet():
-    ui.type_into(panel().fillet.widget, "0.5")
+    ui.type_into(panel().fillet.widget, "0.88")
 
 
 def d_thick():
-    h.check("0.5 fits: no message", panel().message.text() == "", panel().message.text())
+    h.check(
+        "the book's 0.88 fits 100 teeth: no message",
+        panel().message.text() == "",
+        panel().message.text(),
+    )
     ui.type_into(panel().thickness.widget, "4")
 
 
@@ -268,7 +277,7 @@ def d_done():
     s["second"] = g.Name
     o = read(g)
     h.check("100 teeth, 4 thick", o["teeth"] == 100 and near(o["thickness"], 4.0), o)
-    want = gear_core.area(dict(module=1.5, teeth=100, hole=4.0, fillet=0.5)) * 4.0
+    want = gear_core.area(dict(module=1.5, teeth=100, hole=4.0, fillet=0.88)) * 4.0
     s["v2"] = g.Shape.Volume
     h.check("its volume", near(s["v2"], want, 1e-6), (s["v2"], want))
     part = component_of(g)

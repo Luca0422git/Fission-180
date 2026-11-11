@@ -123,5 +123,25 @@ class MidpointReach(unittest.TestCase):
         self.assertIs(core.nearest_snap((19.2, 0.0), points, 1.0), end)
 
 
+class RoundEdgeCentre(unittest.TestCase):
+    """A click at the centre of a round model edge takes that centre (wave 7, replay-f:
+    the Strandbeest's slot starts on the pin's centre)."""
+
+    def test_the_nearest_centre_within_reach(self):
+        centres = [(100.0, 100.0), (104.0, 100.0), None, (300.0, 40.0)]
+        self.assertEqual(core.nearest_within((103.0, 100.0), centres, 6.0), 1)
+        self.assertEqual(core.nearest_within((101.0, 100.0), centres, 6.0), 0)
+
+    def test_nothing_beyond_the_reach(self):
+        self.assertIsNone(
+            core.nearest_within((110.5, 100.0), [(100.0, 100.0), (104.0, 100.0)], 6.0)
+        )
+        self.assertIsNone(core.nearest_within((0.0, 0.0), [], 6.0))
+        self.assertIsNone(core.nearest_within((0.0, 0.0), [None], 6.0))
+
+    def test_the_reach_itself_counts(self):
+        self.assertEqual(core.nearest_within((106.0, 100.0), [(100.0, 100.0)], 6.0), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

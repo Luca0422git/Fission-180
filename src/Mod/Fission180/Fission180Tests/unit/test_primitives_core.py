@@ -2,6 +2,7 @@
 """Box / Cylinder / Sphere / Torus / Coil / Pipe: the number logic of
 fission180/primitives_core.py (sizes, checks, the operation Fusion picks, the coil and pipe
 sections) and the golden-model format of their steps. Runs without FreeCAD."""
+
 import copy
 import math
 import os
@@ -41,6 +42,19 @@ class RoundingTests(unittest.TestCase):
         snaps = [(0.0, 0.0), (40.0, 20.0), (40.5, 20.0)]
         self.assertEqual(core.nearest_snap(0.3, -0.2, snaps, 1.0), (0.0, 0.0))
         self.assertEqual(core.nearest_snap(40.4, 20.1, snaps, 1.0), (40.5, 20.0))
+
+    def test_snap_points_on_one_spot_give_the_first_listed(self):
+        # the origin, and the centres of a gear's tip arcs a hair around it (wave 7,
+        # replay-f): a click nearest one of those still lands on the origin, listed first
+        snaps = [(0.0, 0.0), (0.0008, -0.026), (0.026, 0.0008), (-0.0205, -0.016), (30.0, 0.0)]
+        reach = 10 * 0.07  # 10 pixels at 0.07 mm a pixel
+        self.assertEqual(core.nearest_snap(0.02, -0.02, snaps, reach), (0.0, 0.0))
+        self.assertEqual(core.nearest_snap(0.03, 0.0, snaps, reach), (0.0, 0.0))
+        # a point further away than two pixels from the nearest is another spot
+        self.assertEqual(core.nearest_snap(29.9, 0.1, snaps, reach), (30.0, 0.0))
+        snaps = [(0.0, 0.0), (0.3, 0.0)]  # 0.3 > 0.2 * 0.7: two spots
+        self.assertEqual(core.nearest_snap(0.28, 0.0, snaps, reach), (0.3, 0.0))
+        self.assertIsNone(core.nearest_snap(5.0, 5.0, snaps, reach))
         self.assertIsNone(core.nearest_snap(10.0, 10.0, snaps, 1.0))
         self.assertIsNone(core.nearest_snap(1.5, 0.0, snaps, 1.0))
         self.assertIsNone(core.nearest_snap(0.0, 0.0, [], 1.0))

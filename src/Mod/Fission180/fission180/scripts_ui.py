@@ -512,6 +512,11 @@ class ScriptsDialog(QtWidgets.QDialog):
         ok, message = run_entry(entry)
         self.say(message, ok)
         self.refresh(core.entry_key(entry))
+        if ok and entry.get("kind") == core.SCRIPT:
+            # Fusion's window closes when a script is run (an add-in keeps running and
+            # stays listed): left open, it stood over the design and took the keys (M for
+            # Move went to its Create button; wave 7, replay-f)
+            self.close()
 
     def edit_selected(self):
         entry = self.selected()

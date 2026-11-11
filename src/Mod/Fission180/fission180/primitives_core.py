@@ -56,15 +56,31 @@ def nice_floor(value):
     return best
 
 
+SAME_SPOT = 0.2  # of the reach (2 of its 10 pixels): snap points this near are one spot
+
+
 def nearest_snap(x, y, snaps, reach):
     """The snap point (x, y) nearest to the mouse at (x, y) within `reach` (plane units),
-    or None when none is that close."""
+    or None when none is that close. Snap points that lie within SAME_SPOT of the reach of
+    the nearest one are the same spot on the screen: the one listed FIRST is taken (the
+    plane's origin is listed first). A gear's tooth tips are short arcs whose centres lie
+    a few hundredths of a millimetre around the gear's centre: the second gear of the
+    book's Gear Train, clicked on the origin, landed on one of those, 0.026 mm off (the
+    report: "the rotation pivot was ~0.003 mm off the origin"; wave 7, replay-f)."""
     best = None
     for sx, sy in snaps:
         gap = math.hypot(x - sx, y - sy)
         if gap <= reach and (best is None or gap < best[0]):
             best = (gap, (sx, sy))
-    return None if best is None else best[1]
+    if best is None:
+        return None
+    nearest = best[1]
+    same = SAME_SPOT * reach
+    for sx, sy in snaps:
+        beside = math.hypot(sx - nearest[0], sy - nearest[1]) <= same
+        if beside and math.hypot(x - sx, y - sy) <= reach:
+            return (sx, sy)
+    return nearest
 
 
 def round_to(value, step):

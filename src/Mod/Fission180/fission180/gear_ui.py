@@ -73,8 +73,58 @@ class GearPanel(PlacedPanel):
     def limit_check(self, options):
         gear.check(gear.with_defaults(options))
 
+    # Started from the SpurGear entry of Scripts and Add-Ins: Fusion's sample always makes
+    # a new component ("Spur Gear (20 teeth)"); the book's Gear Train counts on it (its
+    # dialog has no Operation to choose). CREATE > Gear starts as a New Body, as before.
+    as_sample = False
+
+    def __init__(self, *args, **kwargs):
+        self.from_sample = bool(GearPanel.as_sample)
+        GearPanel.as_sample = False
+        self.active_before = None
+        if self.from_sample:
+            # Fusion's sample adds its component to the design itself (rootComponent.
+            # occurrences.addNewComponent), whatever is active, and activates nothing:
+            # the second gear of the book's Gear Train went INSIDE the first one's
+            # component, which the first OK had left active. The design is the active
+            # component while the sample's dialog is open; what was active is active
+            # again when it closes (wave 7, replay-f).
+            self._sample_to_root(args[0] if args else kwargs.get("doc"))
+        super().__init__(*args, **kwargs)
+
+    def _sample_to_root(self, doc):
+        try:
+            from . import components
+
+            self.active_before = components.active_component(doc)
+            if self.active_before is not None:
+                components.set_active(None, doc)
+        except Exception as exc:
+            warn("Gear from the sample: %s" % exc)
+
+    def _restore_active(self):
+        if not getattr(self, "from_sample", False):
+            return
+        try:
+            from . import components
+
+            before = self.active_before
+            if before is not None and getattr(before, "Document", None) is None:
+                before = None  # (it was deleted meanwhile)
+            if components.active_component(self.doc) is not before:
+                components.set_active(before, self.doc)
+        except Exception as exc:
+            warn("Gear from the sample: %s" % exc)
+
+    def reject(self):
+        done = super().reject()
+        self._restore_active()
+        return done
+
     def _auto(self, base):
-        return "new_body"  # Fusion's sample always makes a new component; never a guess
+        if getattr(self, "from_sample", False):
+            return "new_component"
+        return "new_body"  # never a guess from what is under the gear
 
     # -- form -------------------------------------------------------------------------------------
     def _build_form(self):
@@ -338,6 +388,8 @@ class GearPanel(PlacedPanel):
         of the gear made before, when nothing else worked yet), which looked like OK had
         made a copy of the previous gear (book parity report, bug 19)."""
         done = super().accept()
+        if done:
+            self._restore_active()
         try:
             reason = self.error or self.formula_error
             if not done and reason and self.target is not None:

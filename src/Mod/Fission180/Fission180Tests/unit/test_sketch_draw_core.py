@@ -308,5 +308,18 @@ class ConicTests(unittest.TestCase):
         self.assertEqual(core.rho_from_pointer(self.S, self.A, self.E, (10, -3)), core.RHO_MIN)
 
 
+class ValueBoxKeys(unittest.TestCase):
+    """A letter typed into an empty value box starts a name (wave 7, replay-f: the book's
+    Strandbeest types Width=5mm into the slot's width box; W, i, d, t, h ran as keys)."""
+
+    def test_letters_and_underscore_start_a_name(self):
+        for key in ("W", "w", "L", "d", "t", "_", "é"):
+            self.assertTrue(core.letter_starts_name(key), key)
+
+    def test_digits_signs_and_nothing_do_not(self):
+        for key in ("", None, "5", "=", "-", " ", "\t", ";", "Wi"):
+            self.assertFalse(core.letter_starts_name(key), key)
+
+
 if __name__ == "__main__":
     unittest.main()

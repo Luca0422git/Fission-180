@@ -716,17 +716,21 @@ class Boxes:
 
     # -- parameter names while typing (the list of parameters_complete.py) -------------------
     def starts_name(self, text):
-        """A letter typed into an empty box that starts a parameter's name."""
+        """A letter typed into an empty box that starts a name: a parameter's, or a new
+        one (`Width=5mm` makes the parameter). Fusion: while a value box is shown the keys
+        go to it, letters too, whatever key they are elsewhere (Autodesk's own lesson
+        "Create parameter based sketches": "Instead of entering a dimension, type a
+        parameter name followed by the equals symbol and the value ... enter L1=20", L
+        being Line's key). Before this (wave 7, replay-f) only a letter that starts an
+        EXISTING parameter went into the box, so the first `Width=5mm` of a design ran
+        Measure (i), Dimension (d), Trim (t) and Hole (h) one after the other."""
         if self.typing is not None or not self.fields or not text:
             return False
         if self.fields[self.current].kind in (COUNT, RATIO):
             return False
-        try:
-            from . import parameters_complete
+        from . import sketch_draw_core
 
-            return parameters_complete.starts_a_name(text)
-        except Exception:
-            return False
+        return sketch_draw_core.letter_starts_name(text)
 
     def offer_names(self):
         """The matching parameter names under the box being typed in."""

@@ -2723,7 +2723,15 @@ def _run_solver(asm, doc):
     for p in nested:
         p.Placement = places[p.Name]  # the solver reads it as a place in design coordinates
     try:
-        with _only_active(doc):
+        # FreeCAD's solver writes its own red lines to the Report view when it gives up
+        # ("<Assembly> AssemblyObject.cpp(170): Solve failed: iterNo > iterMax", "vector::
+        # _M_range_check: __n (which is 84) >= this->size()"): a Rigid joint previewed
+        # across a closed loop did (the book's Strandbeest, Joint (J) on the last link
+        # before its Type is set). The code it returns is what the dialogs explain
+        # (solve_message); its own lines are kept out (wave 7, replay-f).
+        from . import preview
+
+        with _only_active(doc), preview.quiet():
             return int(asm.solve())
     finally:
         solved = {p.Name: App.Placement(p.Placement) for p in nested}
@@ -3576,6 +3584,15 @@ def part_shape(part):
         shapes = []
         for obj in part.OutListRecursive:
             try:
+                # only what lies INSIDE the part: a pasted or patterned copy links to the
+                # component it repeats, whose bodies are in its OutListRecursive too, so a
+                # copy's shape held the original's solids as well (a copy "ran into"
+                # everything its original touches, and into the original itself; wave 7,
+                # replay-f)
+                if not _inside(obj, part):
+                    continue
+                if _is_copy_feature(obj):
+                    continue  # the solid a copy body starts from: the body counts it
                 if obj.TypeId == "PartDesign::Body" or (
                     obj.isDerivedFrom("Part::Feature")
                     and obj.getParentGeoFeatureGroup() is not None
@@ -3589,6 +3606,33 @@ def part_shape(part):
                 continue
         return Part.makeCompound(shapes) if shapes else Part.Shape()
     return bodies.global_shape(part)
+
+
+def _is_copy_feature(obj):
+    """An instance's copy feature (instances.InstanceCopy): it stands in the component beside
+    the copy body that starts from it, so its solid is the body's (a mirrored or pasted
+    copy's shape held each solid twice; wave 7, replay-f)."""
+    try:
+        from . import instances
+
+        return instances.is_copy_feature(obj)
+    except Exception:
+        return False
+
+
+def _inside(obj, part):
+    """True when `obj` lies in `part` (directly, or in a component inside it)."""
+    try:
+        group = obj.getParentGeoFeatureGroup()
+        for _ in range(64):
+            if group is None:
+                return False
+            if group is part:
+                return True
+            group = group.getParentGeoFeatureGroup()
+    except Exception:
+        pass
+    return False
 
 
 def _volume(shape):
@@ -4260,6 +4304,7 @@ def _rerooted(ref):
             return None
         doc = part.Document
         owner = part
+        through = set()  # the components the path names on its way down
         for name in subs[0].split(".")[:-1]:
             obj = doc.getObject(name)
             if obj is None:
@@ -4267,8 +4312,17 @@ def _rerooted(ref):
             if obj.isDerivedFrom("PartDesign::Feature"):
                 continue
             owner = obj
+            if obj.TypeId == "App::Part":
+                through.add(obj.Name)
         new_part = part_of(owner)
         if new_part is None:
+            return None
+        if new_part is not part and new_part.Name in through and _inside(new_part, part):
+            # the path itself goes down into a component inside the part: a joint of a
+            # subassembly placed on one of its parts (the Robotic Hand's knuckle on the
+            # Finger, on its Proximal's face). It is right as it is; a pattern of the
+            # Finger moved it onto Proximal, which is grounded to the Finger, and the
+            # finger could no longer be driven (wave 7, replay-f)
             return None
         prefix = _path(new_part, owner) if owner is not new_part else ""
         new_subs = [prefix + s.split(".")[-1] for s in subs]
