@@ -14,6 +14,26 @@ last good preview: nothing goes to the Report view and no pop-up appears. Cancel
 Ctrl+Z leave the part as it was, and OK is one undo step. Double-click the step in the
 timeline to edit it again.
 
+## Wave 7: Loft to a point (branch `sf/book-extrude`, 2026-11-11)
+
+The book's surfboard lofts its last section to the origin: "clicking the Workspace ORIGIN as
+the last loft section does nothing ... even a sketch point at the origin could not be clicked
+while the construction planes and the origin were visible". Sources: **Book** (the origin as
+the last section); **Autodesk** Loft reference (search excerpt): the end condition Sharp
+is "available when the profile is a sketch point or construction point", Point Tangent
+makes a dome there; **Autodesk** blog "The Secrets of the Loft Command": lofts are made
+"from sketches, faces, edges, and points".
+
+| Fusion (source) | Fission 180 |
+|---|---|
+| A sketch point or a construction point can be a loft's first or last section (Autodesk); the book lofts to the origin (Book) | Same: the origin point (the row O under Origin in the browser, or a click on the origin in the view) and construction points are sections now (`loft.is_point_object`, `loft.point_of`); sketch points and corners of the part as before |
+| The point can be clicked where the origin's planes and axes are drawn over it (Book) | Same: a click on an origin or construction plane's square or axis, which is no section, goes to the point or face behind it (`loft_ui._behind`, `profile_pick.behind_glyphs`); with nothing usable behind, the dialog says the plane is no profile and what to click |
+| A sketch's profile behind a face is picked through the part; profiles of a hidden body's sketch can be picked | Same as Extrude (`parity/extrude-presspull.md`, "Picking profiles"); Sweep too |
+
+Tests: scenario `book_extrude_loft` (27 checks): the cone to the origin picked in the browser,
+edit, undo / redo, save / reopen; the origin clicked in the view under its planes; a sketch
+point under the planes; a plane refused with the reason.
+
 ## Values past what fits stop at the limit (Luca's decision, 2026-10-21)
 
 **This deliberately differs from Fusion.** Fusion refuses a value that does not fit (a

@@ -190,7 +190,8 @@ class ProfilePicker:
     where it can be seen).
 
     A click that misses every region by a few pixels (NEAR_PIXELS) takes the region next
-    to it: a thin slot or a small hole is only a few pixels wide in a fitted view."""
+    to it, when no face of a part is under the mouse: a thin slot or a small hole is only a
+    few pixels wide in a fitted view."""
 
     CURVE_PIXELS = 6  # a click this close to a sketch curve picks the curve
 
@@ -506,6 +507,18 @@ class ProfilePicker:
                 return best
         return None
 
+    def _part_at(self, position):
+        """True when something other than a sketch is under the mouse (a face, an edge)."""
+        try:
+            info = self.view.getObjectInfo((int(position[0]), int(position[1])))
+            if not info or not info.get("Object"):
+                return False
+            doc = App.getDocument(info["Document"])
+            obj = doc.getObject(info["Object"])
+            return not (obj is not None and obj.isDerivedFrom("Sketcher::SketchObject"))
+        except Exception:
+            return False
+
     def _is_hidden(self, position, point):
         """True if the part (the occluder) is in front of `point` under the mouse."""
         if self.occluder is None:
@@ -632,7 +645,11 @@ class ProfilePicker:
                     self.last_click = time.time()
                     self.on_curve(curve[0], curve[1])
                     return
-            hit = self.region_at(position, check_hidden=True, near=True)
+            hit = self.region_at(position, check_hidden=True)
+            if hit is None and not self._part_at(position):
+                # beside a thin slot or a small hole, with no face of a part under the
+                # mouse (a click on a face next to an area means the face)
+                hit = self.region_at(position, check_hidden=True, near=True)
             if hit is not None:
                 self.last_click = time.time()
                 self.on_pick(hit[0], hit[1])

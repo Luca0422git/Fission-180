@@ -2119,7 +2119,7 @@ class ExtrudePanel(
             if way is not None:
                 overlaps, touches = bodies_core.scope(inside, direct, way[2], way[1])
             else:
-                overlaps, touches = False, self._base_has_solid()
+                overlaps, touches = False, self._base_joinable()
             wanted = bodies_core.auto_operation(into, touches, starts_on=on, overlaps=overlaps)
             self._auto_cache = (key, wanted)
             # A Cut because the extrusion reaches into a body further on (it does not start
@@ -2210,7 +2210,7 @@ class ExtrudePanel(
             if way is not None:
                 touches = bodies_core.scope(None, direct, [], way[1])[1]
             else:
-                touches = self._base_has_solid()
+                touches = self._base_joinable()
             wanted = "join" if touches else "new_body"
         else:
             return
@@ -2659,6 +2659,16 @@ class ExtrudePanel(
     def _base_has_solid(self):
         base = self._base_feature()
         return base is not None and not base.Shape.isNull() and bool(base.Shape.Solids)
+
+    def _base_joinable(self):
+        """What stands in for "touches a body" while the bodies in the way cannot be told
+        (no distance yet): the profile's own body has a solid and belongs to the active
+        component (a face of another component's body is no reason to show Join)."""
+        if not self._base_has_solid():
+            return False
+        _inside, direct = self._auto_scope()
+        body = self._source_body()
+        return direct is None or (body is not None and body.Name in direct)
 
     def _bodies_for_build(self):
         """options["bodies"] for extrude.build: the bodies in the way minus those clicked

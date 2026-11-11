@@ -8,6 +8,38 @@ rounding, size checks, volumes, the automatic operation), `primitives.py` + `pri
 `pipe.py` + `pipe_ui.py`, `undo_links.py` (see "FreeCAD bug" below). Status: **first pass,
 not yet signed off**.
 
+## Wave 7: sizes typed on the canvas, body names (branch `sf/book-extrude`, 2026-11-11)
+
+The book parity report (Play Brick: "there is no on-canvas type 31.8, Tab, 15.8, Enter, 9.6
+flow: focus stays in the 3D view, typed numbers go nowhere and Tab jumps into the dialog";
+Geocache: "Cylinder with Height -8 came out going +8 into the first body"; "this body is
+named Body1, others Body"). What was there: digits typed over the view while placing went
+into the dialog's Length field at the side, where nobody looks while placing, and Tab left
+it for the dialog's next field. Sources: **Book** (the report quoting the book's flow);
+**Autodesk** help "Create a solid box" (search excerpt): "Place the first corner of the box.
+Place the opposite corner, or specify exact Length and Width values, to define the base of
+the box. The Box dialog displays"; **Forum** (IdeaStation "Change inputs with Tab key"):
+"TAB is already in use to jump between input boxes that are on the work surface";
+**Guess**: where each box sits.
+
+| Fusion (source) | Fission 180 |
+|---|---|
+| After the first click the sizes can be typed, in boxes on the work surface (Autodesk; Forum; Book) | Same: Box shows Length and Width on their sides of the outline, Cylinder / Torus / Coil the diameter where the circle passes the mouse (`primitives_ui.PlacingBox`). They follow the outline and show its size |
+| Typed digits go into the first box; Tab moves to the next (Forum); Enter places the shape (Book) | Same: a digit typed with the mouse over the view goes into the first size not typed yet, Tab takes it and moves to the next box on the canvas (round and round), Enter takes it and places the shape as typed (the mouse only says on which side) |
+| The next number is the height, Enter finishes (Book: "9.6") | Same, wherever the mouse was left: it used to go into the box of whichever arrow the mouse rested on (the Width's, where the rectangle ended; the report's -8 that became a diameter) |
+| A negative height goes the other way | Same: against the plane's normal (Cylinder on the Top plane, Height -8: z -8..0) |
+| Bodies are Body1, Body2 ... from the first one on | Same in every command: the root's first body, made by the first sketch, was FreeCAD's "Body" (`commands.ensure_body`, one line) |
+
+**Not built:** on the Front plane a primitive's positive height still goes FreeCAD's way
+(towards the front viewer); Fusion's Front plane looks the other way (`parity/
+extrude-presspull.md`, "Direction and sign", where Extrude does follow Fusion). Sphere has no
+box on the canvas before its one click (the digits go into the dialog's Diameter field, as
+before).
+
+Tests: scenario `book_extrude_primitives` (48 checks): the book's play brick typed on the
+canvas, two cylinders (the second with Height -8), one on a face (Join, then Cut by itself),
+undo / redo, Esc while placing; the older `primitives_qa_keys` still passes.
+
 ## Values past what fits stop at the limit (Luca's decision, 2026-10-21)
 
 **This deliberately differs from Fusion.** Fusion refuses a value that does not fit (a
