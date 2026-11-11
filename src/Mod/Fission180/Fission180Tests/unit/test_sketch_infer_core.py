@@ -421,6 +421,15 @@ class OtherTools(unittest.TestCase):
         self.assertEqual(core.TOOLS["Fission180_SketchLine"], "line")
         self.assertEqual(core.POINTS["slot"], 2)  # the third click is the width
 
+    def test_the_point_tool_is_a_shape_of_one_click(self):
+        # CREATE > Point (hole centres in the book): snapped like any other first click
+        self.assertEqual(core.TOOLS["Sketcher_CreatePoint"], "point")
+        self.assertEqual(core.POINTS["point"], 1)
+        self.assertEqual(core.tool_kind("point", []), "point")
+        # whatever FreeCAD previews meanwhile, it stays the point tool
+        self.assertEqual(core.tool_kind("point", [[(0.0, 0.0), (5.0, 0.0)]]), "point")
+        self.assertNotIn("point", core.DIRECTION)
+
     def test_line_direction_starts_at_its_first_point(self):
         self.assertEqual(core.preview_anchor("line", [[(1.0, 2.0), (9.0, 2.0)]]), (1.0, 2.0))
         self.assertIsNone(core.preview_anchor("line", []))

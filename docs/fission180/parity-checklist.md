@@ -354,6 +354,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `nav`: Theme, Ground Plane, Show All, Two Views Horizontal, Two Views Vertical
 - `marking`: Set Orbit Center, Reset Orbit Center
 - `sketch-marking`: Toggle Driven, Aligned, Horizontal, Vertical
+- `browser:document`: Create Drawing
 - `browser:sheet_metal_rule`: Sheet Metal Rules
 - `browser:plastic_rule`: Assign Plastic Rule, Manage Plastic Rules
 - `browser:settings`: Change Active Units

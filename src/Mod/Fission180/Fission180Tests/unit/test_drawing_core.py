@@ -250,6 +250,10 @@ class SectionTests(unittest.TestCase):
     def test_offset_moves_along_the_side_only(self):
         line = core.section_line((0, -20), (0, 20), (50, 0), "Third angle")
         self.assertTrue(vclose(core.section_offset(line, 60, 13) + (0,), (60, 0, 0)))
+        # the view follows the pointer along its viewing side, wherever the cut line is on
+        # the parent (a cut 80 mm left of a long part's middle, the pointer left of the part)
+        at = core.section_position((190.0, 110.0), line, (46.0, 123.0))
+        self.assertTrue(vclose(at + (0,), (46.0, 110.0, 0)))
 
 
 class DimensionTests(unittest.TestCase):
@@ -328,6 +332,25 @@ class PartsListTests(unittest.TestCase):
         self.assertEqual(
             [(r["Item"], r["PartNumber"], r["Qty"]) for r in rows], [(1, "Plate", 1), (2, "Pin", 2)]
         )
+
+    def test_table_column_grows_for_a_long_part_number(self):
+        # replay of the book's final project: "M3 x 10 Socket Head Cap Screw" ran over the
+        # DESCRIPTION column
+        name = "M3 x 10 Socket Head Cap Screw"
+        rows = core.parts_rows([{"name": "Grip"}, {"name": name, "description": "ISO 4762"}])
+        widths = {key: w for key, _caption, w in core.fitted_columns(rows)}
+        standard = {key: w for key, _caption, w in core.PARTS_COLUMNS}
+        self.assertGreaterEqual(widths["PartNumber"], len(name) * core.TABLE_TEXT * 0.6 + 3.0)
+        for key in ("Item", "Qty", "Description", "Material"):
+            self.assertEqual(widths[key], standard[key])
+        layout = core.table_layout(rows)
+        self.assertEqual(layout["width"], sum(widths.values()))
+        # the DESCRIPTION text starts right of the grown column
+        x_description = [t[0] for t in layout["texts"] if t[3] == "ISO 4762"][0]
+        self.assertGreater(x_description, 24.0 + widths["PartNumber"])
+        # short names: the standard widths
+        short = core.parts_rows([{"name": "Grip"}])
+        self.assertEqual(core.fitted_columns(short), core.PARTS_COLUMNS)
 
     def test_table_layout(self):
         rows = core.parts_rows([{"name": "Plate"}, {"name": "Pin"}])

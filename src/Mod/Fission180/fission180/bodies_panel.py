@@ -8,6 +8,7 @@ Subclasses fill the form in build_form(), take clicks in picked(obj, short, poin
 whether OK is possible in can_finish(), and rebuild the preview in apply() (raise the core
 module's NeedsPick while a box still waits, any other error to show it in red).
 """
+
 import time
 
 import FreeCAD as App
@@ -32,9 +33,14 @@ class BodyPanel(Panel):
     # called "bodies", if there is one. A dialog whose box takes bodies or faces depending on
     # a choice (Move/Copy's Move Object, Appearance's Apply To) has picks_bodies() instead.
     body_boxes = None
+    # True: the dialog picks bodies, components or their faces and has no use for a plane, so
+    # the construction planes drawn in front of the parts do not take its clicks
+    # (planes_aside.py; As-built Joint, Physical Material, Appearance).
+    planes_aside = False
 
     def __init__(self, doc, transaction, editing=False):
         super().__init__(doc, transaction)
+        self._planes_held = []
         type(self).last = self
         BodyPanel.last = self
         self.editing = editing
@@ -65,6 +71,20 @@ class BodyPanel(Panel):
         self.layout.addRow(self.note)
         self.finish_layout()
         self._watch()
+        if self.planes_aside:
+            self.hold_planes(True)
+
+    def hold_planes(self, on):
+        """Construction planes out of the way of the clicks (on) or clickable again."""
+        try:
+            from . import planes_aside
+
+            if on and not self._planes_held:
+                self._planes_held = planes_aside.hold(self.doc)
+            elif not on:
+                planes_aside.release(self.doc, self._planes_held)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
 
     # -- form helpers ----------------------------------------------------------------------------
     def build_form(self):
@@ -337,6 +357,7 @@ class BodyPanel(Panel):
 
     def cleanup(self):
         bodies.resume(self.doc)
+        self.hold_planes(False)
         self._unwatch()
         for guard in (self.escape, self.undo_guard, self.enter):
             try:

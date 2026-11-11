@@ -465,7 +465,10 @@ def build(
     children += components  # Fusion lists the components after the root's own folders
     # (wave 7) a design that holds components is an assembly: Fusion's stacked icon
     root = _node(
-        "document", doc_label, "assembly" if components else "document", "document",
+        "document",
+        doc_label,
+        "assembly" if components else "document",
+        "document",
         children=children,
     )
     root["active"] = active_component is None  # the root component's activate mark
@@ -611,6 +614,10 @@ MENUS = {
         "Show All Bodies",
         "Show All Sketches",
         "Hide All Sketches",
+        "-",
+        # (replay-g) Fusion: "Select any component in the browser, right-click it, and select
+        # Create Drawing"; the design's own row is its top component: the whole assembly.
+        "Create Drawing",
         "-",
         "Rename",
         "-",

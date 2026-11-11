@@ -822,6 +822,15 @@ def section_offset(line, dx, dy):
     return n[0] * along, n[1] * along
 
 
+def section_position(parent_at, line, point):
+    """Where a section view goes while it follows the pointer: under the pointer along its
+    viewing side, lined up with the parent view's middle across it. (Measured from the cut
+    line's middle instead, a cut near one end of a long part put the view that far beside
+    the pointer: on top of its parent.)"""
+    ox, oy = section_offset(line, point[0] - parent_at[0], point[1] - parent_at[1])
+    return parent_at[0] + ox, parent_at[1] + oy
+
+
 # ------------------------------------------------------------------ dimensions
 LINEAR_TYPES = ("Distance", "DistanceX", "DistanceY")
 _PARALLEL = math.radians(1.0)
@@ -998,10 +1007,26 @@ def parts_rows(components):
     return rows
 
 
+TABLE_CHAR = 0.6  # a letter's width, as a share of the text height (the sheet's sans font)
+
+
+def fitted_columns(rows, columns=PARTS_COLUMNS):
+    """The columns with each width grown to fit its longest text (and 1.5 mm each side)."""
+    out = []
+    for key, caption, width in columns:
+        longest = max([len(str(row.get(key, ""))) for row in rows] + [0])
+        need = longest * TABLE_TEXT * TABLE_CHAR + 3.0
+        out.append((key, caption, max(width, round(need, 1))))
+    return tuple(out)
+
+
 def table_layout(rows, columns=PARTS_COLUMNS, header_at_bottom=False):
     """Lines and texts of the parts-list table, origin at its top left corner, y up
     (everything below 0). Fusion flips the header to the bottom when the table sits in
-    the lower half of the sheet; the items then count upwards from the header."""
+    the lower half of the sheet; the items then count upwards from the header. A column is
+    as wide as its widest text needs (a hardware part's "M3 x 10 Socket Head Cap Screw" ran
+    over the DESCRIPTION column), never narrower than its standard width."""
+    columns = fitted_columns(rows, columns)
     width = sum(c[2] for c in columns)
     count = len(rows) + 1
     height = count * ROW_H

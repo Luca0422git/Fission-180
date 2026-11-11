@@ -963,10 +963,14 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             pen.setCapStyle(QtCore.Qt.RoundCap)
             painter.setPen(pen)
             c = box.center()
-            painter.drawLine(QtCore.QPointF(c.x() - 3, c.y() + 3), QtCore.QPointF(c.x() + 4, c.y() - 4))
+            painter.drawLine(
+                QtCore.QPointF(c.x() - 3, c.y() + 3), QtCore.QPointF(c.x() + 4, c.y() - 4)
+            )
             pen.setWidthF(1.0)
             painter.setPen(pen)
-            painter.drawLine(QtCore.QPointF(c.x() - 6, c.y() + 6), QtCore.QPointF(c.x() - 3, c.y() + 3))
+            painter.drawLine(
+                QtCore.QPointF(c.x() - 6, c.y() + 6), QtCore.QPointF(c.x() - 3, c.y() + 3)
+            )
         finally:
             painter.restore()
 
@@ -2184,6 +2188,14 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             pass
         doc.recompute()
 
+    def _new_drawing_of_design(self):
+        """Create Drawing on the design's own row: the whole assembly (nothing selected, so
+        the Create Drawing dialog starts on Full Assembly)."""
+        if not commands.finish_open_dialog():
+            return
+        Gui.Selection.clearSelection()
+        Gui.runCommand("Fission180_NewDrawing")
+
     def _run_with(self, obj, command):
         """Run a command on a browser row's object (it is selected first, as a click does)."""
         if obj is None or not commands.finish_open_dialog():
@@ -2331,7 +2343,11 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Calibrate": lambda: self._run_with(obj, "Fission180_CalibrateCanvas"),
             "Ground": lambda: _joint_action("toggle_ground", obj),
             "Move/Copy": lambda: self._run_with(obj, "Fission180_Move"),
-            "Create Drawing": lambda: self._run_with(obj, "Fission180_NewDrawing"),
+            "Create Drawing": lambda: (
+                self._new_drawing_of_design()
+                if node["kind"] == "document"
+                else self._run_with(obj, "Fission180_NewDrawing")
+            ),
             "Properties": lambda: self._run_with(obj, PROPERTIES_COMMAND),
             "Cycle Component Color": lambda: self._run_with(obj, CYCLE_COLOR_COMMAND),
             "Edit Joint": lambda: _edit_object(obj),

@@ -183,10 +183,36 @@ class ValueField:
         try:
             self.raw = text
             number = parse_number(text, self.unit)
+            if number is None:
+                # (replay-g) a sum or a fraction that is whole now ("1/8" in an inch
+                # design) is previewed too: the preview stayed on the "1" typed first, a
+                # 1 in fillet, until the box was left
+                number = self._whole_formula(text)
             if number is not None and self._alive():
                 self.panel._typed(self.key, number)
         except Exception as exc:
             warn("%s value: %s" % (self.key, exc))
+
+    def _whole_formula(self, text):
+        """The value of a formula typed so far when it is complete ("1/8", "2*0.25",
+        "Width / 2"), else None (half-typed, a name not made yet, no value of this kind).
+        Nothing is created: `Name = value` is settled with the box (_finished)."""
+        if "=" in (text or ""):
+            return None
+        try:
+            return read(self.panel.doc, text, self.unit).value
+        except Exception:
+            return None
+
+    def settle(self):
+        """What was typed and not settled yet (no Enter, Tab or click elsewhere) is taken
+        now: OK clicked right after typing "1/8" took the "1" the preview showed (a 1 in
+        fillet instead of 1/8 in; the replay of the book's American Football). Text that
+        is no value goes to the dialog's _formula_failed, as with Enter: OK then says why
+        and the dialog stays open."""
+        if self.raw is None:
+            return
+        self._finished()
 
     def take_text(self, text):
         """`text` typed for this box somewhere else (the value box next to the arrow in the
