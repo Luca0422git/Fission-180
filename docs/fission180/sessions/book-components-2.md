@@ -79,6 +79,15 @@ the menu entry.
 6. The "Where each command puts its result" rows: probed in `book_components2_cross`
    (Hole, Thread, Fillet, Chamfer, Shell, patterns / Mirror of bodies, Split, Combine).
 
+## Test results (one scenario at a time, the preference on, real FreeCAD 1.1.4)
+
+New: `book_components2_cross` 235 checks, `book_components2_structure` 89,
+`book_components2_refs` 70. The plastic journeys: 232 / 308 / 235. The brief's list of 70
+scenarios and 30 more: all PASS after the changes named above (the first run's failures:
+`components2_bodies`, `components2_move` (the ground), `modify_align` (Align's refusal),
+`book_components_pattern` (my own expectation of the rows)). Unit tests: 3559, OK. Golden
+models: 644 pass, 2 expected failures (as on develop).
+
 ## Added by the orchestrator while this ran
 
 1. `insert_step` failed at "in the Plate's body" on develop: with the design active the
