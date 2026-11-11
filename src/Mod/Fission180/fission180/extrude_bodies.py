@@ -202,7 +202,7 @@ def bodies_in_way(doc, tool, lead=None):
             if shared > enough:
                 through.append(body)
                 touching.append(body)
-            elif shared > VOLUME_TOL or _face_contact(shape, tool):
+            elif shared > VOLUME_TOL or _face_contact(shape, tool) or _curve_contact(shape, tool):
                 touching.append(body)
         except Exception:
             continue
@@ -638,10 +638,27 @@ def _same_surface(a, b, tol):
         offset = sb.Center - sa.Center
         across = offset - sa.Axis * offset.dot(sa.Axis)
         return across.Length <= tol
-    try:
-        return b.distToShape(a)[0] <= tol
-    except Exception:
-        return True
+    # Any other surface (a loft's, an extrusion of a curve): one of the faces must lie on the
+    # other's surface, which shows at points inside it. Two faces that only meet along a
+    # curve (the surfboard's fin under the board) are told apart from points alone: the
+    # distance between the faces (0 there too) and then a boolean of the two took 10 s.
+    return _lies_on(a, sb, tol) or _lies_on(b, sa, tol)
+
+
+def _lies_on(face, surface, tol):
+    """True when points inside `face` lie on `surface` (within tol; the surface may go on
+    past the face it belongs to)."""
+    points = _face_samples(face)
+    if not points:
+        return True  # (cannot be told: the common area decides)
+    for p in points:
+        try:
+            u, v = surface.parameter(p)
+            if (surface.value(u, v) - p).Length > max(tol, 1e-6) * 10:
+                return False
+        except Exception:
+            return True
+    return True
 
 
 def _face_contact(shape, tool, tol=1e-6):
@@ -676,6 +693,93 @@ def _face_contact(shape, tool, tol=1e-6):
                     return True
             except Exception:
                 continue
+    return False
+
+
+CURVE_TOUCH = 1e-3  # mm: a curve shorter than this is a point of contact
+CURVE_TOL = 1e-4  # mm: a point this near a body's face is on it (an Intersect curve is fitted)
+ALONG = (0.2929, 0.5, 0.7071)  # where an edge is looked at (never its ends)
+
+
+def _edge_points(edge):
+    a, b = edge.FirstParameter, edge.LastParameter
+    return [edge.valueAt(a + (b - a) * f) for f in ALONG]
+
+
+def _curve_contact(shape, tool, curves=()):
+    """True when an edge of `tool`, or one of `curves` (the profile's edges: a symmetric
+    extrude's profile lies inside the solid it sweeps), lies on `shape` along its length.
+    Called once the two are known to share no volume, so "in or on" is "on". Only points
+    are classified (no boolean: a section of a lofted board took 4 s).
+
+    The book's surfboard fin: its profile is closed by the board's own outline
+    (Intersect), so the fin, extruded to both sides, touches the board along that outline
+    and nowhere else (the board's underside is round and rises away from the fin's top).
+    The Extrude dialog said "Touches no body: a new body is made" with Join shown, and
+    made a second body: replay-b, wave 7."""
+    box = shape.BoundBox
+    box.enlarge(CURVE_TOL)
+    for edge in list(tool.Edges) + list(curves):
+        try:
+            if edge.Length < CURVE_TOUCH or not box.intersect(edge.BoundBox):
+                continue
+            if all(shape.isInside(p, CURVE_TOL, True) for p in _edge_points(edge)):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def beside(shape, tool, curves=()):
+    """True when the solid `tool` only lies against `shape` along a curve: no point inside
+    one of them is in the other, no piece of a face is shared, and a curve of the tool (or
+    of `curves`) lies on the shape. Points only, no boolean (it runs with every preview).
+
+    OpenCASCADE's fuse of two such solids is wrong: the surfboard and its fin fused into the
+    fin alone (4 faces; the board's deck was no longer drawn). A Join of them is the two
+    solids side by side in one body (join_shape), the same set of points as their union."""
+    try:
+        if _box_overlap(shape.BoundBox, tool.BoundBox) < -CURVE_TOL:
+            return False
+        for face in tool.Faces:
+            if any(shape.isInside(p, 1e-6, True) for p in _face_samples(face)):
+                return False  # inside it, or on one of its faces
+        tbox = tool.BoundBox
+        tbox.enlarge(1e-4)
+        for face in shape.Faces:
+            if not face.BoundBox.intersect(tbox):
+                continue
+            if any(tool.isInside(p, 1e-6, True) for p in _face_samples(face)):
+                return False
+        return _curve_contact(shape, tool, curves)
+    except Exception:
+        return False
+
+
+def join_shape(shape, tool, curves=()):
+    """The solid(s) of a Join of `tool` to `shape`: their union, or, when the tool only
+    lies against the shape along a curve (beside), both side by side in one body."""
+    import Part
+
+    if beside(shape, tool, curves):
+        return Part.makeCompound(list(shape.Solids) + list(tool.Solids))
+    return shape.fuse(tool)
+
+
+def joins_beside(profiles, options, body, lead=None):
+    """True when a Join of this extrusion to `body` (as it is before `lead`) is two solids
+    side by side (beside): Fission 180's own extrude feature builds that; FreeCAD's Pad
+    would fuse them."""
+    try:
+        profiles = normalize(profiles)
+        options = options_with_defaults(options)
+        for candidate, shape in candidate_bodies(body.Document, lead):
+            if candidate is body:
+                prism = tool_prism(profiles, options, [shape])
+                edges = [e for f in global_faces(profiles) for e in f.Edges]
+                return beside(shape, prism, edges)
+    except Exception:
+        return False
     return False
 
 
@@ -763,6 +867,36 @@ def touched_bodies(profiles, options, lead=None, contact=None):
     return found[1] if contact else found[0]
 
 
+def _within_reach(prism, candidates):
+    """The volume of `prism` inside the box round the bodies it could act on: the share a
+    body takes of an extrusion is counted against that. "All" runs four times the design's
+    size past everything, so a hole through the surfboard's 4 mm tail took 0.9 % of it and
+    the dialog proposed Join instead of Cut after Flip (replay-b, wave 7)."""
+    try:
+        import Part
+
+        box = None
+        for _body, shape in candidates:
+            bb = shape.BoundBox
+            if box is None:
+                box = App.BoundBox(bb)
+            else:
+                box.add(bb)
+        if box is None:
+            return prism.Volume
+        box.enlarge(1.0)
+        pbox = prism.BoundBox
+        if box.isInside(pbox):
+            return prism.Volume
+        clip = Part.makeBox(
+            box.XLength, box.YLength, box.ZLength, App.Vector(box.XMin, box.YMin, box.ZMin)
+        )
+        inside = prism.common(clip).Volume
+        return inside if inside > VOLUME_TOL else prism.Volume
+    except Exception:
+        return prism.Volume
+
+
 def in_the_way(profiles, options, lead=None):
     """([bodies the extrusion passes through], [bodies it passes through or only touches],
     [bodies it really overlaps]), oldest first, each body as it was before `lead`; None when
@@ -788,7 +922,7 @@ def in_the_way(profiles, options, lead=None):
         return None
     # A sliver (a tapered neighbour flaring over the profile's edge) does not count.
     enough = max(VOLUME_TOL, prism.Volume * 1e-6)
-    real = max(VOLUME_TOL, prism.Volume * START_SHARE)
+    real = max(VOLUME_TOL, _within_reach(prism, candidates) * START_SHARE)
     through, touching, overlapping = [], [], []
     inner = None
     for body, shape in candidates:
@@ -814,7 +948,13 @@ def in_the_way(profiles, options, lead=None):
                 touching.append(body)
                 if shared > real:
                     overlapping.append(body)
-            elif shared > VOLUME_TOL or _face_contact(shape, prism):
+            elif (
+                shared > VOLUME_TOL
+                or _face_contact(shape, prism)
+                or _curve_contact(
+                    shape, prism, [e for f in global_faces(profiles) for e in f.Edges]
+                )
+            ):
                 touching.append(body)
         except Exception:
             continue

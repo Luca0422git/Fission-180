@@ -1414,8 +1414,13 @@ class ExtrudeFeature:
                 result = base.Shape.common(tool)
             elif operation == "Cut":
                 result = base.Shape.cut(tool)
+            elif has_base:
+                from .extrude_bodies import join_shape
+
+                # (a fin that only lies against the board along a curve: two solids)
+                result = join_shape(base.Shape, tool, [e for f in faces for e in f.Edges])
             else:
-                result = base.Shape.fuse(tool) if has_base else tool
+                result = tool
             if obj.Refine:
                 result = result.removeSplitter()
         except prism.PrismError as exc:
@@ -2072,6 +2077,11 @@ def _structure(feature, profiles, options, participants=None):
     type_id = feature_type(op, options)
     if type_id != INTERSECT_TYPE and curved_elsewhere(options, target):
         type_id = INTERSECT_TYPE  # Fission 180's own feature (see curved_elsewhere)
+    if type_id != INTERSECT_TYPE and op == "join" and target is not None:
+        from .extrude_bodies import joins_beside
+
+        if joins_beside(profiles, options, target, lead=feature):
+            type_id = INTERSECT_TYPE  # two lumps side by side, no fuse (extrude_bodies.beside)
     return target, type_id, src
 
 
