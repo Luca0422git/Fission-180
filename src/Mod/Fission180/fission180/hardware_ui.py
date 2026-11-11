@@ -116,6 +116,7 @@ class HardwarePanel(Panel):
         self.manual_sink = False
         self.auto_hole_off = False  # "Make the hole too" was unticked by a click on a hole
         self.note = ""
+        self.last_click = None
         self.error = ""
         self.found = []
         self._quiet = False
@@ -625,6 +626,7 @@ class HardwarePanel(Panel):
             return
         self.manual_sink = False
         self.note = ""
+        self.last_click = (obj.Name, short)  # what the click hit (said in the tests' notes)
         if own:
             # A click on this part's own hole (the preview): the same face of the part
             # before that hole, at the place clicked (its rim: the hole's axis).
