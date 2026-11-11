@@ -110,10 +110,6 @@ time you start it, but treat that as a safety net, not a plan.
   small round on a face that ends at modeled threads (the Pizza Cutter's Wheel Bracket), on the
   edges the threads run out through. *Workaround:* move the tube a little or try a smaller
   round; leave the edges next to the threads out, or make the round before the threads.
-- **The Surfboard's 1 mm rounds are held smaller** (the dialog says so): 0.71 mm on the fin,
-  which only touches the board along a curve and so stays a solid of its own, and 0.49 mm on
-  the tail hole, 1 mm from the tail. *Workaround:* draw the fin's top edge a hair into the
-  board; put the hole 2.5 mm from the tail.
 - **A modeled thread has one face per turn** on each flank (Fusion has one face for the whole
   flank), so picking "the thread" face by face takes many clicks. *Workaround:* Offset Face and
   Press Pull take the whole thread with one click.
