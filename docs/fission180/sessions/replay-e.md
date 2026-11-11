@@ -32,12 +32,21 @@ commit.
 | Scenario | Checks | Result | Time |
 |---|---|---|---|
 | `replay_12_pizza_cutter` | 525 | PASS (whole project from the first step, one run) | 632 s |
-| `replay_13_tesla_turbine` | (see the report) | housing, gaskets, walls, assembly | |
+| `replay_13_tesla_turbine` | 250 | PASS (whole project from the first step, official runner) | 241 s |
 
 Steps that took more than about 10 s (no progress note shown): the Wheel Bracket's Thread
 dragged before its Chamfer 24 s, the Shoulder Bolt's 12 s (the chamfer is rebuilt on the
 shaft under the modeled thread and the grooves are cut again); the Wheel Bracket's flat-face
-round being refused 13.5 s.
+round being refused 13.5 s. Tesla Turbine: the inlet's junction round 8-9 s (refused, see
+Known issues), the gasket's extrude 8 s.
+
+Older scenarios run after the changes (all PASS): `book_joints_snap` (41), `book_hardware_joint`
+(26), `book_components2_structure` (89), `book_modify_thread_chamfer` (52), `book_hardware_inch`
+(66), `book_joints_motion` (87), `book_extrude_picking` (49; it caught a first version of fix 8
+that dropped a deliberate second click on the face: fixed by counting presses),
+`book_modify_thread_inch` (36), `book_looks_faces` (106). Golden models: every `thread` model
+(17, two new) PASS. Unit tests: all PASS but the generated AI docs (regenerated in their own
+commit).
 
 ## Hitches found and fixed
 
@@ -50,7 +59,7 @@ round being refused 13.5 s.
 | 5 | Pizza Cutter, Blade, 2110 Joint by hovering the bore | The click on the blade's bore took the End Cap's centre | Hovering the edge snaps to that edge's centre (Report/Book) | The hover kept "the hole the pointer is in" for the End Cap's rim the pointer had crossed: on the screen a rim seen at a slant is far narrower than its radius | `joints_ui.SnapHover._through_opening` (new), `SnapHover._keep_hole` |
 | 6 | Pizza Cutter, Motion Link, 2142 | "slides 1.27 mm for each turn" for the 0.05 in typed | The design's units (Autodesk: dialogs use the document's units) | The note was always in mm | `motion_core.link_note` (new, unit tested), `MotionLinkPanel.after_recompute` |
 | 7 | Tesla, Housing, 2180 fillet | "Radius 6.35 mm is too big here" in an inch design (the report quotes the same) | The design's units | The refusal wrote millimetres | `blend.size_text` (new, unit tested), `blend.too_big`, `fillet_sets` (two messages) |
-| 8 | Tesla, Housing, 2185 the five holes | On a busy machine one of five hole profiles came with the face it lies on (the report's "every click went to the body face behind") | The sketch profile is taken (Book) | FreeCAD selects the face under a region on the click's release; the dialog ignored it only within 0.6 s of the region click | `ProfilePicker.clicked_region_at` (new), `ExtrudePanel._selection_changed` |
+| 8 | Tesla, Housing, 2185 the five holes | On a busy machine one of five hole profiles came with the face it lies on (the report's "every click went to the body face behind") | The sketch profile is taken (Book) | FreeCAD selects the face under a region on the click's release; the dialog ignored it only within 0.6 s of the region click | `ProfilePicker.clicked_region_at` (new: the face of the very press that picked the region, counted by `presses` / `region_press`), `ExtrudePanel._selection_changed` |
 | 9 | Tesla, Housing, 2194 pipe thread | A cosmetic NPT thread on the inlet turned the whole housing a quarter turn | Not applicable (a bug) | A cosmetic thread copied its step before with that step's own placement (an extrude on a face), which a thread step drops | `thread.in_place` (new), `ThreadFeature.execute`. Golden `book_thread_cosmetic_on_side_plane` |
 | 10 | Tesla, Power Side Wall, 2227 | The wall's component counted the gasket as its own solid (volume, box) | Not applicable (a bug) | `joints.part_shape` gathered every body the component refers to (its plane lies on the gasket's face) | `joints.part_shape`, `joints._owned_by` (new) |
 | 11 | Tesla, Steam Side Wall, 2241 | Renaming the mirrored copy "Steam Side Wall" renamed the Power Side Wall it mirrors, and the copy became "Steam Side Wall (Mirror)" | A mirrored component is a new component (Forum: "always new part numbers"), renamed on its own | The rename of an occurrence goes to its source (right for "Bolt:2"), also for a mirrored copy; and every sync named a mirrored copy after its source again | `browser_ui._component_rename` (not for a mirrored copy), `instances._sync_one` (a copy with a name of its own keeps it) |
@@ -129,6 +138,10 @@ Joint on a rotor (replayed in the Pizza Cutter), bearings, set screws and retain
 - A plane offset from a face has its origin at the face's centre of area (Fusion: the
   component origin projected); a sketch on it is a few micrometres off the axis when the face
   is not symmetric.
+- The Tesla inlet's 0.25 round where it leaves the housing (the stand-in: a rod 1.09 across,
+  its top 0.125 above the housing's) is refused at 0.25 in a run from the first step (9 s)
+  and built when the same design is saved and opened again: OpenCASCADE's result depends on
+  how the junction was computed. Try a smaller round, or reopen the design.
 - A Thread dragged before a Chamfer on a modeled thread takes 12 to 24 s on this machine with
   no progress note.
 - Duplicate With Joints refuses a screw put in by Hardware ("Rigid 1 is not made on a face,
