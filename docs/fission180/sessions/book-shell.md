@@ -137,7 +137,35 @@ file carries `notes` and `dialogs`.
   `App.getActiveTransaction()` is ("Add a Body", n); not done here (it changes what one
   Undo takes back in every flow that makes a first body).
 
-(The list of every scenario run with the check is in the final report.)
+The same leftover showed in `book_components_menus` (step c_cancel: "Add a Body").
+
+Run with both checks (about 135 of the 650 scenarios, one at a time on the shared machine;
+the merger's full run will add to this list through the NOTE lines): the four `book_shell_*`,
+and of the older ones `navbar_grid`, `viewcube_home`, `viewcube_arrows`, `viewcube_menu`,
+`doc_tabs_top`, `home_screen`, `home_tab_panels`, `ribbon_sweep`, `ribbon_customize`,
+`misc_preferences`, `misc_decal`, `misc_scripts`, `misc_capture`, `misc_derive`,
+`browser_second_click`, `browser_multi_select`, `browser_opacity_hover`, `insert_svg`,
+`insert_dxf`, `insert_step`, `insert_canvas`, `insert_mesh`, `insert_reopen`,
+`import_report`, `export_formats`, `export_print`, `export_everything`, `export_report`,
+`exchange2_export`, `exchange2_link`, `exchange2_step_insert`, `mesh_print`,
+`send_to_slicer`, `data_panel_fusion`, `versions_data_panel`, `versions_save`,
+`versions_link`, `versions_recovery`, `versions_recovery_unchanged`, `polish2_data_panel`,
+`delete_designs`, `cloud_place`, `unfinished_save`, `welcome_line`, `crash_notice`,
+`window_title`, `look_light`, `freecad_tools`, `keys`, `navbar_display`,
+`navigation_orbit`, `marking_menu_command`, `origin_squares_small`, `selection_box`,
+`selection_other`, `selection_dialogs`, `timeline_browser`, `timeline_browser_2`,
+`timeline_browser_qa3`, `tool_switch_any`, `undo_fast`, `value_box_dialogs`,
+`dialog_closed_design_undo`, `direct_history`, `components_basic`, `components2_move`,
+`book_components_menus`, `book_components_active`, `joints_asbuilt_group`,
+`joints2_nested`, `joints_delete`, `bodies_move`, `hole`, `fillet`, `fillet2_component`,
+`patterns_circ`, `modify_align`, `modify2_bodies`, `split_preview`, `sweep_loft_loft`,
+`revolve_axes`, `primitives_box`, `extrudeface_basic`, `extrude_bodies_highlight`,
+`construct_live`, `sketch_areas`, `sketch2_palette`, `book_sketch_a_fit`, `text_on_face`,
+`emboss_cylinder`, `hardware_insert`, `gear_refuse`, `handles_on_top`, `mesh_edit_reopen`,
+`meshinspect2_reedit`, `inspect_analysis_components`, `flatpattern_environment`,
+`drawing_new`, `drawing_detail`, `drawing2_sections`, `sim_setup_browser`,
+`book_cam_setup`. Flags: the three named above and "Add a Body" twice; no dialog that is not
+Fission 180's.
 
 ## FreeCAD facts and traps
 

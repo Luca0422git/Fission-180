@@ -276,6 +276,8 @@ def _dialog_shown(widget):
     try:
         if not widget.isWindow() or state.get("finished") or "t0" not in state:
             return
+        if isinstance(widget, QtWidgets.QProgressDialog):
+            return  # a progress bar of a long import or rebuild asks nothing
         origin = dialog_origin(widget)
         text = ""
         if isinstance(widget, QtWidgets.QMessageBox):
