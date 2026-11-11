@@ -164,6 +164,13 @@ def n2_turned():
 
 
 # -- N3 Base carries Arm --------------------------------------------------------------------------
+def n3_unground():
+    # (wave 7, components-2) Base is the first component of the design: grounded to its
+    # parent, as in Fusion, where a grounded component does not move when it is dragged
+    # (the drag says so and names the menu entry). A person ungrounds it first.
+    cs.unground("Base")
+
+
 def n3_drag_base():
     state["arm"] = App.Placement(arm().Placement)
     state["block_box"] = global_box(j.block())
@@ -226,7 +233,7 @@ steps += [base_select, base_command, base_name, base_ok]
 steps += [arm_select, arm_command, arm_name, arm_ok, nested]
 steps += j.pick_pair("n1") + [n1_type, n1_ok, n1_done]
 steps += [n2_drag, n2_turned]
-steps += [n3_drag_base, n3_moved, n3_undo, n3_undone]
+steps += [n3_unground, n3_drag_base, n3_moved, n3_undo, n3_undone]
 steps += [n4_drive, n4_type, n4_driven, n4_ok, n4_undo, n4_undone]
 
 h.run("joints2_nested", steps, paced_by="state")

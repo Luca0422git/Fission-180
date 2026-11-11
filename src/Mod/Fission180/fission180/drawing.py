@@ -431,8 +431,9 @@ def components_of(sources):
         key = unit.Name
         nested = _nested_source(comp, body) if comp is not None else None
         if nested is not None:
-            # an occurrence of an assembly holds its copies flat: a copy counts as the
-            # component nested in the original that it repeats, once per occurrence
+            # a body in an occurrence of an assembly counts as the component nested in
+            # the original that it repeats, once per occurrence (the occurrence holds it
+            # flat, or, since wave 7, in a row that stands for that component)
             unit, key = nested, comp.Name + "/" + nested.Name
         if key in index:
             index[key]["bodies"].append(body)
@@ -461,6 +462,10 @@ def _nested_source(occurrence, body):
     try:
         from . import components, instances
 
+        if components.is_holder(occurrence):
+            # (wave 7, components-2) a copy keeps a row per part inside it: the row is the
+            # same part as the original's component it stands for
+            return instances.nested_source(occurrence)
         if not instances.is_instance(occurrence):
             return None
         source_body = instances.source_body(body)

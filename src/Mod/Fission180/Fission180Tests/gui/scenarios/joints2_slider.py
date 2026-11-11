@@ -280,6 +280,15 @@ def s4_back():
 
 
 # -- S5 a component held by nothing --------------------------------------------------------------
+def s5_unground():
+    # (wave 7, components-2) the wall's component is the first of the design: grounded to
+    # its parent, as in Fusion, where a grounded component does not move when it is
+    # dragged (the drag says so and names the menu entry). A person ungrounds it first.
+    from Fission180Tests.gui import component_steps as cs
+
+    cs.unground(wall_part().Label)
+
+
 def s5_drag_wall():
     part = wall_part()
     state["wall"] = App.Placement(part.Placement)
@@ -325,6 +334,6 @@ steps += [s2_menu, s2_pick_block, s2_pick_wall, s2_ok, s2_made]
 steps += [s2_limits, s2_widen, s2_widened, s2_drag, s2_through, s2_undo]
 steps += [s3_enable, s3_drag, s3_stopped, s3_undo]
 steps += [s4_drive, s4_type, s4_stopped, s4_cancel, s4_back]
-steps += [s5_drag_wall, s5_moved, s5_undo, s5_undone, s5_disable, s5_off]
+steps += [s5_unground, s5_drag_wall, s5_moved, s5_undo, s5_undone, s5_disable, s5_off]
 
 h.run("joints2_slider", steps, paced_by="state")
