@@ -159,6 +159,7 @@ a_third_point.timeout_s = 60
 
 def a_played():
     p = j.panel()
+    h.check("the Play button is up again", p is not None and not p.play.isChecked())
     h.check("played to the end: 180", abs(angle() - 180) < 1e-4, angle())
     j.ok()
 

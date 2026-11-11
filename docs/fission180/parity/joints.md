@@ -389,6 +389,9 @@ real FreeCAD 1.1.4 first; several of its diagnoses were wrong (session log:
 | Fusion | Evidence | Fission 180 |
 |---|---|---|
 | A joint is a feature of the timeline; everything after the history marker is rolled back and does nothing | Autodesk (the timeline; "Under the Hood of Fusion 360") | Joints, as-built joints, rigid groups and motion links roll back with the marker (`Fission180Rolls`: greyed in the timeline). A rolled-back joint is left out of the solver, the checks, drags and animations (`joints.rolled_back`, `active_links`, `_only_active`), and says nothing in the Report view |
+| A step made while the marker is rolled back goes in at the marker | Autodesk | Same for joints, rigid groups and motion links (`joints.place_step`) |
+| OK of an edit rolls forward; what the later joints hold follows | Autodesk | Same, inside the edit's undo step (`_JointsPanel.roll_forward`): a wheel held on a shaft whose joint was edited follows the shaft on OK |
+| A component inside a subassembly is picked by its browser row | Autodesk | Same (`joints.part_of_row`; the report's bug 15: the row took the outer component) |
 | Editing a joint rolls the marker to it; the later components and joints are not there meanwhile | Autodesk | Same. **This was the report's bugs 11, 12 and part of 14**: the joints after the marker were still solved while their components were hidden ("Broken link in Reference1", "cannot all be satisfied together"), OK was refused in the dialog of the joint being edited, and the next command dropped the edit without a word |
 | Rolled back before a joint, its components stand where they were before it | Autodesk | **Gap**: they stay where the joint put them (they are right again once the marker passes the joint) |
 
@@ -589,5 +592,7 @@ Merge notes for the Components work (both branches touch `browser_core.py`,
 | `book_joints_snap` | a round edge's centre from anywhere on it, a cylinder's axis points, the hole of a notched (threaded) rim on its axis, Select Other for the part behind, undo / redo, reopen (41) |
 | `book_joints_limits` | Flip, Preview Motion, With All Limits, Rest after a drag (twice, and after reopening), undo / redo (63) |
 | `book_joints_motion` | Link with Same Joint (a screw: animate, drive, reverse), a four-bar loop dragged, Animate Joint and Animate Joint Relationships, a refusal, reopen (87) |
+| `book_joints_survive` | two joints made by clicks, then the part edited: a fillet, a higher block, the hole widened and moved, a chamfer and a rename, the body moved to another component, the marker rolled back and forward (a joint made meanwhile goes in at the marker), the hole deleted (the joint says it is lost, nothing jumps), Edit Joint picks the side again, undo / redo, reopen (90) |
+| `book_joints_study` | Motion Study's graph, Enter setting a point (value box, Step box), a click on a joint's line, Play; the browser rows of components inside a subassembly in As-built Joint and Rigid Group (57) |
 | `joints_limits_drag` | Edit Joint Limits: the angle handle on the axis; tick Maximum, drag the disc to 90 (the block turns, Maximum follows, a ghost); tick Minimum, drag to -45 (two ghosts); OK keeps both, no ghost left, Ctrl+Z; again: drag the block itself to 60 (Maximum and the handle follow, not a new pick), Cancel puts it all back (48) |
 

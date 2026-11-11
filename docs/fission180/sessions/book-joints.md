@@ -15,7 +15,7 @@ change. Three of the report's five joint bugs had one root cause it did not see.
 | Bug 12: "Edit Joint Limits opens showing Rigid with no limits; its Cancel also reverts the earlier edit" | Yes, same setup | The same thing seen from the next command: the edit had just been cancelled by it, so the joint *was* Rigid again. With the edit really kept, the dialog shows the joint's type and limits (it always did: `joints_asbuilt_group` C). |
 | Bug 13: "As-built Slider with no axis silently becomes Rigid" | Partly | OK was refused (it always was), in the dialog's last line. But the preview kept the joint it had made while the type was still Rigid: "Rigid 5" stood in the browser and the timeline and looked finished. |
 | Bug 14: "Joint references go stale: Broken link, ?Face5, ?Edge41, fights the others" | Yes, three causes | (1) The same rolled-back joints as bug 11 (any roll of the marker, by hand or by an edit). (2) **As-built joints and rigid groups stored the joint origin as a place in the design** and worked it out again against the component's place at every recompute: after a component had moved, the joint silently had a new zero, or fought the others; a rigid group let go of its members (found here, not in the report). (3) The repair by signature only matched an element that had not changed at all, did not run while a dialog was open, never repaired an as-built side, and a snap on an edge of a face (a midpoint, a corner) fell back to the face's centre when the edges were numbered anew. |
-| Bug 15: nested components not picked from the browser | see "Nested components" below | |
+| Bug 15: "clicking a nested component's row does nothing" | Yes, differently | The row of a component inside a subassembly is selected as (outer component, "Inner."); the dialogs took the *outer* component for it, and the second nested row then dropped it again (a click on a picked component drops it), which looked like nothing happening. `joints.part_of_row` takes the object at the end of the path (As-built Joint, Rigid Group, Contact Set, Motion Link, Motion Study, Duplicate With Joints). |
 | "Clicking a round edge gives (corner) or (midpoint)" | Yes | The kernel's own points were offered as snaps: a full circle's seam vertex and the point opposite it, a cylinder's seam line. They are on the edge, so they were always nearer the pointer than the centre. |
 | "The (loop) centre is 0.37 mm off on threaded geometry" | Yes (a notched rim) | A hole's centre was the centre of area of its outline; a thread's run-out makes the outline not quite round. |
 | "Dragging the crank moved A and B but the rocker stayed" | Yes (headless: the crank did not move at all) | The solver is free to satisfy a closed loop by turning the driven joint back, and did. Cause (2) of bug 14 made it look different each time. |
@@ -40,7 +40,11 @@ the forum's words only (Autodesk's own page could not be read).
   tied (`own_link`, `own_ratio`, `tie_own_motions`, `clamp_values`); closed loops
   (`in_loop`, `_holding`, `solve(hold=...)`); Rest (`rest_values`, `settle_rest`); one joint
   alone (`lone_side`, `drive_alone`).
-- `joints_ui.py`: a refused OK said next to the mouse, a dialog cancelled by another command
+- `joints.py` also: a joint made while the timeline is rolled back goes in at the marker
+  (`place_step`, Fusion); `part_of_row`.
+- `joints_ui.py`: OK of an edit rolls the marker forward inside the edit's undo step, lets the
+  later joints take their parts along and only then remembers the positions
+  (`_JointsPanel.roll_forward`); a refused OK said next to the mouse, a dialog cancelled by another command
   says so (`_JointsPanel.accept` / `finish`); As-built Joint keeps no joint while a moving
   type waits for its position; `_close_step` for the commands without a dialog; the watch
   repairs with a dialog open and says a lost joint once; `_Limits` with Flip, Preview Motion
@@ -80,6 +84,12 @@ the forum's words only (Autodesk's own page could not be read).
 
 ## For the merger
 
+- **An older scenario changed for the new (Fusion) behaviour**: `journey_vex_steps.py` step
+  j7 edits the shaft's joint and checked, with the dialog still open, that the wheel (held
+  on the shaft by a *later* joint) had moved with it. That later joint is now rolled back
+  while the earlier one is edited; the wheel follows on OK, inside the edit's undo step.
+  The two checks moved to after OK; while the dialog is open only the shaft moves.
+
 - **Harness**: `Fission180Tests/gui/book_joints_steps.py` has `no_open_step(where)`: it
   checks `App.getActiveTransaction() is None` and `not doc.HasPendingTransaction`. Every
   `book_joints_*` scenario calls it after each dialog (OK, Cancel, Esc, another command, the
@@ -115,6 +125,9 @@ the forum's words only (Autodesk's own page could not be read).
   point instead of closing the dialog.
 
 ## Known issues
+
+- While a joint is edited, parts held by joints made after it do not follow the preview;
+  they follow when you press OK (in Fusion they are not shown at all meanwhile).
 
 - While the history marker is rolled back before a joint, the joint does nothing (as in
   Fusion), but its parts stay where the joint put them (Fusion puts them back where they

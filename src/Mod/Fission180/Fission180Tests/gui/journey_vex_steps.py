@@ -1782,6 +1782,18 @@ def reopen_steps():
             and abs(sb.ZMax - (S["shaft_box"].ZMax - down)) < EPS,
             (sb.ZMin / IN, S["shaft_box"].ZMin / IN),
         )
+        # (wave 7: the wheel's joint was made after the shaft's, so it is rolled back with
+        # the history marker while the shaft's joint is edited, as in Fusion; the wheel
+        # follows when the edit is finished, inside the edit's undo step)
+        del wb
+        moved = sorted(moved_since(S["before_edit"]))
+        h.check("j7: only the shaft moves while its joint is edited", moved == [SHAFT], moved)
+        vx.ok()
+
+    def edit_undo():
+        js.no_dialog("Edit Joint OK")
+        down = 0.25 * IN
+        wb = bbox(S["wheel"])
         h.check(
             "j7: the wheel (rigid on the shaft) went with it",
             abs(wb.ZMin - (S["wheel_box"].ZMin - down)) < EPS,
@@ -1789,10 +1801,6 @@ def reopen_steps():
         )
         moved = sorted(moved_since(S["before_edit"]))
         h.check("j7: nothing else moved", moved == sorted([SHAFT, WHEEL]), moved)
-        vx.ok()
-
-    def edit_undo():
-        js.no_dialog("Edit Joint OK")
         vx.undo()
 
     def edit_undone():

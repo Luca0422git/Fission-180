@@ -1654,6 +1654,19 @@ def mark_rolling(obj):
         warn("joints: %s" % exc)
 
 
+def place_step(obj):
+    """A joint (rigid group, motion link) made while the timeline is rolled back goes in at
+    the history marker, as every new step does in Fusion: after the rolled-back steps the
+    marker would switch it off at once (timeline_ops.place_root_step)."""
+    try:
+        from . import timeline_ops
+
+        timeline_ops.place_root_step(obj)
+    except Exception as exc:
+        warn("joints: %s" % exc)
+    forget_marker(obj.Document)
+
+
 def forget_marker(doc=None):
     """The history marker (or the list of steps) changed: look again next time."""
     try:
@@ -1976,6 +1989,8 @@ def _new_joint_object(doc, fusion_type, fission180_type="Joint", role="", label=
     JointProxy(joint, fusion_type, fission180_type, role)
     if role:
         bodies.hide_from_timeline(joint)
+    else:
+        place_step(joint)
     return joint
 
 
@@ -3229,6 +3244,7 @@ def create_motion_link(doc, joint1, joint2, value1, value2, reverse=False, motio
     )
     MotionLinkProxy(link)
     bodies.mark(link, "MotionLink")
+    place_step(link)
     set_motion_link(link, joint1, joint2, value1, value2, reverse, motion1, motion2)
     return link
 
@@ -3896,6 +3912,7 @@ def create_rigid_group(doc, members, include_children=True):
     )
     RigidGroupProxy(obj)
     bodies.mark(obj, "RigidGroup")
+    place_step(obj)
     obj.Members = members
     obj.IncludeChildren = bool(include_children)
     rebuild_rigid_group(obj)

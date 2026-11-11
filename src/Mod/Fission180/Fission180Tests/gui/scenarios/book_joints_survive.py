@@ -333,6 +333,24 @@ def g_rolled():
     h.check("the Revolute joint is rolled back with it", jm().rolled_back(revolute()))
     h.check("it is left out", revolute() not in jm().active_links(d()))
     h.check("nothing is called broken", not jm().broken_joints(d()), jm().broken_joints(d()))
+    # a joint made now goes in at the marker (Fusion), so it works at once
+    doc = d()
+    doc.openTransaction("A joint made while rolled back")
+    made = jm().create_as_built_joint(doc, "rigid", bolt_part(), bj.part("Handle"))
+    h.settle("the timeline to read the new joint")
+    order = t.titles()
+    h.check(
+        "a joint made while rolled back is not rolled back itself",
+        not jm().rolled_back(made) and made in jm().active_links(doc),
+        (order, sorted(jm().rolled_back_names(doc))),
+    )
+    h.check(
+        "it stands before the rolled-back joint in the timeline",
+        order.index(made.Label) < order.index("Revolute 1"),
+        order,
+    )
+    doc.abortTransaction()
+    App.closeActiveTransaction(True)
     h.check("the Bolt stays", not bj.moved(bj.place(bolt_part()), S["fasteners"]))
 
 

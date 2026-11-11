@@ -1103,6 +1103,27 @@ class _JointsPanel(BodyPanel):
             "%s was cancelled%s" % (self.title, ": " + said if said else " (it was not finished).")
         )
 
+    # -- OK of an edit: the later steps come back inside the edit's undo step ------------------
+    def roll_forward(self):
+        """OK while the history marker stood at the step being edited: the marker goes back
+        where it was now, still inside this undo step; the joints after it find their parts
+        again and take them along (a wheel held on a shaft whose joint was edited follows
+        the shaft), and only then are the positions remembered. Left to the watch a moment
+        after the dialog, that move was outside the undo step and the next joint command
+        asked whether to capture it."""
+        try:
+            from . import edit_rollback
+
+            edit_rollback.restore(self.doc)
+            preview.catch_up(self.doc)
+            joints.forget_marker(self.doc)
+            joints.repair_references(self.doc)
+            joints.note_lost(self.doc)
+            if joints.needs_solve(self.doc):
+                joints.solve(self.doc)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+
     # -- dragging the joint to set its limits (joints_limit_drag) ---------------------------------
     def _start_limit_drag(self):
         try:
@@ -1916,6 +1937,7 @@ class JointPanel(_JointsPanel):
         self.stop_animation()
         if ok and self.joint is not None:
             try:
+                self.roll_forward()
                 joints.go_to_rest(self.joint)
                 joints.save_baseline(self.doc)
             except Exception as exc:
@@ -2138,6 +2160,7 @@ class AsBuiltPanel(_JointsPanel):
         self.stop_animation()
         if ok and self.joint is not None:
             try:
+                self.roll_forward()
                 joints.go_to_rest(self.joint)
                 joints.save_baseline(self.doc)
             except Exception as exc:
@@ -2371,6 +2394,7 @@ class RigidGroupPanel(_JointsPanel):
     def before_close(self, ok):
         if ok:
             try:
+                self.roll_forward()
                 joints.save_baseline(self.doc)
             except Exception as exc:
                 warn("Rigid Group: %s" % exc)
