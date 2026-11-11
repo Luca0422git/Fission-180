@@ -593,17 +593,30 @@ def _element_of(info):
 
 def _fall_through(view, gl, pos, refused, radius=None):
     """(doc, obj, sub, feature, short, kind) of what the open command takes under the mouse
-    when it refused the nearest pick, or None. Only a refused corner or edge falls through,
-    and only to an edge or face of the same object (the user aimed at a short edge or the
-    face beside an edge; never through to something behind): an edge first for a corner."""
+    when it refused the nearest pick, or None. A refused corner or edge falls through to an
+    edge or face of the same object (the user aimed at a short edge or the face beside an
+    edge; never through to something behind): an edge first for a corner. Else a refused
+    face, edge or corner falls through to a sketch's point or curve that lies on it
+    (_sketch_on)."""
     short = str(refused.get("Component", ""))
-    if not short.startswith(("Vertex", "Edge")):
-        return None
     if radius is None:
         try:
             radius = float(App.ParamGet(VIEW_PARAMS).GetFloat("PickRadius", 5.0))
         except Exception:
             radius = 5.0
+    if short.startswith(("Vertex", "Edge")):
+        found = _same_object(view, gl, pos, refused, radius)
+        if found is not None:
+            return found
+    if short.startswith(("Vertex", "Edge", "Face")):
+        return _sketch_on(view, gl, pos, refused, radius)
+    return None
+
+
+def _same_object(view, gl, pos, refused, radius):
+    """_fall_through for a refused corner or edge: an edge (first for a corner) or face of
+    the same object under the mouse that the command takes, or None."""
+    short = str(refused.get("Component", ""))
     taken = []
     for info in _infos_at(view, gl, pos, radius):
         if not info.get("Object") or not info.get("Component"):
@@ -629,6 +642,58 @@ def _fall_through(view, gl, pos, refused, radius=None):
         if edges:
             best = edges[0]
     return _element_of(best)
+
+
+def _sketch_on(view, gl, pos, refused, radius):
+    """(doc, obj, sub, feature, short, kind) of a sketch point (else curve) under the mouse
+    that the open command takes and that lies on the face, edge or corner it refused, or
+    None.
+
+    A sketch's point on a part's face, or inside the sketch's own shaded area, is as near
+    the eye as the face (the picks' depths differ by the float rounding of a far camera):
+    which of them FreeCAD's pick finds first depends on the camera and on where in the
+    pixel the click lands. The face came first on GitHub's screen (one pixel taller), the
+    sketch's own area one pixel beside the point here, a preview hole's rim once a hole was
+    there. Hole From Sketch takes points and circles only and refused it: the click picked
+    nothing (wave 7, fix-6: replay_manufacture, "Hole: two sketch points picked ([], '')").
+    Fusion's pick goes to what the command takes there, as if the refused element were not
+    drawn; only at its depth, never through it to something behind."""
+    try:
+        at = App.Vector(refused["x"], refused["y"], refused["z"])
+        look = App.Vector(view.getViewDirection())
+        if look.Length < 1e-12:
+            return None
+        look.normalize()
+    except Exception:
+        return None
+    try:
+        diag = _pick_object(refused).Shape.BoundBox.DiagonalLength
+    except Exception:
+        diag = 100.0
+    reach = core.depth_tolerance(diag) + 2.0 * _pixel_mm(view, gl)
+    best = {}
+    for info in _infos_at(view, gl, pos, radius):
+        component = str(info.get("Component", ""))
+        if not info.get("Object") or not component.startswith(("Vertex", "Edge")):
+            continue
+        obj = _pick_object(info)
+        if obj is None or obj.TypeId != core.SKETCH_TYPE:
+            continue
+        try:
+            depth = (App.Vector(info["x"], info["y"], info["z"]) - at).dot(look)
+        except Exception:
+            continue
+        if abs(depth) > reach:
+            continue  # in front of what was refused or behind it: not on it
+        if not _dialog_allows(info):
+            continue
+        kind = _kind_of_info(info)
+        if kind is not None and not filters().allows(kind):
+            continue
+        best.setdefault(0 if component.startswith("Vertex") else 1, info)
+    if not best:
+        return None
+    return _element_of(best[min(best)])
 
 
 def _in_dialog():

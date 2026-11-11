@@ -1414,10 +1414,13 @@ def under_mouse(point):
     return info and (info.get("Object"), info.get("Component"))
 
 
-def click(point, modifiers=QtCore.Qt.NoModifier, button=QtCore.Qt.LeftButton):
-    """Click on the 3D point; remembers what was under the mouse and what got selected."""
+def click(point, modifiers=QtCore.Qt.NoModifier, button=QtCore.Qt.LeftButton, nudge=None):
+    """Click on the 3D point; remembers what was under the mouse and what got selected.
+    `nudge` (dx, dy): that many widget pixels beside it (a hand's aim is not exact)."""
     uncover(point)
     pos = screen_point(point)
+    if nudge:
+        pos = QtCore.QPoint(pos.x() + int(nudge[0]), pos.y() + int(nudge[1]))
     press_pace()  # (before the move: the press follows the move at once)
     move(pos)
     hit = under_mouse(point)

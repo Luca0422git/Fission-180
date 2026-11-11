@@ -94,8 +94,14 @@ def hole_from_sketch():
 
 
 def hole_points():
-    for y in (20, -20):
-        h.click(V(-80, y, 12))
+    # A sketch point lies on the board's face: FreeCAD's pick finds whichever of the two the
+    # float rounding of the camera puts first, the face on GitHub's screen even at the
+    # point's own pixel, here one pixel below it. Hole From Sketch takes the point (as
+    # Fusion does) wherever the click lands within the pick radius: the second point is
+    # clicked a pixel below, as a hand's aim may land (wave 7, fix-6:
+    # selection_ui._sketch_on; without it this click picked nothing here, as on GitHub).
+    for y, nudge in ((20, None), (-20, (0, 1))):
+        h.click(V(-80, y, 12), nudge=nudge)
         h.settle()
     p = hs.hole_panel()
     found = hs.centres_all(p.target) if p.target is not None else []
