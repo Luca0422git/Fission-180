@@ -398,64 +398,121 @@ def whole_pick(root, sub):
 # -- a reference to something of another component -------------------------------------------
 REF_ROLE = "ComponentRef"  # timeline_ops.ROLE value: a helper, never a step or a browser row
 ROLE_PROP = "Fission180Role"
-BINDER = "PartDesign::SubShapeBinder"
+REF_OBJECT = "Part::Part2DObjectPython"  # a Body takes only sketch-like helpers (extrude.py)
+REF_FRAME = "Frame"  # on a reference: where the other body stood for this one
 
 
-def _chain(obj):
-    """[top container, ..., obj]: the objects from the document's root down to ``obj``."""
-    found = [obj]
-    parent = _parent_group(obj)
-    while parent is not None and parent not in found:
-        found.insert(0, parent)
-        parent = _parent_group(parent)
-    return found
+def reference_frame(body, obj):
+    """Where the body of ``obj`` stands as seen from ``body`` now (both in the design's
+    coordinates): what a reference keeps from the moment it is made."""
+    theirs = body_of(obj)
+    if theirs is not None:
+        there = theirs.getGlobalPlacement()
+    else:
+        there = _container_placement(container_of(obj))
+    return body.getGlobalPlacement().inverse().multiply(there)
 
 
-def reference_link(body, obj, sub=""):
-    """(object, sub path) for a link from inside ``body`` to ``sub`` of ``obj`` that FreeCAD
-    places right whichever components the two are in: the first container of ``obj`` that
-    ``body`` is not in, then the path down to the element ("Nozzle", "Body.Extrude.Face6").
-    (FreeCAD 1.1.4 facts, probed: a SubShapeBinder linked straight to a step of another
-    component ignores that component's Placement; linked through a container both are in,
-    the design is no longer a DAG.)"""
-    mine = _chain(body)
-    theirs = _chain(obj)
-    k = 0
-    while k < len(mine) and k < len(theirs) - 1 and mine[k] is theirs[k]:
-        k += 1
-    path = ".".join(o.Name for o in theirs[k + 1 :])
-    if path:
-        return theirs[k], "%s.%s" % (path, sub)
-    return theirs[k], sub
+class ReferenceCopy:
+    """A hidden copy, inside a body, of a face, an edge or a corner of a step of ANOTHER
+    body or component (reference_binder). Saved documents store
+    "fission180.components.ReferenceCopy": keep the name and the properties.
+
+    Source: the step and the elements copied (its only dependency). Frame: where the other
+    body stood for this one when the reference was made. The copy is the elements as they
+    are now, placed by that frame."""
+
+    def __init__(self, obj):
+        obj.Proxy = self
+        self.ensure_properties(obj)
+
+    @staticmethod
+    def ensure_properties(obj):
+        props = obj.PropertiesList
+        if "Source" not in props:
+            obj.addProperty("App::PropertyLinkSubGlobal", "Source", "Reference", "What it copies")
+        if REF_FRAME not in props:
+            obj.addProperty(
+                "App::PropertyPlacement", REF_FRAME, "Reference", "Where the other body stood"
+            )
+        if ROLE_PROP not in props:
+            obj.addProperty("App::PropertyString", ROLE_PROP, "Fission180", "Helper of", 0)
+            obj.setEditorMode(ROLE_PROP, 2)
+        if getattr(obj, ROLE_PROP) != REF_ROLE:
+            setattr(obj, ROLE_PROP, REF_ROLE)
+
+    def onDocumentRestored(self, obj):
+        self.ensure_properties(obj)
+
+    def execute(self, obj):
+        import Part
+
+        source, subs = reference_source(obj)
+        if source is None or not alive(source):
+            return  # what it copied was deleted: the copy stays as it was (the sketch too)
+        frame = getattr(obj, REF_FRAME)
+        shapes = []
+        for sub in subs:
+            shape = _element(source, sub)
+            if shape is None:
+                return  # the element is not there now (rolled back): the copy stays
+            # An element carries a location of its own (a pad's top face: its height). It is
+            # worked into the geometry with the frame: FreeCAD puts the object's Placement
+            # in its place afterwards (transformShape alone left the face at z 0).
+            total = frame.multiply(shape.Placement)
+            shape.Placement = App.Placement()
+            if not total.isIdentity():
+                shape = shape.transformed(total.toMatrix(), True)
+            shapes.append(shape)
+        if not shapes:
+            return
+        obj.Shape = shapes[0] if len(shapes) == 1 else Part.makeCompound(shapes)
+
+    def dumps(self):
+        return None
+
+    def loads(self, state):
+        return None
+
+    __getstate__ = dumps
+    __setstate__ = loads
 
 
-def reference_source(binder):
-    """(object, [plain subs]) a reference made by reference_binder() copies, or (None, [])."""
+def _element(source, sub):
+    """A copy of the element ``sub`` of ``source``, or None. FreeCAD marks a reference whose
+    history changed as missing ("?Edge3": the sketch behind the step was redrawn): the
+    element with that number is taken then, as FreeCAD's own dialogs show it."""
+    names = [sub]
+    plain = (sub or "").lstrip("?").rsplit(".", 1)[-1]
+    if plain.startswith(";") or ":" in plain:
+        try:
+            plain = source.Shape.getElementName(plain, 0) or plain
+        except Exception:
+            pass
+    if plain and plain not in names:
+        names.append(plain)
+    for name in names:
+        try:
+            return source.Shape.getElement(name).copy()
+        except Exception:
+            continue
+    return None
+
+
+def reference_source(ref):
+    """(object, [subs]) a reference made by reference_binder() copies, or (None, [])."""
     try:
-        links = list(binder.Support)
+        link = ref.Source
     except Exception:
         return None, []
-    for top, subs in links:
-        subs = [subs] if isinstance(subs, str) else list(subs)
-        obj, plain = None, []
-        for sub in subs:
-            path, _, short = sub.rpartition(".")
-            target = top
-            if path:
-                try:
-                    target = top.getSubObject(path + ".", retType=1)
-                except Exception:
-                    target = None
-            obj = target if target is not None else obj
-            plain.append(short)
-        if obj is not None:
-            return obj, plain
-    return None, []
+    if not link or link[0] is None:
+        return None, []
+    return link[0], [s for s in (list(link[1]) or []) if s]
 
 
 def is_reference(obj):
     try:
-        return obj.TypeId == BINDER and getattr(obj, ROLE_PROP, "") == REF_ROLE
+        return obj.TypeId == REF_OBJECT and getattr(obj, ROLE_PROP, "") == REF_ROLE
     except Exception:
         return False
 
@@ -466,8 +523,8 @@ def find_reference(body, obj, subs):
     for candidate in body.Group:
         if not is_reference(candidate):
             continue
-        source, plain = reference_source(candidate)
-        if source is obj and sorted(plain) == wanted:
+        source, found = reference_source(candidate)
+        if source is obj and sorted(found) == wanted:
             return candidate
     return None
 
@@ -477,41 +534,48 @@ def reference_binder(body, obj, subs, before=None):
     of ``obj``, a step of another body or component: what a sketch of the active component
     is put on, projects from or measures to when the thing clicked belongs to another
     component (Fusion references it directly; FreeCAD's sketch may only link inside its own
-    body). A PartDesign SubShapeBinder: it follows the other part when that changes, and
-    both components when they move. One per element set (an existing one is reused).
-    ``before``: an object of the body it must stand before (the sketch that will use it)."""
+    body). One per element set (an existing one is reused). ``before``: an object of the
+    body it must stand before (the sketch that will use it).
+
+    The copy (ReferenceCopy) depends on the step only, and stands where the other body
+    stood for this one when the reference was made:
+
+    - it follows the other part when that part CHANGES (a hole made wider, a block longer);
+    - it does not follow later MOVES of either component: what is modelled on it keeps its
+      shape when a joint or Move moves a part, as in Fusion, where a projection is worked
+      out where the parts stood at the sketch's place in the timeline (and as extrude.py's
+      profile copies: "the body's own geometry would shift every time the solver moved it");
+    - a later step of the other body may use what hangs on it (a Cut of the Nozzle from a
+      sketch put on the Nozzle's face).
+
+    FreeCAD 1.1.4 facts behind it (probed): a PartDesign SubShapeBinder linked through the
+    other component follows every move and makes that Cut a dependency cycle; linked
+    straight to the step it loses the element's own location (a pad's top face lands at
+    z 0) and does not get it back when the step changes."""
     subs = [s for s in subs if s]
     existing = find_reference(body, obj, subs)
     if existing is not None:
         return existing
+    doc = body.Document
+    ref = doc.addObject(REF_OBJECT, "Reference")
+    ReferenceCopy(ref)
     if before is not None:
-        binder = body.Document.addObject(BINDER, "Reference")
-        body.insertObject(binder, before, False)
+        body.insertObject(ref, before, False)
     else:
-        binder = body.newObject(BINDER, "Reference")
-    if ROLE_PROP not in binder.PropertiesList:
-        binder.addProperty("App::PropertyString", ROLE_PROP, "Fission180", "Helper of", 0)
-        binder.setEditorMode(ROLE_PROP, 2)
-    setattr(binder, ROLE_PROP, REF_ROLE)
+        body.addObject(ref)
     owner = component_of(obj)
-    binder.Label = "Reference to %s" % (owner.Label if owner is not None else obj.Label)
-    if "Relative" in binder.PropertiesList and not binder.Relative:
-        binder.Relative = True
-    top, path = reference_link(body, obj, "")
-    prefix = path  # "Body.Extrude." or ""
-    binder.Support = [(top, tuple(prefix + s for s in subs))]
-    try:
-        binder.Visibility = False
-    except Exception:
-        pass
+    ref.Label = "Reference to %s" % (owner.Label if owner is not None else obj.Label)
+    setattr(ref, REF_FRAME, reference_frame(body, obj))
+    ref.Source = (obj, list(subs))
     if App.GuiUp:
         try:
-            binder.ViewObject.Visibility = False
-            if "ShowInTree" in binder.ViewObject.PropertiesList:
-                binder.ViewObject.ShowInTree = False
+            ref.ViewObject.Proxy = 0
+            ref.ViewObject.Visibility = False
+            if "ShowInTree" in ref.ViewObject.PropertiesList:
+                ref.ViewObject.ShowInTree = False
         except Exception:
             pass
-    return binder
+    return ref
 
 
 def drop_if_empty(component):

@@ -1019,6 +1019,7 @@ class SketchPicker:
             _then(self.then, sketch)
         except Exception as exc:
             warn("Create Sketch failed: %s" % exc)
+            commands.tell("The sketch could not be made here: %s. Try another face or plane." % exc)
 
     def _cleanup(self):
         self._closed = True

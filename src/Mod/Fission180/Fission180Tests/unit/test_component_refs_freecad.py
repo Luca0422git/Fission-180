@@ -33,7 +33,7 @@ class ComponentRefs(unittest.TestCase):
     def test_every_case_ran(self):
         done = re.search(r"component refs check done (\d+)", self.output)
         self.assertIsNotNone(done, self.output[-3000:])
-        self.assertGreaterEqual(int(done.group(1)), 39, self.output[-2000:])
+        self.assertGreaterEqual(int(done.group(1)), 36, self.output[-2000:])
 
     def test_every_check_passed(self):
         self.assertEqual(re.findall(r"component refs check BAD (.*)", self.output), [])

@@ -388,6 +388,11 @@ def _never_a_row(obj, origins=None):
     tid = obj.TypeId
     if tid == "PartDesign::FeatureBase":
         return True
+    if tid in ("PartDesign::Plane", "Part::Part2DObjectPython"):
+        # (wave 7) a hidden reference to another component's face or plane: what a sketch
+        # of the active component hangs on (components.REF_ROLE)
+        if getattr(obj, "Fission180Role", "") == "ComponentRef":
+            return True
     if tid == "Part::FeaturePython":
         return getattr(obj, "Fission180Type", "") == "InstanceCopy"
     if tid in ORIGIN_FEATURE_TYPES:

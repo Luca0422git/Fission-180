@@ -18,9 +18,11 @@ Setup (through the modules): "Nozzle" with a 20 x 20 x 10 block, standing 30 mm 
   C  A circle drawn in the sketch is made concentric with the projected pin (a constraint
      to the projected circle's centre): it jumps onto the pin's axis: the projection is a
      real reference.
-  D  Finish Sketch. The Nozzle moved 15 mm along Y, the Pins 10 mm along -X (their
-     Placements): the projected line and circle follow in the sketch.
-  E  Save, close, reopen: the projections are there and still follow.
+  D  Finish Sketch. The pin made thicker (radius 6): the projected circle follows. The
+     Nozzle moved 15 mm along Y, the Pins 10 mm along -X (their Placements): the projected
+     curves stay where the parts stood when they were projected (as in Fusion, a later Move
+     or joint does not reshape what was modelled on a part).
+  E  Save, close, reopen: the projections are there and still follow the pin's changes.
 """
 
 import os
@@ -305,6 +307,39 @@ d_finish.done = lambda: h.in_sketch() is None
 d_finish.done_what = "the sketch closed"
 
 
+def pin_sketch():
+    """The sketch the pin was extruded from (in Pins)."""
+    return [x for x in k.sketches_in("Pins")][0]
+
+
+def set_pin_radius(radius):
+    import Part
+
+    sk = pin_sketch()
+    doc = sk.Document
+    doc.openTransaction("Edit Sketch")
+    # (the circle drawn again: FreeCAD then marks the references to the pin's edges as
+    # missing, "?Edge3"; the projection must follow all the same)
+    sk.Geometry = [Part.Circle(V(0, 40, 0), V(0, 0, 1), radius)]
+    doc.commitTransaction()
+    doc.recompute()
+
+
+def d_change():
+    set_pin_radius(6.0)  # the pin made thicker: the part itself changes
+
+
+def d_followed():
+    k.box_is("the pin is thicker", k.part("Pins"), [-6, 34, 0, 6, 46, 20])
+    found = circles()
+    if h.check("the projected circle is there", len(found) == 1, describe()):
+        h.check(
+            "it followed the pin's change: radius 6",
+            abs(found[0].Radius - 6) < 1e-4 and (found[0].Center - V(0, 40, 0)).Length < 1e-4,
+            describe(),
+        )
+
+
 def d_move():
     from fission180 import component_move
 
@@ -318,25 +353,25 @@ def d_move():
     doc.recompute()
 
 
-def d_followed():
+def d_kept():
     k.box_is("the Nozzle moved", k.part("Nozzle"), [30, 15, 0, 50, 35, 10])
     h.check(
-        "the projected edge followed the Nozzle: (30, 15) - (50, 15)",
-        has_line((30, 15, 0), (50, 15, 0)),
+        "the projected edge stays where the Nozzle stood when it was projected (Fusion: a "
+        "later Move or joint does not reshape what was modelled on a part)",
+        has_line((30, 0, 0), (50, 0, 0)),
         describe(),
     )
     found = circles()
     if h.check("the projected circle is there", len(found) == 1, describe()):
-        h.check(
-            "it followed the Pins: centre (-10, 40)",
-            (found[0].Center - V(-10, 40, 0)).Length < 1e-4,
-            describe(),
-        )
+        h.check("it stays on (0, 40)", (found[0].Center - V(0, 40, 0)).Length < 1e-4, describe())
     sk = sketch()
     h.check("the sketch has no error", sk is not None and "Invalid" not in sk.State, sk.State)
     k.no_empty_invalid_bodies()
-    rows = t.children("Heat Break")
-    h.check("no reference shows in the browser", not any("Reference" in r for r in rows), rows)
+    rows = t.children("Heat Break") or []
+    shown = []
+    for folder in rows:
+        shown += t.children(folder) or []
+    h.check("no reference shows in the browser", not any("Reference" in r for r in shown), shown)
     h.check(
         "no reference is a timeline step", not any("Reference" in x for x in t.titles()), t.titles()
     )
@@ -363,12 +398,11 @@ def e_reopened():
     if not h.check("the sketch is there", sk is not None):
         return
     h.check("the projections are there", len(externals()) == state["count"], describe())
-    part = k.part("Nozzle")
-    part.Placement = App.Placement(V(30, 0, 0), App.Rotation())
-    doc.recompute()
+    set_pin_radius(4.0)
+    found = circles()
     h.check(
-        "still following after reopening: the edge back at (30, 0) - (50, 0)",
-        has_line((30, 0, 0), (50, 0, 0)),
+        "still following the pin's changes after reopening: radius 4",
+        len(found) == 1 and abs(found[0].Radius - 4) < 1e-4,
         describe(),
     )
 
@@ -402,8 +436,10 @@ h.run(
         b_concentric,
         b_on_axis,
         d_finish,
-        d_move,
+        d_change,
         d_followed,
+        d_move,
+        d_kept,
         e_save,
         e_reopen,
         e_reopened,
