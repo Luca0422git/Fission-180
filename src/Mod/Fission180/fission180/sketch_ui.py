@@ -689,7 +689,7 @@ def create_sketch(body, target):
     PTFE Tube active, a sketch on the Nozzle's face made the Nozzle active and everything
     drawn went into the Nozzle). Fusion: a new sketch is "nested within the active
     component", whatever face it is put on. The sketch then hangs on a hidden reference to
-    the face (components.reference_binder), which follows the other component."""
+    the face (components.reference_binder), which follows that part's changes."""
     from . import components, sketch_auto_project, timeline_ops
 
     owner = timeline_ops.body_of(target[0])
@@ -1019,6 +1019,7 @@ class SketchPicker:
             _then(self.then, sketch)
         except Exception as exc:
             warn("Create Sketch failed: %s" % exc)
+            commands.tell("The sketch could not be made here: %s. Try another face or plane." % exc)
 
     def _cleanup(self):
         self._closed = True

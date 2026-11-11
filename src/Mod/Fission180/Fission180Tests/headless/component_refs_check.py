@@ -7,21 +7,21 @@ The design: "Outer" (standing 1000 mm up) holds "A" (300 mm along Y, an empty bo
 (100 mm along X, a 20 x 10 x 5 block and an empty second body); a 20 x 10 x 5 block "R" at the
 root, and an empty root body.
 
-1 components.reference_link gives the link FreeCAD places right: from A to B's block (B, the
-  path), inside B (the body, the path), from A to the root block, from the root to B's block.
 2 components.reference_binder copies B's top face into A's body where it stands for A:
-  (100, -300, 5); B moved, A moved, the block made taller: the copy follows each; the same
-  elements asked again give the same reference; it is a helper (no step, hidden).
+  (100, -300, 5); B moved: the copy stays (a joint that moves B later must not reshape what
+  A built on it); A moved: it moves with A; the block made taller: the copy follows; the
+  same elements asked again give the same reference; it is a helper (no step, hidden).
 3 sketch_external.project_across: a sketch of A's body projects an edge, a corner and the
   whole top face of B's block (1 + 1 + 4 curves); the same face again adds nothing; FreeCAD
-  itself refuses the direct link.
+  itself refuses the direct link; a step of B may then use that sketch (no dependency cycle).
 4 Mirror of components (component_pattern, kind mirror): B mirrored across the root block's
   YZ plane: one copy, the same volume, on the other side of the plane; the block made longer:
   the copy follows; removed: the copy goes with it.
 5 components.is_unused / drop_unused_bodies / preferred_body: B's empty second body is
   unused and goes; the block's body stays and is the preferred one.
 6 components.whole_pick: ("Outer", "B.") is B; a face path is left as it is.
-7 Saved and opened again: the reference and the projections are there and still follow.
+7 Saved and opened again: the reference and the projections are there and still follow the
+  part's changes.
 """
 
 import os
@@ -84,20 +84,8 @@ def main():
     body_b, pad_b = _block(doc, "B", part_b)
     spare_b = components.new_body_in(doc, part_b)
     body_r, pad_r = _block(doc, "R", None)
-    root_body = components.new_body_in(doc, None)
     doc.recompute()
     top = _top(pad_b)
-
-    # 1 the link form
-    link = components.reference_link(body_a, pad_b, top)
-    _print(link == (part_b, "%s.%s.%s" % (body_b.Name, pad_b.Name, top)), "link from A to B", link)
-    link = components.reference_link(spare_b, pad_b, top)
-    _print(link == (body_b, "%s.%s" % (pad_b.Name, top)), "link inside B", link)
-    link = components.reference_link(body_a, pad_r, "Face1")
-    _print(link == (body_r, "%s.Face1" % pad_r.Name), "link from A to the root block", link)
-    link = components.reference_link(root_body, pad_b, top)
-    want = (outer, "%s.%s.%s.%s" % (part_b.Name, body_b.Name, pad_b.Name, top))
-    _print(link == want, "link from the root to B", link)
 
     # 2 the reference follows
     binder = components.reference_binder(body_a, pad_b, [top])
@@ -111,15 +99,23 @@ def main():
     _print(again is binder, "the same elements: the same reference")
     part_b.Placement = App.Placement(V(100, 50, 0), App.Rotation())
     doc.recompute()
-    _print(_corner(binder.Shape) == (100, -250, 5), "B moved: it follows", _corner(binder.Shape))
+    _print(
+        _corner(binder.Shape) == (100, -300, 5),
+        "B moved: it stays where B stood when it was made",
+        _corner(binder.Shape),
+    )
     part_a.Placement = App.Placement(V(0, 300, 10), App.Rotation())
     doc.recompute()
-    _print(_corner(binder.Shape) == (100, -250, -5), "A moved: it follows", _corner(binder.Shape))
+    _print(
+        _corner(binder.Shape) == (100, -300, 5),
+        "A moved: it moves with A (the same place in A's own coordinates)",
+        _corner(binder.Shape),
+    )
     pad_b.Length = 8
     doc.recompute()
     _print(
-        _corner(binder.Shape) == (100, -250, -2),
-        "the block taller: it follows",
+        _corner(binder.Shape) == (100, -300, 8),
+        "the block taller: it follows the part's change",
         _corner(binder.Shape),
     )
     part_a.Placement = App.Placement(V(0, 300, 0), App.Rotation())
@@ -174,9 +170,22 @@ def main():
     doc.recompute()
     line = [g for g in list(sketch.ExternalGeo)[2:] if g.TypeId == "Part::GeomLineSegment"][0]
     _print(
-        abs(line.StartPoint.y + 250) < 1e-6, "B moved: the projected edge follows", line.StartPoint
+        abs(line.StartPoint.y + 300) < 1e-6, "B moved: the projected edge stays", line.StartPoint
     )
     part_b.Placement = App.Placement(V(100, 0, 0), App.Rotation())
+    doc.recompute()
+    cut = body_b.newObject("PartDesign::Pocket", "BCut")
+    cut.Profile = (sketch, [])
+    cycle = False
+    try:
+        doc.recompute()
+        cycle = "Invalid" in cut.State and "cycl" in str(getattr(cut, "getStatusString", str)())
+    except Exception:
+        cycle = True
+    deps = sketch in cut.OutListRecursive and cut not in sketch.OutListRecursive
+    _print(deps and not cycle, "a step of B may use the sketch that references B (no cycle)")
+    doc.removeObject(cut.Name)
+    body_b.Tip = pad_b  # (the pocket had become the tip)
     doc.recompute()
 
     # 5 unused bodies (before the mirror: it copies B's bodies)
@@ -244,10 +253,13 @@ def main():
         _corner(binder.Shape),
     )
     _print(len(sketch.ExternalGeo) == count, "reopened: the projections are there")
-    part_b.Placement = App.Placement(V(0, 0, 0), App.Rotation())
+    pad = [o for o in doc.Objects if o.TypeId == "PartDesign::Pad" and o.Name.startswith("B")][0]
+    pad.Length = 7
     doc.recompute()
     _print(
-        _corner(binder.Shape) == (0, -300, 5), "reopened: it still follows", _corner(binder.Shape)
+        _corner(binder.Shape) == (100, -300, 7),
+        "reopened: it still follows the part's change",
+        _corner(binder.Shape),
     )
     App.closeDocument(doc.Name)
     print("component refs check done %d" % _count[0], flush=True)

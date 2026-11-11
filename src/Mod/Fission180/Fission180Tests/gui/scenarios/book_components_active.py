@@ -17,10 +17,17 @@ Setup (through the modules): the component "Nozzle" with a 20 x 20 x 10 block, s
   C  (bug 6) Gaskets active, E, click the Nozzle's +X face, 2 mm, New Body, OK: the new
      body is in Gaskets (it was made in the Nozzle), 20 x 10 x 2 on that face.
   D  (bug 7) Wall active, CONSTRUCT > Offset Plane, click the gasket's outer face, 4 mm,
-     OK: the plane is in Wall, 4 mm off the face. Create Sketch on that plane (browser),
-     a rectangle, extrude 3: sketch and body are in Wall.
+     OK: the plane is in Wall, 4 mm off the face.
   E  (bug 8) Axle active, CONSTRUCT > Axis Through Cylinder/Cone/Torus, click the pin's
      wall, OK: the axis is in Axle, along the pin's axis; Axle has no body row.
+     Then, Axle still active, Create Sketch and the Wall's Plane1 clicked in the browser
+     (a plane of another component): the sketch is in Axle, lies on that plane (x 56) and
+     hangs on a hidden reference; no "Reference" row shows.
+  H  (bug 10, as the report saw it) Axle still active (no solid in it yet), a sketch on the
+     Nozzle's top face, a circle
+     (r 2) beside the tube, E, 4 mm INTO the Nozzle: the operation stays New Body (it came
+     up as Cut and silently cut the other component); OK: a body in Axle, the Nozzle
+     unchanged.
   F  The Nozzle moved 15 mm along Y (its Placement): the tube's sketch, the gasket and
      the axis' plane follow as far as FreeCAD links allow (the sketch stays on the face).
   G  Save, close, reopen: everything is where it was, in the same components.
@@ -420,6 +427,149 @@ def e_made():
     h.shot("E-axis")
 
 
+# -- E2: a sketch on another component's construction plane ------------------------------------
+def e2_sketch():
+    h.click_empty()
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+def e2_plane_row():
+    plane = k.doc().getObject(state["plane"])
+    t.click_row(plane.Label)
+
+
+e2_plane_row.done = lambda: h.in_sketch() is not None
+e2_plane_row.done_what = "a sketch opened on the Wall's plane"
+
+
+def e2_opened():
+    sk = h.in_sketch()
+    if not h.check("sketch open", sk is not None):
+        return
+    h.check(
+        "the sketch is in Axle, the active component",
+        k.container_label(sk) == "Axle",
+        k.container_label(sk),
+    )
+    h.check("Axle is still active", k.active_label() == "Axle", k.active_label())
+    place = sk.getGlobalPlacement()
+    normal = place.Rotation.multVec(V(0, 0, 1))
+    h.check("it lies on the Wall's plane (x 56)", abs(place.Base.x - 56) < 1e-6, place)
+    h.check("flat on it", abs(abs(normal.x) - 1) < 1e-6, normal)
+    h.check("no plane was added to Wall", len(k.datums_in("Wall", "PartDesign::Plane")) == 1)
+
+
+def e2_finish():
+    h.ribbon("Finish Sketch")
+
+
+e2_finish.done = lambda: h.in_sketch() is None
+e2_finish.done_what = "the sketch closed"
+
+
+def e2_rows():
+    rows = t.children("Axle") or []
+    shown = []
+    for folder in rows:
+        shown += t.children(folder) or []
+    h.check(
+        "no reference shows in Axle's folders",
+        not any("Reference" in r for r in shown),
+        (rows, shown),
+    )
+    h.check(
+        "no reference is a timeline step", not any("Reference" in x for x in t.titles()), t.titles()
+    )
+    k.no_empty_invalid_bodies("no invalid body after the sketch on the plane")
+
+
+# -- H: the first extrude of a component into another component's body ------------------------
+def h_activate():
+    h.check(
+        "Axle is the active component, without a solid",
+        k.active_label() == "Axle" and not k.bodies_of("Axle"),
+        k.active_label(),
+    )
+
+
+def h_sketch():
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+def h_face():
+    h.click(V(34, 4, 10))  # the Nozzle's top face, beside the tube
+
+
+h_face.done = lambda: h.in_sketch() is not None
+h_face.done_what = "a sketch opened on the Nozzle's face"
+
+
+def h_draw():
+    sk = h.in_sketch()
+    if not h.check("sketch open", sk is not None):
+        return
+    state["slot_sketch"] = sk.Name
+    h.check("the sketch is in Axle", k.container_label(sk) == "Axle", k.container_label(sk))
+    edges = [g for g in list(sk.ExternalGeo)[2:] if g.TypeId == "Part::GeomLineSegment"]
+    h.check(
+        "Auto project shows the face's four edges (another component's face)",
+        len(edges) == 4,
+        len(edges),
+    )
+    local = sk.getGlobalPlacement().inverse().multVec(V(34, 4, 10))
+    h.draw_circle(sk, local.x, local.y, 2)
+
+
+def h_extrude():
+    h.fit()
+    h.press("e")
+
+
+h_extrude.done = lambda: xpanel() is not None
+h_extrude.done_what = "the Extrude dialog is open"
+
+
+def h_profile():
+    p = xpanel()
+    if p is not None and not p.profiles:
+        h.click(V(34, 4, 10))
+
+
+def h_distance():
+    p = xpanel()
+    if not h.check("extrude dialog open", p is not None):
+        return
+    h.check("a profile is picked", bool(p.profiles), p.profiles)
+    b.type_into(p.distance.widget, "-4")
+
+
+def h_operation():
+    p = xpanel()
+    if p is None:
+        return
+    h.caught_up(p)
+    h.check(
+        "into another component's body: still New Body, not Cut (bug 10)",
+        p.operation.currentText() == "New Body",
+        p.operation.currentText(),
+    )
+
+
+def h_made():
+    slot = k.bodies_of("Axle")
+    if h.check("one body in Axle", len(slot) == 1, [x.Label for x in k.all_bodies_of("Axle")]):
+        state["slot"] = slot[0].Name
+        h.check(
+            "pi * 4 * 4", k.close(k.volume(slot[0]), 3.141592653589793 * 4 * 4), k.volume(slot[0])
+        )
+        k.box_is("inside the Nozzle's top", slot[0], [32, 2, 6, 36, 6, 10])
+    h.check(
+        "the Nozzle was not cut", k.close(k.volume(nozzle_body()), NOZZLE), k.volume(nozzle_body())
+    )
+
+
 # -- F: the Nozzle moves -----------------------------------------------------------------------
 def f_move():
     cs.click_radio("BookComponentsActive")
@@ -515,6 +665,22 @@ h.run(
         e_wall,
         e_ok,
         e_made,
+        e2_sketch,
+        e2_plane_row,
+        e2_opened,
+        e2_finish,
+        e2_rows,
+        h_activate,
+        h_sketch,
+        h_face,
+        h_draw,
+        a_finish,
+        h_extrude,
+        h_profile,
+        h_distance,
+        h_operation,
+        a_ok,
+        h_made,
         f_move,
         f_moved,
         f_followed,

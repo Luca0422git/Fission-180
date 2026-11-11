@@ -976,11 +976,17 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         body = commands.find_body()
         if body is not None:
             return body
-        from . import bodies
+        from . import bodies, components
 
-        body = bodies.new_body(self.doc)
+        # (wave 7) in the ACTIVE component: with an empty component active the body was made
+        # at the design's root, and the root became the active component
+        home = components.active_component(self.doc)
+        if home is not None:
+            body = components.new_body_in(self.doc, home)
+        else:
+            body = bodies.new_body(self.doc)
         try:
-            Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", body)
+            components.activate_body(body)
         except Exception as exc:
             warn("could not activate %s: %s" % (body.Label, exc))
         self.doc.recompute()
@@ -1102,6 +1108,22 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
 
     def _set_plane(self, ref):
         try:
+            # (wave 7) the active component's own origin plane (its browser row) lies where
+            # its body's plane of the same role lies: that one is taken, as Create Sketch
+            # does (it was refused: "Select a plane or a face of a body")
+            from . import components
+
+            plane = ref[0] if ref else None
+            part = components.origin_owner(plane) if plane is not None else None
+            if (
+                components.is_component(part)
+                and self.body is not None
+                and components.container_of(self.body) is part
+            ):
+                ref = (components.same_role_plane(self.body, plane), "")
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+        try:
             ref = primitives.check_ref(ref)
             ref = primitives.earliest_ref(ref)  # the step that made the face, not the last one
             primitives.global_frame(ref)
@@ -1114,6 +1136,14 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         self.message.setText("")
         self._show_plane()
         owner = primitives.owner_body(ref[0])
+        if owner is not None and owner is not self.body and self.target is None:
+            from . import components
+
+            # (wave 7) a face of ANOTHER component: the primitive stays in the active
+            # component's body (the clicked body was taken, and its component became the
+            # active one: the book parity report's bugs 5 - 8, for primitives)
+            if components.host_body(owner, self.body) is not owner:
+                owner = self.body
         if owner is not None and owner is not self.body and self.target is None:
             self.body = owner
             try:

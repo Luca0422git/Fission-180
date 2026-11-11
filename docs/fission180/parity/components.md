@@ -212,7 +212,7 @@ Create Copy of a component makes a linked instance; the dimmed transparency (75 
 ## Part 3: work across components (wave 7, the book parity report, 2026-11-11)
 
 Built in `components.py` (the one rule: `new_home`, `host_body`, `body_for_new`,
-`may_change`, `has_solids`; references to another component: `reference_link`,
+`may_change`, `has_solids`; references to another component: `ReferenceCopy`,
 `reference_binder`; `whole_pick`), `sketch_ui.create_sketch`, `construct.target_body`,
 `sketch_external.project_across` + `sketch_project_across.py` (Project across components),
 `component_pattern.py` (Mirror of components), `component_move_ui.py` (the pivot),
@@ -222,7 +222,10 @@ Tests: scenarios `book_components_active` (bugs 5 - 8, 10), `book_components_new
 ground, nesting), `book_components_nested` (bug 15, parts of a subassembly),
 `book_components_project` (Project across components), `book_components_move` (pivot,
 paste, Move to Component), `book_components_pattern` (Mirror and Rectangular Pattern of
-components); unit tests in `test_components_core.py`.
+components), `book_components_menus` (menus, Isolate, drag, the empty body),
+`book_components_primitive` (Box in the active component); unit tests in
+`test_components_core.py`, a headless check `headless/component_refs_check.py` (run by
+`unit/test_component_refs_freecad.py`).
 
 ### Sources (search excerpts; Autodesk's sites cannot be opened from the sandbox)
 
@@ -277,7 +280,7 @@ components); unit tests in `test_components_core.py`.
 
 | Command | Fusion | Fission 180 before (3.3.10) | Fission 180 now |
 |---|---|---|---|
-| Create Sketch on a face or plane of another component | the active component (21) | the clicked face's body, and that component became the active one (bug 5) | the active component's body; the sketch hangs on a hidden reference to the face (`components.reference_binder`); the active component does not change |
+| Create Sketch on a face or plane of another component | the active component (21) | the clicked face's body, and that component became the active one (bug 5) | the active component's body; the sketch hangs on a hidden reference to the face (`components.reference_binder`, a plane: a hidden plane on it); the active component does not change |
 | Create Sketch on a face of another body of the active component | the active component | the clicked body | the same (FreeCAD keeps a sketch in one body; same component) |
 | Extrude / Revolve / Sweep / Loft, Operation New Body | a new body in the active component (23) | beside the profile's body (bug 6) | the active component (`components.body_for_new`), standing where the profile is |
 | ... Operation New Component | a new component under the active one | the same | the same |
@@ -285,7 +288,7 @@ components); unit tests in `test_components_core.py`.
 | ... the operation proposed by itself | New Body unless a body of the active component is touched or entered (23) | Join / Cut from bodies of any component (bug 10) | from the active component's bodies only |
 | ... Operation Cut, chosen by hand | every body in its way (Objects To Cut), any component (24) | the same | the same |
 | CONSTRUCT planes, axes, points | the active component (1) | the body of the first pick (bugs 7, 8) | the active component's body (`construct.target_body`); the frame follows the picks in design coordinates |
-| Primitives (Box ...) | the active component | the active component | the same |
+| Primitives (Box ...) | the active component | an empty active component: the design's root (and the root became active); New Body on another component's face: that component | the active component (`primitives_ui._ensure_body`, `primitives.new_body` -> `components.body_for_new`); the component's own origin plane picked in the browser is taken |
 | Hole, Thread, Fillet, Chamfer, Shell, Draft (change a body) | change the body picked | the same | the same |
 | Patterns and Mirror of features / faces / bodies | in the body of what is repeated | the same | the same |
 | Pattern / Mirror of components | a step of the design; the copies beside the original | patterns: the same; Mirror: not built | the same; Mirror built |
@@ -299,7 +302,7 @@ components); unit tests in `test_components_core.py`.
 | Fusion | Fission 180 |
 |---|---|
 | Project (P) takes geometry of any component (21) | While FreeCAD's Project (or Include 3D Geometry) runs, a click on a face, edge or corner of another body or component is projected through a hidden reference inside the sketch's body. One undo step per click; the message beside the mouse says how many curves came from which component; an element projected already says so |
-| A projection follows the part it came from | The reference is a PartDesign SubShapeBinder linked through the components (`components.reference_link`): it follows the other part's changes and both components' moves, also after save and reopen. (Fusion computes a projection where the components stood at the sketch's place in the timeline; here it follows later moves too.) |
+| A projection follows the part it came from; a later Move or joint does not reshape what was modelled on a part | The reference (`components.ReferenceCopy`, a hidden sketch-like object in the sketch's body) depends on the step it copies and stands where the other body stood when it was made: it follows the other part's CHANGES (a pin made thicker), also after save and reopen and when FreeCAD marks the element name as missing; it does not follow later MOVES of either component (Fusion works a projection out where the parts stood at the sketch's place in the timeline; `extrude.py`'s profile copies keep their frame for the same reason). A step of the other body may use what hangs on it |
 | New Component: From Bodies | Ticked by itself only when bodies are selected as bodies when the command starts (30); the dialog says "N bodies will move into the new component: ..."; a click on a component's browser row with From Bodies off sets Parent |
 | The first component of each level is grounded to its parent (25) | Same (New Component, Create Components from Bodies): a Ground on it, in the same undo step. Preferences > General > Design > *First component Ground to Parent* (on). Menu: Ground to Parent / Unground From Parent |
 | Move/Copy of a component: the manipulator on its origin (26) | Same (`ComponentMovePanel._new_pivot`: the first picked component's origin); Set Pivot as before |
@@ -326,7 +329,18 @@ components); unit tests in `test_components_core.py`.
   there (`(B, "Body.Pad.Face6")` for a sibling, `(Outer, "B.Body.Pad.Face6")` from the root,
   `(Body, "Pad.Face6")` for another body of the same component). Linked straight to the step
   it ignores the other component's Placement; linked through a container both are in, the
-  document is no longer a DAG.
+  document is no longer a DAG. Such a binder depends on the whole other component: a step of
+  that component that uses what hangs on the binder (a Cut of the Nozzle from a sketch put on
+  the Nozzle's face) is a dependency cycle, and every joint move reshapes what was modelled
+  on it. Not Relative and linked straight to the step, it loses the element's own location
+  (a pad's top face lands at z 0) and does not get it back when the step changes. So the
+  reference is Fission 180's own object (`ReferenceCopy`).
+- An element of a shape carries a location (`shape.Placement`, the pad's height for its top
+  face); `transformShape(matrix, True)` keeps it, and FreeCAD replaces it by the object's
+  Placement when the shape is given to an object: set the element's Placement to none and
+  work `frame * location` into the geometry (`shape.transformed(matrix, True)`).
+- A link to an element whose history changed (the sketch behind the step drawn again) reads
+  back as `?Edge3`; `Shape.getElement("?Edge3")` raises. The plain name is tried then.
 - `Gui.Selection.getSelectionEx("", 0)` gives a nested component selected by its name as its
   top container with the sub path ("Stator", "Housing.").
 - `doc.openTransaction()` only names a pending step; `abortTransaction()` on a step without a
@@ -347,8 +361,15 @@ components); unit tests in `test_components_core.py`.
   180 has no selection sets). The first component picked for a Joint is not ungrounded by
   itself (Fusion does; here the dialog says it is grounded).
 - Wave 7: a construction plane, axis or point built on another component follows that part's
-  changes; when only the other component MOVES it follows at the next change of the part
-  (its frame is worked out from the picks in design coordinates when it recomputes).
+  changes; when the other component MOVES later it moves too at the next change of the part
+  (its frame is worked out from the picks in design coordinates when it recomputes), unlike a
+  sketch's reference, which keeps its place.
+- Wave 7, open: with a sub-component active, a Cut chosen by hand in Extrude did not reach
+  another component's body in the scenario's probe ("The cut does not go through any body",
+  for both signs of the distance; the same profile as New Body lies inside that body).
+  Fusion cuts it (Objects To Cut). The bodies a Cut passes through are not filtered by the
+  wave 7 rule (`extrude_bodies.in_the_way` returns them all); not resolved (the Extrude
+  dialog is the extrude work's). With that body's component active the cut works.
 - Wave 7: with the design's row active, a sketch on a face of a component's body goes into the
   root (Fusion does the same) and its extrude makes a New Body at the root unless Cut is
   chosen; activate the component first to add to its body, as in Fusion.

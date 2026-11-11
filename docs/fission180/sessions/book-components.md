@@ -52,8 +52,16 @@ and 9. Brief: `docs/fission180/dev/briefs/book-components.md`. Spec and sources:
      body: `_joinable` keeps the active component's for Join and for the proposed operation
      (`components.may_change`; an edited step works in its own component).
 2. **References across components** (`components.reference_binder`): a hidden
-   `PartDesign::SubShapeBinder` (role `ComponentRef`, so no timeline step, no browser row,
-   deleted with what uses it) linked through the components (`reference_link`).
+   `ReferenceCopy` (a `Part::Part2DObjectPython`, role `ComponentRef`, so no timeline step, no
+   browser row, deleted with what uses it) that depends on the step only and stands where
+   the other body stood when it was made. The first version was a `SubShapeBinder` linked
+   through the other component: it followed every move (a joint would have reshaped what was
+   modelled on a part) and made a Cut of that part from such a sketch a dependency cycle
+   (found by the scenario); see "FreeCAD facts" in the parity doc.
+2b. **Primitives**: `primitives_ui._ensure_body` made the body at the design's root when the
+   active component was empty (and the root became active); `primitives.new_body` put a New
+   Body beside the clicked face's body; the active component's own origin plane (browser
+   row) was refused. All three go through `components` now.
 3. **Project across components**: `sketch_project_across.AcrossWatch` (a Qt event filter on
    the 3D view while FreeCAD's tool runs) + `sketch_external.project_across`.
 4. **Bug 9**: `NewComponentPanel._selection_changed` took `body_of(anything selected)`.
@@ -89,6 +97,8 @@ and 9. Brief: `docs/fission180/dev/briefs/book-components.md`. Spec and sources:
 
 - `extrude_bodies.py` (extrude): `_joinable` on the touched bodies and in
   `starts_in_material`.
+- `primitives_ui.py`, `primitives.py` (extrude): `_ensure_body` and `_set_plane` use the
+  active component; `new_body` calls `components.body_for_new`.
 - `joints_ui.py` (joints): `_selection_entries` calls `components.whole_pick`.
 - `sketch_tools_ui.py` (sketch-b): Project and Include call `sketch_project_across.watch`;
   `WatchedTool._watch` ignores FreeCAD's no-entry pointer.
@@ -115,8 +125,12 @@ and 9. Brief: `docs/fission180/dev/briefs/book-components.md`. Spec and sources:
 - The first component picked for a Joint is not ungrounded by itself (joints' dialog).
 - A mirrored component is a mirrored copy, not a component with features of its own; a
   patterned or mirrored subassembly comes in flat (bodies, not nested rows).
-- A construction built on another component follows that component's MOVES only at its next
-  recompute.
+- A construction built on another component follows that component's later MOVES at its
+  next recompute (a sketch's reference keeps its place).
+- Open: with a sub-component active, a Cut chosen by hand in Extrude said "The cut does not go
+  through any body" for a body of another component (both signs; the same profile as New
+  Body lies inside it). Fusion cuts it. `extrude_bodies.in_the_way`'s "through" list is not
+  filtered by this work; I did not find why it is empty there. For the extrude builder.
 
 ## Changelog lines
 
@@ -126,7 +140,10 @@ and 9. Brief: `docs/fission180/dev/briefs/book-components.md`. Spec and sources:
 - Extrude's New Body puts the body in the active component, and an extrude no longer joins
   or cuts a body of another component by itself (choose Cut to cut one on purpose).
 - Project (P) and Include 3D Geometry now take faces, edges and corners of other components;
-  the projected curves follow that part.
+  the projected curves follow that part when it changes.
+- A Box (and the other primitives) made with an empty component active now goes into that
+  component, and a primitive put on another component's face as a New Body goes into the
+  active component.
 - New Component no longer ticks From Bodies because a step or a face is selected, and says
   which bodies will move when it is ticked.
 - The first component of a design is grounded automatically, as in Fusion; the menu now
@@ -152,3 +169,8 @@ and 9. Brief: `docs/fission180/dev/briefs/book-components.md`. Spec and sources:
 - New Component offers no External component; use Insert into Current Design for a saved
   design.
 - A mirrored component cannot be edited on its own (edit the original; the mirror follows).
+- With a component active, Extrude's Cut does not cut a body of another component yet:
+  activate that body's component (or the design's row) and cut there.
+- A projection from another component keeps the place the parts had when it was made: after
+  moving a component with Move or a joint it does not move (as in Fusion). Project it again
+  if you want the new place.
