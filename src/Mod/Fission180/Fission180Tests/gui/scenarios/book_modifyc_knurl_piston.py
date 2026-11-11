@@ -141,13 +141,17 @@ def knurled():
     h.check("dialog closed", ps.panel() is None)
     shape = h.body().Shape
     removed = S["before"] - vol()
-    # Long grooves cross each other three times a pair, so the five copies cut far less
-    # than five times the first pair. The number is the kernel's for the same step built
-    # in the window's own process (pattern_benchmark, case firepiston_x: 37.086 mm3): the
-    # build outside gives the same solid.
+    # Each copy cuts nearly a whole pair of grooves: a groove meets only the grooves of the
+    # other hand, where they cross. The number is the kernel's for the same step built in
+    # the window's own process, by the worker's code and by hand from what the Coil and the
+    # Mirror took away (headless/knurl_check.py with FISSION180_KNURL_QUANTITY=6: 67.893
+    # mm3). (Wave 7, fix-6: it was 37.086 while the Coil's tool solid was taken in the
+    # Coil's own coordinates, turned off the handle by its YZ sketch: the Coil's five
+    # copies cut almost nothing, only the Mirror's did; replay-c's pattern.add_sub_shape
+    # placed it, the window and the worker agree.)
     h.check(
-        "the same solid as the build in the window's process (37.086 mm3 cut)",
-        abs(removed - 37.086) < 0.01 and S["pair"] < removed < 5.0 * S["pair"],
+        "the same solid as the build in the window's process (67.893 mm3 cut)",
+        abs(removed - 67.893) < 0.01 and S["pair"] < removed < 5.0 * S["pair"],
         (removed, S["pair"]),
     )
     h.check("a valid solid", shape.isValid() and len(shape.Solids) == 1)

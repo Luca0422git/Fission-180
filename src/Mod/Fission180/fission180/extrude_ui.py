@@ -1437,7 +1437,16 @@ class ExtrudePanel(
             # Fusion: the profiles lie in one plane, so with one picked, a click on a face
             # elsewhere (a vertex, a plane) says where the extrusion ends (Luca's request).
             # A face in a profile's plane is a profile pick, as before.
-            if self.profiles and self._end_at(obj, short, point):
+            if self.profiles and not getattr(self, "_one_pick", True):
+                # One of several things a selection window took: with Select Through on
+                # (Fusion's default) also faces hidden behind the one the person sees,
+                # which comes first (selection_ui._shown_faces_first). Only a face in the
+                # profiles' plane is a profile; a window never says where the extrusion
+                # ends (wave 7, fix-6: the window round a box's top face ended the
+                # extrusion at a hidden side face).
+                if self._window_off_plane(obj, short, point):
+                    return
+            elif self.profiles and self._end_at(obj, short, point):
                 return
             if profile_pick.is_glyph(obj):
                 # An origin or construction plane the extrusion cannot end on: the click
@@ -1649,6 +1658,15 @@ class ExtrudePanel(
         else:
             self._end_object(decision["side"], ref, decision["note"])
         return True
+
+    def _window_off_plane(self, obj, short, point=None):
+        """True for a face, plane or point a selection window brought that lies off the
+        picked profiles' plane (a click there would say where the extrusion ends): it is
+        no profile, and a window sets no end."""
+        try:
+            return self._end_target(obj, short, point) is not None
+        except extrude.ExtrudeError:
+            return False
 
     def _ours(self, obj):
         """True for the extrude's own preview (its feature, helpers and followers)."""

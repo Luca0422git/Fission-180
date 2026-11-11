@@ -8,8 +8,11 @@ Real input, box 40 x 30 x 10.
   B  a long press on a sketch line opens no Select Other list.
   C  keys 1 / 2 / 3 inside the sketch do not change the selection mode (digits are values
      there); Esc keeps the sketch open.
-  D  Finish Sketch: outside, a window around the box selects its faces and edges again,
-     and a window around the sketch's curves (Sketch Curves on) selects them as curves.
+  D  Finish Sketch: outside, a window around the box selects its faces and edges again
+     (all 6 and 12: Select Through is on by default, as in Fusion), and the sketch's
+     curves (Sketch Curves on) as curves; with Select Through off the same window takes
+     the 3 faces the view shows; with Sketch Curves off a window around the rectangle
+     takes no curve.
 """
 
 import FreeCAD as App
@@ -115,9 +118,7 @@ def d_finish():
     h.ribbon("Finish Sketch")
 
 
-def d_box_body():
-    h.check("D the sketch is closed", h.in_sketch() is None)
-    h.fit()
+def box_body():
     box = h.body().Shape.BoundBox
     si.box_around(
         [
@@ -130,18 +131,32 @@ def d_box_body():
     )
 
 
+def sketch_curves_picked():
+    sk = st.get("sketch")
+    return [s for s in Gui.Selection.getSelectionEx() if sk is not None and s.ObjectName == sk.Name]
+
+
+def d_box_body():
+    h.check("D the sketch is closed", h.in_sketch() is None)
+    h.fit()
+    box_body()
+
+
 def d_body_check():
     sel = si.selected_elements()
     faces = {n for n in sel if n.startswith("Face")}
+    edges = {n for n in sel if n.startswith("Edge")}
+    # (wave 7, fix-6) Select Through is on by default, as in Fusion (replay-b; Autodesk
+    # support, "How to select only visible faces in Autodesk Fusion": "Fusion by default has
+    # the select through selection filter enabled"): the window takes the hidden faces and
+    # edges too. d_through_off_check: the 3 the view shows with it off.
     h.check(
-        "D outside the sketch the window selects the box's visible faces again",
-        len(faces) == 3,
+        "D outside the sketch the window selects the box's faces and edges again "
+        "(all 6 and 12: Select Through on)",
+        len(faces) == 6 and len(edges) == 12,
         sorted(sel),
     )
-    sk = st.get("sketch")
-    sketch_picks = [
-        s for s in Gui.Selection.getSelectionEx() if sk is not None and s.ObjectName == sk.Name
-    ]
+    sketch_picks = sketch_curves_picked()
     # (4 drawn and the top face's 4 edges, projected by Auto project: sketch curves too)
     h.check(
         "D ... and the sketch's 8 curves (fully inside the window)",
@@ -149,15 +164,34 @@ def d_body_check():
         [(s.ObjectName, s.SubElementNames) for s in sketch_picks],
     )
     h.click_empty()
+    Gui.runCommand("Fission180_SelectThrough")
+    h.check("D Select Through off", not si.selection_ui().select_through())
+    box_body()
+
+
+def d_through_off_check():
+    sel = si.selected_elements()
+    faces = {n for n in sel if n.startswith("Face")}
+    h.check(
+        "D with Select Through off the window selects the box's visible faces only",
+        len(faces) == 3,
+        sorted(sel),
+    )
+    sketch_picks = sketch_curves_picked()
+    h.check(
+        "D ... and still the sketch's 8 curves (they lie on the top face, in view)",
+        len(sketch_picks) == 1 and len(sketch_picks[0].SubElementNames) == 8,
+        [(s.ObjectName, s.SubElementNames) for s in sketch_picks],
+    )
+    h.click_empty()
+    Gui.runCommand("Fission180_SelectThrough")
+    h.check("D Select Through on again", si.selection_ui().select_through())
     Gui.runCommand("Fission180_SelectFilterSketchCurves")
     si.box_around(rect_points_3d(), margin=10)
 
 
 def d_curves_off_check():
-    sk = st.get("sketch")
-    sketch_picks = [
-        s for s in Gui.Selection.getSelectionEx() if sk is not None and s.ObjectName == sk.Name
-    ]
+    sketch_picks = sketch_curves_picked()
     h.check(
         "D with Sketch Curves off a window around the rectangle takes no curve",
         not sketch_picks,
@@ -181,6 +215,7 @@ steps = b.box_steps("SelSketch") + [
     d_finish,
     d_box_body,
     d_body_check,
+    d_through_off_check,
     d_curves_off_check,
 ]
 
