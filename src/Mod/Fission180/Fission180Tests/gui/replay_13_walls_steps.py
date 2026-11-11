@@ -263,11 +263,36 @@ def group_ready():
     h.check(
         "both nested components are picked by their rows", members == [hs.NAME, GASKETS], members
     )
-    raw = p.fields["components"].button.text()
-    shown = raw.replace("&&", "\0").replace("&", "").replace("\0", "&")
+    from fission180 import taskui
+
+    button = p.fields["components"].button
+    raw = button.text()
+    full = taskui.names_of(button)
     # (report: "A component named Housing & Inlet Tube loses its & in dialog buttons")
+    # The button shortens the names to the room it has, which depends on the machine's
+    # fonts: on GitHub it cut the first name before its "&" ("Housing… + 1 more"; wave 7,
+    # fix-6, as fix-2 found in book_shell_dialogs). So: every "&" it shows is doubled for
+    # Qt (a lone one is a keyboard mark and vanishes), and the name with its "&" is drawn
+    # where the button has room (NAMES_WIDTH, the most a names button shows) and is in
+    # the tool tip when the button shortened it.
     h.check(
-        "the button shows Housing & Inlet Tube with its &", shown.startswith("Housing & In"), raw
+        "the button keeps the name Housing & Inlet Tube with its &",
+        full.startswith("Housing & Inlet Tube"),
+        full,
+    )
+    h.check("no lone & on the button (each one && to Qt)", "&" not in raw.replace("&&", ""), raw)
+    roomy = taskui.NamesButton()
+    roomy.set_names(full)
+    h.check(
+        "with room the button shows Housing & Inlet Tube with its & (&& to Qt)",
+        roomy.text().startswith("Housing && Inlet Tube"),
+        roomy.text(),
+    )
+    roomy.deleteLater()
+    h.check(
+        "shortened, the full names are its tool tip",
+        raw.startswith("Housing && Inlet Tube") or "Housing & Inlet Tube" in button.toolTip(),
+        (raw, button.toolTip()),
     )
 
 
