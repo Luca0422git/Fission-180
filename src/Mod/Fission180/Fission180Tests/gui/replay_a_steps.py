@@ -147,15 +147,22 @@ def volume(d=None):
 
 
 def bbox(shapes=None):
+    """The exact box round the bodies (FreeCAD's plain BoundBox of a round shape is a little
+    off: a torus of 120 answered 119.9)."""
     box = App.BoundBox()
     for b in shapes or solids():
-        box.add(b.Shape.BoundBox)
+        box.add(b.Shape.optimalBoundingBox(False, False))
     return box
 
 
 def box_size(shapes=None):
     b = bbox(shapes)
     return (round(b.XLength, 3), round(b.YLength, 3), round(b.ZLength, 3))
+
+
+def has_row(name):
+    """The browser has a row of that name (the active body's row carries a dot after it)."""
+    return any(label == name or label.split("  ")[0] == name for label in labels())
 
 
 def near(a, b, tol=1e-6):
@@ -277,3 +284,85 @@ def bluish(colours):
     from Fission180Tests.gui import sketch_input as si
 
     return any(c[2] > c[0] + 40 and c[2] > c[1] + 20 for c in map(si.rgb, colours.values()))
+
+
+# -- a real drag of a look onto the part ---------------------------------------------------------
+_drag = {"timer": None, "done": True, "error": ""}
+
+
+def drag_done():
+    return _drag["done"]
+
+
+def drag_look(label, target, from_design=False, widget=None):
+    """Drag the Appearance dialog's swatch called `label` with the real pointer (the X
+    server's: press on the swatch, move, let go over the target), as a person's mouse does.
+    `target`: a 3D point of the 3D view, or a pixel (QPoint) of `widget`.
+
+    Qt runs a drag in a loop of its own from the first move on, so the moves and the release
+    are sent from a timer, one per tick; the step that calls this ends once drag_done()."""
+    from Fission180Tests.gui import looks_steps as k
+    from Fission180Tests.gui import x_input as xi
+
+    p = k.panel()
+    if not h.check("Appearance dialog open (drag %s)" % label, p is not None):
+        return False
+    view = p.design if from_design else p.library
+    item = k.design_item(label) if from_design else k.library_item(label)
+    if not h.check("a swatch called %s" % label, item is not None):
+        return False
+    if not h.check("real X input is possible", xi.available()):
+        return False
+    view.scrollToItem(item)
+    QtWidgets.QApplication.processEvents()
+    start = view.visualItemRect(item).center()
+    if widget is None:
+        widget = h.gl_widget()
+        target = target if isinstance(target, QtCore.QPoint) else h.screen_point(target)
+    end = widget.mapToGlobal(target)
+    h.press_pace()
+    at = xi.move_to(start, view.viewport())
+    moves = [
+        ("down", None),
+        ("move", (at.x() + 4, at.y() + 3)),
+        ("move", (at.x() + 12, at.y() + 9)),
+    ]
+    steps = 12
+    for i in range(1, steps + 1):
+        x = at.x() + 12 + (end.x() - at.x() - 12) * i / float(steps)
+        y = at.y() + 9 + (end.y() - at.y() - 9) * i / float(steps)
+        moves.append(("move", (int(round(x)), int(round(y)))))
+    moves += [("move", (end.x() + 1, end.y())), ("move", (end.x(), end.y())), ("wait", None)]
+    moves += [("wait", None), ("up", None), ("wait", None), ("wait", None)]
+    _drag.update(done=False, error="")
+    timer = QtCore.QTimer()
+    timer.setInterval(40)  # input pace: a hand's drag, one move per tick
+
+    def tick():
+        try:
+            if not moves:
+                timer.stop()
+                _drag["done"] = True
+                return
+            kind, where = moves.pop(0)
+            if kind == "down":
+                xi._xtst.XTestFakeButtonEvent(xi._display, 1, 1, 0)
+            elif kind == "up":
+                xi._xtst.XTestFakeButtonEvent(xi._display, 1, 0, 0)
+            elif kind == "move":
+                xi._xtst.XTestFakeMotionEvent(xi._display, -1, where[0], where[1], 0)
+            xi._x11.XFlush(xi._display)
+        except Exception as exc:  # never leave the button down
+            _drag["error"] = str(exc)
+            timer.stop()
+            try:
+                xi._xtst.XTestFakeButtonEvent(xi._display, 1, 0, 0)
+                xi._x11.XFlush(xi._display)
+            except Exception:
+                pass
+            _drag["done"] = True
+
+    timer.timeout.connect(tick)
+    _drag["timer"] = timer
+    timer.start()
+    return True

@@ -3177,6 +3177,64 @@ class ExtrudePanel(
         if view is not None:
             view.clear()
 
+    def _taper_pivot(self, faces, start, outward, normal, radius):
+        """(pivot, outward) of the taper disc: on the profile's edge on the screen's right,
+        unless an area that can still be clicked lies under the disc there: then on the
+        profile's other edge (the book's donut bite and thruster: the disc sat on the next
+        area to pick and took the click meant for it). Both taken: the right as before."""
+        first = None
+        free = self._unpicked_faces()
+        for direction in (outward, outward * -1.0):
+            reach = 0.0
+            for face in faces:
+                for edge in face.Edges:
+                    for p in edge.discretize(24):
+                        reach = max(reach, (p - start).dot(direction))
+            if reach <= 0:
+                reach = faces[0].BoundBox.DiagonalLength / 2.0
+            pivot = start + direction * reach
+            if first is None:
+                first = (pivot, direction)
+            if not free or not self._covers_free_area(pivot, direction, normal, radius, free):
+                return pivot, direction
+        return first
+
+    def _unpicked_faces(self):
+        """The offered areas that are not picked (their faces, design coordinates)."""
+        picker = self.picker
+        if picker is None:
+            return []
+        picked = {extrude.key(p) for p in self.profiles}
+        return [
+            face
+            for sketch, sub, face, _material in picker.regions
+            if (sketch.Name, sub) not in picked
+        ]
+
+    @staticmethod
+    def _covers_free_area(pivot, direction, normal, radius, free):
+        """Whether a disc of `radius` at `pivot` (on a profile's edge, `direction` pointing
+        away from the profile) lies on one of the `free` faces: its middle, its far side or
+        its two sides along the edge."""
+        side = normal.cross(direction)
+        if side.Length > 1e-9:
+            side.normalize()
+        spots = (
+            pivot,
+            pivot + direction * radius,
+            pivot + direction * (radius * 0.5),
+            pivot + side * (radius * 0.7),
+            pivot - side * (radius * 0.7),
+        )
+        for face in free:
+            try:
+                tolerance = max(radius * 0.05, 1e-4)
+                if any(face.isInside(spot, tolerance, True) for spot in spots):
+                    return True
+            except Exception:
+                continue
+        return False
+
     def _make_taper_handle(self, faces, start, normal, size):
         """The taper disc sits on the profile's edge, turning outward from the normal."""
         if self.options["extent"] != "distance":
@@ -3189,16 +3247,9 @@ class ExtrudePanel(
             if outward.Length < 1e-6:
                 outward = normal.cross(App.Vector(0, 1, 0))
         outward.normalize()
-        reach = 0.0
-        for face in faces:
-            for edge in face.Edges:
-                for p in edge.discretize(24):
-                    reach = max(reach, (p - start).dot(outward))
-        if reach <= 0:
-            reach = faces[0].BoundBox.DiagonalLength / 2.0
+        pivot, outward = self._taper_pivot(faces, start, outward, normal, size * 0.3)
         length = self._arrow_value(self.options["distance"])
         sign = 1.0 if length >= 0 else -1.0
-        pivot = start + outward * reach
         along = normal * sign
         self.taper_length = abs(length)
         self.draggers["taper"] = AngleDragger(
