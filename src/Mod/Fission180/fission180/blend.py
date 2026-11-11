@@ -990,11 +990,29 @@ def check_plain(kind, info, refs, options):
         raise BlendError(too_big(kind, label, size))
 
 
+def size_text(mm, doc=None):
+    """A size (mm) in words, in the design's units: "6.35 mm" in a millimetre design, "0.25
+    in" in an inch one (a refusal said "Radius 6.35 mm is too big here" for the 0.25 typed
+    in the book's inch Tesla Turbine and Pizza Cutter)."""
+    try:
+        from . import browser_core
+
+        if doc is None:
+            import FreeCAD as App
+
+            doc = App.ActiveDocument
+        unit = browser_core.doc_length_unit(doc) if doc is not None else "mm"
+        per = browser_core.MM_PER_UNIT.get(unit, 1.0)
+    except Exception:
+        unit, per = "mm", 1.0
+    return "%g %s" % (round(float(mm) / per, 6), unit)
+
+
 def too_big(kind, label, size, exc=None):
     what = "round" if kind == "fillet" else "bevel"
-    return "%s %g mm is too big here: the %s does not fit on the faces next to it." % (
+    return "%s %s is too big here: the %s does not fit on the faces next to it." % (
         label.capitalize(),
-        size,
+        size_text(size),
         what,
     )
 

@@ -450,3 +450,41 @@ def similar(obj, place):
         found.append((other["face"] or "Face%d" % (i + 1), other["center"]))
     found.sort(key=lambda f: (round(f[1].x, 5), round(f[1].y, 5), round(f[1].z, 5)))
     return found
+
+
+def thread_of_hole(place, tol=1e-3):
+    """(thread type, size) of the Thread step on the hole a click found ("ansi", "1/4" for a
+    1/4-20 UNC on its wall), or None. A threaded hole says what goes in it: the hole's own
+    diameter is the thread's minor diameter (or the tap drill, or what the person drilled),
+    and a size read from it alone took the counterbore of a #5 head for the book's Tesla
+    Turbine wall's 1/4-20 holes (0.241 in)."""
+    try:
+        from . import thread, thread_tables
+
+        body = place.get("body")
+        centre = App.Vector(place["center"])
+        radius = 0.5 * float(place.get("hole_diameter") or place.get("diameter") or 0.0)
+        if body is None or radius <= 0.0:
+            return None
+        plc = body.getGlobalPlacement()
+        for step in body.Group:
+            if not thread.is_thread(step):
+                continue
+            record = thread.computed(step)
+            for one in record.get("threads", []):
+                if not one.get("internal"):
+                    continue
+                base = plc.multVec(App.Vector(*one["base"]))
+                axis = plc.Rotation.multVec(App.Vector(*one["axis"]))
+                off = (centre - base) - axis * (centre - base).dot(axis)
+                if off.Length > max(tol, 0.05 * radius):
+                    continue
+                if abs(float(one.get("radius", 0.0)) - radius) > max(0.1 * radius, 0.2):
+                    continue
+                standard = step.Standard or "iso"
+                found = thread_tables.find(standard, record.get("designation", ""))
+                if found is not None:
+                    return standard, found.size
+    except Exception:
+        return None
+    return None

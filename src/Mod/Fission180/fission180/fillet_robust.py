@@ -382,10 +382,14 @@ def thread_twin(feature):
         return None
     try:
         blank = step.Shape
+        tools = []
         for one in reversed(chain):
+            tools.extend(thread.grooves(one, blank))
             blank = thread.blank(one, blank)
-        grooves = blank.cut(shape)
-        if blank.isNull() or not blank.Solids or grooves.isNull() or not grooves.Solids:
+        if blank.isNull() or not blank.Solids:
+            return None
+        grooves = _grooves_of(blank, shape, tools)
+        if grooves is None:
             return None
     except Exception:
         return None
@@ -393,6 +397,40 @@ def thread_twin(feature):
     _STATE["twins"].insert(0, (key, shape, twin))
     del _STATE["twins"][_KEEP_TWINS:]
     return twin
+
+
+def _grooves_of(blank, shape, tools):
+    """The grooves of a modeled thread as a solid to cut again: the blank minus the threaded
+    part when the kernel makes that difference (it is exactly what the threads took), else
+    the threads' own cutting solids (`tools`, thread.grooves). The difference is not to be
+    trusted when its volume is not the volume the threads took: on the Pizza Cutter's End
+    Cap (1/4-20 on a quarter-inch shank) the kernel handed back the whole blank, and the
+    chamfer dragged after its thread was refused ("would fail there")."""
+    import Part
+
+    took = blank.Volume - shape.Volume
+    try:
+        grooves = blank.cut(shape)
+        if (
+            not grooves.isNull()
+            and grooves.Solids
+            and abs(grooves.Volume - took) <= 1e-3 * max(abs(took), 1e-6) + 1e-6
+        ):
+            return grooves
+    except Exception:
+        pass
+    if not tools:
+        return None
+    return tools[0] if len(tools) == 1 else Part.makeCompound(tools)
+
+
+def _cut_grooves(result, grooves):
+    """`result` with the grooves cut (a compound of cutting solids: one after the other)."""
+    if grooves.ShapeType == "Compound":
+        for tool in grooves.Solids:
+            result = result.cut(tool)
+        return result
+    return result.cut(grooves)
 
 
 def _through_thread(kind, shape, items, tag, once):
@@ -411,7 +449,9 @@ def _through_thread(kind, shape, items, tag, once):
         return None  # a radius that changes along the edge: its ends are not the blank's
     try:
         result = once(kind, blank, carried, tag)
-        result = result.cut(grooves)
+        result = _cut_grooves(result, grooves)
+        if result.ShapeType != "Solid" and len(result.Solids) == 1:
+            result = result.Solids[0]
     except Exception:
         return None
     return result if sound(result, shape) else None

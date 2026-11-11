@@ -1,0 +1,56 @@
+{
+  "id": "book_thread_cosmetic_on_side_plane",
+  "title": "A cosmetic thread on a shaft extruded from a sketch on the Front plane keeps the shaft where it is",
+  "tags": [
+    "thread",
+    "book",
+    "inch"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XZ",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            30,
+            6
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 40
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 6,
+        "count": 1
+      },
+      "modeled": false
+    }
+  ],
+  "expect": {
+    "volume": 4523.893421,
+    "solids": 1,
+    "rel_tol": 1e-06,
+    "source": "analytic",
+    "note": "the book replay (wave 7, replay-e): the Tesla Turbine's inlet got a cosmetic pipe thread after an extrude whose step has a placement of its own (a sketch on a face or a side plane), and the whole body turned a quarter turn: the thread copied the step before with its placement, which a thread step does not keep (thread.in_place). The shaft (radius 6, 40 long, its middle 30 up Z on the Front plane, extruded to -Y as every Front-plane extrude is) stays where the extrude put it: V = pi 6^2 40 = 4523.893, bbox [-6, -40, 24, 6, 0, 36]",
+    "bbox": [
+      -6,
+      -40,
+      24,
+      6,
+      0,
+      36
+    ]
+  }
+}

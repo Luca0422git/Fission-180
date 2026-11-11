@@ -301,5 +301,38 @@ class StudyGraphTests(unittest.TestCase):
         self.assertIsNone(mc.graph_lane([[]], 50, 60, self.H, self.M))
 
 
+class LinkNote(unittest.TestCase):
+    """What Motion Link says its values mean, in the design's units."""
+
+    def test_a_screw_in_millimetres(self):
+        text = mc.link_note(
+            "Cylindrical 1", "Cylindrical 1", "angle", "slide", 2.0 / 360.0, same=True
+        )
+        self.assertIn("slides 2 mm for each turn", text)
+        self.assertIn("0.005556 mm for each degree", text)
+
+    def test_a_screw_in_an_inch_design(self):
+        # the Pizza Cutter's End Cap: 0.05 in (1/20) a turn is stored as 1.27 mm a turn
+        text = mc.link_note(
+            "Cylindrical 1", "Cylindrical 1", "angle", "slide", 1.27 / 360.0, "in", 25.4, True
+        )
+        self.assertIn("slides 0.05 in for each turn", text)
+        self.assertNotIn("mm", text)
+
+    def test_turns_per_inch_slid(self):
+        text = mc.link_note("C", "C", "slide", "angle", 360.0 / 1.27, "in", 25.4, True)
+        self.assertEqual(text, "C turns 7200 deg for each in it slides.")
+
+    def test_two_sliders_keep_their_ratio_in_any_unit(self):
+        for unit, per in (("mm", 1.0), ("in", 25.4)):
+            text = mc.link_note("Slider 1", "Slider 2", "slide", "slide", 2.0, unit, per)
+            self.assertEqual(text, "Slider 2 moves 2 %s for each %s Slider 1 moves." % (unit, unit))
+
+    def test_a_rack_in_inches(self):
+        # 25.4 mm (1 in) of slide for each 90 degrees
+        text = mc.link_note("Revolute 1", "Slider 1", "angle", "slide", 25.4 / 90.0, "in", 25.4)
+        self.assertEqual(text, "Slider 1 moves 0.01111 in for each deg Revolute 1 moves.")
+
+
 if __name__ == "__main__":
     unittest.main()

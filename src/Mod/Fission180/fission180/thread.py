@@ -590,7 +590,7 @@ class ThreadFeature:
                 face_offset=face_offset(obj),
             )
         else:
-            obj.Shape = base.Shape.copy()
+            obj.Shape = in_place(base.Shape)
         text = json.dumps(record, sort_keys=True)
         if obj.Computed != text:
             obj.Computed = text
@@ -605,16 +605,27 @@ class ThreadFeature:
     __setstate__ = loads
 
 
+def in_place(shape):
+    """A copy of `shape` with its placement taken into its geometry (the placement itself
+    left at none): the shape a modeled thread's boolean gives too. A cosmetic thread copied
+    its step before as it was: a step whose own placement is not none (an extrude of a
+    sketch on a face or a side plane) came out turned by it, the whole body with it (the
+    book's Tesla Turbine: the housing turned a quarter turn at the inlet's pipe thread)."""
+    out = shape.copy()
+    plc = out.Placement
+    if not plc.isIdentity():
+        out.Placement = App.Placement()
+        out.transformShape(plc.toMatrix(), True)  # (a copy of the geometry, moved: no location)
+    return out
+
+
 def is_thread(obj):
     return getattr(obj, "Fission180Type", "") == KIND
 
 
-def blank(obj, base_shape=None):
-    """The part under a modeled Thread step: its base (or `base_shape`, the same part) with
-    the threaded cylinders at the thread's diameter, but without the grooves. A fillet or
-    chamfer after the thread is built on it and the grooves are cut again
-    (fillet_robust.py): the kernel cannot blend an edge the grooves cut through."""
-    shape = base_shape if base_shape is not None else obj.BaseFeature.Shape
+def _recorded(obj, shape):
+    """(designation, cylinders, spans) of a computed Thread step, its cylinders found again
+    on `shape` (the part before the thread) by where they are."""
     record = computed(obj)
     designation = tables.find(obj.Standard or "iso", record.get("designation", ""))
     if designation is None or not record.get("threads"):
@@ -626,6 +637,16 @@ def blank(obj, base_shape=None):
             raise ThreadError("The face of this thread is gone.")
         cylinders.append(found[0])
         spans.append((one["z0"], one["z1"]))
+    return designation, cylinders, spans
+
+
+def blank(obj, base_shape=None):
+    """The part under a modeled Thread step: its base (or `base_shape`, the same part) with
+    the threaded cylinders at the thread's diameter, but without the grooves. A fillet or
+    chamfer after the thread is built on it and the grooves are cut again
+    (fillet_robust.py): the kernel cannot blend an edge the grooves cut through."""
+    shape = base_shape if base_shape is not None else obj.BaseFeature.Shape
+    designation, cylinders, spans = _recorded(obj, shape)
     return build(
         shape,
         cylinders,
@@ -638,6 +659,25 @@ def blank(obj, base_shape=None):
         grooves=False,
         face_offset=face_offset(obj),
     )
+
+
+def grooves(obj, base_shape=None):
+    """What a modeled Thread step cuts out of the part under it (blank()): its own cutting
+    solids, one for each threaded face, as build() makes them. (The difference "blank minus
+    threaded part" is the same solid in theory; the kernel gives back the whole blank, or
+    nothing, when the two share every face but the grooves: the Pizza Cutter's 1/4-20 on a
+    quarter-inch shank.)"""
+    shape = base_shape if base_shape is not None else obj.BaseFeature.Shape
+    designation, cylinders, spans = _recorded(obj, shape)
+    tools = []
+    for c, (z0, z1) in zip(cylinders, spans):
+        wanted = thread_class_for(designation.standard, obj.ThreadClass, c.internal)
+        _add, tool = parts(
+            c, designation, z0, z1, obj.LeftHanded, wanted, obj.FromEnd, True, face_offset(obj)
+        )
+        if tool is not None:
+            tools.append(tool)
+    return tools
 
 
 def slack(obj):

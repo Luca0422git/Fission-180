@@ -508,18 +508,20 @@ class MotionLinkPanel(_JointsPanel):
             return
         data = joints.link_data(self.link)
         ratio = motion_core.link_ratio(data["value1"], data["value2"], data["reverse"])
-        units = [_unit(data["motion1"]), _unit(data["motion2"])]
-        if self._same():
-            self.note.setText(
-                "%s slides %.4g mm for each turn (%.4g mm for each degree it turns)."
-                % (self.picked[0].Label, ratio * 360.0, ratio)
-                if data["motion1"] == "angle"
-                else "%s turns %.4g deg for each mm it slides." % (self.picked[0].Label, ratio)
-            )
-            return
+        from . import browser_core
+
+        unit = browser_core.doc_length_unit(self.doc)
         self.note.setText(
-            "%s moves %.4g %s for each %s %s moves."
-            % (self.picked[1].Label, ratio, units[1], units[0], self.picked[0].Label)
+            motion_core.link_note(
+                self.picked[0].Label,
+                self.picked[1].Label if len(self.picked) > 1 else self.picked[0].Label,
+                data["motion1"],
+                data["motion2"],
+                ratio,
+                unit,
+                browser_core.MM_PER_UNIT.get(unit, 1.0),
+                self._same(),
+            )
         )
 
     def preview_steps(self):

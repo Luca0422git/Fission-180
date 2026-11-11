@@ -1408,7 +1408,8 @@ class ExtrudePanel(
             # click on an edge can stand for the face next to it)
             self._one_pick = len(picks) == 1
             for obj, short, point in picks:
-                self._picked(obj, short, recent, point)
+                taken = recent or (self.picker is not None and self.picker.clicked_region_at(point))
+                self._picked(obj, short, taken, point)
         except Exception as exc:
             warn("extrude pick: %s" % exc)
 

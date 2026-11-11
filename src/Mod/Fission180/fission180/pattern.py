@@ -1001,7 +1001,10 @@ def install_orphan_watch():
 
 
 def show_tip(body):
-    tip = body.Tip if body is not None else None
+    # (a pattern of components has a component, not a body, as its "body": nothing to show;
+    # Esc in Rectangular Pattern with Components warned "'App.Part' object has no attribute
+    # 'Tip'": the book replay, Tesla Turbine)
+    tip = getattr(body, "Tip", None) if body is not None else None
     if tip is None:
         return
     try:
