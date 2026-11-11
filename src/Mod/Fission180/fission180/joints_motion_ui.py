@@ -313,7 +313,9 @@ class MotionLinkPanel(_JointsPanel):
         if self.link is None or not self.picked:
             self.animate.setChecked(False)
             return
-        self.stop_animation()
+        # (the base's: this panel's own stop_animation lets the button come up, and the
+        # next press then started the animation again instead of stopping it)
+        _JointsPanel.stop_animation(self)
         self.animator = joints_ui.Animator(self.picked[0], on_done=self._done, loop=True)
         if not self.animator.start():
             self.animator = None

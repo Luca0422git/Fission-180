@@ -222,3 +222,47 @@ def box_centre(obj):
     return App.Vector(
         0.5 * (box.XMin + box.XMax), 0.5 * (box.YMin + box.YMax), 0.5 * (box.ZMin + box.ZMax)
     )
+
+
+# -- watching an animation ---------------------------------------------------------------------
+def standalone_animator():
+    """The animation Animate Joint / Animate Joint Relationships plays, or None."""
+    from fission180 import joints_ui
+
+    animator = joints_ui._STANDALONE.get("animator")
+    return animator if animator is not None and animator.running else None
+
+
+def sample(get_animator, joint_obj, parts, cycles=1.0):
+    """Watch a playing joint animation for `cycles` of its cycle (on the animation's own
+    clock): one record each time something moved: the joint's angle and slide and where
+    each of `parts` stands. Ends early when the animation stops."""
+    import time
+
+    from fission180 import joints_ui
+
+    out = []
+    last = [None]
+
+    def look():
+        animator = get_animator()
+        if animator is None or not animator.running:
+            return True
+        try:
+            value = jm().value(joint_obj)
+            places = [place(x) for x in parts]
+            key = (value, tuple(places))
+            if key != last[0]:
+                last[0] = key
+                out.append({"angle": value[0], "slide": value[1], "places": places})
+        except Exception:
+            pass
+        return time.perf_counter() - animator.started >= cycles * joints_ui.ANIMATION_SECONDS
+
+    h.wait_for(look, "the joint animation to play %g cycle(s)" % cycles)
+    return out
+
+
+def spread(values):
+    values = list(values)
+    return (max(values) - min(values)) if values else 0.0

@@ -2679,8 +2679,8 @@ class _holding:
                 if joint.JointType != kind:
                     joint.JointType = kind
                 refresh_placements(joint)
-            except Exception as exc:
-                warn("joint %s: %s" % (getattr(joint, "Label", "?"), exc))
+            except Exception as problem:
+                warn("joint %s: %s" % (getattr(joint, "Label", "?"), problem))
         return False
 
 

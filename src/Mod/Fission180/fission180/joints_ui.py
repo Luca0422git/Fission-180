@@ -1188,7 +1188,8 @@ class _Limits:
         self.flip = QtWidgets.QPushButton("Flip")
         self.flip.setObjectName("Fission180Joint_%s_flip" % unit)
         self.flip.setToolTip(
-            "Swap the Minimum and Maximum: the motion is then limited on the other side"
+            "Flip the limits to the other side of the joint's zero (Minimum and Maximum "
+            "change places)"
         )
         self.flip.setEnabled(False)
         self.flip.clicked.connect(lambda *_: self._flip())
@@ -1220,12 +1221,15 @@ class _Limits:
         layout.addRow(self.preview, self.all_limits)
 
     def _flip(self):
-        """Swap Minimum and Maximum (values and ticks), as Fusion's Flip does. The limit
-        values are measured along the joint's own direction, so a stop that turned out to
-        be on the wrong side goes to the other with one click."""
+        """Fusion's Flip: Minimum and Maximum change places, on the other side of the
+        joint's zero. The limit values are measured along the joint's own direction, so a
+        stop that turned out to be on the wrong side (the cap slides into the handle
+        instead of out of it) goes to the other side with one click: Minimum 0 becomes
+        Maximum 0, a range 0..60 becomes -60..0; a Rest goes with them."""
         try:
             panel = self.panel
             (cmin, fmin), (cmax, fmax) = self.rows["min"], self.rows["max"]
+            crest, frest = self.rows["rest"]
             on_min, on_max = cmin.isChecked(), cmax.isChecked()
             low, high = fmin.value(), fmax.value()
             was, panel._quiet = panel._quiet, True
@@ -1233,11 +1237,13 @@ class _Limits:
                 cmin.setChecked(on_max)
                 cmax.setChecked(on_min)
                 if on_max:
-                    fmin.set_value(high)
+                    fmin.set_value(-high)
                 if on_min:
-                    fmax.set_value(low)
+                    fmax.set_value(-low)
                 fmin.widget.setEnabled(on_max)
                 fmax.widget.setEnabled(on_min)
+                if crest.isChecked():
+                    frest.set_value(-frest.value())
             finally:
                 panel._quiet = was
             self.on_change()
