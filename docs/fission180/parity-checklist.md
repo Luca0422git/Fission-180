@@ -9,9 +9,9 @@ file is out of date.
 
 ## Headline
 
-**Fusion commands present: 554 / 713 (77.7%)**
+**Fusion commands present: 565 / 714 (79.1%)**
 
-In the areas Fission 180 builds (without the 72 entries left out on purpose, see the end): **554 / 641 (86.4%)**.
+In the areas Fission 180 builds (without the 71 entries left out on purpose, see the end): **565 / 643 (87.9%)**.
 
 What the number means:
 
@@ -20,7 +20,7 @@ What the number means:
   nothing about whether every option of Fusion's dialog is there, or whether the
   result is as good. The depth check is `docs/fission180/dev/core-workflows.md` (everyday
   workflows, end to end) and the parity docs in `docs/fission180/parity/`.
-- Fusion's list is recorded by hand, by name, from memory of stock Fusion; 140 of its
+- Fusion's list is recorded by hand, by name, from memory of stock Fusion; 139 of its
   names are marked "(not sure)" below and wait for a look at real Fusion.
 - Entries are menu entries: a command in two places (Delete in MODIFY and in the
   marking menu) counts twice; panels Fusion repeats on several tabs count once.
@@ -39,14 +39,14 @@ What the number means:
 | **APPLICATION BAR** | all | **10** | **6** | **60.0%** |
 | | (top level) | 7 | 5 | 71.4% |
 | | Profile menu | 3 | 1 | 33.3% |
-| **FILE MENU** | all | **25** | **9** | **36.0%** |
+| **FILE MENU** | all | **25** | **10** | **40.0%** |
 | | (top level) | 13 | 8 | 61.5% |
-| | New Drawing | 2 | 1 | 50.0% |
+| | New Drawing | 2 | 2 | 100.0% |
 | | Share | 2 | 0 | 0.0% |
 | | View | 8 | 0 | 0.0% |
-| **WORKSPACES** | all | **7** | **5** | **71.4%** |
+| **WORKSPACES** | all | **8** | **6** | **75.0%** |
 | | (top level) | 6 | 4 | 66.7% |
-| | Drawing | 1 | 1 | 100.0% |
+| | Drawing | 2 | 2 | 100.0% |
 | **SOLID** | all | **135** | **119** | **88.1%** |
 | | CREATE | 27 | 25 | 92.6% |
 | | FINISH BASE FEATURE | 1 | 1 | 100.0% |
@@ -88,15 +88,15 @@ What the number means:
 | | MODIFY | 10 | 10 | 100.0% |
 | | CONSTRAINTS | 13 | 12 | 92.3% |
 | | FINISH SKETCH | 1 | 1 | 100.0% |
-| **DRAWING** | all | **49** | **35** | **71.4%** |
-| | CREATE | 8 | 6 | 75.0% |
-| | MODIFY | 5 | 3 | 60.0% |
-| | GEOMETRY | 4 | 3 | 75.0% |
+| **DRAWING** | all | **49** | **44** | **89.8%** |
+| | CREATE | 8 | 7 | 87.5% |
+| | MODIFY | 5 | 5 | 100.0% |
+| | GEOMETRY | 4 | 4 | 100.0% |
 | | DIMENSIONS | 12 | 11 | 91.7% |
-| | TEXT | 4 | 2 | 50.0% |
+| | TEXT | 3 | 2 | 66.7% |
 | | SYMBOLS | 4 | 3 | 75.0% |
-| | TABLES | 5 | 2 | 40.0% |
-| | EXPORT | 4 | 2 | 50.0% |
+| | TABLES | 6 | 5 | 83.3% |
+| | EXPORT | 4 | 4 | 100.0% |
 | | SHEET BAR | 3 | 3 | 100.0% |
 | **SIMULATION SETUP** | all | **24** | **16** | **66.7%** |
 | | STUDY | 1 | 1 | 100.0% |
@@ -210,22 +210,13 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 - CREATE > Project / Include > Intersection Curve (not sure)
 - CONSTRAINTS > AutoConstrain (not sure)
 
-### DRAWING (14)
+### DRAWING (5)
 
-- CREATE > Exploded View (greyed, not sure)
 - CREATE > Create Sketch (not sure)
-- MODIFY > Move (greyed)
-- MODIFY > Rotate (greyed)
-- GEOMETRY > Center Mark Pattern (greyed)
 - DIMENSIONS > Arrange Dimensions
-- TEXT > Note (greyed, not sure)
 - TEXT > Hole and Thread Note (not sure)
 - SYMBOLS > Welding Symbol (not sure)
-- TABLES > Renumber (greyed)
-- TABLES > Align Balloons (greyed)
 - TABLES > Hole Table (not sure)
-- EXPORT > Export DWG (greyed)
-- EXPORT > Export CSV (greyed)
 
 ### SIMULATION SETUP (7)
 
@@ -333,7 +324,6 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 - accounts are out of scope (2 entries, 0 present): APPLICATION BAR > Profile menu > My Profile, APPLICATION BAR > Profile menu > Autodesk Account
 - cloud collaboration is out of scope (5 entries, 0 present): APPLICATION BAR > Job Status, APPLICATION BAR > Notifications, FILE MENU > Share > Public Link, FILE MENU > Share > Collaboration, FILE MENU > View > Show/Hide Comments
 - electronics is out of scope (2 entries, 0 present): FILE MENU > New Electronics Design, SOLID > CREATE > Create PCB
-- animation is out of scope (1 entries, 0 present): FILE MENU > New Drawing > From Animation
 - generative design is out of scope (1 entries, 0 present): WORKSPACES > Generative Design
 - rendering is out of scope (1 entries, 0 present): WORKSPACES > Render
 - sculpting (T-spline) is out of scope (48 entries, 0 present): SOLID > CREATE > Create Form, FORM > CREATE > Box, FORM > CREATE > Plane, FORM > CREATE > Cylinder, FORM > CREATE > Sphere, FORM > CREATE > Torus, FORM > CREATE > Quadball, FORM > CREATE > Pipe, FORM > CREATE > Face, FORM > CREATE > Extrude, FORM > CREATE > Revolve, FORM > CREATE > Sweep, FORM > CREATE > Loft, FORM > MODIFY > Edit Form, FORM > MODIFY > Insert Edge, FORM > MODIFY > Subdivide, FORM > MODIFY > Insert Point, FORM > MODIFY > Merge Edge, FORM > MODIFY > Bridge, FORM > MODIFY > Fill Hole, FORM > MODIFY > Erase and Fill, FORM > MODIFY > Weld Vertices, FORM > MODIFY > UnWeld Edges, FORM > MODIFY > Crease, FORM > MODIFY > UnCrease, FORM > MODIFY > Bevel Edge, FORM > MODIFY > Slide Edge, FORM > MODIFY > Smooth, FORM > MODIFY > Pull, FORM > MODIFY > Flatten, FORM > MODIFY > Straighten, FORM > MODIFY > Match, FORM > MODIFY > Interpolate, FORM > MODIFY > Thicken, FORM > MODIFY > Freeze, FORM > MODIFY > UnFreeze, FORM > SYMMETRY > Mirror - Internal, FORM > SYMMETRY > Circular - Internal, FORM > SYMMETRY > Mirror - Duplicate, FORM > SYMMETRY > Circular - Duplicate, FORM > SYMMETRY > Clear Symmetry, FORM > SYMMETRY > Isolate Symmetry, FORM > UTILITIES > Display Mode, FORM > UTILITIES > Repair Body, FORM > UTILITIES > Make Uniform, FORM > UTILITIES > Convert, FORM > UTILITIES > Enable Better Performance, FORM > FINISH FORM > Finish Form
