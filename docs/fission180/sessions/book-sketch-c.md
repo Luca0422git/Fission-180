@@ -15,9 +15,24 @@ Every `book_sketch_a_*`, `book_sketch_b_*`, `book_params_sketch`, `book_params_f
 |---|---|---|
 | book_sketch_a_dimension | FAIL (1 of 12) | PASS (13) |
 | book_sketch_a_centerline | FAIL (7 of 40) | PASS (42) |
-| book_sketch_a_select / line / undo / shapes / project / fit | PASS (26 / 36 / 52 / 48 / 17 / 16) | see the table at the end |
-| book_sketch_b_constraints / constraints2 / dimension / dimension_edge / modify / pattern | PASS (65 / 62 / 54 / 21 / 36 / 70) | see the table at the end |
-| book_params_sketch / fields / drone | PASS (72 / 69 / 85) | see the table at the end |
+| book_sketch_a_select / line / undo / shapes / project / fit | PASS (26 / 36 / 52 / 48 / 17 / 16) | PASS, the same counts |
+| book_sketch_b_constraints / constraints2 / dimension / dimension_edge / modify / pattern | PASS (65 / 62 / 54 / 21 / 36 / 70) | PASS, the same counts |
+| book_params_sketch / fields / drone | PASS (72 / 69 / 85) | PASS, the same counts |
+
+The 85 older sketch scenarios (`sketch*`, `selection_sketch`, `fixsketch_*`,
+`polish2_sketch_check`, `vex_qa_inch_sketch`) all pass, one at a time, on the code of Part 2
+(cadedaa2); the 60 of them that draw lines, snap or constrain were run again after the last
+three small commits (the midpoint snap, the corner projection), and 25 once more after
+`develop` (049c500b: extrude, drawings, looks, hardware) was merged in. `sketch_areas_more`
+failed once and passed on its retry while the golden models and the unit suite ran beside it:
+its check "shading the open 50-curve sketch takes < 1 s" took 1.03 s (a speed limit, not a
+sketch-c change); alone it passes.
+
+New scenarios, real input, paced by state: `book_sketch_c_merge` (40 checks),
+`book_sketch_c_dimension` (48), `book_sketch_c_names` (44), `book_sketch_c_reference` (37),
+`book_sketch_c_grid` (34), `book_sketch_c_scale` (26). Unit: `test_book_sketch_c.py` (21);
+the whole unit suite: 3573 tests pass (10 skipped) after the merge. Golden models: 629 pass,
+2 xfail (as before).
 
 ### The collisions
 
