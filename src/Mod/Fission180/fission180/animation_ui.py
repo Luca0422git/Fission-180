@@ -568,12 +568,11 @@ def _apply(on):
     _hold_design_keys(on)
     if on:
         _start_timer()
-        STATE["key"] = _data_key(doc)
-        refresh_view(force=True)
+        refresh()
         _remember_camera()
     else:
         _stop_timer()
-    _refresh_browser()
+        _refresh_browser()
     if was != STATE["on"]:
         log(
             "%s workspace%s"

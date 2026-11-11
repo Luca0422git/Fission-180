@@ -514,6 +514,13 @@ def click_part(label, dx=0.0, dy=0.0):
     return True
 
 
+def eye(label):
+    """Click the eye of a browser row."""
+    from Fission180Tests.gui import timeline_input as ti
+
+    return ti.click_eye(label)
+
+
 def selected_labels():
     return [c.Label for c in ui_module().selected_components(doc())]
 
