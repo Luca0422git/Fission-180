@@ -186,9 +186,42 @@ class PlacingBox(taskui.ArrowValueBox):
     Enter, 9.6": there was no box on the canvas, the numbers went into the dialog at the
     side, where nobody looks while placing). on_tab(forward) names the next box."""
 
+    POINTER_ROOM = 24  # px around the mouse pointer no size box sits on (see _show_placing_boxes)
+
     def __init__(self, text, commit, on_tab=None, cancel=None):
         super().__init__(text, commit, cancel=cancel)
         self._on_tab = on_tab
+        self.setMouseTracking(True)  # moves over the box reach the 3D view (mouseMoveEvent)
+
+    def mouseMoveEvent(self, event):
+        """The pointer passing over a size box still places the shape (fix-2: the box sits
+        on the canvas where the outline is; a pointer that came to rest on it left the
+        outline behind, so the next click gave the size from before: primitives_qa_paths
+        P1 on GitHub, the Width 12 instead of 15). With no button down the move goes on to
+        the 3D view underneath; the outline follows and the box makes room for the
+        pointer. A press in the box still clicks into it to type."""
+        super().mouseMoveEvent(event)
+        try:
+            if event.buttons() != QtCore.Qt.NoButton:
+                return  # selecting text in the box
+            parent = self.parentWidget()
+            if parent is None:
+                return
+            local = event.position() if hasattr(event, "position") else QtCore.QPointF(event.pos())
+            at = QtCore.QPointF(self.mapTo(parent, local.toPoint()))
+            moved = QtGui.QMouseEvent(
+                QtCore.QEvent.MouseMove,
+                at,
+                QtCore.QPointF(parent.mapToGlobal(at.toPoint())),
+                QtCore.Qt.NoButton,
+                QtCore.Qt.NoButton,
+                event.modifiers(),
+            )
+            QtWidgets.QApplication.sendEvent(parent, moved)
+        except RuntimeError:
+            pass  # the box or the view went
+        except Exception as exc:
+            warn("size box: %s" % exc)
 
     def focusNextPrevChild(self, forward):
         # Tab: take what was typed and go on to the next size box on the canvas (Qt would
@@ -1229,6 +1262,7 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
             if name not in keys:
                 self._drop_placing_box(name)
         view, frame = self.placer.view, self.placer.frame
+        pointer = self._pointer_rect(view, frame, mouse)
         fresh = False
         for key, anchor, tail, tip in spots:
             field = self._visible_field(key)
@@ -1249,6 +1283,9 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
                     for n, b in self.value_boxes.boxes.items()
                     if n != name and n.startswith(self.PLACING) and b.isVisible()
                 ]
+                if pointer is not None:
+                    # never under the pointer: the click that places the shape goes there
+                    others.append(pointer)
                 box.place_segment(
                     view,
                     frame.multVec(App.Vector(anchor[0], anchor[1], 0)),
@@ -1263,6 +1300,21 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
             # a number typed over the view goes into the first size not typed yet
             waiting = [k for k in keys if k[len(self.PLACING) :] not in self.locked]
             self.value_boxes.used((waiting or keys)[0])
+
+    def _pointer_rect(self, view, frame, mouse):
+        """(left, top, width, height) in the 3D view's pixels around the mouse pointer at the
+        plane point `mouse`, which the size boxes keep clear of; None when unknown."""
+        if mouse is None:
+            return None
+        try:
+            parent = taskui.view_widget()
+            ratio = parent.devicePixelRatioF() or 1.0
+            x, y = view.getPointOnViewport(frame.multVec(App.Vector(mouse[0], mouse[1], 0)))
+            x, y = x / ratio, parent.height() - y / ratio
+            room = PlacingBox.POINTER_ROOM
+            return (int(x - room), int(y - room), 2 * room, 2 * room)
+        except Exception:
+            return None
 
     def _make_placing_box(self, key, field):
         try:
