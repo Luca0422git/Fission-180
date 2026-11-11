@@ -292,7 +292,8 @@ components), `book_components_menus` (menus, Isolate, drag, the empty body),
 | Hole, Thread, Fillet, Chamfer, Shell, Draft (change a body) | change the body picked | the same | the same |
 | Patterns and Mirror of features / faces / bodies | in the body of what is repeated | the same | the same |
 | Pattern / Mirror of components | a step of the design; the copies beside the original | patterns: the same; Mirror: not built | the same; Mirror built |
-| Canvas, Decal | the active component | the active component's body | the same |
+| Canvas | the active component | the active component's body | the same (checked again by components-2: `insert_ui` takes `commands.ensure_body()`) |
+| Decal | the active component (Guess: a new object) | the component of the body whose face it is put on (`decal.make`: it is drawn in that component and moves with it) | the same: not the active component when the face is another component's (components-2 corrected this row, which said "the active component's body"); the decal is always on the face clicked |
 | Joints, Rigid Groups, Motion Links | the active component's Joints folder | the design's hidden assembly | the same (one Joints folder: FreeCAD's assembly holds them) |
 | New Component | under the active component (Parent box) | the same | the same; Parent can be clicked in the browser |
 | Paste | the active component | the same | the same, standing on the occurrence copied |
@@ -469,21 +470,21 @@ when a dialog closes (and before the next command).
   components), then snap or dimension to the projected curve. The function to call is
   `sketch_external.project_across(sketch, object, "EdgeN")` (the drawing and dimension tools
   are the sketch builders').
-- Wave 7: New Component has no Internal / External choice (an External component is a design
-  of its own on disk, edited in place; Insert into Current Design links a saved design, but
-  cannot start an empty one or edit it in place). Create Selection Set is not built (Fission
-  180 has no selection sets). The first component picked for a Joint is not ungrounded by
-  itself (Fusion does; here the dialog says it is grounded).
-- Wave 7: a construction plane, axis or point built on another component follows that part's
-  changes; when the other component MOVES later it moves too at the next change of the part
-  (its frame is worked out from the picks in design coordinates when it recomputes), unlike a
-  sketch's reference, which keeps its place.
-- Wave 7, open: with a sub-component active, a Cut chosen by hand in Extrude did not reach
-  another component's body in the scenario's probe ("The cut does not go through any body",
-  for both signs of the distance; the same profile as New Body lies inside that body).
-  Fusion cuts it (Objects To Cut). The bodies a Cut passes through are not filtered by the
-  wave 7 rule (`extrude_bodies.in_the_way` returns them all); not resolved (the Extrude
-  dialog is the extrude work's). With that body's component active the cut works.
+- Wave 7 (components-2): New Component shows Internal / External with External greyed (an
+  External component is a design of its own on disk, edited in place; Insert into Current
+  Design links a saved design, but cannot start an empty one or edit it in place). Create
+  Selection Set is not built (Fission 180 has no selection sets).
+- Wave 7 (components-2): a step made on a body outside the active component (a Hole, a Cut,
+  a Fillet, a Rest on another component's part) is a step of that body's component here
+  (FreeCAD keeps a step inside its body); Fusion lists it under the component that was
+  active. It is said next to the mouse when the dialog closes; the step shows in that
+  component's (and the design's) timeline.
+- Wave 7 (components-2): one Fillet / Chamfer step rounds edges of one body (Fusion's takes
+  edges of several bodies); a click on a second body says so.
+- Wave 7 (components-2): Fusion also grounds the first component that is INSERTED into a
+  design (and the first one made by Extrude > New Component); here only New Component and
+  Create Components from Bodies ground it (`components_ui.ground_first`). Editing a step of
+  another component from the timeline still makes that component the active one.
 - Wave 7: with the design's row active, a sketch on a face of a component's body goes into the
   root (Fusion does the same) and its extrude makes a New Body at the root unless Cut is
   chosen; activate the component first to add to its body, as in Fusion.
@@ -497,19 +498,22 @@ when a dialog closes (and before the next command).
   the root while the body goes to a component" (Fusion's Create Components from Bodies) is
   approximated: the body's sketches move with the body.
 - The New Component dialog's Parent is a drop-down, not Fusion's click-in-the-browser box.
-- Instances: nested components of the copied component are flattened into the instance (its
-  bodies are there, the nested component rows are not); editing happens through the
-  original (activating an instance activates the original; a sketch put directly on an
-  instance's face goes into the instance's copy body only, Fusion would edit the component);
+- Instances: editing happens through the original (activating an instance, or a part
+  inside it, activates the original; a sketch put directly on an instance's face goes into
+  the instance's copy body only, Fusion would edit the component); a part inside a copy of
+  a subassembly cannot be moved or jointed on its own (it stands where the original's part
+  stands; refused with the reason), and the copies have no joints of their own (they show
+  the pose the original's joints give it); instances saved before wave 7 stay flat (no
+  rows for the parts inside);
   deleting the original hands over to an occurrence, but the original's features (its
   timeline steps) and decals go with the original: the occurrence that takes over keeps
   the solids as frozen bases (Fusion keeps the features in the component; Undo brings
   them back), and a pattern's copies of the original stay frozen; a body deleted from an
   instance comes back at the next sync.
 - A pattern's copies cannot be moved on their own (refused with the reason). A mirrored
-  component (wave 7) is an occurrence-like copy ("Name:2") whose solids are mirrored, not a
-  new component with features of its own as in Fusion; nested components of a mirrored or
-  patterned subassembly come in flat (its bodies, not its component rows or joints).
+  component (wave 7) is named "Name (Mirror)" but is still a copy whose solids are
+  mirrored and that is edited through its original, not a new component with features of
+  its own as in Fusion; joints are not mirrored (Fusion neither).
 - A component move that is not captured, in a design without joints, cannot be reverted
   (joints' Capture Position / Revert need the joints' assembly); Fusion asks to capture or
   revert before the next feature (not built: the pending position simply stays). Rolling the
