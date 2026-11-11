@@ -999,6 +999,10 @@ class SketchSession:
         ensure_areas(sketch)  # an older sketch: its areas can be clicked after Finish Sketch
         self.display = DisplayOptions(self)
         self.fixed = FixedColour(self)
+        from . import sketch_dimension_signs
+
+        # the diameter sign on dimensions to a centerline
+        self.signs = sketch_dimension_signs.DiameterSigns(self)
         self.right_angles = None  # the 90 degree marks at corners (sketch_right_angles.py)
         try:
             from .sketch_right_angles import RightAngleMarks
@@ -1077,6 +1081,7 @@ class SketchSession:
         if self.tool is not None:
             self.tool.changed()
         self.fixed.invalidate()
+        self.signs.invalidate()
         self._refresh.start()
 
     def _refreshed(self):
@@ -1087,6 +1092,7 @@ class SketchSession:
             self.areas.refresh(self.shading.shaded)
             self.display.apply()
             self.fixed.apply()
+            self.signs.apply()
             self.frames.update()
         except Exception as exc:
             warn("sketch display: %s" % exc)
@@ -1309,53 +1315,11 @@ class SketchSession:
                 return
             c = constraints[index]
             if c.Type in DIMENSIONAL and c.Driving:
-                # Fusion: a dimension to a centerline is the diameter (sketch_centerline.py)
-                index = self._diameter_dimension(index)
                 if self._make_driven_if_redundant(index):
                     return
                 self.edit_dimension(index)
         except Exception as exc:
             warn("dimension box: %s" % exc)
-
-    def _diameter_dimension(self, index):
-        """The dimension just placed, when it runs from a point or line to a centerline,
-        becomes the diameter, in a step glued to the dimension's own. Returns the index
-        of the dimension to go on with (the new one, or `index`)."""
-        from . import sketch_centerline
-
-        sketch = self.sketch
-        try:
-            if not sketch_centerline.lines(sketch):
-                return index
-            c = sketch.Constraints[index]
-            plan = sketch_centerline.diameter_plan(
-                c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, sketch_centerline.lines(sketch)
-            )
-            if plan is None:
-                return index
-            doc = self.doc
-            infer = self.infer
-            if infer is not None:
-                infer._applying = True
-            doc.openTransaction(INFER_STEP)
-            try:
-                new = sketch_centerline.diameter(sketch, index)
-                sketch.solve()
-            except Exception:
-                doc.abortTransaction()
-                raise
-            finally:
-                if infer is not None:
-                    infer._applying = False
-            doc.commitTransaction()
-            self._tidy_seen = len(sketch.Geometry)
-            if infer is not None:
-                infer.seen = sketch.GeometryCount
-                infer.invalidate()
-            return new if new is not None else index
-        except Exception as exc:
-            warn("diameter dimension: %s" % exc)
-            return index
 
     def _make_driven_if_redundant(self, index):
         """A dimension on a size the other dimensions/constraints already set would
@@ -2235,10 +2199,6 @@ class SketchSession:
             QtWidgets.QApplication.instance().focusChanged.disconnect(self._focus_changed)
         except Exception:
             pass
-        try:
-            self.filter._placed()  # (the view's pick radius, if a dimension was being placed)
-        except Exception as exc:
-            warn("sketch mode: %s" % exc)
         hooked = [(self.gl, self.filter), (self.viewer, self.keys)]
         hooked += [(field, self.keys) for field in self._fields]
         for widget, event_filter in hooked:
@@ -2337,7 +2297,6 @@ class _ViewFilter(QtCore.QObject):
         self.right_pressed = None
         self.refused_release = False  # the release of a refused Project click
         self.chain_double = False  # a double-click's press on the line chain's end
-        self.placing = None  # the view's pick radius, shrunk while a dimension is placed
 
     def eventFilter(self, obj, event):
         try:
@@ -2427,15 +2386,13 @@ class _ViewFilter(QtCore.QObject):
                 return True
             if kind == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
                 session.open_spline_step()  # (FreeCAD's spline tool: the points' undo step)
-                self._placing_dimension(obj, event)
-            elif kind == QtCore.QEvent.MouseButtonRelease and self.placing is not None:
-                QtCore.QTimer.singleShot(0, self._placed)
             # Fusion's inference (sketch_infer.py) may hand FreeCAD a copy of the event
             # with the point moved onto a guide; the copy comes back through here.
             if session.infer is not None and session.infer.mouse(obj, event):
                 return True
             if kind in _REDRAWS:
                 session.fixed.poke()  # FreeCAD recolours curves after these
+                session.signs.poke()  # ...and may write the dimensions' texts again
             if kind == QtCore.QEvent.MouseMove:
                 if event.buttons() == QtCore.Qt.NoButton:
                     session.areas.moved(event.position().toPoint())
@@ -2486,61 +2443,6 @@ class _ViewFilter(QtCore.QObject):
         except Exception as exc:
             warn("sketch view: %s" % exc)
         return False
-
-    def _placing_dimension(self, obj, event):
-        """A left press while FreeCAD's Dimension tool runs: when it places the dimension
-        (sketch_select_core.places_dimension) FreeCAD must find nothing under the pointer,
-        or it takes the click for one more pick. The view's pick radius is shrunk to
-        nothing until the release is handled, and FreeCAD is shown the pointer once more
-        (a move), so that what it had lit goes dark."""
-        if self.placing is not None:
-            self._placed()  # (the release of the click before never came: put back first)
-        session = self.session
-        try:
-            from . import recent
-            from . import sketch_select_core
-
-            if recent.running_tool() not in DIMENSION_COMMANDS or not session.drawing_cursor():
-                return
-            sketch = session.sketch
-            preview = len(sketch.Constraints) > session.constraint_count
-            picked = sum(
-                len(sel.SubElementNames)
-                for sel in Gui.Selection.getSelectionEx()
-                if sel.Object is sketch
-            )
-            pre = Gui.Selection.getPreselection()
-            under = []
-            if getattr(pre, "ObjectName", "") == session.name:
-                under = [n.rsplit(".", 1)[-1] for n in (pre.SubElementNames or ()) if n]
-            if not under or not sketch_select_core.places_dimension(preview, picked, under):
-                return
-            viewer = session.view.getViewer()
-            self.placing = (viewer, viewer.getPickRadius())
-            viewer.setPickRadius(0.01)
-            move = QtGui.QMouseEvent(
-                QtCore.QEvent.MouseMove,
-                event.position(),
-                event.globalPosition(),
-                QtCore.Qt.NoButton,
-                QtCore.Qt.NoButton,
-                event.modifiers(),
-            )
-            QtWidgets.QApplication.sendEvent(obj, move)
-            log("dimension: the click places it (not a pick of %s)" % ", ".join(under))
-        except Exception as exc:
-            self._placed()
-            warn("dimension placement: %s" % exc)
-
-    def _placed(self):
-        placing, self.placing = self.placing, None
-        if placing is None:
-            return
-        try:
-            viewer, radius = placing
-            viewer.setPickRadius(radius)
-        except Exception as exc:
-            warn("dimension placement: %s" % exc)
 
 
 _PRESSES = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)

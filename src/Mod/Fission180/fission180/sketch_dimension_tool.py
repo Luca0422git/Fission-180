@@ -48,6 +48,7 @@ CIRCLE = "Part::GeomCircle"
 ARC = "Part::GeomArcOfCircle"
 PICKABLE_CURVES = (LINE, CIRCLE, ARC)
 TITLE = "Sketch Dimension"
+CENTERLINE = "Centerline diameter"  # a Spec's kind: the diameter about a centerline
 ZERO_HELP = (
     "a dimension cannot be 0 (Fusion refuses it too). To make them meet use Coincident; to "
     "line them up Horizontal/Vertical or Collinear."
@@ -72,18 +73,23 @@ class Spec:
     in mm or radians; `text` what the hint says; `lines` the preview; `label(cursor)` sets
     (LabelDistance, LabelPosition) or None."""
 
-    def __init__(self, kind, value, build, lines=(), label=None, what=""):
+    def __init__(self, kind, value, build, lines=(), label=None, what="", prepare=None):
         self.kind = kind
         self.value = value
         self.build = build
         self.lines = list(lines)
         self.label = label
         self.what = what
+        # run once inside the dimension's undo step before build() (a centerline diameter's
+        # hidden mirror point)
+        self.prepare = prepare
 
     def text(self):
         if self.kind == "Angle":
             return "%.1f deg" % math.degrees(abs(self.value))
-        prefix = {"Diameter": "diameter ", "Radius": "radius "}.get(self.kind, "")
+        prefix = {"Diameter": "diameter ", "Radius": "radius ", CENTERLINE: "diameter "}.get(
+            self.kind, ""
+        )
         return "%s%s%s" % (prefix, _fmt(abs(self.value)), self.what)
 
 
@@ -276,6 +282,8 @@ class Dimension(draw.DrawTool):
         if value <= core.ZERO:
             return "that point is on the line: " + ZERO_HELP
         f = core.foot(p, origin, direction)
+        if line >= 0 and line in self._centerlines():
+            return self._centerline_diameter(point_item, line, p, f, value, cursor)
         lines = core.linear_preview(core.ALIGNED, f, p, cursor)
         if line in (-1, -2):
             # an axis: FreeCAD's signed horizontal / vertical distance from the origin keeps
@@ -298,6 +306,48 @@ class Dimension(draw.DrawTool):
             lambda: _con("Distance", point_item[0], point_item[1], line, value),
             lines,
             lambda c: core.linear_label(core.ALIGNED, f, p, c),
+        )
+
+    def _centerlines(self):
+        """The geometry indices of the sketch's centerlines (Linetype: Centerline)."""
+        try:
+            from . import sketch_centerline
+
+            return sketch_centerline.lines(self.sketch)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            return []
+
+    def _centerline_diameter(self, point_item, line, p, f, value, cursor):
+        """Fusion: a dimension from a point, a line or a circle's centre to a CENTERLINE is
+        the diameter across the turned part (twice the distance). FreeCAD's solver has no
+        such dimension: it is a Distance from the point to its hidden mirror image across
+        the centerline (sketch_centerline.mirror_point), drawn across the centerline with
+        the diameter sign (sketch_dimension_signs.py)."""
+        from . import sketch_centerline
+
+        sketch = self.sketch
+        image = (2.0 * f[0] - p[0], 2.0 * f[1] - p[1])
+        made = {}
+
+        def prepare():
+            made["helper"] = sketch_centerline.mirror_point(
+                sketch, point_item[0], point_item[1], line
+            )
+            if made["helper"] is None:
+                raise ValueError("the point is on the centerline")
+
+        def build_it():
+            return _con("Distance", point_item[0], point_item[1], made["helper"], 1, 2.0 * value)
+
+        return Spec(
+            CENTERLINE,
+            2.0 * value,
+            build_it,
+            core.linear_preview(core.ALIGNED, p, image, cursor),
+            lambda c: core.linear_label(core.ALIGNED, p, image, c),
+            " (to the centerline)",
+            prepare,
         )
 
     def _spec_two(self, first, second, cursor):
@@ -347,6 +397,9 @@ class Dimension(draw.DrawTool):
             line, other = (g1, g2) if g1 >= 0 else (g2, g1)
             if line < 0:
                 return "both lines are fixed (axes or projected): pick a sketch line."
+            centerlines = self._centerlines()
+            if line in centerlines and other >= 0 and other not in centerlines:
+                line, other = other, line  # (the diameter: measured from the other line)
             return self._point_line((line, 1), other, cursor)
         sector = core.angle_sector(o1, d1, o2, d2, cursor)
         if sector is None:
@@ -514,6 +567,8 @@ class Dimension(draw.DrawTool):
         try:
             from . import preview
 
+            if spec.prepare is not None:
+                spec.prepare()
             outcome = ctools.add_forms(sketch, self.title, [[spec.build()]])
             index = len(sketch.Constraints) - 1
             if not outcome.ok:
