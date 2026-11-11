@@ -189,6 +189,34 @@ plate is 120 x 90 now, the check unchanged (accepted by the orchestrator).
    `preview.FormulaInput` (the same). Read in the code; no scenario of this builder types a
    parameter name there.
 
+## From the orchestrator, late in the session
+
+- **The largest-size search gave another answer under load** (docs example: "Largest radius
+  found that fits here: 19.98 mm" instead of "... that fits here: 19.99 mm"). The search was
+  cut off by seconds: 1.5 s in the dialogs (`value_limits.BUDGET`), 3 s in the AI tools
+  (`ai/value_fit.BUDGET`), 0.6 s in `blend.max_size`, 1 s in `fillet_robust._alone`. It ends
+  by itself when its gap is under the box's step (0.01 mm: about a dozen builds from 30 mm),
+  so the seconds are now a far guard only (30 s, 60 s, 20 s; `_alone` is bounded by the
+  number of edges, 16). When the guard does stop a search, the note and the AI's answer say
+  "about". Unit tests with a slow clock (`SlowComputer` in `test_value_limits` and
+  `test_ai_value_fit`): the same number and the same sentence at 1 ms and at 2.5 s a build.
+- **The half sentence "(30 mm do"** was the log's cut; the sentence is whole (unit tested).
+  But the sentence before it was wrong on that example: "1 of the 4 edges cannot be rounded;
+  the other 3 can ... (a tiny step or sliver ...)" for four corners that each build alone and
+  do not fit together. Now: "The rounds do not fit together: every edge can be rounded on its
+  own, but once the other 3 are built there is no room left for the last of the 4 ...".
+  Singular / plural fixed; no "click them again" in a tool's answer.
+- **The docs' example now answers 20.00 mm**: 30 mm on the four corners of a 60 x 40 plate;
+  two 20 mm rounds use up the 40 mm side exactly, which builds now (`fillet_section`).
+  `edit_step` on FreeCAD's own Fillet step still answers 19.99 (that step cannot hold the
+  other route's result; the dialog switches to Fission 180's step, the AI's edit does not).
+- **Windows golden models**: `book_chamfer_after_modeled_thread` and
+  `book_thread_dragged_before_chamfer` held Linux's printed volume at 1e-6. Hand formula now
+  (the threaded shaft less the bevel's ring less the grooves' share of it): 29457.434, with
+  the other swept-thread models' 2e-5 (Linux: 29457.470).
+- **`fillet_qa_more` P18**: the step types `2*0.25`; the sum is kept as typed since builder
+  params' merge (Fusion's rule). The check expected it dropped: updated, reason at the line.
+
 ## FreeCAD facts and traps
 
 - `shape.Edges[i]` in a loop builds the whole edge list every time. Take the list once.
@@ -230,6 +258,9 @@ Golden: `book_tensegrity_corner_chamfer_20` (analytic), `book_carabiner_full_rou
 - No highlight of the edges in the way: the refusal counts them and says why, in words.
 - A full round whose pick includes the face's short end edges is held just under (and said).
 - No GUI scenario for the Tesla cases (the benchmark holds them).
+- The AI's `edit_step` on FreeCAD's own Fillet / Chamfer step cannot reach a size only
+  another route builds (it answers the kernel's limit, 19.99 for the docs' plate); a new
+  `fillet` call can (20).
 
 ## Changelog lines
 
@@ -245,6 +276,8 @@ Golden: `book_tensegrity_corner_chamfer_20` (analytic), `book_carabiner_full_rou
 - The Fillet and Chamfer dialogs write their sizes in the design's units (inches in an inch design).
 - An inch design no longer goes back to millimetres after a chamfer with two sizes (the cause is fixed, not only guarded).
 - Auto Timeline reads a part with a modeled thread again.
+- The largest size that fits is the same on a slow computer as on a fast one (it could come out a hundredth smaller, with another sentence, when the computer was busy).
+- When several fillets each fit on their own but not together, the message says that, instead of naming one edge as the culprit.
 
 ## Known issues
 
