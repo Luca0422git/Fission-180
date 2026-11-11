@@ -115,6 +115,10 @@ PARAMS = [
     # "non-intrusive" setting must stay on: off, FreeCAD shows its user warnings ("Wrong
     # selection"...) as blocking message boxes instead.
     (NOTIFICATIONS, "Bool", "NonIntrusiveNotificationsEnabled", True),
+    # FreeCAD's modal "Sketcher Constraint Substitution" box (Tangent on curves whose ends
+    # are joined) never shows: Fusion says nothing there (sf/book-sketch-b; Fission 180's
+    # own Tangent does the same swap without a word, sketch_constrain_tools.py)
+    (SKETCHER_GENERAL, "Bool", "NotifyConstraintSubstitutions", False),
     (NOTIFICATIONS, "Int", "MaxOpenNotifications", 0),
     # Fusion: every closed area of a sketch is a profile you can click, also after Finish
     # Sketch and before any command (then E or Q uses it). FreeCAD can do that when a

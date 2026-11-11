@@ -364,106 +364,88 @@ class SketchIntersect(_SketchCommand):
 
 # -- constraints ---------------------------------------------------------------------
 class _Constraint(_SketchCommand):
-    """A CONSTRAINTS tool the Fusion way. FreeCAD's constraint commands use what is
-    selected; when that does not fit (one line selected for Parallel...) they only show a
-    "Wrong selection" note and do nothing. Fusion starts the tool and waits for picks:
-    here the selection is dropped and FreeCAD's tool starts in its pick mode."""
+    """A CONSTRAINTS tool the Fusion way, on Fission 180's own pick tools
+    (sketch_constrain_tools.py): with fitting things selected it applies at once; else the
+    tool starts and waits for picks. A click or selection that does not fit, and a
+    constraint the sketch cannot take, say why next to the mouse. (Until wave 7 these ran
+    FreeCAD's own commands: on a selection that did not fit they did nothing, Tangent on
+    joined curves showed FreeCAD's modal "Sketcher Constraint Substitution" box, Coincident
+    took a click on a line as its midpoint, and Symmetry knew only two points.)"""
 
-    freecad = ""
-
-    def command_for(self, sketch):
-        return self.freecad
+    tool = ""  # the command name of the tool in sketch_constrain_tools.TOOLS
+    gives_way = False  # sketch_draw.run ends the running tool itself (and keeps the selection)
 
     def run(self):
-        sketch = _in_sketch(self.title)
-        if sketch is None:
+        if _in_sketch(self.title) is None:
             return
-        had_selection = bool(Gui.Selection.getSelectionEx())
-        before = len(sketch.Constraints)
-        Gui.runCommand(self.command_for(sketch))
-        if len(sketch.Constraints) != before or not had_selection or _tool_running():
-            return
-        Gui.Selection.clearSelection()
-        Gui.runCommand(self.freecad)
-        commands.tell("%s: click what to constrain." % self.title)
+        from . import sketch_constrain_tools, sketch_draw
+
+        sketch_draw.run(sketch_constrain_tools.TOOLS[self.tool])
 
 
-class _Fix(_Constraint):
-    """Fusion's Fix/Unfix also fixes whole curves: selected curves get FreeCAD's Block
-    (the curve stays where it is); points get Lock."""
-
-    def command_for(self, sketch):
-        names = [
-            n.rsplit(".", 1)[-1]
-            for sel in Gui.Selection.getSelectionEx()
-            if sel.Object is sketch
-            for n in sel.SubElementNames
-        ]
-        if names and all(n.startswith("Edge") for n in names):
-            return "Sketcher_ConstrainBlock"
-        return self.freecad
-
-
-def _tool_running():
-    gl = sketch_mode.gl_widget()
-    try:
-        return gl is not None and gl.cursor().shape() != QtCore.Qt.ArrowCursor
-    except Exception:
-        return False
-
-
-def _constraint(title, freecad, icon, tip):
+def _constraint(title, command, icon, tip):
     return type(
-        "Constraint_" + freecad,
+        "Constraint_" + command.rsplit("_", 1)[-1],
         (_Constraint,),
-        {"title": title, "freecad": freecad, "icon": icon, "tip": tip},
+        {"title": title, "tool": command, "icon": icon, "tip": tip},
     )
 
 
 CONSTRAINTS = {
-    "Fission180_SketchCoincident": _constraint(
-        "Coincident",
-        "Sketcher_ConstrainCoincidentUnified",
-        "c_coincident",
-        "Make points meet, or put a point on a curve: click them",
-    ),
-    "Fission180_SketchFix": type(
-        "Constraint_Fix",
-        (_Fix,),
-        {
-            "title": "Fix/Unfix",
-            "freecad": "Sketcher_ConstrainLock",
-            "icon": "c_fix",
-            "tip": "Fix curves or points where they are: select them, or click points",
-        },
-    ),
-    "Fission180_SketchParallel": _constraint(
-        "Parallel", "Sketcher_ConstrainParallel", "c_parallel", "Make lines parallel: click them"
-    ),
-    "Fission180_SketchPerpendicular": _constraint(
-        "Perpendicular",
-        "Sketcher_ConstrainPerpendicular",
-        "c_perpendicular",
-        "Make two curves perpendicular: click them",
-    ),
-    "Fission180_SketchHorizontalVertical": _constraint(
-        "Horizontal/Vertical",
-        "Sketcher_ConstrainHorVer",
-        "c_horizontal",
-        "Make lines horizontal or vertical: click them",
-    ),
-    "Fission180_SketchTangent": _constraint(
-        "Tangent", "Sketcher_ConstrainTangent", "c_tangent", "Make two curves tangent: click them"
-    ),
-    "Fission180_SketchEqual": _constraint(
-        "Equal", "Sketcher_ConstrainEqual", "c_equal", "Make curves the same size: click them"
-    ),
-    "Fission180_SketchSymmetry": _constraint(
-        "Symmetry",
-        "Sketcher_ConstrainSymmetric",
-        "c_symmetric",
-        "Make two points symmetric about a line or point: click them",
-    ),
+    name: _constraint(title, name, icon, tip)
+    for name, title, icon, tip in (
+        (
+            "Fission180_SketchCoincident",
+            "Coincident",
+            "c_coincident",
+            "Make two points meet, or put a point on a curve: click them (or select them first)",
+        ),
+        (
+            "Fission180_SketchFix",
+            "Fix/Unfix",
+            "c_fix",
+            "Fix curves or points where they are: click them (or select them first). A click "
+            "on a fixed one frees it",
+        ),
+        (
+            "Fission180_SketchParallel",
+            "Parallel",
+            "c_parallel",
+            "Make lines parallel: click them (or select them first)",
+        ),
+        (
+            "Fission180_SketchPerpendicular",
+            "Perpendicular",
+            "c_perpendicular",
+            "Make two lines, or a line and a curve, perpendicular: click them",
+        ),
+        (
+            "Fission180_SketchHorizontalVertical",
+            "Horizontal/Vertical",
+            "c_horizontal",
+            "Make a line, or two points, horizontal or vertical, whichever is nearest: click "
+            "the line, or one point and then the other",
+        ),
+        (
+            "Fission180_SketchTangent",
+            "Tangent",
+            "c_tangent",
+            "Make two curves tangent: click them (or select them first)",
+        ),
+        (
+            "Fission180_SketchEqual",
+            "Equal",
+            "c_equal",
+            "Make lines the same length, or circles and arcs the same size: click them",
+        ),
+        (
+            "Fission180_SketchSymmetry",
+            "Symmetry",
+            "c_symmetric",
+            "Make two points, lines, circles or arcs mirror each other: click the two, then "
+            "the line to mirror about",
+        ),
+    )
 }
 
 

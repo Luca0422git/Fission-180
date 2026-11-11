@@ -299,6 +299,32 @@ def refused_constraint(title, kind, culprits_text, count=1, partial=False):
     return "%s: not added, it is so already." % title
 
 
+def refused_unmet(title, neighbours_text):
+    """A constraint the solver finds no way to meet, and cannot say what stops it (a
+    Parallel between a Horizontal and a Vertical line): the constraints on the same curves
+    are shown, as the place to look."""
+    if neighbours_text:
+        return (
+            "%s: not added, it cannot be met together with the other constraints on these "
+            "curves (%s%s)." % (title, neighbours_text, SHOWN.replace(" (", "; ").rstrip(")"))
+        )
+    return "%s: not added, it does not fit the sketch's other constraints." % title
+
+
+def refused_partial(title, culprits_text):
+    """A constraint that says something new, but part of it is said already by something
+    that cannot simply be replaced (a dimension, a Fix): FreeCAD's solver takes neither."""
+    if culprits_text:
+        return (
+            "%s: not added, part of it is already said by %s%s. Delete that first, then add "
+            "%s again." % (title, culprits_text, SHOWN, title)
+        )
+    return (
+        "%s: not added, part of it is already said by the sketch's other constraints; the "
+        "sketch solver cannot take both." % title
+    )
+
+
 def driven_dimension(culprits_text, partial=False):
     """A dimension on a size the sketch already sets: it is added as a driven dimension."""
     if culprits_text and partial:
