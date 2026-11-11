@@ -206,7 +206,16 @@ def bodies_in_way(doc, tool, lead=None):
                 touching.append(body)
         except Exception:
             continue
-    return through, touching
+    return through, _joinable(touching, lead)
+
+
+def _joinable(touching, lead=None):
+    """Of the bodies a solid touches, those a Join may change and that count for the
+    operation proposed by itself: the active component's (components.may_change; wave 7,
+    book parity report bug 10). A Cut still lists every body it passes through."""
+    from . import components
+
+    return [b for b in touching if components.may_change(b, lead=lead)]
 
 
 def participants_of(feature, doc, options, tool_fn):
@@ -809,21 +818,25 @@ def in_the_way(profiles, options, lead=None):
                 touching.append(body)
         except Exception:
             continue
-    return through, touching, overlapping
+    # (the Join list: only bodies a Join may change, the active component's; components'
+    # _joinable, wave 7. The automatic Cut's own scope is the dialog's: auto_scope.)
+    return through, _joinable(touching, lead), overlapping
 
 
-def auto_scope(doc):
-    """(names inside, names direct) for extrude_bodies_core.scope: the bodies inside the
-    active component (None: the root is active, every body counts) and the bodies that
-    belong to the active component itself. Only these decide the automatic operation."""
+def auto_scope(doc, lead=None):
+    """(names inside, names direct) for extrude_bodies_core.scope: the bodies that decide
+    the operation a dialog proposes by itself. Both are the bodies of the active component
+    (components.may_change, the components builder's rule for the report's bug 10: "only
+    bodies of the active component do"); a body of another component, or of a component
+    inside the active one, never turns an extrude into a Cut or a Join by itself. The
+    person can still pick Cut: the Bodies to Cut row then lists every body in the way."""
     from . import components
 
     try:
-        active = components.active_component(doc)
-        direct = [b.Name for b in components.bodies_in(doc, active)]
-        if active is None:
-            return None, direct
-        return [b.Name for b in components.bodies_in(doc, active, recursive=True)], direct
+        names = [
+            b.Name for b in bodies.list_bodies(doc) if components.may_change(b, doc, lead=lead)
+        ]
+        return names, names
     except Exception:
         return None, None  # (cannot be told: every body counts, as before components)
 
@@ -850,6 +863,8 @@ def start_state(profiles, options, lead=None, inside=None, on=None):
         candidates = candidate_bodies(profiles[0][0].Document, lead)
         if not candidates:
             return False, False
+        # (wave 7, bug 10: only material of the active component proposes a Cut; the
+        # dialog passes those bodies as `inside` and `on`: auto_scope)
         inside = None if inside is None else set(inside)
         on = None if on is None else set(on)
         if options["direction"] == "symmetric":

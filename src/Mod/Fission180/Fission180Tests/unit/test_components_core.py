@@ -226,11 +226,16 @@ class InstanceLabelTests(unittest.TestCase):
 
 
 class PickTests(unittest.TestCase):
-    def test_root_active_picks_the_top_component(self):
-        self.assertEqual(core.component_to_pick(["Comp2", "Comp1"], None), "Comp1")
+    def test_root_active_picks_the_part_that_was_clicked(self):
+        # wave 7 (book parity report): a click on a part of a subassembly picks that part,
+        # not the subassembly (Fusion's subassemblies are flexible); was "Comp1"
+        self.assertEqual(core.component_to_pick(["Comp2", "Comp1"], None), "Comp2")
 
     def test_active_component_picks_the_one_below_it(self):
         self.assertEqual(core.component_to_pick(["Comp2", "Comp1"], "Comp1"), "Comp2")
+
+    def test_three_deep_picks_the_nearest(self):
+        self.assertEqual(core.component_to_pick(["C3", "C2", "C1"], "C1"), "C3")
 
     def test_a_body_of_the_active_component_picks_it(self):
         self.assertEqual(core.component_to_pick(["Comp1"], "Comp1"), "Comp1")

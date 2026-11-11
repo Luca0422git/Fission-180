@@ -385,6 +385,17 @@ OPTIONS = [
         apply="components",
     ),
     _option(
+        "first_component_grounded",
+        "design",
+        "First component Ground to Parent",
+        "bool",
+        True,
+        (PREFS, "Bool", "FirstComponentGrounded"),
+        group="General",
+        tip="The first component made at each level of a design is grounded: it stays put "
+        "while the parts joined to it move. Right-click it > Unground From Parent to free it.",
+    ),
+    _option(
         "sketch_guides",
         "design",
         "Show inference guides while sketching",

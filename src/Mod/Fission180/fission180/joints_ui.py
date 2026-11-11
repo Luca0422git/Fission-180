@@ -73,7 +73,10 @@ def _selection_entries(doc):
         subs = list(sel.SubElementNames) or [""]
         for i, sub in enumerate(subs):
             point = App.Vector(points[i]) if i < len(points) else None
-            found.append((sel.Object, sub, point))
+            # (wave 7, bug 15) a nested component's browser row is that component
+            from .components import whole_pick
+
+            found.append(whole_pick(sel.Object, sub) + (point,))
     return found
 
 

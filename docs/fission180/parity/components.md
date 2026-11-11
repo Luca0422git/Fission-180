@@ -209,9 +209,149 @@ Create Copy of a component makes a linked instance; the dimmed transparency (75 
 | Paste New | `doc.copyObject(part, True)` |
 | Active Component Visibility | an `SoMaterial` with only its transparency set and the override flag on, at the top of each dimmed object's scene node (a body or a whole component), removed again when it is no longer dimmed |
 
+## Part 3: work across components (wave 7, the book parity report, 2026-11-11)
+
+Built in `components.py` (the one rule: `new_home`, `host_body`, `body_for_new`,
+`may_change`, `has_solids`; references to another component: `reference_link`,
+`reference_binder`; `whole_pick`), `sketch_ui.create_sketch`, `construct.target_body`,
+`sketch_external.project_across` + `sketch_project_across.py` (Project across components),
+`component_pattern.py` (Mirror of components), `component_move_ui.py` (the pivot),
+`clipboard_ui.py` / `instances.py` (where a paste stands), `components_ui.py` (From Bodies,
+the first component's ground, Isolate), `components_core.component_to_pick`.
+Tests: scenarios `book_components_active` (bugs 5 - 8, 10), `book_components_new` (bug 9,
+ground, nesting), `book_components_nested` (bug 15, parts of a subassembly),
+`book_components_project` (Project across components), `book_components_move` (pivot,
+paste, Move to Component), `book_components_pattern` (Mirror and Rectangular Pattern of
+components); unit tests in `test_components_core.py`.
+
+### Sources (search excerpts; Autodesk's sites cannot be opened from the sandbox)
+
+21. **Autodesk** Learn, *Project geometry into a sketch* / *Sketch basics*: after Create
+    Sketch "the new Sketch feature displays in the Timeline and in the Browser, nested
+    within the active component"; Project "allows you to project geometry from anywhere in
+    your design into the active sketch". With source 1 (API manual: geometry made through
+    the UI goes into the active component): **new things go into the active component,
+    whatever was clicked.** The report was right.
+22. **Forum**, *The active component will switch itself*: a user saw the active component
+    change when a face was picked for a sketch; the answer: an existing sketch was picked,
+    Fusion does not switch the active component for a new sketch.
+23. **Autodesk** training (Fusion CAM 2.5-axis cert prep): "the Operation type is set to
+    create a New Body in the active component"; **Forum**, *Cannot Join Bodies with
+    Extrude* and *Extrude New Components From Component*: a Join "works when you activate
+    the component you want to join to", otherwise "it has to be New Body, as there is nothing
+    in the other Component to join to"; two bodies in different components cannot be joined.
+24. **Autodesk** knowledge, *How to extrude from one component to cut another component*:
+    choose Operation Cut and, under Objects to Cut, the component to cut from; **Forum**:
+    "even making the component active, using the cut/hole feature will still affect other
+    component". So a Cut reaches bodies of other components, a Join does not. (The report's
+    bug 10 said Fusion starts a new component's first extrude as New Body: confirmed for
+    the operation proposed by itself; a Cut chosen by hand still cuts other components.)
+25. **Autodesk** blog, *Introducing Ground to Parent* (2024) and help *Ground and unground
+    components*: "the first component created at each layer of the sub-assembly, whether
+    internal or externally referenced, will be Ground to Parent by default"; Preferences >
+    Design > Assemblies > "First component Ground to Parent"; right-click > "Unground From
+    Parent"; "if it is grounded to parent, the first component you select when you create a
+    joint is automatically ungrounded from parent". The report was right (and the menu is
+    named Ground to Parent, not Ground).
+26. **Forum**, *Rotating Assemblies?* / *Set body pivot point*: "the pivot point for an
+    assembly ... is at the assembly origin"; Set Pivot lasts for the command only. **Book**
+    (the report quoting it): a pasted copy turned by Move turns about its origin.
+27. **Autodesk** help, *Copy / paste a component*: after Paste "the Move/Copy dialog
+    displays"; where the paste stands is not said (**Guess**: on the occurrence copied; the
+    report expected Bolt:5's place).
+28. **Forum**, *Should mirroring components preserve their joints*, *Mirror feature*: a Fusion
+    community manager: "Mirror in Fusion is for producing true 'mirrored' components and
+    bodies, meaning a 'left' and 'right' handed version of a component with different
+    geometry. These are always new part numbers"; staff: "mirroring components does not
+    mirror the joints".
+29. **Forum** (*Component Gets Rotated But Not All Sub-Components Rotate With It*, staff
+    answers on flexible subassemblies): "in Fusion, all sub-assemblies are flexible":
+    a part of a subassembly is moved and dragged on its own. **Guess** from that and the
+    book's steps: a click in the window picks the part clicked (the nearest component),
+    the browser row picks a whole subassembly.
+30. When Fusion fills From Bodies by itself: not found in a source. **Guess**: when bodies
+    are selected (as bodies) when New Component starts; never from a face, a sketch or a
+    timeline step.
+
+### Where each command puts its result
+
+| Command | Fusion | Fission 180 before (3.3.10) | Fission 180 now |
+|---|---|---|---|
+| Create Sketch on a face or plane of another component | the active component (21) | the clicked face's body, and that component became the active one (bug 5) | the active component's body; the sketch hangs on a hidden reference to the face (`components.reference_binder`); the active component does not change |
+| Create Sketch on a face of another body of the active component | the active component | the clicked body | the same (FreeCAD keeps a sketch in one body; same component) |
+| Extrude / Revolve / Sweep / Loft, Operation New Body | a new body in the active component (23) | beside the profile's body (bug 6) | the active component (`components.body_for_new`), standing where the profile is |
+| ... Operation New Component | a new component under the active one | the same | the same |
+| ... Operation Join | only bodies of the active component (23) | every shown body it touched, any component | only bodies of the active component count (`components.may_change`); touching none: New Body |
+| ... the operation proposed by itself | New Body unless a body of the active component is touched or entered (23) | Join / Cut from bodies of any component (bug 10) | from the active component's bodies only |
+| ... Operation Cut, chosen by hand | every body in its way (Objects To Cut), any component (24) | the same | the same |
+| CONSTRUCT planes, axes, points | the active component (1) | the body of the first pick (bugs 7, 8) | the active component's body (`construct.target_body`); the frame follows the picks in design coordinates |
+| Primitives (Box ...) | the active component | the active component | the same |
+| Hole, Thread, Fillet, Chamfer, Shell, Draft (change a body) | change the body picked | the same | the same |
+| Patterns and Mirror of features / faces / bodies | in the body of what is repeated | the same | the same |
+| Pattern / Mirror of components | a step of the design; the copies beside the original | patterns: the same; Mirror: not built | the same; Mirror built |
+| Canvas, Decal | the active component | the active component's body | the same |
+| Joints, Rigid Groups, Motion Links | the active component's Joints folder | the design's hidden assembly | the same (one Joints folder: FreeCAD's assembly holds them) |
+| New Component | under the active component (Parent box) | the same | the same; Parent can be clicked in the browser |
+| Paste | the active component | the same | the same, standing on the occurrence copied |
+
+### What else changed (wave 7)
+
+| Fusion | Fission 180 |
+|---|---|
+| Project (P) takes geometry of any component (21) | While FreeCAD's Project (or Include 3D Geometry) runs, a click on a face, edge or corner of another body or component is projected through a hidden reference inside the sketch's body. One undo step per click; the message beside the mouse says how many curves came from which component; an element projected already says so |
+| A projection follows the part it came from | The reference is a PartDesign SubShapeBinder linked through the components (`components.reference_link`): it follows the other part's changes and both components' moves, also after save and reopen. (Fusion computes a projection where the components stood at the sketch's place in the timeline; here it follows later moves too.) |
+| New Component: From Bodies | Ticked by itself only when bodies are selected as bodies when the command starts (30); the dialog says "N bodies will move into the new component: ..."; a click on a component's browser row with From Bodies off sets Parent |
+| The first component of each level is grounded to its parent (25) | Same (New Component, Create Components from Bodies): a Ground on it, in the same undo step. Preferences > General > Design > *First component Ground to Parent* (on). Menu: Ground to Parent / Unground From Parent |
+| Move/Copy of a component: the manipulator on its origin (26) | Same (`ComponentMovePanel._new_pivot`: the first picked component's origin); Set Pivot as before |
+| Paste stands on what was copied (27, guess) | Same for Paste and Paste New (a copy of Bolt:5 starts on Bolt:5) |
+| A click picks the part clicked, also inside a subassembly (29, guess) | `components_core.component_to_pick`: the nearest component (Move's Components, patterns of components); a browser row picks a whole subassembly |
+| A nested component's browser row is that component | `components.whole_pick`: the joint dialogs read the selection through its containers and took the top-level subassembly (bug 15) |
+| Mirror, Pattern Type Components: a mirrored component (28) | One Mirror step with one copy whose solids are mirrored across the plane; it follows the original, is edited, rolled back and deleted like a pattern of components; joints are not mirrored (Fusion neither) |
+| Mirror / patterns start with any component active | They open when the active component has no solid but the design has components, with Pattern Type Components |
+| Isolate another component while one is isolated | Its menu offers Isolate (it only offered Exit Isolate) |
+| The design's row of an assembly: stacked blocks | The `assembly` icon when the design holds components |
+| Component menu: Move/Copy, Create Drawing, Properties | Move/Copy (Move opens on the component), Create Drawing (the DRAWING workspace's command), Properties (shown once the Properties command exists) |
+| Drag a row onto a component | It lands on the row under the pointer when the button is let go (the tree is rebuilt after every drop) |
+| Move to Component | An empty body Fission 180 made for a sketch that went elsewhere is removed when the body with the part arrives (`components.drop_unused_bodies`); new work prefers a body with something in it |
+
+### FreeCAD facts (1.1.4, probed)
+
+- `Sketch.addExternal` and FreeCAD's Project tool refuse every object outside the sketch's own
+  body ("is not allowed as external geometry of this sketch"; the tool's pointer turns into a
+  no-entry sign and stays so until the mouse moves).
+- A sketch attached straight to a face of a step in another `App::Part` ignores both parts'
+  Placements (it is right only while neither component was moved).
+- A `PartDesign::SubShapeBinder` with `Relative` on follows both components only when its
+  Support starts at the first container the binder's body is NOT in and names the path from
+  there (`(B, "Body.Pad.Face6")` for a sibling, `(Outer, "B.Body.Pad.Face6")` from the root,
+  `(Body, "Pad.Face6")` for another body of the same component). Linked straight to the step
+  it ignores the other component's Placement; linked through a container both are in, the
+  document is no longer a DAG.
+- `Gui.Selection.getSelectionEx("", 0)` gives a nested component selected by its name as its
+  top container with the sub path ("Stator", "Housing.").
+- `doc.openTransaction()` only names a pending step; `abortTransaction()` on a step without a
+  change does nothing, and the next change anywhere becomes a step under that name:
+  `App.closeActiveTransaction(True)` closes it.
 
 ## Known gaps (honest list)
 
+- Wave 7: snapping and inference to another component's geometry while drawing, and a
+  dimension that references a model edge by itself (Fusion's "Auto project edges on
+  reference") are not built: press P and click the edge first (that now works across
+  components), then snap or dimension to the projected curve. The function to call is
+  `sketch_external.project_across(sketch, object, "EdgeN")` (the drawing and dimension tools
+  are the sketch builders').
+- Wave 7: New Component has no Internal / External choice (an External component is a design
+  of its own on disk, edited in place; Insert into Current Design links a saved design, but
+  cannot start an empty one or edit it in place). Create Selection Set is not built (Fission
+  180 has no selection sets). The first component picked for a Joint is not ungrounded by
+  itself (Fusion does; here the dialog says it is grounded).
+- Wave 7: a construction plane, axis or point built on another component follows that part's
+  changes; when only the other component MOVES it follows at the next change of the part
+  (its frame is worked out from the picks in design coordinates when it recomputes).
+- Wave 7: with the design's row active, a sketch on a face of a component's body goes into the
+  root (Fusion does the same) and its extrude makes a New Body at the root unless Cut is
+  chosen; activate the component first to add to its body, as in Fusion.
 - Ghosting, the marker and instances are built (components-2); what is still missing:
 - A component made from bodies that existed before it (Create Components from Bodies) stays
   shown when the marker stands before its step (Fusion puts the body back at the root): hiding
@@ -231,8 +371,10 @@ Create Copy of a component makes a linked instance; the dimmed transparency (75 
   the solids as frozen bases (Fusion keeps the features in the component; Undo brings
   them back), and a pattern's copies of the original stay frozen; a body deleted from an
   instance comes back at the next sync.
-- A pattern's copies cannot be moved on their own (refused with the reason); Mirror of
-  components is not built (greyed in Mirror's Pattern Type).
+- A pattern's copies cannot be moved on their own (refused with the reason). A mirrored
+  component (wave 7) is an occurrence-like copy ("Name:2") whose solids are mirrored, not a
+  new component with features of its own as in Fusion; nested components of a mirrored or
+  patterned subassembly come in flat (its bodies, not its component rows or joints).
 - A component move that is not captured, in a design without joints, cannot be reverted
   (joints' Capture Position / Revert need the joints' assembly); Fusion asks to capture or
   revert before the next feature (not built: the pending position simply stays). Rolling the

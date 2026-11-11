@@ -202,6 +202,14 @@ class InstanceCopy:
             if obj.Index >= len(moves):
                 return  # about to be removed (the pattern has fewer copies now)
             shape.transformShape(moves[obj.Index].toMatrix(), True)
+            try:  # a Mirror of components: the solids mirrored across its plane
+                from . import component_pattern
+
+                plane = component_pattern.mirror_plane(pattern)
+                if plane is not None:
+                    shape = shape.mirror(plane[0], plane[1])
+            except Exception as exc:
+                warn("mirrored copy %s: %s" % (obj.Label, exc))
             body = copy_body(obj)
             obj.Shape = bodies.to_local(shape, body) if body is not None else shape
             return
@@ -471,9 +479,10 @@ def crown(handed):
         warn("%s keeps its name: %s" % (heir.Label, exc))
 
 
-def paste_new(source, parent=components.KEEP):
+def paste_new(source, parent=components.KEEP, placement=None):
     """Paste New: an independent copy of a component with all its features, named
-    "<name> (1)", placed right on the original. Returns the new part."""
+    "<name> (1)", placed right on the original (``placement``, design coordinates: on the
+    occurrence that was copied). Returns the new part."""
     source = definition(source)
     if source is None:
         raise ValueError("That component's original was deleted: Paste New cannot copy it.")
@@ -488,7 +497,7 @@ def paste_new(source, parent=components.KEEP):
     if where is not None and components.is_inside(where, source):
         where = components.container_of(source)
     current = components.container_of(copy)
-    wanted = global_placement(source)
+    wanted = placement if placement is not None else global_placement(source)
     if current is not where:
         if current is not None:
             current.removeObject(copy)
