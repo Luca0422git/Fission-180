@@ -318,8 +318,20 @@ class TestRealMenus(unittest.TestCase):
         self.assertEqual(missing, [])
 
     def test_greyed_ribbon_entries_are_read_as_not_available(self):
-        self.assertTrue(self.has("tab:drawing", "Export DWG", available=False))
-        self.assertFalse(self.has("tab:drawing", "Export DWG", available=True))
+        # (Export DWG was the greyed example until wave 7 gave it a command; now whatever
+        # entry the ribbon still greys out, item("...", None, ...), must read as not
+        # available, and Export DWG as available)
+        import re
+
+        config = os.path.join(REPO, "src", "Mod", "Fission180", "fission180", "ribbon_config.py")
+        with open(config, encoding="utf-8") as handle:
+            greyed = re.findall(r'\bitem\(\s*"([^"]+)",\s*None\s*[,)]', handle.read())
+        for label in greyed[:5]:
+            self.assertTrue(
+                any(e.label == label and not e.available for e in self.entries), label
+            )
+        self.assertTrue(self.has("tab:drawing", "Export DWG", available=True))
+        self.assertFalse(self.has("tab:drawing", "Export DWG", available=False))
 
     def test_every_fusion_scope_names_a_fission180_place_or_an_area_left_out(self):
         scopes = {e.scope for e in self.entries}

@@ -1379,3 +1379,17 @@ def aligned(spots, line_at):
     if max(xs) - min(xs) >= max(ys) - min(ys):
         return [(x, line_at[1]) for x, _y in spots], "horizontal"
     return [(line_at[0], y) for _x, y in spots], "vertical"
+
+
+# ------------------------------------------------------------------ a table as CSV
+def csv_text(cells):
+    """Rows of text as CSV (commas; a cell with a comma, a quote or a line break in
+    quotes), lines ending CR LF as spreadsheets write them."""
+    import csv
+    import io
+
+    handle = io.StringIO()
+    writer = csv.writer(handle, lineterminator="\r\n")
+    for row in cells:
+        writer.writerow(["" if cell is None else str(cell) for cell in row])
+    return handle.getvalue()

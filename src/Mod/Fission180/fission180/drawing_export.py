@@ -11,8 +11,6 @@ ones File > Export uses for the design, exchange.dwg_converter). Without one a D
 be written honestly: the dialog says so and writes the DXF, which every DWG program opens.
 """
 
-import csv
-import io
 import os
 
 from . import drawing, log
@@ -76,13 +74,7 @@ def _cell(value):
 
 
 def csv_text(cells):
-    """Rows of text as CSV (commas; a cell with a comma, a quote or a line break in
-    quotes), lines ending CR LF as spreadsheets write them."""
-    handle = io.StringIO()
-    writer = csv.writer(handle, lineterminator="\r\n")
-    for row in cells:
-        writer.writerow(row)
-    return handle.getvalue()
+    return core.csv_text(cells)
 
 
 def export_csv(table, path):

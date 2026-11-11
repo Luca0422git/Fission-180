@@ -428,7 +428,9 @@ def refresh_drawings(doc_name, again=True):
         return
     if again:
         # a big view's lines can come later than this first look: annotations, marks
-        # and extensions that follow edges look once more (it changes only what moved)
+        # and extensions that follow edges look once more (it changes only what moved):
+        # as soon as TechDraw has drawn the views, and once more after a fixed time
+        _later(_refresh_when_drawn, doc_name, ms=100)
         _later(refresh_drawings, doc_name, False, ms=LATE_REFRESH_MS)
     else:
         _later(_watch_depth, doc_name, 0, ms=DEPTH_WATCH_MS[0])
@@ -488,6 +490,20 @@ def recompute_stale(doc_name, tries=0):
             apply_view_looks(page)
         except Exception as exc:
             log("drawing looks: %s" % exc)
+
+
+def _refresh_when_drawn(doc_name, tries=0):
+    """The second look of refresh_drawings, taken when TechDraw has finished drawing the
+    views (it draws in a thread): a centre mark then follows its hole at once, however
+    long the view took (it waited a fixed 1.5 s, too short for a big view and a visible
+    lag on a small one)."""
+    doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+    if doc is None:
+        return
+    if (hlr_busy() or getattr(doc, "Recomputing", False)) and tries < 1200:
+        _later(_refresh_when_drawn, doc_name, tries + 1, ms=100)
+        return
+    refresh_drawings(doc_name, False)
 
 
 DEPTH_WATCH_MS = (3000, 6000, 12000)  # a big section's lines can come later still
@@ -927,8 +943,8 @@ def pick_at(page, point, tolerance, want_vertex=True, kinds=None, curve=None):
         for name, p in _vertexes_of(view):
             d = math.hypot(p.x - local[0], p.y - local[1])
             if d <= tol * 0.6 and (best is None or d < best[0]):
-                best = (d, name)
-        if best is not None:
+                best = (d, name, p)
+        if best is not None and not _seam_only(view, best[2]):
             return view, best[1], local
     best = None
     hidden_shown = bool(getattr(view, "HardHidden", False))
@@ -946,11 +962,46 @@ def pick_at(page, point, tolerance, want_vertex=True, kinds=None, curve=None):
         near.append((round(d, 4), name, visible is None or _signature(edge, s) in visible))
         if visible is not None and _signature(edge, s) not in visible:
             continue
-        if best is None or d < best[0] - 1e-9:
-            best = (d, name)
+        # An edge of the part before a line Fission 180 drew on it: a centre mark's line
+        # runs through its circle's 3, 6, 9 and 12 o'clock points, and a click there took
+        # the mark's line (no dimension, no second mark came of it).
+        drawn = _is_cosmetic(view, name)
+        key = (1 if drawn else 0, d)
+        if best is None or key[0] < best[2][0] or (key[0] == best[2][0] and d < best[0] - 1e-9):
+            best = (d, name, key)
     if best is None and near:
         log("pick at %s: only hidden edges near %s" % (local, near))
     return view, (best[1] if best else None), local
+
+
+def _seam_only(view, point):
+    """True for a view point that is nothing but the seam of a full circle: where a round
+    edge starts and ends, with no other edge ending there. TechDraw makes it a vertex, but
+    to a person it is just a place on the circle: a click on a disc's 3 o'clock point took
+    that point and asked for "the second point" instead of giving the diameter."""
+    import Part
+
+    probe = Part.Vertex(App.Vector(point.x, point.y, 0))
+    touching = []
+    for name, edge in _edges_of(view):
+        try:
+            if edge.distToShape(probe)[0] < 1e-6 and not _is_cosmetic(view, name):
+                touching.append(edge)  # (a centre mark's line crossing there is no corner)
+        except Exception:
+            continue
+    return bool(touching) and all(edge.isClosed() for edge in touching)
+
+
+def _is_cosmetic(view, name):
+    """True for an edge that is no part of the model: a cosmetic line (a centre mark, an
+    edge extension, a pattern's circle) or a TechDraw centre line."""
+    for getter in ("getCosmeticEdgeBySelection", "getCenterLineBySelection"):
+        try:
+            if getattr(view, getter)(name) is not None:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _is_curve(edge, curve):
@@ -1452,7 +1503,8 @@ def automatic_views(page):
         if storyboard:
             # a drawing made From Animation: every view shows the storyboard's end
             drawing_exploded.add_exploded(base, storyboard)
-        plan = drawing.automatic_plan(page, list(base.Source), "Front")
+        # (the base view's own orientation: a flat pattern is drawn from the top)
+        plan = drawing.automatic_plan(page, list(base.Source), drawing.orientation_of(base))
         drawing.set_scale(base, plan["scale"])
         base.X, base.Y = plan["views"]["Base"]
         for kind in core.AUTO_KINDS:

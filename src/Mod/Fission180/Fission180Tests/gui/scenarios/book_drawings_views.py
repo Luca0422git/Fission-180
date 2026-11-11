@@ -23,6 +23,9 @@ D  A second drawing, Automatic views, of the same stick: four views, none overla
    title block, at a standard scale.
 E  A click on a corner with no room is still said: Projected View again, the base view
    clicked, a click on the view itself: "Move off the view...".
+F  The annotations the report did not get to, on the stick's base view (the book's next
+   steps): GEOMETRY > Centerline on its two long edges: a centre line along its axis;
+   TEXT > Leader on its upper edge with the text typed: a leader note.
 """
 
 import FreeCAD as App
@@ -251,6 +254,82 @@ def e_closed():
     h.check("nothing added", len(d.views()) == state["views"], len(d.views()))
 
 
+# -- F ------------------------------------------------------------------------------------------
+def long_edge(upper):
+    """A page point on the stick's long straight edge (y = +7 or -7 in the base view)."""
+    want = bfx.STICK_RADIUS if upper else -bfx.STICK_RADIUS
+
+    def is_it(info):
+        if info["kind"] != "line":
+            return False
+        (x1, y1), (x2, y2) = info["p1"], info["p2"]
+        return abs(y1 - want) < 0.01 and abs(y2 - want) < 0.01 and abs(x2 - x1) > 200.0
+
+    return d.edge_point(base(), is_it, 0.4)
+
+
+def f_centerline():
+    state["lines"] = len(base().CenterLines)
+    h.ribbon("Centerline")
+
+
+def f_first_edge():
+    h.check("the Centerline dialog", d.panel_of("CenterlinePanel") is not None, d.panel())
+    point = long_edge(True)
+    if h.check("the stick's upper long edge is drawn", point is not None):
+        d.click_at(*point)
+
+
+def f_second_edge():
+    point = long_edge(False)
+    if h.check("its lower long edge", point is not None):
+        d.click_at(*point)
+
+
+def f_end():
+    d.key(QtCore.Qt.Key_Return)
+
+
+def f_leader():
+    h.check("the dialog closed", d.panel() is None, d.panel())
+    h.check("a centre line along the stick", len(base().CenterLines) == state["lines"] + 1)
+    state["notes"] = len(d.of_type("TechDraw::DrawViewSymbol"))
+    d.group_menu("TEXT", "Leader")
+
+
+def f_leader_edge():
+    h.check("the Leader dialog", d.panel_of("LeaderPanel") is not None, d.panel())
+    d.click_at(*long_edge(True))
+
+
+def f_leader_place():
+    x, y = long_edge(True)
+    d.move_to(x + 20.0, y + 14.0)
+    d.click_at(x + 25.0, y + 18.0)
+
+
+def f_leader_type():
+    p = d.panel_of("LeaderPanel")
+    if h.check("the leader's text box", p is not None, d.panel()):
+        d.type_into(p.text, "HICKORY")
+
+
+def f_leader_ok():
+    d.ok()
+
+
+def f_made():
+    from fission180 import drawing
+
+    h.check("the dialog closed", d.panel() is None, d.panel())
+    notes = [
+        o for o in d.of_type("TechDraw::DrawViewSymbol") if drawing.kind(o) == "DrawingAnnotation"
+    ]
+    h.check("a leader note on the sheet", len(notes) == 1, [o.Label for o in notes])
+    h.check("no preview left", d.previews_left() == 0, d.previews_left())
+    h.shot("f-annotated")
+
+
 h.run(
     "book_drawings_views",
     [new_design]
@@ -273,6 +352,18 @@ h.run(
         d_design_tab,
     ]
     + d.drawing_steps("auto", standard="ASME", views="Automatic (base, projected, iso)")
-    + [d_automatic, e_command, e_click_parent, e_click_on_view, e_said, e_closed],
+    + [d_automatic, e_command, e_click_parent, e_click_on_view, e_said, e_closed]
+    + [
+        f_centerline,
+        f_first_edge,
+        f_second_edge,
+        f_end,
+        f_leader,
+        f_leader_edge,
+        f_leader_place,
+        f_leader_type,
+        f_leader_ok,
+        f_made,
+    ],
     paced_by="state",
 )

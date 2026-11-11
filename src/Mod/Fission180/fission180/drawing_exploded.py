@@ -226,11 +226,23 @@ class ExplodedCopy:
     __setstate__ = loads
 
 
+_MOVES = {}  # (document, copy name) -> (the Moves text, what it says): read once
+
+
 def _moves_of(copy):
+    """{body name: pose} of a copy (a parts list asks once per sight line: the text is
+    read again only when it changed)."""
+    text = copy.Moves or "{}"
+    key = (copy.Document.Name, copy.Name)
+    known = _MOVES.get(key)
+    if known is not None and known[0] == text:
+        return known[1]
     try:
-        return json.loads(copy.Moves or "{}")
+        moves = json.loads(text)
     except ValueError:
-        return {}
+        moves = {}
+    _MOVES[key] = (text, moves)
+    return moves
 
 
 def copy_shape(copy):

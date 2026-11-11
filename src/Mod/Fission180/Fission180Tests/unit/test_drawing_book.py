@@ -201,5 +201,78 @@ class BalloonLayoutTests(unittest.TestCase):
         self.assertLessEqual(out[-1], 10.0 + 1e-9)
 
 
+class PatternTests(unittest.TestCase):
+    def test_holes_on_a_line(self):
+        shape = core.pattern_shape([(20, 15), (60, 35), (40, 25)])
+        self.assertEqual(shape[0], "line")
+        self.assertEqual(sorted([shape[1], shape[2]]), [(20.0, 15.0), (60.0, 35.0)])
+        self.assertEqual(core.pattern_shape([(0, 0), (10, 0)])[0], "line")
+
+    def test_holes_on_a_bolt_circle(self):
+        import math
+
+        shape = core.pattern_shape([(28, 0), (0, 28), (-28, 0), (0, -28)])
+        self.assertEqual(shape[0], "circle")
+        self.assertAlmostEqual(shape[2], 28.0)
+        self.assertAlmostEqual(math.hypot(*shape[1]), 0.0)
+        pts = [(5 + 10 * math.cos(a), 7 + 10 * math.sin(a)) for a in (0.1, 1.3, 2.9, 4.0, 5.5)]
+        shape = core.pattern_shape(pts)
+        self.assertEqual(shape[0], "circle")
+        self.assertAlmostEqual(shape[1][0], 5.0)
+        self.assertAlmostEqual(shape[1][1], 7.0)
+        self.assertAlmostEqual(shape[2], 10.0)
+
+    def test_no_pattern(self):
+        self.assertIsNone(core.pattern_shape([(28, 0), (0, 28), (-28, 0), (0, 0)]))
+        self.assertIsNone(core.pattern_shape([(1, 1)]))
+        self.assertIsNone(core.pattern_shape([(1, 1), (1, 1)]))  # the same hole twice
+        self.assertIsNone(core.pattern_shape([]))
+
+    def test_the_same_hole_picked_twice_counts_once(self):
+        shape = core.pattern_shape([(0, 0), (10, 0), (10, 0), (20, 0)])
+        self.assertEqual(shape, ("line", (0.0, 0.0), (20.0, 0.0)))
+
+
+class BalloonNumberTests(unittest.TestCase):
+    def test_renumber_swaps_with_the_row_that_had_the_number(self):
+        items = {"handle": 1, "fork": 2, "blade": 3}
+        self.assertEqual(core.renumbered(items, 3, 1), {"handle": 3, "fork": 2, "blade": 1})
+        self.assertEqual(items, {"handle": 1, "fork": 2, "blade": 3})  # (a copy)
+
+    def test_renumber_to_a_free_number(self):
+        self.assertEqual(core.renumbered({"a": 1, "b": 2}, 2, 10), {"a": 1, "b": 10})
+
+    def test_renumber_to_itself_or_of_nothing_changes_nothing(self):
+        self.assertEqual(core.renumbered({"a": 1, "b": 2}, 2, 2), {"a": 1, "b": 2})
+        self.assertEqual(core.renumbered({"a": 1, "b": 2}, 7, 1), {"a": 1, "b": 2})
+
+    def test_align_level_or_upright(self):
+        places, way = core.aligned([(0, 0), (20, 3), (40, -2)], (5, 50))
+        self.assertEqual(way, "horizontal")
+        self.assertEqual(places, [(0, 50), (20, 50), (40, 50)])
+        places, way = core.aligned([(0, 0), (3, 20), (-2, 40)], (5, 50))
+        self.assertEqual(way, "vertical")
+        self.assertEqual(places, [(5, 0), (5, 20), (5, 40)])
+        self.assertEqual(core.aligned([], (0, 0)), ([], "horizontal"))
+
+
+class CsvTests(unittest.TestCase):
+    def test_a_parts_list_reads_back(self):
+        import csv
+        import io
+
+        cells = [
+            ["ITEM", "QTY", "PART NUMBER", "DESCRIPTION", "MATERIAL"],
+            [1, 2, 'Screw, "M4" x 10', "", "Steel"],
+            [2, 1, "Träger", None, "Aluminium"],
+        ]
+        text = core.csv_text(cells)
+        self.assertEqual(text.count("\r\n"), 3)
+        back = list(csv.reader(io.StringIO(text, newline="")))
+        self.assertEqual(back[0], cells[0])
+        self.assertEqual(back[1], ["1", "2", 'Screw, "M4" x 10', "", "Steel"])
+        self.assertEqual(back[2], ["2", "1", "Träger", "", "Aluminium"])
+
+
 if __name__ == "__main__":
     unittest.main()
