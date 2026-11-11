@@ -40,6 +40,7 @@ from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import sketch_tools_steps as st
 from Fission180Tests.gui import x_input as x
+from PySide6 import QtCore
 
 V = App.Vector
 s = st.s
@@ -259,7 +260,15 @@ def e_centre():
 
 
 def e_quantity():
-    h.check("E the origin is the centre", st.tool().center == (-1, 1), st.tool().center)
+    from fission180 import sketch_constrain_tools
+
+    # (the origin itself, or the construction line's end that lies on it)
+    centre = sketch_constrain_tools.point_of(sk(), st.tool().center)
+    h.check(
+        "E the point at the origin is the centre",
+        centre is not None and abs(centre[0]) < 1e-9 and abs(centre[1]) < 1e-9,
+        st.tool().center,
+    )
     b.panel_type(PATTERN, "Fission180PatternQuantity", "4")
 
 
@@ -325,7 +334,7 @@ def g_check():
 # == H ======================================================================================
 def h_delete():
     s["hidden_before"] = len(hidden())
-    h.press("Delete")
+    h.press(QtCore.Qt.Key_Delete)
 
 
 def h_check():
