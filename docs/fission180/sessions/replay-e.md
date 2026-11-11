@@ -32,7 +32,7 @@ commit.
 | Scenario | Checks | Result | Time |
 |---|---|---|---|
 | `replay_12_pizza_cutter` | 525 | PASS (whole project from the first step, one run) | 632 s |
-| `replay_13_tesla_turbine` | (in progress) | housing, gaskets, walls replayed part by part | |
+| `replay_13_tesla_turbine` | (see the report) | housing, gaskets, walls, assembly | |
 
 Steps that took more than about 10 s (no progress note shown): the Wheel Bracket's Thread
 dragged before its Chamfer 24 s, the Shoulder Bolt's 12 s (the chamfer is rebuilt on the
@@ -53,6 +53,9 @@ round being refused 13.5 s.
 | 8 | Tesla, Housing, 2185 the five holes | On a busy machine one of five hole profiles came with the face it lies on (the report's "every click went to the body face behind") | The sketch profile is taken (Book) | FreeCAD selects the face under a region on the click's release; the dialog ignored it only within 0.6 s of the region click | `ProfilePicker.clicked_region_at` (new), `ExtrudePanel._selection_changed` |
 | 9 | Tesla, Housing, 2194 pipe thread | A cosmetic NPT thread on the inlet turned the whole housing a quarter turn | Not applicable (a bug) | A cosmetic thread copied its step before with that step's own placement (an extrude on a face), which a thread step drops | `thread.in_place` (new), `ThreadFeature.execute`. Golden `book_thread_cosmetic_on_side_plane` |
 | 10 | Tesla, Power Side Wall, 2227 | The wall's component counted the gasket as its own solid (volume, box) | Not applicable (a bug) | `joints.part_shape` gathered every body the component refers to (its plane lies on the gasket's face) | `joints.part_shape`, `joints._owned_by` (new) |
+| 11 | Tesla, Steam Side Wall, 2241 | Renaming the mirrored copy "Steam Side Wall" renamed the Power Side Wall it mirrors, and the copy became "Steam Side Wall (Mirror)" | A mirrored component is a new component (Forum: "always new part numbers"), renamed on its own | The rename of an occurrence goes to its source (right for "Bolt:2"), also for a mirrored copy; and every sync named a mirrored copy after its source again | `browser_ui._component_rename` (not for a mirrored copy), `instances._sync_one` (a copy with a name of its own keeps it) |
+| 12 | Tesla, assembly, 2280 Hardware bolts | A screw put in a 1/4-20 threaded hole (0.241 in) came as #5 (the hole matched a #5 head's counterbore) | The part that goes in the hole (Book: the bolts fit the walls' tapped holes) | The size came from the hole's diameter alone; the hole's Thread step was not read | `hardware_place.thread_of_hole` (new), `HardwarePanel._fit_existing` |
+| 13 | Tesla, assembly, 2271 Rectangular Pattern of components | Esc in the dialog warned "'App.Part' object has no attribute 'Tip'" | (a bug) | `pattern.show_tip` was given the component | `pattern.show_tip` |
 
 ## Report items that now simply work (replayed the book's way, no workaround)
 
@@ -86,7 +89,16 @@ search "Rubber", Rubber soft and its colour edited; Mirror of bodies about XZ fr
 browser; Rigid Group of two nested components by their browser rows, "&" kept; Offset Plane
 into the active component; Center Rectangle, sketch Fillet two lines per corner, sketch
 Circular Pattern; Hole Counterbore with typed X / Y 0; Thread on four hole walls at once;
-Mirror with Pattern Type Components.
+Mirror with Pattern Type Components; renaming the mirrored copy; As-built Slider with Minimum,
+Rest, Preview Motion and Flip; a 1/4-20 screw from Hardware in each threaded hole; As-built
+Slider; Motion Link of two sliders (its note in inches); Rigid Group of four screws picked in
+the window; Rectangular Pattern of components picks the screw, not the subassembly; search
+"anodized".
+
+Not replayed in the Tesla Turbine (time): Circular Pattern of components (Hardware filled the
+four holes at once) and of a hole's faces, Copy / Paste of a bolt, Save As DXF, Link with Same
+Joint on a rotor (replayed in the Pizza Cutter), bearings, set screws and retaining rings
+(each tested by `book_hardware_*`), the book's triangle in the first sketch (no size).
 
 ## Changelog lines
 
@@ -103,6 +115,9 @@ Mirror with Pattern Type Components.
 - A cosmetic thread after an extrude on a face no longer turns the whole body.
 - A component whose plane or sketch was made on another component's face no longer counts
   that component's body as its own.
+- A mirrored component can be renamed on its own (renaming it renamed the original).
+- A screw from Hardware put in a threaded hole takes the hole's thread size.
+- Esc in a pattern of components no longer shows a warning.
 
 ## Known issues
 
@@ -116,3 +131,11 @@ Mirror with Pattern Type Components.
   is not symmetric.
 - A Thread dragged before a Chamfer on a modeled thread takes 12 to 24 s on this machine with
   no progress note.
+- Duplicate With Joints refuses a screw put in by Hardware ("Rigid 1 is not made on a face,
+  an edge or a corner ..."): Hardware's joint records where the screw sits instead of a face
+  of the screw. Joint the screw by hand (J) to duplicate it, or put it in with Hardware.
+- Hardware puts a screw in every hole like the one clicked at once (the book patterns one
+  bolt round instead).
+- At the whole design's zoom the joints' symbols cover small parts (a 1/4 screw head): zoom
+  in to click the part.
+- Motion Link's first value starts at 10 mm (0.39 in in an inch design).
