@@ -83,10 +83,14 @@ def unit_scale(unit):
 
 def design_unit(doc):
     """The Unit Type that matches the design's units ("Millimeter" for a mm design)."""
+    # (wave 7) read through browser_core.doc_length_unit: this called int() on the unit
+    # system's NAME ("Imperial decimal (in, lb)"), which always failed, so every design
+    # counted as millimetres and Insert Mesh started on Millimeter in an inch design too
+    # (found by the hardware builder)
     try:
         from . import browser_core
 
-        short = browser_core.unit_label(int(doc.UnitSystem))
+        short = browser_core.doc_length_unit(doc)
     except Exception:
         short = None
     return UNIT_BY_SHORT.get(short or "mm", "Millimeter")

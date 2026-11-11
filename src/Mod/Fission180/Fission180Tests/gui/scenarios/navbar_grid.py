@@ -140,7 +140,9 @@ def sketch_grid():
     vp = sk.ViewObject
     h.check("its grid is fixed", not vp.GridAuto)
     size = float(getattr(vp.GridSize, "Value", vp.GridSize))
-    h.check("its spacing is 5 mm", abs(size - 5) < 1e-9, size)
+    # (wave 7, sketch-a) FreeCAD's GridSize is the distance between two grid LINES: Major
+    # Grid Spacing 5 mm with 4 subdivisions is a line every 1.25 mm, every fourth one major
+    h.check("its lines are 1.25 mm apart (major every 5 mm)", abs(size - 1.25) < 1e-9, size)
     n.choose(GS, "Grid Settings")
 
 

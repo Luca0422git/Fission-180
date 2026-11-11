@@ -164,6 +164,40 @@ class DialogFitTest(unittest.TestCase):
         self.assertEqual(got, (1920, 20, 400, 300))
 
 
+class DesignUnitTest(unittest.TestCase):
+    """Insert Mesh's Unit Type starts on the design's unit (insert.design_unit)."""
+
+    class Doc:
+        def __init__(self, index):
+            self.names = [
+                "Standard (mm, kg, s, °)",
+                "MKS (m, kg, s, °)",
+                "US customary (in, lb)",
+                "Imperial decimal (in, lb)",
+                "Building Euro (cm, m², m³)",
+                "Building US (ft-in, sqft, cft)",
+                "Metric small parts & CNC (mm, mm/min)",
+                "Imperial for Civil Eng (ft, ft/s)",
+                "FEM (mm, N, s)",
+                "Meter decimal (m, m², m³)",
+            ]
+            self.UnitSystem = self.names[index]
+
+        def getEnumerationsOfProperty(self, _name):
+            return list(self.names)
+
+    def test_follows_the_design(self):
+        from fission180 import browser_core, insert
+
+        for index in range(10):
+            doc = self.Doc(index)
+            short = browser_core.doc_length_unit(doc)
+            self.assertEqual(insert.design_unit(doc), insert.UNIT_BY_SHORT[short], doc.UnitSystem)
+        self.assertEqual(insert.design_unit(self.Doc(0)), "Millimeter")
+        self.assertEqual(insert.design_unit(self.Doc(3)), "Inch")
+        self.assertEqual(insert.design_unit(None), "Millimeter")
+
+
 class DataPanelFoldersTest(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="fission180-dp-")
