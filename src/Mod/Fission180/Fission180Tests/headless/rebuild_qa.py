@@ -480,9 +480,15 @@ def threaded(agent, folder):
         agent,
         "QaThread",
         [
-            ("create_sketch", {"plane": "XY", "geometry": [{"rect": [0, 0, 40, 30]}]}),
+            # (wave 7) A plate of 120 x 90: a modeled thread is a real thread since the hole
+            # is brought to the thread's minor diameter (Autodesk's rule, thread.parts): this
+            # M6's grooves are 37.8 mm3. On the 40 x 30 plate this part had before, that is
+            # 0.32 % of the part, so a plain hole can never match it to the 0.999 the last
+            # check asks ("the plain plate matches but for the thread"); the thread it had
+            # then was 1 mm3 of slivers outside a 6 mm hole. On this plate it is 0.035 %.
+            ("create_sketch", {"plane": "XY", "geometry": [{"rect": [0, 0, 120, 90]}]}),
             ("extrude", {"profile": "Sketch1", "distance": 10}),
-            ("create_sketch", {"plane": "XY", "offset": 10, "geometry": [{"circle": [20, 15, 3]}]}),
+            ("create_sketch", {"plane": "XY", "offset": 10, "geometry": [{"circle": [60, 45, 3]}]}),
             ("hole", {"sketch": "Sketch2", "diameter": 6, "through_all": True}),
             (
                 "thread",
