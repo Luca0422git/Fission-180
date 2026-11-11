@@ -2205,6 +2205,10 @@ class SketchSession:
             QtWidgets.QApplication.instance().focusChanged.disconnect(self._focus_changed)
         except Exception:
             pass
+        try:
+            self.filter._placed()  # (the view's pick radius, if a dimension was being placed)
+        except Exception as exc:
+            warn("sketch mode: %s" % exc)
         hooked = [(self.gl, self.filter), (self.viewer, self.keys)]
         hooked += [(field, self.keys) for field in self._fields]
         for widget, event_filter in hooked:
@@ -2460,7 +2464,7 @@ class _ViewFilter(QtCore.QObject):
         nothing until the release is handled, and FreeCAD is shown the pointer once more
         (a move), so that what it had lit goes dark."""
         if self.placing is not None:
-            return
+            self._placed()  # (the release of the click before never came: put back first)
         session = self.session
         try:
             from . import recent
