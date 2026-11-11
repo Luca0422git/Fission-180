@@ -81,7 +81,7 @@ from the sandbox.
 | 13 | Modal | Modal, one undo step, Cancel puts everything back | `book_params_dialog` I |
 | 14 | Model parameters | Grouped by step, in the design's units, including Offset Plane, Coil, Thread, Hole, patterns, primitives (every number a step shows) | `book_params_units` F; `parameters_check.py` |
 | 14b | An inch design is inch everywhere | Sketch grid and snap from 1 in, drag steps 0.1 in, the adaptive layout grid in round inches, tooltips "Type a value (in)", limit notes in inches | `book_params_units` B, J; `test_design_units_core.py` |
-| 15 | Units stay | `design_units.py` holds each design to its units | `book_params_units` (149 checks; fails without the guard) |
+| 15 | Units stay | `design_units.py` holds each design to its units | `book_params_units` (156 checks; fails without the guard) |
 | 16 | Thread default | `design_units.design_is_inch(doc)` for the thread builder | see the session log |
 
 Names: W, H, T, h, t, s, g, A, N... are fine as parameter names (FreeCAD reads them as units:
