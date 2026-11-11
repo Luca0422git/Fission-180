@@ -81,3 +81,122 @@ setters passed every route (the `elif` chains were not the cause).
 Also seen: the command search runs a command whose `IsActive` is false without a word
 (S > "Study Materials" from Manufacture does nothing). `search_ui.py` is the shell
 builder's: reported, not changed.
+
+## 4. Manufacture: what the book's two CAM projects use
+
+The book itself is not in the repository; the report lists the chapter's steps (Setup, 2D
+Adaptive, 2D Contour, Tool Library, Simulate, Post Process), and Autodesk's help was used
+for what a longboard and a guitar body need on top: a board as stock, tabs that hold the
+part, and a second setup for the other side. Followed by real input in
+`book_cam_book_projects` (a board 200 x 120 x 30 with a pocket on top, a cavity in its
+back and two holes). What could not be followed before, and was built:
+
+- **Tabs at clicked points** ("Tab Positioning: At points", the Tab Positions box).
+- **Stock From preceding setup** for the second setup (greyed before).
+- An inch tool was there already (the inch sample library); Fixed size box, Simulate and
+  Post Process worked as the first scenarios left them.
+
+Not built (the book's text could not be read to confirm whether it uses them): NC Program
+objects (Post Process posts the active setup or the picked operations), machining
+boundaries for the 3D operations, a Lead-Out Feedrate field.
+
+FreeCAD facts: the tab dress-up places tabs at `Positions` (points that must lie within
+0.1 mm of the toolpath's bottom wire, `pathData.bottomEdges`), and disables tabs that
+overlap (`Disabled`); a straight edge's `discretize(Deflection=...)` gives its two ends
+only (use `distToShape`).
+
+## 5. Animation: what the book's animation project uses
+
+Followed by real input in `book_animation_book_project` (explode, a part moved, a callout,
+duplicate and reverse, publish). Built on the way:
+
+- **Space** plays and pauses whenever the workspace is in front and nobody is typing (an
+  application event filter; before, only the timeline took it, and in the 3D view FreeCAD's
+  own Space, Toggle Visibility, hid what was selected).
+- **A part inside a subassembly** by a second click (Fusion's rule for Transform Components
+  was not found written; see the parity doc).
+- **Hidden in the design**: the row's tip was there for the component itself; it now also
+  covers a part inside a hidden subassembly, and Show/Hide says which component hides it.
+
+View actions (the camera) are covered by `book_animation_publish`; the drawing's Exploded
+View is the drawings builder's (merged: it reads `animation.placements_at`, `trail_lines`,
+`hidden_at`, whose signatures are unchanged).
+
+## 6. MP4
+
+The AppImage: no ffmpeg program, no Qt Multimedia; VTK's `vtkIOFFMPEG` is there (its writer
+makes AVI only). The Windows build comes from the same conda recipe, and conda-forge builds
+`vtk-io-ffmpeg` only for Linux and macOS, so nothing there can encode either (read from the
+recipe; no Windows machine here to look at). AVI and PNG stay; the greyed MP4 entry's tip,
+the refusal and the AI tool now tell where to get ffmpeg for each system, and ffmpeg is also
+looked for where `winget` and `C:\Program Files` put it. Nothing is bundled.
+
+## Tests
+
+| Scenario (real input, paced by state) | Checks |
+|---|---|
+| book_workspaces_switch (every route between the workspaces) | 229 |
+| book_cam_feeds (tolerance, lead-in and ramp feedrates read in the G-code) | 77 |
+| book_cam_book_projects (the book's two CAM projects) | 69 |
+| book_animation_book_project (the book's animation project) | 51 |
+| book_workspaces_ai_tools (the AI tools with the window) | 47 |
+
+Headless: `Fission180Tests/headless/workspace_tools.py`, 90 calls (every tool, its numbers
+against the golden models', its refusals). Unit: `test_ai_workspace_tools.py`,
+`test_workspace_switch.py`, new cases in `test_manufacture_core.py` and
+`test_animation_core.py`. The results of the final round are in the builder's report.
+
+## Shared files touched
+
+- `ai/catalog/__init__.py` (two imports, `AI_TOOLS_TO_COME = ()`, the module's docstring),
+  `ai/catalog/registry.py` (categories "manufacture" and "animation"),
+  `ai/actions/__init__.py` (two imports).
+- `Fission180Tests/unit/test_ai_sheetmetal_plastic_tools.py` (the assertion put back),
+  `Fission180Tests/headless/runner.py` (runs the new session),
+  `Fission180Tests/docs/tool_examples.py` and `tool_results.json` (the new tools' examples),
+  `Fission180Tests/gui/scenarios/book_animation_publish.py` (the MP4 tip's new words).
+- `simulation_ui.py`: `_timeline` and `_hold_design_keys` use `workspace_switch`, and
+  `enter_workspace` calls `workspace_switch.leave_others("simulation")`.
+- `ribbon_ui.py`, `browser_ui.py`: not touched.
+
+## Changelog lines
+
+- The AI assistant can now work in the MANUFACTURE workspace: make a setup, add and change
+  milling and drilling operations with tools from the Tool Library, generate, simulate (with
+  the machining time, the volume removed and any rapid move into the stock) and post process
+  (with the file and what the checker found).
+- The AI assistant can now work in the ANIMATION workspace: storyboards, moving and
+  exploding components, show / hide, callouts, reading a storyboard, publishing a video.
+- Manufacture: Tolerance, Lead-In Feedrate and Ramp Feedrate now reach the toolpath (they
+  were shown but ignored); where an operation has no use for one, the field is greyed and
+  its tip says why.
+- Manufacture: holding tabs can be put where you click (Tab Positioning: At points).
+- Manufacture: a second setup can take its stock From preceding setup, for the other side
+  of a part.
+- Fixed: after going from Manufacture to Simulation (or between any two workspaces) through
+  a command of the other workspace, Design came back without its timeline, and the design's
+  keys worked inside the other workspace.
+- Animation: Space plays and pauses wherever the pointer is (no need to click the timeline
+  first); it no longer hides the selected component.
+- Animation: a part inside a subassembly can be picked in the 3D view: click it a second
+  time (the first click takes the subassembly, and the dialog says so).
+- Animation: a component hidden in Design says so in its browser row's tip, also when it is
+  hidden because the subassembly it is in is hidden.
+- Publish Video: the greyed MP4 entry now tells where to get ffmpeg.
+
+## Known issues
+
+- Stock From preceding setup is the whole block of the setup before: what that setup's
+  operations cut away is not taken off. The tool then treats those places as material (safe,
+  a little slower); Simulate starts from the full block.
+- A lead-out is cut at the cutting feed (Fusion has a Lead-Out Feedrate of its own).
+- A toolpath made before this version shows "needs regenerating" once (the engine changed).
+- Tabs At points: the points are kept where they were clicked; after the design changes,
+  a point that is no longer on the contour is refused with how far off it is. Click the
+  positions again.
+- The command search (S) runs a command that is greyed in the ribbon without saying
+  anything (in Manufacture, S > "Study Materials" does nothing). Use the workspace menu, or
+  "New Simulation Study".
+- MP4 still needs the ffmpeg program installed; AVI and PNG need nothing.
+- The AI assistant cannot yet change or delete one action of a storyboard, or record camera
+  moves; undo, or the timeline, does that.

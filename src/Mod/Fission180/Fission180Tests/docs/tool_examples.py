@@ -1374,15 +1374,21 @@ CAM_SETUP = CAM_PLATE + [
     )
 ]
 CAM_TOOL_6 = {"library": "sample:mm", "id": "sample-mm-flat-6"}
+# (cam_operation has an argument called "tool": written out, not through call())
 CAM_OPS = CAM_SETUP + [
-    call("cam_operation", kind="face", tool={"type": "flat", "diameter": 10, "number": 1}),
-    call(
-        "cam_operation",
-        kind="contour2d",
-        faces={"normal": [0, 0, -1], "count": 1},
-        tool=CAM_TOOL_6,
-        options={"linking": {"lead_in": False, "lead_out": False}},
-    ),
+    {
+        "tool": "cam_operation",
+        "args": {"kind": "face", "tool": {"type": "flat", "diameter": 10, "number": 1}},
+    },
+    {
+        "tool": "cam_operation",
+        "args": {
+            "kind": "contour2d",
+            "faces": {"normal": [0, 0, -1], "count": 1},
+            "tool": CAM_TOOL_6,
+            "options": {"linking": {"lead_in": False, "lead_out": False}},
+        },
+    },
 ]
 ANIM_EXPLODED = COMPONENTS + [
     call("anim_storyboard", name="Explode"),

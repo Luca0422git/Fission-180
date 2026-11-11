@@ -117,9 +117,18 @@ workspace), `ai/ops/animation_ops.py` (steps for golden models and, later, AI to
   second. While a command's dialog is open the playhead and the bars do not move (the
   command works at the time it was started at; a click says so).
 - **Selecting**: a click in the 3D view takes the top-level component of what was clicked
-  (as Fusion takes the child of the active component); a part inside a subassembly is
-  picked by its browser row. Selected before the command, or clicked while its dialog is
-  open (a click on a picked one drops it).
+  (as Fusion takes the child of the active component). Selected before the command, or
+  clicked while its dialog is open (a click on a picked one drops it). **A part inside a
+  subassembly** (workspaces-2): in a dialog, a second click on the same part takes the
+  component one level in, a click on the innermost lets go, and the dialog says after the
+  first click what the next takes (`animation_core.click_step`). Fusion's own rule for
+  Transform Components was looked for (Autodesk's help and forum, search excerpts
+  2026-11-11) and not found written; the forum's advice for groups is the browser's nodes,
+  and Select Other in Design can move to a parent (Forum / G). So the first click is kept
+  as it was and the nested part is offered by the next; its browser row works as before.
+  FreeCAD fact: a click in the view on a component that is selected whole arrives without
+  the face clicked, and for a nested component as its top-level one: the view's object
+  under the pointer (`getObjectInfo`) says what was clicked.
 - **Auto Explode** (Fusion's rule is not published; ours, `animation_core.explode_moves`):
   among the components of one level the biggest (by its box) stays. Each other one goes
   along the axis on which it lies most outside the biggest one (the lid on top goes up,
@@ -141,11 +150,18 @@ workspace), `ai/ops/animation_ops.py` (steps for golden models and, later, AI to
   zone the view is only stored once the storyboard has views. Scrubbing and playing turn
   the camera between the views (the point looked at moves in a line, the direction slerps).
 - **Publish Video**: frames are rendered from the 3D view off screen, one per 1/fps of each
-  storyboard, both ends included. FreeCAD's AppImage and Windows build have no ffmpeg
-  program and no Qt Multimedia (checked: only `libavcodec` inside VTK), so the default file
-  is an **AVI with Motion JPEG** written by Fission 180 itself (`AviWriter`: plays in VLC,
-  mpv, Windows' players, ffmpeg). When an `ffmpeg` program is found on the computer the
-  dialog also offers **MP4 (H.264)**; without it that entry is greyed and says why. A
+  storyboard, both ends included. FreeCAD's AppImage has no ffmpeg program and no Qt
+  Multimedia; it has VTK's `vtkIOFFMPEG` (with libx264 / openh264 beside it), whose
+  `vtkFFMPEGWriter` only writes AVI, which Fission 180 writes itself. The Windows build is
+  made from the same conda recipe (`package/rattler-build/recipe.yaml`: `qt6-main`, `vtk`);
+  conda-forge builds `vtk-io-ffmpeg` for Linux and macOS only, so it has no FFmpeg library
+  at all (read from the recipe, workspaces-2; not looked at on a Windows machine). So the
+  default file is an **AVI with Motion JPEG** written by Fission 180 itself (`AviWriter`:
+  plays in VLC, mpv, Windows' players, ffmpeg). When an `ffmpeg` program is found on the
+  computer (the PATH, `C:\ffmpeg\bin`, `C:\Program Files\ffmpeg\bin`, winget's links
+  folder, Homebrew's) the dialog also offers **MP4 (H.264)**; without it that entry is
+  greyed and its tip tells where to get ffmpeg for each system
+  (`animation_video.FFMPEG_HELP`; the refusal and the AI tool say the same). A
   **PNG image sequence** is always offered. Frame rate: 12 / 24 / 30 / 60 (Fusion: 24, no
   choice). Cancel stops it and leaves no file.
 
@@ -188,7 +204,7 @@ workspace ever having been entered. An unknown storyboard name raises
 | Publish Video: .mp4 | AVI (Motion JPEG) unless ffmpeg is installed | No encoder is bundled with FreeCAD |
 | A storyboard shows and hides components whatever the design shows | A component hidden in the design stays hidden (Show/Hide and its eye say so) | Hiding a component in Design also hides what is in it; a storyboard cannot take that back on the view alone |
 | Undo in Animation stays in Animation | The same, on the design's one undo history: an Undo that would take back a step of the design is put back at once and says to go to Design for it (steps the workspace made in this session are known by name; after a reopen there is no history anyway) | FreeCAD has one undo history per design |
-| Space plays from anywhere | Space plays when the timeline has the keyboard (click it first) | Space over the 3D view is not ours to take |
+| Space plays from anywhere | The same (workspaces-2): Space plays and pauses whenever the workspace is in front, unless a dialog, a menu or another window is open or a box a person types in has the keyboard (`animation_ui.space_plays`) | An application event filter takes the key before FreeCAD's own Space (Toggle Visibility, which hid what was selected) |
 
 ## 4. Tests
 
@@ -201,12 +217,17 @@ Scenarios (real input): `book_animation_workspace`, `_transform`, `_storyboards`
 
 ## Gaps
 
-- **No AI tools yet**: the design steps (`anim_storyboard`, `anim_explode`,
-  `anim_manual_explode`, `anim_transform`, `anim_restore_home`, `anim_show_hide`,
-  `anim_reverse`) are built and golden-tested and wait in `catalog.AI_TOOLS_TO_COME`.
+- **AI tools** (workspaces-2): `anim_storyboard` (new / duplicate / reverse / rename /
+  delete / activate), `anim_transform`, `anim_explode`, `anim_manual_explode`,
+  `anim_show_hide`, `anim_restore_home`, `anim_callout`, `anim_storyboards` (the storyboards,
+  a storyboard's actions, the components' places at a time) and `anim_publish_video` (needs
+  the window). Not yet a tool: editing or deleting one action (its start and end), and the
+  View actions (the camera).
 - **File > New Drawing > From Animation / Base View of a storyboard** is the drawings
   builder's (the contract above is what it needs).
-- **A click in the view cannot pick a part inside a subassembly** (its browser row does).
+- **A component hidden in the design** stays hidden in every storyboard: its browser row's
+  tip says so and where to show it (also for a part inside a hidden subassembly); its eye
+  and Show/Hide refuse with the same words.
 - **Trails** are on or off per component (the dialogs' Trail Line Visibility, or
   right-click the row's name); Fusion can also show and hide single trail lines.
 - **Fades** are one see-through amount for the whole component (a material in front of
