@@ -1872,6 +1872,128 @@ TABS = [
     },
 ]
 
+# -- MANUFACTURE workspace (wave 7, cam: milling on FreeCAD's CAM engine) -----------------------
+# Fusion's MILLING tab: SETUP, 2D, 3D, DRILLING, ACTIONS, MANAGE (MULTI-AXIS, and the TURNING,
+# ADDITIVE, INSPECTION and FABRICATION tabs, are left out: docs/fission180/parity/
+# manufacture.md). Entries Fusion has that FreeCAD's engine cannot make are greyed with why.
+# owner: cam (manufacture_ui.py); the tab is added to TABS here, in a block of its own.
+CAM_SETUP = group(
+    "cam_setup",
+    "SETUP",
+    ["New Setup"],
+    [
+        item("New Setup", "Fission180_CamNewSetup", "cam_setup"),
+    ],
+)
+CAM_2D = group(
+    "cam_2d",
+    "2D",
+    ["2D Adaptive Clearing", "2D Pocket", "Face", "2D Contour"],
+    [
+        item("2D Adaptive Clearing", "Fission180_CamAdaptive2D", "cam_adaptive2d"),
+        item("2D Pocket", "Fission180_CamPocket2D", "cam_pocket2d"),
+        item("Face", "Fission180_CamFace", "cam_face"),
+        item("2D Contour", "Fission180_CamContour2D", "cam_contour2d"),
+        item("Slot", "Fission180_CamSlot", "cam_slot"),
+        item("Trace", "Fission180_CamTrace", "cam_trace"),
+        item(
+            "Thread",
+            None,
+            "cam_thread",
+            note="Thread milling is not in Fission 180 yet: cut threads with a tap",
+        ),
+        item("Bore", "Fission180_CamBore", "cam_bore"),
+        item("Circular", "Fission180_CamCircular", "cam_circular"),
+        item("Engrave", "Fission180_CamEngrave", "cam_engrave"),
+        item("2D Chamfer", "Fission180_CamChamfer2D", "cam_chamfer2d"),
+    ],
+)
+_CAM_NO_ENGINE = "Not in Fission 180: FreeCAD's CAM engine has no such strategy"
+CAM_3D = group(
+    "cam_3d",
+    "3D",
+    ["Adaptive Clearing", "Pocket Clearing", "Parallel", "Contour"],
+    [
+        item("Adaptive Clearing", "Fission180_CamAdaptive3D", "cam_adaptive3d"),
+        item("Pocket Clearing", "Fission180_CamPocket3D", "cam_pocket3d"),
+        item("Parallel", "Fission180_CamParallel", "cam_parallel"),
+        item("Contour", "Fission180_CamContour3D", "cam_contour3d"),
+        SEP,
+        item("Scallop", None, "cam_parallel", note=_CAM_NO_ENGINE),
+        item("Pencil", None, "cam_contour3d", note=_CAM_NO_ENGINE),
+        item("Spiral", None, "cam_adaptive3d", note=_CAM_NO_ENGINE),
+        item("Radial", None, "cam_parallel", note=_CAM_NO_ENGINE),
+    ],
+)
+CAM_DRILLING = group(
+    "cam_drilling",
+    "DRILLING",
+    ["Drill"],
+    [
+        item("Drill", "Fission180_CamDrill", "cam_drill"),
+    ],
+)
+CAM_ACTIONS = group(
+    "cam_actions",
+    "ACTIONS",
+    ["Generate", "Simulate", "Post Process"],
+    [
+        item("Generate", "Fission180_CamGenerate", "cam_generate"),
+        item("Simulate", "Fission180_CamSimulate", "cam_simulate"),
+        item("Post Process", "Fission180_CamPostProcess", "cam_post"),
+        item("Setup Sheet", "Fission180_CamSetupSheet", "cam_sheet"),
+    ],
+)
+CAM_MANAGE = group(
+    "cam_manage",
+    "MANAGE",
+    ["Tool Library"],
+    [
+        item("Tool Library", "Fission180_CamToolLibrary", "cam_tools"),
+    ],
+)
+TABS.append(
+    {
+        "id": "cam_milling",
+        "title": "MILLING",
+        "contextual": True,
+        "groups": [
+            CAM_SETUP,
+            CAM_2D,
+            CAM_3D,
+            CAM_DRILLING,
+            CAM_ACTIONS,
+            CAM_MANAGE,
+            INSPECT,
+            SELECT,
+        ],
+    }
+)
+# The right-click marking menu in the MANUFACTURE workspace (manufacture_ui.open_marking_menu):
+# the workspace's own commands; nothing that changes the design.
+CAM_MARKING_MENU = [
+    item("Repeat", "__repeat__", "compute"),
+    item("New Setup", "Fission180_CamNewSetup", "cam_setup"),
+    item("2D Contour", "Fission180_CamContour2D", "cam_contour2d"),
+    item("Undo", "Std_Undo", "qa_undo", "Ctrl+Z"),
+    item("2D Pocket", "Fission180_CamPocket2D", "cam_pocket2d"),
+    item("Generate", "Fission180_CamGenerate", "cam_generate"),
+    item("Simulate", "Fission180_CamSimulate", "cam_simulate"),
+    item("Post Process", "Fission180_CamPostProcess", "cam_post"),
+]
+CAM_MARKING_LIST = [
+    item("Redo", "Std_Redo", "qa_redo", "Ctrl+Y"),
+    item("Face", "Fission180_CamFace", "cam_face"),
+    item("Drill", "Fission180_CamDrill", "cam_drill"),
+    item("Tool Library", "Fission180_CamToolLibrary", "cam_tools"),
+    SEP,
+    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Look At", "Std_AlignToSelection", "nav_lookat"),
+    SEP,
+    item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
+    item("Reset Orbit Center", "Fission180_ResetOrbitCenter", "orbit_center"),
+]
+
 # Fusion's File menu (the application menu), in its order; cloud-only entries (upload,
 # share, recover documents) are left out. Shown first by the quick-access Menu button,
 # above FreeCAD's own menus (ribbon_ui).

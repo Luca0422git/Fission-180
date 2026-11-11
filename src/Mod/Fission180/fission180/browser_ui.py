@@ -37,10 +37,35 @@ SELECTABLE_TYPES = core.BODY_TYPES | core.MESH_TYPES | core.COMPONENT_TYPES
 DROP_TARGETS = ("component", "document")
 # The SIMULATION workspace's rows (simulation_browser.py, beta 3) that can be renamed.
 SIM_RENAMABLE = ("sim_study", "sim_item", "sim_document")
+# The MANUFACTURE workspace's rows (manufacture_browser.py, wave 7 cam): their kinds start with
+# "sim_cam_" so they take the SIMULATION hooks below, which hand them to manufacture_browser.
+SIM_RENAMABLE += ("sim_cam_setup", "sim_cam_op", "sim_cam_document")
+
+
+def _manufacture_browser(doc=None):
+    """manufacture_browser while the design is in the MANUFACTURE workspace, else None."""
+    try:
+        from . import manufacture_ui
+
+        if not manufacture_ui.in_workspace(doc):
+            return None
+        from . import manufacture_browser
+
+        return manufacture_browser
+    except Exception as exc:
+        warn("manufacture browser: %s" % exc)
+        return None
 
 
 def _simulation_tree(doc):
     """The study tree while the design is in the SIMULATION workspace, else None."""
+    cam = _manufacture_browser(doc)  # MANUFACTURE workspace: its setups tree (wave 7 cam)
+    if cam is not None:
+        try:
+            return cam.tree(doc)
+        except Exception as exc:
+            warn("manufacture browser: %s" % exc)
+            return None
     try:
         from . import simulation_ui
 
@@ -58,6 +83,8 @@ def _simulation_call(name, *args):
     """simulation_browser.<name>(*args), never raising."""
     try:
         from . import simulation_browser
+
+        simulation_browser = _manufacture_browser() or simulation_browser  # (wave 7 cam)
 
         return getattr(simulation_browser, name)(*args)
     except Exception as exc:
