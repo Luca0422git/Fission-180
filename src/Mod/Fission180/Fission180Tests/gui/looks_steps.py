@@ -225,3 +225,112 @@ def face_named(body, where):
         if (face.CenterOfMass - where).Length < 1e-6:
             return "Face%d" % (i + 1)
     return None
+
+
+# -- the lists' menus, the look editor ---------------------------------------------------------
+def _item_pos(view, item):
+    view.scrollToItem(item)
+    QtWidgets.QApplication.processEvents()
+    return view.visualItemRect(item).center()
+
+
+def design_menu(label, entry):
+    """Right-click the In This Design swatch called `label`, click the menu entry."""
+    p = panel()
+    item = design_item(label)
+    if not h.check("In This Design has %s" % label, item is not None, design_labels()):
+        return False
+    ok = w.right_click(p.design.viewport(), _item_pos(p.design, item), entry)
+    h.check("look menu %s > %s" % (label, entry), ok)
+    return ok
+
+
+def design_menu_entries(label):
+    p = panel()
+    item = design_item(label)
+    if item is None:
+        return []
+    return [text for text, _on in w.menu_texts(p.design.viewport(), _item_pos(p.design, item))]
+
+
+def library_menu(label, entry):
+    p = panel()
+    item = library_item(label)
+    if not h.check("the library lists %s" % label, item is not None):
+        return False
+    ok = w.right_click(p.library.viewport(), _item_pos(p.library, item), entry)
+    h.check("library menu %s > %s" % (label, entry), ok)
+    return ok
+
+
+def double_click_design(label):
+    p = panel()
+    item = design_item(label)
+    if not h.check("In This Design has %s" % label, item is not None, design_labels()):
+        return False
+    w.double_click(p.design.viewport(), _item_pos(p.design, item))
+    return True
+
+
+def editor():
+    """The open look editor, or None."""
+    p = panel()
+    found = getattr(p, "editor", None) if p is not None else None
+    try:
+        return found if found is not None and found.isVisible() else None
+    except RuntimeError:
+        return None
+
+
+def type_field(widget, text, end=QtCore.Qt.Key_Tab):
+    """Click into a field, replace what is there by `text`, then Tab (or Enter)."""
+    w.click(widget, QtCore.QPoint(12, widget.height() // 2))
+    w.key(widget, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+    w.type_text(widget, text)
+    w.key(widget, end)
+    QtWidgets.QApplication.processEvents()
+
+
+def library_labels():
+    p = panel()
+    return [i.data(QtCore.Qt.UserRole)["label"] for i in p.items()] if p is not None else []
+
+
+def roughness(point, half=18):
+    """How busy the screen is round a 3D point: the mean step in brightness between pixels
+    next to each other. A flat colour on a curved face shades smoothly (well under 1); a
+    pattern's light and dark give a few units."""
+    h.view_drawn()
+    gl = h.gl_widget()
+    pos = point if isinstance(point, QtCore.QPoint) else h.screen_point(point)
+    g = gl.mapToGlobal(pos)
+    image = QtWidgets.QApplication.primaryScreen().grabWindow(0).toImage()
+    ratio = image.devicePixelRatio()
+    total, count = 0.0, 0
+    for dy in range(-half, half + 1):
+        last = None
+        for dx in range(-half, half + 1):
+            c = image.pixelColor(int((g.x() + dx) * ratio), int((g.y() + dy) * ratio))
+            light = (c.red() + c.green() + c.blue()) / 3.0
+            if last is not None:
+                total += abs(light - last)
+                count += 1
+            last = light
+    return total / max(1, count)
+
+
+def pattern_drawn(step):
+    """(patterns, triangles) drawn over a step's faces."""
+    from fission180 import appearance_draw
+
+    return appearance_draw.drawn(step)
+
+
+def click_group_tick(group):
+    """Click a checkable group box on its own tick, where a person clicks."""
+    option = QtWidgets.QStyleOptionGroupBox()
+    group.initStyleOption(option)
+    rect = group.style().subControlRect(
+        QtWidgets.QStyle.CC_GroupBox, option, QtWidgets.QStyle.SC_GroupBoxCheckBox, group
+    )
+    w.click(group, rect.center())
