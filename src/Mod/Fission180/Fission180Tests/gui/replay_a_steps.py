@@ -165,6 +165,15 @@ def has_row(name):
     return any(label == name or label.split("  ")[0] == name for label in labels())
 
 
+def centre(body):
+    """A body's centre of mass (its shape may be a compound of solids, which has none)."""
+    total, volume_ = V(0, 0, 0), 0.0
+    for solid in body.Shape.Solids:
+        total += solid.CenterOfMass * solid.Volume
+        volume_ += solid.Volume
+    return total * (1.0 / volume_) if volume_ else total
+
+
 def near(a, b, tol=1e-6):
     return abs(a - b) <= tol
 

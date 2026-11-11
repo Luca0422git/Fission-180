@@ -59,6 +59,7 @@ from Fission180Tests.gui import replay_a_steps as r
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import sketch_tools_steps as st
 from Fission180Tests.gui import timeline_input as t
+from Fission180Tests.gui import versions_input as vi
 from Fission180Tests.gui import viewcube_input as vc
 from Fission180Tests.gui import widget_input as w
 from Fission180Tests.gui import x_input as xi
@@ -500,6 +501,7 @@ e_found.while_busy = True
 def e_oak():
     h.check("E the drag ran", not r._drag["error"], r._drag["error"])
     h.settle()
+    r.keys_to_window()  # (no window manager under xvfb: nothing is active after a drag)
     data = k.stored(donut())["body"] or {}
     h.check(
         "E Oak dragged onto the donut with the mouse: the donut is Oak",
@@ -718,7 +720,7 @@ g_ok.done_what = "Split Body to finish"
 
 
 def top_and_bottom():
-    found = sorted(r.solids(), key=lambda x: x.Shape.CenterOfMass.z)
+    found = sorted(r.solids(), key=lambda x: r.centre(x).z)
     return found[-1], found[0]
 
 
@@ -732,8 +734,8 @@ def g_done():
     top, bottom = top_and_bottom()
     h.check(
         "G one above the other",
-        top.Shape.CenterOfMass.z > 2 and bottom.Shape.CenterOfMass.z < -2,
-        (top.Shape.CenterOfMass, bottom.Shape.CenterOfMass),
+        r.centre(top).z > 2 and r.centre(bottom).z < -2,
+        (r.centre(top), r.centre(bottom)),
     )
     names = sorted(x.Label for x in found)
     h.check("G they are called Body1 and Body2", names == ["Body1", "Body2"], names)
@@ -980,12 +982,190 @@ def i_done():
         )
     h.check("I together: the donut less the bite", r.rel(r.volume(), total, 1e-5), r.volume())
     h.check("I the donut is no higher", r.box_size()[2] == 40.0, r.box_size())
+    pieces = [len(x.Shape.Solids) for x in found]
+    h.check("I each half is still one piece", pieces == [1, 1], pieces)
     titles = t.titles()
     h.check("I the timeline ends with the extrude", titles[-1].startswith("Extrude"), titles)
     for body in found:
         look = k.stored(body)["body"] or {}
         h.check("I %s is still Oak" % body.Label, look.get("key") == "wood_oak", look)
     h.shot("I-bite")
+
+
+# == J: the pink icing =========================================================================
+PINK = (1.0, 0x6F / 255.0, 0xB5 / 255.0)
+ON_BOTTOM = V(39.6, -39.6, -12)  # the lower half's outer wall, facing the Home view
+
+
+def default_label():
+    return [x for x in k.design_labels() if "default" in x][0]
+
+
+def j_open():
+    vc.move_away()
+    h.click_empty()
+    h.press("a")
+
+
+j_open.done = lambda: k.panel() is not None
+j_open.done_what = "the Appearance dialog (A)"
+
+
+def j_drag_default():
+    labels = k.design_labels()
+    h.check("J In This Design lists the default look and Oak", len(labels) == 2, labels)
+    # The book: the plain look of In This Design (Fusion's Steel - Satin) goes onto the top
+    # half, then its colour is edited to pink.
+    r.drag_look(default_label(), ON_DONUT, from_design=True)
+
+
+j_drag_default.done = r.drag_done
+j_drag_default.done_what = "the drag of the default look onto the top half"
+j_drag_default.while_busy = True
+
+
+def j_edit():
+    h.settle()
+    r.keys_to_window()  # (no window manager under xvfb: nothing is active after a drag)
+    top, bottom = top_and_bottom()
+    look = k.body_look_label(top)
+    h.check("J the top half has the plain look now", look == default_label(), look)
+    h.check("J the bottom half is still Oak", k.body_look_label(bottom) == "Oak")
+    k.double_click_design(default_label())
+
+
+j_edit.done = lambda: k.editor() is not None
+j_edit.done_what = "the look's editor (a double-click)"
+
+
+def j_pink():
+    e = k.editor()
+    k.type_field(e.hex, "#FF6FB5", QtCore.Qt.Key_Return)
+
+
+def j_pinked():
+    e = k.editor()
+    h.check("J Enter in the colour box keeps the editor open", e is not None)
+    top, _bottom = top_and_bottom()
+    shown = k.shown_colors(top.Tip)
+    h.check("J the top half turns pink at once", shown and k.same(shown[0], PINK), shown[:2])
+    w.click(e.ok_button)
+
+
+j_pinked.done = lambda: k.editor() is None
+j_pinked.done_what = "the editor to close"
+
+
+def j_ok():
+    h.task_button("OK")
+
+
+j_ok.done = r.no_panel
+j_ok.done_what = "Appearance to close"
+
+
+def j_done():
+    vc.move_away()
+    h.click_empty()
+    top, bottom = top_and_bottom()
+    rgb = k.screen_rgb(ON_DONUT)
+    h.check("J the icing is pink on the screen", k.hue_like(rgb, PINK, 0.12), rgb)
+    rgb = k.screen_rgb(ON_BOTTOM)
+    h.check("J the lower half is not", not k.hue_like(rgb, PINK, 0.08), rgb)
+    look = k.stored(bottom)["body"] or {}
+    h.check(
+        "J ... it is still Oak at 44 %", look.get("key") == "wood_oak" and look.get("scale") == 44
+    )
+    groups, triangles = k.pattern_drawn(bottom.Tip)
+    h.check("J ... with its grain drawn", groups == 1 and triangles > 50, (groups, triangles))
+    groups, _triangles = k.pattern_drawn(top.Tip)
+    h.check("J no grain on the icing", groups == 0, groups)
+    h.shot("J-icing")
+
+
+# == K: Save ===================================================================================
+def k_save():
+    r.keys_to_window()  # (the look editor's window closed: no window manager under xvfb)
+    h.press("s", QtCore.Qt.ControlModifier)
+
+
+k_save.done = lambda: vi.save_dialog() is not None
+k_save.done_what = "the Save dialog (Ctrl+S)"
+
+
+def tree_item(d, *names):
+    item = d.tree.topLevelItem(0)
+    for name in names:
+        found = None
+        for i in range(item.childCount()):
+            if item.child(i).text(0) == name:
+                found = item.child(i)
+        if found is None:
+            return None
+        item = found
+    return item
+
+
+def k_dialog():
+    d = vi.save_dialog()
+    h.check("K the dialog has a Name and a Location", d.location.isVisible())
+    h.check("K the folders are shown in the dialog", d.tree.isVisible())
+    blank = h.blank_buttons(d)
+    h.check("K every button of it paints (the ...)", not blank, blank)
+    project = tree_item(d, r.BOOK)
+    if not h.check("K the project is in the tree", project is not None):
+        return
+    if not project.isExpanded():  # a double-click opens a folder of the tree
+        w.double_click(d.tree.viewport(), d.tree.visualItemRect(project).center())
+
+
+k_dialog.done = (
+    lambda: tree_item(vi.save_dialog(), r.BOOK, r.FUND) is not None
+    and tree_item(vi.save_dialog(), r.BOOK).isExpanded()
+)
+k_dialog.done_what = "1 - Fundamentals to show in the tree"
+
+
+def k_folder():
+    d = vi.save_dialog()
+    item = tree_item(d, r.BOOK, r.FUND)
+    w.click(d.tree.viewport(), d.tree.visualItemRect(item).center())
+
+
+def k_name():
+    d = vi.save_dialog()
+    fund = os.path.join(s["root"], r.BOOK, r.FUND)
+    h.check(
+        "K a click on the folder sets the Location", d.location.text() == fund, d.location.text()
+    )
+    vi.fill_save_dialog(name="Classic Donut")
+    h.shot("K-save")
+    vi.click_save()
+
+
+k_name.done = lambda: vi.save_dialog() is None and os.path.isfile(
+    os.path.join(s["root"], r.BOOK, r.FUND, "Classic Donut.FCStd")
+)
+k_name.done_what = "the design to be saved in 1 - Fundamentals"
+k_name.timeout_s = 120
+
+
+def k_saved():
+    d = r.doc()
+    fund = os.path.join(s["root"], r.BOOK, r.FUND)
+    h.check("K the design is in 1 - Fundamentals", d.FileName.startswith(fund), d.FileName)
+    tabs = h.document_tabs()
+    texts = [tabs.tabText(i) for i in range(tabs.count())]
+    h.check("K its tab says Classic Donut", any("Classic Donut" in x for x in texts), texts)
+    h.check("K two bodies, as modelled", len(r.solids()) == 2)
+    titles = t.titles()
+    kinds = [x.rstrip("0123456789 ") for x in titles]
+    h.check(
+        "K the timeline is the book's",
+        kinds == ["Sketch", "Revolve", "Sketch", "Split Body", "Sketch", "Extrude"],
+        titles,
+    )
+    h.shot("K-end")
 
 
 h.run(
@@ -1073,6 +1253,18 @@ h.run(
         i_symmetric,
         i_distance,
         i_done,
+        j_open,
+        j_drag_default,
+        j_edit,
+        j_pink,
+        j_pinked,
+        j_ok,
+        j_done,
+        k_save,
+        k_dialog,
+        k_folder,
+        k_name,
+        k_saved,
     ],
     paced_by="state",
 )
