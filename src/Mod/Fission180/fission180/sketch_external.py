@@ -238,3 +238,98 @@ def _follow_auto_ids(sketch, ids):
         setattr(sketch, auto.PROPERTY, kept)
     except Exception as exc:
         log("sketch: Auto project ids not kept: %s" % exc)
+
+
+# -- Project from another body or component (wave 7, the book parity report) -----------------
+def needs_reference(sketch, obj):
+    """True when `obj` (a step, a body) cannot be an external reference of `sketch` as it
+    is: FreeCAD's sketch links only inside its own body (SketchObject::isExternalAllowed:
+    "This object belongs to another body / another part"), and its Project tool shows a
+    no-entry pointer and does nothing."""
+    from . import components
+
+    try:
+        mine = components.body_of(sketch)
+        theirs = components.body_of(obj)
+        if mine is None:
+            return components.container_of(sketch) is not components.container_of(obj)
+        return theirs is not mine
+    except Exception:
+        return False
+
+
+def project_across(sketch, obj, sub, defining=True):
+    """Project the face, edge or corner `sub` of `obj`, which belongs to another body or
+    component, onto `sketch`: Fusion's Project (P) takes any component's geometry; FreeCAD's
+    takes only the sketch's own body's (Hot End, Pizza Cutter, Tesla Turbine: "project the
+    previous part's face" did nothing, with no message).
+
+    A hidden reference to the element is made inside the sketch's body, before the sketch
+    (components.reference_binder: a copy that follows the other part when it changes and
+    keeps the place the two components had when it was made, as a Fusion projection does),
+    and the sketch projects that. A face gives all its edges, as FreeCAD's own Project
+    does. `defining` False: reference curves that make no profile (Include 3D Geometry).
+
+    Returns the number of curves it added (0: it was projected already). Raises ValueError
+    with a sentence for the person when it cannot be done. No undo step of its own."""
+    from . import components
+
+    if not is_sketch(sketch):
+        raise ValueError("Open a sketch first.")
+    body = components.body_of(sketch)
+    if body is None:
+        raise ValueError("This sketch is in no body, so it cannot reference another component.")
+    kind = "".join(c for c in (sub or "") if c.isalpha())
+    if kind not in ("Face", "Edge", "Vertex"):
+        raise ValueError("Project takes faces, edges and corners.")
+    try:
+        obj.Shape.getElement(sub)
+    except Exception:
+        raise ValueError("%s has no %s any more." % (obj.Label, sub))
+    name = kind + "1"
+    binder = components.find_reference(body, obj, [sub])
+    if binder is not None and _projects(sketch, binder, name):
+        return 0  # projected already: nothing is touched (no empty undo step)
+    binder = components.reference_binder(body, obj, [sub], before=sketch)
+    try:
+        binder.recompute()
+    except Exception:
+        sketch.Document.recompute()
+    try:
+        if binder.Shape.isNull():
+            raise ValueError("empty")
+        binder.Shape.getElement(name)
+    except Exception:
+        raise ValueError("%s of %s could not be referenced." % (sub, obj.Label))
+    if _projects(sketch, binder, name):
+        return 0
+    before = len(sketch.ExternalGeo)
+    try:
+        sketch.addExternal(binder.Name, name, bool(defining), False)
+    except Exception as exc:
+        raise ValueError("%s of %s cannot be projected here: %s" % (sub, obj.Label, exc))
+    added = len(sketch.ExternalGeo) - before
+    log(
+        "sketch %s: %d curve(s) projected from %s.%s through %s"
+        % (sketch.Label, added, obj.Label, sub, binder.Label)
+    )
+    return added
+
+
+def _projects(sketch, obj, name):
+    for linked, subs in sketch.ExternalGeometry or []:
+        if linked is obj and name in ([subs] if isinstance(subs, str) else list(subs)):
+            return True
+    return False
+
+
+def source_of_reference(obj):
+    """(object, [subs]) a hidden reference (components.reference_binder) stands for, else
+    (obj, None): what a projected curve really comes from, for labels and messages."""
+    from . import components
+
+    if components.is_reference(obj):
+        source, subs = components.reference_source(obj)
+        if source is not None:
+            return source, subs
+    return obj, None

@@ -718,15 +718,8 @@ class PatternPanel(Panel):
         form = self.layout
         self.fields = {}
         self.captions = {}
-        self.pattern_type = _combo(
-            PATTERN_TYPES,
-            self.options["pattern_type"],
-            disabled=(
-                {"components": "Mirror of components is not built yet (patterns are)."}
-                if self.kind == "mirror"
-                else {}
-            ),
-        )
+        # (wave 7) Mirror takes components too: component_pattern.py
+        self.pattern_type = _combo(PATTERN_TYPES, self.options["pattern_type"])
         form.addRow("Pattern Type", self.pattern_type)
         self._selection("objects", "Select", "Objects")
         self.objects_label = QtWidgets.QLabel("")
@@ -1139,6 +1132,13 @@ class PatternPanel(Panel):
                 self.base = first.Tip
         if ptype == "components" or (objects == [] and self._components_only()):
             self._use_design_frame()  # a pattern of components: the design's origin axes
+            if not objects:  # (wave 7) nothing else can be repeated here: Components
+                ptype = "components"
+                self.options["pattern_type"] = ptype
+                self._quiet = True
+                common.set_combo(self.pattern_type, ptype)
+                self._quiet = False
+                self._update_visibility()
         elif self.body is None or self.base is None or self.base.Shape.isNull():
             self.message.setText("⚠ Make a solid first (Create Sketch, then Extrude).")
             return
@@ -1204,7 +1204,7 @@ class PatternPanel(Panel):
             return faces, "faces"
         if bodies:
             return bodies, "bodies"  # every selected body (Fusion patterns them all)
-        if parts and self.kind != "mirror":
+        if parts:
             return parts[:1], "components"
         return [], self.options["pattern_type"]
 
@@ -1472,7 +1472,13 @@ class PatternPanel(Panel):
         """True when the design has components but no body to pattern features of."""
         from . import components
 
-        return self.body is None and bool(components.list_components(self.doc))
+        # (wave 7) also when the active component has only an empty body: the book's Mirror
+        # with a subassembly or the design's row active said "needs a solid to repeat"
+        try:
+            empty = self.base is None or self.base.Shape.isNull() or not self.base.Shape.Solids
+        except Exception:
+            empty = True
+        return (self.body is None or empty) and bool(components.list_components(self.doc))
 
     def _use_design_frame(self):
         """A pattern of components works in design coordinates: the origin axes drawn are
@@ -2489,7 +2495,14 @@ def start(kind, panel_class=None):
     tip = body.Tip if body is not None else None
     if surface is None and (tip is None or tip.Shape.isNull() or not tip.Shape.Solids):
         surface = _shown_surface(doc)
-    if surface is None and (tip is None or tip.Shape.isNull() or not tip.Shape.Solids):
+    from . import components as _components  # (wave 7) components can be repeated too
+
+    has_parts = any(
+        _components.has_solids(part, doc, recursive=True)
+        for part in _components.list_components(doc)
+    )
+    no_solid = tip is None or tip.Shape.isNull() or not tip.Shape.Solids
+    if surface is None and no_solid and not has_parts:
         commands.tell(
             "%s needs a solid to repeat: make one first (Create Sketch, then Extrude)."
             % pattern.TITLES[kind]

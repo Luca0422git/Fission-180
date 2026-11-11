@@ -5,16 +5,18 @@ Setup: a 40 x 30 x 10 box made into the component "Bracket" (Create Components f
 Bodies, then renamed), and a second box "Free" (x 60..100) left at the root.
 
   A  M, Move Object Components (the dialog switches), click the box: the component is
-     picked, the manipulator sits at its middle (20, 15, 5). Drag the X arrow about 15 mm:
+     picked, the manipulator sits at its origin (0, 0, 0). Drag the X arrow about 15 mm:
      the component follows. Type X Distance 10, tick Capture Position, OK: Bracket stands
      at x 10 (its Placement), its body is unchanged inside it, the timeline has a Move.
   B  Undo: back at 0, no Move; Redo: at 10 again with its Move.
   C  Double-click the Move in the timeline: the dialog edits it (Capture on, Components);
      Y Distance 5, OK: Bracket at (10, 5, 0), still one Move step.
   D  Select Bracket's browser row, M: the dialog opens on Components with Bracket picked.
-     Set Pivot, click near the corner (10, 5, 10): the manipulator jumps there and nothing
+     Set Pivot, click near the corner (10, 35, 10): the manipulator jumps there and nothing
      moves; Done; Z Angle 90: Bracket turns about the vertical line through the corner:
-     x -20..10, y 5..45. OK without Capture Position: no new timeline step.
+     x 10..40, y 35..75. OK without Capture Position: no new timeline step.
+     (Wave 7: the manipulator starts on the component's origin (10, 5, 0), as in Fusion; the
+     corner above it, (10, 5, 10), lies under its Z arrow, so another corner is clicked.)
   E  M on Bracket's row, X Distance 30, Esc: nothing moved.
   F  Ground Bracket (browser), M, Components, click it: refused, the dialog says it is
      grounded and picks nothing; Cancel; Unground.
@@ -102,7 +104,10 @@ def a_picked():
     h.check("Bracket picked", p.options.get("components") == [bracket()], p.options)
     triad = getattr(p, "triad", None)
     if h.check("manipulator shown", triad is not None):
-        h.check("at Bracket's middle", (triad.center - V(20, 15, 5)).Length < 1e-6, triad.center)
+        # wave 7 (book parity report): the manipulator starts on the component's ORIGIN,
+        # as in Fusion (it stood at the middle of its solids, (20, 15, 5)); Bracket was made
+        # from a body at the root, so its origin is the design's
+        h.check("at Bracket's origin", (triad.center - V(0, 0, 0)).Length < 1e-6, triad.center)
     h.shot("A-picked")
 
 
@@ -227,7 +232,7 @@ def d_pivot_mode():
 
 
 def d_click_corner():
-    h.click(V(11, 6, 10))
+    h.click(V(11, 34, 10))
 
 
 def d_pivot_set():
@@ -237,12 +242,12 @@ def d_pivot_set():
     triad = p.triad
     h.check(
         "the manipulator jumped to the corner",
-        triad is not None and (triad.center - V(10, 5, 10)).Length < 1e-6,
+        triad is not None and (triad.center - V(10, 35, 10)).Length < 1e-6,
         triad.center if triad else None,
     )
     c.placed("nothing moved", bracket(), V(10, 5, 0))
     values = [f.value() for f in p.pivot_fields]
-    h.check("Pivot X / Y / Z show it", all(abs(a - b) < 1e-6 for a, b in zip(values, (10, 5, 10))))
+    h.check("Pivot X / Y / Z show it", all(abs(a - b) < 1e-6 for a, b in zip(values, (10, 35, 10))))
     h.shot("D-pivot")
 
 
@@ -261,7 +266,7 @@ def d_turn():
 
 
 def d_turned():
-    c.box_is("turned 90 about the corner", bracket(), [-20, 5, 0, 10, 45, 10])
+    c.box_is("turned 90 about the corner", bracket(), [10, 35, 0, 40, 75, 10])
     h.check("volume kept", c.close(c.volume(bracket()), BOX), c.volume(bracket()))
 
 
@@ -270,7 +275,7 @@ def d_ok():
 
 
 def d_done_check():
-    c.box_is("stays turned", bracket(), [-20, 5, 0, 10, 45, 10])
+    c.box_is("stays turned", bracket(), [10, 35, 0, 40, 75, 10])
     h.check("no new step (Capture Position off)", len(c.moves()) == 1, c.moves())
     state["turned"] = App.Placement(bracket().Placement)
 
@@ -289,7 +294,7 @@ def e_type():
 
 
 def e_moved():
-    c.box_is("previewed 30 further", bracket(), [10, 5, 0, 40, 45, 10])
+    c.box_is("previewed 30 further", bracket(), [40, 35, 0, 70, 75, 10])
 
 
 def e_escape():
@@ -303,7 +308,7 @@ def e_back():
 
 # -- F --------------------------------------------------------------------------------------------
 def f_ground():
-    t.row_menu("Bracket", "Ground")
+    t.row_menu("Bracket", "Ground to Parent")
 
 
 def f_press_m():
@@ -318,7 +323,7 @@ def f_switch():
 
 
 def f_click():
-    h.click(V(-5, 25, 10))
+    h.click(V(25, 55, 10))
 
 
 def f_refused():
@@ -348,7 +353,7 @@ def g_cancel():
 
 def g_unground():
     h.check("dialog closed", c.panel() is None)
-    t.row_menu("Bracket", "Unground")
+    t.row_menu("Bracket", "Unground From Parent")
 
 
 # -- H --------------------------------------------------------------------------------------------

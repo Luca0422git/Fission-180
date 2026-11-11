@@ -63,14 +63,16 @@ def same_plc(a, c, tol=1e-6):
 
 # -- A ground ----------------------------------------------------------------------------------
 def a_ground():
-    j.browser_menu(j.plate().Label, "Ground")
+    j.browser_menu(j.plate().Label, "Ground to Parent")
 
 
 def a_grounded():
     h.check("plate grounded", jm().is_grounded(j.plate()))
     entries = [e[0] for e in t.row_menu_entries(j.plate().Label)]
     h.check(
-        "its menu now offers Unground", "Unground" in entries and "Ground" not in entries, entries
+        "its menu now offers Unground From Parent",
+        "Unground From Parent" in entries and "Ground to Parent" not in entries,
+        entries,
     )
     h.check("the block is not", not jm().is_grounded(j.block()))
 
@@ -92,7 +94,7 @@ def a_redone():
 
 
 def a_unground():
-    j.browser_menu(j.plate().Label, "Unground")
+    j.browser_menu(j.plate().Label, "Unground From Parent")
 
 
 def a_free():
