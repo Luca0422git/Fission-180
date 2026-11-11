@@ -241,6 +241,31 @@ def xclick(point, held=()):
     h.settle()
 
 
+def xclick_px(pixel, held=()):
+    """A real click (through the X server) on a pixel of the 3D view."""
+    x.click(pixel, held=held)
+    h.settle()
+
+
+def zoom_on(spot, width_in, name):
+    """A step that zooms the view, as it is turned now, onto `spot` (a 3D point or a function
+    giving one) so that `width_in` inches fit across: a person rolls the wheel over it."""
+
+    def step():
+        target = spot() if callable(spot) else spot
+        cam = h.view().getCameraNode()
+        rot = App.Rotation(*cam.orientation.getValue().getValue())
+        back = rot.multVec(V(0, 0, 1))
+        eye = target + back * 500.0
+        cam.position.setValue((eye.x, eye.y, eye.z))
+        gl = h.gl_widget()
+        cam.height.setValue(width_in * IN * gl.height() / float(max(1, gl.width())))
+        QtWidgets.QApplication.processEvents()
+        h.view_still()
+
+    return named(name, step)
+
+
 def iso_view(name="iso_view"):
     """A step that turns the view to the home (isometric) view and fits the design: a person
     orbits to see a face; the view is not what is tested."""

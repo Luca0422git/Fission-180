@@ -270,6 +270,7 @@ class ShapeIndex:
         z, hint = joints._edge_frame(edge)
         out = []
         if joints._is_circle(edge):
+            z = self._round_edge_axis(element, edge, z)
             out.append(_snap("circle", element, App.Vector(edge.Curve.Center), z, hint))
         for loop in self.loops_of_edge(element, edge):
             out.append(self._loop_snap(loop))
@@ -280,6 +281,27 @@ class ShapeIndex:
             if name:
                 out.append(_snap("vertex", name, v.Point, z, hint))
         return out
+
+    def _round_edge_axis(self, element, edge, axis):
+        """The Z of a round edge's centre snap: out of the flat face the edge bounds, as that
+        face's own snaps point (Fusion: the joint origin of a round edge lies in its face).
+        The circle's own axis runs whichever way the kernel made the edge: a bolt jointed by
+        its shoulder's edge to the rim of a hole went in head first or shank first by that
+        accident (the book's Pizza Cutter). An edge between two round faces keeps its axis."""
+        from . import joints
+
+        try:
+            for face_name in self.faces_of_edge(element, edge):
+                face = self.element(face_name)
+                if face is None or face.Surface.TypeId != PLANE:
+                    continue
+                _centre, normal, _hint = joints._face_frame(face)
+                along = normal.dot(axis)
+                if abs(along) > 0.99 * normal.Length * axis.Length:
+                    return axis * -1 if along < 0 else axis
+        except Exception:
+            pass
+        return axis
 
     # -- holes -----------------------------------------------------------------------------------
     def face_loops(self, element, face=None, frame=None):
