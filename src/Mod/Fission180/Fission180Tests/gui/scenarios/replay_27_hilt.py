@@ -7,10 +7,13 @@ import FreeCAD as App
 
 from Fission180Tests.gui import blend_steps as b
 from Fission180Tests.gui import book_components_steps as k
+from Fission180Tests.gui import book_hardware_steps as bh
 from Fission180Tests.gui import fillet2_steps as f2
 from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import hole_steps as hs
 from Fission180Tests.gui import inspect_steps as ins
+from Fission180Tests.gui import joints_steps as j
+from Fission180Tests.gui import looks_steps as lk
 from Fission180Tests.gui import plane_input as pl
 from Fission180Tests.gui import replay_g_steps as r
 from Fission180Tests.gui import sketch_input as si
@@ -455,6 +458,288 @@ SWITCH_STEPS = (
     + [holes_made]
 )
 
+# -- Screws: INSERT > Hardware stands in for the McMaster-Carr catalogue (report 2579) ---------
+SCREW = "M3 x 10 Socket Head Cap Screw"
+
+
+def hardware_open():
+    S["components"] = k.labels()
+    bh.open_hardware()
+
+
+hardware_open.done = bh.is_open
+hardware_open.done_what = "the Hardware dialog is open"
+
+
+def hardware_click():
+    p = bh.panel()
+    h.check(
+        "Hardware: starts on an M3 x 10 socket head screw", p.name.text() == SCREW, p.name.text()
+    )
+    h.check("Hardware: All holes like it is ticked", p.similar.isChecked())
+    h.fit()
+    h.check(
+        "Hardware: the rim of the lower hole clicked",
+        h.click_edge(V(1.7 * C45, -21, 50 - 1.7 * C45)),
+    )
+
+
+def hardware_placed():
+    p = bh.panel()
+    if not h.check("Hardware: placed", p.target is not None, (p.last_click, p.message.text())):
+        return
+    found = bh.hw().occurrences(p.target)
+    h.check("Hardware: both holes are filled by the one click", len(found) == 2, len(found))
+    spots = sorted(round(c.getGlobalPlacement().Base.z, 4) for c in found)
+    h.check("Hardware: a screw at z 50 and one at z 70", spots == [50.0, 70.0], spots)
+    h.check("Hardware: no error", "⚠" not in p.message.text(), p.message.text())
+    h.task_button("OK")
+
+
+hardware_placed.done = lambda: not bh.is_open()
+hardware_placed.done_what = "the Hardware dialog closed"
+
+
+def hardware_made():
+    feature = bh.part_named(SCREW)
+    if not h.check("Hardware: the screw is a component", feature is not None, k.labels()):
+        return
+    made = bh.joints_of(feature)
+    h.check("Hardware: two rigid joints hold the screws", len(made) == 2, [x.Label for x in made])
+    new = [x for x in k.labels() if x not in S["components"]]
+    h.check("Hardware: one component and one more occurrence", new == [SCREW, SCREW + ":2"], new)
+    h.check(
+        "Hardware: the screws are at the top level, not in Switch",
+        all(k.container_label(k.part(x)) == "" for x in new),
+        [k.container_label(k.part(x)) for x in new],
+    )
+    h.check("Hardware: the plate is not cut again", r.near(r.vol("Switch"), DRILLED, 1e-6))
+    r.nothing_broken("Hardware")
+    h.shot("screws")
+
+
+# -- As-built joints: the parts were modelled in place ------------------------------------------
+def rigid(name, first, first_point, second, second_point):
+    def command():
+        h.click_empty()
+        h.fit()
+        S["joints"] = [x.Label for x in j.joint_list()]
+        j.menu("As-built Joint")
+
+    command.done = lambda: j.panel() is not None
+    command.done_what = "the As-built Joint dialog is open"
+
+    def click_first():
+        h.click(first_point)
+
+    def click_second():
+        h.click(second_point)
+
+    def ok():
+        p = j.panel()
+        got = [x.Label for x in p.parts] if p is not None else None
+        h.check("As-built %s: %s and %s taken" % (name, first, second), got == [first, second], got)
+        h.check(
+            "As-built %s: Rigid by default" % name,
+            p is not None and p.type_box.currentData() == "rigid",
+        )
+        j.ok()
+
+    ok.done = lambda: j.panel() is None
+    ok.done_what = "the As-built Joint dialog closed"
+
+    def made():
+        new = [x for x in j.joint_list() if x.Label not in S["joints"]]
+        h.check(
+            "As-built %s: one more joint, rigid" % name,
+            len(new) == 1 and "Rigid" in new[0].Label,
+            [x.Label for x in new],
+        )
+        h.check(
+            "As-built %s: no undo step left open" % name,
+            not h.open_undo_step(),
+            h.open_undo_step(),
+        )
+        k.box_is(
+            "As-built %s: %s did not move" % (name, first), r.body_in(first), S["boxes"][first]
+        )
+
+    out = [command, click_first, click_second, ok, made]
+    for fn in out:
+        fn.__name__ = "joint_%s_%s" % (name, fn.__name__)
+    return out
+
+
+def remember_boxes():
+    S["boxes"] = {x: k.box(r.body_in(x)) for x in ("Grip", "Emitter", "Pommel", "Switch")}
+
+
+def joints_solved():
+    jm = j.joints_module()
+    h.check("Joints: the Grip is grounded", jm.is_grounded(k.part("Grip")))
+    h.check("Joints: the assembly solves", jm.solve(k.doc()) == 0)
+    for label, box in S["boxes"].items():
+        k.box_is("Joints: %s is where it was modelled" % label, r.body_in(label), box)
+    print("JOINTS", [x.Label for x in j.joint_list()], flush=True)
+
+
+# -- Physical materials (report 2572: Brass, Gold, ABS) ------------------------------------------
+def material_panel():
+    p = r.panel()
+    return p if p is not None and p.title == "Physical Material" else None
+
+
+def materials_open():
+    h.click_empty()
+    h.fit()
+    si.menu_item("MODIFY", "Physical Material")
+
+
+materials_open.done = lambda: material_panel() is not None
+materials_open.done_what = "the Physical Material dialog is open"
+
+
+def material_on(label, part, point, key, density):
+    def pick():
+        p = material_panel()
+        item = p.item_for(label)
+        if h.check("Physical Material: %s is in the library" % label, item is not None):
+            lk.click_item(p.library, item)
+
+    def click():
+        h.click(point)
+
+    def check():
+        from fission180 import material
+
+        body = r.body_in(part)
+        h.check(
+            "Physical Material: the %s is %s" % (part, label),
+            material.key_of(body) == key,
+            material.key_of(body),
+        )
+        mass = material.mass(body)
+        if density is None:
+            h.check("Physical Material: it has a mass", mass is not None and mass > 0, mass)
+            return
+        want = body.Shape.Volume * density * 1e-6
+        h.check(
+            "Physical Material: its mass follows (%.1f g)" % (want * 1000),
+            mass is not None and abs(mass - want) < 1e-9 + 1e-6 * want,
+            (mass, want),
+        )
+
+    out = [pick, click, check]
+    for fn in out:
+        fn.__name__ = "material_%s_%s" % (key, fn.__name__)
+    return out
+
+
+def materials_ok():
+    h.task_button("OK")
+
+
+materials_ok.done = lambda: material_panel() is None
+materials_ok.done_what = "the Physical Material dialog closed"
+
+
+# -- Appearances (report 2568, 2573: powder coat, black metallic paint, LED; Apply To Faces) ----
+def looks_open():
+    h.click_empty()
+    h.fit()
+    h.press("a")
+
+
+looks_open.done = lambda: lk.panel() is not None
+looks_open.done_what = "the Appearance dialog is open"
+
+
+def look_grip():
+    h.check(
+        "Appearance: A opens it on Bodies/Components",
+        lk.panel().apply_to.currentText() == "Bodies/Components",
+    )
+    h.check(
+        "Appearance: the view takes Powder coat, black",
+        lk.drop_look("Powder coat, black", ring(16, 25)),
+    )
+
+
+def look_grip_done():
+    data = lk.stored(r.body_in("Grip"))
+    h.check(
+        "Appearance: the Grip is powder coated",
+        (data["body"] or {}).get("key") == "powder_black",
+        data["body"],
+    )
+
+
+def look_switch():
+    h.check(
+        "Appearance: the view takes Paint, metallic black",
+        lk.drop_look("Paint, metallic black", V(3, -21, 60)),
+    )
+
+
+def look_switch_done():
+    data = lk.stored(r.body_in("Switch"))
+    h.check(
+        "Appearance: the Switch is metallic black",
+        (data["body"] or {}).get("key") == "paint_metallic_black",
+        data["body"],
+    )
+    b.choose(lk.panel().apply_to, "Faces")
+
+
+def look_led():
+    h.check("Appearance: Apply To Faces", lk.panel().apply_to.currentText() == "Faces")
+    h.check("Appearance: the view takes LED, red", lk.drop_look("LED, red", V(4, -3, 150)))
+
+
+def look_led_done():
+    body = r.body_in("Emitter")
+    data = lk.stored(body)
+    faces = data["faces"]
+    h.check("Appearance: ONE face of the Emitter is LED red", len(faces) == 1, faces)
+    h.check(
+        "Appearance: ...the Emitter itself keeps its brass",
+        (data["material"] or {}).get("key") == "brass" and data["body"] is None,
+        data,
+    )
+    red = [n for n, c in lk.face_colors(body).items() if lk.same(c, (1.0, 0.10, 0.08), 0.05)]
+    h.check("Appearance: that face is drawn red", len(red) == 1, lk.face_colors(body))
+    h.check("Appearance: no question is open", lk.question() is None)
+    h.shot("looks")
+    h.task_button("OK")
+
+
+look_led_done.done = lambda: lk.panel() is None
+look_led_done.done_what = "the Appearance dialog closed"
+
+
+def looks_kept():
+    data = lk.stored(r.body_in("Emitter"))
+    h.check("Appearance: the LED face is kept after Close", len(data["faces"]) == 1, data["faces"])
+    r.nothing_broken("Appearance")
+
+
+ASSEMBLY_STEPS = (
+    [r.activate("")]
+    + [hardware_open, hardware_click, hardware_placed, hardware_made, remember_boxes]
+    + rigid("emitter", "Emitter", ring(20, 135), "Grip", ring(16, 100))
+    + rigid("pommel", "Pommel", ring(18, -8), "Grip", ring(16, 100))
+    + rigid("switch", "Switch", V(5, -18.5, 62), "Grip", ring(16, 100))
+    + [joints_solved]
+    + [materials_open]
+    + material_on("Brass", "Emitter", ring(20, 135), "brass", 8.5)
+    + material_on("Gold", "Pommel", ring(18, -8), "gold", 19.32)
+    + material_on("ABS Plastic", "Switch", V(5, -18.5, 62), "abs", None)
+    + [materials_ok]
+    + [looks_open, look_grip, look_grip_done, look_switch, look_switch_done, look_led]
+    + [look_led_done, looks_kept]
+)
+
+
 steps = (
     r.new_design_steps("hilt")
     + r.new_component("Grip", grounded=True)
@@ -489,6 +774,7 @@ steps = (
     + [thread_start, thread_face, thread_ok, thread_made]
     + POMMEL_STEPS
     + SWITCH_STEPS
+    + ASSEMBLY_STEPS
 )
 
 h.run("replay_27_hilt", steps, paced_by="state")

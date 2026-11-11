@@ -2061,6 +2061,13 @@ class AsBuiltPanel(_JointsPanel):
         finally:
             self._quiet = False
 
+    def activated(self, name):
+        super().activated(name)
+        # (replay-g) While the Components box takes the clicks, a construction plane in
+        # front of a part does not take them (it used to give its own component to the
+        # joint); the Position box may take a plane, so there they can be clicked again.
+        self.hold_planes(name == "components")
+
     def allow_object(self, obj):
         return self.active == "components" and joints.part_of(obj) is not None
 

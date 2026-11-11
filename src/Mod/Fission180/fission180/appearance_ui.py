@@ -242,6 +242,7 @@ class AppearancePanel(BodyPanel):
     title = "Appearance"
     icon = "appearance"
     needs_pick = ()
+    planes_aside = True  # a look dropped on a body behind a construction plane lands on it
 
     def picks_bodies(self):
         """Apply To Bodies: the body under the pointer lights up whole (body_hover); Faces:

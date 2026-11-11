@@ -138,6 +138,7 @@ class MaterialPanel(BodyPanel):
     title = "Physical Material"
     icon = "material"
     needs_pick = ()
+    planes_aside = True  # a click on a body behind a construction plane takes the body
 
     def picks_bodies(self):
         """Every click takes a whole body: it lights up whole under the pointer (body_hover)."""
