@@ -991,23 +991,60 @@ def fillet_edge_2():
     h.click(point)
 
 
+def is_hole_wall(face):
+    return face.Surface.TypeId == "Part::GeomCylinder" and near(face.Surface.Radius, 1.0)
+
+
+def hole_wall_aim(wall):
+    """A point of the hole's inner wall that the view shows, found by state: the first thing
+    FreeCAD's pick finds there, behind the construction planes (Plane 4 is drawn over the
+    hole), is the wall. The view looks down at the board at about 35 degrees, so through the
+    2 mm hole only the far wall's top 1.4 mm shows; the wall's middle (aimed at until wave 7,
+    fix-8) lies behind the board's top skin, and the click picked the skin, the whole board's
+    lofted face, on every screen (its edges, not the hole's two rims, were rounded). None:
+    nowhere (the check after the click says what was picked)."""
+    import math
+
+    import Part
+
+    from fission180 import profile_pick
+
+    view = h.view()
+    centre, radius = wall.Surface.Center, wall.Surface.Radius
+    d = view.getViewDirection()
+    away = V(d.x, d.y, 0)
+    away.normalize()
+    side = V(-away.y, away.x, 0)
+    top = wall.BoundBox.ZMax
+    for below in (0.3, 0.5, 0.7, 0.2, 0.9):  # mm under the wall's highest point
+        for turn in (0.0, 20.0, -20.0, 40.0, -40.0):  # degrees around the far side
+            a = math.radians(turn)
+            out = away * math.cos(a) + side * math.sin(a)
+            point = V(centre.x + out.x * radius, centre.y + out.y * radius, top - below)
+            if wall.distToShape(Part.Vertex(point))[0] > 1e-4:
+                continue  # above the rim there (the board's top is curved)
+            for obj, short, _at in profile_pick.under(view, view.getPointOnViewport(point)):
+                if profile_pick.is_glyph(obj):
+                    continue
+                face = obj.Shape.getElement(short) if short.startswith("Face") else None
+                if face is not None and is_hole_wall(face):
+                    return point
+                break
+    return None
+
+
 def fillet_hole_face():
     p = b.blend_panel()
     h.check("Fillet: the fin's two edges are picked", len(p.refs) == 2, p.refs)
     h.fit()
     shape = r.bodies()[0].Shape
-    wall = [
-        f
-        for f in shape.Faces
-        if f.Surface.TypeId == "Part::GeomCylinder" and near(f.Surface.Radius, 1.0)
-    ][0]
+    wall = [f for f in shape.Faces if is_hole_wall(f)][0]
     centre = wall.Surface.Center
-    d = h.view().getViewDirection()
-    flat = V(d.x, d.y, 0)
-    flat.normalize()
-    z = (wall.BoundBox.ZMin + wall.BoundBox.ZMax) * 0.5
-    point = V(centre.x + flat.x, centre.y + flat.y, z)  # the far wall, seen through the hole
-    r.look_at(point, 8.0)
+    r.look_at(V(centre.x, centre.y, wall.BoundBox.ZMax), 8.0)
+    point = hole_wall_aim(wall)
+    h.check("Fillet: the hole's inner wall shows through its opening", point is not None)
+    if point is None:  # (the click below then says what it picked)
+        point = V(centre.x, centre.y, wall.BoundBox.ZMax)
     h.click(point)
 
 
@@ -1018,7 +1055,13 @@ fillet_hole_face.timeout_s = 240
 
 def fillet_size():
     p = b.blend_panel()
-    h.check("Fillet: 3 picks (the hole's wall gives its two rims)", len(p.refs) >= 3, p.refs)
+    faces = [ref for ref in p.refs if ref.startswith("Face")]
+    walls = [ref for ref in faces if is_hole_wall(p.info.shape.getElement(ref))]
+    h.check(
+        "Fillet: 3 picks, the third the hole's inner wall (it gives its two rims)",
+        len(p.refs) == 3 and faces == walls == p.refs[2:],
+        (p.refs, [(f, p.info.shape.getElement(f).Surface.TypeId) for f in faces]),
+    )
     b.type_into(p.radius.widget, "1")
 
 
@@ -1030,16 +1073,20 @@ def fillet_ok():
     h.caught_up(p)
     d = p._value(p._row_key(), "radius")
     note = p.limit_label.text() if p.limit_label.isVisible() else ""
-    S["fillet_note"] = note
-    # HITCH NOT FIXED (replay-b): the book takes 1 mm. Here 1 mm does not fit: the fin is a
-    # solid of its own beside the board (it touches it along a curve only, and OpenCASCADE
-    # cannot fuse that), so its outline's rounds run into its own top edges at its two ends
-    # (0.71 mm fits), and the hole's rims, 1 mm from the board's tail, into the tail (0.49).
-    # What is checked: the dialog says so (no silent cap), and OK makes what fits.
+    S["fillet_note"], S["fillet_size"] = note, d
+    # The book's 1 mm on the fin's two edges and the hole's rims: built on every board tried
+    # (wave 7, fix-8; replay-b's "does not fit: 0.49 mm" came from the click on the hole,
+    # which picked the board's whole skin). The board's lofted skin comes out a little
+    # different from run to run (8513 or 8781 mm2 here, the fin's spline is clicked), and
+    # OpenCASCADE's answer for a round on it is not the same for every size (on one board 0.3
+    # and 0.4 mm refused, 0.49 built): where 1 mm is refused, the dialog must say so with the
+    # size that fits, and OK makes that. Never 1 mm in the box with no note and no fillet.
+    built = abs(d - 1.0) < 1e-9 and not note and not p.message.text()
+    held = note.startswith("1 mm does not fit: limited to ") and 0.0 < d < 1.0
     h.check(
-        "Fillet: 1 mm does not fit here, and the dialog says so with what fits",
-        note.startswith("1 mm does not fit: limited to ") and 0.3 < d < 1.0,
-        (note, d),
+        "Fillet: 1 mm (the book), or the dialog says it does not fit and holds what fits",
+        built or held,
+        (note, d, p.message.text()),
     )
     h.fit()
     h.shot("fillet")
@@ -1056,7 +1103,14 @@ def fillet_made():
     shape = made[0].Shape
     h.check("Fillet: one body, valid", len(made) == 1 and shape.isValid(), len(made))
     changed = S["before_fillet"] - shape.Volume
-    h.check("Fillet: the rounds took a little material off", 0.1 < changed < 20.0, changed)
+    # a round of radius r takes (1 - pi/4) r2 off per mm of edge: the fin's two 43 mm edges
+    # and the hole's two rims, about 21 mm3 at 1 mm (20.7 - 21.8 on the boards here)
+    expected = 21.3 * S["fillet_size"] ** 2
+    h.check(
+        "Fillet: the four rounds took their share of material off",
+        0.6 * expected < changed < 1.4 * expected,
+        (changed, expected),
+    )
     h.check("nothing in error", not r.errors(), r.errors())
     S["final"] = shape.Volume
     h.fit()
