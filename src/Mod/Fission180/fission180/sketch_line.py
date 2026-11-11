@@ -93,10 +93,17 @@ class LineChain:
     def _tool_running(self):
         """The line tool is still the active tool: it was the last command started and
         FreeCAD's drawing cursor is still on the 3D view."""
-        from . import recent
+        from . import commands, recent
 
         last = recent.last()
-        if last is not None and last[0] not in ("Fission180_SketchLine", COMMAND):
+        # (wave 7, replay-b) X (construction) inside the Line tool keeps it going, as in
+        # Fusion: the book's Tensegrity draws its guides with L, X; the chain stopped after
+        # the first line because X was the last command run
+        if (
+            last is not None
+            and last[0] not in ("Fission180_SketchLine", COMMAND)
+            and last[0] not in commands.KEEPS_SKETCH_TOOL
+        ):
             return False
         try:
             return self.session.drawing_cursor()
@@ -280,8 +287,16 @@ def _ends_on_geometry(sketch, index):
     made it coincident with another curve's point or put it on a curve. The origin and the
     axes (FreeCAD's geometry -1 and -2) do not count: a line drawn along the X axis gets a
     point-on-object there and must still go on. A line of the chain joined to the previous
-    one is coincident at its start, not its end, so a chain going on does not count."""
+    one is coincident at its start, not its end, so a chain going on does not count.
+
+    A line that ends ON the origin goes on whatever else sits there: the book's Tensegrity
+    Tower draws its guides "from the top-left corner through the origin to the top-right
+    corner" with the hexagon's centre on the origin (FreeCAD joined the end to that centre,
+    not to the origin, and the chain ended: replay-b, wave 7)."""
     try:
+        end = sketch.Geometry[index].EndPoint
+        if abs(end.x) <= 1e-7 and abs(end.y) <= 1e-7:
+            return False
         for c in sketch.Constraints:
             if c.Type not in ("Coincident", "PointOnObject"):
                 continue
