@@ -298,7 +298,7 @@ Fission 180 offers 154 tools to AI apps (through MCP, the built-in chat panel an
 ## Assemble
 
 - [`pattern_components`](fission180://docs/reference/pattern_components.md): Pattern a whole component (its copies are linked instances, as Fusion's): kind rectangular (direction, direction2: origin axes X / Y / Z; quantity, quantity2, distance, distance2, distribution extent | spacing) or circular (axis, quantity, angle, circular_type full | angle | symmetric).
-- [`insert_hardware`](fission180://docs/reference/insert_hardware.md): Insert a fastener with the hole it needs: click a flat face of the current body at at ([x, y, z], design coordinates) or a round edge (a hole's rim).
+- [`insert_hardware`](fission180://docs/reference/insert_hardware.md): Insert a standard part with the hole it needs: click a flat face of the current body at at ([x, y, z], design coordinates) or a round edge (a hole's rim: the part sits on its axis).
 - [`new_component`](fission180://docs/reference/new_component.md): Make a new, empty component (Fusion's New Component) with its own body, inside parent (a component id) or at the top of the design; it becomes the active component, so the next sketches and features go into it.
 - [`components_from_bodies`](fission180://docs/reference/components_from_bodies.md): Put bodies into components of their own (one component per body), so joints can move them.
 - [`copy_component`](fission180://docs/reference/copy_component.md): Copy a component and paste it: new false (default) makes a linked instance (it changes with the original, Fusion's Paste), new true an independent copy (Paste New); moved by dx / dy / dz (mm).

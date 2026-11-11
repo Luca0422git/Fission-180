@@ -286,7 +286,13 @@ INSERT = group(
             "Hardware...",
             "Fission180_Hardware",
             "hardware",
-            note="A real-size screw, nut, washer, heat-set insert or magnet, and its hole.",
+            note="A standard part (screws, O-rings, bearings ... metric or inch) and its hole.",
+        ),
+        item(
+            "Insert Catalogue Part...",
+            "Fission180_InsertCataloguePart",
+            "catalogue_part",
+            note="A supplier's website in your browser; the STEP you download comes in.",
         ),
     ],
 )

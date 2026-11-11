@@ -111,8 +111,7 @@ def _companions(obj):
         from . import hardware
 
         if hardware.is_hardware(obj):
-            own = hardware.hole_of(obj)
-            return [own] if own is not None else []
+            return hardware.holes_of(obj)  # (one per place it was put on)
     except Exception:
         pass
     try:

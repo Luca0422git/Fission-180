@@ -1,0 +1,103 @@
+{
+  "id": "hardware_set_screw_m4_cup",
+  "title": "An M4 x 6 cup point set screw (ISO 4029) in a 3.3 mm tap drill hole: flush with the face",
+  "tags": [
+    "hardware",
+    "setscrew",
+    "rim"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "rect": [
+            0,
+            0,
+            40,
+            30
+          ],
+          "name": "plate"
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 10
+    },
+    {
+      "op": "hole_at",
+      "id": "h1",
+      "face": {
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "count": 1
+      },
+      "at": [
+        20,
+        15,
+        10
+      ],
+      "extent": "all",
+      "diameter": 3.3,
+      "tap_type": "simple",
+      "drill_point": "flat"
+    },
+    {
+      "op": "sf_hardware",
+      "id": "hw1",
+      "standard": "iso4029",
+      "size": "4",
+      "length": 6,
+      "edge": {
+        "type": "circle",
+        "radius": 1.65,
+        "at": {
+          "axis": "z",
+          "value": "max"
+        },
+        "count": 1
+      },
+      "make_hole": false,
+      "hardware_bbox": [
+        18,
+        13,
+        4,
+        22,
+        17,
+        10
+      ]
+    },
+    {
+      "op": "expect_bodies",
+      "bodies": {
+        "hw1": {
+          "volume": 66.13336986023258,
+          "solids": 1
+        }
+      }
+    }
+  ],
+  "expect": {
+    "volume": 11914.470140006018,
+    "faces": 7,
+    "bbox": [
+      0,
+      0,
+      0,
+      40,
+      30,
+      10
+    ],
+    "solids": 1,
+    "source": "analytic",
+    "note": "ISO 4029 M4: hexagon socket 2.0 x 2.5 deep, cup 2.0 wide (a 120 degree cone 1 / tan 60 deep): V = pi 2^2 6 - pi/3 1^2 0.5774 - sqrt3/2 2^2 2.5. Its top flush with the face (z 4 to 10). The plate: 12000 - pi 1.65^2 10."
+  }
+}
