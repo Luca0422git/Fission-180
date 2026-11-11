@@ -1457,6 +1457,217 @@ def cap_drag_undone():
     r.timeline_ok("Ctrl+Z of the drag")
 
 
+# == 9: the O-rings (report 1702-1721) =============================================================
+# The book inserts McMaster-Carr parts (out of scope); INSERT > Hardware has the same standard
+# O-rings by their AS568 dash numbers. -012 (0.364 x 0.070) goes on the End Cap's d3/8 shank.
+ORING_CAP = "O-Ring AS568-012"
+ORING_CS = 0.070
+
+
+def _bh():
+    from Fission180Tests.gui import book_hardware_steps as bh
+
+    return bh
+
+
+def _c2():
+    from Fission180Tests.gui import component2_steps as c2
+
+    return c2
+
+
+def hardware_open():
+    _bh().open_hardware()
+
+
+hardware_open.done = lambda: _bh().is_open()
+hardware_open.done_what = "the Hardware dialog is open"
+
+
+def hardware_search(text, want):
+    def search():
+        _bh().search(text)
+
+    def pick():
+        bh = _bh()
+        h.check("Search offers %s" % want, bh.results()[:1] == [want], bh.results()[:3])
+        bh.click_result(0)
+
+    key = text.replace(" ", "_").replace("-", "_")
+    return [r.named(search, "hardware_search_" + key), r.named(pick, "hardware_pick_" + key)]
+
+
+def oring_ok():
+    bh = _bh()
+    shown = bh.shown()
+    h.check("an inch O-ring by its dash number", shown[:2] == ("Inch", "O-ring"), shown)
+    h.check("nothing clicked: OK puts it at the origin", "origin" in bh.panel().hint.text(), bh.panel().hint.text())
+    r.ok()
+
+
+oring_ok.done = lambda: _c2().component_panel() is not None
+oring_ok.done_what = "the Move dialog opens on the O-ring"
+
+
+def oring_move(dx_text):
+    def step():
+        c2 = _c2()
+        p = c2.component_panel()
+        # report 1713: "Move with Y Angle 90 and X Distance, like the book's placement step"
+        c2.type_value(p, "ry", "90")
+        c2.type_value(p, "dx", dx_text)
+
+    return r.named(step, "oring_move_" + dx_text.replace("-", "m").replace(".", "_"))
+
+
+def move_ok():
+    r.ok()
+
+
+move_ok.done = lambda: _c2().component_panel() is None
+move_ok.done_what = "the Move dialog closed"
+
+
+def _ring_box(label):
+    from fission180 import components
+
+    part = r.part(label)
+    bodies = components.bodies_in(r.doc(), part, recursive=True)
+    from fission180 import bodies as bodies_module
+
+    shape = bodies_module.global_shape(bodies[0])
+    b = shape.optimalBoundingBox(False, False)
+    return [round(v, 4) for v in (b.XMin, b.YMin, b.ZMin, b.XMax, b.YMax, b.ZMax)]
+
+
+def oring_placed(label, x_in, inside_in):
+    def step():
+        h.check("%s is a component at the top level" % label, r.part(label) is not None and _owner(label) == "", [p.Label for p in _parts()])
+        box = _ring_box(label)
+        out = (inside_in + 2 * ORING_CS) * IN / 2.0
+        # (the part's own origin is on the face it lies on, not in its middle)
+        want = [x_in * IN, -out, -out, (x_in + ORING_CS) * IN, out, out]
+        # typed -2 is -2 in; turned 90 degrees about Y the ring stands across the X axis
+        h.check("the O-ring stands across the X axis at x = %g in" % x_in, all(abs(a - b) < 1e-3 for a, b in zip(box, want)), (box, want))
+        h.check("an inserted part is not grounded", not r.grounded(label))
+        h.check("the active component is still the design", r.active_label() == "", r.active_label())
+        inch("the O-ring's Move")
+        r.timeline_ok("Hardware")
+
+    return r.named(step, "oring_placed_" + label[-3:])
+
+
+def hide_construction():
+    """The Piston Body's offset plane is drawn as large as the whole part (FreeCAD sizes a
+    plane to its body; Fusion to the face it was made from), so from the home view it lies
+    in front of the End Cap's shank, see-through, and a Joint takes the plane there. Its
+    folder's eye is clicked, as a person hides what is in the way (the report's tester hid
+    parts for the picks too, line 1720). Listed in the session log as a hitch not fixed."""
+    S["plane_shown"] = t.shown(_planes()[0])
+    t.click_eye("Construction")
+
+
+def construction_hidden():
+    h.check("the offset plane was shown, and is hidden now", S["plane_shown"] and not t.shown(_planes()[0]))
+
+
+def joint_start():
+    j.press_j()
+
+
+joint_start.done = lambda: j.joint_panel() is not None
+joint_start.done_what = "the Joint dialog is open"
+
+
+def _torus_spot(label):
+    from fission180 import bodies as bodies_module
+    from fission180 import components
+
+    body = components.bodies_in(r.doc(), r.part(label), recursive=True)[0]
+    shape = bodies_module.global_shape(body)
+    return r.seen_face_spot(shape)
+
+
+def joint_pick_ring(label, centre_in):
+    def step():
+        from Fission180Tests.gui import book_joints_steps as bj
+
+        h.fit()
+        spot = _torus_spot(label)
+        if not h.check("the O-ring is in view", spot is not None):
+            return
+        bj.hover_point(spot)
+        p = j.joint_panel()
+        hot = bj.hot(p)
+        # report 1716: "clicking a round surface snaps to the nearest snap point, usually an
+        # EDGE MIDPOINT, so the O-ring landed off-axis"
+        App.Console.PrintMessage("[Fission 180] replay: ring snaps %s hot %s\n" % (bj.kinds(p), hot and (hot["kind"], hot["point"])))
+        h.check(
+            "the O-ring's only snap is its centre, on its axis",
+            hot is not None and (hot["point"] - V(centre_in * IN, 0, 0)).Length < 1e-4,
+            hot and (hot["kind"], hot["point"]),
+        )
+        h.click(spot)
+
+    return r.named(step, "joint_pick_ring_" + label[-3:])
+
+
+def joint_pick_cap_end():
+    from Fission180Tests.gui import book_joints_steps as bj
+
+    p = j.joint_panel()
+    snap = p.snaps["comp1"]
+    h.check("the O-ring is component 1, by its centre", snap is not None and p.active == "comp2", (snap and snap["kind"], p.active))
+    shape = r.shape_of("End Cap")
+    end = [f for f in shape.Faces if f.Surface.TypeId == "Part::GeomPlane" and abs(f.CenterOfMass.x - CAP_X2 * IN) < 1e-6]
+    spot = r.seen_spot(end[0]) if end else None
+    if not h.check("the flat end of the shank is in view", spot is not None, len(end)):
+        return
+    bj.hover_point(spot)
+    hot = bj.hot(p)
+    App.Console.PrintMessage("[Fission 180] replay: shank end snaps %s hot %s\n" % (bj.kinds(p), hot and (hot["kind"], hot["point"])))
+    h.check(
+        "the lit snap of the round end face is its centre",
+        hot is not None and (hot["point"] - V(CAP_X2 * IN, 0, 0)).Length < 1e-4,
+        hot and (hot["kind"], hot["point"]),
+    )
+    h.click(spot)
+
+
+def joint_ring_offset():
+    p = j.joint_panel()
+    h.check("both sides are picked", p.snaps["comp1"] is not None and p.snaps["comp2"] is not None, p.active)
+    box = _ring_box(ORING_CAP)
+    h.check("the O-ring jumped onto the shank's end, on the axis", abs((box[0] + box[3]) / 2 - CAP_X2 * IN) < 1e-3 and abs(box[1] + box[4]) < 1e-3 and abs(box[2] + box[5]) < 1e-3, box)
+    # report 1719: "then Offset Z -0.465 in (end cap) to slide the O-ring into place"
+    r.type_field(p.offset_fields["z"].widget, "-0.465")
+
+
+def joint_ring_ok():
+    p = j.joint_panel()
+    h.check("no problem shown", p.message.text() == "", p.message.text())
+    r.ok()
+
+
+joint_ring_ok.done = lambda: j.joint_panel() is None
+joint_ring_ok.done_what = "the Joint dialog closed"
+
+
+def joint_ring_made():
+    box = _ring_box(ORING_CAP)
+    seat = (CAP_X1 + ORING_CS / 2) * IN  # against the head, in the rounded corner
+    h.check("-0.465 typed is 0.465 in along the shank: the O-ring sits under the head", abs((box[0] + box[3]) / 2 - seat) < 1e-3, ((box[0] + box[3]) / 2 / IN, seat / IN))
+    h.check("still on the axis", abs(box[1] + box[4]) < 1e-3 and abs(box[2] + box[5]) < 1e-3, box)
+    made = j.joint_list()
+    kinds = [x.Label for x in made]
+    h.check("one Rigid joint", len([k for k in kinds if k.startswith("Rigid")]) == 1, kinds)
+    box_cap = [CAP_X0 * IN, -R_OUT * IN, -R_OUT * IN, CAP_X2 * IN, R_OUT * IN, R_OUT * IN]
+    r.check_box("the End Cap did not move (the O-ring came to it)", "End Cap", box_cap)
+    inch("Joint")
+    r.timeline_ok("Joint")
+    h.shot("10-oring-cap")
+
+
 def steps():
     return r.stages(
         "replay_10",
@@ -1621,6 +1832,25 @@ def steps():
                     cap_drag,
                     cap_dragged,
                     cap_drag_undone,
+                ],
+            ),
+            (
+                "cap_oring",
+                [hardware_open]
+                + hardware_search("o-ring 012", ORING_CAP)
+                + [
+                    oring_ok,
+                    oring_move("-2"),
+                    move_ok,
+                    oring_placed(ORING_CAP, -2.0, 0.364),
+                    hide_construction,
+                    construction_hidden,
+                    joint_start,
+                    joint_pick_ring(ORING_CAP, -2.0 + ORING_CS / 2),
+                    joint_pick_cap_end,
+                    joint_ring_offset,
+                    joint_ring_ok,
+                    joint_ring_made,
                 ],
             ),
         ],

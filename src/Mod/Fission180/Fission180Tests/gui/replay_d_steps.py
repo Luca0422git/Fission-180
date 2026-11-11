@@ -404,7 +404,8 @@ def _pixel_mm():
 def seen_spot(face, shape=None, n=14):
     """A point of `face` (design coordinates) that the camera sees (the 3D view's own pick
     finds the face's surface there), as far from the face's rim as can be: what a person
-    aims at. None when the face is hidden from here. (`shape` is not needed any more.)"""
+    aims at. None when the face is hidden from here. With `shape` (the face's own solid) a
+    face that shows through a construction plane counts as seen."""
     import Part
 
     u0, u1, v0, v1 = face.ParameterRange
@@ -421,10 +422,24 @@ def seen_spot(face, shape=None, n=14):
     for room, p in spots:
         if room < 2.0 * _pixel_mm():
             break  # nearer the rim than a person can aim
-        hit, _info = _hit(p)
+        hit, info = _hit(p)
         if hit is not None and (hit - p).Length <= reach:
             return p
+        if shape is not None and hit is not None and _is_plane(info):
+            # a see-through construction plane in front: the face shows through it
+            from fission180 import profile_pick
+
+            if not profile_pick.hidden_by(shape, p, h.view().getViewDirection()):
+                return p
     return None
+
+
+def _is_plane(info):
+    try:
+        obj = App.getDocument(info["Document"]).getObject(info["Object"])
+        return obj.TypeId in ("PartDesign::Plane", "App::Plane", "Part::DatumPlane")
+    except Exception:
+        return False
 
 
 def seen_face_spot(shape, test=None):
