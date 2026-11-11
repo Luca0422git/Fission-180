@@ -23,9 +23,10 @@ typed, OK; a window drag over the whole part, Chamfer, 0.5 typed, OK. Then undo 
 a size that truly does not fit (50 mm on an edge of the 6 mm thick arm) is still held at
 what fits, and said.
 
-The window drag takes the edges and faces the view shows (about 70 of the part's 98 sharp
-edges). On those OpenCASCADE's one run fails too: at the far ends of the pockets' corners a
-filled inside corner and a bevelled outside edge meet beside an edge that is not picked.
+The window drag takes every edge and face of the part: Select Through is on by default, as
+in Fusion (wave 7, replay-b; before, it took the ~70 of the 98 sharp edges the view shows).
+On those OpenCASCADE's one run fails too: at the far ends of the pockets' corners a filled
+inside corner and a bevelled outside edge meet beside an edge that is not picked.
 Fission 180 builds such a group in two runs (fillet_robust._in_turn).
 
 FISSION180_BOOK_BEFORE=1 runs it as it was before the fix (OpenCASCADE's own blend only):
@@ -254,8 +255,8 @@ def all_kept():
     h.check("dialog closed", panel() is None)
     shape = h.body().Shape
     removed = S["v1"] - vol()
-    # (which edges a window drag takes depends on what the view shows: about 70 of the
-    # part's 98 here; all 98 would remove 272 mm3)
+    # (Select Through on, Fusion's default: the window takes all 98 edges, 272 mm3; with it
+    # off, the ~70 the view shows)
     h.check("the picked edges are bevelled 0.5 mm", 120.0 < removed < 300.0, removed)
     h.check("a valid solid in one piece", shape.isValid() and len(shape.Solids) == 1)
     S["v2"] = vol()

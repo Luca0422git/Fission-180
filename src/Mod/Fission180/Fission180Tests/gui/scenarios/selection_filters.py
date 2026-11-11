@@ -12,7 +12,8 @@ Fusion (parity/selection.md). Only real input, on a 40 x 30 x 10 box.
      (and the body lights up under the mouse); a window around the box selects the body;
      Ctrl + click on it drops it; the same entry again clears the priority (every filter
      on; the Ctrl + click left nothing selected).
-  D  Selection Filters > Select Through ticks on and off again.
+  D  Selection Filters > Select Through (on by default, as in Fusion) ticks off and on
+     again.
   E  Fission 180 off (Part Design workbench): with Body Edges filtered out, an edge still
      selects there (FreeCAD's own selection); back in Fission 180 the filter is back (the
      edge does not select); then edges on again.
@@ -115,10 +116,10 @@ def b_faces_off():
         h.check("B the filters submenu has %r" % want, want in subs, subs)
     ticked = {t: c for t, _e, c in result["sub"]}
     h.check(
-        "B every filter was ticked before (and Select Through not)",
+        "B every filter was ticked before (Select Through too: Fusion's default)",
         ticked.get("Body Faces") is True
         and ticked.get("Bodies") is True
-        and ticked.get("Select Through") is False,
+        and ticked.get("Select Through") is True,  # (on by default, as in Fusion)
         ticked,
     )
 
@@ -244,15 +245,16 @@ def c_face_again():
 
 
 # -- D -------------------------------------------------------------------------------------------
-def d_through_on():
-    result = si.choose_select(["Selection Filters", "Select Through"])
-    h.check("D Select Through ticked", result["ok"] and sel_ui().select_through())
-
-
 def d_through_off():
     result = si.choose_select(["Selection Filters", "Select Through"])
     h.check("D Select Through unticked", result["ok"] and not sel_ui().select_through())
     h.check("D ... remembered", App.ParamGet(PARAMS).GetBool("SelectThrough", True) is False)
+
+
+def d_through_on():
+    result = si.choose_select(["Selection Filters", "Select Through"])
+    h.check("D Select Through ticked again", result["ok"] and sel_ui().select_through())
+    h.check("D ... remembered", App.ParamGet(PARAMS).GetBool("SelectThrough", False) is True)
 
 
 # -- E -------------------------------------------------------------------------------------------
@@ -508,8 +510,8 @@ steps = b.box_steps("SelFilters") + [
     c_ctrl_check,
     c_cleared_check,
     c_face_again,
-    d_through_on,
     d_through_off,
+    d_through_on,
     e_edges_off_then_fission180_off,
     e_click_edge_in_freecad,
     e_freecad_check,

@@ -2,8 +2,8 @@
 """Box selection like Fusion (parity/selection.md), only real input on a 40 x 30 x 10 box.
 
 A  a window (left to right) around the whole box: the faces and edges the camera sees
-   (3 and 9: Select Through is off by default), no corner points (Fusion's box takes
-   faces and edges); the box widget is gone after.
+   (3 and 9: Select Through switched off first; it is on by default, as in Fusion: H),
+   no corner points (Fusion's box takes faces and edges); the box widget is gone after.
 B  a click on empty space clears the selection (FreeCAD's own click).
 C  a small crossing box (right to left) inside the top face: the top face alone.
    The same small box left to right (window): nothing is fully inside, nothing selected.
@@ -20,8 +20,8 @@ F2 Shift + click on the front face adds it to a selected top face; Shift + click
    it; Shift + click on empty space keeps the selection.
 G  Esc clears the selection; Esc while a box is being dragged cancels it (the box
    widget hides, the release selects nothing).
-H  Select Through on: the window around the whole box takes the hidden faces and edges
-   too (all 6 and 12); off again: back to 3 and 9.
+H  Select Through on again (Fusion's default): the window around the whole box takes
+   the hidden faces and edges too (all 6 and 12); off again: back to 3 and 9.
 I  Paint Selection (key 3): a stroke from the top face onto the front face selects both
    (and at most the edge between them); key 1 brings Window Selection back.
 J  Freeform Selection (key 2): a lasso through the same corners selects what E did.
@@ -67,6 +67,11 @@ def last():
 
 # -- A -------------------------------------------------------------------------------------------
 def a_window_whole_box():
+    # (wave 7, replay-b) Select Through is on by default, as in Fusion; A - G test the box
+    # with it off (a person who unticked it), H switches it on and off again
+    if si.selection_ui().select_through():
+        Gui.runCommand("Fission180_SelectThrough")
+    h.check("A Select Through is off for A - G", not si.selection_ui().select_through())
     h.fit()
     si.box_around(corners(), margin=25)
 
