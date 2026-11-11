@@ -43,7 +43,7 @@ You call tools; each answers in plain sentences, often followed by JSON:
   30 mm): Radius 30 mm is too big here: ...`. Read it, fix the arguments, call again. When
   the reason is a size that does not fit (a fillet radius, chamfer distance, shell or wall
   thickness, draft or taper angle, press pull distance...), the answer also gives the
-  largest value that fits (`Largest radius that fits here: 19.99 mm`); Fission 180 never
+  largest value that fits (`Largest radius that fits here: 20.00 mm`); Fission 180 never
   builds a smaller value in place of the one you asked for.
 - An export says what the file does not keep (`Not kept in this file:` ...), an insert or
   open what did not come in (`Not brought in, or changed:` ...): facts about the format,
@@ -76,7 +76,7 @@ You call tools; each answers in plain sentences, often followed by JSON:
   {"tool": "fillet", "args": {"edges": {"type": "line", "parallel": [0, 0, 1], "count": 4},
     "radius": 30},
    "expect": {"error": true, "contains": ["Radius 30 mm is too big here",
-     "Largest radius that fits here: 19.99 mm"]}}
+     "Largest radius that fits here: 20.00 mm"]}}
 ]
 ```
 

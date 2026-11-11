@@ -42,10 +42,12 @@ draft angle steeper than the face takes, a press pull deeper than the part: the 
 and changes nothing. Fission 180 never builds a smaller value in place of yours (you asked for
 an exact value); instead the answer ends with the largest value that does fit, found by
 trying smaller values (the same search Fission 180's dialogs use when a person drags a value
-past what fits): `Largest radius that fits here: 19.99 mm`. Every try rebuilds the design, so
-the search has a time limit of a few seconds, every try counted: when it runs out the answer
-says `Largest radius found that fits here` (a little more may fit), and on a design so big
-that a single try takes longer than that, Fission 180 does not search at all and says so
+past what fits): `Largest radius that fits here: 20.00 mm`. The search halves the gap until
+it is under 0.01 mm (about a dozen tries), so the answer is the same on every computer. Every
+try rebuilds the design; only as a guard the search has a time limit of a minute, every try
+counted: if it ever runs out the answer says `Largest radius found that fits here: about ...`
+(a little more may fit), and on a design so big that a single try takes half of that,
+Fission 180 does not search at all and says so
 (`Fission 180 did not search for the largest radius that fits`): try a smaller value yourself.
 For a value that goes the other way (a press pull into the part, a negative angle) it says
 `Furthest ... that fits here`. Use that value or less, or rethink the size. Changing a step
@@ -57,7 +59,7 @@ not searched.
   {"tool": "fillet", "args": {"edges": {"type": "line", "parallel": [0, 0, 1], "count": 4},
     "radius": 30},
    "expect": {"error": true, "contains": ["Radius 30 mm is too big here",
-     "Largest radius that fits here: 19.99 mm", "give radius 19.99 or less"]}},
+     "Largest radius that fits here: 20.00 mm", "give radius 20.00 or less"]}},
   {"tool": "shell", "args": {"faces": {"normal": [0, 0, 1], "count": 1}, "thickness": 25},
    "expect": {"error": true, "contains": ["the value does not fit here",
      "Largest thickness that fits here: 9.99 mm"]}},

@@ -42,16 +42,42 @@ def _ribbon_entries(available):
                         continue
                     seen.add(key)
                     out.append(
-                        {"name": resolved[0], "text": item["label"], "shortcut": item.get("key") or "", "ribbon": True}
+                        {
+                            "name": resolved[0],
+                            "text": item["label"],
+                            "shortcut": item.get("key") or "",
+                            "ribbon": True,
+                        }
                     )
     except Exception as exc:
         warn("search: menu entries: %s" % exc)
     return out
 
 
+# Fusion's names for tools Fission 180 lists under another name: typing Fusion's finds them
+# (book parity report: "Parts List" is TABLES > Table, the Spur Gear add-in is CREATE > Gear).
+ALSO_CALLED = (
+    ("Parts List", "Fission180_DrawingTable"),
+    ("Spur Gear", "Fission180_Gear"),
+    ("Add-Ins", "Fission180_ScriptsAddIns"),
+    ("Fit to View", "Fission180_Fit"),
+    ("New Design", "Fission180_NewDesign"),
+)
+
+
+def _also_called(available, entries):
+    listed = {e["text"].lower() for e in entries}
+    out = []
+    for text, name in ALSO_CALLED:
+        if name in available and text.lower() not in listed:
+            out.append({"name": name, "text": text, "shortcut": "", "ribbon": True})
+    return out
+
+
 def _build_entries():
     available = set(Gui.listCommands())
     entries = _ribbon_entries(available)
+    entries += _also_called(available, entries)
     ours = _fission180_keys()
     for name in Gui.listCommands():
         text, shortcut = name, ""

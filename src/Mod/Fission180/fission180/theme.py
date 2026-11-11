@@ -320,6 +320,22 @@ QPushButton {{ background: {button}; color: {text}; border: 1px solid {line}; bo
     padding: 4px 14px; }}
 QPushButton:hover {{ background: {hover}; }}
 QPushButton:default {{ border: 1px solid {accent}; }}
+/* Every dialog has the theme's ground. A dialog made as a child of the main window had it
+   already (the rule at the top); one made without a parent (FreeCAD's SVG importer's
+   question, add-ons' boxes) kept the system's light ground under the theme's light text:
+   "white on a white background" (book parity report). */
+QDialog, QMessageBox, QInputDialog {{ background: {chrome}; color: {text}; }}
+/* A plain tool button in a dialog (Parameters' "+" and "-", Save's "..."): without a rule it
+   kept the system's light button under the theme's light text, a blank white square (book
+   parity report, bug 1). The bars with rules of their own (the ribbon, the timeline, the
+   navigation bar, a command dialog's rows) are named further down and win. */
+QDialog QToolButton {{ background: {button}; color: {text}; border: 1px solid {line};
+    border-radius: 2px; padding: 2px 6px; }}
+QDialog QToolButton:hover {{ background: {hover}; }}
+QDialog QToolButton:pressed, QDialog QToolButton:checked {{ background: {active}; }}
+QDialog QToolButton:disabled {{ color: {disabled}; }}
+QDialog QToolButton[autoRaise="true"] {{ background: transparent; border: none; }}
+QDialog QToolButton[autoRaise="true"]:hover {{ background: {hover}; }}
 QCheckBox, QRadioButton, QLabel, QGroupBox {{ color: {text}; background: transparent; }}
 /* An unticked box must be visible on the dark panels (it was only visible once ticked) */
 QCheckBox::indicator {{ width: 13px; height: 13px; border: 1px solid {check_line}; border-radius: 2px;

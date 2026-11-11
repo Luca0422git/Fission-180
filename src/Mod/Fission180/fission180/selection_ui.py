@@ -1395,7 +1395,8 @@ class SelectOtherMenu(QtWidgets.QMenu):
             if row is None:
                 self.addSeparator()
                 continue
-            action = self.addAction(ui_icon(row.icon), row.label)
+            # (wave 7, shell) a name with "&" is drawn whole (Qt would drop the &)
+            action = self.addAction(ui_icon(row.icon), str(row.label).replace("&", "&&"))
             action.setData(len(self.rows))
             self.rows.append(row)
         self.hovered.connect(self._hover)

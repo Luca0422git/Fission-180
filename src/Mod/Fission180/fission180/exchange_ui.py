@@ -237,17 +237,23 @@ def insert_cad_files(paths, parent=None, place=True):
         if len(made) > 1:
             lay_side_by_side([m.top for _p, m in made if m.top is not None])
     except Exception:
-        doc.abortTransaction()
+        from . import transactions
+
+        transactions.close(doc, abort=True)
         App.closeActiveTransaction(True)
         doc.recompute()
         raise
     if not made:
-        doc.abortTransaction()
+        from . import transactions
+
+        transactions.close(doc, abort=True)
         App.closeActiveTransaction(True)
         if failed:
             raise core.ExchangeError(failed[0][1])
         return []
-    doc.commitTransaction()
+    from . import transactions
+
+    transactions.close(doc)
     App.closeActiveTransaction()
     doc.recompute()
     for _path, m in made:
@@ -409,8 +415,8 @@ class SaveAsDXFCommand:
 
 
 def save_as_mesh(obj=None):
-    """Right-click a body or component > Save As Mesh: the Export dialog on it, a mesh type
-    chosen (Fusion's Save As Mesh: Format, Unit Type, Structure, Refinement)."""
+    """Right-click a body or component > Save As Mesh: Fusion's Save As Mesh dialog on it
+    (Format, Unit Type, Structure, Refinement, Send to 3D Print Utility)."""
     from . import export_ui
 
     doc = App.ActiveDocument
@@ -429,7 +435,8 @@ def save_as_mesh(obj=None):
     if obj is None:
         commands.tell("Select a body or a component first, then Save As Mesh.")
         return None
-    dialog = export_ui.ExportDialog(doc, preset=obj, mesh=True)
+    # (wave 7) Fusion's Save As Mesh dialog, with Send to 3D Print Utility
+    dialog = export_ui.SaveAsMeshDialog(doc, obj)
     dialog.show()
     return dialog
 
@@ -475,16 +482,22 @@ def break_link(component=None):
     try:
         made = design_insert.break_link(component)
     except ValueError as exc:
-        doc.abortTransaction()
+        from . import transactions
+
+        transactions.close(doc, abort=True)
         commands.tell(str(exc))
         return None
     except Exception as exc:
-        doc.abortTransaction()
+        from . import transactions
+
+        transactions.close(doc, abort=True)
         doc.recompute()
         warn("Break Link failed: %s" % exc)
         commands.tell("The link could not be broken: %s" % exc)
         return None
-    doc.commitTransaction()
+    from . import transactions
+
+    transactions.close(doc)
     _refresh_browser()
     commands.tell(
         "%s is now part of this design: its features can be edited here." % component.Label

@@ -32,6 +32,7 @@ FreeCAD's Draft is silent about some failures (a face it cannot tilt is just ski
 with a message in the Report view only), so check() refuses such faces first and
 undrafted() finds any face the result left untouched.
 """
+
 import json
 import math
 
@@ -1142,18 +1143,36 @@ def _volume(shape):
 _SCRATCH = {"name": None, "waiting": False}
 
 
+def _same_units(scratch, design_name):
+    """The throw-away document takes the design's units: FreeCAD writes a hidden document's
+    units into the active design at every property change in it (report bug 2: an inch
+    design went back to mm), so with the same units there is nothing to carry over."""
+    import FreeCAD as App
+
+    try:
+        design = App.getDocument(design_name) if design_name else None
+        if design is not None and design.Name != scratch.Name:
+            if scratch.UnitSystem != design.UnitSystem:
+                scratch.UnitSystem = design.UnitSystem
+    except Exception:
+        pass
+
+
 def _scratch_document():
     import FreeCAD as App
 
     name = _SCRATCH["name"]
-    if name and name in App.listDocuments():
-        return App.getDocument(name)
     active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
+    if name and name in App.listDocuments():
+        doc = App.getDocument(name)
+        _same_units(doc, active)
+        return doc
     doc = App.newDocument("Fission180Scratch", "scratch", True, True)
     try:
         doc.UndoMode = 0
     except Exception:
         pass
+    _same_units(doc, active)
     _SCRATCH["name"] = doc.Name
     _restore_active(active)
     return doc

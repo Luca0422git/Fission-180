@@ -1171,6 +1171,9 @@ SKETCH_MODIFY = group(
         item("Break", ("Fission180_SketchBreak", "Sketcher_Split"), "sk_break"),
         item("Sketch Scale", "Fission180_SketchScale", "sk_scale"),
         item("Move/Copy", "Fission180_SketchMove", "sk_move", "M"),
+        SEP,
+        # Fusion's sketch MODIFY menu ends with Change Parameters too (wave 7, shell)
+        _same(SOLID_MODIFY, "Change Parameters"),
     ],
 )
 SKETCH_CONSTRAINTS = group(
@@ -1635,7 +1638,7 @@ SIM_MARKING_LIST = [
     SEP,
     item("Hide", "Std_HideSelection", "nav_display"),
     item("Show All", "Std_ShowObjects", "nav_display"),
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
@@ -1671,7 +1674,7 @@ SIMR_MARKING_LIST = [
         "Show Mesh", "Fission180_SimResultsMesh", "simr_mesh", toggle="simulation_results_ui:mesh_on"
     ),
     SEP,
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
@@ -1825,7 +1828,9 @@ TABS = [
     {
         "id": "solid",
         "title": "SOLID",
-        "groups": [SOLID_CREATE, SOLID_MODIFY, CONSTRUCT, INSPECT, INSERT, ASSEMBLE, SELECT],
+        # Fusion's order: CREATE, (AUTOMATE), MODIFY, ASSEMBLE, (CONFIGURE), CONSTRUCT,
+        # INSPECT, INSERT, SELECT (wave 7: ASSEMBLE stood after INSERT)
+        "groups": [SOLID_CREATE, SOLID_MODIFY, ASSEMBLE, CONSTRUCT, INSPECT, INSERT, SELECT],
     },
     {
         "id": "surface",
@@ -2061,7 +2066,7 @@ CAM_MARKING_LIST = [
     item("Drill", "Fission180_CamDrill", "cam_drill"),
     item("Tool Library", "Fission180_CamToolLibrary", "cam_tools"),
     SEP,
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
@@ -2237,7 +2242,7 @@ QUICK_ACCESS = [
         note="The project folder's designs with thumbnails (Fusion's Data Panel)",
     ),
     item("Menu", "__menu__", "qa_menu", note="All FreeCAD menus"),
-    item("New", "Std_New", "qa_new", "Ctrl+N"),
+    item("New", ("Fission180_NewDesign", "Std_New"), "qa_new", "Ctrl+N"),
     item("Open", ("Fission180_Open", "Std_Open"), "qa_open", "Ctrl+O"),
     item(
         "Save",
@@ -2284,7 +2289,7 @@ NAV_BAR = [
         ],
         "nav_zoom",
     ),
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     sub(
         "Display Settings",
         [
@@ -2572,7 +2577,7 @@ MARKING_LIST = [
     SEP,
     item("Hide", "Std_HideSelection", "nav_display"),
     item("Show All", "Std_ShowObjects", "nav_display"),
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),

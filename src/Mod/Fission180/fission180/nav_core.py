@@ -189,6 +189,10 @@ def grid_lines(centre, half, major, subdivisions):
     y_lo, y_hi = first_y * minor_step, last_y * minor_step
     majors, minors = [], []
     if last_x - first_x > 4000 or last_y - first_y > 4000:
+        if subdivisions > 1:
+            # zoomed far out of a fixed grid: the major lines alone (they were all dropped,
+            # and the grid went away)
+            return grid_lines(centre, half, major, 1)
         return [], []
     for i in range(first_x, last_x + 1):
         x = i * minor_step
@@ -197,6 +201,26 @@ def grid_lines(centre, half, major, subdivisions):
         y = j * minor_step
         (majors if j % subdivisions == 0 else minors).append((x_lo, y, x_hi, y))
     return majors, minors
+
+
+def grid_numbers(lo, hi, step, limit=40):
+    """The values the layout grid's Reference Numbers show between lo and hi: every major
+    line but 0, or every 2nd, 5th, 10th... when there would be more than `limit`."""
+    if step <= 0 or hi <= lo:
+        return []
+    first, last = int(math.ceil(lo / step - 1e-9)), int(math.floor(hi / step + 1e-9))
+    every = 1
+    for factor in (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000):
+        every = factor
+        if (last - first) / factor <= limit:
+            break
+    return [i * step for i in range(first, last + 1) if i != 0 and i % every == 0]
+
+
+def number_text(value):
+    """A reference number as written on the grid: no trailing zeros, no "-0"."""
+    text = ("%.4f" % value).rstrip("0").rstrip(".")
+    return "0" if text in ("-0", "") else text
 
 
 # -- increments ------------------------------------------------------------------------------

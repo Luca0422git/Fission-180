@@ -61,7 +61,17 @@ def curves_of(sketch):
     """{geo: (kind, ends)} of the sketch's curves and projected curves (sketch_draw's
     numbering: projected curves from -3)."""
     found = {}
+    try:
+        # helper curves that work unseen (a circular pattern's spokes, a polygon's corner
+        # circle): a chain never walks into one (sketch-b's wave 7 gap)
+        from . import sketch_helpers
+
+        unseen = sketch_helpers.hidden(sketch)
+    except Exception:
+        unseen = set()
     for i, geo in enumerate(sketch.Geometry):
+        if i in unseen:
+            continue
         ends = _ends(geo)
         if ends is None:
             continue

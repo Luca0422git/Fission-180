@@ -220,3 +220,24 @@ an older version's button).
 Not built: Move / Copy of whole folders; dragging cards between folders; Fusion's per-reference
 "Get Latest Version" (Get Latest takes every newer reference at once); FreeCAD's own Close All
 Documents still asks FreeCAD's question (its Save makes a version all the same).
+
+
+## Wave 7 (2026-11-11): the Data Panel and Save as the book uses them (`sf/book-shell`)
+
+| Fusion | Source | Fission 180 |
+|---|---|---|
+| **New Project** at the top of the Data Panel; a project holds folders and designs. | Autodesk blog "Getting Started with Projects, Folders, and Files"; Book | **New Project** button (and the empty-space menu): a project is a folder directly in the project folder (Luca's NAS folder stays the root, shown as "Project"). It is made at once and its name is ready to type on its card. Projects are drawn with their own icon and "Project" under the name. |
+| **New Folder**: the name is typed right away. | Autodesk help "Create, rename, and delete project folders"; Book | The folder is made as "New Folder" and its name is typed in place on the card (Enter or a click elsewhere keeps it, Esc leaves "New Folder"). No dialog. |
+| Rename, Move, Copy, Delete from a folder's right-click menu. | Autodesk help (web client: Rename / Delete in the right-click menu, Move in the drop-down; a folder cannot move while designs outside refer into it); Forum (moving whole folders in the desktop panel is unreliable) | A folder's menu: Open, **Rename** (in place; F2 too; a taken name is refused in the status line and the field stays), **Move...**, **Copy...** (the folder list without the folder itself; a move takes every design with its versions and points the designs that use them at the new place; a copy makes each design a separate one, v1), **Delete** (a question; to the computer's trash, `QFile.moveToTrash`; a place without one, a NAS share: the place's `.fission180-trash`), Show in Folder. Refused, with the reason, while a design of the folder (or one that uses its designs) is open. Delete key on a folder card too. |
+| A right-click on empty space: New Folder... | Book | New Project, New Folder, Upload..., Refresh: on the empty space between the cards and anywhere else on the panel. |
+| The panel slides in on the left over the whole height; an obvious X closes it. | Autodesk help (Show Data Panel); Book | The dock is put left of the browser over the whole height, 320 px wide (it was a small square under the browser); the browser keeps its width; its own title bar with a visible close button (and Ctrl+Alt+P). The path in the panel is shortened from the front ("Project / … / 1 - Fundamentals") instead of widening the panel. |
+| The panel opens where it was. | Guess | The folder shown is remembered (`DataPanelFolder`) while it is still a folder of the project folder. |
+| Save: Name, and the Location as the tree of projects and folders, the one open in the Data Panel selected. | Book ("Fusion saves into the open folder"; "shows the project/folder tree inline") | The Save dialog shows the folders of the place as a tree under Location (click one; **New Folder** makes one there and its name is typed in the tree); a design without a file starts in **the folder open in the Data Panel** (it was the project's root). The path box and "..." stay for a folder elsewhere. |
+
+Tests: scenario `book_shell_data_panel` (99 checks); unit tests `test_book_shell.py`
+(`DataPanelFoldersTest`).
+
+Still open: dragging a folder card onto another folder (designs can be dragged, a folder goes
+through Move...); the root is called "Project" although it now holds projects (Luca's wording
+since the NAS set-up: his call to rename it); restoring from the trash is done with the file
+manager.

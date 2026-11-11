@@ -63,7 +63,24 @@ transcripts survive, each was resumed with SendMessage. GitHub's full run on 049
 `fillet_qa_more` + 2 Windows golden models off by 0.0002 % (modify-b); `bodies_look`
 (library-2); `export_report` (shell); `surface2_loft`, `surface3_untrim_revolve`,
 `extrude_presspull_qa4` (extrude-2, brief `book-extrude-2.md`). Windows simulation: one
-CalculiX crash (exit 3221225477), seen once, not followed up. **Open follow-ups for the orchestrator** (do before release):
+CalculiX crash (exit 3221225477), seen once, not followed up. Then **sketch-c**
+(ee6562f3: one Sketch Dimension tool, `GridSnapFull`, `sketch_reference.py` auto project on
+reference, `sketch_first_dimension.py`, `sketch_named_dimensions.py`), **modify-b** (43d1db44:
+`fillet_section.py` swept bevel sections, `fillet_robust.first()` quick refusals, limit
+search by steps not seconds, `FaceOffset` on a thread) and **shell** (e35d1ef2: the last of
+the thirteen; `Fission180_NewDesign`, `view_fit.py`, Data Panel projects, `export_usd.py`,
+`transactions.close`, harness checks: an unexpected FreeCAD dialog fails a scenario, an undo
+step left open is a NOTE unless `FISSION180_STRICT_UNDO=1`) merged. **All thirteen areas are
+on develop.** `harness.prepare()` now switches FOUR user defaults off for older scenarios
+(first component grounded, full grid snap, scale at first dimension, layout grid): the
+acceptance replay must run with the users' defaults. Still running: components-2, modify-c,
+workspaces-2, library-2, extrude-2. Known open after them (to be judged by the replay, not
+chased one by one): edit a made sketch pattern; slot / origin snaps; world axis colours in a
+Front sketch; older sketches' helper clutter; `sketch_qa_keys` red on GitHub only; the
+Tesla housing's fillet where the tube leaves tangent; a thread has one face per turn (Fusion
+4); Select Through starts off (`selection_core.DEFAULT_SELECT_THROUGH`; the book's "window
+the whole model, Chamfer" needs it on; Autodesk does not document the default); balloons do
+not follow a design change; DWG needs a converter program. **Open follow-ups for the orchestrator** (do before release):
 (1) AI tools for Manufacture, and the cam dialog fields the engine ignores (tolerance,
 lead-in / ramp feedrates); (2) run the components / joints / journey scenarios with
 `FirstComponentGrounded` ON (users' default) and fix what breaks, then drop the harness

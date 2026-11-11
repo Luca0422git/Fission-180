@@ -216,7 +216,8 @@ class SmokeTest(unittest.TestCase):
 
         # F runs Fission 180's Fusion-style Fillet (config.PREFERRED), not FreeCAD's.
         self.assertEqual(shortcuts.bound_keys().get("F"), "Fission180_Fillet")
-        self.assertEqual(shortcuts.bound_keys().get("F6"), "Std_ViewFitAll")
+        # (wave 7) F6 runs Fission 180's own Fit (the design or the open sketch, never a grid)
+        self.assertEqual(shortcuts.bound_keys().get("F6"), "Fission180_Fit")
         self.assertEqual(self.commands["Sketcher_Trimming"].shortcut, "", "clashing key parked")
         # The parked key is kept in the preferences too (FreeCAD saves a key set from Python
         # when it quits: with Fission 180 still on, the empty key would be kept for good).

@@ -99,6 +99,8 @@ class DocumentTabs(QtWidgets.QTabBar):
         self.setUsesScrollButtons(True)
         self.setElideMode(QtCore.Qt.ElideRight)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
+        # as wide as its tabs: the "+" (a new design) sits right after the last one
+        self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
         self._syncing = False
         self.currentChanged.connect(self._clicked)
         self.tabCloseRequested.connect(self._close)
