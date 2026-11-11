@@ -141,5 +141,42 @@ class MessageTests(unittest.TestCase):
             blend.trial("chamfer", Corner(60), ["Edge1"], dict(options, angle=125))
 
 
+class SizeText(unittest.TestCase):
+    """A refusal's size is said in the design's units (the book's inch designs read
+    "Radius 6.35 mm is too big here" for the 0.25 typed)."""
+
+    class Design:
+        def __init__(self, system):
+            self.UnitSystem = system
+
+        def getEnumerationsOfProperty(self, name):
+            from fission180 import browser_core
+
+            names = [""] * 10
+            for short, long_name, index in browser_core.UNITS:
+                names[index] = long_name if short != "in" else "Imperial decimal (in)"
+            return names
+
+    def _doc(self, unit):
+        from fission180 import browser_core
+
+        for short, long_name, index in browser_core.UNITS:
+            if short == unit:
+                design = self.Design("")
+                design.UnitSystem = design.getEnumerationsOfProperty("UnitSystem")[index]
+                return design
+        raise AssertionError(unit)
+
+    def test_millimetres(self):
+        self.assertEqual(blend.size_text(6.35, self._doc("mm")), "6.35 mm")
+
+    def test_inches(self):
+        self.assertEqual(blend.size_text(6.35, self._doc("in")), "0.25 in")
+        self.assertEqual(blend.size_text(0.508, self._doc("in")), "0.02 in")
+
+    def test_no_design_is_millimetres(self):
+        self.assertEqual(blend.size_text(1.5), "1.5 mm")
+
+
 if __name__ == "__main__":
     unittest.main()

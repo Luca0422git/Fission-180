@@ -222,6 +222,7 @@ class ProfilePicker:
         self.face_materials = []  # materials of the highlighted body faces
         self.unpickable = []  # (sketch's root node, pick style) put in while offered
         self.last_click = 0.0  # time of the last click that picked a region
+        self.last_click_at = None  # ...and where on the screen it was (Coin pixels)
         self.paused = False  # a dialog's other selection box takes the clicks now
         self.root = coin.SoSeparator()
         pick = coin.SoPickStyle()
@@ -652,12 +653,29 @@ class ProfilePicker:
                 hit = self.region_at(position, check_hidden=True, near=True)
             if hit is not None:
                 self.last_click = time.time()
+                self.last_click_at = position
                 self.on_pick(hit[0], hit[1])
         except Exception as exc:
             warn("profile pick: %s" % exc)
 
     def clicked_region_recently(self, seconds=0.6):
         return time.time() - self.last_click < seconds
+
+    def clicked_region_at(self, point, seconds=5.0, pixels=4.0):
+        """True when the click that selected `point` (a 3D point FreeCAD's selection gives)
+        is the very click this picker took on a region: the same spot on the screen, not
+        long ago. FreeCAD selects the face under a region on the same click's release; on a
+        busy computer that came more than clicked_region_recently's 0.6 s later, and the
+        face was picked too (a sketch on a face, the book's Tesla Turbine nozzle holes: one
+        of five hole profiles came with the face it lies on)."""
+        try:
+            at = getattr(self, "last_click_at", None)
+            if at is None or point is None or time.time() - self.last_click >= seconds:
+                return False
+            x, y = self.view.getPointOnViewport(App.Vector(point))[:2]
+            return abs(float(x) - at[0]) <= pixels and abs(float(y) - at[1]) <= pixels
+        except Exception:
+            return False
 
     def remove(self):
         for kind, callback in self.callbacks:

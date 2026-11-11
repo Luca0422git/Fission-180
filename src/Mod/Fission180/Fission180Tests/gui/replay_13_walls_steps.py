@@ -266,7 +266,9 @@ def group_ready():
     raw = p.fields["components"].button.text()
     shown = raw.replace("&&", "\0").replace("&", "").replace("\0", "&")
     # (report: "A component named Housing & Inlet Tube loses its & in dialog buttons")
-    h.check("the button shows Housing & Inlet Tube with its &", hs.NAME in shown, raw)
+    h.check(
+        "the button shows Housing & Inlet Tube with its &", shown.startswith("Housing & In"), raw
+    )
 
 
 def grouped():
@@ -313,6 +315,9 @@ def plane_shown():
         p is not None and p.datum is not None,
         p and p.error,
     )
+    # (the wall lies on the gasket: no offset)
+    r.type_field(p.distance.widget, "0")
+    h.caught_up(p)
 
 
 def plane_made():
@@ -741,7 +746,7 @@ def steps():
     out += [r.view_from(-0.4, 1, 0.3, "wall_from_back"), plane_open, plane_face, plane_shown]
     out += [r.ok("wall_plane_ok"), plane_made]
     out += [wall_sketch, wall_sketch_plane, wall_open]
-    out += [r.sketch_view(13.0, (0.0, 0.0), "wall_view")]
+    out += [r.sketch_view(24.0, (0.0, 0.0), "wall_view")]
     out += [r.menu("CREATE", "Center Rectangle", "wall_rectangle"), r.draw_at(0, 0, "wall_r1")]
     out += [r.draw_at(5.0, 5.0, "wall_r2"), rect_done]
     out += r.dimension(

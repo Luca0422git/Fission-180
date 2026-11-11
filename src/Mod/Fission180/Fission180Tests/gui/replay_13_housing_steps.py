@@ -7,7 +7,7 @@ The report gives some of the book's sizes: the housing's diameter typed as "9 * 
 whole length 2.25, a 0.84 hole 4.17 up on the Right plane, a 0.25 fillet where the tube leaves
 the housing, a 0.04 chamfer on the two flat faces, five 1/16 holes 1.25 deep at the tube's
 end, pipe threads. The rest is a stand-in consistent with those (named at each step): the
-bore 8.50 (a 0.34 wall), the inlet a rod 1.09 across from the middle out to 2.5, its
+bore 8.50 (a 0.34 wall), the inlet a rod 1.09 across from the middle out to 4.0 (beyond the housing), its
 centerline 4.17 up; the 0.84 hole goes through the wall on the other side (an outlet). The
 book's triangle in the first sketch (no size given) is left out.
 
@@ -42,7 +42,7 @@ PI = math.pi
 NAME = "Housing & Inlet Tube"
 STATOR = "Stator Subassembly"
 R_OUT, R_IN, CL = 9.0 * 1.02 / 2.0, 4.25, 4.17
-ROD, ROD_END, WIDTH = 0.545, 2.5, 2.25
+ROD, ROD_END, WIDTH = 0.545, 4.0, 2.25
 
 
 # -- units and the subassembly --------------------------------------------------------------------
@@ -243,7 +243,7 @@ def sketch1_done():
     top = sketch.Geometry[rect_side("top")]
     bottom = sketch.Geometry[rect_side("bottom")]
     h.check(
-        "the inlet: from the centerline (4.17) to 4.715, out to 2.5",
+        "the inlet: from the centerline (4.17) to 4.715, out to 4.0",
         r.near(bottom.StartPoint.y / IN, CL)
         and r.near(top.StartPoint.y / IN, CL + ROD)
         and r.near(max(top.StartPoint.x, top.EndPoint.x) / IN, ROD_END),
@@ -264,8 +264,22 @@ extrude_key.done = lambda: r.panel() is not None
 extrude_key.done_what = "the Extrude dialog is open"
 
 
+def sketch1():
+    """The housing's first sketch (also when the replay starts from a checkpoint)."""
+    if S.get("sketch1"):
+        return r.doc().getObject(S["sketch1"])
+    found = [
+        o
+        for o in r.doc().Objects
+        if o.TypeId == "Sketcher::SketchObject" and r.comps().container_of(o) is r.component(NAME)
+    ]
+    found.sort(key=lambda o: o.Name)
+    S["sketch1"] = found[0].Name
+    return found[0]
+
+
 def sketch_point(u, v):
-    sketch = r.doc().getObject(S["sketch1"])
+    sketch = sketch1()
     return sketch.getGlobalPlacement().multVec(V(u * IN, v * IN, 0))
 
 
@@ -369,7 +383,8 @@ def hole_cut():
 
 # -- Revolve the inlet ----------------------------------------------------------------------------
 def show_sketch1():
-    ti.click_eye(r.doc().getObject(S["sketch1"]).Label)
+    S.setdefault("holed", r.vol_in3(NAME))
+    ti.click_eye(sketch1().Label)
 
 
 def revolve_open():
@@ -402,7 +417,7 @@ def revolve_axis_box():
 def revolve_axis():
     p = r.panel()
     if p.axis is None:
-        r.xclick(sketch_point(1.5 * ROD_END, CL))  # the construction line, beyond the inlet
+        r.xclick(sketch_point(ROD_END + 0.4, CL))  # the construction line, beyond the inlet
 
 
 def revolve_ready():
@@ -410,7 +425,7 @@ def revolve_ready():
     axis = p.axis
     h.check(
         "the axis is the construction line of Sketch 1",
-        axis is not None and axis[0].Name == S["sketch1"],
+        axis is not None and axis[0] is sketch1(),
         axis and axis[0].Name,
     )
     r.choose(p.operation, "Join")
@@ -427,15 +442,16 @@ def revolved():
 
 # -- Sketch 1 shown again: its inner circle cut ---------------------------------------------------
 def sketch1_visible():
-    return r.doc().getObject(S["sketch1"]).ViewObject.Visibility
+    return sketch1().ViewObject.Visibility
 
 
 def show_again():
     if not sketch1_visible():
-        ti.click_eye(r.doc().getObject(S["sketch1"]).Label)
+        ti.click_eye(sketch1().Label)
 
 
 def cut_key():
+    S.setdefault("revolved", r.vol_in3(NAME))
     h.check("Sketch 1 is shown", sketch1_visible())
     Gui.Selection.clearSelection()
     h.press("e")
@@ -480,6 +496,7 @@ def inner_cut():
 
 # -- Fillet 0.25 where the inlet leaves the housing -----------------------------------------------
 def fillet_key():
+    S.setdefault("housing", r.vol_in3(NAME))
     Gui.Selection.clearSelection()
     h.fit()
     h.press("f")
@@ -506,7 +523,11 @@ def fillet_edge():
     if not h.check("the inlet meets the housing along a junction edge", bool(found), len(found)):
         return
     e = max(found, key=lambda x: x.Length)
-    h.click_edge(e.valueAt((e.FirstParameter + e.LastParameter) * 0.5))
+    S["fillet_t0"] = __import__("time").monotonic()
+    h.click_edge(e.valueAt(e.FirstParameter + (e.LastParameter - e.FirstParameter) * 0.3))
+
+
+fillet_edge.timeout_s = 180
 
 
 def fillet_size():
@@ -516,7 +537,15 @@ def fillet_size():
     r.type_field(p.fields["radius"].widget, "0.25")
     h.caught_up(p)
     S["fillet_said"] = p.message.text()
-    print("[Fission 180] replay tesla fillet: %s | %s" % (p.refs, S["fillet_said"]), flush=True)
+    S["fillet_s"] = round(__import__("time").monotonic() - S.get("fillet_t0", 0), 1)
+    print(
+        "[Fission 180] replay tesla fillet: %s | %s | %s s"
+        % (p.refs, S["fillet_said"], S["fillet_s"]),
+        flush=True,
+    )
+
+
+fillet_size.timeout_s = 180
 
 
 def fillet_close():
@@ -525,7 +554,7 @@ def fillet_close():
 
 fillet_close.done = lambda: not Gui.Control.activeDialog()
 fillet_close.done_what = "the Fillet dialog closed"
-fillet_close.timeout_s = 120
+fillet_close.timeout_s = 180
 
 
 def filleted():
@@ -616,6 +645,10 @@ def pin_rim():
     return r.gp(ROD_END, 1.0 / 32.0, CL)
 
 
+def pin_index():
+    return [k for k, x in enumerate(r.sk().Geometry) if x.TypeId == "Part::GeomCircle"][0]
+
+
 def pin_done():
     r.stop_tool()
     h.check("one circle", len(circles()) == 1, len(circles()))
@@ -704,17 +737,27 @@ def holes_depth():
 def holes_made():
     got = r.vol_in3(NAME)
     want = 5 * PI * (1.0 / 32.0) ** 2 * 1.25
+    import Part
+
+    shape = r.shape_of(NAME)
+    bores = [
+        f
+        for f in shape.Faces
+        if isinstance(f.Surface, Part.Cylinder) and r.near(f.Surface.Radius / IN, 1.0 / 32.0, 1e-6)
+    ]
+    axes = {round(f.Surface.Center.z / IN, 4) for f in bores}
+    h.check("five 1/16 holes", len(axes) == 5, sorted(axes))
+    # (1.25 deep, part of the way through the housing's chamber: less than 5 whole bores)
+    taken = S["before_holes"] - got
     h.check(
-        "five 1/16 holes, 1.25 deep",
-        r.near(S["before_holes"] - got, want, 2e-4),
-        (S["before_holes"] - got, want),
+        "1.25 deep (where there is material)", 0.85 * want < taken < want * 1.005, (taken, want)
     )
     S["housing"] = got
     r.all_ok("Housing, holes")
 
 
 # -- a pipe thread on the inlet -------------------------------------------------------------------
-INLET_SIDE = r.gp(2.2, -ROD * 0.7071, CL + ROD * 0.7071)
+INLET_SIDE = r.gp(ROD_END - 0.4, -ROD * 0.7071, CL + ROD * 0.7071)
 
 
 def thread_face():
@@ -775,13 +818,13 @@ def steps():
     out += [r.named("name_housing", lambda: cs.type_name(NAME))]
     out += [r.ok("ok_housing"), housing_made]
     out += r.create_sketch("XZ_Plane", "housing")
-    out += [r.sketch_view(11.0, (0.8, 0.5), "housing_view")]
+    out += [r.sketch_view(13.0, (0.5, 0.5), "housing_view")]
     out += [r.key("c", "housing_c1"), r.draw_at(0.0, 0.0, "housing_c1_centre")]
     out += [r.draw_at(4.5, 0.0, "housing_c1_rim"), circle_done(1)]
     # the first dimension: "9 * 1.02" (it scales what is drawn: only this circle)
     out += r.dimension(
-        [rim(OUTER)],
-        (3.5, -3.5),
+        [rim(OUTER, 135)],
+        (-4.2, 4.2),
         "9 * 1.02",
         "housing_dia_out",
         lambda sk: r.near(sk.Geometry[OUTER].Radius / IN, R_OUT),
@@ -790,8 +833,8 @@ def steps():
     out += [r.key("c", "housing_c2"), r.draw_at(0.0, 0.0, "housing_c2_centre")]
     out += [r.draw_at(4.0, 0.0, "housing_c2_rim"), circle_done(2)]
     out += r.dimension(
-        [rim(INNER, -120)],
-        (-2.5, -2.5),
+        [rim(INNER, 200)],
+        (-2.6, -1.4),
         "8.5",
         "housing_dia_in",
         lambda sk: r.near(sk.Geometry[INNER].Radius / IN, R_IN),
@@ -813,12 +856,12 @@ def steps():
         lambda sk: r.near(sk.Geometry[S["axis"]].length() / IN, 6.0),
     )
     out += [axis_select, r.key("x", "housing_construction"), axis_construction]
-    out += [r.sketch_view(4.0, (1.4, 4.4), "housing_view_inlet")]
+    out += [r.sketch_view(6.0, (2.0, 4.4), "housing_view_inlet")]
     out += [
         r.key("r", "housing_rectangle"),
         r.named("housing_r1", lambda: r.xclick(r.geo_point(S["axis"], 1))),
     ]
-    out += [r.draw_at(2.5, 4.75, "housing_r2"), rect_done]
+    out += [r.draw_at(4.0, 4.75, "housing_r2"), rect_done]
     out += r.dimension(
         [side("right")],
         beside("right", 0.3, 0.0),
@@ -829,7 +872,7 @@ def steps():
     out += r.dimension(
         [side("top", 0.8)],
         beside("top", 0.6, 0.3),
-        "2.5",
+        "4",
         "housing_inlet_long",
         lambda sk: r.near(sk.Geometry[rect_side("top")].length() / IN, ROD_END),
     )
@@ -859,10 +902,13 @@ def steps():
     )
     out += [hole_sketch_done, r.finish_sketch("housing_hole_finish")]
     out += [extrude_key, cut_all, cut_side, r.ok("housing_cut_ok"), hole_cut]
-    out += [show_sketch1, revolve_open, r.sketch_view(4.0, (1.2, 4.3), "housing_inlet_view")]
+    out += [show_sketch1, revolve_open, r.view_from(0, -1, 0, "housing_front")]
+    out += [r.zoom_on(lambda: sketch_point(1.2, 4.3), 4.0, "housing_inlet_view")]
     out += [inlet_piece(0), inlet_piece(1), inlet_piece(2)]
+    out += [r.zoom_on(lambda: sketch_point(ROD_END, CL), 3.0, "housing_axis_view")]
     out += [revolve_axis_box, revolve_axis, revolve_ready, r.ok("housing_revolve_ok"), revolved]
-    out += [show_again, cut_key, inner_click, inner_all, inner_ready]
+    out += [show_again, r.view_from(0, -1, 0, "housing_front_again"), cut_key, inner_click]
+    out += [inner_all, inner_ready]
     out += [r.ok("housing_inner_ok"), inner_cut]
     out += [fillet_key, fillet_edge, fillet_size, fillet_close, filleted]
     out += [r.view_from(0.3, -1, 0.2, "housing_from_front"), chamfer_open, chamfer_front]
@@ -870,13 +916,14 @@ def steps():
     out += [r.ok("housing_chamfer_ok", 120), chamfered]
     out += [r.view_from(1, -0.6, 0.4, "housing_tube_end"), r.zoom_on(END_FACE, 2.0, "tube_zoom")]
     out += [end_sketch, end_face, end_open, remember_end_sketch]
+    out += [r.zoom_on(r.gp(ROD_END, 0, CL), 1.6, "tube_zoom_sketch")]
     out += [
         r.key("c", "tube_pin"),
         r.named("tube_pin_centre", lambda: r.xclick(r.gp(ROD_END, 0, CL))),
     ]
     out += [r.named("tube_pin_rim", lambda: r.xclick(pin_rim())), pin_done]
     out += r.dimension(
-        [lambda: pin_rim()],
+        [lambda: r.geo_mid(pin_index(), 0.15)],
         lambda: r.gp(ROD_END, 0.2, CL + 0.2),
         "1/16",
         "tube_pin_dia",

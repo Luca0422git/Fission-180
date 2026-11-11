@@ -886,8 +886,8 @@ def _compute(shape, spec, refs, refs2, features, features2):
             except KernelError as exc:
                 raise core.SetError(
                     getattr(exc, "instead", "")
-                    or "Radius %g mm is too big here: the rounds do not fit on the faces next "
-                    "to their edges.%s" % (r, getattr(exc, "way", ""))
+                    or "Radius %s is too big here: the rounds do not fit on the faces next "
+                    "to their edges.%s" % (blend.size_text(r), getattr(exc, "way", ""))
                 )
         elif mode == "full_round":
             result = shape
@@ -952,8 +952,8 @@ def _too_big(spec, i):
     rtype = row.get("radius_type", "constant")
     if rtype == "chord":
         return (
-            "Chord length %g mm is too big here: the round does not fit on the faces next to "
-            "it." % float(row.get("chord", 1.0))
+            "Chord length %s is too big here: the round does not fit on the faces next to "
+            "it." % blend.size_text(float(row.get("chord", 1.0)))
         )
     if rtype == "variable":
         return (
