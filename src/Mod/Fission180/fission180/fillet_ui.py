@@ -402,6 +402,10 @@ class BlendPanel(Panel):
         self._edit_pending = False
         self._limiting = False
         self._good_values = {}
+        # the size now is built only by another route than the kernel's one run
+        # (fillet_robust), and the own step this dialog made only for that (_uses_step)
+        self._robust = False
+        self._for_route = False
         self.arrows = []  # (ArrowDragger, spot, origin, direction) in global coordinates
         self.value_boxes = ValueBoxes(self)  # the value box next to each arrow
         self.fields = {}  # option name -> ValueField
@@ -1507,7 +1511,7 @@ class BlendPanel(Panel):
     def _limit_works(self, row, what):
         """works(value): the blend builds with `what` set to value (nothing in the document)."""
         spec = copy.deepcopy(self.spec)
-        uses_step = self._uses_step()
+        uses_step = not self._route_only()  # (as _trial builds it)
         flat = self._flat() if uses_step else None
         native = self._native_row()
         info, groups = self.info, [list(g) for g in self.groups]
@@ -1965,18 +1969,40 @@ class BlendPanel(Panel):
 
     def _uses_step(self):
         """Fission 180's own step builds this (or already holds it)."""
-        if self.target is not None and fillet_sets.is_sets(self.target):
+        if self._needs_step():
             return True
         if getattr(self, "_robust", False):
             return True  # only another route than the kernel's one run builds it
-        return self._needs_step()
+        # an own step opened for editing stays one; the one this dialog made only for a size
+        # another route builds (_for_route) is FreeCAD's step again once the kernel builds
+        # the size in one run (fix-1, wave 7)
+        target = self.target
+        return (
+            target is not None
+            and fillet_sets.is_sets(target)
+            and not getattr(self, "_for_route", False)
+        )
+
+    def _route_only(self):
+        """True when FreeCAD's own Fillet / Chamfer would hold these picks and settings, so
+        that only the size decides which step holds them: one the kernel builds in one run
+        is FreeCAD's, one only another route builds (fillet_robust: a modeled thread, a face
+        used up exactly, a bevel past a narrowing face) is Fission 180's."""
+        if self._needs_step():
+            return False
+        target = self.target
+        return (
+            target is None
+            or not fillet_sets.is_sets(target)
+            or bool(getattr(self, "_for_route", False))
+        )
 
     def _trial(self):
         """Build the blend without touching the document; BlendError says why it fails."""
         from . import fillet_robust
 
         with fillet_robust.source(self.base):
-            if self._uses_step():
+            if not self._route_only():
                 fillet_sets.compute(
                     self.info.shape,
                     self.spec,
@@ -1991,10 +2017,13 @@ class BlendPanel(Panel):
                 # shape when it failed, and the dialog showed no reason
                 row = self._native_row()
                 blend.check_build(self.kind, self.info, self.groups[row], self.spec["sets"][row])
-                if fillet_robust.used():
-                    # built by another route than the kernel's one run (after a modeled
-                    # thread: fillet_robust): FreeCAD's own step cannot, Fission 180's can
-                    self._robust = True
+                # built by another route than the kernel's one run (fillet_robust): FreeCAD's
+                # own step cannot hold it, Fission 180's can. Decided again for every size
+                # (fix-1, wave 7): this was set once and never cleared, made for a modeled
+                # thread (where every size needs it); since modify-b's routes also build the
+                # size at the exact limit (fillet_section), a search past the limit turned a
+                # plain fillet into Fission 180's step for good, also once 2 mm was typed.
+                self._robust = bool(fillet_robust.used())
 
     def _preview(self):
         if self._limit_searching() and not self._closed:
@@ -2034,8 +2063,10 @@ class BlendPanel(Panel):
                         self.features,
                         self.features2,
                     )
+                    self._for_route = not self._needs_step()
                 elif not fillet_sets.is_sets(self.target):
                     self._swap(flat)
+                    self._for_route = not self._needs_step()
                 else:
                     fillet_sets.update(
                         self.target,
@@ -2054,6 +2085,8 @@ class BlendPanel(Panel):
                 if self.target is None:
                     self.target = blend.make(self.body, self.base, refs, self.kind, options)
                     self._sync_formulas()
+                elif fillet_sets.is_sets(self.target):
+                    self._swap_back(refs, options)  # (only an own step made for a size)
                 else:
                     blend.set_refs(self.target, self.base, subs)
                     self._sync_formulas()
@@ -2183,6 +2216,30 @@ class BlendPanel(Panel):
         log(
             "%s is now Fission 180's own step %s (more than FreeCAD's one size)" % (label, new.Name)
         )
+
+    def _swap_back(self, refs, options):
+        """The own step this dialog made only for a size another route builds (_for_route)
+        becomes FreeCAD's Fillet / Chamfer again, now that the kernel builds the size in one
+        run: a plain fillet is FreeCAD's step (Press Pull's fillet editing, the AI's
+        edit_step and the timeline's own step work on it), in the same place of the
+        timeline, under the same name."""
+        old = self.target
+        label = old.Label
+        self._looks.restore()
+        self._ghost = False
+
+        def build(body):
+            return blend.make(body, self.base, refs, self.kind, options)
+
+        new, _expressions = fillet_sets.replace(old, build)
+        try:
+            new.Label = label
+        except Exception:
+            pass
+        self.target = new
+        self._for_route = False
+        self._sync_formulas()
+        log("%s is FreeCAD's own step %s again (the kernel builds this size)" % (label, new.Name))
 
     def _discard_target(self):
         """Every pick dropped (x, or the last edge clicked again) while making a new blend:
