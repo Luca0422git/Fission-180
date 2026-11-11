@@ -55,6 +55,22 @@ report's bug 10: "it overlapped a body in another component and cut it, silently
 that component"). Picking Cut by hand works as in Fusion: the Bodies to Cut row lists every
 shown body in the way, other components' too, and each can be clicked away.
 
+**A hand-chosen Cut, Intersect or To Object across components** (found by builder
+"components" during the wave; scenario `book_extrude_across`, 43 checks). Sources:
+**Autodesk** support, "How to extrude from one component to cut another component" (set
+Objects to Cut to the component to cut) and the Extrude reference ("Objects To Cut ...
+Auto-Select re-computes the bodies to cut based on the current visibility state");
+**Forum**, "extrude-cut through all problem".
+
+| Situation (Axle active; the Nozzle is another component, standing 30 mm off) | Fission 180 | Source |
+|---|---|---|
+| A sketch on the Nozzle's top face, E | The sketch and the extrude belong to Axle; the dialog proposes New Body (row 5) | Autodesk Learn; the report's bug 10 |
+| Operation Cut by hand, -4 | The Nozzle is listed under Bodies to Cut and is cut; nothing is made in Axle | Autodesk support; Forum |
+| Operation Cut by hand, +4 (up into the air) | "The cut does not go through any body", which is then true | - |
+| Operation Intersect by hand | The Nozzle keeps what the extrusion and it share | **Guess** (the same list of bodies as Cut) |
+| Extent To Object, a face of the Nozzle | Ends on that face, wherever the Nozzle stands | Autodesk (To Object takes any face) |
+| After OK | **Axle is still the active component.** Before wave 7 the changed body, and with it the Nozzle, became active, so the next sketch and extrude went into the Nozzle (and came up as Cut). Only a body the step made (New Body, New Component), or a body of the active component, becomes the active body (`extrude_finish.activate_result`; Extrude, Revolve, Sweep, Loft, the primitives) | **Guess**: no source says an extrude changes the active component; in Fusion it changes through Activate |
+
 Where the two readings of Fusion's rule part (Strater's "intersects a solid" against the
 forum's "mostly inside / mostly outside"), rows 2 and 3 are Fission 180's reading: building
 on a face stays a Join whatever it runs into (the forum's reading, and what a person means),

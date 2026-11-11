@@ -39,6 +39,7 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
 | 10 | The first body is "Body", Box makes "Body1" | Yes | Body1, Body2 ... | `commands.ensure_body` kept FreeCAD's label at the root | One line there |
 | 11 | Join of several areas (drone) | The report's own cause (an area left out); a New Body of areas that touch is one body | - | - | No change |
 | 12 | Speed: an extrude dialog with 36 areas; Hole from sketch | Extrude with 37 areas opens in 0.65 s and answers a click in under 0.2 s plus the hand's pace; not slow. Hole is modify's | - | - | Measured in `book_extrude_areas` |
+| 13 | (from builder "components", during the wave) Axle active, a sketch on a face of the Nozzle (another component, 30 mm off), Cut chosen by hand: "The cut does not go through any body" for -4 and +4 | Not on this branch nor on the tip of `sf/book-components` (their commit 352e9771, "references keep the place they were made at", is in both): -4 cuts 50.3 mm3 out of the Nozzle, +4 goes up into the air and the message is then true, Intersect leaves 50.3 mm3, To Object the Nozzle's underside works. What I did find: after OK the Nozzle became the active component | A Cut chosen by the person cuts bodies of other components too (Autodesk support, "How to extrude from one component to cut another component"; Extrude reference, "Objects To Cut"; Forum, "extrude-cut through all problem"); only the proposed operation looks at the active component. That the active component stays as it is after such a cut is a Guess (no source says an extrude changes it; in Fusion it changes through Activate) | After OK every dialog activated the result's body, and with it that body's component | `extrude_finish.activate_result`: only a body the step made, or one of the active component, is activated (Extrude, Revolve, Sweep, Loft, primitives) |
 
 ## What I built
 
@@ -46,7 +47,8 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
   `in_the_way` (third list: real overlaps) / `auto_scope`; `extrude_ui`: the rule, the picked
   operation that stays, `refuse()`.
 - `extrude_finish.py` (new): `SaysWhy` mixin and `speaking` decorator, used by Extrude,
-  Revolve, Sweep, Loft, Box / Cylinder / Sphere / Torus / Coil.
+  Revolve, Sweep, Loft, Box / Cylinder / Sphere / Torus / Coil; `activate_result` (which
+  body becomes the active one after OK).
 - `sketch_area_id.py`, `sketch_area_id_core.py` (new): sketch areas' identity; installed
   with `sketch_area_fill.install()`.
 - `profile_pick.py`: `through`, the see-through layer, the pixel reach, `shown_part`,
@@ -90,7 +92,32 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
   builder had added `_joinable` / `components.may_change` to `bodies_in_way`, `in_the_way` and
   `starts_in_material` for bug 10. Kept: their `_joinable` on the Join lists and their
   `may_change` as the one rule for which bodies decide; my `start_state` takes the scope as
-  arguments instead of filtering inside.
+  arguments instead of filtering inside. Merged it a second time (a2cfdb87, no conflict) for
+  their later commits.
+- Scenarios of other areas that named the first body's browser row or label "Body" (it is
+  "Body1" now, item 10; the object's name is still `Body`), one to six lines each, nothing
+  else changed: `browser_ghost`, `browser_second_click`, `extrude_presspull_qa2`,
+  `gaps_extrude_taper_to`, `inspect_analysis_zebra`, `inspect_qa2`, `meshinspect2_inspect`,
+  `shell_draft_hollow`, `shell_draft_scale`, `shell_draft_qa_mix`, `shell_draft_qa_shell`,
+  `selection_other`, `pattern_handles_bodies`, `patterns_qa_features`, `timeline_browser_2`
+  and the helper `fixpattern_steps.py`.
+
+## Proof
+
+| Scenario (`paced_by="state"`) | Checks | Covers |
+|---|---|---|
+| `book_extrude_operation` | 72 | Items 1 and 3: the five rows of the rule, Symmetric, Flip + All, the fin, the new component, To Object, the picked operation that stays, the refused OK that says why |
+| `book_extrude_direction` | 41 | Item 2: the Front plane, old sketches, undo / redo, save / reopen |
+| `book_extrude_taper` | 22 | Item 4 |
+| `book_extrude_picking` | 49 | Items 5 and 6 |
+| `book_extrude_areas` | 72 | Items 7 and 12: slivers, the 30-area parametric plate through parameter changes, save / reopen, the timing |
+| `book_extrude_loft` | 27 | Item 8 |
+| `book_extrude_primitives` | 48 | Items 2b, 9 and 10 |
+| `book_extrude_across` | 43 | Item 13 |
+
+Unit tests: `test_extrude_bodies_core.py`, `test_sketch_area_id_core.py` (16),
+`test_sketch_area_id_freecad.py` (runs `headless/sketch_area_id_check.py`, 64 checks in real
+FreeCAD).
 
 ## Gaps
 
@@ -126,6 +153,7 @@ report (`docs/fission180/dev/research/book-parity-report.txt`), brief
 - Loft can end in the origin point or a construction point.
 - Box, Cylinder, Torus and Coil show size boxes on the canvas while you place them: type a size, Tab to the next, Enter to place, then type the height.
 - The first body of a design is now called Body1.
+- Cutting, joining or intersecting a body of another component no longer makes that component the active one.
 
 ## Known issues
 
