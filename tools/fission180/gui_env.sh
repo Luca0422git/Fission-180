@@ -22,9 +22,19 @@ if [ "${1:-}" = "--install" ]; then
     set -e
     # xvfb + xauth: the virtual screen; libgl1-mesa-dri: software OpenGL; fonts-dejavu-core:
     # the one font family; python3-numpy: the simulation results' unit tests
-    sudo apt-get update -qq
-    sudo apt-get install -y -qq xvfb xauth libgl1-mesa-dri fonts-dejavu-core python3-numpy
-    exit 0
+    # (three tries, a minute apart: runs #72-#74 of the tests lost every Linux job to one
+    # passing "Temporary failure resolving azure.archive.ubuntu.com" on GitHub's runners)
+    set +e
+    for _try in 1 2 3; do
+        sudo apt-get -o Acquire::Retries=3 update -qq
+        if sudo apt-get -o Acquire::Retries=3 install -y -qq \
+            xvfb xauth libgl1-mesa-dri fonts-dejavu-core python3-numpy; then
+            exit 0
+        fi
+        echo "[Fission 180] gui_env: installing the test packages failed (try ${_try} of 3)"
+        [ "${_try}" -lt 3 ] && sleep 60
+    done
+    exit 1
 fi
 
 export FISSION180_XVFB_ARGS="-screen 0 1920x1200x24 -dpi 96 -nolisten tcp"
