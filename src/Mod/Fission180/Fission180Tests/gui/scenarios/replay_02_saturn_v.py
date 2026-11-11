@@ -49,11 +49,9 @@ import math
 import os
 
 import FreeCAD as App
-import FreeCADGui as Gui
-from PySide import QtCore, QtGui, QtWidgets
+from PySide import QtCore, QtWidgets
 from PySide6 import QtTest
 
-from Fission180Tests.gui import bodies_steps as bs
 from Fission180Tests.gui import book_sketch_b_steps as b
 from Fission180Tests.gui import dialog_input as di
 from Fission180Tests.gui import harness as h
@@ -64,6 +62,7 @@ from Fission180Tests.gui import replay_a_steps as r
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import sketch_tools_steps as st
 from Fission180Tests.gui import timeline_input as t
+from Fission180Tests.gui import versions_input as vi
 from Fission180Tests.gui import viewcube_input as vc
 from Fission180Tests.gui import widget_input as w
 
@@ -1177,6 +1176,7 @@ def h_cone():
     )
     h.check("H nothing is red", not errors(), errors())
     s["with_cone"] = r.volume()
+    s["thruster_extrude"] = t.titles()[-1]
     home()
 
 
@@ -1230,6 +1230,591 @@ h_filleted.done = r.isometric
 def h_fit():
     vc.move_away()
     h.press(QtCore.Qt.Key_F6)
+
+
+# == I: the fin ================================================================================
+# The fin on the Front plane: its bottom on the X axis (Coincident with the origin), its root
+# 30.5 mm out from the rocket's axis, so it stands on the thruster's cone (Saturn V's fins sit
+# on the engine fairings), 28 along the bottom, 30 high at the root and 12.5 at the tip, the
+# top sloping between (the report's four dimensions; the book's figure is not at hand).
+FIN = [(30.5, 0.0), (58.5, 0.0), (58.5, 12.5), (30.5, 30.0)]
+# by eye, the bottom line 8 mm above the axis (Snap puts each point on a crossing of the
+# 10 mm grid lines)
+# (the root's corners clicked between the seam lines of the rocket, x 29, and of the
+# thruster's cone: a click on a model edge projects it, Auto project edges on reference)
+FIN_DRAWN = [V(31.5, 8, 0), V(61, 9, 0), V(59, 21, 0), V(31, 41, 0)]
+
+
+def lines():
+    return [(i, g) for i, g in enumerate(sk().Geometry) if g.TypeId == "Part::GeomLineSegment"]
+
+
+def fin_line(kind):
+    """The fin's line: "bottom", "root" (left upright), "tip" (right upright), "top"."""
+    found = lines()
+    if kind == "bottom":
+        return min(found, key=lambda x: x[1].StartPoint.y + x[1].EndPoint.y)
+    if kind == "top":
+        return [
+            x
+            for x in found
+            if abs(x[1].StartPoint.y - x[1].EndPoint.y) > 1e-6
+            and abs(x[1].StartPoint.x - x[1].EndPoint.x) > 1e-6
+        ][0]
+    ups = [x for x in found if abs(x[1].StartPoint.x - x[1].EndPoint.x) < 1e-6]
+    ups.sort(key=lambda x: x[1].StartPoint.x)
+    return ups[0] if kind == "root" else ups[-1]
+
+
+def middle(g):
+    return (g.StartPoint + g.EndPoint) * 0.5
+
+
+def root_foot():
+    g = fin_line("root")[1]
+    return g.StartPoint if g.StartPoint.y < g.EndPoint.y else g.EndPoint
+
+
+def i_home():
+    vc.hover("front")
+    vc.click("home")
+
+
+i_home.done = r.isometric
+
+
+def i_create():
+    vc.move_away()
+    h.click_empty()
+    h.press(QtCore.Qt.Key_F6)
+    h.settle()
+    h.ribbon("Create Sketch")
+
+
+i_create.done = lambda: pl.picker() is not None
+
+
+def i_front():
+    pl.click_square("XZ_Plane")
+
+
+i_front.done = lambda: h.in_sketch() is not None
+i_front.done_what = "the fin's sketch on the Front plane"
+
+
+def i_zoom():
+    st.s["sk"] = h.in_sketch()
+    h.view_still()
+    h.check("I the view looks from the FRONT", vc.looks_along((0, 1, 0)), vc.describe())
+    r.wheel(st.g(V(45, 15, 0)), 5)  # a person zooms in on where the fin goes
+    b.watch_modals()
+    h.press("l")
+
+
+def fin_click_steps():
+    steps = []
+    for i, point in enumerate(FIN_DRAWN + [FIN_DRAWN[0]]):
+
+        def click(point=point):
+            st.click(point)
+
+        click.__name__ = "i_line_%d" % (i + 1)
+        steps.append(click)
+    return steps
+
+
+def i_drawn():
+    st.esc()
+    st.esc()
+    found = lines()
+    h.check("I four lines", len(found) == 4, len(found))
+    ends = {}
+    for _i, g in found:
+        for p in (g.StartPoint, g.EndPoint):
+            spot = (round(p.x, 6), round(p.y, 6))
+            ends[spot] = ends.get(spot, 0) + 1
+    h.check("I closed: four corners, two lines at each", sorted(ends.values()) == [2] * 4, ends)
+    h.check("I nothing of the model was projected", not sk().ExternalGeo[2:], len(sk().ExternalGeo))
+    bottom = fin_line("bottom")[1]
+    h.check("I drawn by eye: the bottom line is above the axis", bottom.StartPoint.y > 1, bottom)
+    b.menu("Coincident")
+
+
+def i_co_line():
+    h.check("I Coincident runs", st.tool_title() == "Coincident", st.tool_title())
+    st.click(middle(fin_line("bottom")[1]))
+
+
+def i_co_origin():
+    st.click(V(0, 0, 0))
+
+
+def i_dimension():
+    bottom = fin_line("bottom")[1]
+    h.check(
+        "I Coincident: the bottom line is on the X axis (the origin on its extension)",
+        abs(bottom.StartPoint.y) < 1e-6 and abs(bottom.EndPoint.y) < 1e-6,
+        bottom,
+    )
+    st.esc()
+    h.press("d")
+
+
+def dim_steps(name, pick, place, value):
+    def first():
+        for point in pick():
+            st.click(point)
+
+    first.__name__ = "i_d_%s" % name
+
+    def placed():
+        st.click(place())
+
+    placed.__name__ = "i_d_%s_place" % name
+    placed.done = lambda: editor() is not None
+    placed.done_what = "the %s dimension's value box" % name
+
+    def typed():
+        si.type_text(value)
+
+    typed.__name__ = "i_d_%s_type" % name
+    typed.done = lambda: editor() is None
+    return [first, placed, typed]
+
+
+def i_fin_done():
+    st.esc()
+    corners = sorted(
+        {(round(p.x, 6), round(p.y, 6)) for _i, g in lines() for p in (g.StartPoint, g.EndPoint)}
+    )
+    h.check("I the fin is the book's", corners == sorted(FIN), corners)
+    h.check("I the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    st.sketch_ok("I")
+    b.no_modal("I the fin's sketch")
+    s["before_fin"] = body().Shape.copy()
+    h.ribbon("Finish Sketch")
+
+
+i_fin_done.done = lambda: h.in_sketch() is None
+
+
+def i_extrude():
+    h.press("e")
+
+
+i_extrude.done = lambda: extrude_panel() is not None
+
+
+def i_symmetric():
+    p = extrude_panel()
+    h.check("I the fin's one area is taken by itself", len(p.profiles) == 1, p.profiles)
+    di.choose(p.direction, "Symmetric")
+
+
+def i_whole():
+    p = extrude_panel()
+    di.choose(p.measurement, "Whole Length")
+
+
+def i_distance():
+    p = extrude_panel()
+    type_field(p.distance.widget, "2.4")
+
+
+def i_operation():
+    p = extrude_panel()
+    h.caught_up(p)
+    # the fin stands in the thruster's cone: Cut by itself, and the book says to pick Join
+    h.check("I Operation: Cut by itself (the book says so)", p.operation.currentText() == "Cut")
+    di.choose(p.operation, "Join")
+
+
+def i_ok():
+    p = extrude_panel()
+    h.caught_up(p)
+    h.check("I Join stays", p.operation.currentText() == "Join", p.operation.currentText())
+    h.task_button("OK")
+
+
+i_ok.done = lambda: extrude_panel() is None
+i_ok.timeout_s = 120
+
+
+def fin_solid():
+    import Part
+
+    wire = Part.makePolygon([V(x, 0, z) for x, z in FIN + [FIN[0]]])
+    return Part.Face(wire).extrude(V(0, 2.4, 0)).translated(V(0, -1.2, 0))
+
+
+def i_done():
+    want = s["before_fin"].fuse(fin_solid()).Volume
+    h.check("I the fin: 2.4 thick, joined on", r.rel(r.volume(), want, 1e-5), (r.volume(), want))
+    h.check("I one body", len(r.solids()) == 1)
+    h.check("I nothing is red", not errors(), errors())
+    s["fin_extrude"] = t.titles()[-1]
+
+
+def fin_face(kind):
+    """The fin's sloping top ("top") or its tip ("tip") faces: [(name, face)] of the body."""
+    out = []
+    for i, face in enumerate(body().Shape.Faces):
+        if face.Surface.TypeId != "Part::GeomPlane":
+            continue
+        box = face.BoundBox
+        if box.YMin < -1.2001 or box.YMax > 1.2001 or box.XMin < 30:
+            continue
+        n = face.normalAt(0, 0)
+        if kind == "tip" and abs(n.x - 1) < 1e-6 and abs(box.XMin - 58.5) < 1e-6:
+            out.append(("Face%d" % (i + 1), face))
+        if kind == "top" and n.z > 0.3 and n.x > 0.3:
+            out.append(("Face%d" % (i + 1), face))
+    return out
+
+
+def i_split():
+    h.click_empty()
+    si.menu_item("MODIFY", "Split Face")
+
+
+i_split.done = lambda: r.panel() is not None and getattr(r.panel(), "title", "") == "Split Face"
+i_split.done_what = "the Split Face dialog"
+
+
+def i_split_zoom():
+    # a person zooms in on the fin until its 2.4 mm faces are wide enough to click
+    r.wheel(V(50, 0, 15), 6)
+    pointer_off_the_part()
+    a, e = h.screen_point(V(44.5, -1.2, 21.25)), h.screen_point(V(44.5, 1.2, 21.25))
+    s["fin_px"] = math.hypot(a.x() - e.x(), a.y() - e.y())
+    if s["fin_px"] < 24:
+        r.wheel(V(50, 0, 15), 6)
+
+
+def i_split_top():
+    h.click(V(44.5, -0.2, 21.25))  # the middle of the sloping top, 2.4 mm wide
+
+
+def i_split_tip():
+    p = r.panel()
+    picked = p.options.get("faces")
+    h.check(
+        "I a click picks the fin's sloping top (2.4 mm, %d px wide before zooming on)"
+        % s["fin_px"],
+        bool(picked) and len(picked[1]) == 1,
+        picked,
+    )
+    h.click(V(58.5, -0.2, 6))
+
+
+def i_split_tool_box():
+    p = r.panel()
+    picked = p.options.get("faces")
+    h.check("I ... and its tip", bool(picked) and len(picked[1]) == 2, picked)
+    w.click(p.fields["tool"].button)
+
+
+def i_split_tool():
+    t.click_row("XZ")
+
+
+def i_split_ok():
+    p = r.panel()
+    h.caught_up(p)
+    h.check("I the XZ plane picked in the browser is the tool", p.options.get("tool") is not None)
+    h.check("I no complaint", p.message.text() == "", p.message.text())
+    h.task_button("OK")
+
+
+i_split_ok.done = r.no_panel
+
+
+def i_split_done():
+    tops, tips = fin_face("top"), fin_face("tip")
+    h.check("I the sloping top is two faces of 1.2 mm", len(tops) == 2, len(tops))
+    h.check("I the tip is two faces", len(tips) == 2, len(tips))
+    s["fin_split"] = t.titles()[-1]
+    h.check("I the timeline ends with a Split Face", s["fin_split"].startswith("Split Face"))
+
+
+def half(kind):
+    """The 3D middle of the fin's -Y half face of `kind`."""
+    for _name, face in fin_face(kind):
+        if face.CenterOfMass.y < 0:
+            return face.CenterOfMass
+    return None
+
+
+def i_looks():
+    h.press("a")
+
+
+i_looks.done = lambda: k.panel() is not None
+
+
+def i_looks_faces():
+    p = k.panel()
+    di.choose(p.apply_to, "Faces")
+
+
+def i_looks_search():
+    p = k.panel()
+    w.click(p.search)
+    w.key(p.search, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+    w.type_text(p.search, "black oxide")
+
+
+def i_drop_middle():
+    s["faces_looks"] = looks_on_faces()
+    r.drag_look("Steel, black oxide", half("top"))
+
+
+i_drop_middle.done = r.drag_done
+i_drop_middle.while_busy = True
+
+
+def i_dropped_middle():
+    h.settle()
+    r.keys_to_window()
+    found = looks_on_faces()
+    target = face_at(half("top"))
+    h.check("I the fin's half top is black", found.get(target) == "Steel, black oxide", found)
+    h.check("I ... only it", len(found) == len(s["faces_looks"]) + 1, found)
+    s["faces_looks"] = found
+    # the half tip face, dropped on its edge (the report: "the drop lands on an EDGE ...
+    # Fission applies the look to the WHOLE BODY")
+    centre = half("tip")
+    r.pan_to(V(58.5, -1.2, centre.z))  # a middle drag: the fin's tip into view
+    edge = k.edge_pixel(V(58.5, -1.2, centre.z))
+    h.check(
+        "I there is an edge pixel at the tip's side, in the view",
+        edge is not None and h.gl_widget().rect().contains(edge),
+        edge,
+    )
+    s["edge_pixel"] = edge
+    r.drag_look("Steel, black oxide", edge or centre)
+
+
+i_dropped_middle.done = r.drag_done
+i_dropped_middle.while_busy = True
+
+
+def i_dropped_edge():
+    h.settle()
+    r.keys_to_window()
+    found = looks_on_faces()
+    look = k.stored(body())["body"] or {}
+    h.check(
+        "I a drop on an edge: the body keeps its white paint",
+        look.get("label") == "Paint, gloss white",
+    )
+    kept = all(found.get(f) == v for f, v in s["faces_looks"].items())
+    h.check("I ... and every earlier face look", kept, (found, s["faces_looks"]))
+    p = k.panel()
+    h.check(
+        "I ... the face next to the edge got the look",
+        len(found) == len(s["faces_looks"]) + 1,
+        (
+            found,
+            p.message.text(),
+            p.note.text(),
+            s["edge_pixel"],
+            [(e["point"], e["normal"]) for e in k.stored(body())["faces"]][-2:],
+            p.face_near(s["edge_pixel"]),
+        ),
+    )
+    h.task_button("OK")
+
+
+i_dropped_edge.done = r.no_panel
+
+
+def i_shot():
+    h.shot("I-fin")
+    home()
+
+
+i_shot.done = r.isometric
+
+
+# == J: the circular pattern ===================================================================
+def pattern_panel():
+    from Fission180Tests.gui import pattern_steps as ps
+
+    return ps.panel()
+
+
+def j_pattern():
+    vc.move_away()
+    h.click_empty()
+    h.press(QtCore.Qt.Key_F6)
+    h.settle()
+    s["before_pattern"] = r.volume()
+    s["faces_before_pattern"] = len(body().Shape.Faces)
+    si.menu_item("CREATE", "Circular Pattern")
+
+
+j_pattern.done = lambda: pattern_panel() is not None
+j_pattern.done_what = "the Circular Pattern dialog"
+
+
+def j_type():
+    p = pattern_panel()
+    di.choose(p.pattern_type, "Features")
+
+
+def j_features():
+    from Fission180Tests.gui import pattern_steps as ps
+
+    titles = t.titles()
+    s["pattern_steps"] = [s["thruster_extrude"], "Fillet 1", s["fin_extrude"], s["fin_split"]]
+    for title in s["pattern_steps"]:
+        h.check("J the timeline has %s" % title, title in titles, titles)
+        ps.timeline_click(title)
+        h.settle()
+
+
+def j_axis_box():
+    from Fission180Tests.gui import pattern_steps as ps
+
+    p = pattern_panel()
+    names = len(p.options["objects"])
+    h.check("J the four features are picked", names == 4, p.options["objects"])
+    ps.click_box("axis")
+
+
+def j_axis():
+    h.click(SIDE * 29.0 + V(0, 0, 200))  # the rocket's round face
+
+
+def j_quantity():
+    from Fission180Tests.gui import pattern_steps as ps
+
+    p = pattern_panel()
+    axis = p.options.get("axis")
+    h.check("J the round face gives the axis", axis is not None, axis)
+    ps.type_quantity(p.quantity, 4)
+
+
+def j_ok():
+    p = pattern_panel()
+    h.caught_up(p)
+    h.check("J no complaint", p.message.text() == "", p.message.text())
+    h.task_button("OK")
+
+
+j_ok.done = lambda: pattern_panel() is None
+j_ok.timeout_s = 180
+
+
+def j_done():
+    added = r.volume() - s["before_pattern"]
+    h.check("J the pattern added three thrusters and fins", added > 1000, added)
+    h.check("J one body", len(r.solids()) == 1)
+    h.check("J nothing is red", not errors(), errors())
+    fins = [
+        f
+        for f in body().Shape.Faces
+        if f.Surface.TypeId == "Part::GeomPlane"
+        and 0 < f.CenterOfMass.z < 12.5
+        and 58.4 < math.hypot(f.CenterOfMass.x, f.CenterOfMass.y) < 58.6
+        and abs(f.Area - 1.2 * 12.5) < 1e-3
+    ]
+    h.check("J the four fins' tips are each split in two", len(fins) == 8, len(fins))
+    h.shot("J-pattern")
+
+
+# == K: Save and USDZ ==========================================================================
+def k_save():
+    r.keys_to_window()
+    h.press("s", QtCore.Qt.ControlModifier)
+
+
+k_save.done = lambda: vi.save_dialog() is not None
+k_save.done_what = "the Save dialog (Ctrl+S)"
+
+
+def k_name():
+    d = vi.save_dialog()
+    item = d.tree.topLevelItem(0)
+    path = os.path.join(s["root"], r.BOOK, r.FUND)
+    for name in (r.BOOK, r.FUND):
+        found = [item.child(i) for i in range(item.childCount()) if item.child(i).text(0) == name]
+        if not h.check("K the tree has %s" % name, bool(found)):
+            return
+        item = found[0]
+        if name == r.BOOK and not item.isExpanded():
+            w.double_click(d.tree.viewport(), d.tree.visualItemRect(item).center())
+            h.wait_for(lambda: item.isExpanded(), "the project to open in the tree")
+    w.click(d.tree.viewport(), d.tree.visualItemRect(item).center())
+    h.wait_for(lambda: d.location.text() == path, "the Location to be 1 - Fundamentals")
+    vi.fill_save_dialog(name="Saturn V Rocket")
+    vi.click_save()
+
+
+k_name.done = lambda: vi.save_dialog() is None and os.path.isfile(
+    os.path.join(s["root"], r.BOOK, r.FUND, "Saturn V Rocket.FCStd")
+)
+k_name.timeout_s = 120
+
+
+def export_dialog():
+    from fission180 import export_ui
+
+    d = export_ui.ExportDialog.last
+    try:
+        return d if d is not None and d.isVisible() and type(d) is export_ui.ExportDialog else None
+    except RuntimeError:
+        return None
+
+
+def k_export():
+    from Fission180Tests.gui import insert_steps as ins
+
+    ins.ribbon_tab("UTILITIES")
+    h.ribbon("Export")
+
+
+k_export.done = lambda: export_dialog() is not None
+k_export.done_what = "the Export dialog"
+
+
+def k_usdz():
+    d = export_dialog()
+    types = [d.type.itemText(i) for i in range(d.type.count())]
+    h.check("K Export has USDZ", "USDZ" in types, types)
+    di.choose(d.type, "USDZ")
+
+
+def k_write():
+    from Fission180Tests.gui import blend_steps as bl
+
+    d = export_dialog()
+    h.check("K USDZ chosen", d.type.currentText() == "USDZ")
+    h.check("K it starts in the design's folder", d.folder.text().endswith(r.FUND), d.folder.text())
+    bl.type_into(d.name, "Saturn V Rocket")
+    bl.click_widget(d.export_button)
+
+
+k_write.done = lambda: os.path.isfile(
+    os.path.join(s["root"], r.BOOK, r.FUND, "Saturn V Rocket.usdz")
+)
+k_write.done_what = "Saturn V Rocket.usdz"
+k_write.timeout_s = 120
+
+
+def k_done():
+    from fission180 import export_usd
+
+    path = os.path.join(s["root"], r.BOOK, r.FUND, "Saturn V Rocket.usdz")
+    info = export_usd.read_usdz(path)
+    h.check("K the USDZ reads back", info["stored"] and info["aligned"] and info["meshes"])
+    colours = {tuple(round(c, 2) for c in m["color"]) for m in info["meshes"] if m.get("color")}
+    h.check("K with the rocket's colours (white and the face looks)", len(colours) >= 3, colours)
+    from Fission180Tests.gui import insert_steps as ins
+
+    ins.ribbon_tab("SOLID")
+    h.shot("K-end")
 
 
 h.run(
@@ -1351,6 +1936,75 @@ h.run(
         h_fillet_ok,
         h_filleted,
         h_fit,
+        i_home,
+        i_create,
+        i_front,
+        i_zoom,
+    ]
+    + fin_click_steps()
+    + [i_drawn, i_co_line, i_co_origin, i_dimension]
+    + dim_steps(
+        "bottom",
+        lambda: [middle(fin_line("bottom")[1])],
+        lambda: middle(fin_line("bottom")[1]) + V(0, -8, 0),
+        "28",
+    )
+    + dim_steps(
+        "root",
+        lambda: [middle(fin_line("root")[1])],
+        lambda: middle(fin_line("root")[1]) + V(-9, 0, 0),
+        "30",
+    )
+    + dim_steps(
+        "tip",
+        lambda: [middle(fin_line("tip")[1])],
+        lambda: middle(fin_line("tip")[1]) + V(9, 0, 0),
+        "12.5",
+    )
+    + dim_steps(
+        "out",
+        lambda: [V(0, 0, 0), root_foot()],
+        lambda: V(root_foot().x * 0.5, -14, 0),
+        "30.5",
+    )
+    + [
+        i_fin_done,
+        i_extrude,
+        i_symmetric,
+        i_whole,
+        i_distance,
+        i_operation,
+        i_ok,
+        i_done,
+        i_split,
+        i_split_zoom,
+        i_split_top,
+        i_split_tip,
+        i_split_tool_box,
+        i_split_tool,
+        i_split_ok,
+        i_split_done,
+        i_looks,
+        i_looks_faces,
+        i_looks_search,
+        i_drop_middle,
+        i_dropped_middle,
+        i_dropped_edge,
+        i_shot,
+        j_pattern,
+        j_type,
+        j_features,
+        j_axis_box,
+        j_axis,
+        j_quantity,
+        j_ok,
+        j_done,
+        k_save,
+        k_name,
+        k_export,
+        k_usdz,
+        k_write,
+        k_done,
     ],
     paced_by="state",
 )

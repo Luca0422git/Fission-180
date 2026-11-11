@@ -403,3 +403,18 @@ def wheel(point, notches):
         QtWidgets.QApplication.sendEvent(target, event)
         QtWidgets.QApplication.processEvents()
     h.view_still()
+
+
+def pan_to(point):
+    """A middle-button drag that brings the 3D point to the middle of the view (a person
+    panning to what they want to click), then the pointer rests off to the side."""
+    gl = h.gl_widget()
+    middle = QtCore.QPoint(gl.width() // 2, gl.height() // 2)
+    at = h.screen_point(point)
+    start = QtCore.QPoint(
+        max(10, min(gl.width() - 10, middle.x() - (at.x() - middle.x()) // 2)),
+        max(10, min(gl.height() - 10, middle.y() - (at.y() - middle.y()) // 2)),
+    )
+    end = QtCore.QPoint(start.x() + middle.x() - at.x(), start.y() + middle.y() - at.y())
+    h.drag(start, end, button=QtCore.Qt.MiddleButton)
+    h.view_still()
