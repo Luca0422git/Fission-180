@@ -15,7 +15,8 @@ origin.
      4 (plain clicks are the tool's picks, nothing is "replaced"): perpendicular
   C  tool first: Equal, the two circles; selection first: Shift+click two lines, Equal
   D  a plain click on line 4 replaces that selection (one line selected); D: the line is the
-     dimension's pick; a click places it, 20 typed
+     dimension's pick; a click places it below the (nearly level) line, 20 typed: it spans
+     20 across (the horizontal distance, as Fusion gives there)
   E  selection first: the small circle clicked, CREATE > Circular Pattern (it is the
      Objects), the origin clicked as centre, Quantity 4, OK: three copies tied by hidden
      spokes
@@ -241,7 +242,14 @@ def d_type():
 
 def d_check():
     g = sk().Geometry[s["l4"]]
-    h.check("D 20 typed: the line is 20 long", abs(g.length() - 20) < 1e-6, g.length())
+    # (fix-5) Line 4 is nearly level by now (B made it square to line 3): 12 mm below its
+    # middle is out of the thin box its ends span, where Fusion gives the HORIZONTAL distance
+    # (Inventor forum "aligned dimensions": aligned "within the bounding box of the end
+    # points", horizontal or vertical outside; Fusion forum "Dimension diagonal line": for a
+    # nearly level line "the aligned zone can be quite small"; sketch_dimension_core.
+    # linear_kind). This check asked for the aligned length (20 long).
+    span = abs(g.EndPoint.x - g.StartPoint.x)
+    h.check("D 20 typed: the line spans 20 across (the horizontal one)", abs(span - 20) < 1e-6, g)
     end_tool()
 
 

@@ -14,10 +14,50 @@ A, B = (0.0, 0.0), (10.0, 10.0)  # a line at 45 degrees
 
 
 class LinearKind(unittest.TestCase):
+    # Fusion (and Inventor, the same Autodesk sketch dimension): aligned while the pointer is
+    # inside the box of the two points, horizontal / vertical once it leaves that box
+    # (sketch_dimension_core.linear_kind has the sources)
     def test_beside_a_slanted_line_is_aligned(self):
         # the report (Strandbeest): Fusion offers the aligned length of a slanted line
         self.assertEqual(dc.linear_kind(A, B, (8.0, 2.0)), dc.ALIGNED)
         self.assertEqual(dc.linear_kind(A, B, (2.0, 8.0)), dc.ALIGNED)
+
+    def test_the_whole_box_is_aligned_up_to_its_edges(self):
+        for cursor in ((0.0, 10.0), (10.0, 0.0), (0.0, 0.0), (10.0, 10.0), (0.5, 9.5)):
+            self.assertEqual(dc.linear_kind(A, B, cursor), dc.ALIGNED, cursor)
+
+    def test_just_out_of_the_box_above_or_below_is_horizontal(self):
+        # however near: the box is the aligned zone, not the stretch square to the line
+        self.assertEqual(dc.linear_kind(A, B, (5.0, 10.1)), dc.HORIZONTAL)
+        self.assertEqual(dc.linear_kind(A, B, (5.0, -0.1)), dc.HORIZONTAL)
+        self.assertEqual(dc.linear_kind(A, B, (10.1, 5.0)), dc.VERTICAL)
+        self.assertEqual(dc.linear_kind(A, B, (-0.1, 5.0)), dc.VERTICAL)
+
+    def test_the_two_points_in_either_order(self):
+        for cursor in ((8.0, 2.0), (5.0, -10.0), (25.0, 5.0), (-3.0, -20.0), (13.0, -1.0)):
+            self.assertEqual(dc.linear_kind(A, B, cursor), dc.linear_kind(B, A, cursor))
+            self.assertEqual(
+                dc.linear_kind((0, 10), (10, 0), cursor), dc.linear_kind((10, 0), (0, 10), cursor)
+            )
+
+    def test_a_nearly_level_line_has_a_thin_aligned_zone(self):
+        # Autodesk forum "Dimension diagonal line": "the aligned zone can be quite small";
+        # Fusion blog "5 Essential Right-Click Tricks": right-click > Aligned then
+        a, b = (0.0, 0.0), (20.0, 2.0)
+        self.assertEqual(dc.linear_kind(a, b, (10.0, 1.6)), dc.ALIGNED)
+        self.assertEqual(dc.linear_kind(a, b, (10.0, -8.0)), dc.HORIZONTAL)
+        self.assertEqual(dc.linear_kind(a, b, (9.0, 12.0)), dc.HORIZONTAL)
+        self.assertEqual(dc.linear_kind(a, b, (25.0, 1.0)), dc.VERTICAL)
+
+    def test_the_book_steps(self):
+        # the Strandbeest's crank: its centre line (0, 0) - (12, 9), the 15 put beside it
+        crank = ((0.0, 0.0), (12.0, 9.0))
+        self.assertEqual(dc.linear_kind(*crank, (3.3, 8.1)), dc.ALIGNED)
+        # ...half its length off its middle is above its box: the horizontal distance
+        self.assertEqual(dc.linear_kind(*crank, (1.5, 10.5)), dc.HORIZONTAL)
+        # two circles' centres 30 apart, the dimension put between them
+        self.assertEqual(dc.linear_kind((-20.0, 10.0), (0.0, 40.0), (-15.0, 30.0)), dc.ALIGNED)
+        self.assertEqual(dc.linear_kind((-20.0, 10.0), (0.0, 40.0), (-30.0, 30.0)), dc.VERTICAL)
 
     def test_far_below_is_horizontal(self):
         self.assertEqual(dc.linear_kind(A, B, (5.0, -10.0)), dc.HORIZONTAL)
@@ -36,10 +76,13 @@ class LinearKind(unittest.TestCase):
         self.assertEqual(dc.linear_kind(origin, centre, (1.95, -3.0)), dc.HORIZONTAL)
         self.assertEqual(dc.linear_kind(origin, centre, (1.95, 7.0)), dc.HORIZONTAL)
 
-    def test_in_the_box_and_square_to_the_line_in_a_corner_is_aligned(self):
+    def test_out_past_a_corner_is_never_aligned(self):
+        # (replay-c had the corners square to the line aligned; Inventor forum "aligned
+        # dimensions": outside the box it "changes to horizontal or vertical")
         self.assertEqual(dc.linear_kind(A, B, (5.0, 5.5)), dc.ALIGNED)
-        self.assertEqual(dc.linear_kind(A, B, (-2.0, 12.0)), dc.ALIGNED)
-        self.assertEqual(dc.linear_kind(A, B, (13.0, -1.0)), dc.ALIGNED)
+        self.assertEqual(dc.linear_kind(A, B, (-1.0, 13.0)), dc.HORIZONTAL)
+        self.assertEqual(dc.linear_kind(A, B, (13.0, -1.0)), dc.VERTICAL)
+        self.assertEqual(dc.linear_kind(A, B, (20.0, -10.0)), dc.HORIZONTAL)  # a tie: horizontal
 
     def test_a_level_or_upright_line_is_always_aligned(self):
         for cursor in ((5.0, -30.0), (40.0, 3.0), (-9.0, -9.0)):

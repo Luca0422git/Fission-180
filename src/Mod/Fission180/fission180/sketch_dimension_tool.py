@@ -17,9 +17,10 @@ dimension it makes is decided in sketch_dimension_core (unit tested):
 
 - a click on a thing is a pick while fewer than two are picked; with two picked the next
   click places the dimension wherever it lands;
-- one line: its length (a slanted line: aligned beside it, horizontal / vertical past its
-  ends); a circle: the diameter; an arc: the radius; two points: their distance (aligned /
-  horizontal / vertical the same way); a point and a line, two parallel lines: the distance;
+- one line: its length (a slanted line: aligned while the pointer is inside the box its ends
+  span, horizontal / vertical once it leaves that box: core.linear_kind); a circle: the
+  diameter; an arc: the radius; two points: their distance (aligned / horizontal / vertical
+  the same way); a point and a line, two parallel lines: the distance square to the line;
   two lines that cross: the angle of the sector the pointer is in; a point alone and a click
   in empty space: its distance from the origin;
 - an edge or corner of the part (not in the sketch): projected into the sketch on the spot
