@@ -327,6 +327,19 @@ class Inference:
         if not view.ok:
             return None
         result, grid = self._infer(view, start)
+        if (
+            result is None
+            and kind == QtCore.QEvent.MouseButtonPress
+            and tool != "spline"
+            and self._freecad_snap(view) is None
+        ):
+            # Fusion's "Auto project edges on reference": the click is on an edge or corner
+            # of the model that is not in the sketch: it is projected (purple) and the
+            # point lands on it like on any sketch curve (sketch_reference.py)
+            from . import sketch_reference
+
+            if sketch_reference.project_under(session, event.position(), "Sketch"):
+                result, grid = self._infer(view, start)
         if result is None and tool != "spline":
             # a free point: the grid alone places it, within a reach on the screen. (Not
             # a spline's points: FreeCAD's spline tool keeps each clicked point loose until

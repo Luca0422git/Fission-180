@@ -495,6 +495,7 @@ class PickConstraint(draw.DrawTool):
     one that also adds geometry, `constrain(picks)`."""
 
     needs = 2
+    references_model = True  # (a click on a model edge projects it, then picks it)
     points_ok = False  # a sketch point can be picked
     snap_dot = False  # it picks curves: they light up instead
     takes = "two curves"  # what it works on, for the message of a click that does not fit

@@ -597,37 +597,16 @@ class Dimension(draw.DrawTool):
         if pos is None:
             return None
         try:
-            from . import sketch_auto_project
+            # (wave 7, sketch-c: the one place that projects on reference, also from another
+            # body or component, behind Fusion's preference: sketch_reference.py)
+            from . import sketch_reference
 
-            gl = session.gl
-            ratio = gl.devicePixelRatioF()
-            info = session.view.getObjectInfo(
-                (int(pos.x() * ratio), int((gl.height() - pos.y()) * ratio))
-            )
-            if not info or not info.get("Component"):
+            found = sketch_reference.element_under(session, pos)
+            if found is None:
                 return None
-            obj = self.doc.getObject(info.get("Object", ""))
-            sub = info["Component"].rsplit(".", 1)[-1]
-            if obj is None or obj is self.sketch or not sub.startswith(("Edge", "Vertex")):
-                return None
-            before = len(self.sketch.ExternalGeo)
-            self.doc.openTransaction("Project")
-            try:
-                if sub.startswith("Edge"):
-                    missing, _have = sketch_auto_project.missing_edges(self.sketch, obj, sub)
-                    if missing:
-                        sketch_auto_project.add_edges(self.sketch, obj, missing)
-                else:
-                    self.sketch.addExternal(obj.Name, sub)
-                self.sketch.solve()
-            except Exception:
-                ctools.end_step(self.doc, abort=True)
-                raise
-            ctools.end_step(self.doc)
-            added = len(self.sketch.ExternalGeo) - before
+            sub = found[1]
+            added = sketch_reference.project_under(session, pos, self.title)
             self._geometry = None
-            if added:
-                log("%s: projected %s of %s to dimension to it" % (self.title, sub, obj.Label))
             for item in self.candidates(snap):
                 kinds = [self.kind_of(p) for p in self.picks]
                 if (

@@ -427,6 +427,19 @@ OPTIONS = [
         "(purple) curves, so the shapes you draw against them make profiles. Delete them "
         "in the sketch if you do not want them: they stay deleted.",
     ),
+    _option(
+        "sketch_project_on_reference",
+        "design",
+        "Auto project edges on reference",
+        "bool",
+        True,
+        (INFERENCE, "Bool", "ProjectOnReference"),
+        group="Sketch",
+        tip="While you draw, constrain or dimension in a sketch, a click on an edge or "
+        "corner of the model (also of another body or component) projects it into the "
+        "sketch as a purple curve and snaps to it. Off: only what you project with "
+        "Project (P) can be snapped to.",
+    ),
     # -- General > API ----------------------------------------------------------------------
     _option(
         "scripts_folder",

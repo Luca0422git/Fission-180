@@ -964,6 +964,17 @@ class Hint(QtWidgets.QLabel):
             pass
 
 
+def unsnapped(snap):
+    """True when `snap` sits on nothing of the sketch (no point, curve or crossing)."""
+    return (
+        snap is not None
+        and snap.key is None
+        and snap.curve is None
+        and snap.mid_of is None
+        and snap.target is None
+    )
+
+
 # -- the tool ------------------------------------------------------------------------------
 class DrawTool:
     """Base of Fission 180's own sketch tools. A subclass sets `title` and implements
@@ -974,6 +985,9 @@ class DrawTool:
     repeat = True  # Fusion: the tool stays on for the next shape
     direction_steps = ()  # steps whose point is the end of a direction from the last point
     pick_steps = ()  # steps that pick a curve (no point snapping)
+    # a click on an edge or corner of the model projects it into the sketch (Fusion's "Auto
+    # project edges on reference", sketch_reference.py): the drawing and constraint tools
+    references_model = False
 
     def __init__(self, session):
         self.session = session
@@ -1243,6 +1257,15 @@ class DrawTool:
             if view is None:
                 return True
             snap = self.snap_for(view, event)
+            if self.references_model and unsnapped(snap):
+                # Fusion's "Auto project edges on reference": a click on an edge or corner
+                # of the model that is not in the sketch projects it (purple), and the
+                # point or pick lands on it (sketch_reference.py)
+                from . import sketch_reference
+
+                if sketch_reference.project_under(session, event.position(), self.title):
+                    self._geometry = None
+                    snap = self.snap_for(view, event)
             self.last = snap
             self._pressed = (event.position(), snap)
             self._double = kind == QtCore.QEvent.MouseButtonDblClick
