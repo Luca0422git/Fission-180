@@ -84,17 +84,17 @@ and hole), `joints`).
 ### The families (the tables in `hardware_tables.py`)
 
 Every table is Fission 180's own, typed from the dimension data of the public standard named
-(the usual largest value of each dimension). **How sure the numbers are:** the tables were
-typed from the standards as known to the builder; the sandbox cannot open a standard or a
-supplier page, and search excerpts rarely show table cells. Checked by search: the DIN 472
-22 mm row (free diameter 23.5, groove 23), the 1/2 in external ring (0.035 thick, groove
-0.468 x 0.039), the 120 degree cup of a cup point. Checked by formula in the unit tests,
-every row: head height = diameter and head width 1.5 d (socket heads), k = (dk - d) / 2 for
-90 degree heads and (A - d) / 2 / tan 41 for 82 degree ones, numbered sizes 0.060 + 0.013 n,
-nut and bolt on the same spanner, key = d / 2 and dog = d / 4 (set screws), AS568 inside
-diameters a 64th-fraction less a constant per series, bearing bore = 5 x the last two digits,
-free ring diameter < groove < shaft (and the reverse for bores), washers over their screw.
-**A size that matters for a real order should be checked against the supplier's sheet.**
+(the standard's nominal size or its largest value). **How sure the numbers are:** see
+"Verified dimensions" below: the second pass (2026-11-11, builder library-2) compared the
+tables with an independent open table and with suppliers' listings, and corrected 11 rows.
+Checked by formula in the unit tests, every row: head height = diameter and head width 1.5 d
+(socket heads), k = (dk - d) / 2 for 90 degree heads and (A - d) / 2 / tan 41 for 82 degree
+ones, numbered sizes 0.060 + 0.013 n, nut and bolt on the same spanner, key = d / 2 and
+dog = d / 4 (set screws), AS568 inside diameters a 64th-fraction less a constant per series
+and the step between dash numbers, bearing bore = 5 x the last two digits, free ring diameter
+< groove < shaft (and the reverse for bores), ring widths growing with the size, washers over
+their screw. **A size that matters for a real order should be checked against the supplier's
+sheet.**
 
 | Family | Sizes | Standard (the table's source) |
 |---|---|---|
@@ -106,7 +106,7 @@ free ring diameter < groove < shaft (and the reverse for bores), washers over th
 | Pan head screw, Phillips and slotted | M1.6 - M10; #0 - 3/8 in | ISO 7045, ISO 1580; ASME B18.6.3 |
 | Set screw: cup, flat, cone, dog point | M2 - M12; #0 - 3/4 in (half dog) | ISO 4029, 4026, 4027, 4028; ASME B18.3 |
 | Shoulder screw | shoulder 6 - 20 mm; 1/4 - 3/4 in | ISO 7379; ASME B18.3 |
-| Hex nut, thin (jam) nut, nylon insert lock nut | M1.6 - M24; #0 - 1 in | ISO 4032, 4035, 7040; ASME B18.2.2, B18.6.3 (numbered sizes), B18.16.6 (lock nuts: the heights sellers list for the numbered sizes, **Guess**) |
+| Hex nut, thin (jam) nut, nylon insert lock nut | M1.6 - M24; #0 - 1 in | ISO 4032, 4035, 7040; ASME B18.2.2, B18.6.3 (numbered sizes), B18.16.6 (lock nuts: the nominal heights) |
 | Plain washer, split lock washer | M1.6 - M24; #2 - 1 in (SAE, USS, lock) | ISO 7089, DIN 127 B; ASME B18.21.1 |
 | O-ring | AS568 -001 to -050, -102 to -178, -201 to -258, -309 to -350, -425 to -445 (248 sizes); metric inside x section (1 - 5 mm sections, 98 sizes) | SAE AS568; the metric pairs are the commonly sold ones, **Guess** (ISO 3601-1 allows any) |
 | Ball bearing (Open / Shielded ZZ / Sealed 2RS) | 6000 - 6010, 6200 - 6210, 6300 - 6306, 6800 - 6805, 6900 - 6905, 604 - 609, 623 - 629, 683 - 689, 693 - 699, MR63 - MR148; inch R144, R2-5, R2, R3, R188, R4 - R16 | ISO 15 boundary dimensions; ABMA 12 / 20. Where a shielded miniature bearing is wider than the open one both widths are in the table |
@@ -119,6 +119,58 @@ free ring diameter < groove < shaft (and the reverse for bores), washers over th
 Lengths: the ISO 888 series (2 ... 100 mm) and the inch fractions (1/16 ... 6 in) within
 each size's range; the ranges of the inch sizes and of ISO 7380 are the commonly sold ones
 (**Guess**). The hole a part gets comes from `hole_tables.py` (the Hole dialog's rows).
+
+### Verified dimensions (2026-11-11, second pass)
+
+How: (1) every row the two have in common was compared by a script with **bd_warehouse 0.4.0**
+(the data files of an open-source parts library, Apache-2.0, typed from the same standards by
+other people; downloaded from PyPI, used as a reference only, nothing of it is in Fission
+180): 1,207 values agreed, the differences are listed below; (2) web searches for the
+standards' tables and for suppliers' listings of single sizes (the sandbox cannot open a
+page: only what a search excerpt shows counts). "All" means every size of the table.
+
+| Family | Sizes checked (dimensions) | Source | Corrections made |
+|---|---|---|---|
+| Socket head cap screw, ISO 4762 | all 13 (dk, k, s, t) | bd_warehouse; M1.6, M3, M6, M24 also in a published metric table (irad.pages.dev) | none |
+| Socket head cap screw, ASME B18.3 | all 18 (A, H, J, T) | bd_warehouse | none |
+| Button head, ISO 7380-1 | all 7 (dk, k, s, t) | bd_warehouse; M3, M4, M6, M10, M12 (dk, k, s) in ISO 7380-1's table (search: iteh.ai sample, fastenerdata.co.uk) | none |
+| Button head, ASME B18.3 | 1/4 (0.437, 0.132, 5/32) | McMaster-Carr's listing of a 1/4-20 button head (search excerpt) | none; the other sizes not found |
+| Countersunk, ISO 10642 | M10 (dk 22.40, k 6.2), M5 (k 3.1, s 3); every row dk = 2.24 d and k = (dk - d) / 2 | Wurth's ISO 10642 listings (search). bd_warehouse's "iso10642" column holds DIN 7991's smaller head (dk = 2 d) and was not used | none |
+| Flat head, ASME B18.3 | none confirmed (a seller's chart lists the smallest head, 0.507 for 1/4, where the table has the sharp-cornered 0.531); every row by the 82 degree formula | Albany County Fasteners (search) | none |
+| Low head, DIN 7984 | all 7 socket depths (1.5, 2.3, 2.7, 3, 3.8, 4.5, 5); M6 k and s | Westfield Fasteners' DIN 7984 table, a seller's M6 sheet (search) | none |
+| Low head, ASME B18.3 | not confirmed (no excerpt showed a row) | - | none |
+| Hex head, ISO 4017 | all 10 spanner sizes; head heights M3, M5, M8, M12, M16, M24 lie just under the listed largest (2.12, 3.65, 5.45, 7.68, 10.18, 15.22) | bd_warehouse; fasten.it's ISO 4017 / DIN 933 table (search) | none (the table holds the nominal height) |
+| Hex cap screw, ASME B18.2.1 | 1/4 (7/16, 5/32 within 0.150 - 0.188) | Brighton-Best data sheet (search) | none; the other sizes not found |
+| Pan head, ISO 7045 | M2 to M10 (dk, k: the same head as ISO 14583 in bd_warehouse); M1.6 (3.2, 1.3, recess 0), M4 (8, 3.1) | bd_warehouse; fasten.it, Wurth (search) | none; the recess diameters not confirmed |
+| Slotted pan head, ISO 1580 | all 9 (dk, k, t) | bd_warehouse (its slot widths are the largest, 0.2 - 0.3 mm over the nominal ones here) | none |
+| Pan head, ASME B18.6.3 | all 13 head diameters; recessed head heights and diameters of #4, #6, #8, #10, 1/4 | bd_warehouse; ASME B18.6.3-2013 tables (search: amesweb.info, tannerbolt.com). bd_warehouse's recessed heights of #3 to #12 are 0.002 - 0.007 in higher: the 2013 values kept | none |
+| Set screws, ISO 4026 - 4029 | all 9 sockets and socket depths | bd_warehouse (ISO 4026 columns) | none; the point diameters not confirmed |
+| Set screws, ASME B18.3 | all 16 sockets and depths; keys of #0 to #4 and #10 | bd_warehouse; AFT Fasteners' B18.3-2003 table, torqbolt.com (search). bd_warehouse has 0.028 for #1: the standard's 0.035 kept (two sources) | none; the point sizes not confirmed |
+| Shoulder screw, ISO 7379 | all 6 (thread, dk, k, s, t) | bd_warehouse; Ganter's ISO 7379 data sheet, SKDIN and Accu listings (search) | **head height of the 12 mm shoulder 8 -> 9, of the 16 mm shoulder 10 -> 11** |
+| Shoulder screw, ASME B18.3 | 3/4 (A 1.000, H 0.500) | AFT Fasteners' B18.3-2003 table (search) | none; the other sizes not found |
+| Hex nut ISO 4032, thin nut ISO 4035 | all 13 and all 12 (s, m) | bd_warehouse (its thin nuts M10 and M12 have DIN 439's 17 and 19 mm spanner: ISO's 16 and 18 kept) | none |
+| Lock nut, ISO 7040 | not confirmed (one listing shows DIN 982's 6.3 for M5; ISO 7040's largest height is 6.8) | - | none |
+| Inch nuts | hex 1/4 (7/16, 7/32), 1 (1 1/2, 55/64 within 0.831 - 0.887), #10 machine screw nut (3/8, 1/8) | AFT Fasteners, amesweb.info tables (search) | none; jam nuts not found |
+| Nylon insert lock nut, inch | spanner sizes of #4, #6, #8, #10, 1/4; heights of #4 to 1/2 lie 0.012 - 0.016 in under the chart's largest | Albany County Fasteners' nylon insert lock nut chart (search) | none; no longer a Guess: the nominal heights |
+| Plain washer, ISO 7089 | all 13 (d1, d2; h is the nominal, the reference lists the largest) | bd_warehouse | none |
+| Split lock washer, DIN 127 B | d1 of M3, M6, M10, M16, M24; M2 (2.1, 4.4, 0.5); M5 (d2 9.2, s 1.2) | Westfield Fasteners' table, suppliers (search) | none |
+| Plain washers, inch | SAE #6 (whole row), #10, 1/4, 1/2, 1 (inside, outside); USS 1/4 | Albany County Fasteners' charts, McMaster-Carr listing (search) | none |
+| Split lock washer, inch | #4, #10, 1/2, 1 (outside, thickness; the inside is the smallest allowed) | suppliers' charts (search) | none |
+| O-ring, AS568 | **all 248** (inside diameter, cross section); -438, -441, -443 with suppliers | bd_warehouse (`o-ring_parameters.csv`, mm); Crimp Supply, Zoro, McMaster-Carr, Mykin listings (search) | **-438 to -445: 6.100 ... 6.975 -> 6.225, 6.475, 6.725, 6.975, 7.225, 7.475, 7.725, 7.975** (the first pass ran the series in eighths of an inch to its end; it goes in quarters from -438) |
+| O-ring, metric | - | commercial pairs, still a **Guess** | none |
+| Ball bearings, metric | 28 (623 - 629, 604 - 609, 684 - 689, 694 - 699, 6800, 6900, 6000, 6200, 6300: d, D, B) | bd_warehouse's boundary-dimension rows | none |
+| Ball bearings, inch | R2, R188, R4, R8, R16 (d, D, both widths) | SMB Bearings' table, McMaster-Carr, NSK (search) | none |
+| Retaining ring, DIN 471 | all 33 (s, d3, b, d2, m); 48 mm (1.75, 44.5, 45.5) with Zoro / Rotor Clip | bd_warehouse (`din471.csv`; it has 2 for the 48's thickness: the standard's 1.75 kept, two sources) | none |
+| Retaining ring, DIN 472 | all 30 (s, d3, b, d2, m) | bd_warehouse (`din472.csv`) | **37 mm: width 3.5 -> 3.6** |
+| Retaining rings, inch | external 1/4 (0.025, 0.225, 0.230, 0.029), 1/2 (first pass), 1 (0.042, 0.925); internal 1 (0.042, groove width 0.046) | Hi-Line, McMaster-Carr, Intech, Zoro listings (search) | none; the radial width is still a **Guess** (no source found) |
+| Dowel pin, ISO 2338 | not confirmed by search | - | none |
+| Dowel pin, ASME B18.8.2 | not confirmed; the chamfer is still a **Guess** | - | none |
+| Key, DIN 6885 | 2x2 to 14x9 (b, h) | bd_warehouse (`shaft_key_parameters.csv`) | none |
+| Key, ASME B17.1 | square by definition | - | none |
+
+Marked honestly: where the row says "not confirmed", the numbers are the first builder's and
+this builder's recollection of the standard agreeing, nothing more. The script and the
+reference files are not in the repository (a reference, not a source of data).
 
 ### How the parts are drawn (simply, on purpose)
 

@@ -254,13 +254,16 @@ ASME_SET = {
 
 # == shoulder screws ===============================================================================
 # ISO 7379, hexagon socket head shoulder screws: shoulder diameter -> (d1, thread size,
-# thread length b, dk, k, s, t, (shortest, longest shoulder length))
+# thread length b, dk, k, s, t, (shortest, longest shoulder length)). The shoulders are the
+# ones sold (6, 8, 10, 12, 16, 20 mm, f9): the standard's own nominal sizes are 6.5 and 13 for
+# the first and the fourth, with the same threads and heads. Head heights 9 and 11 for the
+# 12 and 16 mm shoulders (the first pass had 8 and 10; corrected 2026-11-11).
 ISO_7379 = {
     "6": (6.0, "5", 9.75, 10.0, 4.5, 3.0, 2.4, (10, 40)),
     "8": (8.0, "6", 11.25, 13.0, 5.5, 4.0, 3.3, (12, 50)),
     "10": (10.0, "8", 13.25, 16.0, 7.0, 5.0, 4.2, (16, 60)),
-    "12": (12.0, "10", 16.4, 18.0, 8.0, 6.0, 4.9, (16, 80)),
-    "16": (16.0, "12", 18.4, 24.0, 10.0, 8.0, 6.6, (20, 100)),
+    "12": (12.0, "10", 16.4, 18.0, 9.0, 6.0, 4.9, (16, 80)),
+    "16": (16.0, "12", 18.4, 24.0, 11.0, 8.0, 6.6, (20, 100)),
     "20": (20.0, "16", 22.4, 30.0, 14.0, 10.0, 8.8, (30, 100)),
 }
 # ASME B18.3, socket head shoulder screws: (shoulder diameter, thread size, thread length E,
@@ -319,7 +322,9 @@ ISO_7040 = {
 }
 # Inch hex nuts: (d, across flats F, height H). The numbered sizes are ASME B18.6.3 machine
 # screw nuts, 1/4 and up ASME B18.2.2 hex nuts; jam nuts ASME B18.2.2; nylon insert lock nuts
-# ASME B18.16.6 (the NE light series heights sellers list: Guess for the numbered sizes).
+# ASME B18.16.6 (the NE light series: the nominal heights, as fractions; a maker's chart gives
+# the same spanner sizes and largest heights 0.012 to 0.016 in above these: 0.153, 0.188,
+# 0.239, 0.249, 0.328, 0.468 and 0.609 in for #4, #6, #8, #10, 1/4, 3/8 and 1/2).
 ASME_NUT = {
     "#0": (0.060, 5 / 32, 3 / 64),
     "#1": (0.073, 5 / 32, 3 / 64),
@@ -448,7 +453,8 @@ ASME_LOCKWASHER = {
 
 # == O-rings =======================================================================================
 # SAE AS568 (the "dash numbers"): cross section per series and the inside diameters in dash
-# order, inches. -001 to -003 have cross sections of their own.
+# order, inches. -001 to -003 have cross sections of their own. Every one of the 248 rows was
+# compared with an independent open table (docs/fission180/parity/hardware.md, "Verified").
 AS568_SMALL = {"001": (0.029, 0.040), "002": (0.042, 0.050), "003": (0.056, 0.060)}
 AS568_SERIES = {
     # first dash number: (cross section, inside diameters...)
@@ -495,8 +501,11 @@ AS568_SERIES = {
     425: (
         0.275,
         (
+            # -425 to -437 go up in eighths of an inch, -438 to -445 in quarters (the first
+            # pass had eighths to the end: -438 was 6.100 instead of 6.225, ... -445 6.975
+            # instead of 7.975; corrected 2026-11-11 against suppliers' AS568 charts)
             4.475, 4.600, 4.725, 4.850, 4.975, 5.100, 5.225, 5.350, 5.475, 5.600, 5.725, 5.850,
-            5.975, 6.100, 6.225, 6.350, 6.475, 6.600, 6.725, 6.850, 6.975,
+            5.975, 6.225, 6.475, 6.725, 6.975, 7.225, 7.475, 7.725, 7.975,
         ),
     ),
 }  # fmt: skip
@@ -599,7 +608,7 @@ DIN_472 = {
     "25": (1.2, 26.9, 2.7, 26.2, 1.3), "26": (1.2, 27.9, 2.8, 27.2, 1.3),
     "28": (1.2, 30.1, 2.9, 29.4, 1.3), "30": (1.2, 32.1, 3.0, 31.4, 1.3),
     "32": (1.2, 34.4, 3.2, 33.7, 1.3), "35": (1.5, 37.8, 3.4, 37.0, 1.6),
-    "37": (1.5, 39.8, 3.5, 39.0, 1.6), "38": (1.5, 40.8, 3.7, 40.0, 1.6),
+    "37": (1.5, 39.8, 3.6, 39.0, 1.6), "38": (1.5, 40.8, 3.7, 40.0, 1.6),
     "40": (1.75, 43.5, 3.9, 42.5, 1.85), "42": (1.75, 45.5, 4.1, 44.5, 1.85),
     "45": (1.75, 48.5, 4.3, 47.5, 1.85), "47": (1.75, 50.5, 4.4, 49.5, 1.85),
     "50": (2.0, 54.2, 4.6, 53.0, 2.15), "52": (2.0, 56.2, 4.7, 55.0, 2.15),

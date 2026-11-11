@@ -215,6 +215,19 @@ class SetAndShoulderTables(unittest.TestCase):
                 d = core.dims(standard, size)
                 self.assertLess(d["d"], d["d1"], size)  # the thread is thinner than the shoulder
                 self.assertGreater(d["dk"], d["d1"], size)
+        # head diameter, head height and socket of the shoulders sold, typed from a maker's
+        # ISO 7379 data sheet (the first pass had head heights 8 and 10 for 12 and 16 mm)
+        sheet = {
+            "6": (10.0, 4.5, 3.0),
+            "8": (13.0, 5.5, 4.0),
+            "10": (16.0, 7.0, 5.0),
+            "12": (18.0, 9.0, 6.0),
+            "16": (24.0, 11.0, 8.0),
+            "20": (30.0, 14.0, 10.0),
+        }
+        for size, (dk, k, s) in sheet.items():
+            d = core.dims("iso7379", size)
+            self.assertEqual((d["dk"], d["k"], d["s"]), (dk, k, s), size)
 
 
 class NutAndWasherTables(unittest.TestCase):
@@ -288,6 +301,53 @@ class ORingTables(unittest.TestCase):
             [s for s, _ in tables.AS568_SERIES.values()], [0.070, 0.103, 0.139, 0.210, 0.275]
         )
 
+    def test_the_steps_between_dash_numbers(self):
+        # AS568's inside diameters go up in sixteenths, then eighths, then quarters of an inch:
+        # the dash number where each series changes step, typed from the standard's layout
+        # (the first pass ran the -4xx series in eighths to its end: -438 was 0.125 in short,
+        # -445 a whole inch)
+        steps = {
+            4: ((10, None), (11, 1 / 16), (29, 1 / 8), (42, 1 / 4)),
+            102: ((110, 1 / 16), (151, 1 / 8), (152, 1 / 4)),
+            201: ((202, 1 / 16), (223, 1 / 8)),
+            309: ((310, 1 / 16), (325, 1 / 8)),
+            425: ((426, 1 / 8), (438, 1 / 4)),
+        }
+        have = tables.as568()
+        for first, changes in steps.items():
+            count = len(tables.AS568_SERIES[first][1])
+            for dash in range(first + 1, first + count):
+                step = None
+                for start, size in changes:
+                    if dash >= start:
+                        step = size
+                if step is None:
+                    continue
+                gap = have["%03d" % dash][0] - have["%03d" % (dash - 1)][0]
+                self.assertAlmostEqual(gap, step, delta=0.0011, msg=dash)
+
+    def test_rows_confirmed_with_suppliers_charts(self):
+        # typed from suppliers' AS568 listings (not from the table): dash number -> inches
+        confirmed = {
+            "438": 6.225,
+            "439": 6.475,
+            "440": 6.725,
+            "441": 6.975,
+            "442": 7.225,
+            "443": 7.475,
+            "444": 7.725,
+            "445": 7.975,
+            "437": 5.975,
+            "350": 4.600,
+            "258": 5.984,
+            "178": 9.737,
+            "050": 5.239,
+        }
+        have = tables.as568()
+        for dash, inside in confirmed.items():
+            self.assertEqual(have[dash][0], inside, dash)
+        self.assertEqual(have["445"], (7.975, 0.275))
+
     def test_metric(self):
         self.assertEqual(core.dims("oring_metric", "10x2"), {"id": 10.0, "cs": 2.0})
         self.assertIn("20x1.5", core.sizes("oring_metric"))
@@ -356,6 +416,18 @@ class RingPinKeyTables(unittest.TestCase):
             d = core.dims("din472", size)
             self.assertTrue(d["d3"] > d["d2"] > d["d1"], size)
             self.assertGreater(d["m"], d["s"], size)
+        # rows typed again from other sources than the table (suppliers' listings and an
+        # independent open table): a 48 mm shaft's ring is 1.75 thick, not 2; a 37 mm bore's
+        # ring is 3.6 wide (the first pass had 3.5)
+        d = core.dims("din471", "48")
+        self.assertEqual((d["s"], d["d3"], d["d2"]), (1.75, 44.5, 45.5))
+        d = core.dims("din471", "50")
+        self.assertEqual((d["s"], d["d3"], d["d2"]), (2.0, 45.8, 47.0))
+        self.assertEqual(core.dims("din472", "37")["b"], 3.6)
+        widths = [core.dims("din472", size)["b"] for size in core.sizes("din472")]
+        self.assertEqual(widths, sorted(widths))  # wider with every size
+        widths = [core.dims("din471", size)["b"] for size in core.sizes("din471")]
+        self.assertEqual(widths, sorted(widths))
 
     def test_inch_rings(self):
         d = core.dims("asme_ring_ext", "1/2")
