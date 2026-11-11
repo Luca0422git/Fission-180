@@ -239,11 +239,7 @@ def _own_tool_running(session, name):
     press does (O again ends Offset, M again keeps Move/Copy with its picks), so it is not
     stopped first."""
     tool = getattr(session, "tool", None)
-    return (
-        tool is not None
-        and bool(getattr(tool, "active", False))
-        and getattr(tool, "command", "") == name
-    )
+    return tool is not None and bool(getattr(tool, "active", False)) and getattr(tool, "command", "") == name
 
 
 def _would_ask(name):

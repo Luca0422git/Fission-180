@@ -179,6 +179,7 @@ SPLINE_COMMANDS = (
 )
 SPLINE_STEP = "Add Sketch B-Spline"
 ELLIPSE_STEP = "Add sketch ellipse"  # FreeCAD's Ellipse tool's undo step
+LINE_STEP = "Add sketch line"  # ...and its Line tool's
 # the spline tools whose clicks are fit points (the curve goes through them)
 FIT_SPLINE_COMMANDS = (
     "Fission180_SketchFitSpline",
@@ -207,6 +208,7 @@ _state = {
     "session": None,
     "profilelib": None,
     "polygon": None,  # {"circumscribed": bool} while Fission 180's polygon tool runs
+    "centerline": False,  # new lines are centerlines (Linetype > Centerline, nothing selected)
 }
 
 
@@ -248,6 +250,62 @@ def construction_mode():
         return shown == constr.pixmap(16, 16).toImage()
     except Exception:
         return False
+
+
+def centerline_mode():
+    """New lines are drawn as centerlines (Linetype > Centerline with nothing selected)."""
+    return bool(_state.get("centerline"))
+
+
+def toggle_centerline():
+    """The palette's Centerline button (Fusion's Linetype): the selected lines become
+    centerlines (normal lines again when all of them are), or, with nothing selected, new
+    lines are drawn as centerlines until it is clicked again (sketch_centerline.py)."""
+    from . import commands, sketch_centerline
+
+    sketch = editing_sketch()
+    if sketch is None:
+        return
+    try:
+        geos = []
+        others = 0
+        for sel in Gui.Selection.getSelectionEx():
+            if sel.Object is not sketch:
+                continue
+            for name in sel.SubElementNames:
+                short = name.rsplit(".", 1)[-1]
+                if short.startswith("Edge"):
+                    geo = int(short[4:]) - 1
+                    if sketch.Geometry[geo].TypeId == sketch_centerline.LINE:
+                        geos.append(geo)
+                    else:
+                        others += 1
+        if not geos:
+            if others:
+                commands.tell("Only lines can be centerlines: select a line.")
+                return
+            _state["centerline"] = not centerline_mode()
+            commands.tell(
+                "New lines are centerlines (dashed: a dimension to one is a diameter, "
+                "Revolve takes it as its axis). Click Centerline again for normal lines."
+                if _state["centerline"]
+                else "New lines are normal lines again."
+            )
+            return
+        now = set(sketch_centerline.lines(sketch))
+        on = not all(g in now for g in geos)
+        doc = sketch.Document
+        doc.openTransaction("Centerline")
+        try:
+            sketch_centerline.set_centerline(sketch, geos, on)
+            sketch.solve()
+        except Exception:
+            doc.abortTransaction()
+            raise
+        doc.commitTransaction()
+        Gui.Selection.clearSelection()
+    except Exception as exc:
+        warn("centerline: %s" % exc)
 
 
 def normal_mode():
@@ -1097,12 +1155,20 @@ class SketchSession:
             # undo list, under its own constraints' steps): a spline or an ellipse that
             # came some other way (a paste, a pattern, a script) is left as it is
             steps = list(self.doc.UndoNames)[:3]
-            splines, ellipses = [], []
+            splines, ellipses, centerlines = [], [], []
+            if centerline_mode() and LINE_STEP in steps:
+                # Linetype > Centerline is on: the lines the Line tool just drew
+                centerlines = [
+                    i
+                    for i in new
+                    if geometry[i].TypeId == "Part::GeomLineSegment"
+                    and not sketch.getConstruction(i)
+                ]
             if SPLINE_STEP in steps:
                 splines = [i for i in new if geometry[i].TypeId == helpers.BSPLINE]
             if ELLIPSE_STEP in steps:
                 ellipses = [i for i in new if geometry[i].TypeId == helpers.ELLIPSE]
-            if not splines and not ellipses:
+            if not splines and not ellipses and not centerlines:
                 return
             from . import recent
 
@@ -1118,6 +1184,10 @@ class SketchSession:
                 for ellipse in reversed(ellipses):
                     major, _minor = helpers.tidy_ellipse(sketch, ellipse)
                     self._level_ellipse(major)
+                if centerlines:
+                    from . import sketch_centerline
+
+                    sketch_centerline.set_centerline(sketch, centerlines, True)
                 sketch.solve()
             except Exception:
                 doc.abortTransaction()
@@ -1220,11 +1290,53 @@ class SketchSession:
                 return
             c = constraints[index]
             if c.Type in DIMENSIONAL and c.Driving:
+                # Fusion: a dimension to a centerline is the diameter (sketch_centerline.py)
+                index = self._diameter_dimension(index)
                 if self._make_driven_if_redundant(index):
                     return
                 self.edit_dimension(index)
         except Exception as exc:
             warn("dimension box: %s" % exc)
+
+    def _diameter_dimension(self, index):
+        """The dimension just placed, when it runs from a point or line to a centerline,
+        becomes the diameter, in a step glued to the dimension's own. Returns the index
+        of the dimension to go on with (the new one, or `index`)."""
+        from . import sketch_centerline
+
+        sketch = self.sketch
+        try:
+            if not sketch_centerline.lines(sketch):
+                return index
+            c = sketch.Constraints[index]
+            plan = sketch_centerline.diameter_plan(
+                c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, sketch_centerline.lines(sketch)
+            )
+            if plan is None:
+                return index
+            doc = self.doc
+            infer = self.infer
+            if infer is not None:
+                infer._applying = True
+            doc.openTransaction(INFER_STEP)
+            try:
+                new = sketch_centerline.diameter(sketch, index)
+                sketch.solve()
+            except Exception:
+                doc.abortTransaction()
+                raise
+            finally:
+                if infer is not None:
+                    infer._applying = False
+            doc.commitTransaction()
+            self._tidy_seen = len(sketch.Geometry)
+            if infer is not None:
+                infer.seen = sketch.GeometryCount
+                infer.invalidate()
+            return new if new is not None else index
+        except Exception as exc:
+            warn("diameter dimension: %s" % exc)
+            return index
 
     def _make_driven_if_redundant(self, index):
         """A dimension on a size the other dimensions/constraints already set would

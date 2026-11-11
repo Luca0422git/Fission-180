@@ -9,11 +9,7 @@ ribbon entries): Fusion's window shows them, and a person looking for one learns
 nothing here. Sources: docs/fission180/parity/misc.md.
 """
 
-from . import (
-    __version__ as _version,
-    interface_scale as _interface_scale,
-    update_core as _update_core,
-)
+from . import __version__ as _version, interface_scale as _interface_scale, update_core as _update_core
 from . import touchpad_core as _touchpad
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"

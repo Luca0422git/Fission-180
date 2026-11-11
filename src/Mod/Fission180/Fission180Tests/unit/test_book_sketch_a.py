@@ -8,6 +8,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from fission180 import sketch_centerline as centerline  # noqa: E402
+from fission180 import sketch_draw_helpers as helpers  # noqa: E402
 from fission180 import sketch_grid  # noqa: E402
 from fission180 import sketch_infer_core as core  # noqa: E402
 from fission180 import sketch_select_core as select  # noqa: E402
@@ -126,6 +128,58 @@ class ClickRule(unittest.TestCase):
             ["Edge1"], ["Constraint2", "Constraint3", "Constraint2"], "replace"
         )
         self.assertEqual(got, ["Constraint2", "Constraint3"])
+
+
+class Centerline(unittest.TestCase):
+    def test_mirror_across_a_level_line(self):
+        self.assertEqual(centerline.mirror((30.0, 10.0), (0.0, 0.0), (30.0, 0.0)), (30.0, -10.0))
+
+    def test_mirror_across_a_slanted_line(self):
+        x, y = centerline.mirror((0.0, 2.0), (0.0, 0.0), (5.0, 5.0))
+        self.assertAlmostEqual(x, 2.0)
+        self.assertAlmostEqual(y, 0.0)
+
+    def test_point_to_centerline_is_a_diameter(self):
+        # FreeCAD's point-to-line distance: the point first, the line second
+        self.assertEqual(centerline.diameter_plan("Distance", 2, 1, 0, 0, [0]), ((2, 1), 0))
+        # ...also with the two picked the other way round
+        self.assertEqual(centerline.diameter_plan("Distance", 0, 0, 2, 2, [0]), ((2, 2), 0))
+
+    def test_line_to_centerline_is_a_diameter(self):
+        self.assertEqual(centerline.diameter_plan("Distance", 3, 0, 0, 0, [0]), ((3, 1), 0))
+        self.assertEqual(centerline.diameter_plan("Distance", 0, 0, 3, 0, [0]), ((3, 1), 0))
+
+    def test_what_is_no_diameter(self):
+        no_geo = centerline.NO_GEO
+        # a line's own length, also the centerline's
+        self.assertIsNone(centerline.diameter_plan("Distance", 0, 0, no_geo, 0, [0]))
+        # a distance to a line that is no centerline
+        self.assertIsNone(centerline.diameter_plan("Distance", 2, 1, 1, 0, [0]))
+        # a distance between two points
+        self.assertIsNone(centerline.diameter_plan("Distance", 2, 1, 0, 1, [0]))
+        # other dimensions
+        self.assertIsNone(centerline.diameter_plan("DistanceX", 2, 1, 0, 0, [0]))
+        self.assertIsNone(centerline.diameter_plan("Radius", 2, 0, no_geo, 0, [0]))
+        # no centerline in the sketch
+        self.assertIsNone(centerline.diameter_plan("Distance", 2, 1, 0, 0, []))
+        # two centerlines: the distance between them stays a distance
+        self.assertIsNone(centerline.diameter_plan("Distance", 0, 0, 1, 0, [0, 1]))
+
+
+class PolygonParts(unittest.TestCase):
+    def test_circumscribed_hides_the_corner_circle_and_the_spoke(self):
+        ids = list(range(10, 19))  # 6 lines, corner circle, spoke, edge circle
+        lines, hide, keep = helpers.polygon_parts(ids, 6, True)
+        self.assertEqual(lines, [10, 11, 12, 13, 14, 15])
+        self.assertEqual(hide, [16, 17])
+        self.assertEqual(keep, 18)
+
+    def test_inscribed_keeps_its_circle(self):
+        ids = list(range(0, 7))
+        lines, hide, keep = helpers.polygon_parts(ids, 6, False)
+        self.assertEqual(lines, [0, 1, 2, 3, 4, 5])
+        self.assertEqual(hide, [])
+        self.assertEqual(keep, 6)
 
 
 if __name__ == "__main__":

@@ -107,6 +107,22 @@ def _global(widget, pos):
     return widget.mapToGlobal(QtCore.QPoint(int(pos.x()), int(pos.y())))
 
 
+def _reaches(widget, pos):
+    """The click at widget pixel `pos` of the 3D view reaches the view: nothing that takes
+    the mouse floats over it there (the Sketch Palette, a dialog). A real pointer clicks
+    whatever is on top."""
+    if widget is not h.gl_widget():
+        return
+    on_top = h.covered(QtCore.QPoint(int(pos.x()), int(pos.y())))
+    if on_top is not None and on_top.testAttribute(QtCore.Qt.WA_TransparentForMouseEvents):
+        on_top = None  # (a hint beside the pointer: clicks go through it)
+    if on_top:
+        raise RuntimeError(
+            "x_input: pixel (%d, %d) of the 3D view is covered by %s"
+            % (pos.x(), pos.y(), h.describe(on_top))
+        )
+
+
 def move_to(pos, widget=None):
     """The real pointer onto widget pixel `pos` (of the 3D view when no widget is given),
     waiting until Qt has seen it there."""
@@ -176,6 +192,7 @@ def click(pos, held=(), widget=None, hover=True):
     the keys go down first, the pointer comes over the spot, rests until the view has
     drawn what is under it, press, release, keys up."""
     widget = widget or h.gl_widget()
+    _reaches(widget, pos)
     h.press_pace()
     for k in held:
         key(k, True)
@@ -196,6 +213,7 @@ def click(pos, held=(), widget=None, hover=True):
 def double_click(pos, widget=None):
     """A real double-click: two clicks well inside the system's double-click time."""
     widget = widget or h.gl_widget()
+    _reaches(widget, pos)
     h.press_pace()
     glide_to(QtCore.QPoint(pos.x() + 9, pos.y() + 6), widget, steps=3)
     move_to(pos, widget)
@@ -214,6 +232,7 @@ def double_click(pos, widget=None):
 def press_drag_release(start, end, held=(), widget=None, steps=10, rest_ms=0):
     """Press at `start`, move to `end` with the button down, release there."""
     widget = widget or h.gl_widget()
+    _reaches(widget, start)
     h.press_pace()
     for k in held:
         key(k, True)

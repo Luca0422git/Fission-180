@@ -314,8 +314,11 @@ class Inference:
                 self._remember_press(None, None, step, view if view.ok else None, True)
             return (event.position(), True, False, None, None)
         if tool is None or not setting("Enabled"):
+            # (a tool the guides do not know is left alone altogether: it may be no
+            # drawing tool at all. FreeCAD's Dimension tool got its placement click as a
+            # copy moved by the grid's reach and went on waiting for one)
             self.overlay.clear()
-            return self._grid_plan(obj, event)
+            return None
         if step is None:  # the tool asks for a size now (a radius, a width): no guides
             self.overlay.clear()
             self.last, self.last_step = None, None

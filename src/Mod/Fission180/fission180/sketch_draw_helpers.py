@@ -125,6 +125,12 @@ def hide_constraints(sketch, indices):
 
 def hide_curves(sketch, indices):
     """Curves onto the hidden visual layer. False without FreeCAD's window."""
+    return set_layer(sketch, indices, HIDDEN_LAYER)
+
+
+def set_layer(sketch, indices, wanted):
+    """Curves onto visual layer `wanted` (0 normal, 1 dashed, 2 hidden). False without
+    FreeCAD's window."""
     indices = [i for i in indices if i is not None and i >= 0]
     if not indices:
         return True
@@ -138,7 +144,7 @@ def hide_curves(sketch, indices):
         changed = False
         for i in indices:
             old = facades[i]
-            if layer_of(old) == HIDDEN_LAYER:
+            if layer_of(old) == wanted:
                 continue
             new = old.Geometry.copy()
             for ext in old.getExtensions():
@@ -147,7 +153,7 @@ def hide_curves(sketch, indices):
                 except Exception:
                     pass
             layer = SketcherGui.ViewProviderSketchGeometryExtension()
-            layer.VisualLayerId = HIDDEN_LAYER
+            layer.VisualLayerId = wanted
             new.setExtension(layer)
             facades[i] = Sketcher.GeometryFacade(new)
             changed = True
@@ -155,7 +161,7 @@ def hide_curves(sketch, indices):
             sketch.GeometryFacadeList = facades
         return True
     except Exception as exc:
-        warn("sketch helpers: curves not hidden: %s" % exc)
+        warn("sketch helpers: curves not moved to layer %d: %s" % (wanted, exc))
         return False
 
 
