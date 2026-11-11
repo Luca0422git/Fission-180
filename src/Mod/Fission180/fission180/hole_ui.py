@@ -1151,10 +1151,15 @@ class HolePanel(Panel):
                 "simple",
                 "taper",
             ):
-                # Start from the size nearest to the diameter the hole has now.
-                d = tables.closest(
-                    self.standard.currentData(), self.diameter.value(), internal=tap == "tapped"
-                )
+                # Start from the size nearest to the diameter the hole has now: a tapped
+                # hole keeps its diameter as the tap drill (5 mm: M6x1), a clearance hole
+                # takes the fastener of that diameter (hole_tables.size_for_drill).
+                if tap == "tapped":
+                    d = hole_tables.size_for_drill(
+                        self.standard.currentData(), self.diameter.value()
+                    )
+                else:
+                    d = tables.closest(self.standard.currentData(), self.diameter.value())
                 if d is not None:
                     self._fill_sizes(d.standard, d.size, d.label)
             elif tap == "clearance":

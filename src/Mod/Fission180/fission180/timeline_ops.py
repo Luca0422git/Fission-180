@@ -139,6 +139,8 @@ def settle(doc):
             repaired = repair_references(doc)
             if _resolve_patterns(doc) or repaired:
                 doc.recompute()
+            if _follow_counts(doc):
+                doc.recompute()
             if _keep_splits(doc):
                 doc.recompute()
             if _follow_faces(doc):
@@ -149,6 +151,17 @@ def settle(doc):
         follow_mesh_steps(doc)  # after an undo, a step added or deleted: mesh steps' sides
     finally:
         _settling.discard(doc.Name)
+
+
+def _follow_counts(doc):
+    """A pattern of bodies whose quantity follows a parameter gets as many copy bodies as
+    its count is now (pattern.follow_counts). True when bodies were added or removed."""
+    try:
+        from . import pattern
+
+        return pattern.follow_counts(doc)
+    except Exception:
+        return False
 
 
 def _keep_splits(doc):
@@ -308,6 +321,12 @@ def install_guard(defer=None):
         from . import split_face
 
         split_face.install()  # a split face stays split under the steps after it
+    except Exception:
+        pass
+    try:
+        from . import pattern
+
+        pattern.install_count_watch()  # a pattern of bodies follows its quantity parameter
     except Exception:
         pass
     picks.install()  # picked edges / faces kept when FreeCAD loses their names

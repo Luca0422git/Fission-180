@@ -216,16 +216,17 @@ def bodies_formula():
 
 def bodies_refused():
     p = ps.panel()
-    # Fusion takes a parameter here; each copy of a body is a body of its own, so Fission 180
-    # takes the number the parameter gives now and says that it is kept as a number (wave 7,
-    # the book's Metric Bolt; it was refused: "takes a plain number as its quantity")
+    # Fusion takes a parameter here (the book's Metric Bolt). It was refused ("takes a plain
+    # number as its quantity"), then taken once as a number; now the pattern keeps the
+    # formula and its copies follow the parameter (wave 7, modify-c; the scenario
+    # book_modifyc_pattern_quantity changes the parameter and counts the bodies).
     h.check("no refusal", not p.message.text(), p.message.text())
     h.check(
-        "the dialog says the number is what n gives now, and that it is kept as a number",
-        "Quantity 2 is what 'n' gives now" in p.info.text() and "keeps the number" in p.info.text(),
-        p.info.text(),
+        "the formula is kept",
+        p.options["expressions"].get("quantity") == "n",
+        p.options["expressions"],
     )
-    h.check("no formula kept", "quantity" not in p.options["expressions"])
+    h.check("the formula is shown", "Quantity = n" in p.formulas.text(), p.formulas.text())
     h.check("the field shows n's value", p.quantity.value() == 2, p.quantity.value())
     h.press(QtCore.Qt.Key_Escape)
 

@@ -20,6 +20,7 @@ Path 4, values while the preview runs: a pattern along Y; "abc" in Quantity is e
 
 Hand-derived: box 40 x 30 x 10 = 12000; a through hole r 2 removes pi 2^2 10.
 """
+
 import math
 
 import FreeCAD as App
@@ -223,7 +224,8 @@ def p4_y_taken():
 
 def p4_abc():
     text = message()
-    h.check("'abc' explained in plain words", "not a number or a parameter" in text, text)
+    # (the wording of the one formula reader since wave 7: fission180.parameters.read)
+    h.check("'abc' explained in plain words", "There is no parameter named 'abc'" in text, text)
     h.check("no FreeCAD jargon", "Property" not in text, text)
     h.task_button("OK")
 
@@ -274,7 +276,9 @@ def p4_fourteen():
     p = ps.panel()
     h.check("copy at (8, 8 + 4 pi)", (8, round(8 + 4 * math.pi, 4)) in centres(), centres())
     h.check("4 holes", ps.close(h.solid_volume(), ps.BOX - 4 * HOLE), h.solid_volume())
-    h.check("the formula is kept", "4 * pi" in p.formulas.text(), p.formulas.text())
+    # A formula typed without a unit in a length field is kept with the design's unit on its
+    # numbers (wave 7, params: "4 * pi" typed for a length is 4 mm * pi).
+    h.check("the formula is kept", "4 mm * pi" in p.formulas.text(), p.formulas.text())
     handle = p.handles.get("distance")
     if h.check("the arrow is there", handle is not None):
         h.fit()
@@ -285,7 +289,7 @@ def p4_clicked_arrow():
     p = ps.panel()
     h.check(
         "a click on the arrow without moving it keeps the formula",
-        "4 * pi" in p.formulas.text(),
+        "4 mm * pi" in p.formulas.text(),
         p.formulas.text(),
     )
     h.check(

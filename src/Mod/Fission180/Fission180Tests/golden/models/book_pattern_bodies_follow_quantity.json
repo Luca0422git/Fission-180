@@ -1,0 +1,109 @@
+{
+  "id": "book_pattern_bodies_follow_quantity",
+  "title": "Metric Bolt: a pattern of bodies whose Quantity is a parameter; the parameter changed from 3 to 5, then to 2",
+  "tags": [
+    "pattern",
+    "rectangular",
+    "bodies",
+    "parameter",
+    "book"
+  ],
+  "steps": [
+    {
+      "op": "parameter",
+      "name": "Quantity",
+      "value": 3,
+      "unit": ""
+    },
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "rect": [
+            0,
+            0,
+            20,
+            10
+          ],
+          "name": "b"
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 5
+    },
+    {
+      "op": "rectangular_pattern",
+      "id": "p1",
+      "body": true,
+      "direction": "X",
+      "quantity": 3,
+      "distance": 30,
+      "distribution": "spacing",
+      "expressions": {
+        "quantity": "Quantity"
+      }
+    },
+    {
+      "op": "check",
+      "expect": {
+        "volume": 3000,
+        "faces": 18,
+        "solids": 3,
+        "source": "analytic",
+        "note": "Quantity = 3: the body and two copies at x 30 and 60. V = 3*20*10*5."
+      }
+    },
+    {
+      "op": "parameter",
+      "name": "Quantity",
+      "value": 5,
+      "unit": ""
+    },
+    {
+      "op": "check",
+      "expect": {
+        "volume": 5000,
+        "faces": 30,
+        "solids": 5,
+        "bbox": [
+          0,
+          0,
+          0,
+          140,
+          10,
+          5
+        ],
+        "source": "analytic",
+        "note": "Quantity = 5: two more bodies, at x 90 and 120. V = 5*1000; the last one ends at x 140."
+      }
+    },
+    {
+      "op": "parameter",
+      "name": "Quantity",
+      "value": 2,
+      "unit": ""
+    }
+  ],
+  "expect": {
+    "volume": 2000,
+    "area": 1400,
+    "faces": 12,
+    "solids": 2,
+    "bbox": [
+      0,
+      0,
+      0,
+      50,
+      10,
+      5
+    ],
+    "source": "analytic",
+    "note": "Quantity = 2: three copy bodies are taken away again; the body and one copy at x 30 are left. Measured over every body: V = 2*20*10*5; A = 2*(2*200 + 2*100 + 2*50)."
+  }
+}
