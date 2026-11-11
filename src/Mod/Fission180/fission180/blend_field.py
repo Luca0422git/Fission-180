@@ -41,6 +41,17 @@ def _in_unit(quantity, unit, text):
         raise ValueError("'%s' is not %s." % (text, what))
 
 
+def _hint(unit):
+    """The box's tooltip: the unit a plain number is read in is the design's (an inch
+    design said "Type a value (mm)": book parity report, Pizza Cutter)."""
+    try:
+        from . import design_units
+
+        return design_units.hint(kind="angle" if unit == "deg" else "length")
+    except Exception:
+        return "Type a value, a parameter name or a formula such as  r * 2"
+
+
 def _plain(text):
     try:
         from . import parameters
@@ -70,26 +81,16 @@ def parse_number(text, unit="mm"):
 def evaluate(doc, text, unit="mm"):
     """The value of what was typed in a box: a number ("2", "0.1 in"), a parameter or a
     formula ("r", "r * 2 + 1 mm"). Raises ValueError with a plain-language reason."""
-    text = (text or "").strip().lstrip("=").strip()
-    if not text:
-        raise ValueError("Type a value.")
-    if _NUMBER.match(text):
-        return plain_value(float(text.replace(",", ".")), unit)
-    if _plain(text):
-        return _in_unit(App.Units.Quantity(text), unit, text)
-    from . import parameters, parameters_core
+    return read(doc, text, unit).value
 
-    expr = parameters_core.to_freecad(text, parameters.user_names(doc))
-    host = parameters.container(doc)
-    if host is None:
-        if not doc.Objects:
-            raise ValueError("'%s' is not a value." % text)
-        host = doc.Objects[0]
-    try:
-        value = host.evalExpression(expr)
-    except Exception as exc:
-        raise ValueError("'%s' is not a value here: %s" % (text, exc))
-    return _in_unit(value, unit, text)
+
+def read(doc, text, unit="mm", create=False):
+    """What was typed in a box, understood the way every value box does (parameters.read:
+    the design's units for a number without a unit, also inside a formula; `Name = value`
+    makes a user parameter when `create`). Raises ValueError with a plain-language reason."""
+    from . import parameters
+
+    return parameters.read(doc, text, unit, create=create)
 
 
 class ValueField:
@@ -112,9 +113,8 @@ class ValueField:
         # "0.50 mm"; Fusion's Enter finishes the command at once (the text is settled in
         # _finished, which runs on that same Enter).
         self.widget.setProperty("autoNormalize", False)
-        self.widget.setToolTip(
-            "Type a value (%s), a parameter name or a formula such as  r * 2" % unit
-        )
+        self.field.formula_input = self  # what is no plain number is settled in _finished
+        self.widget.setToolTip(_hint(unit))
         self.edit = self.widget.findChild(QtWidgets.QLineEdit)
         if self.edit is not None:
             self.edit.textEdited.connect(self._edited)
@@ -200,18 +200,19 @@ class ValueField:
         if raw is None or not self._alive():
             return
         try:
-            text = raw.strip().lstrip("=").strip()
-            if not text:
+            text = raw.strip()
+            if not text.strip("= "):
                 self.set_value(self.panel.options.get(self.key, self.value()))
                 return
             try:
-                value = evaluate(self.panel.doc, text, self.unit)
+                got = read(self.panel.doc, text, self.unit, create=True)
             except Exception as exc:
                 self.set_value(self.panel.options.get(self.key, self.value()))
                 self.panel._formula_failed(self.key, str(exc))
                 return
+            value = got.value
             self.set_value(value)  # shown in mm again ("1.50 mm")
-            formula = "" if _NUMBER.match(text) or _plain(text) else text
+            formula = "" if got.plain else got.formula
             if formula != self.formula:
                 self.formula = formula
                 self.panel._formula_changed(self.key)

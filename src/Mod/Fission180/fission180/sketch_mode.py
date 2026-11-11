@@ -1249,7 +1249,11 @@ class SketchSession:
             sketch_pick_ui.stop_waiting()
         except Exception as exc:
             warn("sketch tool: %s" % exc)
-        if not self.tool_running() and not self._spline_in_progress() and not self._spline_panel_shown():
+        if (
+            not self.tool_running()
+            and not self._spline_in_progress()
+            and not self._spline_panel_shown()
+        ):
             return
         kept = []
         try:
@@ -1349,7 +1353,11 @@ class SketchSession:
             if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
                 return
             cursor_on = self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
-            if cursor_on or self._spline_panel_shown() or (self.tool is not None and self.tool.active):
+            if (
+                cursor_on
+                or self._spline_panel_shown()
+                or (self.tool is not None and self.tool.active)
+            ):
                 self._orphan_ticks = 0
                 return
             points = self._spline_points()
@@ -1476,7 +1484,10 @@ class SketchSession:
             QtWidgets.QApplication.processEvents()
         if _count_splines(sketch) > splines:
             made = "freecad"
-            log("spline: made from the points clicked (%d curve(s) added)" % (len(sketch.Geometry) - before))
+            log(
+                "spline: made from the points clicked (%d curve(s) added)"
+                % (len(sketch.Geometry) - before)
+            )
         else:
             left = self._spline_points() or points
             if len(left) >= 2:
@@ -2207,7 +2218,9 @@ def paste():
         # said once the tool's panel has settled (its start hid an earlier tip)
         QtCore.QTimer.singleShot(
             150,
-            lambda: commands.tell("Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."),
+            lambda: commands.tell(
+                "Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."
+            ),
         )
 
     QtCore.QTimer.singleShot(0, place)
@@ -2389,7 +2402,11 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
             expressions = dict(self.sketch.ExpressionEngine)
             path = ".Constraints[%d]" % self.index
             if path in expressions:
-                return "=" + expressions[path]
+                # the formula as the person writes it (Fusion shows "Arm_Length", not
+                # FreeCAD's "=Parameters.Arm_Length": book parity report, Drone)
+                from . import parameters_core
+
+                return parameters_core.from_freecad(expressions[path])
             q = self.sketch.getDatum(self.index)
             if self.is_angle():
                 return "%g deg" % round(q.getValueAs("deg").Value, 6)
@@ -2429,29 +2446,28 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
 
     def _value(self, text):
         """Parse the typed text: (quantity or None, expression or None). Raises
-        ValueError with a message for the box when the value is not possible."""
-        text = text.strip()
-        if text.startswith("="):
-            return None, text[1:].strip()
-        try:
-            q = App.Units.Quantity(text)
-        except Exception:
-            raise ValueError("Not a value: %s" % text)
-        angle = self.is_angle()
-        if q.Unit == App.Units.Quantity(1.0).Unit:  # a bare number (or 10+5*2)
-            if angle:
-                q = App.Units.Quantity("%r deg" % q.Value)
-            else:  # in the design's units, like Fusion ("2" in an inch design is 2 in)
-                from . import browser_core
+        ValueError with a message for the box when the value is not possible.
 
-                mm = browser_core.plain_length(q.Value, self.sketch.Document)
-                q = App.Units.Quantity("%r mm" % mm)
-        wanted = App.Units.Quantity("1 deg" if angle else "1 mm").Unit
-        if q.Unit != wanted:
-            raise ValueError(
-                "Type %s, e.g. %s" % (("an angle", "30") if angle else ("a length", "25"))
-            )
-        value = q.getValueAs("deg" if angle else "mm").Value
+        Read the one way every value box reads (parameters.read, wave 7): a number is in
+        the design's units, a parameter name or a formula needs no leading "=" (Fusion's
+        way: `Head_Length`, `Support_Width/2`, `9 * 1.02`; a bare name used to keep the
+        measured value), and `Name = value` makes the user parameter Name and uses it."""
+        from . import parameters, parameters_core
+
+        text = text.strip()
+        angle = self.is_angle()
+        kind = "angle" if angle else "length"
+        doc = self.sketch.Document
+        name, rest = parameters_core.split_assignment(text)
+        if name is not None:
+            # checked here; made inside the undo step (apply), so a refusal leaves nothing
+            parameters.check_new(doc, name)
+            parameters.read(doc, rest, kind)
+            return None, text
+        got = parameters.read(doc, text, kind)
+        if not got.plain:
+            return None, got.formula
+        value = got.value
         # Fusion refuses sizes of 0 or less: a dimension of 0 collapses the curve (FreeCAD's
         # solver then fails and the sketch breaks).
         if value <= 1e-7:
@@ -2464,8 +2480,8 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
             current = 1.0
         if current < 0 and self._constraint().Type in ("DistanceX", "DistanceY", "Angle"):
             # FreeCAD keeps the direction in the sign; the user types the size.
-            q = App.Units.Quantity("%r %s" % (-value, "deg" if angle else "mm"))
-        return q, None
+            value = -value
+        return App.Units.Quantity("%r %s" % (value, "deg" if angle else "mm")), None
 
     def keyPressEvent(self, event):
         """Enter typed in the box finished it (returnPressed, inside the box's own key
@@ -2541,17 +2557,14 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         doc.openTransaction("Edit Dimension")
         try:
             if expression is not None:
-                from . import parameters, parameters_core
+                from . import parameters
 
-                # Fusion's parameter names (=width*2) in FreeCAD's spelling (Parameters.width)
-                formula = parameters_core.to_freecad(expression, parameters.user_names(doc))
-                # a formula FreeCAD cannot compute (an unknown name): said, not kept. Asked
-                # of the formula itself, not of the sketch's State (it can be left from an
-                # earlier try, or the sketch can be broken for another reason)
-                try:
-                    self.sketch.evalExpression(formula)
-                except Exception:
-                    raise ValueError("That formula cannot be computed: %s" % expression)
+                # Fusion's formula (width*2, Arm_Length + 5, Name = value) in FreeCAD's
+                # spelling, its numbers in the design's units; `Name = value` makes the
+                # parameter here, inside this undo step. A formula that cannot be computed
+                # (an unknown name) is said, not kept (parameters.read raises).
+                kind = "angle" if self.is_angle() else "length"
+                formula = parameters.read(doc, expression, kind, create=True).freecad
                 self.sketch.setExpression(".Constraints[%d]" % self.index, formula)
                 self.sketch.recompute()
                 # a formula is checked like a typed value: no size of 0 or less

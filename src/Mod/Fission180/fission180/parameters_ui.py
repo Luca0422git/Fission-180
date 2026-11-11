@@ -49,6 +49,11 @@ def _fmt(value, unit):
     return text + (" " + unit if unit else "")
 
 
+def _is_on(state):
+    """True for a checked check state, whether Qt hands it over as a number or an enum."""
+    return getattr(state, "value", state) == 2
+
+
 def unit_label(unit):
     return dict(UNIT_CHOICES).get(unit, unit)
 
@@ -82,7 +87,7 @@ class RowDelegate(QtWidgets.QStyledItemDelegate):
         opt.features &= ~QtWidgets.QStyleOptionViewItem.HasCheckIndicator
         style = opt.widget.style() if opt.widget is not None else QtWidgets.QApplication.style()
         style.drawControl(QtWidgets.QStyle.CE_ItemViewItem, opt, painter, opt.widget)
-        on = state in (QtCore.Qt.Checked, 2)
+        on = _is_on(state)
         painter.save()
         painter.setPen(QtGui.QColor(STAR_ON if on else STAR_OFF))
         font = QtGui.QFont(opt.font)
@@ -103,10 +108,10 @@ class RowDelegate(QtWidgets.QStyledItemDelegate):
         kind = event.type()
         mouse = (QtCore.QEvent.MouseButtonRelease, QtCore.QEvent.MouseButtonDblClick)
         if kind in mouse and self.star_rect(option).contains(event.pos()):
-            if kind == QtCore.QEvent.MouseButtonRelease:
-                on = self._starred(index) in (QtCore.Qt.Checked, 2)
-                state = QtCore.Qt.Unchecked if on else QtCore.Qt.Checked
-                model.setData(index, state, QtCore.Qt.CheckStateRole)
+            # (a second click soon after the first reaches the view as a double-click, and
+            # the view then sends no release for it: each of the two is one click here)
+            # (plain numbers: a PySide enum stored in the model reads back as "unchecked")
+            model.setData(index, 0 if _is_on(self._starred(index)) else 2, QtCore.Qt.CheckStateRole)
             return True
         if kind == QtCore.QEvent.MouseButtonPress and self.star_rect(option).contains(event.pos()):
             return True
@@ -268,7 +273,10 @@ class ParametersDialog(QtWidgets.QDialog):
         self.setWindowTitle("Parameters")
         self.setWindowIcon(ui_icon("parameters"))
         self.resize(820, 640)
-        doc.openTransaction("Change Parameters")
+        # Like Fusion's, the dialog keeps the rest of the window still while it is open (it
+        # holds one undo step: another command started under it would close that step).
+        self.setModal(True)
+        self._open_step()
         self._loading = False
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -585,15 +593,44 @@ class ParametersDialog(QtWidgets.QDialog):
             return
         self._apply(lambda: parameters.remove_user(self.doc, name))
 
+    def _open_step(self):
+        """One undo step for everything done in the dialog. It has to outlive the command
+        that opens the dialog: FreeCAD closes a step opened inside a command when the
+        command returns (App::AutoTransaction), and the dialog's changes were then made
+        outside any undo step: Ctrl+Z did not take them back and Cancel put nothing back
+        (found by scenario book_params_dialog). `persist` keeps the step open."""
+        try:
+            App.setActiveTransaction("Change Parameters", True)
+        except Exception:
+            self.doc.openTransaction("Change Parameters")
+
+    def _close_step(self, abort):
+        try:
+            if abort:
+                self.doc.abortTransaction()
+            else:
+                self.doc.commitTransaction()
+        finally:
+            try:
+                App.closeActiveTransaction(abort)  # the step's name, when nothing changed
+            except Exception:
+                pass
+
     def accept(self):
-        self.doc.recompute()
-        self.doc.commitTransaction()
-        log("parameters changed")
+        try:
+            self.doc.recompute()
+            self._close_step(False)
+            log("parameters changed")
+        except Exception as exc:
+            warn("Change Parameters: %s" % exc)
         super().accept()
 
     def reject(self):
-        self.doc.abortTransaction()
-        self.doc.recompute()
+        try:
+            self._close_step(True)
+            self.doc.recompute()
+        except Exception as exc:
+            warn("Change Parameters: %s" % exc)
         super().reject()
 
 

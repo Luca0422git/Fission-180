@@ -105,6 +105,14 @@ class ParameterError(ValueError):
     pass
 
 
+class UnknownName(ParameterError):
+    """A formula names something that is no parameter (`.name`)."""
+
+    def __init__(self, message, name):
+        super().__init__(message)
+        self.name = name
+
+
 def check_name(name, existing=()):
     """Raise ParameterError unless `name` can be a parameter name."""
     if not name or not _IDENT.fullmatch(name):
@@ -630,7 +638,7 @@ class _Reader:
             self.swaps.append((node.start, node.end, "%s.%s" % (CONTAINER, prop_name(name))))
             return _KIND_DIM.get(self.params[name])
         if node.op == "qualified":
-            raise ParameterError(self._unknown(name))
+            raise UnknownName(self._unknown(name), name)
         if name in CONSTANTS:
             if name == "PI":
                 self.swaps.append((node.start, node.end, "pi"))
@@ -641,7 +649,7 @@ class _Reader:
             return NONE
         if not self.strict:
             return None
-        raise ParameterError(self._unknown(name))
+        raise UnknownName(self._unknown(name), name)
 
     def _unknown(self, name):
         close = difflib.get_close_matches(name, list(self.params), n=1, cutoff=0.6)
@@ -650,8 +658,6 @@ class _Reader:
             if name.lower() in lowered:
                 close = [lowered[name.lower()]]
         hint = " Did you mean %s?" % close[0] if close else ""
-        if not self.params:
-            hint = " This design has no user parameters yet (MODIFY > Change Parameters)."
         return "There is no parameter named '%s'.%s" % (name, hint)
 
     def _bin(self, node):

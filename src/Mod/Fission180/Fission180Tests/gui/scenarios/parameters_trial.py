@@ -11,8 +11,8 @@ A  MODIFY > Change Parameters; double-click width's Expression, type 0, Enter: r
 B  Type 50: accepted, the part follows (10000 mm3), no message.
 C  The extrude's Distance (model parameters) typed 0: refused, the message names the
    extrude; the distance stays 10.
-B2 Type width2 (a typo: no such name): refused, the formula cannot be computed; width stays
-   50 with no formula.
+B2 Type width2 (a typo: no such name): refused, "There is no parameter named 'width2'"; width
+   stays 50 with no formula.
 B3 Type -5: refused, and the message says the dimension would be -5 mm (FreeCAD holds a length
    at 0: the message shows what was typed).
 C2 The sketch's height (model parameters) typed -3: refused like 0 (the profile would flip),
@@ -186,8 +186,9 @@ def b2_check():
 
     d = dialog()
     text = d.message.text() if d is not None else ""
-    h.check("B2: refused", "Not changed: with width = width2" in text, text)
-    h.check("B2: says the formula cannot be computed", "cannot be computed" in text, text)
+    # (wave 7: an unknown name is refused before anything is tried, and named)
+    h.check("B2: refused, in the dialog", text.startswith("⚠"), text)
+    h.check("B2: says which name is unknown", "no parameter named 'width2'" in text, text)
     h.check("B2: width stays 50", abs(width() - 50) < 1e-9, width())
     container = parameters.container(doc())
     h.check("B2: no formula kept", not dict(container.ExpressionEngine), container.ExpressionEngine)

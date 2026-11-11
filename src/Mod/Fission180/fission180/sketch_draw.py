@@ -423,6 +423,7 @@ class Field:
         self.high = high
         self.value = None  # what the pointer gives now (mm, radians, count, ratio)
         self.typed = None  # the value typed and taken (holds until the shape is made)
+        self.formula = None  # the parameter / formula typed for it (FreeCAD's spelling)
         self.anchor = None  # sketch point the box sits beside
 
     def shown(self):
@@ -450,21 +451,15 @@ class Field:
             if self.kind == COUNT:
                 value = int(round(value))
         else:
-            try:
-                q = App.Units.Quantity(text)
-            except Exception:
-                raise ValueError("Not a value: %s" % text)
-            unit = "deg" if self.kind == ANGLE else "mm"
-            if q.Unit == App.Units.Quantity(1.0).Unit:  # a plain number: the design's units
-                value = q.Value if self.kind == ANGLE else _plain_length(q.Value)
-                q = App.Units.Quantity("%r %s" % (value, unit))
-            if q.Unit != App.Units.Quantity("1 %s" % unit).Unit:
-                raise ValueError(
-                    "Type %s" % ("an angle, e.g. 30" if self.kind == ANGLE else "a length, e.g. 25")
-                )
-            value = q.getValueAs(unit).Value
-            if self.kind == ANGLE:
-                value = math.radians(value)
+            # read the one way every value box reads (parameters.read, wave 7): a plain
+            # number in the design's units, a parameter or a formula (Fusion's way:
+            # "Head_Diam", "Support_Width / 2"; the dimension made from it then follows the
+            # parameter, parameters.bind_typed in Tool.make), `Name = value` makes Name
+            from . import parameters
+
+            got = parameters.read_typed(App.ActiveDocument, text, self.kind)
+            self.formula = None if got.plain else got.freecad
+            value = math.radians(got.value) if self.kind == ANGLE else got.value
         if self.kind == LENGTH and value <= 1e-7:
             raise ValueError("The value must be more than 0.")
         if self.low is not None and value < self.low:
@@ -1396,6 +1391,13 @@ class DrawTool:
             first = len(sketch.Constraints)
             ours = self.build(construction) or []
             kept = self._add_checked(ours)
+            try:  # a parameter or formula typed in a value box drives its dimension
+                from . import parameters
+
+                if parameters.bind_typed(sketch, first, self.boxes.fields):
+                    sketch.recompute()
+            except Exception as exc:
+                warn("%s: the typed formula was not kept: %s" % (self.title, exc))
             sketch.solve()
         except Exception as exc:
             doc.abortTransaction()

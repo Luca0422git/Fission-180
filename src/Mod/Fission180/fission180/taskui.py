@@ -207,6 +207,22 @@ class DistanceField:
         self._on_change = on_change
         self._quiet = False
         self._typed = None  # text typed since the box was last settled
+        self._before = None  # the value before that typing began (put back on a refusal)
+        # A preview.FormulaInput (or blend_field.ValueField) on this field stores a typed
+        # parameter or formula on the feature; without one the field itself works out what
+        # was typed (wave 7, params: "Arm_Length" in the Move dialog gave 0, "-2 *
+        # Arm_Length" was read as -2 mm: FreeCAD's box drops what it cannot read)
+        self.formula_input = None
+        self.refused = ""  # why the last thing typed was no value ("" when it was one)
+        # parameter names are offered while typing (parameters_complete.py)
+        self.widget.setProperty("fission180_formula", True)
+        try:
+            from . import design_units
+
+            kind = {"deg": "angle", "": "number"}.get(unit, "length")
+            self.widget.setToolTip(design_units.hint(kind=kind))
+        except Exception:
+            pass
         edit = self.widget.findChild(QtWidgets.QLineEdit)
         if edit is not None:
             edit.textEdited.connect(self._edited)
@@ -222,6 +238,11 @@ class DistanceField:
 
     def value(self):
         typed = self._bare()
+        if typed is None and self._formula_typed():
+            try:  # a parameter or formula typed and not settled yet (Enter is OK at once)
+                return self._read(self._typed).value
+            except ValueError:
+                pass
         return typed if typed is not None else float(self.widget.property("rawValue"))
 
     def set_value(self, value):
@@ -237,15 +258,77 @@ class DistanceField:
             return None
         return plain_value(float(self._typed.strip().replace(",", ".")), self.unit)
 
+    def _formula_typed(self):
+        """True when what was typed is for this field to work out itself: not a bare number
+        (settled as before) and no FormulaInput that stores it on the feature."""
+        return (
+            self.formula_input is None
+            and self._typed is not None
+            and bool(self._typed.strip())
+            and not _BARE_NUMBER.match(self._typed)
+        )
+
+    def _read(self, text):
+        """What was typed, understood the one way every value box does (parameters.read)."""
+        from . import parameters
+
+        return parameters.read(App.ActiveDocument, text, self.unit)
+
     def _edited(self, text):
+        if self._typed is None:
+            try:
+                self._before = float(self.widget.property("rawValue"))
+            except Exception:
+                self._before = None
         self._typed = text
+        self.refused = ""
+
+    def _settle_formula(self, raw):
+        """A parameter, a formula or a value with a unit typed in a field that has no
+        formula store: its value is taken; what is no value is refused with the reason next
+        to the mouse, and the value from before is put back (never silently another number)."""
+        try:
+            if not self.widget.isVisible():
+                return
+            shown = float(self.widget.property("rawValue"))
+        except RuntimeError:
+            return  # the box went with its dialog
+        owner = getattr(self._on_change, "__self__", None)
+        alive = self._on_change is not None and not getattr(owner, "_closed", False)
+        try:
+            value = self._read(raw).value
+        except ValueError as exc:
+            self.refused = str(exc)
+            before = self._before if self._before is not None else shown
+            self.set_value(before)
+            if alive and abs(before - shown) > 1e-12:
+                self._on_change(before)  # FreeCAD's box had read part of it as a number
+            try:
+                from . import commands
+
+                commands.tell(self.refused)
+            except Exception:
+                pass
+            return
+        if abs(shown - value) <= 1e-12:
+            return
+        self.set_value(value)
+        if alive:
+            self._on_change(value)
 
     def _settle(self):
         """Editing finished: a plain number typed counts in the design's units (an angle
         in degrees). Only a value FreeCAD read in another unit is corrected; nothing is done
         while the dialog closes (leaving the box then also "finishes" it, after the value
         was taken)."""
+        raw = self._typed if self._formula_typed() else None
         typed, self._typed = self._bare(), None
+        if raw is not None:
+            try:
+                self._settle_formula(raw)
+            except Exception as exc:
+                warn("value box: %s" % exc)
+            return
         if typed is None:
             return
         try:
@@ -275,18 +358,8 @@ class DistanceField:
         text = (text or "").strip()
         if _BARE_NUMBER.match(text):
             return plain_value(float(text.replace(",", ".")), self.unit)
-        try:
-            quantity = App.Units.Quantity(text)
-        except Exception:
-            raise ValueError("'%s' is not a value." % text)
-        angle = self.unit == "deg"
-        if quantity.Unit == App.Units.Quantity(1.0).Unit:
-            return plain_value(float(quantity.Value), self.unit)
-        if quantity.Unit != App.Units.Quantity("1 " + self.unit).Unit:
-            raise ValueError(
-                "Type %s, for example %s." % (("an angle", "30") if angle else ("a length", "25"))
-            )
-        return float(quantity.getValueAs(self.unit).Value)
+        # a parameter or a formula works here as in every value box (parameters.read)
+        return self._read(text).value
 
     def take(self, value):
         """Show `value` and tell the dialog, as if it had been typed in the field."""

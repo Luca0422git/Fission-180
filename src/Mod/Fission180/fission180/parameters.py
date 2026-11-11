@@ -445,6 +445,16 @@ def _resolver(doc):
     return resolve
 
 
+def check_new(doc, name):
+    """Raise ParameterError unless `Name = value` typed in a value box can make `name`."""
+    if name in user_names(doc):
+        raise core.ParameterError(
+            "A parameter named '%s' already exists: type %s to use it, or change its "
+            "value in MODIFY > Change Parameters." % (name, name)
+        )
+    core.check_name(name)
+
+
 def read(doc, text, expect=None, create=False, unit=None, skip=None, comment=""):
     """Understand what a person typed in a value box of this design: a number ("25",
     "1 in"), a parameter or formula Fusion's way ("Head_Length", "Arm_Length + 5",
@@ -464,12 +474,7 @@ def read(doc, text, expect=None, create=False, unit=None, skip=None, comment="")
             raise core.ParameterError(
                 "'%s' cannot be made here: add it in MODIFY > Change Parameters." % name
             )
-        if name in user_names(doc):
-            raise core.ParameterError(
-                "A parameter named '%s' already exists: type %s to use it, or change its "
-                "value in MODIFY > Change Parameters." % (name, name)
-            )
-        core.check_name(name)
+        check_new(doc, name)
         first = read(doc, rest, expect, unit=unit)
         kind = first.kind if first.kind in ("length", "angle", "number") else expect
         new_unit = {"length": unit or design_unit(doc), "angle": "deg"}.get(kind, "")
@@ -492,6 +497,11 @@ def read(doc, text, expect=None, create=False, unit=None, skip=None, comment="")
             expr = core.to_freecad(rest, params)
             compute(doc, expr)
         except Exception:
+            if isinstance(mine, core.UnknownName) and not kinds(doc):
+                raise core.ParameterError(
+                    "%s This design has no user parameters yet (MODIFY > Change Parameters, "
+                    "or type %s = a value)." % (mine, mine.name)
+                )
             raise mine
         out = core.Read()
         out.freecad, out.formula = expr, core.from_freecad(expr)
@@ -531,6 +541,64 @@ def read(doc, text, expect=None, create=False, unit=None, skip=None, comment="")
     return out
 
 
+def read_typed(doc, text, expect=None):
+    """read() for a value box that has no undo step of its own open (a box of a sketch
+    drawing tool): `Name = value` makes the parameter in an undo step of its own."""
+    name, _rest = core.split_assignment(text)
+    if name is None:
+        return read(doc, text, expect)
+    doc.openTransaction("Add Parameter")
+    try:
+        got = read(doc, text, expect, create=True)
+    except Exception:
+        doc.abortTransaction()
+        raise
+    doc.commitTransaction()
+    return got
+
+
+_LENGTH_CONSTRAINTS = ("Distance", "DistanceX", "DistanceY", "Radius", "Diameter")
+
+
+def bind_typed(sketch, first, fields):
+    """A sketch tool made a shape from values typed in its boxes: the dimensions it added
+    (constraints from index `first`) for the boxes that took a parameter or a formula
+    (`field.formula`, FreeCAD's spelling; `field.typed`, its value in mm or radians) get
+    that formula, so they follow the parameter like a dimension typed afterwards. Returns
+    how many dimensions were bound."""
+    engine = dict(sketch.ExpressionEngine)
+    constraints = sketch.Constraints
+    taken = set()
+    for field in fields:
+        formula = getattr(field, "formula", None)
+        typed = getattr(field, "typed", None)
+        if not formula or typed is None:
+            continue
+        angle = getattr(field, "kind", "") == "angle"
+        for i in range(first, len(constraints)):
+            c = constraints[i]
+            path = ".Constraints[%d]" % i
+            if i in taken or path in engine or not c.Driving:
+                continue
+            if angle != (c.Type == "Angle") or (not angle and c.Type not in _LENGTH_CONSTRAINTS):
+                continue
+            value = c.Value
+            if abs(abs(value) - abs(typed)) < 1e-6:
+                expr = formula
+            elif c.Type == "Radius" and abs(abs(value) * 2 - abs(typed)) < 1e-6:
+                expr = "(%s) / 2" % formula  # a diameter typed, a radius dimension made
+            elif c.Type == "Diameter" and abs(abs(value) / 2 - abs(typed)) < 1e-6:
+                expr = "(%s) * 2" % formula
+            else:
+                continue
+            if value * typed < 0:
+                expr = "-(%s)" % expr  # FreeCAD keeps a dimension's direction in its sign
+            sketch.setExpression(path, expr)
+            taken.add(i)
+            break
+    return len(taken)
+
+
 def _names_in(text):
     import re
 
@@ -561,8 +629,8 @@ def model_parameters(doc):
     column shows (the formula, or the value in the design's units)."""
     rows = []
     stars = set(favorites(doc))
-    labels = _step_names(doc)
     length_unit = design_unit(doc)
+    # (the groups keep the objects' labels: scenarios and scripts find them by it)
     for obj in doc.Objects:
         expressions = dict(obj.ExpressionEngine)
         found = []
@@ -581,7 +649,7 @@ def model_parameters(doc):
             for prop, label in _props_of(obj):
                 found.append(_row(obj, prop, label, getattr(obj, prop), expressions.get(prop, "")))
         for row in found:
-            row["owner"] = labels.get(obj.Name) or obj.Label
+            row["owner"] = obj.Label
             unit = {"length": length_unit, "angle": "deg"}.get(row["kind"], "")
             row["display_unit"] = unit
             row["shown"] = row["expression"] or value_text(row["value"], unit)
@@ -693,7 +761,7 @@ def is_plain_number(text):
     return core.is_plain(text)
 
 
-def _kind_of_path(obj, path):
+def kind_of_path(obj, path):
     if path.startswith(".Constraints["):
         kind = obj.Constraints[int(path[len(".Constraints[") : -1])].Type
         return "angle" if kind == "Angle" else "length"
@@ -716,7 +784,7 @@ def _set(obj, path, text, names=None, unit=None):
     doc = obj.Document
     holder = container(doc)
     skip = core.display_name(path) if obj is holder else None
-    kind = _kind_of_path(obj, path)
+    kind = kind_of_path(obj, path)
     got = read(doc, text, kind, unit=unit, skip=skip)
     if not got.plain:
         obj.setExpression(path, got.freecad)
