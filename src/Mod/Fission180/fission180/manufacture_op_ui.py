@@ -32,7 +32,12 @@ LAST_TOOL = {}  # tool type group -> the tool picked last (new operations start 
 # field key -> (label, how it is edited, tool tip). "mm": a length; "deg"; "int"; "s";
 # "tick"; a tuple of (key, title[, built]) rows: a drop-down.
 PASS_FIELDS = {
-    "tolerance": ("Tolerance", "mm", "How closely the toolpath follows the model"),
+    "tolerance": (
+        "Tolerance",
+        "mm",
+        "How closely the toolpath follows the model: curves are cut as short moves that stay "
+        "within this distance (smaller: smoother, more moves, slower to compute)",
+    ),
     "direction": (
         "Sideways Compensation",
         core.DIRECTIONS,
@@ -557,6 +562,49 @@ class OpPanel(panels.CamPanel):
                 label, widget = self.rows[key]
                 label.setVisible(on)
                 widget.setVisible(on)
+        self._show_unused()
+
+    # Tolerance, Lead-In Feedrate and Ramp Feedrate: the field's key in the dialog
+    USED_FIELDS = (
+        ("tolerance", "tolerance"),
+        ("leadin_feed", "feed_leadin_feed"),
+        ("ramp_feed", "feed_ramp_feed"),
+    )
+
+    def _show_unused(self):
+        """A field this operation's toolpath does not use is greyed, and its tip says why
+        (a typed value that did nothing was a silent failure): manufacture_core.unused_fields
+        knows which, as the fields stand now (Ramp Type Plunge, Lead-In off, tabs on...)."""
+        try:
+            unused = core.unused_fields(self.kind, self.read())
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            return
+        if not hasattr(self, "_tips"):
+            self._tips = {}
+        for field, key in self.USED_FIELDS:
+            box = self.inputs.get(key)
+            if box is None:
+                continue
+            widget = getattr(box, "widget", box)
+            if key not in self._tips:
+                self._tips[key] = widget.toolTip()
+            reason = unused.get(field)
+            widget.setEnabled(reason is None)
+            widget.setToolTip(reason or self._tips[key])
+            row = self.rows.get(key)
+            if row is not None and row[0] is not None:
+                row[0].setEnabled(reason is None)
+                row[0].setToolTip(reason or "")
+
+    def unused_reason(self, field):
+        """Why a field is greyed ("" when it is used): for tests."""
+        key = dict(self.USED_FIELDS)[field]
+        box = self.inputs.get(key)
+        if box is None:
+            return None
+        widget = getattr(box, "widget", box)
+        return "" if widget.isEnabled() else widget.toolTip()
 
     def fields_changed(self, key):
         self._show_rows()

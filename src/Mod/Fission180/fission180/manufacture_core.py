@@ -1042,7 +1042,7 @@ OP_DEFAULTS = {
 KIND_DEFAULTS = {
     "face": {"heights": {"bottom": {"from": "model_top", "offset": 0.0}}},
     "adaptive2d": {
-        "passes": {"stock_to_leave": True, "multiple_depths": False},
+        "passes": {"stock_to_leave": True, "multiple_depths": False, "tolerance": 0.1},
         "linking": {"ramp": "helix"},
     },
     "pocket2d": {"linking": {"ramp": "helix"}},
@@ -1075,7 +1075,7 @@ KIND_DEFAULTS = {
         }
     },
     "adaptive3d": {
-        "passes": {"stock_to_leave": True, "multiple_depths": True},
+        "passes": {"stock_to_leave": True, "multiple_depths": True, "tolerance": 0.1},
         "linking": {"ramp": "helix"},
         "heights": {"bottom": {"from": "model_bottom", "offset": 0.0}},
     },
@@ -1086,6 +1086,77 @@ KIND_DEFAULTS = {
         "heights": {"bottom": {"from": "model_bottom", "offset": 0.0}},
     },
 }
+
+
+# The operations whose toolpath follows the model within the Tolerance (FreeCAD: the accuracy
+# of Path.Area's curves, Adaptive's Tolerance, the 3D operations' LinearDeflection). The others
+# follow the picked edges and circles exactly: their Tolerance field is greyed.
+TOLERANCE_KINDS = (
+    "face",
+    "adaptive2d",
+    "pocket2d",
+    "contour2d",
+    "adaptive3d",
+    "pocket3d",
+    "parallel",
+    "contour3d",
+)
+TOLERANCE_MIN, TOLERANCE_MAX = 0.001, 1.0
+RAMP_KINDS = ("pocket2d", "pocket3d", "contour2d")  # a Ramp Type on the Linking tab
+HELIX_KINDS = ("adaptive2d", "adaptive3d")  # always enter on a helix
+
+
+def tolerance(kind, options):
+    """The operation's Tolerance in mm, or None when its engine has none to set."""
+    if kind not in TOLERANCE_KINDS:
+        return None
+    return float(options["passes"].get("tolerance") or 0.01)
+
+
+def has_lead_in(kind, options):
+    return bool(
+        kind == "contour2d"
+        and options["linking"].get("lead_in")
+        and not options["geometry"]["tabs"].get("on")
+    )
+
+
+def has_ramp(kind, options):
+    if kind in HELIX_KINDS:
+        return True
+    return kind in RAMP_KINDS and options["linking"].get("ramp") != "plunge"
+
+
+def unused_fields(kind, options):
+    """{field: why it does nothing in this operation} of the fields a person can type that
+    this operation's toolpath does not use: "tolerance", "leadin_feed", "ramp_feed". The
+    dialog greys them with the reason; a field that is not listed reaches the toolpath."""
+    out = {}
+    if kind not in TOLERANCE_KINDS:
+        out["tolerance"] = (
+            "Not used here: this operation follows the picked edges and circles exactly."
+        )
+    if not has_lead_in(kind, options):
+        if kind != "contour2d":
+            why = "Not used here: this operation has no lead-in."
+        elif options["geometry"]["tabs"].get("on"):
+            why = "Not used: with tabs the lead-in is left out (Geometry tab)."
+        else:
+            why = "Not used: Lead-In is off (Linking tab)."
+        out["leadin_feed"] = why
+    if not has_ramp(kind, options):
+        if kind in RAMP_KINDS:
+            why = (
+                "Not used: Ramp Type is Plunge (Linking tab), the tool goes straight down at "
+                "the Plunge Feedrate."
+            )
+        else:
+            why = (
+                "Not used here: this operation has no ramp, the tool goes down at the Plunge "
+                "Feedrate."
+            )
+        out["ramp_feed"] = why
+    return out
 
 
 def op_info(kind):
@@ -1196,6 +1267,16 @@ def op_problems(kind, options, picks=None):
         out.append("Nothing is selected: click %s (Geometry tab)." % words)
     passes = options["passes"]
     if t and not out:
+        f = feeds(options)
+        if has_lead_in(kind, options) and f["leadin_feed"] <= 0:
+            out.append("The Lead-In Feedrate must be more than 0.")
+        if has_ramp(kind, options) and f["ramp_feed"] <= 0:
+            out.append("The Ramp Feedrate must be more than 0.")
+        tol = tolerance(kind, options)
+        if tol is not None and not TOLERANCE_MIN - EPS <= tol <= TOLERANCE_MAX + EPS:
+            out.append(
+                "The Tolerance is between %s and %s mm." % (fmt(TOLERANCE_MIN), fmt(TOLERANCE_MAX))
+            )
         if stepover(options) <= 0 or stepover(options) > t["diameter"] + EPS:
             out.append(
                 "The stepover is between 0 and the tool's diameter (%s mm)." % fmt(t["diameter"])
@@ -1266,6 +1347,8 @@ def engine_plan(kind, options, env):
     lead = float(lead) if lead is not None else d / 2.0
     parts = []
     given = env.get("parts") or [{}]
+    speeds = feeds(options)
+    tol = tolerance(kind, options)
 
     def part(props, source, dressups=None, module=None):
         merged = dict(common)
@@ -1281,16 +1364,23 @@ def engine_plan(kind, options, env):
             )
             if kind in ("adaptive2d", "pocket2d", "pocket3d"):
                 merged["FinalDepth"] += axial
-        parts.append(
-            {
-                "module": module or info["engine"],
-                "props": merged,
-                "base": source.get("base") or [],
-                "locations": source.get("locations") or [],
-                "dressups": dressups or [],
-                "label": info["title"],
-            }
-        )
+        made = {
+            "module": module or info["engine"],
+            "props": merged,
+            "base": source.get("base") or [],
+            "locations": source.get("locations") or [],
+            "dressups": dressups or [],
+            "label": info["title"],
+        }
+        if tol is not None:
+            # the Tolerance: the accuracy of the engine's curves (Path.Area, the job's
+            # geometry tolerance); Adaptive and the 3D operations have a property of their own
+            made["tolerance"] = tol
+        if kind in HELIX_KINDS:
+            # FreeCAD's Adaptive goes down its helix at the plunge feed and has no property
+            # for it: the Ramp Feedrate is written onto those moves after (with_feeds)
+            made["ramp_feed"] = float(speeds["ramp_feed"])
+        parts.append(made)
 
     def ramp_dressup():
         method = {"helix": "Helix", "profile": "RampMethod1", "zigzag": "RampMethod3"}.get(
@@ -1299,7 +1389,14 @@ def engine_plan(kind, options, env):
         if method is None:
             return []
         angle = max(0.5, min(89.0, float(linking.get("ramp_angle") or 2.0)))
-        return [{"module": "RampEntry", "props": {"Method": method, "Angle": angle}}]
+        props = {
+            "Method": method,
+            "Angle": angle,
+            # the Ramp Feedrate (FreeCAD: the ramp's own "Custom" feed rate)
+            "RampFeedRate": "Custom",
+            "CustomFeedRate": "%.6f mm/min" % float(speeds["ramp_feed"]),
+        }
+        return [{"module": "RampEntry", "props": props}]
 
     if kind == "face":
         over = percent(stepover(options), d)
@@ -1333,6 +1430,7 @@ def engine_plan(kind, options, env):
                 "KeepToolDownRatio": 3.0 if linking.get("keep_down") else 0.0,
                 "UseHelixArcs": False,
                 "ForceInsideOut": False,
+                "Tolerance": max(TOLERANCE_MIN, tol),
             }
             if kind == "adaptive3d":
                 props["ModelAwareExperiment"] = True
@@ -1383,19 +1481,22 @@ def engine_plan(kind, options, env):
                 )
             dressups += ramp_dressup()
             if (linking.get("lead_in") or linking.get("lead_out")) and not tabs.get("on"):
-                dressups.append(
-                    {
-                        "module": "LeadInOut",
-                        "props": {
-                            "LeadIn": bool(linking.get("lead_in")),
-                            "LeadOut": bool(linking.get("lead_out")),
-                            "StyleIn": "Arc",
-                            "StyleOut": "Arc",
-                            "RadiusIn": lead,
-                            "RadiusOut": lead,
-                        },
-                    }
-                )
+                leads = {
+                    "module": "LeadInOut",
+                    "props": {
+                        "LeadIn": bool(linking.get("lead_in")),
+                        "LeadOut": bool(linking.get("lead_out")),
+                        "StyleIn": "Arc",
+                        "StyleOut": "Arc",
+                        "RadiusIn": lead,
+                        "RadiusOut": lead,
+                    },
+                }
+                if linking.get("lead_in"):
+                    # FreeCAD's lead-in is cut at the cutting feed and has no property for
+                    # it: the Lead-In Feedrate is written onto its moves after (with_feeds)
+                    leads["lead_feed"] = float(speeds["leadin_feed"])
+                dressups.append(leads)
             finishing = max(0, int(passes.get("finishing_passes") or 0))
             # outside, climb milling goes clockwise around the part (spindle turning
             # clockwise); inside a pocket or hole it goes anticlockwise
@@ -1482,6 +1583,7 @@ def engine_plan(kind, options, env):
                     "StepDown": down,
                     "DepthOffset": axial,
                     "SampleInterval": max(0.2, min(1.0, d / 6.0)),
+                    "LinearDeflection": tol,
                     "CutMode": "Climb" if climb else "Conventional",
                 },
                 source,
@@ -1494,6 +1596,7 @@ def engine_plan(kind, options, env):
                     "BoundBox": "Stock",
                     "StepDown": max(0.1, stepdown(options)),
                     "SampleInterval": max(0.2, min(1.0, d / 6.0)),
+                    "LinearDeflection": tol,
                     "CutMode": "Climb" if climb else "Conventional",
                 },
                 source,
@@ -1750,6 +1853,87 @@ def path_stats(segments, rapid_rate=5000.0):
         "min_cut_z": round(cut_lo, 4) if cut_lo != float("inf") else None,
         "moves": len(segments),
     }
+
+
+_F_WORD = re.compile(r"\s*F\s*[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+
+
+def _motions(text):
+    """[(line index, command, parameters, start, end)] of the G0 - G3 lines of a toolpath's
+    G-code (FreeCAD's own: one command a line), with the tool's place before and after."""
+    pos = [None, None, None]
+    mode = None
+    out = []
+    for command, params, number in parse_gcode(text):
+        if command in MOTION:
+            mode = command
+        elif command != "" or mode is None:
+            continue
+        start = tuple(pos)
+        for i, letter in enumerate("XYZ"):
+            if letter in params:
+                pos[i] = params[letter]
+        out.append((number - 1, mode, params, start, tuple(pos)))
+    return out
+
+
+def _point_key(point, digits=3):
+    return tuple(None if c is None else round(c, digits) + 0.0 for c in point)
+
+
+def with_feeds(gcode, ramp=None, leadin=None, before_leads=None):
+    """A toolpath's G-code with the feed rates FreeCAD's engine has no setting for written
+    onto their moves; returns (the G-code, {"ramp": moves changed, "leadin": moves changed}).
+    Feeds are in the G-code's own unit (FreeCAD's paths: mm/s).
+
+    `ramp`: the Ramp Feedrate, put on every cutting move that goes down while it moves
+    sideways (the turns of a helix, a ramp): for operations whose engine ramps by itself.
+    `leadin`: the Lead-In Feedrate, put on the lead-in moves: the sideways cutting moves that
+    start at a place `before_leads` (the same toolpath before the lead-ins were added) never
+    visits. A lead-out starts on the contour and keeps the cutting feed. The move after a
+    changed one gets its own feed written again."""
+    lines = str(gcode).splitlines()
+    counts = {"ramp": 0, "leadin": 0}
+    known = None
+    if leadin is not None and before_leads:
+        known = set()
+        for _i, command, _params, start, end in _motions(before_leads):
+            if command != "G0":
+                known.add(_point_key(start))
+                known.add(_point_key(end))
+    if ramp is None and known is None:
+        return gcode, counts
+    modal = None  # the feed the engine's own program has at this point
+    written = None  # the feed the program has as it is written out
+    for index, command, params, start, end in _motions(gcode):
+        if "F" in params:
+            modal = params["F"]
+        if command == "G0":
+            if "F" in params:
+                written = params["F"]
+            continue
+        want = modal
+        if None not in start and None not in end:
+            sideways = command in ("G2", "G3") or (
+                abs(end[0] - start[0]) > 1e-6 or abs(end[1] - start[1]) > 1e-6
+            )
+            if known is not None and sideways and _point_key(start) not in known:
+                want = float(leadin)
+                counts["leadin"] += 1
+            elif ramp is not None and sideways and end[2] < start[2] - 1e-6:
+                want = float(ramp)
+                counts["ramp"] += 1
+        if want is None:
+            continue
+        own = params.get("F")
+        if (own is None and written is not None and abs(written - want) < 1e-9) or (
+            own is not None and abs(own - want) < 1e-9
+        ):
+            written = want
+            continue
+        lines[index] = _F_WORD.sub("", lines[index]).rstrip() + " F%.6f" % want
+        written = want
+    return "\n".join(lines), counts
 
 
 def time_text(seconds):

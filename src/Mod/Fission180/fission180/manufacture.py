@@ -1185,7 +1185,7 @@ def fingerprint(op, setup=None):
     )
 
 
-ENGINE_VERSION = 1
+ENGINE_VERSION = 2
 
 
 def result(op):
@@ -1492,7 +1492,9 @@ class Run:
                     _store(op, self._keys[name], "", text, planned["warnings"], None)
                     continue
                 gcode = core.with_clearance(
-                    found["gcode"], planned["heights"]["clearance"], planned["heights"]["retract"]
+                    _with_feeds(found, planned["parts"]),
+                    planned["heights"]["clearance"],
+                    planned["heights"]["retract"],
                 )
                 stats = core.path_stats(
                     core.moves(core.parse_gcode(gcode), feed_scale=60.0), RAPID_RATE
@@ -1507,6 +1509,30 @@ class Run:
         finally:
             if self.state != "running":
                 self._cleanup()
+
+
+def _with_feeds(found, planned_parts):
+    """An operation's toolpath as the engine made it, with the Lead-In and Ramp Feedrates
+    written onto their moves (manufacture_core.with_feeds; FreeCAD's units: mm/s)."""
+    parts = found.get("parts")
+    if not parts:
+        return found["gcode"]
+    chunks = []
+    for item in parts:
+        planned = planned_parts[item["index"]] if item["index"] < len(planned_parts) else {}
+        lead = None
+        for spec in planned.get("dressups") or []:
+            if spec.get("lead_feed") is not None:
+                lead = float(spec["lead_feed"]) / 60.0
+        ramp = planned.get("ramp_feed")
+        text, _counts = core.with_feeds(
+            item["gcode"],
+            ramp=float(ramp) / 60.0 if ramp is not None else None,
+            leadin=lead,
+            before_leads=item.get("before_leads"),
+        )
+        chunks.append(text)
+    return "\n".join(c.strip("\n") for c in chunks if c.strip())
 
 
 def _engine_sentence(found, lead="The toolpath could not be made"):

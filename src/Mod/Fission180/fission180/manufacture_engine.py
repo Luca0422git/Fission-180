@@ -26,7 +26,7 @@ import traceback
 
 import FreeCAD as App
 
-VERSION = 1
+VERSION = 2
 
 
 class _Capture:
@@ -292,6 +292,7 @@ class Engine:
 
         module = importlib.import_module("Path.Op.%s" % part["module"])
         self.chooser.controller = controller
+        self._tolerance(part.get("tolerance") or 0.01)
         op = module.Create(label, parentJob=self.job)
         op.ToolController = controller
         # always: FreeCAD fills a new drilling operation with every hole it finds itself
@@ -302,17 +303,38 @@ class Engine:
             _set(op, name, value)
         self.doc.recompute()
         final = op
+        before_leads = None
         for spec in part.get("dressups") or []:
+            if spec.get("lead_feed") is not None:
+                before_leads = final.Path.toGCode()  # (to tell the lead-ins from the contour)
             final = self._dressup(spec, final)
             self.doc.recompute()
         state = list(getattr(final, "State", []))
         if "Invalid" in state or "Invalid" in list(getattr(op, "State", [])):
             raise ValueError("FreeCAD's CAM could not compute it")
-        return final.Path
+        return final.Path, before_leads
+
+    def _tolerance(self, value):
+        """The operation's Tolerance: the accuracy of the curves Path.Area makes (its
+        default is what FreeCAD's CAM preferences set once) and the job's geometry tolerance
+        (profiles, the 3D operations). Path.Area uses its accuracy more than once (cutting
+        a curve into points, offsetting, fitting arcs again): measured on a contour around
+        an ellipse the toolpath is up to 2.35 times the accuracy away from the true path,
+        whatever the accuracy. A third of the Tolerance keeps the toolpath within it."""
+        import Path
+
+        try:
+            Path.Area.setDefaultParams(Accuracy=float(value) / 3.0, Deflection=float(value) / 3.0)
+        except Exception:
+            pass
+        try:
+            self.job.GeometryTolerance = float(value)
+        except Exception:
+            pass
 
     def operation(self, spec):
         started = time.time()
-        out = {"gcode": "", "error": None, "messages": [], "seconds": 0.0}
+        out = {"gcode": "", "error": None, "messages": [], "seconds": 0.0, "parts": []}
         capture = _Capture()
         try:
             with capture:
@@ -320,9 +342,18 @@ class Engine:
                 chunks = []
                 for index, part in enumerate(spec.get("parts") or []):
                     label = "Op%s_%d" % (spec.get("id", ""), index)
-                    path = self._part(part, controller, label)
-                    if _has_cut(path):
+                    path, before_leads = self._part(part, controller, label)
+                    if _has_cut(path) and path.toGCode().strip():
                         chunks.append(path.toGCode())
+                        # (what manufacture_core.with_feeds needs to write the Lead-In and
+                        # Ramp Feedrates onto this part's moves)
+                        out["parts"].append(
+                            {
+                                "index": index,
+                                "gcode": path.toGCode().strip("\n"),
+                                "before_leads": before_leads,
+                            }
+                        )
                 out["gcode"] = "\n".join(c.strip("\n") for c in chunks if c.strip())
                 if not out["gcode"]:
                     raise ValueError("no toolpath came out for this selection")
