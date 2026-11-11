@@ -590,7 +590,7 @@ class ThreadFeature:
                 face_offset=face_offset(obj),
             )
         else:
-            obj.Shape = base.Shape.copy()
+            obj.Shape = in_place(base.Shape)
         text = json.dumps(record, sort_keys=True)
         if obj.Computed != text:
             obj.Computed = text
@@ -603,6 +603,20 @@ class ThreadFeature:
 
     __getstate__ = dumps
     __setstate__ = loads
+
+
+def in_place(shape):
+    """A copy of `shape` with its placement taken into its geometry (the placement itself
+    left at none): the shape a modeled thread's boolean gives too. A cosmetic thread copied
+    its step before as it was: a step whose own placement is not none (an extrude of a
+    sketch on a face or a side plane) came out turned by it, the whole body with it (the
+    book's Tesla Turbine: the housing turned a quarter turn at the inlet's pipe thread)."""
+    out = shape.copy()
+    plc = out.Placement
+    if not plc.isIdentity():
+        out.Placement = App.Placement()
+        out.transformShape(plc.toMatrix(), True)  # (a copy of the geometry, moved: no location)
+    return out
 
 
 def is_thread(obj):

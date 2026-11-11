@@ -92,7 +92,11 @@ gasket_key.done_what = "the Extrude dialog is open"
 
 
 def gasket_face():
+    print("[Fission 180] replay gasket under %s | active %s" % (h.under_mouse(FRONT), r.active_label()), flush=True)
     r.xclick(FRONT)
+    p = r.panel()
+    print("[Fission 180] replay gasket took %s | %s | %s" % (p.profiles, p.message.text(), p.info.text()), flush=True)
+    h.shot("gasket-click")
 
 
 def gasket_values():
@@ -735,6 +739,7 @@ def steam_named():
 
 def steps():
     out = [activate(hs.STATOR)] + r.new_component(GASKETS) + [in_stator(GASKETS)]
+    out += [r.view_from(0.3, -1, 0.2, "gasket_front")]
     out += [gasket_key, gasket_face, gasket_values, r.ok("gasket_extrude_ok"), gasket_made]
     out += [r.named("gasket_appearance", r.appearance_open), look_search, look_drop]
     out += [look_edit, look_colour, look_editor_ok, r.ok("gasket_look_ok"), look_done]
