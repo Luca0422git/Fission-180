@@ -40,7 +40,7 @@ Sources: **Autodesk** (help, blog, API reference, a community manager on the for
 |---|---|
 | A sketch pattern's glyph; double-click it to edit Quantity / Distance / Suppression (Autodesk help "Create a rectangular sketch pattern": "double-click the Rectangular Pattern glyph next to the original instance") | Not built (no room left in this session). A pattern is still ordinary curves and hidden ties after OK. What it needs: a hidden record on the sketch per pattern (originals, copies, ties by geometry id, the dialog's values), the glyph as a Coin node, the tool reopened from the record |
 | Splines / ellipses / conics in a pattern follow the original | Not built (they are placed, not tied) |
-| The midpoint snap as narrow as Fusion's triangle; a slot's end onto an arc's middle; the origin when a later point passes over it | Not reproduced or changed in this session |
+| A slot's end onto an arc's middle; the origin when a later point passes over it | Not reproduced or changed in this session (the midpoint snap itself is narrow now: a middle is taken within about 5 pixels, and FreeCAD's own "within a twentieth of the line's length" rule no longer applies; Guess for the pixel number) |
 | World axis colours in a sketch on the Front / Right plane | Not looked at |
 | A sketch made before wave 7 keeps FreeCAD's helper circles and labels | Not built: only new shapes are tidied |
 | One edge of an Auto-projected face deleted | FreeCAD removes the face's whole reference: all its edges go (they stay deleted). What it needs: re-add the kept edges as edge references and carry their constraints over |
