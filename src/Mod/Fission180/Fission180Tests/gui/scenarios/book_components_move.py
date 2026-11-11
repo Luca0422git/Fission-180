@@ -14,7 +14,8 @@ x 40..60.
      OK: the copy turned about its ORIGIN: its solid now spans x -10..0, y -63..-53 (about
      the middle of its solid it would have stayed in place).
   B  Motor:2's row, Ctrl+C, Ctrl+V: the paste (Motor:3) stands where Motor:2 stands (it
-     started on the original Motor before), turned like it. Esc keeps it there.
+     started on the original Motor before), turned like it. Esc takes the paste away
+     again (Fusion: Cancel cancels the Paste); Ctrl+V and OK keep it there.
   C  Undo takes the paste. Undo again: the turn of Motor:2. Redo twice.
   D  The root block's browser row, right-click > Move to Component > Frame: the body is in
      Frame, where it stood; no body is left at the root, none is invalid. Undo, Redo.
@@ -150,9 +151,20 @@ escape.done = panel_closed
 escape.done_what = "the dialog closed"
 
 
+def b_cancelled():
+    # (wave 7, components-2) Fusion: cancelling the Move that opens after a Paste cancels
+    # the Paste; the copy and the clipboard are still there for another Ctrl+V
+    h.check("Esc takes the paste away again", k.part("Motor:3") is None, k.labels())
+    t.ctrl("v")
+
+
+b_cancelled.done = panel_open
+b_cancelled.done_what = "Move/Copy opened on the second paste"
+
+
 def b_kept():
     copy = k.part("Motor:3")
-    if h.check("Esc keeps the paste", copy is not None, k.labels()):
+    if h.check("OK keeps the paste", copy is not None, k.labels()):
         k.box_is("where it was pasted", copy, [-10, -63, 0, 0, -53, 6])
 
 
@@ -259,6 +271,8 @@ h.run(
         paste_key,
         b_pasted,
         escape,
+        b_cancelled,
+        ok,
         b_kept,
         undo,
         c_no_paste,

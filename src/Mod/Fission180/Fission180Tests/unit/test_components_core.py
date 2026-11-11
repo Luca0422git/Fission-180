@@ -224,6 +224,24 @@ class InstanceLabelTests(unittest.TestCase):
         )
         self.assertEqual(core.paste_new_label("Bracket:2", ["Bracket"]), "Bracket (1)")
 
+    def test_mirror_label(self):
+        # (wave 7, components-2) a mirrored component is a component of its own in name
+        self.assertEqual(core.mirror_label("Bracket", ["Bracket"]), "Bracket (Mirror)")
+        self.assertEqual(core.mirror_label("Bracket:2", ["Bracket"]), "Bracket (Mirror)")
+        self.assertEqual(
+            core.mirror_label("Bracket", ["Bracket", "Bracket (Mirror)"]), "Bracket (Mirror) (1)"
+        )
+        self.assertEqual(
+            core.mirror_label("Bracket", ["Bracket (Mirror)", "Bracket (Mirror) (1)"]),
+            "Bracket (Mirror) (2)",
+        )
+        self.assertEqual(core.mirror_base("Bracket (Mirror)"), "Bracket")
+        self.assertEqual(core.mirror_base("Bracket (Mirror) (2)"), "Bracket")
+        self.assertIsNone(core.mirror_base("Bracket:2"))
+        self.assertIsNone(core.mirror_base("Bracket"))
+        # no occurrence number is read out of a mirrored component's name
+        self.assertEqual(core.split_instance_label("Bracket (Mirror)"), ("Bracket (Mirror)", None))
+
 
 class PickTests(unittest.TestCase):
     def test_root_active_picks_the_part_that_was_clicked(self):

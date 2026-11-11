@@ -1092,6 +1092,11 @@ def editable(component):
             source = instances.source_of(component)
             if source is not None:
                 return source
+        # (wave 7, components-2) a component inside a copy of a subassembly: the nested
+        # component of the original it stands for
+        original = instances.nested_source(component)
+        if original is not None:
+            return editable(original)
     except Exception:
         pass
     return component

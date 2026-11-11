@@ -121,6 +121,29 @@ def click_radio(label):
     return True
 
 
+def grounded(label):
+    from fission180 import joints
+
+    part = component(label)
+    return part is not None and joints.is_part(part) and joints.is_grounded(part)
+
+
+def unground(label):
+    """Right-click a component's browser row > Unground From Parent, as a person does who
+    wants to move the first component of a design (wave 7: Fusion grounds the first
+    component of each level to its parent, "First component Ground to Parent"; a grounded
+    component cannot be moved or dragged, in Fusion as here). Checks that it was grounded
+    and no longer is."""
+    from Fission180Tests.gui import timeline_input as tl
+
+    was = h.check("%s is grounded (the first component of its level)" % label, grounded(label))
+    if was:
+        tl.row_menu(label, "Unground From Parent")
+        h.settle()
+        h.check("%s: Unground From Parent took the ground away" % label, not grounded(label))
+    return was
+
+
 def drag_row(label, onto):
     """Drag a browser row onto another row (a body onto a component), as a person does."""
     tree = t.tree()

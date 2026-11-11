@@ -248,6 +248,9 @@ def c_done():
     made = copies(found[0])
     if h.check("one mirrored copy", len(made) == 1, [x.Label for x in made]):
         state["wall_copy"] = made[0].Name
+        # (wave 7, components-2) a mirrored component is the other hand of the part: a
+        # component of its own in name, not "Wall:2" (which made the original "Wall:1")
+        h.check("named Wall (Mirror)", made[0].Label == "Wall (Mirror)", made[0].Label)
         k.box_is("the Wall mirrored across YZ: x -70..-60", made[0], [-70, 0, 0, -60, 30, 20])
         h.check(
             "the same volume", k.close(sum(k.volume(x) for x in k.bodies_of(made[0].Label)), 6000.0)
@@ -306,11 +309,23 @@ def e_done():
         box = k.box(made[0])
         ok_box = box is not None and abs(box[1] + 30) < 1e-4 and abs(box[4]) < 1e-4
         h.check("the housing and the bolts mirrored across XZ: y -30..0", ok_box, box)
+        # (wave 7, components-2) the copy of a subassembly keeps its structure (it came in
+        # flat: two bodies straight in the copy) and is a component of its own in name
+        from fission180 import components
+
+        rows = {c.Label: c for c in made[0].Group if components.is_component(c)}
         h.check(
-            "its bodies: the housing and the bolt",
-            len(k.bodies_of(made[0].Label)) >= 2,
-            [x.Label for x in k.bodies_of(made[0].Label)],
+            "its rows: the Housing and the Bolt, as in the original",
+            sorted(rows) == ["Bolt", "Housing"],
+            sorted(rows),
         )
+        h.check(
+            "one body in each",
+            all(len(components.bodies_in(k.doc(), c)) == 1 for c in rows.values()),
+            {name: len(components.bodies_in(k.doc(), c)) for name, c in rows.items()},
+        )
+        h.check("no body straight in the copy", not components.bodies_in(k.doc(), made[0]))
+        h.check("named Stator (Mirror)", made[0].Label == "Stator (Mirror)", made[0].Label)
 
 
 # -- F ---------------------------------------------------------------------------------------------

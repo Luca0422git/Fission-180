@@ -78,13 +78,23 @@ def refusal(part):
         if joints.is_part(part) and joints.is_grounded(part):
             return (
                 "%s is grounded, so it cannot move. Unground it first (right-click it in the "
-                "browser)." % part.Label
+                "browser > Unground From Parent)." % part.Label
             )
     except Exception:
         pass
     try:
         from . import instances
 
+        around = instances.instance_around(part)
+        if around is not None:
+            # (wave 7, components-2) a part inside a copy of a subassembly stands where
+            # the original's part stands: moved there, it moves in every copy
+            original = instances.nested_source(part)
+            return "%s is part of the copy %s: move %s in the original (every copy follows)." % (
+                part.Label,
+                around.Label,
+                original.Label if original is not None else "it",
+            )
         pattern = instances.pattern_of(part)
         if pattern is not None:
             return (

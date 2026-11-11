@@ -12,7 +12,8 @@ Setup: a 40 x 30 x 10 box made into the component "Bracket"; a body "Free" (150.
   C  Right-click Bracket:1, Paste New: an independent "Bracket (1)" with its own steps, Move
      opens on it; Y Distance 50, OK. Extrude 1 to 30: Bracket and Bracket:2 grow to 36000,
      Bracket (1) keeps 24000.
-  D  Ctrl+V again: Bracket:3; Esc closes the move and keeps the paste (on the original).
+  D  Ctrl+V again: Bracket:3; Esc closes the move and takes the paste away again (Fusion:
+     Cancel cancels the Paste); Ctrl+V and OK keep it (on the original).
      Undo: Bracket:3 gone; Redo: back; Delete key on its row: gone.
   E  Click the activate ring of Bracket:2: Bracket (its original) becomes the active one.
   F  Click the body Free, Ctrl+C, Ctrl+V: Move/Copy opens on it with Create Copy on; X
@@ -224,9 +225,29 @@ def d_escape():
     h.press(QtCore.Qt.Key_Escape)
 
 
+def d_cancelled():
+    # (wave 7, components-2) Fusion: cancelling the Move that opens after a Paste cancels
+    # the Paste (it was kept before, standing unseen on the original)
+    h.check("Esc takes the paste away again", c.part("Bracket:3") is None, c.labels())
+    h.check("the Move closed", c.component_panel() is None)
+    h.press(QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+
+
+d_cancelled.done = lambda: c.component_panel() is not None
+d_cancelled.done_what = "Move/Copy opened on the second paste"
+
+
+def d_ok():
+    h.task_button("OK")
+
+
+d_ok.done = lambda: c.component_panel() is None
+d_ok.done_what = "Move/Copy closed on OK"
+
+
 def d_kept():
     copy = c.part("Bracket:3")
-    h.check("Esc keeps the paste", copy is not None, c.labels())
+    h.check("OK keeps the paste", copy is not None, c.labels())
     c.box_is("on the original", copy, [0, 0, 0, 40, 30, 30])
 
 
@@ -380,6 +401,8 @@ h.run(
             c_only_one,
             d_paste,
             d_escape,
+            d_cancelled,
+            d_ok,
             d_kept,
             d_undo,
             d_undone,

@@ -231,6 +231,14 @@ def delete_components(doc, parts):
 
 
 # -- the New Component dialog -------------------------------------------------------------------
+EXTERNAL_WHY = (
+    "External: a component saved as a design of its own that this design refers to. Not "
+    "built: Fission 180 keeps one design per file. Make the component Internal; to use a "
+    "part in several designs, save it as a design of its own and bring it in with INSERT > "
+    "Insert into Current Design (it comes in linked; Break Link to change it here)."
+)
+
+
 class NewComponentPanel(taskui.Panel):
     """Fusion's New Component dialog: Name, Parent, From Bodies, Activate. Nothing is
     previewed; the component appears on OK (Cancel makes nothing)."""
@@ -254,6 +262,28 @@ class NewComponentPanel(taskui.Panel):
         self.type_box.addItem("Standard", "standard")
         self.type_box.addItem("Sheet Metal", "sheet_metal")
         self.layout.addRow("Type", self.type_box)
+        # (wave 7, components-2) Fusion's Internal / External choice. External is "a
+        # separate design file ... referenced" (an X-ref that is edited in place): Fission
+        # 180 keeps one design per file, and its linked designs (Insert into Current
+        # Design) are locked until Break Link, so an empty External component could never
+        # be modelled in. Shown greyed with the reason, as every choice Fusion has that is
+        # not built.
+        self.internal = QtWidgets.QRadioButton("Internal")
+        self.internal.setObjectName("Fission180ComponentInternal")
+        self.internal.setChecked(True)
+        self.internal.setToolTip("The component is kept inside this design.")
+        self.external = QtWidgets.QRadioButton("External")
+        self.external.setObjectName("Fission180ComponentExternal")
+        self.external.setEnabled(False)
+        self.external.setToolTip(EXTERNAL_WHY)
+        where = QtWidgets.QWidget()
+        row = QtWidgets.QHBoxLayout(where)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self.internal)
+        row.addWidget(self.external)
+        row.addStretch(1)
+        where.setToolTip(EXTERNAL_WHY)
+        self.layout.addRow("Saved", where)
         self.rule_box = QtWidgets.QComboBox()
         self.rule_box.setObjectName("Fission180ComponentRule")
         self.rule_label = QtWidgets.QLabel("Rule")

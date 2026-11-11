@@ -436,7 +436,24 @@ def owner_body(obj):
     return None
 
 
+# (wave 7, components-2) While a construction built on ANOTHER component works its frame
+# out, each pick's body stands where it stood when the construction was made
+# (ConstructionFrame.execute): {object name: the placement to read its elements with}.
+_FROZEN = {}
+
+
 def _parent_placement(obj):
+    try:
+        frozen = _FROZEN.get(obj.Name)
+        if frozen is not None:
+            return frozen
+    except Exception:
+        pass
+    return _live_parent_placement(obj)
+
+
+def _live_parent_placement(obj):
+    """Where the body (or component) of ``obj`` stands in the design now."""
     try:
         parent = obj.getParentGeoFeatureGroup()
     except Exception:
@@ -1004,6 +1021,10 @@ class ConstructionFrame:
             ("App::PropertyAngle", "Angle", "Angle"),
             ("App::PropertyFloat", "Fraction", "Proportional distance along the path (0..1)"),
             ("App::PropertyString", "DistanceType", "proportional or physical"),
+            # (wave 7, components-2) picks on another component: see _freeze
+            ("App::PropertyPlacement", "Home", "Where its body stood when it was made"),
+            ("App::PropertyPlacementList", "Frames", "Where each pick's body stood then"),
+            ("App::PropertyBoolList", "HasFrame", "Which picks are on another component"),
         ]
         for kind, name, doc in add:
             if name not in props:
@@ -1039,9 +1060,12 @@ class ConstructionFrame:
 
             warn("construction %s: %s" % (obj.Label, exc))
         refs = helper_refs(obj)
+        body = owner_body(obj)
+        home = None
         try:
             if len(refs) < len(obj.HasPoint) or any(not alive(r[0]) for r in refs):
                 raise LostReference(LOST)
+            home = _frozen_world(obj, refs, body)
             place = compute(obj.Kind, refs, helper_points(obj), helper_values(obj))
         except LostReference:
             report_problem(obj, LOST)
@@ -1049,8 +1073,11 @@ class ConstructionFrame:
         except Exception as exc:
             report_problem(obj, str(exc) or "This construction cannot be built any more.")
             return
-        body = owner_body(obj)
-        if body is not None:
+        finally:
+            _FROZEN.clear()
+        if home is not None:
+            place = home.inverse().multiply(place)
+        elif body is not None:
             place = body.getGlobalPlacement().inverse().multiply(place)
         report_problem(obj, "")
         if not obj.Placement.isSame(place, 1e-12):
@@ -1068,6 +1095,76 @@ class ConstructionFrame:
 
     __getstate__ = dumps
     __setstate__ = loads
+
+
+def _ref_home(obj):
+    """The component a pick belongs to (None: the design itself)."""
+    from . import components
+
+    try:
+        owner = owner_body(obj) or components.origin_owner(obj)
+        if owner is not None and components.is_component(owner):
+            return owner  # a component's own origin plane or axis
+        return components.container_of(owner if owner is not None else obj)
+    except Exception:
+        return None
+
+
+def _freeze(helper, refs):
+    """Remember where the body of each pick on ANOTHER component stands, as seen from the
+    construction's own body, and where that body stands (wave 7, components-2).
+
+    Fusion works a construction out where the parts stood at its place in the timeline: a
+    plane offset from a face of another component does not jump when that component is
+    moved by a later Move or joint, exactly like a sketch's projection from another
+    component (components.ReferenceCopy keeps its frame the same way). Before, the frame
+    was worked out from where both components stand NOW at every recompute, so the plane
+    followed the other component's later moves (and everything modelled on it reshaped).
+    It still follows the other part's CHANGES (a face that moves because its extrude was
+    made longer)."""
+    from . import components
+
+    body = owner_body(helper)
+    here = body.getGlobalPlacement() if body is not None else App.Placement()
+    mine = components.container_of(body) if body is not None else None
+    frames, flags = [], []
+    for obj, _sub in refs:
+        foreign = body is not None and _ref_home(obj) is not mine
+        flags.append(bool(foreign))
+        frames.append(
+            here.inverse().multiply(_live_parent_placement(obj)) if foreign else App.Placement()
+        )
+    helper.Home = here
+    helper.Frames = frames
+    helper.HasFrame = flags
+
+
+def _frozen_world(helper, refs, body):
+    """Fill _FROZEN for a construction with picks on another component and return the
+    placement its body has in that world (None: no such pick, the frame is worked out
+    where everything stands now, as before). A helper saved before this (no frames yet)
+    freezes now."""
+    _FROZEN.clear()
+    if body is None:
+        return None
+    flags = list(getattr(helper, "HasFrame", []) or [])
+    if len(flags) != len(refs):
+        _freeze(helper, refs)
+        flags = list(helper.HasFrame)
+    if not any(flags):
+        return None
+    frames = list(helper.Frames)
+    home = App.Placement(helper.Home)
+    now = body.getGlobalPlacement()
+    for i, (obj, _sub) in enumerate(refs):
+        if flags[i]:
+            _FROZEN[obj.Name] = home.multiply(frames[i])
+        else:
+            # a pick of its own component: where it is for the construction's body now,
+            # seen in the world the frozen picks are in
+            relative = now.inverse().multiply(_live_parent_placement(obj))
+            _FROZEN[obj.Name] = home.multiply(relative)
+    return home
 
 
 def _relink_datum(helper):
@@ -1393,8 +1490,10 @@ def _drop_helper(datum, helper):
 def _fill_helper(helper, key, refs, points, values, formulas):
     if helper.Kind != key:
         helper.Kind = key
-    if not _same_refs(expand(helper.Refs), refs):
+    if not _same_refs(expand(helper.Refs), refs) or len(helper.HasFrame) != len(refs):
         helper.Refs = _link_list(refs)
+        _FROZEN.clear()
+        _freeze(helper, refs)  # (wave 7, components-2) picks on another component
     flags = [p is not None for p in points]
     vectors = [V(p) if p is not None else V() for p in points]
     if list(helper.HasPoint) != flags:

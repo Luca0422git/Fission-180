@@ -323,6 +323,19 @@ class AlignPanel(BodyPanel):
                 % (" in a component" if self.options["objects"] == "components" else "")
             )
             return
+        if self.options["objects"] == "components":
+            # (wave 7, components-2) a grounded component cannot move (Fusion: "to move a
+            # component, whether by dragging or using the move feature, you have to first
+            # unground it from the parent"): Align moved it all the same, without a word
+            try:
+                from . import component_move
+
+                why = component_move.refusal(thing)
+            except Exception:
+                why = ""
+            if why:
+                self.message.setText(why)
+                return
         movement = self._movement()
         if movement is not None and thing is self.moving:
             frame = _unmove(frame, movement)  # picked on the moved preview
