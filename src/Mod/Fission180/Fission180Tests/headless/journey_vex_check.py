@@ -265,10 +265,12 @@ def check_balloons_on_moved_components():
         for balloon in made:
             origin, _spot = drawing.balloon_page_points(balloon)
             body = drawing.component_at(view, drawing.page_to_local(view, origin))
-            owners.append(body.Label if body is not None else None)
+            # (by object name: with labels allowed twice, as the app sets it, both parts'
+            # bodies are "Body1")
+            owners.append(body.Name if body is not None else None)
         _out(
             "balloons: each balloon's arrow on its own part",
-            sorted(owners) == sorted([ba.Label, bb.Label]) and len(set(owners)) == 2,
+            sorted(owners) == sorted([ba.Name, bb.Name]) and len(set(owners)) == 2,
             owners,
         )
     finally:

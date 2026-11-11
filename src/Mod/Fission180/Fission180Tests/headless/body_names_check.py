@@ -33,8 +33,19 @@ def main():
 
 
 def _run():
-    # as the app sets it at start-up (theme.py): two objects may have the same label
-    App.ParamGet("User parameter:BaseApp/Preferences/Document").SetBool("DuplicateLabels", True)
+    # as the app sets it at start-up (theme.py): two objects may have the same label. Put
+    # back afterwards: the unit tests' headless runs share one profile, and a check after
+    # this one must find it as it was.
+    group = App.ParamGet("User parameter:BaseApp/Preferences/Document")
+    before = group.GetBool("DuplicateLabels", False)
+    group.SetBool("DuplicateLabels", True)
+    try:
+        _checks()
+    finally:
+        group.SetBool("DuplicateLabels", before)
+
+
+def _checks():
     doc = App.newDocument("body_names")
     top1 = bodies.new_body(doc)
     top2 = bodies.new_body(doc)

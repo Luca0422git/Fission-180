@@ -2797,6 +2797,12 @@ class ExtrudePanel(
 
     def _show_body_checks(self, show):
         """The check boxes of the bodies in the way (ticked: the extrude acts on it)."""
+        try:
+            self._fill_body_checks(show)
+        except Exception as exc:
+            warn("extrude bodies list: %s" % exc)
+
+    def _fill_body_checks(self, show):
         touched = (self._touched_names(compute=False) or []) if show else []
         found = [self.doc.getObject(name) for name in touched]
         found = [obj for obj in found if obj is not None]

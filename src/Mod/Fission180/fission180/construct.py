@@ -1500,8 +1500,15 @@ def _unturned(text):
     if stripped.startswith("-"):
         inner = stripped[1:].strip()
         if inner.startswith("(") and inner.endswith(")"):
-            return inner[1:-1].strip()
-    return "-(%s)" % stripped
+            depth = 0
+            for i, char in enumerate(inner):
+                depth += char == "("
+                depth -= char == ")"
+                if depth == 0 and i < len(inner) - 1:
+                    break  # "-(a) + (b)": the first bracket closes before the end
+            else:
+                return inner[1:-1].strip()
+    return "-(%s)" % stripped  # (changed by hand since: still the same value)
 
 
 def guess_key(datum):
