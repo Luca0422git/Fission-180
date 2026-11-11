@@ -687,18 +687,32 @@ def d_lines_done():
     # Each line is held level or upright by what the Line tool inferred: its own Horizontal /
     # Vertical, or both of its ends put on the same sketch axis (a short line drawn along the
     # Y axis: on GitHub's renderer the tool inferred "on the axis" for both ends instead of
-    # Vertical, which holds it upright just the same; fix-5's reading of CI run #76)
+    # Vertical, which holds it upright just the same; fix-5's reading of CI run #76).
+    # An end is on an axis when it was put there itself or is tied (Coincident) to a point
+    # that was: the line drawn down the Y axis starts at the end of the line before, which
+    # was put on the axis, so only its far end is put there (on GitHub's screen, 770 pixels
+    # tall, CI #78; this screen made 770 tall draws the same: nothing of the model under the
+    # pointer, no projection; wave 7, fix-7).
     held = []
-    on_axis = {}
+    on_axis = {}  # (curve, end) -> the axes it is on
     for _i, c in r.cons(("PointOnObject",)):
         if c.Second in (-1, -2):
-            on_axis.setdefault(c.First, set()).add((c.FirstPos, c.Second))
+            on_axis.setdefault((c.First, c.FirstPos), set()).add(c.Second)
+    tied = [((c.First, c.FirstPos), (c.Second, c.SecondPos)) for _i, c in r.cons(("Coincident",))]
+    grew = True
+    while grew:
+        grew = False
+        for a, b in tied:
+            both = on_axis.get(a, set()) | on_axis.get(b, set())
+            for end in (a, b):
+                if both - on_axis.get(end, set()):
+                    on_axis[end] = set(both)
+                    grew = True
     kinds = {c.First: c.Type for _i, c in r.cons(("Horizontal", "Vertical"))}
     for i, g in r.geo("Part::GeomLineSegment"):
         if i < s["geo0"]:
             continue
-        axes = on_axis.get(i, set())
-        both = any((1, a) in axes and (2, a) in axes for a in (-1, -2))
+        both = on_axis.get((i, 1), set()) & on_axis.get((i, 2), set())
         held.append(kinds.get(i) or ("on an axis" if both else None))
     h.check("D each line is level or upright by inference", all(held) and len(held) == 6, held)
     r.sketch_clean("D drawn:")
