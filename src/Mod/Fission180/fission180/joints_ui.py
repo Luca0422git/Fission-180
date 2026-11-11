@@ -2035,7 +2035,7 @@ class AsBuiltPanel(_JointsPanel):
 
     def picked_raw(self, root, sub, point):
         pick = joints.resolve_selection(root, sub, point)
-        part = pick.part if pick is not None else joints.part_of(root)
+        part = pick.part if pick is not None else joints.part_of_row(root, sub)
         if part is None:
             return
         slot_box = self.active if self.slot_of(self.active) is not None else None
@@ -2329,7 +2329,7 @@ class RigidGroupPanel(_JointsPanel):
 
     def picked_raw(self, root, sub, point):
         pick = joints.resolve_selection(root, sub, point)
-        part = pick.part if pick is not None else joints.part_of(root)
+        part = pick.part if pick is not None else joints.part_of_row(root, sub)
         if part is None:
             return
         if part in self.members:
@@ -2453,7 +2453,7 @@ class DrivePanel(_JointsPanel):
             joint = root
         else:
             pick = joints.resolve_selection(root, sub, point)
-            part = pick.part if pick is not None else joints.part_of(root)
+            part = pick.part if pick is not None else joints.part_of_row(root, sub)
             if part is not None:
                 for j in joints.joints(self.doc):
                     if (

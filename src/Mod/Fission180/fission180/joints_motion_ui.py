@@ -35,7 +35,7 @@ def _joint_from(root, sub, point, doc):
     if joints.is_joint(root):
         return root, ""
     pick = joints.resolve_selection(root, sub, point)
-    part = pick.part if pick is not None else joints.part_of(root)
+    part = pick.part if pick is not None else joints.part_of_row(root, sub)
     if part is None:
         return None, ""
     for j in joints.joints(doc):
@@ -576,7 +576,7 @@ class ContactSetPanel(_JointsPanel):
 
     def picked_raw(self, root, sub, point):
         pick = joints.resolve_selection(root, sub, point)
-        part = pick.part if pick is not None else joints.part_of(root)
+        part = pick.part if pick is not None else joints.part_of_row(root, sub)
         if part is None:
             return
         if part in self.members:

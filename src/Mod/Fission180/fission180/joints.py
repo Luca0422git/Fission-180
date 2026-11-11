@@ -281,6 +281,24 @@ def part_of(obj):
     return None
 
 
+def part_of_row(root, sub=""):
+    """The part a whole-object selection means (a row of the browser, no face or edge): the
+    part of the object at the end of the path. A component inside another one is selected
+    as (the outer component, "Inner."): the part is the inner one, not the root (it was
+    the root: a nested component's row picked its parent; the book parity report, bug 15)."""
+    obj = root
+    try:
+        doc = root.Document
+        for name in [n for n in (sub or "").split(".")[:-1] if n]:
+            child = doc.getObject(name)
+            if child is None:
+                break
+            obj = child
+    except Exception:
+        obj = root
+    return part_of(obj) or part_of(root)
+
+
 def _path(part, obj):
     """Object names from `part` down to `obj` (not including the part), dotted + "."."""
     names = []
