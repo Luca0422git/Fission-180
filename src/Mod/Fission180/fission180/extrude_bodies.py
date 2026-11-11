@@ -153,6 +153,18 @@ def lead_operation(lead):
     return read(lead)[1]["operation"]
 
 
+def _placed_tool(lead, sub):
+    """FreeCAD's tool solid of `lead` in design coordinates. It is kept in the feature's own
+    coordinates: the body's placement AND the feature's own Placement (the step before it,
+    e.g. a primitive that is not at the origin) go on it (wave 7, the book replay: the same
+    mistake in pattern.add_sub_shape put the Geocache's coil 8 mm too high)."""
+    out = bodies.baked(sub)
+    place = lead.getGlobalPlacement() if owner_body(lead) is not None else lead.Placement
+    if not place.isIdentity():
+        out.transformShape(place.toMatrix(), True)
+    return out
+
+
 def lead_tool(lead):
     """The solid a Revolve, Sweep or Loft lead adds or takes away, in design coordinates:
     FreeCAD's own tool solid (AddSubShape) when the lead is a PartDesign Revolution, Groove,
@@ -163,13 +175,7 @@ def lead_tool(lead):
         except Exception:
             sub = None
         if sub is not None and not sub.isNull() and sub.Solids:
-            out = bodies.baked(sub)
-            body = owner_body(lead)
-            if body is not None:
-                place = body.getGlobalPlacement()
-                if not place.isIdentity():
-                    out.transformShape(place.toMatrix(), True)
-            return out
+            return _placed_tool(lead, sub)
     kind = lead_kind(lead)
     module = _kind_module(lead)
     if kind == "revolve":
@@ -982,13 +988,7 @@ def follower_tool(lead, reach=None):
         except Exception:
             sub = None
     if sub is not None and not sub.isNull() and sub.Solids:
-        out = bodies.baked(sub)
-        body = owner_body(lead)
-        if body is not None:
-            place = body.getGlobalPlacement()
-            if not place.isIdentity():
-                out.transformShape(place.toMatrix(), True)
-        return out
+        return _placed_tool(lead, sub)
     return tool_prism(profiles, options, [reach] if reach is not None else [])
 
 

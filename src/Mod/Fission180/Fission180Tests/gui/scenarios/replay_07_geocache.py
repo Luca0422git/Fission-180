@@ -496,11 +496,14 @@ def c_pattern():
     from Fission180Tests.gui import pattern_steps as ps
 
     removed = s["v_knob"] - vol()
+    # the coil runs 36 degrees round from the XZ plane down, its mirror the other way: a V
+    # that meets at the top (two grooves, no crossing)
     h.check(
-        "C the mirrored groove crosses the first (two grooves, less where they cross)",
-        1.5 * s["groove"] < removed < 2.0 * s["groove"] + 1e-6,
+        "C the mirror cuts the same groove the other way",
+        abs(removed - 2.0 * s["groove"]) < 0.01 * s["groove"],
         (removed, s["groove"]),
     )
+    h.check("C at mid height: two grooves", len(grooves()) == 2, grooves())
     h.check("C Coil 1, Mirror 1", t.titles()[-2:] == ["Coil 1", "Mirror 1"], t.titles())
     all_ok("C mirror:")
     s["v_pair"] = vol()
@@ -569,6 +572,31 @@ c_light.done_what = "the knurl to be built (a progress window says so) and the d
 c_light.timeout_s = 600
 
 
+def grooves(z=-5.0, radius=19.85):
+    """The middles (degrees) of the dips a person sees going once round the knob at height z
+    just under its rim (a slice of the part there): the grooves."""
+    points = []
+    for wire in screw().Shape.slice(V(0, 0, 1), z):
+        for edge in wire.Edges:
+            for p in edge.discretize(Distance=0.02):
+                points.append((math.degrees(math.atan2(p.y, p.x)) % 360.0, math.hypot(p.x, p.y)))
+    points = sorted(p for p in points if p[1] > 15.0)  # the knob's rim, not a hole
+    if not points:
+        return []
+    dips = [a for a, r in points if r < radius]
+    if not dips:
+        return []
+    runs = [[dips[0]]]
+    for a in dips[1:]:
+        if a - runs[-1][-1] > 0.5:
+            runs.append([a])
+        else:
+            runs[-1].append(a)
+    if len(runs) > 1 and runs[0][0] + 360.0 - runs[-1][-1] <= 0.5:
+        runs[0] = runs.pop() + [x + 360.0 for x in runs[0]]
+    return sorted(round(((r[0] + r[-1]) / 2.0) % 360.0, 2) for r in runs)
+
+
 def progress():
     from fission180 import pattern_progress
 
@@ -583,12 +611,15 @@ def c_knurled():
     removed = s["v_knob"] - vol()
     pair = s["v_knob"] - s["v_pair"]
     h.check(
-        "C 25 pairs of grooves (less where they cross)",
-        18.0 * pair < removed < 25.0 * pair + 1e-6,
+        "C 25 pairs of grooves, crossing their neighbours (less than 25 pairs apart)",
+        10.0 * pair < removed < 25.0 * pair,
         (removed, pair),
     )
+    found = grooves()
+    h.check("C at mid height: 50 grooves round the knob", len(found) == 50, found)
+    gaps = [round((b - a) % 360.0, 1) for a, b in zip(found, found[1:] + found[:1])]
+    h.check("C ...7.2 degrees apart", all(abs(g - 7.2) < 0.6 for g in gaps), gaps)
     h.check("C one valid solid", shape.isValid() and len(shape.Solids) == 1)
-    h.check("C many more faces", len(shape.Faces) > s["faces"] + 400, len(shape.Faces))
     h.check("C built outside the window's process, once", progress()["runs"] == s["runs"] + 1)
     h.check(
         "C the knurl took under 2 minutes (the report: never finished)",

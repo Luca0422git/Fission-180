@@ -1686,16 +1686,34 @@ def _same_face(shape, face):
     raise PatternError("A picked face no longer exists after an earlier change. Pick it again.")
 
 
+def add_sub_shape(feature):
+    """A copy of FreeCAD's tool solid of an add/sub feature (AddSubShape), in body
+    coordinates. FreeCAD keeps it in the feature's own coordinates: a feature takes the
+    Placement of the step before it (Feature::positionByPrevious), and a primitive's is where
+    it is attached (FreeCAD's Transformed applies getLocation() to it the same way). (Wave
+    7, the book replay: the Geocache's knob, a Cylinder with Height -8, sits at z = -8, so
+    the Coil after it has that Placement; its tool was taken 8 mm too high and the knurl's
+    25 copies of the coil cut nothing, only the mirror's were there.)"""
+    tool = feature.AddSubShape.copy()
+    place = getattr(feature, "Placement", None)
+    if place is not None and not place.isIdentity():
+        own = tool.Placement
+        same = (own.Base - place.Base).Length < 1e-12 and own.Rotation.isSame(place.Rotation, 1e-12)
+        if not same:
+            tool.Placement = place.multiply(own)
+    return tool
+
+
 def feature_tools(feature):
     """What a feature adds or removes: its tool shape for extrudes, holes and the like, else
     the difference it made to the part (fillets, chamfers, Press Pull...)."""
     if is_add_sub(feature) and not _is_dress_up(feature):
         try:
-            tool = feature.AddSubShape
+            tool = add_sub_shape(feature)
         except Exception:
             tool = None
         if tool is not None and not tool.isNull() and tool.Solids:
-            return [(tool.copy(), "cut" if is_subtractive(feature) else "add")]
+            return [(tool, "cut" if is_subtractive(feature) else "add")]
     if _divides_faces(feature):
         return []  # a Split Face: its lines are drawn on each copy (repeat_splits)
     before_obj = getattr(feature, "BaseFeature", None)
@@ -2262,7 +2280,7 @@ def objects_center(options, base=None):
                 shape = obj.Shape.getElement(sub)
                 part = shape.BoundBox
             elif is_add_sub(obj) and not _is_dress_up(obj) and not obj.AddSubShape.isNull():
-                shape = obj.AddSubShape
+                shape = add_sub_shape(obj)
                 part = obj.Shape.BoundBox
             else:
                 shape = obj.Shape
@@ -2330,7 +2348,7 @@ def feature_of_face(body, face, until=None):
         if is_add_sub(feature):
             try:
                 if not feature.AddSubShape.isNull():
-                    tools.append(feature.AddSubShape)
+                    tools.append(add_sub_shape(feature))
             except Exception:
                 pass
         for tool in tools:
