@@ -74,6 +74,16 @@ the whole unit suite: 3573 tests pass (10 skipped) after the merge. Golden model
 - **Undo.** See Part 2, item 9 (a drawn line with a typed parameter name is one step).
 - **`commands.make_way_for`**: sketch-a's `NOTHING_TO` kept; `book_sketch_a_undo` passes.
 
+## GitHub's run on develop (049c500b): the five failures of this area
+
+| Scenario | Cause | Green since |
+|---|---|---|
+| `book_sketch_a_dimension` (A) | The check expected FreeCAD's aligned length; D is sketch-b's tool, which gives a slanted line the vertical distance once the pointer is past its ends (Fusion: aligned beside the line, horizontal / vertical past it). The check now asks for a dimension between the line's two ends and for the vertical one at that pointer place | 65b70794 (in d1d7d552) |
+| `book_sketch_a_centerline` (7) | sketch-a's diameter sat on FreeCAD's Dimension tool, which D no longer starts | 65b70794 (in d1d7d552) |
+| `book_sketch_b_dimension_edge` (5) | Passes in this sandbox on develop as it is. On GitHub the pixel of the click answers the face beside the outline edge (or nothing), so nothing was projected and the click placed the dimension. A model edge now counts within a few pixels (`sketch_reference.AIM`) | 381b9393 (aim), ebbe8a6a (the one projecting function); proof without GitHub: `book_sketch_c_reference` B clicks 3 px OUTSIDE the edge |
+| `navbar_grid` (sketch_grid) | The app is right (Fusion: Major 5 mm with 4 Minor Subdivisions is a line every 1.25 mm, a major one every 5): the check was for the old hand-over of the major spacing as the line spacing. It now checks 1.25 mm lines and a 5 mm major spacing, with the reason | the commit "Scenarios: the pointer 'leaving' the view..." |
+| `sketch_qa_keys` (R2: a typed 12 not upright) | **Not reproduced**: it passes here on every run (cadedaa2, HEAD before and after the merge of develop). Two guesses were tested as scenario steps and did not fail before any change, so nothing was changed: the view told that the pointer "left" it while FreeCAD's value box is under the pointer (`book_sketch_c_merge` J), and the pointer moved before the Line tool restarted from the end (K). What is known: with a typed length FreeCAD drops its own upright constraint and Fission 180 adds it from the last pointer move's inference (`Inference.commit_signal`, `self.last`); a line off by 0.03 mm is that inference lost. GitHub's scenario log of that step (the `[Fission 180]` lines between `r_after_20` and `r_after_12`) would show which event came in between | open |
+
 ## FreeCAD 1.1.4 facts and traps (new here)
 
 - The text of a dimension is the `string` field (an `SoMFString`) of the `SoDatumLabel` node
