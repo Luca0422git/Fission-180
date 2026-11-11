@@ -87,6 +87,26 @@ def look_from(direction):
     h.view_still("the 3D view to stop changing after the turn")
 
 
+def zoom_on(point, height):
+    """Zoom the view in on a 3D point: `height` millimetres from the bottom of the view to
+    its top (the wheel and a pan, in effect; as harness.fit, not what a replay tests)."""
+    camera = h.view().getCameraNode()
+    direction = V(*h.view().getViewDirection())
+    position = V(*camera.position.getValue().getValue())
+    focal = camera.focalDistance.getValue()
+    centre = position + direction * focal
+    shift = point - centre
+    shift = shift - direction * shift.dot(direction)
+    new = position + shift
+    camera.position.setValue(new.x, new.y, new.z)
+    try:
+        camera.height.setValue(float(height))
+    except Exception:
+        pass  # (a perspective camera has no height)
+    QtWidgets.QApplication.processEvents()
+    h.view_still("the 3D view to stop changing after the zoom")
+
+
 # == keys ==========================================================================================
 def keyboard(text="", key=None, modifiers=NONE):
     """Type like a keyboard: every key goes to the widget that has the keyboard then."""
@@ -280,7 +300,10 @@ def sketch_clean(tag, sketch=None):
 
 
 def dof(sketch=None):
-    return (sketch or sk()).solve()
+    """How many ways the sketch can still move (0: fully constrained)."""
+    sketch = sketch or sk()
+    sketch.solve()
+    return sketch.DoF
 
 
 def value_editor():

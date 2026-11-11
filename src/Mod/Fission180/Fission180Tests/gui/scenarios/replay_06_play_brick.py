@@ -529,6 +529,330 @@ def e_done():
     h.shot("E-shell")
 
 
+# == F: PLAY on a stud =============================================================================
+TOP_R = STUD_R - STUD_H * math.tan(math.radians(1.0))  # the drafted stud's top
+STUD = V(3.9, 3.9, H + STUD_H)
+
+
+def f_sketch():
+    h.ribbon("Create Sketch")
+
+
+def f_face():
+    h.click(STUD + V(0.8, -0.5, 0))  # the first stud's top
+
+
+f_face.done = lambda: h.in_sketch() is not None
+f_face.done_what = "the sketch on the stud is open"
+
+
+def to_sketch(point):
+    p = r.sk().getGlobalPlacement().inverse().multVec(point)
+    return V(p.x, p.y, 0)
+
+
+def f_text():
+    from Fission180Tests.gui import text_input as ti
+
+    sk = r.sk()
+    s["text_sketch"] = sk.Name
+    h.check("F the sketch is on the stud's top", r.near(sk.getGlobalPlacement().Base.z, STUD.z))
+    rims = [
+        g
+        for g in sk.ExternalGeo
+        if g.TypeId == "Part::GeomCircle" and r.near(g.Radius, TOP_R, 1e-6)
+    ]
+    h.check("F the stud's rim is projected into the sketch (Auto project)", len(rims) == 1, rims)
+    r.zoom_on(STUD, 9.0)
+    s["texts"] = list(ti.texts(sk))
+    s["geo0"] = len(sk.Geometry)
+    ti.open_text_tool()
+
+
+f_text.done = lambda: __import__("Fission180Tests.gui.text_input").gui.text_input.dialog()
+f_text.done_what = "the Text dialog is open"
+
+
+def f_corner_1():
+    c = to_sketch(STUD)
+    r.sclick(c + V(-1.4, -0.8, 0))
+
+
+def f_corner_2():
+    c = to_sketch(STUD)
+    r.sclick(c + V(1.4, 0.8, 0))
+
+
+def f_type():
+    from Fission180Tests.gui import text_input as ti
+
+    d = ti.dialog()
+    h.check("F two clicks placed the frame", d is not None and d.frame_placed)
+    ti.type_text("PLAY")
+    ti.type_field(d.height, "1")
+    ti.press_button(d.bold)
+    ti.press_button(d.italic)
+    ti.press_button(d.h_buttons["center"])
+    ti.press_button(d.v_buttons["middle"])
+
+
+def f_ok():
+    from Fission180Tests.gui import text_input as ti
+
+    d = ti.dialog()
+    h.check("F bold, italic, centred, middle", d.bold.isChecked() and d.italic.isChecked())
+    h.check("F nothing is refused", not d.message.text(), d.message.text())
+    ti.ok()
+
+
+f_ok.done = lambda: __import__("Fission180Tests.gui.text_input").gui.text_input.dialog() is None
+f_ok.done_what = "OK closed the Text dialog"
+
+
+def frame_lines():
+    """[index] of the text frame's four lines, in the order they were made."""
+    return [i for i, _g in r.geo("Part::GeomLineSegment", construction=True) if i >= s["geo0"]]
+
+
+def rim_spot(angle):
+    """A sketch point on the stud's projected rim at `angle` degrees."""
+    c = to_sketch(STUD)
+    a = math.radians(angle)
+    return c + V(TOP_R * math.cos(a), TOP_R * math.sin(a), 0)
+
+
+def f_tangent():
+    from Fission180Tests.gui import sketch_input as si
+    from Fission180Tests.gui import text_input as ti
+
+    new = [o for o in ti.texts(r.sk()) if o not in s["texts"]]
+    h.check("F the text PLAY is in the sketch", len(new) == 1, new)
+    s["text"] = new[0].Name if new else None
+    if new:
+        h.check("F ...1 mm high", r.near(new[0].TextHeight.Value, 1.0), new[0].TextHeight)
+    h.check("F the frame has four lines", len(frame_lines()) == 4, frame_lines())
+    s["dof_free"] = r.dof()
+    si.menu_item("CONSTRAINTS", "Tangent")
+
+
+def tangent_steps(k, angle):
+    def line():
+        g = r.sk().Geometry[frame_lines()[k]]
+        r.sclick((g.StartPoint + g.EndPoint) * 0.5 + (g.EndPoint - g.StartPoint) * 0.2)
+
+    def rim():
+        r.sclick(rim_spot(angle))
+
+    def check():
+        g = r.sk().Geometry[frame_lines()[k]]
+        c = to_sketch(STUD)
+        d = g.EndPoint - g.StartPoint
+        off = abs((c - g.StartPoint).cross(d).z) / d.Length
+        h.check(
+            "F frame line %d touches the stud's rim (the report: no constraint was added)" % (k + 1),
+            r.near(off, TOP_R, 1e-6),
+            (off, TOP_R),
+        )
+        r.sketch_clean("F tangent %d:" % (k + 1))
+
+    return [
+        r.named(line, "f_tangent_line_%d" % k),
+        r.named(rim, "f_tangent_rim_%d" % k),
+        r.named(check, "f_tangent_check_%d" % k),
+    ]
+
+
+def f_finish():
+    from Fission180Tests.gui import text_input as ti
+
+    tangents = [c for _i, c in r.cons(("Tangent",))]
+    h.check("F four Tangent constraints", len(tangents) == 4, len(tangents))
+    h.check("F the frame is held (5 free before)", r.dof() < s["dof_free"], (s["dof_free"], r.dof()))
+    text = r.doc().getObject(s["text"])
+    box = ti.letters_box(text)
+    c = to_sketch(STUD)
+    h.check(
+        "F PLAY sits in the middle of the stud",
+        abs((box[0] + box[2]) / 2 - c.x) < 0.05 and abs((box[1] + box[3]) / 2 - c.y) < 0.05,
+        (box, c),
+    )
+    h.shot("F-text")
+    r.esc()
+    h.ribbon("Finish Sketch")
+
+
+f_finish.done = lambda: h.in_sketch() is None
+f_finish.done_what = "Finish Sketch closed the sketch"
+
+
+def f_letters():
+    from Fission180Tests.gui import text_input as ti
+
+    text = r.doc().getObject(s["text"])
+    s["letters"] = sum(f.Area for f in text.Shape.Faces)
+    r.zoom_on(STUD, 9.0)
+    x, y = ti.middle_of_first_letter(text)
+    sk = r.doc().getObject(s["text_sketch"])
+    h.click(sk.getGlobalPlacement().multVec(V(x, y, 0)))
+
+
+def f_extrude():
+    h.press("e")
+
+
+def f_distance():
+    from fission180 import extrude_ui
+
+    from Fission180Tests.gui import arrow_input as arrows
+
+    p = extrude_ui.ExtrudePanel.last
+    text = r.doc().getObject(s["text"])
+    h.check("F the letters are the profile", p.profiles == [(text, "")], p.profiles)
+    arrows.give_distance("0.1")
+    s["operation"] = p.operation.currentText()
+    h.task_button("OK")
+
+
+f_distance.done = r.no_dialog
+f_distance.done_what = "OK finished the Extrude"
+f_distance.timeout_s = 120
+
+
+def f_done():
+    h.check("F raised letters are a Join", s.get("operation") == "Join", s.get("operation"))
+    want = s["v_shell"] + s["letters"] * 0.1
+    h.check("F PLAY stands 0.1 on the stud", r.near(vol(), want, 1e-5), (vol(), want))
+    h.check("F the brick is 0.1 higher", r.near(body().Shape.BoundBox.ZMax, H + STUD_H + 0.1, 1e-6))
+    s["v_text"] = vol()
+    r.nothing_broken("F")
+    h.fit()
+    si_menu("CREATE", "Rectangular Pattern")
+
+
+f_done.done = lambda: pattern_panel() is not None
+f_done.done_what = "the Rectangular Pattern dialog is open"
+
+
+def si_menu(group, label):
+    from Fission180Tests.gui import sketch_input as si
+
+    return si.menu_item(group, label)
+
+
+def f_pattern_type():
+    from Fission180Tests.gui import dialog_input as di
+
+    di.choose(pattern_panel().pattern_type, "Features")
+
+
+def f_pattern_feature():
+    from Fission180Tests.gui import pattern_steps as ps
+
+    s["text_extrude"] = r.timeline()[-1]
+    ps.timeline_click(s["text_extrude"])
+
+
+def f_direction_box():
+    from Fission180Tests.gui import pattern_steps as ps
+
+    q = pattern_panel()
+    names = [o.Label for o, _s in q.options["objects"]]
+    h.check("F the letters' Extrude is the object", len(names) == 1, names)
+    ps.click_box("direction")
+
+
+def f_pattern_ok():
+    q = pattern_panel()
+    h.caught_up(q)
+    h.check("F nothing is refused", not q.message.text(), q.message.text())
+    h.task_button("OK")
+
+
+f_pattern_ok.done = lambda: pattern_panel() is None
+f_pattern_ok.done_what = "OK finished the pattern"
+f_pattern_ok.timeout_s = 300
+
+
+def f_patterned():
+    want = s["v_shell"] + 8 * s["letters"] * 0.1
+    h.check("F PLAY on all eight studs", r.near(vol(), want, 1e-5), (vol(), want))
+    s["v_brick"] = vol()
+    r.nothing_broken("F pattern:")
+    h.fit()
+    h.shot("F-play")
+
+
+# == G: the brick turned over ======================================================================
+def move_panel():
+    return r.panel("MovePanel")
+
+
+def g_move():
+    Gui.Selection.clearSelection()
+    h.press("m")
+
+
+g_move.done = lambda: move_panel() is not None
+g_move.done_what = "the Move dialog is open"
+
+
+def g_body():
+    from Fission180Tests.gui import bodies_steps as bs
+
+    bs.click_browser_row("Body1")
+
+
+def g_angle():
+    from Fission180Tests.gui import bodies_steps as bs
+
+    p = move_panel()
+    h.check("G Body1 is the object to move", [b.Label for b in p.options["bodies"]] == ["Body1"])
+    s["box_before"] = r.bbox(body().Shape)
+    bs.type_value(p.angle_fields[1].widget, "180")
+
+
+def g_ok():
+    p = move_panel()
+    h.caught_up(p)
+    h.check("G nothing is refused", not p.message.text(), p.message.text())
+    h.task_button("OK")
+
+
+g_ok.done = lambda: move_panel() is None
+g_ok.done_what = "OK finished the Move"
+g_ok.timeout_s = 120
+
+
+def flipped(point):
+    """Where a point of the brick is once it is turned over (180 degrees about the Y
+    direction through the middle of its box)."""
+    b = s["box_before"]
+    cx, cz = (b[0] + b[3]) / 2.0, (b[2] + b[5]) / 2.0
+    return V(2 * cx - point.x, point.y, 2 * cz - point.z)
+
+
+def g_done():
+    import Part
+
+    shape = body().Shape
+    h.check("G the same brick", r.near(shape.Volume, s["v_brick"], 1e-6), shape.Volume)
+    h.check(
+        "G turned over in place (the same box)",
+        r.box_near(shape, s["box_before"], 1e-4),
+        (r.bbox(shape), s["box_before"]),
+    )
+    probe = Part.makeSphere(0.3, flipped(V(3.9, 3.9, H + 0.9)))
+    h.check(
+        "G the studs point down now",
+        r.near(shape.common(probe).Volume, probe.Volume, 1e-3),
+        shape.common(probe).Volume,
+    )
+    h.check("G the timeline ends with the Move", r.timeline()[-1].startswith("Move"), r.timeline())
+    r.nothing_broken("G")
+    h.fit()
+    h.shot("G-turned")
+
+
 steps = r.home_steps() + [a_box, a_plane, a_corner, a_length, a_width, a_height, a_done]
 steps += [b_sketch, b_face, b_circle, b_centre, b_diameter, b_drawn]
 steps += [b_dim_x_pick, b_dim_x_origin, b_dim_x_place, b_dim_x_value]
@@ -538,5 +862,12 @@ steps += [c_draft, c_pull, c_ok_too_early, c_refused, c_side, c_angle, c_done]
 steps += [d_pattern, d_type, d_extrude, d_draft, d_direction_box, d_edge_x, d_edge_y]
 steps += [d_values, d_ok, d_done]
 steps += [e_shell, e_bottom, e_thickness, e_done]
+steps += [f_sketch, f_face, f_text, f_corner_1, f_corner_2, f_type, f_ok, f_tangent]
+for _k, _angle in enumerate((250, 340, 70, 160)):
+    steps += tangent_steps(_k, _angle)
+steps += [f_finish, f_letters, f_extrude, f_distance, f_done]
+steps += [f_pattern_type, f_pattern_feature, f_direction_box, d_edge_x, d_edge_y, d_values]
+steps += [f_pattern_ok, f_patterned]
+steps += [g_move, g_body, g_angle, g_ok, g_done]
 
 h.run("replay_06_play_brick", steps, paced_by="state")
