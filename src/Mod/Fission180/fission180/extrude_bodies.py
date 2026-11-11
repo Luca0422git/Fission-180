@@ -206,7 +206,16 @@ def bodies_in_way(doc, tool, lead=None):
                 touching.append(body)
         except Exception:
             continue
-    return through, touching
+    return through, _joinable(touching, lead)
+
+
+def _joinable(touching, lead=None):
+    """Of the bodies a solid touches, those a Join may change and that count for the
+    operation proposed by itself: the active component's (components.may_change; wave 7,
+    book parity report bug 10). A Cut still lists every body it passes through."""
+    from . import components
+
+    return [b for b in touching if components.may_change(b, lead=lead)]
 
 
 def participants_of(feature, doc, options, tool_fn):
@@ -799,7 +808,7 @@ def in_the_way(profiles, options, lead=None):
                 touching.append(body)
         except Exception:
             continue
-    return through, touching
+    return through, _joinable(touching, lead)
 
 
 def starts_in_material(profiles, options, lead=None):
@@ -813,6 +822,9 @@ def starts_in_material(profiles, options, lead=None):
         if not profiles or options["direction"] == "symmetric":
             return False
         candidates = candidate_bodies(profiles[0][0].Document, lead)
+        # FISSION180 wave 7 (bug 10): only material of the active component proposes a Cut
+        keep = _joinable([body for body, _shape in candidates], lead)
+        candidates = [c for c in candidates if c[0] in keep]
         if not candidates:
             return False
         sign = _sign1(profiles, options)

@@ -266,15 +266,233 @@ def new_body_in(doc, container, label=None):
 
 
 def body_for_new(src_body, component=False):
-    """The body a feature's New Body / New Component result goes into: a new body beside
-    the source body, or a new body inside a new component. Fusion puts the new component
-    under the active component (the source body's one when no GUI decides)."""
+    """The body a feature's New Body / New Component result goes into: a new body in the
+    ACTIVE component, or a new body inside a new component under the active component.
+    Fusion puts every new body in the active component, whatever was clicked (book parity
+    report, bug 6: the gasket extruded from the housing's face went into the housing).
+    Without a GUI nothing is active: the source body's component then."""
     doc = src_body.Document
+    home = new_home(doc, src_body)
     if not component:
-        return new_body_in(doc, container_of(src_body))
-    parent = active_component(doc) if App.GuiUp else container_of(src_body)
-    part = new_component(doc, parent=parent)
+        body = new_body_in(doc, home)
+        try:
+            # the new body shows what was built in the source body's coordinates: it stands
+            # where the source body stands (two components moved differently)
+            here = _container_placement(home)
+            there = _container_placement(container_of(src_body))
+            if not here.isSame(there, 1e-12):
+                body.Placement = here.inverse().multiply(there).multiply(src_body.Placement)
+        except Exception as exc:
+            warn("%s: could not line the new body up: %s" % (body.Label, exc))
+        return body
+    part = new_component(doc, parent=home)
     return new_body_in(doc, part)
+
+
+# -- where new things go: one rule (wave 7, the book parity report's bugs 5 - 8) -------------
+def new_home(doc, picked=None):
+    """The component a new body, sketch, plane, axis, point... goes into: the ACTIVE
+    component, whatever was clicked to make it (Fusion: "geometry made through the UI goes
+    into the active component"). Without a GUI nothing is active (the golden builder, the
+    headless tests): the component of what it is built on then, as before."""
+    if App.GuiUp:
+        return active_component(doc)
+    return container_of(picked) if picked is not None else None
+
+
+def body_of(obj):
+    """The body an object is in (a body is its own); None outside every body."""
+    if is_body(obj):
+        return obj
+    parent = _parent_group(obj)
+    while parent is not None and parent.TypeId != BODY:
+        parent = _parent_group(parent)
+    return parent
+
+
+def in_active(obj, doc=None):
+    """True when ``obj`` (a body, or something inside one) sits directly in the active
+    component: work started on it can go into its own body. Without a GUI: always."""
+    if not App.GuiUp:
+        return True
+    try:
+        doc = doc or obj.Document
+        return container_of(body_of(obj) or obj) is active_component(doc)
+    except Exception:
+        return False
+
+
+def host_body(picked, work=None):
+    """The body a new sketch or construction made on ``picked`` (a face's step, a plane, an
+    edge's step) goes into. FreeCAD keeps such things inside a body; Fusion keeps them in
+    the active component. So: the body of what was picked when that body is in the active
+    component (as before components), else ``work``, the active component's own body
+    (commands.find_body() / ensure_body()): never a body of another component, and the
+    active component never changes because of what was clicked."""
+    owner = body_of(picked) if picked is not None else None
+    if owner is not None and in_active(owner):
+        return owner
+    return work if work is not None else owner
+
+
+def has_solids(component, doc=None, recursive=False):
+    """True when the component (None: the root) holds a body with a solid: the first
+    feature of a component without one starts as New Body in Fusion (bug 10)."""
+    from . import bodies
+
+    doc = doc or (component.Document if component is not None else App.ActiveDocument)
+    if doc is None:
+        return False
+    for body in bodies_in(doc, component, recursive=recursive):
+        try:
+            if bodies.has_solid(body) and not getattr(body, "Fission180RolledHidden", False):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def may_change(body, doc=None, lead=None):
+    """True when a feature made now may JOIN ``body``, and when ``body`` counts for the
+    operation a dialog proposes by itself: only bodies of the active component do.
+    Fusion: "the Operation type is set to create a New Body in the active component";
+    a Join "works when you activate the component you want to join to" (forum); a new
+    component's first extrude starts as New Body, whatever body of another component it
+    overlaps (book parity report, bug 10: it came up as Cut and silently cut another
+    component's pin). A Cut the person chooses still goes through every body in its way,
+    as in Fusion (Objects To Cut). ``lead``: a step being edited works in its own
+    component, whichever is active now (editing an older step must not drop the body it
+    joins). Without a GUI nothing is active: always True."""
+    if not App.GuiUp or body is None:
+        return True
+    try:
+        home = container_of(body)
+        if home is active_component(doc or body.Document):
+            return True
+        if lead is not None and alive(lead):
+            return home is container_of(body_of(lead) or lead)
+    except Exception:
+        return True
+    return False
+
+
+# -- a reference to something of another component -------------------------------------------
+REF_ROLE = "ComponentRef"  # timeline_ops.ROLE value: a helper, never a step or a browser row
+ROLE_PROP = "Fission180Role"
+BINDER = "PartDesign::SubShapeBinder"
+
+
+def _chain(obj):
+    """[top container, ..., obj]: the objects from the document's root down to ``obj``."""
+    found = [obj]
+    parent = _parent_group(obj)
+    while parent is not None and parent not in found:
+        found.insert(0, parent)
+        parent = _parent_group(parent)
+    return found
+
+
+def reference_link(body, obj, sub=""):
+    """(object, sub path) for a link from inside ``body`` to ``sub`` of ``obj`` that FreeCAD
+    places right whichever components the two are in: the first container of ``obj`` that
+    ``body`` is not in, then the path down to the element ("Nozzle", "Body.Extrude.Face6").
+    (FreeCAD 1.1.4 facts, probed: a SubShapeBinder linked straight to a step of another
+    component ignores that component's Placement; linked through a container both are in,
+    the design is no longer a DAG.)"""
+    mine = _chain(body)
+    theirs = _chain(obj)
+    k = 0
+    while k < len(mine) and k < len(theirs) - 1 and mine[k] is theirs[k]:
+        k += 1
+    path = ".".join(o.Name for o in theirs[k + 1 :])
+    if path:
+        return theirs[k], "%s.%s" % (path, sub)
+    return theirs[k], sub
+
+
+def reference_source(binder):
+    """(object, [plain subs]) a reference made by reference_binder() copies, or (None, [])."""
+    try:
+        links = list(binder.Support)
+    except Exception:
+        return None, []
+    for top, subs in links:
+        subs = [subs] if isinstance(subs, str) else list(subs)
+        obj, plain = None, []
+        for sub in subs:
+            path, _, short = sub.rpartition(".")
+            target = top
+            if path:
+                try:
+                    target = top.getSubObject(path + ".", retType=1)
+                except Exception:
+                    target = None
+            obj = target if target is not None else obj
+            plain.append(short)
+        if obj is not None:
+            return obj, plain
+    return None, []
+
+
+def is_reference(obj):
+    try:
+        return obj.TypeId == BINDER and getattr(obj, ROLE_PROP, "") == REF_ROLE
+    except Exception:
+        return False
+
+
+def find_reference(body, obj, subs):
+    """The reference in ``body`` that already copies exactly ``subs`` of ``obj``, or None."""
+    wanted = sorted(subs)
+    for candidate in body.Group:
+        if not is_reference(candidate):
+            continue
+        source, plain = reference_source(candidate)
+        if source is obj and sorted(plain) == wanted:
+            return candidate
+    return None
+
+
+def reference_binder(body, obj, subs, before=None):
+    """A hidden copy inside ``body`` of the elements ``subs`` ("Face6", "Edge3", "Vertex1")
+    of ``obj``, a step of another body or component: what a sketch of the active component
+    is put on, projects from or measures to when the thing clicked belongs to another
+    component (Fusion references it directly; FreeCAD's sketch may only link inside its own
+    body). A PartDesign SubShapeBinder: it follows the other part when that changes, and
+    both components when they move. One per element set (an existing one is reused).
+    ``before``: an object of the body it must stand before (the sketch that will use it)."""
+    subs = [s for s in subs if s]
+    existing = find_reference(body, obj, subs)
+    if existing is not None:
+        return existing
+    if before is not None:
+        binder = body.Document.addObject(BINDER, "Reference")
+        body.insertObject(binder, before, False)
+    else:
+        binder = body.newObject(BINDER, "Reference")
+    if ROLE_PROP not in binder.PropertiesList:
+        binder.addProperty("App::PropertyString", ROLE_PROP, "Fission180", "Helper of", 0)
+        binder.setEditorMode(ROLE_PROP, 2)
+    setattr(binder, ROLE_PROP, REF_ROLE)
+    owner = component_of(obj)
+    binder.Label = "Reference to %s" % (owner.Label if owner is not None else obj.Label)
+    if "Relative" in binder.PropertiesList and not binder.Relative:
+        binder.Relative = True
+    top, path = reference_link(body, obj, "")
+    prefix = path  # "Body.Extrude." or ""
+    binder.Support = [(top, tuple(prefix + s for s in subs))]
+    try:
+        binder.Visibility = False
+    except Exception:
+        pass
+    if App.GuiUp:
+        try:
+            binder.ViewObject.Visibility = False
+            if "ShowInTree" in binder.ViewObject.PropertiesList:
+                binder.ViewObject.ShowInTree = False
+        except Exception:
+            pass
+    return binder
 
 
 def drop_if_empty(component):

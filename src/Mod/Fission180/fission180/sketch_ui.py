@@ -680,31 +680,45 @@ def sketch_target(selection=None):
 def create_sketch(body, target):
     """New sketch in `body` attached flat to `target` = (plane or feature, "" or "FaceN").
 
-    A face or plane of another body puts the sketch in that body and makes it active, as
-    in Fusion, where Extrude then joins the body that was clicked. (In `body` the sketch
-    would reach out of its body, and the extrude would join the wrong one.)"""
+    A face or plane of another body of the ACTIVE component puts the sketch in that body
+    and makes it the active body (FreeCAD keeps a sketch inside one body; Extrude then
+    joins the body that was clicked, as in Fusion).
+
+    A face or plane of ANOTHER component leaves the sketch in `body`, the active
+    component's body, and the active component as it is (book parity report, bug 5: with
+    PTFE Tube active, a sketch on the Nozzle's face made the Nozzle active and everything
+    drawn went into the Nozzle). Fusion: a new sketch is "nested within the active
+    component", whatever face it is put on. The sketch then hangs on a hidden reference to
+    the face (components.reference_binder), which follows the other component."""
     from . import components, sketch_auto_project, timeline_ops
 
     owner = timeline_ops.body_of(target[0])
+    across = False
     # A face of a surface body (SURFACE tools, surface.py) hosts the sketch but not its
     # solid features: the sketch stays in `body`, attached across to the face.
     if owner is not None and owner is not body and not _surface_body(owner):
-        body = owner
-        try:
-            components.activate_body(body)  # and its component
-        except Exception as exc:
-            warn("could not activate %s: %s" % (body.Label, exc))
+        if components.host_body(owner, body) is owner:
+            body = owner
+            try:
+                components.activate_body(body)  # a body of the same (active) component
+            except Exception as exc:
+                warn("could not activate %s: %s" % (body.Label, exc))
+        else:
+            across = True
     if target[0].TypeId in PLANE_TYPES and not target[1]:
         # A component's own origin plane (clicked in the browser) lies where the body's
         # plane of the same role lies: the sketch hangs on the body's, inside the body.
         if components.is_component(components.origin_owner(target[0])):
             target = (components.same_role_plane(body, target[0]), "")
+            across = False
     point = _face_point(target)
     shown = _earliest(target, point, same_outline=True)
     target = _earliest(target, point)
     doc = body.Document
     doc.openTransaction("Create Sketch")
     try:
+        if across:  # (the reference first: it stands before the sketch in the body)
+            target, shown, point = _across(body, target, shown)
         sketch = body.newObject("Sketcher::SketchObject", "Sketch")
         sketch.AttachmentSupport = [target]
         sketch.MapMode = "FlatFace"
@@ -716,6 +730,44 @@ def create_sketch(body, target):
         raise
     doc.commitTransaction()
     return sketch
+
+
+def _across(body, target, shown):
+    """(target, shown, point) for a sketch of `body` put on a face or plane of another
+    component: a hidden reference inside `body` stands in for it. A flat face: a copy of
+    the face that follows it (the sketch hangs on the copy's Face1, Auto project shows the
+    copy's edges). A plane: a hidden plane in `body` that lies on it."""
+    from . import components
+
+    obj, name = target
+    doc = body.Document
+    if name.startswith("Face"):
+        binder = components.reference_binder(body, obj, [name])
+        doc.recompute()
+        if binder.Shape.isNull() or not binder.Shape.Faces:
+            raise RuntimeError("the face of %s could not be referenced" % obj.Label)
+        seen = (binder, "Face1")
+        if shown != target:  # the face as a later step left it (a Draft, a fillet round it)
+            other = components.reference_binder(body, shown[0], [shown[1]])
+            doc.recompute()
+            if not other.Shape.isNull() and other.Shape.Faces:
+                seen = (other, "Face1")
+        return (binder, "Face1"), seen, None
+    from . import construct, timeline_ops
+
+    plane = construct.make(body, "OffsetPlane", [(obj, "")], {"distance": 0.0})
+    owner = components.component_of(obj)
+    plane.Label = "Reference to %s" % (owner.Label if owner is not None else obj.Label)
+    if timeline_ops.ROLE not in plane.PropertiesList:
+        plane.addProperty("App::PropertyString", timeline_ops.ROLE, "Fission180", "Helper of", 0)
+        plane.setEditorMode(timeline_ops.ROLE, 2)
+    setattr(plane, timeline_ops.ROLE, components.REF_ROLE)
+    try:
+        plane.ViewObject.Visibility = False
+    except Exception:
+        pass
+    doc.recompute()
+    return (plane, ""), (plane, ""), None
 
 
 def _surface_body(body):
