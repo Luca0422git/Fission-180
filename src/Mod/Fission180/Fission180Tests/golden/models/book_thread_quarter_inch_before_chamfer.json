@@ -1,0 +1,81 @@
+{
+  "id": "book_thread_quarter_inch_before_chamfer",
+  "title": "Pizza Cutter End Cap: 1/4-20 UNC dragged before the 0.02 in chamfer of the shank's end",
+  "tags": [
+    "thread",
+    "chamfer",
+    "book",
+    "timeline",
+    "robust",
+    "inch"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            0,
+            3.175
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 12.7
+    },
+    {
+      "op": "blend_chamfer",
+      "id": "c1",
+      "distance": 0.508,
+      "edges": {
+        "on_faces": {
+          "type": "plane",
+          "normal": [
+            0,
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 3.175,
+        "count": 1
+      },
+      "standard": "ansi",
+      "designation": "1/4-20 UNC",
+      "modeled": true
+    },
+    {
+      "op": "move",
+      "target": "t1",
+      "before": "c1"
+    }
+  ],
+  "expect": {
+    "volume": 302.82353,
+    "solids": 1,
+    "bbox": [
+      -3.109076,
+      -3.109076,
+      0,
+      3.109076,
+      3.109076,
+      12.7
+    ],
+    "rel_tol": 2e-05,
+    "source": "analytic",
+    "note": "the book's Pizza Cutter End Cap (book replay, wave 7): a 0.25 in shank 0.5 in long, a 0.02 in chamfer on its end, a modeled 1/4-20 UNC thread, and the Thread dragged before the Chamfer. The drag was refused (\"Chamfer 1 would fail there\"): the bevel after a modeled thread is built on the shaft under the thread and the grooves are cut again (fillet_robust.py), and the grooves were taken as the kernel's difference 'shaft minus threaded shaft', which came back as the whole shaft here. They are the thread's own cutting solids now (thread.grooves) whenever that difference does not have the volume the thread took. V = the threaded shaft, pi 3.175^2 12.7 - thread_core.class_removed_volume(1/4-20 UNC, 2A, external, 3.175, 12.7) = 402.19906 - 98.66053 = 303.53854, less what the bevel takes of it: 0.508 down the crest's cylinder (r = 3.109076, the 2A major radius) and 0.508 in on the end face, so at depth t under the end it reaches in to c = r - (0.508 - t); per unit length the threaded shaft has, between c and the crest, the ring pi (r^2 - c^2) less the grooves' share (2 pi / P) * integral of rho w(rho) from c to r (thread_core._integral_rw, P = 1.27); integrated over the 0.508: 0.71501. V = 302.82353"
+  }
+}
