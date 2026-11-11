@@ -16,8 +16,8 @@ the empty component "Tube"; two blocks at the root: Body1 (x 0..20, y 50..70) an
   C  Tube's ring, Create Sketch, Cancel: no body and no open undo step are left (wave 7,
      components-2: the body made to show the planes stayed). A body nothing was put in is
      then set up in Tube. The design's ring. Body1's row dragged onto Tube: it lands in
-     Tube, and the empty body is gone (it would have taken the next sketch). Body2's row dragged onto
-     Housing right after (the tree was rebuilt in between): it lands in Housing, the row
+     Tube, and the empty body is gone (it would have taken the next sketch). Body2's row
+     dragged onto Housing right after (the tree was rebuilt in between): it lands in Housing, the row
      under the pointer.
   D  Undo twice: both blocks are back at the root. Redo twice.
 """
