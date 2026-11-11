@@ -148,8 +148,8 @@ Scenarios (real input, paced by state), all PASS on the last commit:
 Unit tests: `test_parameters_read.py` (30), `test_parameters_core.py` (10),
 `test_design_units_core.py` (7), `test_parameters_freecad.py` (2, running the 17 cases of
 `Fission180Tests/headless/parameters_check.py` in FreeCAD without a window).
-Whole unit suite: 3164 tests, only `test_ai_docs_contract` fails until the generated docs
-are regenerated (done in the last commit). Golden models: 619 pass, 2 xfail (as before).
+Whole unit suite: 3162 tests pass (10 skipped) once the generated docs
+are regenerated (the last commit). Golden models: 619 pass, 2 xfail (as before).
 Headless AI tools: 465 calls, 0 failed; the AI documentation examples: 180 items, 0 failed.
 Older scenarios of the files touched, all PASS: parameters_trial, sketch_explain_box,
 sketch_qa, sketch_dim_box_closes, sketch_geometry_keep, sketch_geometry_follow,
