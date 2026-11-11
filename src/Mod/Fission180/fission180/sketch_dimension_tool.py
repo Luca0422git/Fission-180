@@ -145,20 +145,16 @@ class Dimension(draw.DrawTool):
 
     def candidates(self, snap):
         """What is under the pointer, best first: a point, then curves (the sketch's own
-        before an axis or a projected curve at the same distance)."""
+        before a projected curve at the same distance; the sketch's axes, over which the
+        origin's planes lie edge-on, after every other curve there: draw.Geometry.
+        curves_under)."""
         geo = self.geometry()
         tol = draw.pick_pixels() * self._px()
         out = []
         vertex = icore.nearest_vertex(snap.raw, geo.verts, tol)
         if vertex is not None:
             out.append(vertex[0])
-        curves = []
-        for index, curve in geo.hits:
-            if not icore.near_curve(snap.raw, curve, tol):
-                continue
-            d = icore.curve_distance(snap.raw, curve)
-            curves.append((round(d, 6), 0 if index >= 0 else 1, index))
-        for _d, _own, index in sorted(curves):
+        for index in geo.curves_under(snap.raw, tol):
             if (index, 0) not in out:
                 out.append((index, 0))
         return out

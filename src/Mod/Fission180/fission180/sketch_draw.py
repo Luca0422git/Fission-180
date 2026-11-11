@@ -186,6 +186,17 @@ class Geometry:
                 best = (geo, d)
         return best
 
+    def curves_under(self, raw, tol, kinds=None):
+        """The curves within `tol` of `raw` (sketch coordinates) as geometry indices, best
+        first, for the tools that pick curves (Sketch Dimension, the constraints): the
+        nearest first, the sketch's own before a projected one, the sketch's two axes (over
+        which the origin's planes lie edge-on) after every other curve there
+        (sketch_infer_core.curves_under). `kinds`: TypeIds the curve must have (None: any)."""
+        hits = self.hits
+        if kinds is not None:
+            hits = [(geo, c) for geo, c in hits if _type_of(self.sketch, geo) in kinds]
+        return icore.curves_under(raw, hits, tol)
+
 
 def _type_of(sketch, geo):
     try:
