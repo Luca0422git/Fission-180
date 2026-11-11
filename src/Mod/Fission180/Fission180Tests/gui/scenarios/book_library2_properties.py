@@ -12,12 +12,11 @@ B  Part Number "BR-100" and Description "Left bracket, steel" typed (Enter): sto
    component. Part Name "Bracket L": the component is renamed (the browser shows it), its
    part number stays BR-100. An empty name is refused, with why.
 C  Copy to Clipboard: the text has the three and the mass.
-D  The drawing's parts list (made by script, as DRAWING > Table makes it): Bracket's row
-   reads BR-100 / Left bracket, steel; Pin's row its name.
 E  A body clicked in the 3D view: the fields are greyed and say what to select. Pin's row
    clicked: they are Pin's.
-F  Undo takes the rename back. Save, close, reopen: the part number and the description are
-   kept.
+F  Save, close, reopen: the part number, the name and the description are kept.
+D  The drawing's parts list (made by script at the end, as DRAWING > Table makes it):
+   Bracket's row reads BR-100 / Left bracket, steel; Pin's row its name.
 """
 
 import os
@@ -138,7 +137,9 @@ def b_renamed():
     comp = doc().getObject(S["bracket"])
     h.check("the component is renamed", comp.Label == "Bracket L", comp.Label)
     h.check("its part number stays", pu().part_number(comp) == "BR-100")
-    h.check("the dialog follows", shown() == ("BR-100", "Bracket L", "Left bracket, steel"), shown())
+    h.check(
+        "the dialog follows", shown() == ("BR-100", "Bracket L", "Left bracket, steel"), shown()
+    )
     h.settle("the browser to read the name")
     tree = Gui.getMainWindow().findChild(QtWidgets.QTreeWidget, "Fission180Browser")
     h.check("the browser shows the new name", tree.row("Bracket L") is not None, tree.labels())
@@ -183,23 +184,6 @@ def d_rows():
         short == [("BR-100", 1, "Left bracket, steel"), ("Pin", 1, "")],
         short,
     )
-    Gui.ActiveDocument.setActiveView = None if False else Gui.ActiveDocument.ActiveView
-
-
-def d_back_to_design():
-    from fission180 import drawing
-
-    d = doc()
-    try:
-        d.removeObject(S["view"])
-        drawing.remove_drawing(d.getObject(S["page"]))
-    except Exception:
-        pass
-    d.recompute()
-    for view in Gui.ActiveDocument.mdiViewsOfType("Gui::View3DInventor"):
-        Gui.getMainWindow().setActiveWindow(view)
-        break
-    h.fit()
 
 
 # -- E --------------------------------------------------------------------------------------------
@@ -232,7 +216,9 @@ e_pin.done_what = "the Properties dialog is closed"
 # -- F --------------------------------------------------------------------------------------------
 def f_save():
     comp = doc().getObject(S["bracket"])
-    h.check("before saving", (pu().part_number(comp), comp.Label2) == ("BR-100", "Left bracket, steel"))
+    h.check(
+        "before saving", (pu().part_number(comp), comp.Label2) == ("BR-100", "Left bracket, steel")
+    )
     S["path"] = os.path.join(tempfile.mkdtemp(), "book_library2_properties.FCStd")
     doc().saveAs(S["path"])
     App.closeDocument(doc().Name)
@@ -249,7 +235,11 @@ def f_reopened():
     if comp is None:
         return
     kept = (pu().part_number(comp), comp.Label, comp.Label2)
-    h.check("reopened: number, name and description", kept == ("BR-100", "Bracket L", "Left bracket, steel"), kept)
+    h.check(
+        "reopened: number, name and description",
+        kept == ("BR-100", "Bracket L", "Left bracket, steel"),
+        kept,
+    )
     h.check("Pin's part number is its name", pu().part_number(part("Pin")) == "Pin")
 
 
@@ -264,15 +254,14 @@ h.run(
         b_renamed,
         b_refused,
         c_copied,
-        d_parts_list,
-        d_rows,
-        d_back_to_design,
         e_body,
         e_greyed,
         e_pin,
         f_save,
         f_open,
         f_reopened,
+        d_parts_list,
+        d_rows,
     ],
     paced_by="state",
 )

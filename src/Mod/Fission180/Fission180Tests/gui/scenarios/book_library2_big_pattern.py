@@ -5,7 +5,8 @@ than 6,000 triangles gets its pattern 0.4 s after its last change instead of at 
 arrives, it is worked out ONCE per change (never per frame of an orbit, never per step of a
 drag), and it follows the part.
 
-The part (by script): the book's donut, a torus (R 30, r 10) drawn finely.
+The part (by script): the book's donut, a torus (R 30, r 10) with 28 little balls on it
+(sprinkles): many curved faces, more than 6,000 triangles as FreeCAD draws it by default.
 
 A  MODIFY > Appearance, "Oak" dragged onto the donut: the pattern was put off and then laid
    once; it covers more than 6,000 triangles and shows on screen. OK.
@@ -17,6 +18,8 @@ C  Move/Copy (M), the donut clicked, the X arrow dragged 40 mm in 24 moves: whil
 D  Undo: the donut is back where it was, with its pattern.
 """
 
+import math
+
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtCore
@@ -27,7 +30,8 @@ from Fission180Tests.gui import looks_steps as k
 
 V = App.Vector
 S = {}
-TOP = V(30, 0, 10)
+TOP = V(27.34, -27.34, 5)  # on the ring, towards the viewer, clear of the balls
+SIDE = TOP
 
 
 def draw():
@@ -64,11 +68,14 @@ def setup():
     ring = d.addObject("PartDesign::AdditiveTorus", "Ring")
     donut.addObject(ring)
     ring.Radius1, ring.Radius2 = 30, 10
-    d.recompute()
-    for obj in (ring, donut):
-        view = obj.ViewObject
-        view.Deviation = 0.02
-        view.AngularDeflection = 2.0
+    # sprinkles: 28 little balls on the ring make the part's drawing fine (many curved
+    # faces, each with its own triangles) without touching how finely FreeCAD draws
+    for i in range(28):
+        ball = d.addObject("PartDesign::AdditiveSphere", "Ball%d" % i)
+        donut.addObject(ball)
+        ball.Radius = 3
+        angle = math.radians(i * 360.0 / 28)
+        ball.Placement.Base = V(30 * math.cos(angle), 30 * math.sin(angle), 9)
     d.recompute()
     h.fit()
     mark()
@@ -129,7 +136,7 @@ b_orbited.done_what = "the Move/Copy dialog is open"
 
 # -- C --------------------------------------------------------------------------------------------
 def c_pick():
-    h.click(TOP)
+    h.click(SIDE)
 
 
 def c_drag():

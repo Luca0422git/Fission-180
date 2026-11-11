@@ -105,3 +105,73 @@ builders "hardware" and "looks" (`docs/fission180/sessions/book-hardware.md`,
 - A worktree-isolated agent's shell refuses commands that mix `git` with redirects, `cd`
   or here-documents: patch scripts are written with the Write tool and run as plain
   commands.
+
+## Item 7: Component Color Swatch in the browser and the timeline, Cycle Component Color
+
+- Fusion (Autodesk, "Color code components and features", search excerpt): every component
+  has a colour in the canvas, the Browser and the Timeline; a feature of several components
+  shows a swatch for each; right-click a component > Cycle Component Color; the timeline's
+  Settings > Component Color Swatch hides or shows the swatches while the canvas colours can
+  stay on. Forum (an Autodesk reply): the Cycle entry only shows while component colours
+  are displayed.
+- Built: `component_colors_ui` answers two small hooks, `browser_ui.ROW_COLORS` (a square
+  before the row's activate ring) and `timeline_ui.STEP_COLORS` (bars along a step's foot).
+  A step's component is read from the step's body as it is now (a body moved into a
+  component takes its steps along; the timeline item's own `component` field said the
+  root for those). Cycle picks the next colour no other component has; the number of
+  cycles is a hidden property of the component (saved, undoable).
+- The list in the 3D view is gone. Off by default (Guess: Fusion's default was not found).
+
+## Item 11: a new body is drawn in the default look
+
+- Measured first: a new body's colours were FreeCAD's (0.8 grey), the library's Steel,
+  satin is (0.62, 0.63, 0.65); the first builder had made the default look's swatch show
+  FreeCAD's grey instead of making the body show the look.
+- Built at the root: FreeCAD takes a new part's colours from its Part colour preferences
+  (`View/DefaultShapeColor`, `DefaultAmbientColor`, `DefaultSpecularColor`,
+  `DefaultEmissiveColor`, `DefaultShapeShininess`, `DefaultShapeTransparency`); they are set
+  to the default look at start (`appearance.use_default_look`), so FreeCAD itself draws new
+  parts in it, and what FreeCAD writes on a body when its material is touched (bug 16's
+  grey) is the same look. Bodies of older designs that were saved in the old grey take the
+  default look when the design opens (`adopt_default`; the design does not count as
+  changed). Bodies with a look are not touched. The themes do not touch these preferences.
+- A colour goes through FreeCAD's preferences in 8 bits: the numbers a body is drawn from
+  are the look's within 1/255.
+
+## Items 3 and 6: the cosmetic thread, the AI tool
+
+- `thread_ui.cosmetic_spots` got one generic branch: a step may say its own cosmetic
+  threads in the hidden property `Fission180CosmeticThreads` (JSON like `thread.computed`'s
+  "threads"). The Hardware step says it, and so does the base step of each occurrence's
+  body (an occurrence's body is a copy body: its only step is a `PartDesign::FeatureBase`).
+- `insert_hardware`: the op had `wall` already, the catalogue did not offer it. Now face /
+  edge / wall, and on a hole the dialog's rules (`hardware.fit_to_place`: size from the
+  hole, no second hole, the head seated), `similar`, `joint`. The schema's defaults are not
+  applied to a call's arguments by the executor: a tool that wants a default on says so
+  in a `steps=` function (`_steps_hardware`).
+
+## Item 9: Part Number, Part Name, Description
+
+- The drawing's parts list read the component's name as PART NUMBER and `Label2` as
+  DESCRIPTION. Properties now has the three as fields for the one component selected: the
+  name is the component's label (renamed through `components.rename`), the description
+  `Label2`, the part number a hidden property (`Fission180PartNumber`; empty = the name,
+  which is what Fusion starts a part number as). `drawing._part_name` reads the part number
+  (one helper, `_number_of`: drawings' file).
+- **Trap:** a `QDialog`'s first push button is its default button: Enter typed in a field
+  of the Properties dialog pressed Copy to Clipboard. The dialog's buttons are no longer
+  auto-default.
+
+## Item 12: a pattern on a finely drawn part
+
+- `appearance_draw.COUNTS` counts how often a big part's pattern was put off and how often
+  a pattern was worked out; the scenario orbits and drags by real input and checks the
+  pattern is worked out once per change.
+- **Found on the way (not in these files, on plain develop too):** Move/Copy on a body whose
+  view was given `Deviation = 0.02` and `AngularDeflection = 2` (by script: Fission 180 has
+  no setting for them) never comes back from FreeCAD's recompute (`preview.recompute` called
+  by the Move dialog's tick; the harness's watchdog ended FreeCAD after 30 s). The same
+  torus with FreeCAD's default mesh settings moves fine. Probe scenario, three runs:
+  default mesh PASS; fine mesh FAIL on this branch; fine mesh FAIL on develop 049c500b+.
+  The scenario's part is therefore made fine by its many faces (28 balls on the donut), not
+  by the mesh settings.

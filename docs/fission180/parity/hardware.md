@@ -60,7 +60,7 @@ Community, tutorials, course pages), **Book** (the report quoting the book), **G
 |---|---|
 | Online catalogues (McMaster-Carr, TraceParts, the cloud fastener library) | **INSERT > Hardware...**: Fission 180's own library, **offline**, metric and inch (the families below). **INSERT > Insert Catalogue Part...** for a supplier's own model |
 | Search / filter / browse the library | **Search** at the top of the dialog: words and a size ("set screw m3", "m3x20 countersunk", "1/4-20 pan", "#10-24 set screw cup 1/4\"", "6202", "608zz", "o-ring 012", "as568-110", "10x2"); click a result (Enter takes the first). Or Units (Metric / Inch), Type, Standard, Size, Thread, Length, Seals. Nothing found: the dialog says so and what to type |
-| A downloaded STEP solid; threads through the Thread feature, cosmetic by default | A solid built from the tables. **Modeled threads** off: a plain cylinder at the nominal diameter (like a cosmetic thread). On: the real thread, cut by the Thread tool's own code (`thread.build`) with the pitch from `thread_tables.py`; a screw from its tip over the standard thread length (2 d + 6 mm, inch 2 d + 1/4 in), a nut and a standoff right through. Thread offers a size's fine pitch (M6x0.75, 1/4-28 UNF) |
+| A downloaded STEP solid; threads through the Thread feature, cosmetic by default | A solid built from the tables. **Modeled threads** off: a plain cylinder at the nominal diameter with the thread drawn on it as the **dashed helix** of a cosmetic thread (the Thread tool's drawing: every occurrence, over the thread length from the tip; inside a nut). On: the real thread, cut by the Thread tool's own code (`thread.build`) with the pitch from `thread_tables.py`; a screw from its tip over the standard thread length (2 d + 6 mm, inch 2 d + 1/4 in), a nut and a standoff right through. Thread offers a size's fine pitch (M6x0.75, 1/4-28 UNF) |
 | Inserted as a component named after the part number | A component named like the part is asked for: "M3 x 20 Countersunk Screw", "1/4-20 x 1/4 in Cup Point Set Screw", "O-Ring AS568-012", "Ball Bearing 608-2RS", "External Retaining Ring 8 mm"; its standard as the component's description (the parts list's DESCRIPTION), one body, one step **Hardware** |
 | Physical material | Steel for fasteners, bearings, rings, pins and keys, aluminium for standoffs, brass for inserts when the library has it (else copper), **Rubber (NBR)** for O-rings (FreeCAD's library has no rubber: made once as the person's own material, 1.2 g/cm3). So the part has a mass and the parts list a material |
 | Select a circular edge, a cylindrical or conical face | Click any part of a hole: its **rim**, its **wall**, a **countersink or chamfer** (the cone's face or either of its edges), the edge of a counterbore's floor; a **shaft**'s side or end edge; a **flat face** (the part goes where it was clicked). The whole hole is read (`hardware_place.py`): its own diameter, how deep a counterbore is, how wide and steep a countersink is |
@@ -68,12 +68,13 @@ Community, tutorials, course pages), **Book** (the report quoting the book), **G
 | The head seats in the hole | A countersunk head lies where its cone meets the countersink (flush when they match, proud in a small chamfer, on the hole's edge when the countersink is flatter); a socket / button / low / pan / hex head goes to the floor of a counterbore it fits into, whatever its depth; a bearing clicked at the foot of a shaft stands on the shoulder. **Head sunk in** by hand overrides |
 | Select Similar (on by default) | **All holes like it** (on by default): every hole of the same size, counterbore and countersink that opens on the same face. Each further hole clicked gets one more; a click on one of the screws just placed takes it away; a stray click on a face keeps them and says what to click |
 | Several fasteners: occurrences of one component | The same: one component and one occurrence of it per further hole ("...:2", ":3": `instances.py`), so the parts list has one row with the count |
-| Placed with joints | **Rigid joint to what it is placed on** (on by default): an as-built rigid joint between each occurrence and the component (or root body) it was put on, made at OK, in the same undo step. A part inside its own parent component gets none (it moves with it) |
+| Placed with joints (on the hole's edge) | **Rigid joint to what it is placed on** (on by default): a rigid joint between each occurrence and the component (or root body) it was put on, **on the round edge of its hole** (the rim, a shaft's end; the hole made with the part too), made at OK, in the same undo step. The part moves with the component and **follows its hole**: change the hole's position (its sketch's dimension, its Hole step) and the screw goes with it (the joint finds its edge again after every edit, `joints.repair_references`). A flat face with no round edge under the part: an as-built joint to the component. A part inside its own parent component gets none (it moves with it). Editing the Hardware step and clicking another hole takes the old joint away at once and makes the new one at OK |
 | Insert McMaster part: at the origin, then Move | Nothing clicked and OK: the part comes in at the origin of the active component and the **Move** dialog opens on it (Esc leaves it there) |
 | Inserted components are not grounded | The same: an inserted part is never grounded by "First component Ground to Parent", also as the first component of an empty design |
 | Flip (sketch point only) | **Flip** turns any part round on its axis; **Offset** slides it along the axis (an O-ring down into its groove, a retaining ring down a shaft) |
 | Does not make holes | **Make the hole too** (on for a flat face, off by itself on a hole that is there): a normal **Hole** step per place: screws a clearance hole (ISO 273 / ASME B18.2.8, Fit Close / Normal / Loose) with the counterbore or countersink of the head when sunk; **set screws a tapped hole** as deep as the screw; nuts and washers a clearance hole; inserts and magnets as before. Other parts get none |
 | One undo step | The same: components, occurrences, holes and joints of one insert are one undo step (Cancel / Esc removes all) |
+| (the AI) | The tool `insert_hardware`: `face` + `at`, `edge` (a rim, a countersink's edge, a shaft's end) or `wall` (a hole's wall, its countersink or chamfer, a shaft's side). On a hole the part takes its size from the hole unless `size` is given, makes no second hole and seats its head (`hardware.fit_to_place`: the dialog's rules); `similar: true` fills every hole like it; a rigid joint on the hole's edge unless `joint: false` |
 | Edit a fastener (right-click) | Double-click the **Hardware** step in the timeline: the dialog opens with everything as left, all its places listed ("4 holes"); every occurrence, hole and name follows a change |
 | The catalogue's own part | **Insert Catalogue Part...**: Supplier (McMaster-Carr, MISUMI, TraceParts to start; + adds one, - removes one; a `{}` in the address is where the part number goes), "Open in my web browser" (the person's own browser; Fission 180 fetches nothing), "Downloaded file" (the STEP / IGES files of the Downloads folder, newest first, found by itself while the dialog is open; Browse), OK: the file is inserted as a component and Move opens (Insert STEP's code). One line in the dialog says the catalogue is the supplier's own website |
 
@@ -205,16 +206,17 @@ below each face (**Guess**); a nylon lock nut is a higher hex nut.
 
 ### Known gaps (with the reason)
 
-- **The joint is as-built**: the part moves with the component it was put on, but when the
-  HOLE moves inside that component (its sketch is edited) the part stays; edit the Hardware
-  step and click the hole again. Fusion's fastener joints follow the hole's edge. (A joint
-  on the hole's own edge would re-place the part on every solve; the as-built joint was
-  the safe choice for this pass.)
+- (Solved 2026-11-11, library-2: the joint follows the hole; the cosmetic thread is drawn;
+  the AI tool takes any part of a hole.)
+- **Which part moves** when a hole moves is the joints' rule: the grounded part stays, else
+  component 2 of the group's oldest joint. A screw that is itself the anchor of an older
+  joint stays, and the holed part comes to it.
+- A part on a **flat face with no hole** (Make the hole too off) has an as-built joint: it
+  moves with the component, nothing more.
 - **No hover preview** before the click, no sketch point and no other fastener as the place
   (a nut cannot be clicked onto a screw: put it on the face or edge it sits on).
-- **A cosmetic thread is not drawn** on the part (no dashed helix): the Thread tool's
-  drawing reads Thread steps and holes only (`thread_ui.cosmetic_spots`, the modify
-  builder's file). The part's name carries the thread.
+- The joints' marks are drawn at the holes (one per screw), as for every joint with an
+  origin; the Joints folder's eye hides them.
 - **Deleting only the Hardware step** in the timeline leaves its empty component and its
   occurrences; delete the component(s) in the browser instead (`timeline_ops`' delete is
   not hardware's file).
@@ -224,5 +226,5 @@ below each face (**Guess**); a nylon lock nut is a higher hex nut.
   Pozidriv drives, no hex-head set screws, no E-clips, no needle or thrust bearings, no
   split or coiled pins, no Woodruff keys; O-rings above -445 and bearings above 50 mm bore
   are not in the tables.
-- The AI tool `insert_hardware` knows every family but places on a face or a rim only (no
-  wall, no several holes, no joint).
+- Retaining rings are drawn without lugs, a Phillips recess as two crossed slots, heads and
+  nuts without their chamfers (the shapes of the first pass).
