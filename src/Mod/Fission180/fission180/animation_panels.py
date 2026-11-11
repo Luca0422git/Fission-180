@@ -57,6 +57,7 @@ class AnimPanel(taskui.Panel):
     last = None
 
     def __init__(self, doc, transaction):
+        animation.STEPS.add(transaction)
         super().__init__(doc, transaction)
         type(self).last = self
         self.name = ui.current(doc)

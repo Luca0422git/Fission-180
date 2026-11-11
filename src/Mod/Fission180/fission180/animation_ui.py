@@ -818,6 +818,37 @@ class _Watch:
     def slotActivateDocument(self, doc):
         QtCore.QTimer.singleShot(0, sync)
 
+    def slotUndoDocument(self, doc):
+        """Undo in the workspace stays in the workspace (Fusion): a step of the design
+        that an Undo took back is put back at once, with a word why."""
+        try:
+            if not STATE["on"] or doc is not _doc() or not in_workspace(doc):
+                return
+            undone = list(doc.RedoNames)
+            if undone and undone[0] not in animation.STEPS:
+                name, step = doc.Name, undone[0]
+                QtCore.QTimer.singleShot(0, lambda: _put_design_step_back(name, step))
+        except Exception as exc:
+            warn("animation workspace: undo: %s" % exc)
+
+
+def _put_design_step_back(doc_name, step):
+    try:
+        doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+        if doc is None or not in_workspace(doc):
+            return
+        if list(doc.RedoNames)[:1] != [step]:
+            return
+        doc.redo()
+        commands.tell(
+            "Nothing more of the animation to undo. The next step back is the design's "
+            '("%s"): go to the Design workspace to undo it.' % step
+        )
+        log("animation: an undo of the design step %s was put back" % step)
+        refresh()
+    except Exception as exc:
+        warn("animation workspace: undo: %s" % exc)
+
 
 def _window_changed(sub=None):
     if sub is None:

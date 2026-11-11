@@ -187,7 +187,7 @@ workspace ever having been entered. An unknown storyboard name raises
 | Publish Video: cloud save option | Local file only | No cloud |
 | Publish Video: .mp4 | AVI (Motion JPEG) unless ffmpeg is installed | No encoder is bundled with FreeCAD |
 | A storyboard shows and hides components whatever the design shows | A component hidden in the design stays hidden (Show/Hide and its eye say so) | Hiding a component in Design also hides what is in it; a storyboard cannot take that back on the view alone |
-| Undo in Animation stays in Animation | Undo walks on into the design's steps once the storyboard's are used up | One undo history per design (as in Fission 180's Simulation and Manufacture) |
+| Undo in Animation stays in Animation | The same, on the design's one undo history: an Undo that would take back a step of the design is put back at once and says to go to Design for it (steps the workspace made in this session are known by name; after a reopen there is no history anyway) | FreeCAD has one undo history per design |
 | Space plays from anywhere | Space plays when the timeline has the keyboard (click it first) | Space over the 3D view is not ours to take |
 
 ## 4. Tests

@@ -37,6 +37,9 @@ AnimationError = core.AnimationError
 V = App.Vector
 
 _CACHE = {}  # document name -> (stored text, raw data)
+# The names of the undo steps the workspace made in this session: Undo in the workspace
+# stops at a step that is not one of these (it is the design's: animation_ui).
+STEPS = set()
 
 
 # -- the saved object (module and class names are written into files: never rename) -------------
@@ -337,6 +340,7 @@ def change(doc, step, fn):
     if step is None:
         write(doc, data)
     else:
+        STEPS.add(step)
         doc.openTransaction(step)
         try:
             write(doc, data)

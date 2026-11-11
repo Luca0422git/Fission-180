@@ -40,6 +40,12 @@ back_to_first.done_what = "the first design is in front"
 
 
 def enter():
+    # a step of the design, with its undo step, made before the workspace is entered
+    doc = a.doc()
+    doc.openTransaction("Describe Component")
+    a.comp("Foot").Label2 = "the stand"
+    doc.commitTransaction()
+    s["design_undo"] = list(doc.UndoNames)
     s["placements"] = a.design_placements()
     a.enter()
 
@@ -106,6 +112,21 @@ def no_extrude():
 def undone_by_key():
     h.check("Ctrl+Z over the view undid the explode", a.actions() == [], a.spans())
     h.check("the parts are drawn together", a.view_at_home(), a.offsets_now())
+    h.check("the design's own step is next in line", list(a.doc().UndoNames) == s["design_undo"])
+    st.undo_key()
+
+
+def undo_stops():
+    h.check(
+        "another Ctrl+Z does not undo the design's step",
+        a.comp("Foot").Label2 == "the stand",
+    )
+    h.check(
+        "it is still there to undo in Design",
+        list(a.doc().UndoNames) == s["design_undo"],
+        list(a.doc().UndoNames),
+    )
+    h.check("and says why", "Nothing more of the animation to undo" in a.told(), a.told())
     h.press(QtCore.Qt.Key_Y, QtCore.Qt.ControlModifier)
 
 
@@ -374,6 +395,7 @@ h.run(
         no_move,
         no_extrude,
         undone_by_key,
+        undo_stops,
         redone_by_key,
         marking,
         marking_ran,
