@@ -45,9 +45,10 @@ def doc():
     return App.ActiveDocument
 
 
-def by_label(label):
-    found = doc().getObjectsByLabel(label)
-    return found[0] if found else None
+def by_name(name):
+    # (by name, not by label: bodies are numbered per component, so the body of the new
+    # component and the design's first body are both "Body1")
+    return doc().getObject(name)
 
 
 def g1_error(loft_body, wall_body, point):
@@ -443,7 +444,7 @@ def l4_save_as():
 
 def l4_ctrl_s():
     s["titles"] = st.timeline_titles()
-    s["labels"] = [s[k].Label for k in ("wall", "loft1", "loft2")]
+    s["names"] = [s[k].Name for k in ("wall", "loft1", "loft2")]
     h.press(QtCore.Qt.Key_S, QtCore.Qt.ControlModifier)
 
 
@@ -465,8 +466,8 @@ def l4_reopen():
 def l4_reopened():
     from fission180 import surface
 
-    wall, loft1, loft2 = (by_label(x) for x in s["labels"])
-    h.check("the bodies are back", None not in (wall, loft1, loft2), s["labels"])
+    wall, loft1, loft2 = (by_name(x) for x in s["names"])
+    h.check("the bodies are back", None not in (wall, loft1, loft2), s["names"])
     if None in (wall, loft1, loft2):
         return
     s["wall"], s["loft1"], s["loft2"] = wall, loft1, loft2

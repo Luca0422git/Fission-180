@@ -30,11 +30,12 @@ the box. The Box dialog displays"; **Forum** (IdeaStation "Change inputs with Ta
 | A negative height goes the other way | Same: against the plane's normal (Cylinder on the Top plane, Height -8: z -8..0) |
 | Bodies are Body1, Body2 ... from the first one on | Same in every command: the root's first body, made by the first sketch, was FreeCAD's "Body" (`commands.ensure_body`, one line) |
 
-**Not built:** on the Front plane a primitive's positive height still goes FreeCAD's way
-(towards the front viewer); Fusion's Front plane looks the other way (`parity/
-extrude-presspull.md`, "Direction and sign", where Extrude does follow Fusion). Sphere has no
-box on the canvas before its one click (the digits go into the dialog's Diameter field, as
-before).
+On the Front plane a new Box, Cylinder or Coil counts its Height Fusion's way: plus is +Y,
+away from the front viewer, the same way a positive Extrude distance and a positive Offset
+Plane distance go (wave 7 follow-up, `sf/book-extrude-2`: `primitives.front_turned`, the
+note `"front": true` in the step's options; `parity/extrude-presspull.md`, "One rule on the
+Front plane for every command"). A step made before, or by the AI tools, keeps its side.
+Gear (modify's) still counts FreeCAD's way there.
 
 Tests: scenario `book_extrude_primitives` (48 checks): the book's play brick typed on the
 canvas, two cylinders (the second with Height -8), one on a face (Join, then Cut by itself),

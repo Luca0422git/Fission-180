@@ -2125,7 +2125,19 @@ class ExtrudePanel(
                 overlaps, touches = bodies_core.scope(inside, direct, way[2], way[1])
             else:
                 overlaps, touches = False, self._base_joinable()
-            wanted = bodies_core.auto_operation(into, touches, starts_on=on, overlaps=overlaps)
+            # Pushed into the part of another component: a Cut too, with that part under
+            # Bodies to Cut (Fusion: "mostly inside another visible body")
+            others = False
+            if way is not None and not into and inside is not None:
+                reached = [n for n in way[0] if n not in inside]
+                others = bool(reached) and bool(
+                    extrude_bodies.inside_others(
+                        self.profiles, options, lead=self.target, own=inside, names=reached
+                    )
+                )
+            wanted = bodies_core.auto_operation(
+                into, touches, starts_on=on, overlaps=overlaps, inside_others=others
+            )
             self._auto_cache = (key, wanted)
             # A Cut because the extrusion reaches into a body further on (it does not start
             # in one): a drag on the same side keeps it (_live_operation).
@@ -2540,6 +2552,16 @@ class ExtrudePanel(
         self.bodies_names = QtWidgets.QLabel("")  # which bodies, by name
         self.bodies_names.setWordWrap(True)
         form.addRow(self.bodies_names)
+        # Fusion's Objects To Cut list: one check box for each body in the way; clearing
+        # one leaves that body out (what a click on the body does with the row active)
+        self.bodies_checks = QtWidgets.QWidget()
+        self.bodies_checks.setObjectName("Fission180ExtrudeBodies")
+        layout = QtWidgets.QVBoxLayout(self.bodies_checks)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        self._body_checks = {}  # body name -> its check box
+        self._body_checks_shown = None
+        form.addRow(self.bodies_checks)
 
     def _way_signature(self, side_only=False):
         """What the extrusion's solid depends on (the cache key of the bodies in its way).
@@ -2694,8 +2716,8 @@ class ExtrudePanel(
         names = bodies_core.participants(touched, self.excluded)
         if touched and not names:
             raise extrude.ExtrudeError(
-                "%s is empty. Click it, then click a body to take it back."
-                % bodies_core.row_label(operation)
+                "%s is empty. Tick a body in its list, or click the row and then a body, to "
+                "take it back." % bodies_core.row_label(operation)
             )
         found = [self.doc.getObject(n) for n in names]
         return [b for b in found if b is not None]
@@ -2740,6 +2762,7 @@ class ExtrudePanel(
         show = bool(label) and bool(self.profiles)
         for widget in (self.bodies_label, self.fields["bodies"].widget, self.bodies_names):
             widget.setVisible(show)
+        self._show_body_checks(show)
         if not show:
             self._highlight_bodies([])
             if self.active == "bodies":
@@ -2751,10 +2774,12 @@ class ExtrudePanel(
             body = self._source_body()
             names = [body.Name] if body is not None else []
         self._highlight_bodies(names if self.active == "bodies" else [])
-        labels = []
-        for name in names:
-            obj = self.doc.getObject(name)
-            labels.append(obj.Label if obj is not None else name)
+        # (two bodies of one name, each its component's first: "Body1 (Bracket)")
+        found = [self.doc.getObject(name) for name in names]
+        if all(obj is not None for obj in found):
+            labels = bodies.list_names(found)
+        else:
+            labels = [obj.Label if obj is not None else n for n, obj in zip(names, found)]
         self.fields["bodies"].set_text(bodies_core.count_text(len(labels)))
         text = bodies_core.names_text(labels)
         if not labels:
@@ -2769,6 +2794,75 @@ class ExtrudePanel(
         if self.active == "bodies":
             text += "\nClick a body to leave it out or take it back."
         self.bodies_names.setText(text)
+
+    def _show_body_checks(self, show):
+        """The check boxes of the bodies in the way (ticked: the extrude acts on it)."""
+        try:
+            self._fill_body_checks(show)
+        except Exception as exc:
+            warn("extrude bodies list: %s" % exc)
+
+    def _fill_body_checks(self, show):
+        touched = (self._touched_names(compute=False) or []) if show else []
+        found = [self.doc.getObject(name) for name in touched]
+        found = [obj for obj in found if obj is not None]
+        # Cut and Intersect: Fusion's Objects To Cut list, also for one body. Join: only
+        # when there is a choice (the row above names the one body)
+        cuts = self.options.get("operation") in ("cut", "intersect")
+        if len(found) < (1 if cuts else 2):
+            found = []
+        wanted = [(b.Name, shown) for b, shown in zip(found, bodies.list_names(found))]
+        state = [(name, shown, name not in self.excluded) for name, shown in wanted]
+        self.bodies_checks.setVisible(bool(wanted))
+        if state == self._body_checks_shown:
+            return
+        self._body_checks_shown = state
+        layout = self.bodies_checks.layout()
+        if [n for n, _t in wanted] != list(self._body_checks):
+            while layout.count():
+                item = layout.takeAt(0)
+                if item.widget() is not None:
+                    item.widget().setParent(None)
+                    item.widget().deleteLater()
+            self._body_checks = {}
+            for name, shown in wanted:
+                box = QtWidgets.QCheckBox(shown)
+                box.setObjectName("Fission180ExtrudeBody_" + name)
+                box.toggled.connect(lambda on, n=name: self._body_check_toggled(n, on))
+                layout.addWidget(box)
+                self._body_checks[name] = box
+        for name, shown, ticked in state:
+            box = self._body_checks[name]
+            box.blockSignals(True)
+            try:
+                box.setText(shown)
+                box.setChecked(ticked)
+            finally:
+                box.blockSignals(False)
+
+    def _body_check_toggled(self, name, ticked):
+        """A check box of the list was clicked: the body is left out or taken back."""
+        try:
+            excluded = set(self.excluded)
+            if ticked:
+                excluded.discard(name)
+            else:
+                excluded.add(name)
+            if excluded == set(self.excluded):
+                return
+            self.excluded = excluded
+            self.message.setText("")
+            obj = self.doc.getObject(name)
+            log(
+                "extrude: %s %s"
+                % (
+                    bodies.clear_name(obj) if obj is not None else name,
+                    "taken back" if ticked else "left out",
+                )
+            )
+            self._changed()
+        except Exception as exc:
+            warn("extrude bodies list: %s" % exc)
 
     def _highlight_bodies(self, names):
         """While the row takes the clicks, the bodies it lists show as see-through blue

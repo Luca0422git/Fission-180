@@ -765,6 +765,9 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
     last = None
     MESSAGE_LINES = 3
     HINTS = ("Click to place it.",)
+    # True for the dialogs whose new steps count Fusion's way on the Front plane (a positive
+    # Height goes to +Y: primitives.front_turned). Gear (modify's) builds its own frame.
+    COUNTS_FRONT = False
 
     def __init__(self, doc, feature=None):
         super().__init__(doc, self.title if feature is None else "Edit %s" % self.title)
@@ -784,6 +787,8 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         self.editing = feature is not None
         self.ref = None
         self.options = self._defaults()
+        if feature is None and self.COUNTS_FRONT:
+            self.options["front"] = True  # (a step being edited keeps what it was made with)
         self.user_picked_operation = feature is not None
         self.error = ""
         self.dirty = False
@@ -1166,7 +1171,7 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         self.points = []
         self.info.setText(self.HINTS[0])
         try:
-            frame = primitives.global_frame(self.ref)
+            frame = primitives.global_frame(self.ref, self.options)
             try:
                 snaps = primitives.snap_points(self.doc, frame)
             except Exception as exc:
@@ -1444,7 +1449,7 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
     def _mark(self):
         """Half the size of the + drawn at the mouse while placing (a few pixels)."""
         try:
-            frame = primitives.global_frame(self.ref)
+            frame = primitives.global_frame(self.ref, self.options)
             return 6.0 * view_scale(Gui.ActiveDocument.ActiveView, frame.Base)
         except Exception:
             return 1.0
@@ -1717,7 +1722,7 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
 
     def handle_size(self):
         try:
-            frame = primitives.global_frame(self.ref)
+            frame = primitives.global_frame(self.ref, self.options)
             o = self.options
             at = frame.multVec(App.Vector(float(o.get("x", 0)), float(o.get("y", 0)), 0))
             return self.HANDLE_PIXELS * view_scale(Gui.ActiveDocument.ActiveView, at)
@@ -1932,6 +1937,7 @@ def _plain(text):
 
 # -- Box ---------------------------------------------------------------------------------------------------------
 class BoxPanel(PlacedPanel):
+    COUNTS_FRONT = True
     FORMULA_KEYS = ("length", "width", "height")
     TYPE_ORDER = ("length", "width", "height")
     READY_KEY = "height"
@@ -2036,7 +2042,7 @@ class BoxPanel(PlacedPanel):
 
     def _handle_specs(self):
         o = self.options
-        frame = primitives.global_frame(self.ref)
+        frame = primitives.global_frame(self.ref, self.options)
         u = frame.Rotation.multVec(App.Vector(1, 0, 0))
         v = frame.Rotation.multVec(App.Vector(0, 1, 0))
         n = frame.Rotation.multVec(App.Vector(0, 0, 1))
@@ -2068,6 +2074,7 @@ class BoxPanel(PlacedPanel):
 
 # -- Cylinder ----------------------------------------------------------------------------------------------------
 class CylinderPanel(PlacedPanel):
+    COUNTS_FRONT = True
     FORMULA_KEYS = ("diameter", "height")
     TYPE_ORDER = ("diameter", "height")
     READY_KEY = "height"
@@ -2117,7 +2124,7 @@ class CylinderPanel(PlacedPanel):
 
     def _handle_specs(self):
         o = self.options
-        frame = primitives.global_frame(self.ref)
+        frame = primitives.global_frame(self.ref, self.options)
         u = frame.Rotation.multVec(App.Vector(1, 0, 0))
         n = frame.Rotation.multVec(App.Vector(0, 0, 1))
         center = frame.multVec(App.Vector(float(o["x"]), float(o["y"]), 0))
@@ -2137,6 +2144,7 @@ class CylinderPanel(PlacedPanel):
 
 # -- Sphere --------------------------------------------------------------------------------------------------------
 class SpherePanel(PlacedPanel):
+    COUNTS_FRONT = True
     FORMULA_KEYS = ("diameter",)
     TYPE_ORDER = ("diameter",)
     READY_KEY = "diameter"
@@ -2171,7 +2179,7 @@ class SpherePanel(PlacedPanel):
         cx, cy = points[0]
         try:
             view = Gui.ActiveDocument.ActiveView
-            frame = primitives.global_frame(self.ref)
+            frame = primitives.global_frame(self.ref, self.options)
             pixel = view_scale(view, frame.multVec(App.Vector(cx, cy, 0)))
             width = view.getSize()[0] * pixel
             diameter = primitives.nice(width / 8.0)
@@ -2181,7 +2189,7 @@ class SpherePanel(PlacedPanel):
 
     def _handle_specs(self):
         o = self.options
-        frame = primitives.global_frame(self.ref)
+        frame = primitives.global_frame(self.ref, self.options)
         u = frame.Rotation.multVec(App.Vector(1, 0, 0))
         center = frame.multVec(App.Vector(float(o["x"]), float(o["y"]), 0))
         return [
@@ -2198,6 +2206,7 @@ class SpherePanel(PlacedPanel):
 
 # -- Torus ----------------------------------------------------------------------------------------------------------
 class TorusPanel(PlacedPanel):
+    COUNTS_FRONT = True
     FORMULA_KEYS = ("inner_diameter", "torus_diameter")
     TYPE_ORDER = ("inner_diameter", "torus_diameter")
     READY_KEY = "torus_diameter"
@@ -2254,7 +2263,7 @@ class TorusPanel(PlacedPanel):
 
     def _handle_specs(self):
         o = self.options
-        frame = primitives.global_frame(self.ref)
+        frame = primitives.global_frame(self.ref, self.options)
         u = frame.Rotation.multVec(App.Vector(1, 0, 0))
         n = frame.Rotation.multVec(App.Vector(0, 0, 1))
         center = frame.multVec(App.Vector(float(o["x"]), float(o["y"]), 0))

@@ -6,7 +6,8 @@ is built only when the mouse rests or is let go, as Draft does (draft_live). Tim
 checked here (Luca, 2026-10-23: he judges the feel on his own computer); what is checked:
 
   every case    the picture shows during the moves, at the dialog's value; no exact rebuild
-                between two moves; let go: the picture goes, the exact solid comes back
+                while the handle keeps moving (counted by the dialog's own rest time, not
+                by the wall clock); let go: the picture goes, the exact solid comes back
                 (shown again, the part before the step no longer see-through), with the
                 volume the same dialog built before the live pictures; every point of the
                 picture at the final value lies on that exact solid
@@ -15,6 +16,8 @@ checked here (Luca, 2026-10-23: he judges the feel on his own computer); what is
   Extrude       a rectangle and a circle: distance, then the taper disc, then Symmetric
   leftovers     no picture node in the scene after OK, Cancel, or Undo in the middle of a drag
 """
+
+import time
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -139,7 +142,10 @@ def held(p, handle, start, end, label, moves=24):
     real = p._recompute
 
     def counted(*args, **kwargs):
-        rec["builds"].append(len(rec["samples"]))
+        # (how long the dialog had seen no change and no mouse move when it built: what it
+        # decides by, whatever the machine's pace)
+        rested = time.perf_counter() - p.last_moved()
+        rec["builds"].append((len(rec["samples"]), rested, p._rest_needed()))
         return real(*args, **kwargs)
 
     p._recompute = counted
@@ -186,9 +192,27 @@ def after_drag(label, p, hidden=(), unghosted=()):
         all(x["same"] for x in shown),
         [x["values"] for x in shown if not x["same"]][:3],
     )
+    # An exact rebuild between two moves is a fault only when the dialog built although
+    # the handle had moved less than its own rest time before (taskui's _rest_needed): counted,
+    # on any machine. On a machine so slow that two moves of the drag come further apart
+    # than the rest time, the dialog rightly builds in between (the mouse rested, as far as
+    # it can tell): said, not counted (it was a speed check on the wall clock before, and
+    # failed 4 times under load on GitHub's run of 049c500b).
     last = max([x["i"] for x in moving], default=0)
-    early = [i for i in rec.get("builds", []) if i < last - 1]
-    h.speed_check("%s: no exact rebuild between the moves" % label, not early, early)
+    between = [(i, round(r, 3), round(n, 3)) for i, r, n in rec.get("builds", []) if i < last - 1]
+    early = [x for x in between if x[1] < 0.9 * x[2]]
+    if between and not early:
+        print(
+            "[Fission 180] live_shapes: %s: %d exact rebuild(s) between moves that came "
+            "further apart than the dialog's rest time (a slow machine): (move, rested s, "
+            "rest time s) %s" % (label, len(between), between),
+            flush=True,
+        )
+    h.check(
+        "%s: no exact rebuild while the handle kept moving" % label,
+        not early,
+        "(move, rested s, rest time s) %s" % early,
+    )
     live = live_of(p)
     h.check("%s: let go, the picture is gone" % label, live is None or not live.shown)
     h.check("%s: nothing hidden for it any more" % label, live is None or not live.hid)

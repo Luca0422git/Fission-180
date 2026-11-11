@@ -35,6 +35,7 @@ SECTION_LABELS = [
 
 
 class CoilPanel(PlacedPanel):
+    COUNTS_FRONT = True  # (a positive Height goes to +Y on the Front plane, like Fusion)
     FORMULA_KEYS = ("diameter", "revolutions", "height", "pitch", "angle", "section_size")
     TYPE_ORDER = ("diameter",)
     READY_KEY = "height"
@@ -206,7 +207,7 @@ class CoilPanel(PlacedPanel):
     # -- handles ------------------------------------------------------------------------------------------
     def _handle_specs(self):
         o = self.options
-        frame = primitives.global_frame(self.ref)
+        frame = primitives.global_frame(self.ref, self.options)
         u = frame.Rotation.multVec(App.Vector(1, 0, 0))
         n = frame.Rotation.multVec(App.Vector(0, 0, 1))
         center = frame.multVec(App.Vector(float(o["x"]), float(o["y"]), 0))

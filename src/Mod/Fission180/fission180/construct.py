@@ -722,13 +722,47 @@ def compute(key, refs, points=None, values=None):
     return handler(refs, points, values, spec)
 
 
+# (wave 7, builder extrude-2) Fusion's Front plane looks to +Y, FreeCAD's XZ plane to -Y
+# (extrude.is_front_plane). An Offset Plane made in its dialog since then notes FRONT and
+# counts its distance Fusion's way on the Front plane (and on a plane offset from it): plus
+# is +Y, as for Extrude, Box and Cylinder. Planes made before, and planes made from code
+# without "front" in their values (the AI tools, scripts), count FreeCAD's way as always.
+FRONT = "Fission180FrontNormal"
+
+
+def offset_side(refs, values):
+    """-1.0 when an Offset Plane on `refs` with `values` counts its distance against the
+    picked plane's own normal (Fusion's Front plane), else 1.0."""
+    try:
+        if values and values.get("front") and refs and not (refs[0][1] or ""):
+            from . import extrude
+
+            if extrude.is_front_plane(refs[0][0]):
+                return -1.0
+    except Exception:
+        pass
+    return 1.0
+
+
+def _note_front(obj, values):
+    try:
+        if values.get("front") and FRONT not in obj.PropertiesList:
+            obj.addProperty(
+                "App::PropertyBool", FRONT, "Fission180", "Plus is +Y on the Front plane", 0
+            )
+            obj.setEditorMode(FRONT, 2)
+            setattr(obj, FRONT, True)
+    except Exception:
+        pass
+
+
 def _c_OffsetPlane(refs, points, values, spec):
     origin, normal = plane_of(refs[0])
     if len(refs) > 1 and refs[1] is not None:
         # Extent To Object: through the picked point (Fusion's "offset through point").
         d = (point_of(refs[1]) - origin).dot(normal)
     else:
-        d = float(values.get("distance", spec.get("default", 0.0)))
+        d = float(values.get("distance", spec.get("default", 0.0))) * offset_side(refs, values)
     base = frame(origin, normal)
     return frame(origin + normal * d, normal, base.Rotation.multVec(V(1, 0, 0)))
 
@@ -1249,6 +1283,7 @@ def helper_values(helper):
         "angle": float(helper.Angle.Value),
         "fraction": float(helper.Fraction),
         "distance_type": helper.DistanceType or "proportional",
+        "front": bool(getattr(helper, FRONT, False)),  # (offset_side)
     }
 
 
@@ -1383,12 +1418,19 @@ def update(datum, key, refs, values=None, points=None, formulas=None):
     if not _same_refs(expand(getattr(datum, PROP_REFS)), refs):
         setattr(datum, PROP_REFS, _link_list(refs))
     helper = helper_of(datum)
+    _note_front(datum, values)
     if _native(key, body, refs):
         if helper is not None:
             _drop_helper(datum, helper)
         _set_support(datum, [refs[0]], "FlatFace")
-        offset = App.Placement(V(0, 0, values["distance"]), App.Rotation())
-        _set_expression(datum, ".AttachmentOffset.Base.z", formulas.get("distance"))
+        side = offset_side(refs, values)  # (-1: Fusion's Front plane, plus is +Y)
+        offset = App.Placement(V(0, 0, values["distance"] * side), App.Rotation())
+        formula = formulas.get("distance")
+        _set_expression(
+            datum,
+            ".AttachmentOffset.Base.z",
+            "-(%s)" % formula if formula and side < 0 else formula,
+        )
         if not formulas.get("distance") and not datum.AttachmentOffset.isSame(offset, 1e-12):
             datum.AttachmentOffset = offset
         _clear_warning(datum)  # picked again: no longer "lost what it was on"
@@ -1488,6 +1530,7 @@ def _drop_helper(datum, helper):
 
 
 def _fill_helper(helper, key, refs, points, values, formulas):
+    _note_front(helper, values)
     if helper.Kind != key:
         helper.Kind = key
     if not _same_refs(expand(helper.Refs), refs) or len(helper.HasFrame) != len(refs):
@@ -1538,11 +1581,33 @@ def read(datum):
     except Exception:
         refs = []
     points = [None] * len(refs)
-    values["distance"] = float(datum.AttachmentOffset.Base.z)
+    values["front"] = bool(getattr(datum, FRONT, False))
+    side = offset_side(refs, values)
+    values["distance"] = float(datum.AttachmentOffset.Base.z) * side
     text = formula_of(datum, ".AttachmentOffset.Base.z")
+    if text and side < 0:
+        text = _unturned(text)
     if text:
         formulas["distance"] = text
     return key, refs, points, values, formulas
+
+
+def _unturned(text):
+    """The formula as typed, from "-(formula)" (what a plane that counts Fusion's way on
+    the Front plane keeps on its offset)."""
+    stripped = text.strip()
+    if stripped.startswith("-"):
+        inner = stripped[1:].strip()
+        if inner.startswith("(") and inner.endswith(")"):
+            depth = 0
+            for i, char in enumerate(inner):
+                depth += char == "("
+                depth -= char == ")"
+                if depth == 0 and i < len(inner) - 1:
+                    break  # "-(a) + (b)": the first bracket closes before the end
+            else:
+                return inner[1:-1].strip()
+    return "-(%s)" % stripped  # (changed by hand since: still the same value)
 
 
 def guess_key(datum):

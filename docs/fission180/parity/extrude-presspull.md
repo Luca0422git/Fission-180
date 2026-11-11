@@ -31,10 +31,11 @@ rows marked so.
 | # | Situation (the first row that fits decides) | The dialog shows | Source |
 |---|---|---|---|
 | 1 | The extrusion **starts inside** a body: its first 0.01 mm lies in material (at least 1 % of it). A face pushed in, a profile on a plane through the part. One Side / Two Sides: side one; **Symmetric: both sides** (a profile on a middle plane) | **Cut** | Autodesk (Strater; Learn); Book (the thruster cone pushed up into the rocket "was set to Cut automatically ... exactly as the book says"; the donut bite) |
+| 1b | (wave 7 follow-up, `sf/book-extrude-2`) It lies **mostly inside shown bodies of other components**: more than half of the new solid (a profile pushed into another component's part, To Object through it), whichever component is active, the design's top row included. Those bodies are listed under Bodies to Cut, each with a check box | **Cut** | Autodesk (Strater confirmed a user's reading in "Tool behaviour - unexpected": "if the new body's volume is mostly inside another visible body" it is a Cut); Forum (the automatic Cut happens "even when the cut goes through all components in the assembly"; "extrude-cut through all problem": both components are selected under Objects To Cut). The share of one half is a Guess. A new part that only overlaps another component's part a little is no Cut (row 5: the report's bug 10, a link around another component's pin, 6 % inside) |
 | 2 | It **starts on a face** of a body and goes away from it (the profile is the face, or a sketch on it), also when it runs into another part of the body further on (a column next to it that leans over the face) | **Join** | Autodesk Learn ("when you extrude a face in a direction away from the existing body, the Operation type is set to Join") |
 | 3 | It starts in the air and **reaches into** a body further on, by at least 1 % of its own volume (a profile beside a step, a sketch on a plane above the part extruded down into it, To Object the underside; a sliver along an edge does not count) | **Cut** | Autodesk (Strater: "intersects a solid"); the report (Hot End flats: "the dialog chose Join") |
 | 4 | It only **touches** a body, face to face | **Join** | Autodesk (Strater: "Join/New Body") |
-| 5 | None of these: it touches nothing; the first solid; the active component has no solid yet, whatever body of another component it goes through or touches | **New Body** | Autodesk Learn ("a New Body in the active component"); the report's bug 10 |
+| 5 | None of these: it touches nothing; the first solid; the active component has no solid yet and the extrusion is not mostly inside another component's body (row 1b) | **New Body** | Autodesk Learn ("a New Body in the active component"); the report's bug 10 |
 | | Direction Symmetric, Two Sides, Extent All, To Object, Flip, a typed or dragged distance, a negative distance | The same rows, decided again with each preview (60 ms after the last change; while an arrow is dragged, row 1 shows at once) | Autodesk (the rule names no direction); **before wave 7 a symmetric extrude never cut by itself**, which made the book's donut bite a Join |
 | | The person picks an operation in the list | That operation, from then on, whatever changes in the dialog (`user_picked_operation`); a build that fails keeps the picked operation shown with the reason beside it (it used to show the old one again) | Forum (IdeaStation); Luca's brief |
 | | An extrude edited from the timeline | The saved operation; it never changes by itself | as above |
@@ -87,6 +88,28 @@ operation staying put. Code: `extrude_bodies_core.auto_operation` / `scope` (uni
 `speaking` (also in Revolve, Sweep, Loft and the primitives). Scenario
 `book_extrude_operation` (ten rows, 72 checks).
 
+### Objects To Cut: a list with check boxes, names with their component (`sf/book-extrude-2`)
+
+Fusion lists the bodies a Cut or Intersect acts on under Objects To Cut (Autodesk, Extrude
+reference: Objects To Cut, whose Auto-Select "re-computes the bodies to cut based on the
+current visibility state"; the support article "How to extrude from one component to cut
+another component": "For Objects to Cut, select only the component that you want to cut
+from"). That each body has a check box there is the brief's description of Fusion's dialog
+(Guess: no page was found that shows it). The Extrude dialog's Bodies to Cut /
+Bodies to Intersect row now has that list under it: one check box for each body in the
+extrusion's way, ticked when the extrude acts on it; a click on a box leaves the body out or
+takes it back (what a click on the body in the view does while the row is active). With
+every box cleared the dialog says that the list is empty and what to do, and OK is refused
+with the reason next to the mouse. A Join shows the list only when two or more bodies are
+in its way.
+
+Bodies are numbered per component (the design's first body and each component's first body
+are all "Body1"), so the list, the row's names and the log name a body with its component:
+"Body1 (Block)" (`bodies.clear_name`; `bodies.named(doc, text)` finds a body from such a
+name, its object name or a label only one body has, and says what to write when several
+bodies share it). Scenario `book_extrude2_across` (37 checks); the older
+`book_extrude_across` follows row 1b (43 checks).
+
 ## Direction and sign (wave 7)
 
 A positive distance goes along the profile's normal, a negative one against it, in every
@@ -106,9 +129,41 @@ normal of a marked sketch round, so the arrow, a Start offset, Two Sides, a clic
 end the extrusion and the edit dialog all agree. A sketch an extrude already used (a design
 made before wave 7, a script, a golden model) has no mark and keeps FreeCAD's way: nothing
 that exists changes. A Rib or Web drawn on a Front plane sketch reads the same mark for its
-One Side (`parity/sweep-loft-rib.md`). **Not built:** the same for Box / Cylinder placed on the Front plane
-(their height still goes FreeCAD's way there) and for CONSTRUCT > Offset Plane from the Front
-plane (components' area: a positive offset should go to +Y in Fusion).
+One Side (`parity/sweep-loft-rib.md`).
+
+### One rule on the Front plane for every command (wave 7 follow-up, `sf/book-extrude-2`)
+
+The same positive number now goes the same way on Top, Front and Right in every command that
+counts from an origin plane (scenario `book_extrude2_planes`, 114 checks: Box, Hole, Offset
+Plane, Extrude on the plane, Extrude on the offset plane, Cylinder, undo / redo, each on the
+three planes with the same keys).
+
+| Command on the Front plane (XZ) | Fusion | Source | Fission 180 |
+|---|---|---|---|
+| Extrude of a sketch | plus is +Y | Book; third-party Fusion reference (sketch x = X, y = -Z) | the sketch's mark (first builder) |
+| CONSTRUCT > Offset Plane | "Positive offset goes in the plane's normal direction. For XY: +Z. For XZ: +Y" | third-party Fusion reference (a Fusion scripting guide); Forum (Autodesk community: "XZ plane (FRONT): up and down swapped", i.e. sketch y = -Z, normal +Y) | a new plane notes `Fission180FrontNormal` and counts against FreeCAD's normal (`construct.offset_side`); its arrow points to +Y; a formula is kept as `-(formula)` on the offset and read back as typed; a plane offset from such a plane counts the same way |
+| Box, Cylinder (Height) | plus goes along the plane's normal, +Y, like an extrude and an offset from the same plane (a Box is one "Box Primitive" step in Fusion's timeline, not a sketch and an extrude: Forum) | Guess for the sign (no page found that states it; the plane's normal is the one direction Fusion's other commands count along) | a new primitive notes `"front": true` in its options and is built in Fusion's frame of the Front plane (`primitives.front_turned`, `FRONT_TURN`: x = X, y = -Z, z = +Y) |
+| Coil (Height) | as Cylinder | Guess (same construction) | the same note |
+| Sphere, Torus | lie in the plane's middle: no side | - | the note, no visible change |
+| Hole from a sketch point | drills into the part | Guess (what `hole.py` was built to in wave 3: "Fusion drills into the part"); checked in the scenario on the three planes | already so (`hole.py` turns the hole into the material); nothing changed |
+| Rib, Web (One Side) | plus is +Y | as Extrude | the sketch's mark (first builder) |
+| Revolve (angle), Sweep (distance along the path), Loft, Emboss (depth from the face), the Move triad (world axes) | do not count from a plane's normal | - | nothing to turn |
+
+Only NEW objects count Fusion's way: a primitive, coil or offset plane made in its dialog
+from now on. One made before (no note), and one made from code without the note, keeps
+FreeCAD's way; edited in its dialog it keeps its side (the scenario's last three steps: an
+older box on the Front plane lies from -10 to 0, its arrow points to -Y, a new height of 15
+gives -15 to 0).
+
+**The AI tools** (`ai/ops/core.py`, also the language of the golden models) keep their own
+documented convention: "XZ (normal -Y)", a positive distance, height or offset goes along
+that normal. Chosen because the same step list must build the same solid as before (golden
+models, saved scripts, an AI's earlier calls), and their documentation states the normal with
+every plane. Two things were done so that this stays true next to the dialogs: the extrude
+op turns its options round on a sketch that a person's Extrude marked Fusion's way
+(`_along_plane_normal`: the step still goes to -Y), and the tools' help text says that a
+number typed in a dialog for a step on XZ has the other sign. Gear (`gear*.py`, modify's)
+still counts its thickness FreeCAD's way on the Front plane.
 
 The report's two other sign cases: "Cylinder Height -8 came out going +8 into the first
 body" was the typed -8 landing in the box of another arrow (the one the mouse rested on);

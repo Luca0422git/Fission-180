@@ -33,7 +33,7 @@ class SketchAreasFollow(unittest.TestCase):
     def test_every_case_ran(self):
         done = re.search(r"areas check done (\d+)", self.output)
         self.assertIsNotNone(done, self.output[-2000:])
-        self.assertGreaterEqual(int(done.group(1)), 60, self.output[-2000:])
+        self.assertGreaterEqual(int(done.group(1)), 90, self.output[-2000:])
 
     def test_every_check_passed(self):
         self.assertEqual(re.findall(r"areas check BAD (.*)", self.output), [])

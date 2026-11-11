@@ -384,6 +384,10 @@ class ConstructPanel(bodypick.Tones, pickpanel.PickPanel):
         self.active = 0
         self.values = construct.default_values(key)
         self.values["extent"] = "distance"  # Offset Plane's Extent (Distance / To Object)
+        if datum is None:
+            # (extrude-2) a new Offset Plane counts Fusion's way on the Front plane: plus is
+            # +Y (construct.offset_side); a plane being edited keeps what it was made with
+            self.values["front"] = True
         self.formulas = {}
         self.formula_errors = {}  # value box -> why what was typed there is no value
         self.work_body = commands.find_body()
@@ -570,6 +574,7 @@ class ConstructPanel(bodypick.Tones, pickpanel.PickPanel):
                 if len(refs) > 1:
                     origin, normal = construct.plane_of(refs[0])
                     gap = (construct.point_of(refs[1]) - origin).dot(normal)
+                    gap *= construct.offset_side(refs[:1], self.values)
                     self.values["distance"] = gap
                     self.formulas.pop("distance", None)
                     if self.distance is not None:
@@ -979,7 +984,7 @@ class ConstructPanel(bodypick.Tones, pickpanel.PickPanel):
             origin, normal = construct.plane_of(refs[0])
             self.handle = handles3d.LinearHandle(
                 origin,
-                normal,
+                normal * construct.offset_side(refs, self.values),
                 self.values["distance"],
                 size,
                 on_drag=self._dragged_distance,

@@ -11,7 +11,11 @@ Conventions (documented for model authors in Fission180Tests/golden/README.md):
   * Sketch planes are the body's origin planes. In FreeCAD the sketch normal is
     +Z for XY, -Y for XZ and +X for YZ; sketch x/y map to (X,Y), (X,Z), (Y,Z).
   * Extrude "distance" goes along the sketch normal; "flip": true goes the
-    other way. That holds for both join and cut.
+    other way. That holds for both join and cut. (The app's own dialogs count
+    the Front plane Fusion's way, plus is +Y, for sketches first extruded there
+    since wave 7: fission180/extrude.py, FRONT. A step built here always counts
+    along the normals above, also on such a sketch: _along_plane_normal. The
+    same step list builds the same solid as it always did.)
   * Every feature gets Refine = True, because Fusion never leaves the extra
     seam faces FreeCAD keeps by default (face counts are compared exactly).
 """
@@ -78,8 +82,14 @@ class Builder:
 
     def learn(self):
         """Know every object of the design by its Name and Label (new ones keep their id)."""
+        from fission180 import bodies
+
         for obj in self.doc.Objects:
-            for key in (obj.Name, obj.Label):
+            keys = [obj.Name, obj.Label]
+            if obj.TypeId == "PartDesign::Body":
+                # "Body1 (Bracket)": every component's first body is called Body1
+                keys.append(bodies.clear_name(obj))
+            for key in keys:
                 if key not in self.objects:
                     self.objects[key] = obj
                     if obj.TypeId == "Sketcher::SketchObject":
@@ -250,6 +260,7 @@ class Builder:
             if "profile" in step and "regions" in step:
                 sketch = self.objects[step["profile"]]
                 curves += [self._region(step, [sketch], p) for p in step["regions"]]
+            options = self._along_plane_normal(curves, options)
             try:
                 feature = extrude.make(self.body, curves, options, step["id"])
             except extrude.ExtrudeError as exc:
@@ -270,11 +281,49 @@ class Builder:
                 profile = [(sketch, "") for sketch in sketches]
             else:
                 profile = sketches[0]
+            options = self._along_plane_normal(sketches, options)
         try:
             feature = extrude.make(self.body, profile, options, step["id"])
         except extrude.ExtrudeError as exc:
             raise BuildError("extrude %r: %s" % (step["id"], exc))
         return self._extruded(step, feature)
+
+    @staticmethod
+    def _along_plane_normal(profiles, options):
+        """A step counts along the sketch plane's own normal (-Y on XZ), whatever way the
+        app's Extrude dialog counts on that sketch. A sketch on the Front plane that a
+        person extruded in the dialog counts Fusion's way from then on (plus is +Y:
+        extrude.fusion_side): for such a sketch the options are turned round here (side
+        one becomes side two), so the step still builds what its numbers say."""
+        from fission180 import extrude
+
+        try:
+            first = profiles[0]
+            sketch = first[0] if isinstance(first, (tuple, list)) else first
+            if not extrude.is_sketch(sketch) or extrude.fusion_side(sketch) > 0:
+                return options
+        except Exception:
+            return options
+        turned = dict(options)
+        turned["start_offset"] = -float(options.get("start_offset", 0.0))
+        if options.get("direction") == "two_sides":
+            for a, b in (
+                ("distance", "distance2"),
+                ("extent", "extent2"),
+                ("taper", "taper2"),
+                ("extent_object", "extent_object2"),
+                ("extend", "extend2"),
+                ("object_offset", "object_offset2"),
+                ("wall_location", "wall_location2"),
+                ("wall_thickness", "wall_thickness2"),
+            ):
+                if a in options or b in options:
+                    turned[a], turned[b] = options.get(b), options.get(a)
+            for key in [k for k, v in turned.items() if v is None]:
+                del turned[key]
+        elif options.get("direction") != "symmetric":
+            turned["distance"] = -float(options.get("distance", 1.0))
+        return turned
 
     def _extruded(self, step, feature):
         from fission180 import extrude

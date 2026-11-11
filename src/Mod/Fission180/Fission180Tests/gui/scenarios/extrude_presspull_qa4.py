@@ -11,10 +11,14 @@ Path 17, double-click a timeline step while an Extrude with a preview is open: t
 Path 18, a New Body extrude edited into a Cut of the first body: the empty new body
          goes away and the next command works on the first body.
 Path 19, double-click the timeline icon of the extrude being made while it still waits
-         for its To Object pick: it is cancelled, no error.
+         for its To Object pick: the dialog stays open and says that it is still open for
+         this step (Fusion shows no timeline icon before OK, so there is nothing to edit;
+         cancelling took the step away without a word: book parity report, bug 20). Esc
+         then cancels it: nothing added, no error.
 
 Numbers by hand: base 40 x 30 x 10, wall 10 x 30 x 20 on its right end.
 """
+
 import math
 
 import FreeCAD as App
@@ -289,8 +293,7 @@ def p17_face():
 
 def p17_preview():
     p = xpanel()
-    h.check("face extrude preview", p.target is not None and len(p.profiles) == 1,
-            p.message.text())
+    h.check("face extrude preview", p.target is not None and len(p.profiles) == 1, p.message.text())
     s["count"] = len(extrudes())
     s["before_dblclick"] = vol1()
     h.check("double-click Extrude 1", ui.double_click_timeline("Extrude 1"), ui.timeline_titles())
@@ -396,8 +399,20 @@ def p19_double_click_own():
     h.check("double-click its own icon %s" % own, ui.double_click_timeline(own), titles)
 
 
+def p19_kept_open():
+    from fission180 import commands
+
+    p = xpanel()
+    said = str(commands._TOLD.get("msg") or "")
+    h.check("the unfinished extrude stays open (it is its own step)", dialog_open())
+    h.check("it says that Extrude is still open for this step", "still open" in said, said)
+    h.check("its step is still there", len(extrudes()) == s["count"] + 1)
+    h.check("still To Object", p is not None and p.extent.currentText() == "To Object")
+    h.press(QtCore.Qt.Key_Escape)
+
+
 def p19_done():
-    h.check("the unfinished extrude was cancelled (OK not possible)", not dialog_open())
+    h.check("Esc cancels the unfinished extrude", not dialog_open())
     h.check("nothing added", len(extrudes()) == s["count"] and near(vol1(), s["volume"]))
     h.check("nothing in error", not broken(), broken())
 
@@ -449,6 +464,7 @@ h.run(
         p19_face,
         p19_to_object,
         p19_double_click_own,
+        p19_kept_open,
         p19_done,
     ],
     paced_by="state",

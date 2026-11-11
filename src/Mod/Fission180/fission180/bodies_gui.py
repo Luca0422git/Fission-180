@@ -346,10 +346,11 @@ def picked_bodies(doc, picks):
 def body_text(found):
     if not found:
         return ""
+    # (bodies.shown_name: "Body1 (Bracket)" when several bodies are called Body1)
     if len(found) == 1:
-        return found[0].Label
+        return bodies.shown_name(found[0])
     if len(found) <= 3:
-        return ", ".join(b.Label for b in found)
+        return ", ".join(bodies.shown_name(b) for b in found)
     return "%d bodies" % len(found)
 
 
