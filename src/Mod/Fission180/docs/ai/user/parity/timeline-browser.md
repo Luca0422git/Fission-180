@@ -277,3 +277,15 @@ Ctrl+Z / Ctrl+Y, the browser's "Sketch 1" / "Sketch 2", Enter renames nothing, p
 - A step dragged before or after another keeps its picks: a Thread finds its cylinder again,
   a fillet / chamfer its edges (also Fission 180's own step with several sets), within the
   distance a modeled thread moved the surface (`timeline_ops._names_on`).
+
+## Wave 7, second pass: Delete on steps that made a component (branch `sf/book-modify-c`, 2026-11-11)
+
+| Step deleted in the timeline | What goes (one undo step) |
+|---|---|
+| Hardware | The part's component with its body, its other occurrences, the holes made for it and its joints (it used to leave the empty component behind) |
+| A pattern of a component | The pattern and its copies |
+| A component's own step (New Component, Create Components from Bodies) | The component with all in it; when an occurrence of it remains (Paste), that occurrence keeps the component alive, as in Fusion; a pattern that repeated it is marked in the timeline with the reason |
+| A pasted occurrence | Has no step of its own in the timeline: delete it in the browser |
+
+Scenario `book_modifyc_delete_component_steps` (31 checks). Insert of another design was not
+walked in this pass.
