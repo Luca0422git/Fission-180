@@ -1058,6 +1058,15 @@ def plan(op, fr=None):
             "The Bottom Height is %s mm below the stock: the tool would cut into what the stock lies on."
             % core.fmt(fr.stock_box[2] - heights["bottom"])
         )
+    linking = options["linking"]
+    if (
+        kind == "contour2d"
+        and options["geometry"]["tabs"].get("on")
+        and (linking.get("lead_in") or linking.get("lead_out"))
+    ):
+        warnings.append(
+            "With tabs the lead-in and lead-out are left out (FreeCAD's engine cannot make both)."
+        )
     env = {
         "heights": heights,
         "parts": resolved["parts"],

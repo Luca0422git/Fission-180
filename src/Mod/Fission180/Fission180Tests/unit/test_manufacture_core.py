@@ -269,10 +269,11 @@ class Operations(unittest.TestCase):
         plan = core.engine_plan("contour2d", options, self.env(parts))
         self.assertEqual([p["props"]["Side"] for p in plan], ["Outside", "Inside"])
         self.assertEqual([p["props"]["Direction"] for p in plan], ["CW", "CCW"])
-        self.assertEqual(
-            [d["module"] for d in plan[0]["dressups"]], ["LeadInOut", "RampEntry", "Tags"]
-        )
-        self.assertEqual(plan[0]["dressups"][2]["tabs"]["count"], 3)
+        # with tabs the lead-ins are left out (FreeCAD cannot make both); the tabs come first
+        self.assertEqual([d["module"] for d in plan[0]["dressups"]], ["Tags", "RampEntry"])
+        self.assertEqual(plan[0]["dressups"][0]["tabs"]["count"], 3)
+        plain = core.engine_plan("contour2d", self.options("contour2d"), self.env(parts[:1]))
+        self.assertEqual([d["module"] for d in plain[0]["dressups"]], ["LeadInOut"])
         self.assertEqual(plan[0]["props"]["StepDown"], 6.0)
         flipped = self.options(
             "contour2d", geometry={"flip_side": True}, passes={"direction": "conventional"}

@@ -1360,24 +1360,11 @@ def engine_plan(kind, options, env):
             inside = source.get("side") == "inside"
             if geometry.get("flip_side"):
                 inside = not inside
-            # FreeCAD's lead-in / lead-out reads the heights of the operation it is put on, so
-            # it comes first; the holding tabs are cut into the finished path last
+            # holding tabs and lead-ins do not go together in FreeCAD (tabs find no contour in
+            # a path with lead-ins; lead-ins put on a path with tabs retract at every tab): with
+            # tabs the leads are left out, and manufacture.plan says so
+
             dressups = []
-            if linking.get("lead_in") or linking.get("lead_out"):
-                dressups.append(
-                    {
-                        "module": "LeadInOut",
-                        "props": {
-                            "LeadIn": bool(linking.get("lead_in")),
-                            "LeadOut": bool(linking.get("lead_out")),
-                            "StyleIn": "Arc",
-                            "StyleOut": "Arc",
-                            "RadiusIn": lead,
-                            "RadiusOut": lead,
-                        },
-                    }
-                )
-            dressups += ramp_dressup()
             if tabs.get("on"):
                 dressups.append(
                     {
@@ -1391,6 +1378,21 @@ def engine_plan(kind, options, env):
                             "positioning": tabs["positioning"],
                             "distance": float(tabs["distance"]),
                             "count": int(tabs["count"]),
+                        },
+                    }
+                )
+            dressups += ramp_dressup()
+            if (linking.get("lead_in") or linking.get("lead_out")) and not tabs.get("on"):
+                dressups.append(
+                    {
+                        "module": "LeadInOut",
+                        "props": {
+                            "LeadIn": bool(linking.get("lead_in")),
+                            "LeadOut": bool(linking.get("lead_out")),
+                            "StyleIn": "Arc",
+                            "StyleOut": "Arc",
+                            "RadiusIn": lead,
+                            "RadiusOut": lead,
                         },
                     }
                 )

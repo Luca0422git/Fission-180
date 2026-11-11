@@ -86,8 +86,10 @@ class ToolEditor(QtWidgets.QDialog):
         self.tool = core.tool(tool)
         self.fields = {}
         layout = QtWidgets.QVBoxLayout(self)
+        self.setMinimumWidth(620)  # (all five tabs show: none hides behind a scroll arrow)
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.setObjectName("Fission180CamToolTabs")
+        self.tabs.setUsesScrollButtons(False)
         layout.addWidget(self.tabs)
         self._general()
         self._cutter()

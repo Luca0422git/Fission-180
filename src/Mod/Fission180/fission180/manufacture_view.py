@@ -34,6 +34,16 @@ STATE = {
 }
 
 
+# what counts() says of each drawn part
+PART_COUNTS = {
+    "setup": ("stock", "triad", "origin"),
+    "paths": ("paths", "kinds"),
+    "heights": ("planes", "heights"),
+    "marks": ("marks",),
+    "simulation": ("simulation", "tool_at"),
+}
+
+
 def _coin():
     from pivy import coin
 
@@ -109,7 +119,8 @@ def _set_part(doc, name, node):
 def drop(name):
     root = STATE["root"]
     old = STATE["parts"].pop(name, None)
-    STATE["counts"].pop(name, None)
+    for key in PART_COUNTS.get(name, (name,)):
+        STATE["counts"].pop(key, None)
     if root is not None and old is not None:
         try:
             root.removeChild(old)
