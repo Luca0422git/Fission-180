@@ -427,6 +427,31 @@ OPTIONS = [
         "(purple) curves, so the shapes you draw against them make profiles. Delete them "
         "in the sketch if you do not want them: they stay deleted.",
     ),
+    _option(
+        "sketch_project_on_reference",
+        "design",
+        "Auto project edges on reference",
+        "bool",
+        True,
+        (INFERENCE, "Bool", "ProjectOnReference"),
+        group="Sketch",
+        tip="While you draw, constrain or dimension in a sketch, a click on an edge or "
+        "corner of the model (also of another body or component) projects it into the "
+        "sketch as a purple curve and snaps to it. Off: only what you project with "
+        "Project (P) can be snapped to.",
+    ),
+    _option(
+        "sketch_scale_first_dimension",
+        "design",
+        "Scale entire sketch at first dimension",
+        "bool",
+        True,
+        (INFERENCE, "Bool", "ScaleAtFirstDimension"),
+        group="Sketch",
+        tip="The value typed into the first dimension you place in a sketch scales "
+        "everything drawn in it by the same factor, so a shape drawn by eye keeps its "
+        "proportions. Not when something in the sketch is fixed or projected.",
+    ),
     # -- General > API ----------------------------------------------------------------------
     _option(
         "scripts_folder",

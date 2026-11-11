@@ -48,6 +48,16 @@ CIRCLE = "Part::GeomCircle"
 ARC = "Part::GeomArcOfCircle"
 PICKABLE_CURVES = (LINE, CIRCLE, ARC)
 TITLE = "Sketch Dimension"
+CENTERLINE = "Centerline diameter"  # a Spec's kind: the diameter about a centerline
+# Fusion's right-click menu while a length follows the pointer (Autodesk blog "Mastering
+# Sketch Dimensions: 5 Essential Right-Click Tricks": "right-click before placing it and
+# select horizontal, vertical or aligned": the dimension keeps that orientation wherever
+# the pointer goes)
+ORIENTATIONS = {
+    "Aligned": core.ALIGNED,
+    "Horizontal": core.HORIZONTAL,
+    "Vertical": core.VERTICAL,
+}
 ZERO_HELP = (
     "a dimension cannot be 0 (Fusion refuses it too). To make them meet use Coincident; to "
     "line them up Horizontal/Vertical or Collinear."
@@ -72,18 +82,23 @@ class Spec:
     in mm or radians; `text` what the hint says; `lines` the preview; `label(cursor)` sets
     (LabelDistance, LabelPosition) or None."""
 
-    def __init__(self, kind, value, build, lines=(), label=None, what=""):
+    def __init__(self, kind, value, build, lines=(), label=None, what="", prepare=None):
         self.kind = kind
         self.value = value
         self.build = build
         self.lines = list(lines)
         self.label = label
         self.what = what
+        # run once inside the dimension's undo step before build() (a centerline diameter's
+        # hidden mirror point)
+        self.prepare = prepare
 
     def text(self):
         if self.kind == "Angle":
             return "%.1f deg" % math.degrees(abs(self.value))
-        prefix = {"Diameter": "diameter ", "Radius": "radius "}.get(self.kind, "")
+        prefix = {"Diameter": "diameter ", "Radius": "radius ", CENTERLINE: "diameter "}.get(
+            self.kind, ""
+        )
         return "%s%s%s" % (prefix, _fmt(abs(self.value)), self.what)
 
 
@@ -96,6 +111,7 @@ class Dimension(draw.DrawTool):
         draw.DrawTool.__init__(self, session)
         self.cursor = None  # the pointer in sketch coordinates
         self.last_index = None  # the dimension placed last (tests)
+        self.forced = None  # the orientation chosen with a right click, until it is placed
 
     def steps(self):
         return 3
@@ -109,7 +125,10 @@ class Dimension(draw.DrawTool):
         spec = self._spec(self.cursor) if self.cursor is not None else None
         if isinstance(spec, Spec):
             more = "" if len(self.picks) >= 2 else ", or click a second thing"
-            return "%s: click to place it%s." % (spec.text(), more)
+            turn = ""
+            if self.can_force():
+                turn = " Right-click: Aligned, Horizontal or Vertical."
+            return "%s: click to place it%s.%s" % (spec.text(), more, turn)
         if len(self.picks) == 1:
             return "click the second point or line (or an empty spot: from the origin)."
         return "click to place the dimension."
@@ -147,7 +166,7 @@ class Dimension(draw.DrawTool):
     def pick_at(self, snap):
         """The thing the click at `snap` picks, or None when it is the placing click."""
         kinds = [self.kind_of(p) for p in self.picks]
-        for item in self.candidates(snap):
+        for item in self._first_through(self.candidates(snap)):
             if item in self.picks:
                 continue
             if not core.is_pick(kinds, self.kind_of(item)):
@@ -156,6 +175,31 @@ class Dimension(draw.DrawTool):
                 continue  # the same spot as the first pick: the next thing under the pointer
             return item
         return None
+
+    def _first_through(self, items):
+        """A second click on the spot of the first pick (a point) means the next thing
+        there: the sketch's own curves that pass through that point come before an axis
+        that happens to be a hair nearer to the pointer (an arc that starts on the origin:
+        the click picked the Y axis)."""
+        if len(self.picks) != 1 or self.picks[0][1] == 0:
+            return items
+        p0 = ctools.point_of(self.sketch, self.picks[0])
+        if p0 is None:
+            return items
+        curves = dict(self.geometry().hits)
+        through = [
+            item
+            for item in items
+            if item[1] == 0
+            and item[0] >= 0
+            and item[0] in curves
+            and icore.curve_distance(p0, curves[item[0]]) <= 1e-6
+        ]
+        if not through:
+            return items
+        points = [item for item in items if item[1] != 0]
+        rest = [item for item in items if item[1] == 0 and item not in through]
+        return points + through + rest
 
     def _same_place(self, a, b):
         """Two picked POINTS at the same place (an arc's end on the origin): no dimension
@@ -242,9 +286,66 @@ class Dimension(draw.DrawTool):
             return "click the point or line to measure from the axis."
         return "that cannot be dimensioned."
 
+    # -- the orientation chosen with a right click ------------------------------------------
+    def can_force(self):
+        """A length between two points follows the pointer: it can be aligned, horizontal
+        or vertical (a radius, an angle or a distance to a line has one way only)."""
+        if not self.picks:
+            return False
+        try:
+            return self._ends() is not None
+        except Exception:
+            return False
+
+    def _ends(self):
+        """The two sketch points the length that follows the pointer runs between, or
+        None when the picks give another kind of dimension."""
+        picks = self.picks
+        if len(picks) == 1:
+            item = picks[0]
+            kind = self.kind_of(item)
+            if kind == core.LINE:
+                g = build.geometry(self.sketch, item[0])
+                return (g.StartPoint.x, g.StartPoint.y), (g.EndPoint.x, g.EndPoint.y)
+            if kind == core.POINT and item != (-1, 1):
+                return (0.0, 0.0), self._point(item)
+            return None
+        k1, k2 = self.kind_of(picks[0]), self.kind_of(picks[1])
+        pointy = (core.POINT, core.CIRCLE, core.ARC)
+        if k1 in pointy and k2 in pointy:
+            a, b = self._point(picks[0]), self._point(picks[1])
+            if a is None or b is None or math.hypot(a[0] - b[0], a[1] - b[1]) <= 1e-7:
+                return None
+            return a, b
+        return None
+
+    def force(self, name):
+        """Right-click > Aligned / Horizontal / Vertical while the dimension follows the
+        pointer. Returns False (and says why) when nothing can be turned."""
+        kind = ORIENTATIONS.get(name)
+        if kind is None or not self.can_force():
+            self.say(
+                "%s: pick a line or two points first; the dimension that follows the pointer "
+                "can then be made %s." % (name, name.lower())
+            )
+            return False
+        a, b = self._ends()
+        if core.measure(kind, a, b) <= core.ZERO:
+            self.say(
+                "%s: the two points are lined up that way already (it would be 0). %s"
+                % (name, ZERO_HELP)
+            )
+            return False
+        self.forced = kind
+        log("%s: the dimension is %s (right click)" % (self.title, name.lower()))
+        if self.cursor is not None and self.last is not None:
+            self.moved(self.last)
+        self._tell()
+        return True
+
     def _linear(self, ia, ib, a, b, cursor, whole_line=None):
         """A length between two points (items ia, ib at a, b)."""
-        kind = core.linear_kind(a, b, cursor)
+        kind = self.forced or core.linear_kind(a, b, cursor)
         value = core.measure(kind, a, b)
         if value <= core.ZERO:
             if core.measure(core.ALIGNED, a, b) <= core.ZERO:
@@ -276,6 +377,8 @@ class Dimension(draw.DrawTool):
         if value <= core.ZERO:
             return "that point is on the line: " + ZERO_HELP
         f = core.foot(p, origin, direction)
+        if line >= 0 and line in self._centerlines():
+            return self._centerline_diameter(point_item, line, p, f, value, cursor)
         lines = core.linear_preview(core.ALIGNED, f, p, cursor)
         if line in (-1, -2):
             # an axis: FreeCAD's signed horizontal / vertical distance from the origin keeps
@@ -298,6 +401,48 @@ class Dimension(draw.DrawTool):
             lambda: _con("Distance", point_item[0], point_item[1], line, value),
             lines,
             lambda c: core.linear_label(core.ALIGNED, f, p, c),
+        )
+
+    def _centerlines(self):
+        """The geometry indices of the sketch's centerlines (Linetype: Centerline)."""
+        try:
+            from . import sketch_centerline
+
+            return sketch_centerline.lines(self.sketch)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            return []
+
+    def _centerline_diameter(self, point_item, line, p, f, value, cursor):
+        """Fusion: a dimension from a point, a line or a circle's centre to a CENTERLINE is
+        the diameter across the turned part (twice the distance). FreeCAD's solver has no
+        such dimension: it is a Distance from the point to its hidden mirror image across
+        the centerline (sketch_centerline.mirror_point), drawn across the centerline with
+        the diameter sign (sketch_dimension_signs.py)."""
+        from . import sketch_centerline
+
+        sketch = self.sketch
+        image = (2.0 * f[0] - p[0], 2.0 * f[1] - p[1])
+        made = {}
+
+        def prepare():
+            made["helper"] = sketch_centerline.mirror_point(
+                sketch, point_item[0], point_item[1], line
+            )
+            if made["helper"] is None:
+                raise ValueError("the point is on the centerline")
+
+        def build_it():
+            return _con("Distance", point_item[0], point_item[1], made["helper"], 1, 2.0 * value)
+
+        return Spec(
+            CENTERLINE,
+            2.0 * value,
+            build_it,
+            core.linear_preview(core.ALIGNED, p, image, cursor),
+            lambda c: core.linear_label(core.ALIGNED, p, image, c),
+            " (to the centerline)",
+            prepare,
         )
 
     def _spec_two(self, first, second, cursor):
@@ -347,6 +492,9 @@ class Dimension(draw.DrawTool):
             line, other = (g1, g2) if g1 >= 0 else (g2, g1)
             if line < 0:
                 return "both lines are fixed (axes or projected): pick a sketch line."
+            centerlines = self._centerlines()
+            if line in centerlines and other >= 0 and other not in centerlines:
+                line, other = other, line  # (the diameter: measured from the other line)
             return self._point_line((line, 1), other, cursor)
         sector = core.angle_sector(o1, d1, o2, d2, cursor)
         if sector is None:
@@ -449,37 +597,16 @@ class Dimension(draw.DrawTool):
         if pos is None:
             return None
         try:
-            from . import sketch_auto_project
+            # (wave 7, sketch-c: the one place that projects on reference, also from another
+            # body or component, behind Fusion's preference: sketch_reference.py)
+            from . import sketch_reference
 
-            gl = session.gl
-            ratio = gl.devicePixelRatioF()
-            info = session.view.getObjectInfo(
-                (int(pos.x() * ratio), int((gl.height() - pos.y()) * ratio))
-            )
-            if not info or not info.get("Component"):
+            found = sketch_reference.element_under(session, pos)
+            if found is None:
                 return None
-            obj = self.doc.getObject(info.get("Object", ""))
-            sub = info["Component"].rsplit(".", 1)[-1]
-            if obj is None or obj is self.sketch or not sub.startswith(("Edge", "Vertex")):
-                return None
-            before = len(self.sketch.ExternalGeo)
-            self.doc.openTransaction("Project")
-            try:
-                if sub.startswith("Edge"):
-                    missing, _have = sketch_auto_project.missing_edges(self.sketch, obj, sub)
-                    if missing:
-                        sketch_auto_project.add_edges(self.sketch, obj, missing)
-                else:
-                    self.sketch.addExternal(obj.Name, sub)
-                self.sketch.solve()
-            except Exception:
-                ctools.end_step(self.doc, abort=True)
-                raise
-            ctools.end_step(self.doc)
-            added = len(self.sketch.ExternalGeo) - before
+            sub = found[1]
+            added = sketch_reference.project_under(session, pos, self.title)
             self._geometry = None
-            if added:
-                log("%s: projected %s of %s to dimension to it" % (self.title, sub, obj.Label))
             for item in self.candidates(snap):
                 kinds = [self.kind_of(p) for p in self.picks]
                 if (
@@ -514,6 +641,8 @@ class Dimension(draw.DrawTool):
         try:
             from . import preview
 
+            if spec.prepare is not None:
+                spec.prepare()
             outcome = ctools.add_forms(sketch, self.title, [[spec.build()]])
             index = len(sketch.Constraints) - 1
             if not outcome.ok:
@@ -549,11 +678,15 @@ class Dimension(draw.DrawTool):
             return
         try:
             self.session.edit_dimension(index)
+            if self.session.editor is not None:
+                # (its first value: "Scale entire sketch at first dimension")
+                self.session.editor.just_placed = True
         except Exception as exc:
             warn("%s: the value box: %s" % (self.title, exc))
 
     def _reset(self):
         self.picks = []
+        self.forced = None
         self.step = 0
         self._geometry = None
         self.preview.clear()
@@ -561,6 +694,7 @@ class Dimension(draw.DrawTool):
 
     def undone(self):
         self._geometry = None
+        self.forced = None
         self.picks = []
         self.step = 0
         self.preview.clear()

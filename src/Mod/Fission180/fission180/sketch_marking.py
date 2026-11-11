@@ -92,6 +92,27 @@ def _dimension_entries():
     return []
 
 
+def _placing_entries():
+    """Aligned / Horizontal / Vertical while Sketch Dimension has a length following the
+    pointer (Fusion's right-click menu while a dimension is being placed)."""
+    try:
+        session = _session()
+        tool = getattr(session, "tool", None) if session is not None else None
+        if tool is None or not getattr(tool, "active", False):
+            return []
+        can = getattr(tool, "can_force", None)
+        if can is None or not can():
+            return []
+        return [
+            item("Aligned", "Fission180_SketchDimensionAligned", "sk_dimension"),
+            item("Horizontal", "Fission180_SketchDimensionHorizontal", "sk_dimension"),
+            item("Vertical", "Fission180_SketchDimensionVertical", "sk_dimension"),
+        ]
+    except Exception as exc:
+        warn("sketch marking menu: %s" % exc)
+    return []
+
+
 def _tool_running():
     session = _session()
     try:
@@ -135,7 +156,8 @@ def _menu_class():
                     int(RADIUS * math.cos(angle)), int(-RADIUS * math.sin(angle))
                 )
                 self.slots.append(self._slot(entry, pos, available))
-            listing = build_menu(self, _dimension_entries() + _text_entries() + LIST, available)
+            entries = _placing_entries() + _dimension_entries() + _text_entries() + LIST
+            listing = build_menu(self, entries, available)
             self.list = QtWidgets.QListWidget(self)
             self.list.setObjectName("Fission180MarkingList")
             self.list.setFixedWidth(200)

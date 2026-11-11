@@ -396,6 +396,47 @@ class SketchDimension(_SketchCommand):
         sketch_draw.run(sketch_dimension_tool.Dimension)
 
 
+class _DimensionOrientation(_SketchCommand):
+    """Fusion's right-click menu while a dimension is being placed: Aligned, Horizontal or
+    Vertical. The length that follows the pointer keeps that orientation until it is placed
+    (sketch_dimension_tool.Dimension.force)."""
+
+    orientation = ""
+    icon = "sk_dimension"
+    gives_way = False
+
+    def run(self):
+        if _in_sketch(self.title) is None:
+            return
+        from . import sketch_dimension_tool, sketch_mode
+
+        session = sketch_mode.current()
+        tool = getattr(session, "tool", None) if session is not None else None
+        if not isinstance(tool, sketch_dimension_tool.Dimension) or not tool.active:
+            commands.tell(
+                "%s: start Sketch Dimension (D) and pick a line or two points first; then "
+                "right-click and choose it before you click to place the dimension."
+                % self.orientation
+            )
+            return
+        tool.force(self.orientation)
+
+
+def _orientation(name):
+    return type(
+        "SketchDimension%s" % name,
+        (_DimensionOrientation,),
+        {
+            "orientation": name,
+            "title": "%s Dimension" % name,
+            "tip": (
+                "While a sketch dimension follows the pointer: make it %s, wherever you "
+                "then click to place it" % name.lower()
+            ),
+        },
+    )
+
+
 class SketchToggleDriven(_SketchCommand):
     """Fusion's Toggle Driven (the right-click menu on a dimension): a driving dimension
     becomes a driven one (in brackets: it shows the size) and back."""
@@ -525,6 +566,9 @@ COMMANDS = {
     "Fission180_SketchSymmetry": CONSTRAINTS["Fission180_SketchSymmetry"],
     "Fission180_SketchDimension": SketchDimension,
     "Fission180_SketchToggleDriven": SketchToggleDriven,
+    "Fission180_SketchDimensionAligned": _orientation("Aligned"),
+    "Fission180_SketchDimensionHorizontal": _orientation("Horizontal"),
+    "Fission180_SketchDimensionVertical": _orientation("Vertical"),
     "Fission180_FinishSketch": FinishSketch,
     "Fission180_SketchLine": SketchLine,
     "Fission180_PolygonCircumscribed": PolygonCircumscribed,
