@@ -21,9 +21,11 @@ a 30 x 20 x 1 sheet metal plate (y -60..-40).
   body), Chamfer 1 mm (the same edge), Shell 1 mm (top face), Hole (top face), Press Pull
   +2 (top face), Thread (the cylinder's wall), Split Body (the block by A's -Y face,
   extended), Combine (the block + the tool box), Mirror (the cylinder across the block's
-  +X face), Extrude Cut by hand (a circle sketched on B's top face: the sketch goes into
-  A, the cut goes through B), PLASTIC > Rest (an offset plane and a sketch in A, 3 mm in
-  front of B's block: the rest is built on B), SHEET METAL > Flange (an edge of B's plate).
+  +X face), Extrude Cut (a circle sketched on B's top face: the sketch goes into A; 25
+  down, mostly outside B's block: New Body proposed; 5 down, inside it: Cut by itself, B's
+  block under Bodies to Cut, the cut goes through B), PLASTIC > Rest (an offset plane and
+  a sketch in A, 3 mm in front of B's block: the rest is built on B), SHEET METAL > Flange
+  (an edge of B's plate).
 """
 
 import math
@@ -297,7 +299,7 @@ def mirror_made():
         h.check("Mirror: across x 70 (55 -> 85)", xs == [55.0, 85.0], xs)
 
 
-# -- Extrude Cut by hand -----------------------------------------------------------------------
+# -- Extrude Cut -----------------------------------------------------------------------------------
 def xpanel():
     from fission180 import extrude_ui
 
@@ -357,20 +359,44 @@ def cut_profile():
 def cut_distance():
     p = xpanel()
     if h.check("Cut: a profile is picked", p is not None and bool(p.profiles)):
-        b.type_into(p.distance.widget, "-5")
+        b.type_into(p.distance.widget, "-25")
 
 
-def cut_operation():
+def cut_small_overlap():
+    # Fusion's rule for the operation it proposes (Autodesk's J. Strater on the forum, "Tool
+    # behaviour - unexpected"; book-extrude-2.md, item 3): MOSTLY inside a shown body, of
+    # whichever component: Cut; otherwise, with nothing of the active component to join:
+    # New Body. Both sides, as book_extrude_operation R9: 25 down through B's 10 mm block is
+    # two fifths inside it: New Body, B untouched (the book report's bug 10: a new part
+    # that only overlaps another component's must not cut it by itself).
     p = xpanel()
     if p is None:
         return
     h.caught_up(p)
     h.check(
-        "Cut: proposed New Body (B's block is another component's: no Cut by itself)",
+        "Cut: two fifths of it inside B's block: New Body proposed, no Cut by itself",
         p.operation.currentText() == "New Body",
         p.operation.currentText(),
     )
-    ui.choose(p.operation, "Cut")
+    h.check("Cut: B's block untouched in that preview", k.close(vol("b"), B_BOX), vol("b"))
+    b.type_into(p.distance.widget, "-5")
+
+
+def cut_operation():
+    # ...and 5 down, wholly inside B's block: Cut by itself, with B's block listed under
+    # Bodies to Cut (this check expected New Body until extrude-2 built Fusion's rule: the
+    # first fix for bug 10 let only bodies of the active component decide).
+    p = xpanel()
+    if p is None:
+        return
+    h.caught_up(p)
+    h.check(
+        "Cut: wholly inside B's block: Cut proposed by itself",
+        p.operation.currentText() == "Cut",
+        p.operation.currentText(),
+    )
+    names = p._participant_names(compute=False) or []
+    h.check("Cut: B's block is under Bodies to Cut", names == [obj("b").Name], names)
 
 
 def cut_preview():
@@ -646,6 +672,7 @@ steps = (
         cut_extrude,
         cut_profile,
         cut_distance,
+        cut_small_overlap,
         cut_operation,
         cut_preview,
         cut_made,
