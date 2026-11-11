@@ -259,6 +259,7 @@ def b_dragged():
     )
     h.check("B nothing is refused", t.tl().refusal() == "", t.tl().refusal())
     all_ok("B drag:")
+    tip_shown("B after the drag:", screw())
     s["thread_through"] = vol()
     h.check(
         "B the thread runs into the chamfer (more is cut)",
@@ -1336,6 +1337,24 @@ def f_reopened():
     h.check("F reopened: the same solids", volumes() == s["volumes"], (volumes(), s["volumes"]))
     all_ok("F reopened:")
     h.shot("F-reopened")
+
+
+def tip_shown(tag, body):
+    """What the view draws of a body is its Tip (the last step), and the browser's eye says
+    the body is shown."""
+    from fission180 import body_visibility
+
+    drawn = [
+        o.Label
+        for o in body.Group
+        if o.isDerivedFrom("PartDesign::Feature") and o.ViewObject.Visibility
+    ]
+    h.check(
+        "%s the view draws the body's last step" % tag,
+        drawn == [body.Tip.Label],
+        (drawn, body.Tip.Label),
+    )
+    h.check("%s the browser's eye shows the body" % tag, body_visibility.body_shown(body))
 
 
 steps = r.home_steps()

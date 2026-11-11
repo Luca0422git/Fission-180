@@ -1939,6 +1939,13 @@ def move(doc, name, slot):
             item = timeline(doc).find(name)
             what = item.display if item is not None else name
             raise TimelineError(_fails_there(doc, name, what))
+        # (wave 7, the book replay: the Metric Bolt's Thread dragged before its Chamfer) the
+        # recompute showed the moved step again: the view drew the thread without the
+        # chamfer and the browser's eye said the body was hidden. Its Tip is what shows.
+        for body_name in tips:
+            body = doc.getObject(body_name)
+            if body is not None and getattr(body, "Tip", None) is not None:
+                _show_only_tip(body, body.Tip)
     except Exception:
         doc.abortTransaction()
         recompute(doc)

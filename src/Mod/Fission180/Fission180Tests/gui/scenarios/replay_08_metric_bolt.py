@@ -665,6 +665,7 @@ def f_dragged():
     h.check("F nothing is refused", t.tl().refusal() == "", t.tl().refusal())
     all_ok("F drag:")
     h.check("F the bolt is shown", bolt().Visibility, bolt().Visibility)
+    tip_shown("F after the drag:", bolt())
     s["v_threaded"] = vol()
     h.fit()
     h.shot("F-thread")
@@ -834,7 +835,26 @@ def h_reopened():
     h.check("H reopened: the same timeline", t.titles() == s["titles"], t.titles())
     h.check("H reopened: Quantity still drives the pattern", r.near(value("Quantity"), 8.0))
     all_ok("H reopened:")
+    tip_shown("H reopened:", bolt())
     h.shot("H-reopened")
+
+
+def tip_shown(tag, body):
+    """What the view draws of a body is its Tip (the last step), and the browser's eye says
+    the body is shown."""
+    from fission180 import body_visibility
+
+    drawn = [
+        o.Label
+        for o in body.Group
+        if o.isDerivedFrom("PartDesign::Feature") and o.ViewObject.Visibility
+    ]
+    h.check(
+        "%s the view draws the body's last step" % tag,
+        drawn == [body.Tip.Label],
+        (drawn, body.Tip.Label),
+    )
+    h.check("%s the browser's eye shows the body" % tag, body_visibility.body_shown(body))
 
 
 steps = r.home_steps() + [a_open]
