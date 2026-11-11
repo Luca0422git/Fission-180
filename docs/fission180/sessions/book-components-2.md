@@ -48,8 +48,15 @@ the preview and after OK). What it probably saw was the active component switchi
 
 ## Part 2: the suite with "First component Ground to Parent" on
 
-The harness block that switched the preference off is gone. See the table in the final
-report (every scenario of the list, run one at a time with the default preference).
+The harness block that switched the preference off is gone. Every scenario of the brief's
+list ran one at a time with the default preference (70 of the list, plus 30 more that the
+changed files or the orchestrator's questions touch). Two failed because of the ground
+(`components2_bodies`, `components2_move`: they moved their first component with Move) and
+one because of the Align fix (`modify_align`); all pass after the scenario changes below.
+Nothing else in the list needed the preference off: the joints and VEX scenarios make
+their components by Insert or through the modules, which do not ground (Fusion grounds
+the first component *created*; an inserted one is not grounded, here as there),
+and the Joint dialog ungrounds the first component picked.
 Scenarios that assumed a free first component now do what a person does: right-click the
 component > Unground From Parent (`component_steps.unground`, real input), with a comment.
 App fixes: Align refused nothing (it moved a grounded component); Move's refusal now names

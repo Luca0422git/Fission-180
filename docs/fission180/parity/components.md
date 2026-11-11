@@ -481,10 +481,12 @@ when a dialog closes (and before the next command).
   component's (and the design's) timeline.
 - Wave 7 (components-2): one Fillet / Chamfer step rounds edges of one body (Fusion's takes
   edges of several bodies); a click on a second body says so.
-- Wave 7 (components-2): Fusion also grounds the first component that is INSERTED into a
-  design (and the first one made by Extrude > New Component); here only New Component and
-  Create Components from Bodies ground it (`components_ui.ground_first`). Editing a step of
-  another component from the timeline still makes that component the active one.
+- Wave 7 (components-2): "First component Ground to Parent" grounds the first component
+  CREATED at a level (New Component, Create Components from Bodies:
+  `components_ui.ground_first`). The first one made by Extrude > New Component is not
+  grounded here (Fusion's blog says "the first component created at each layer": a gap). An
+  INSERTED part is not grounded (the hardware builder's finding for Fusion; kept). Editing
+  a step of another component from the timeline still makes that component the active one.
 - Wave 7: with the design's row active, a sketch on a face of a component's body goes into the
   root (Fusion does the same) and its extrude makes a New Body at the root unless Cut is
   chosen; activate the component first to add to its body, as in Fusion.
