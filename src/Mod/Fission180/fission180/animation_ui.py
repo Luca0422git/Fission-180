@@ -47,6 +47,7 @@ STATE = {
     "camera_doc": None,
     "camera_moving": None,
     "key": None,  # what the timeline and the view showed last (to follow undo / redo)
+    "board": None,  # (key, the storyboard shown) kept until the storyboards change
     "note": "",  # the line under the timeline (what was dropped, what just happened)
 }
 PLAY_MS = 33
@@ -110,13 +111,22 @@ def set_current(name, doc=None):
 
 
 def board(doc=None):
-    """The storyboard shown, as animation_core data (a copy)."""
+    """The storyboard shown, as animation_core data. Read it, never change it (a dialog
+    copies it for its preview): it is kept until the design's storyboards change, so a
+    playback does not read the design again for every frame."""
     doc = doc or _doc()
     if doc is None:
         return None
     name = current(doc)
+    key = (_data_key(doc)[:3], name)
+    kept = STATE.get("board")
+    if kept is not None and kept[0] == key:
+        return kept[1]
     found = core.find(animation.load(doc), name)
-    return found if found is not None else core.new_storyboard(name or animation.FIRST)
+    if found is None:
+        found = core.new_storyboard(name or animation.FIRST)
+    STATE["board"] = (key, found)
+    return found
 
 
 def playhead(doc=None):
@@ -267,7 +277,19 @@ def _data_key(doc):
         return None
     obj = animation.store(doc)
     text = getattr(obj, animation.PROP, "") if obj is not None else ""
-    return (doc.Name, hash(text), tuple(animation.movable_names(doc)))
+    parts = animation.movables(doc)
+    # (what the storyboards say, which components there are, and where and whether the
+    # design shows them: an undo of a design step changes those under the workspace)
+    design = tuple(
+        (
+            tuple(round(c, 6) for c in part.Placement.Base),
+            tuple(round(c, 9) for c in part.Placement.Rotation.Q),
+            animation.design_visible(part),
+            part.Label,
+        )
+        for part in parts
+    )
+    return (doc.Name, hash(text), tuple(p.Name for p in parts), design)
 
 
 def refresh(camera=False):
@@ -690,6 +712,20 @@ def _timeline(on):
         warn("animation workspace timeline: %s" % exc)
 
 
+def _keep_design_timeline_away():
+    """The design timeline shown again by someone else while the workspace is on (Home let
+    go of it after the workspace had come back): away with it, to come back with Design."""
+    try:
+        from . import timeline_ui
+
+        dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
+        if dock is not None and dock.isVisible():
+            STATE["timeline"] = True
+            timeline_ui.hide()
+    except Exception as exc:
+        warn("animation workspace timeline: %s" % exc)
+
+
 def sync():
     """The active design changed (another tab, a design closed), or another workspace was
     entered: show what the design in front is in."""
@@ -699,10 +735,10 @@ def sync():
         if want and _other_workspace(doc) is not None:
             STATE["docs"][doc.Name] = False  # one workspace at a time
             want = False
-        try:  # a drawing's tab in front: the workspace waits behind it
-            from . import drawing_ui
+        try:  # a drawing's tab or Home in front: the workspace waits behind it
+            from . import drawing_ui, home_ui
 
-            if want and drawing_ui.is_on():
+            if want and (drawing_ui.is_on() or home_ui.is_active()):
                 want = False
         except Exception:
             pass
@@ -810,6 +846,7 @@ def _tick():
             return
         if getattr(doc, "Recomputing", False):
             return
+        _keep_design_timeline_away()
         key = _data_key(doc)
         if key != STATE["key"]:
             refresh()

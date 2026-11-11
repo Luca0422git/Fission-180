@@ -133,12 +133,12 @@ def body_of(label):
 
 
 def design_placements():
-    """{label: (x, y, z, qx, qy, qz, qw)} of every component as the design has it."""
+    """{object name: (x, y, z, qx, qy, qz, qw)} of every component as the design has it."""
     out = {}
     for obj in doc().Objects:
         if obj.TypeId == "App::Part":
             p = obj.Placement
-            out[obj.Label] = tuple(round(c, 6) for c in tuple(p.Base) + tuple(p.Rotation.Q))
+            out[obj.Name] = tuple(round(c, 6) for c in tuple(p.Base) + tuple(p.Rotation.Q))
     return out
 
 

@@ -71,8 +71,10 @@ def store(doc, create=False):
     """The object holding the design's storyboards (None when there is none yet)."""
     if doc is None:
         return None
-    for obj in doc.Objects:
-        if obj.TypeId == "App::FeaturePython" and bodies.kind(obj) == STORE_TYPE:
+    # (FreeCAD's own filter by type: a design of thousands of objects is asked this on
+    # every tick of the workspace)
+    for obj in components.of_type(doc, "App::FeaturePython"):
+        if bodies.kind(obj) == STORE_TYPE:
             return obj
     if not create:
         return None

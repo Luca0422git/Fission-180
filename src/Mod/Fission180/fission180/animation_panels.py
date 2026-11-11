@@ -455,7 +455,7 @@ class TransformPanel(AnimPanel):
         move = self.move_vector()
         pivot = self.centre()
         world = animation.global_of(self.doc, animation.placements_of(self.doc, board, self.at))
-        for comp in self.picks:
+        for comp in self.moving():
             m = animation.to_parent_frame(comp, move, world=world)
             a = animation.to_parent_frame(comp, axis, world=world)
             p = animation.to_parent_frame(comp, pivot, point=True, world=world)
@@ -468,6 +468,13 @@ class TransformPanel(AnimPanel):
         kept = [n for n in board.get("trails", []) if n not in names]
         board["trails"] = kept + (names if self.trails.isChecked() else [])
         return made
+
+    def moving(self):
+        """The picked components that move themselves: one picked together with a
+        component it lies in goes along with that one (it is not moved twice)."""
+        from . import components
+
+        return [c for c in self.picks if not any(a in self.picks for a in components.ancestors(c))]
 
     def preview_board(self):
         temp = copy.deepcopy(self.board())

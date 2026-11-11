@@ -469,6 +469,103 @@ def home_base():
 
 def base_already_home():
     h.check("Restore Home on a part that never moved says so", "Already home" in a.told(), a.told())
+    a.click_time(6.0)
+
+
+# -- Set Pivot and Trail Line Visibility --------------------------------------------------------
+def pivot_pick():
+    a.click_row("Right")
+
+
+def pivot_open():
+    h.ribbon("Transform Components")
+
+
+pivot_open.done = lambda: a.panel() is not None
+pivot_open.done_what = "the Transform Components dialog is open"
+
+
+def pivot_button():
+    p = a.panel()
+    h.check(
+        "the manipulator starts on the middle of the Right pin",
+        a.close(tuple(p.triad.center), (70, 20, 5)),
+        tuple(p.triad.center),
+    )
+    w.click(a.field("set_pivot"))
+
+
+def pivot_click():
+    h.check("Set Pivot asks for a point", "Click the point" in a.message(), a.message())
+    a.click_part("Right", dx=-8, dy=3)
+
+
+def pivot_set():
+    p = a.panel()
+    h.check(
+        "the click set the pivot (and picked nothing else)",
+        p.pivot is not None and [c.Label for c in p.picks] == ["Right"],
+    )
+    h.check(
+        "on the clicked point of the pin's top",
+        p.pivot is not None and a.close(tuple(p.pivot), (62, 23, 8), 1.0),
+        p.pivot,
+    )
+    h.check("the manipulator stands on it", a.close(tuple(p.triad.center), tuple(p.pivot), 1e-6))
+    h.check("Set Pivot is released", not a.field("set_pivot").isChecked())
+    s["pivot"] = tuple(p.pivot)
+    a.type_number("rz", "90")
+
+
+def pivot_turn():
+    # a quarter turn about Z through the pivot (px, py): the pin's origin goes to
+    # (px + py, py - px)
+    px, py = s["pivot"][0], s["pivot"][1]
+    h.check(
+        "the pin turns about the pivot",
+        a.close(a.shown("Right"), (px + py, py - px, 0)),
+        a.shown("Right"),
+    )
+    a.tick("trails")
+
+
+def pivot_ok():
+    h.check(
+        "the preview draws the trail",
+        a.view_module().drawn_trails(a.doc()) == 1,
+        a.view_module().drawn_trails(a.doc()),
+    )
+    a.ok()
+
+
+pivot_ok.done = a.panel_closed
+pivot_ok.done_what = "the dialog closed"
+
+
+def trail_kept():
+    h.check(
+        "the Right pin has a Rotate action from 0 to 6 s",
+        a.spans("transform", "Right") == [(0.0, 6.0)],
+        a.spans("transform", "Right"),
+    )
+    h.check("it is called Rotate", a.core().title(a.actions("transform", "Right")[0]) == "Rotate")
+    h.check(
+        "its trail is kept and drawn",
+        a.board()["trails"] == [a.comp("Right").Name]
+        and a.view_module().drawn_trails(a.doc()) == 1,
+    )
+    c = a.canvas()
+    y = c.row_y(a.comp("Right").Name)
+    h.check(
+        "right-click the row's name > Trail Line Visibility",
+        w.right_click(c, QtCore.QPoint(30, y + 11), "Trail Line Visibility"),
+    )
+
+
+def trail_off():
+    h.check(
+        "the trail is off", a.board()["trails"] == [] and a.view_module().drawn_trails(a.doc()) == 0
+    )
     a.leave()
 
 
@@ -538,6 +635,15 @@ h.run(
         foot_half,
         home_base,
         base_already_home,
+        pivot_pick,
+        pivot_open,
+        pivot_button,
+        pivot_click,
+        pivot_set,
+        pivot_turn,
+        pivot_ok,
+        trail_kept,
+        trail_off,
         left,
     ],
     paced_by="state",

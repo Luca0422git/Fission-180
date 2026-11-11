@@ -244,6 +244,50 @@ def callout_follows():
 
 def callout_not_yet():
     h.check("before 1 s the callout is not drawn", a.view_module().drawn_callouts(a.doc()) == [])
+    a.double_click_bar(a.actions("callout")[0]["id"])
+
+
+callout_not_yet.done = lambda: a.panel() is not None
+callout_not_yet.done_what = "a double-click on the callout's bar opened its dialog"
+
+
+def callout_edit():
+    h.check(
+        "the dialog shows the callout's text",
+        a.field("text").text() == "Lid",
+        a.field("text").text(),
+    )
+    h.check(
+        "To the end is ticked, End greyed",
+        a.field("to_end").isChecked() and not a.field("end").isEnabled(),
+    )
+    a.type_text("text", "Top cover")
+    a.tick("to_end", False)
+
+
+def callout_end():
+    h.check("End takes a time now", a.field("end").isEnabled())
+    a.type_number("end", "2.5")
+
+
+def callout_edit_ok():
+    a.ok()
+
+
+callout_edit_ok.done = a.panel_closed
+callout_edit_ok.done_what = "the dialog closed"
+
+
+def callout_edited():
+    found = a.actions("callout")
+    h.check("the callout says Top cover now", found and found[0]["text"] == "Top cover", found)
+    h.check("and shows from 1 to 2.5 s", a.spans("callout") == [(1.0, 2.5)], a.spans("callout"))
+    a.click_time(2.0)
+
+
+def callout_new_text_drawn():
+    drawn = a.view_module().drawn_callouts(a.doc())
+    h.check("the view draws the new text", len(drawn) == 1 and drawn[0][1] == "Top cover", drawn)
     a.click_time(3.0)
 
 
@@ -328,8 +372,8 @@ def reversed_copy():
         a.spans("visibility") == [(0.0, 1.0)] and a.actions("visibility")[0]["show"],
     )
     h.check(
-        "the callout shows from the start to 2 s",
-        a.spans("callout") == [(0.0, 2.0)],
+        "the callout shows from 0.5 to 2 s",
+        a.spans("callout") == [(0.5, 2.0)],
         a.spans("callout"),
     )
     a.transport("play")
@@ -582,6 +626,11 @@ h.run(
         callout_made,
         callout_follows,
         callout_not_yet,
+        callout_edit,
+        callout_end,
+        callout_edit_ok,
+        callout_edited,
+        callout_new_text_drawn,
         new_storyboard,
         new_dialog,
         new_ok,
