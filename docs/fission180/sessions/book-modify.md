@@ -63,8 +63,9 @@ In the parity docs, each row marked Autodesk / Forum / Book / Guess: `parity/hol
   the sets step's Picks rebased (`MOVE_PROPS`), `_keep_splits` in `settle`;
   `timeline_ui.py`: fast drags, Create Group, the refusal next to the pointer, the settings
   menu as a pop-up, Edit Feature on an open dialog's own step.
-- `split_face.py`: `keep_splits` + a document observer (Refine off after a Split Face),
-  `made_edges`, `imprint`; `pattern.py`: `repeat_splits`; `pattern_ui.py`: `_edge_meant`,
+- `split_face.py`: `keep_splits` (a step after a Split Face that merged the split away is
+  built again without Refine; called from `timeline_ops.settle`, and by an observer when
+  there is no GUI), `made_edges`, `imprint`; `pattern.py`: `repeat_splits`; `pattern_ui.py`: `_edge_meant`,
   a body pattern's quantity from a formula, the start in an assembly without a solid of its
   own.
 - `gear_ui.py` / `gear_core.py`: the operation stays picked, the refusal next to the pointer,
@@ -104,9 +105,25 @@ dialog's own step (bug 20).
 
 ## Benchmarks
 
-Blends (`Fission180Tests/headless/blend_benchmark.py`, real FreeCAD 1.1.4, this machine): see
-the table in the final report of this session (built in one run: before; with the other
-routes: after).
+Blends (`Fission180Tests/headless/blend_benchmark.py`, real FreeCAD 1.1.4, this machine).
+"One run" is what Fission 180 did before (OpenCASCADE's single fillet / chamfer of all the
+edges); "with routes" is `fillet_sets.kernel` now:
+
+| case | edges | one run | with routes | how |
+|---|---|---|---|---|
+| chamfer 3 on the end of a modeled M33 thread | 5 | fails | built (5.7 s) | thread |
+| chamfer 1 on the end of a modeled M33 thread | 5 | fails | built (2.4 s) | thread |
+| chamfer 0.25 on the end of a modeled M33 thread | 5 | fails | built (1.9 s) | thread |
+| fillet 1 on the end of a modeled M33 thread | 5 | fails | built (1.5 s) | thread |
+| chamfer 2 on both ends of the thread | 10 | fails | built (1.5 s) | thread |
+| fillet 3 along an edge split by an unrefined seam | 2 | built | built | one run |
+| chamfer 0.5 on every edge of two blocks joined without Refine | 16 | built | built | one run |
+| chamfer 0.5 on every edge of a plate with 12 bosses | 36 | built | built | one run |
+| chamfer 0.25 on every edge, copies drifted by micrometres | 116 | fails | fails (2.4 s) | refused: "36 of the 116 edges cannot be bevelled at this size" |
+| chamfer 1 where a tangent tube leaves the housing | 2 | fails | fails | refused |
+
+Built in one run: 3 of 10; with the other routes: 8 of 10. The two that still fail are the
+kernel's (no size works on those edges); the refusal now counts the edges in the way.
 
 Knurl (a Coil groove, its Mirror, a Circular Pattern of both; `book_modify_knurl`):
 
@@ -160,7 +177,11 @@ The pattern is built once per value the dialog shows (3, then 25) and not again 
 - **The knurl's time** (30-40 s for 25 copies here): the kernel's; Fusion's "Optimized"
   compute (patterning faces) is not built.
 - **Draft's Pull Direction / Faces boxes, Section Analysis's double entry**: not reached.
-- A seam can show after a Split Face where a later step lands flush on an older face.
+- A seam can show after a Split Face on a later step that had to be built without Refine
+  (one that would have merged the split away), where it lands flush on an older face. The
+  first try switched Refine off on every step after a Split Face: Press Pull on one half then
+  left three seams (golden `direct_split_face_then_press_pull`: 11 faces for 8); now only a
+  step that loses a split line is switched.
 - A body pattern's quantity typed as a parameter is taken once (the dialog says so).
 
 ## Changelog lines
@@ -189,7 +210,7 @@ The pattern is built once per value the dialog shows (3, then 25) and not again 
 
 ## Known issues
 
-- After a Split Face, a later feature that lands exactly flush on an older face can leave a thin seam line there. Delete or suppress the Split Face to get the merged face back, or make the Split Face last.
+- After a Split Face, a later feature that would have merged the split away is built without tidying its faces, so where it lands exactly flush on an older face a thin seam line can show. Delete or suppress the Split Face to get the merged face back.
 - A pattern of bodies does not follow its quantity parameter by itself: after changing the parameter, edit the pattern and type the parameter again.
 - A 25-times pattern of crossing grooves (a knurl) takes about half a minute to build.
 - A chamfer on the rim of a hole after its modeled thread is refused (in Fusion too): make the chamfer first, or roll the marker back before the thread.

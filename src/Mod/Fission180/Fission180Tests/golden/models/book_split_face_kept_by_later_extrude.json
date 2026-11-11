@@ -1,0 +1,83 @@
+{
+  "id": "book_split_face_kept_by_later_extrude",
+  "title": "Saturn V: a split face stays split under the next extrude",
+  "tags": [
+    "split",
+    "refine",
+    "book"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "center_rect": [
+            0,
+            0,
+            80,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 10
+    },
+    {
+      "op": "split_face",
+      "id": "f1",
+      "faces": {
+        "type": "plane",
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "count": 1
+      },
+      "tool": "YZ"
+    },
+    {
+      "op": "sketch",
+      "id": "s2",
+      "plane": "XY",
+      "offset": 10,
+      "geometry": [
+        {
+          "rect": [
+            -32,
+            -5,
+            -22,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e2",
+      "profile": "s2",
+      "distance": 6
+    }
+  ],
+  "expect": {
+    "volume": 48600,
+    "faces": 12,
+    "solids": 1,
+    "bbox": [
+      -40,
+      -30,
+      0,
+      40,
+      30,
+      16
+    ],
+    "source": "analytic",
+    "note": "the plate's 6 faces + 1 (its top split in two by the YZ plane) + the boss's 5: 12. FreeCAD's Refine merged the two halves again at the extrude (11 faces); the steps after a Split Face are built without Refine (split_face.keep_splits). V = 48000 + 600"
+  }
+}

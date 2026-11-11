@@ -1,0 +1,68 @@
+{
+  "id": "book_thread_survives_deleted_chamfer",
+  "title": "The chamfer under a thread deleted: the thread stays, over the whole shaft",
+  "tags": [
+    "thread",
+    "chamfer",
+    "book",
+    "timeline"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            0,
+            16.5
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 40
+    },
+    {
+      "op": "blend_chamfer",
+      "id": "c1",
+      "distance": 3,
+      "edges": {
+        "on_faces": {
+          "type": "plane",
+          "normal": [
+            0,
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 16.5,
+        "count": 1
+      },
+      "modeled": true
+    },
+    {
+      "op": "delete",
+      "target": "c1"
+    }
+  ],
+  "expect": {
+    "volume": 29665.152112923144,
+    "solids": 1,
+    "rel_tol": 2e-05,
+    "source": "analytic",
+    "note": "V = pi 16.5^2 40 - thread_core.class_removed_volume(M33x3.5, 6g, external, 16.5, 40): the thread found its cylinder again on the extrude and runs its whole 40 mm (it failed with 'Pick a cylindrical face to thread')"
+  }
+}

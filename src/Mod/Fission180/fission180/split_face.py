@@ -74,12 +74,19 @@ def is_split_face(obj):
 # step, so that no seam shows where two faces lie in one plane) merges faces of one plane or
 # one cylinder again: the book's Saturn V lost its split band at the next Extrude, and with
 # it the band's colour (book parity report, page 20). The kernel has no way to mark an edge
-# "keep" (ModelRefine joins any two neighbouring faces on the same surface), so the steps
-# after a Split Face in its body are built without Refine: the split stays, and a seam can
-# show where one of those later steps lands flush on an older face (the lesser evil; it goes
-# when the Split Face is deleted or suppressed: Refine comes back).
+# "keep" (ModelRefine joins any two neighbouring faces on the same surface; a wrapper around
+# one half's surface does not stop it). So a step after a Split Face that would merge the
+# split away is built without Refine: looked at after it was built (did a line the Split
+# Face drew vanish from a face that is still there?), switched, and built again. A step that
+# leaves the split alone, or uses it up (Press Pull on one half: the line becomes a real
+# corner), keeps its Refine, so no seam shows there. A seam can show on a step that was
+# switched, where it lands flush on an older face (the lesser evil; Refine comes back when
+# the Split Face is deleted or suppressed).
 KEPT = "Fission180SplitKept"  # hidden: this step's Refine was switched off to keep a split
 SPLITS = "Fission180RepeatsSplits"  # hidden: a pattern / mirror that repeats a Split Face
+MOST_LINES = 400  # split lines looked at per body (more: the steps after them are switched)
+
+_KEEPER = {"observer": None, "busy": False}
 
 
 def _keeps_a_split(obj):
@@ -100,25 +107,25 @@ def _suppressed(obj):
         return False
 
 
-_KEEPER = {"observer": None, "busy": False}
+def _marked(obj):
+    return KEPT in obj.PropertiesList and bool(getattr(obj, KEPT))
 
 
-def _set_refine(obj, seen):
-    """One step: Refine off (and marked) after a split, on again when it was off for one
-    that is gone. True when it changed."""
+def _set_refine(obj, off):
+    """One step: Refine off (and marked) to keep a split, or on again when it was off for
+    one that is gone. True when it changed."""
     if "Refine" not in obj.PropertiesList or is_split_face(obj):
         return False
-    marked = KEPT in obj.PropertiesList and bool(getattr(obj, KEPT))
     busy = _KEEPER["busy"]
     _KEEPER["busy"] = True
     try:
-        if seen and obj.Refine:
+        if off and obj.Refine:
             if KEPT not in obj.PropertiesList:
                 obj.addProperty("App::PropertyBool", KEPT, "Base", "", 4)
             setattr(obj, KEPT, True)
             obj.Refine = False
             return True
-        if not seen and marked:
+        if not off and _marked(obj):
             setattr(obj, KEPT, False)
             if not obj.Refine:
                 obj.Refine = True
@@ -130,45 +137,132 @@ def _set_refine(obj, seen):
     return False
 
 
-def _split_before(obj):
-    """True when a step that keeps a split comes before `obj` in its body's history."""
-    step = getattr(obj, "BaseFeature", None)
-    for _ in range(100000):
-        if step is None:
-            return False
-        if _keeps_a_split(step) and not _suppressed(step):
-            return True
-        step = getattr(step, "BaseFeature", None)
+def _merged_away(lines, shape):
+    """True when one of `lines` (edges a Split Face drew) is no edge of `shape` any more
+    although the face it lay on is still there: Refine merged the two halves."""
+    import Part
+
+    if not lines or shape.isNull() or not shape.Faces:
+        return False
+    try:
+        edges = Part.makeCompound(shape.Edges)
+    except Exception:
+        return False
+    for line in lines:
+        try:
+            mid = Part.Vertex(line.valueAt((line.FirstParameter + line.LastParameter) / 2.0))
+            if edges.distToShape(mid)[0] < 1e-6:
+                continue  # still an edge there
+            if shape.distToShape(mid)[0] < 1e-6:
+                return True  # on a face, and no edge: merged
+        except Exception:
+            continue
     return False
 
 
-class _Keeper:
-    """Document observer: a step made, moved or switched after a Split Face loses its
-    Refine at once (FreeCAD 1.1 has no "before recompute" signal for Python: the step's own
-    change is the moment)."""
+def _still_there(lines, shape):
+    """The lines that are still edges of `shape` (the others were used up or covered)."""
+    import Part
 
-    def slotChangedObject(self, obj, prop):
-        if _KEEPER["busy"] or prop not in ("Refine", "BaseFeature", "Suppressed", SPLITS):
-            return
+    if not lines or shape.isNull():
+        return []
+    try:
+        edges = Part.makeCompound(shape.Edges)
+    except Exception:
+        return list(lines)
+    kept = []
+    for line in lines:
         try:
-            doc = obj.Document
+            mid = Part.Vertex(line.valueAt((line.FirstParameter + line.LastParameter) / 2.0))
+            if edges.distToShape(mid)[0] < 1e-6:
+                kept.append(line)
+        except Exception:
+            continue
+    return kept
+
+
+def keep_splits(doc):
+    """Every body: a step after a Split Face that merged the split away is switched to no
+    Refine (see above); a step switched earlier whose Split Face is gone gets Refine back.
+    Called after a recompute (timeline_ops.settle; without the GUI: the observer below).
+    The steps that changed (empty: none): the caller recomputes."""
+    changed = []
+    for body in doc.Objects:
+        if body.TypeId != "PartDesign::Body":
+            continue
+        lines, seen, always = [], False, False
+        for obj in body.Group:
+            if "BaseFeature" not in obj.PropertiesList:
+                continue
+            source = _keeps_a_split(obj) and not _suppressed(obj)
+            if source and is_split_face(obj):
+                seen = True
+                if len(lines) < MOST_LINES:
+                    try:
+                        lines += made_edges(obj)
+                    except Exception:
+                        always = True
+                else:
+                    always = True  # too many lines to look at one by one
+                continue
+            if "Refine" in obj.PropertiesList:
+                try:
+                    state = list(obj.State)
+                    shape = obj.Shape
+                except Exception:
+                    continue
+                if not seen:
+                    if _set_refine(obj, False):
+                        changed.append(obj)
+                elif _marked(obj):
+                    pass  # switched for a split that is still before it: stays
+                elif "Invalid" in state or "Error" in state or shape.isNull():
+                    pass
+                elif obj.Refine and (always or _merged_away(lines, shape)):
+                    if _set_refine(obj, True):
+                        changed.append(obj)  # (built again without Refine: its lines stay)
+                else:
+                    lines = _still_there(lines, shape)
+            if source:
+                # a pattern that repeats a Split Face: its copies' lines are not looked at
+                # one by one, the steps after it are switched
+                seen = always = True
+    return changed
+
+
+class _Keeper:
+    """Without the GUI (the golden models, the AI tools run headless) nothing settles a
+    design after a recompute: the same look is taken right after each one."""
+
+    def slotRecomputedDocument(self, doc):
+        if _KEEPER["busy"] or App.GuiUp:
+            return
+        _KEEPER["busy"] = True
+        try:
             if getattr(doc, "Restoring", False) or getattr(doc, "Transacting", False):
                 return
-            if prop in ("Refine", "BaseFeature"):
-                if "Refine" in obj.PropertiesList and "BaseFeature" in obj.PropertiesList:
-                    _set_refine(obj, _split_before(obj))
-            if _keeps_a_split(obj) or prop == SPLITS:
-                # a Split Face put in, taken out or switched: the steps after it
-                step, later = obj, []
-                body = bodies.body_of(obj)
-                group = list(body.Group) if body is not None else []
-                if obj in group:
-                    later = group[group.index(obj) + 1 :]
-                for step in later:
-                    if "BaseFeature" in step.PropertiesList:
-                        _set_refine(step, _split_before(step))
+            try:
+                _KEEPER["busy"] = False
+                switched = keep_splits(doc)
+            finally:
+                _KEEPER["busy"] = True
+            # (the design's own recompute is still going on here and cannot be started
+            # again: the switched steps and the steps after them are built one by one)
+            done = set()
+            for first in switched:
+                body = bodies.body_of(first)
+                group = list(body.Group) if body is not None else [first]
+                after = group[group.index(first) :] if first in group else [first]
+                for step in after:
+                    if step.Name not in done and "BaseFeature" in step.PropertiesList:
+                        done.add(step.Name)
+                        step.recompute()
+                if body is not None:
+                    body.recompute()
         except Exception:
             pass
+        finally:
+            _KEEPER["busy"] = False
 
 
 def install():
@@ -176,26 +270,6 @@ def install():
     if _KEEPER["observer"] is None:
         _KEEPER["observer"] = _Keeper()
         App.addDocumentObserver(_KEEPER["observer"])
-
-
-def keep_splits(doc):
-    """Switch Refine off on the steps after a Split Face in its body (and on again where no
-    Split Face is before them any more): the whole design at once (after a recompute, an
-    undo, a file opened: timeline_ops.settle). True when a step changed."""
-    changed = False
-    for body in doc.Objects:
-        if body.TypeId != "PartDesign::Body":
-            continue
-        seen = False
-        for obj in body.Group:
-            if "BaseFeature" not in obj.PropertiesList:
-                continue
-            if _keeps_a_split(obj) and not _suppressed(obj):
-                seen = True
-                continue
-            if _set_refine(obj, seen):
-                changed = True
-    return changed
 
 
 def made_edges(feature):
@@ -213,13 +287,27 @@ def made_edges(feature):
             mid = edge.CenterOfMass
         return (round(mid.x, 5), round(mid.y, 5), round(mid.z, 5), round(edge.Length, 5))
 
+    import Part
+
     old = {key(e) for e in base.Shape.Edges}
+    try:
+        outline = Part.makeCompound(base.Shape.Edges)
+    except Exception:
+        outline = None
     found, seen = [], set()
     for edge in feature.Shape.Edges:
         k = key(edge)
         if k in old or k in seen:
             continue
         seen.add(k)
+        # not the pieces of an old edge the line ends on (the face's outline cut in two):
+        # those are no split, and a later step may well merge them again
+        try:
+            mid = edge.valueAt((edge.FirstParameter + edge.LastParameter) / 2.0)
+            if outline is not None and outline.distToShape(Part.Vertex(mid))[0] < 1e-6:
+                continue
+        except Exception:
+            pass
         found.append(edge.copy())
     return found
 

@@ -2090,7 +2090,8 @@ class PatternPanel(Panel):
         return self.target
 
     def show_status(self):
-        self.info.setText(self.waiting or getattr(self, "_taken", ""))
+        taken = getattr(self, "_taken", "")  # a body pattern's quantity taken from a formula
+        self.info.setText("\n".join(t for t in (self.waiting, taken) if t))
         if self.formula_error:
             self.message.setText("⚠ " + self.formula_error)
             return

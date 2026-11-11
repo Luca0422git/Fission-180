@@ -311,6 +311,11 @@ class ThreadPanel(Panel):
         try:
             if obj.isDerivedFrom("Sketcher::SketchObject") or not obj.Shape.Solids:
                 return False
+            if self.target is not None and self.faces and (obj is self.target or obj is self.body):
+                # the thread being made (the click names it, or its body): a click on its
+                # grooves is a click on the face they were cut into ("click it again to
+                # drop it", from any view)
+                return True
             return thread.is_cylinder(obj.Shape.getElement(name))
         except Exception:
             return False
@@ -402,7 +407,8 @@ class ThreadPanel(Panel):
 
     def _face_clicked(self, obj, short, point):
         face = common.global_shape(obj, short)
-        if face is None or not thread.is_cylinder(face):
+        on_preview = obj is self.target and obj is not self.source and bool(self.faces)
+        if face is None or not (thread.is_cylinder(face) or on_preview):
             self.message.setText("Pick a cylindrical face: the side of a shaft or a hole's wall.")
             return
         owner = thread.owner_body(obj)
@@ -421,6 +427,17 @@ class ThreadPanel(Panel):
             self._use_body(owner)
             if self.base is None:
                 return
+        if point is not None:
+            # FreeCAD gives (0, 0, 0) as the picked point of some clicks (a face of the
+            # body's shown step, picked through the body): a point that is not on the
+            # clicked face is no picked point
+            try:
+                import Part
+
+                if face.distToShape(Part.Vertex(App.Vector(point)))[0] > 1.0:
+                    point = None
+            except Exception:
+                point = None
         if point is None:
             u0, u1, v0, v1 = face.ParameterRange
             point = face.valueAt((u0 + u1) / 2.0, (v0 + v1) / 2.0)

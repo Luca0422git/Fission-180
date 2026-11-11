@@ -41,10 +41,11 @@ from . import blend
 
 TOL = 1e-6
 ON_TOL = 1e-5  # an edge lies on another one when its points are this near
-CHAIN_BUDGET = 4.0  # seconds for building group by group (and finding the group in the way)
+CHAIN_BUDGET = 2.0  # seconds for building group by group (and finding the group in the way)
 
-_STATE = {"source": None, "used": None, "blockers": [], "twins": []}
+_STATE = {"source": None, "used": None, "blockers": [], "twins": [], "refined": [], "fails": {}}
 _KEEP_TWINS = 3
+_KEEP_FAILS = 400
 
 
 class Refused(blend.BlendError):
@@ -292,14 +293,40 @@ def _through_thread(kind, shape, items, tag, once):
     return result if sound(result, shape) else None
 
 
-def _refined(kind, shape, items, tag, once):
+def _refined_shape(shape):
+    """`shape` with the faces of one plane and the edges of one line merged, or None when
+    nothing was split. Kept for the last few shapes: a search for the largest size that
+    fits asks many times for the same part."""
+    try:
+        key = shape.hashCode()
+    except Exception:
+        key = None
+    for known, source_shape, result in _STATE["refined"]:
+        try:
+            if key is not None and known == key and source_shape.isSame(shape):
+                return result
+        except Exception:
+            continue
+    result = None
     try:
         refined = shape.removeSplitter()
-        if refined.isNull() or not refined.Solids:
-            return None
-        if len(refined.Faces) >= len(shape.Faces) and len(refined.Edges) >= len(shape.Edges):
-            return None  # nothing was split
+        if (
+            not refined.isNull()
+            and refined.Solids
+            and (len(refined.Faces) < len(shape.Faces) or len(refined.Edges) < len(shape.Edges))
+        ):
+            result = refined
     except Exception:
+        result = None
+    if key is not None:
+        _STATE["refined"].insert(0, (key, shape, result))
+        del _STATE["refined"][_KEEP_TWINS:]
+    return result
+
+
+def _refined(kind, shape, items, tag, once):
+    refined = _refined_shape(shape)
+    if refined is None:
         return None
     carried = [_carry_item(shape, item, refined) for item in items]
     if any(c is None for c in carried):
@@ -321,9 +348,21 @@ def _by_groups(kind, shape, items, tag, once):
         return None, []
     start = time.time()
     work, blocked = shape, []
+    try:
+        shape_key = shape.hashCode()
+    except Exception:
+        shape_key = None
+    fails = _STATE["fails"]
     for part in parts:
         if time.time() - start > CHAIN_BUDGET:
             return None, []
+        # a group that failed on its own at a size fails at every larger one: not tried
+        # again (a search for the largest size that fits asks for many sizes)
+        key = (shape_key, kind, tuple(sorted(item[0] for item in part)))
+        size = max(max(a, b) for _i, a, b in part)
+        if shape_key is not None and fails.get(key, float("inf")) <= size + 1e-12:
+            blocked.extend("Edge%d" % item[0] for item in part)
+            continue
         if work is shape:
             here = list(part)
         else:
@@ -337,6 +376,10 @@ def _by_groups(kind, shape, items, tag, once):
                 raise ValueError("unsound")
         except Exception:
             blocked.extend("Edge%d" % item[0] for item in part)
+            if shape_key is not None and work is shape:
+                if len(fails) > _KEEP_FAILS:
+                    fails.clear()
+                fails[key] = min(fails.get(key, float("inf")), size)
             continue
         work = result
     if blocked:
@@ -361,8 +404,30 @@ def retry(kind, shape, items, tag, once, error):
     if result is not None:
         _STATE["used"] = "chains"
         return result
+    if not blocked:
+        blocked = _alone(kind, shape, items, tag, once)
     _STATE["blockers"] = blocked
     raise Refused(str(error) or "command not done", blocked)
+
+
+def _alone(kind, shape, items, tag, once):
+    """The edges that cannot be blended even on their own (each tried alone, for the
+    refusal's count only: nothing is built from it). [] when every edge works alone (they
+    do not fit together), when all fail, or when there is no time to try them all."""
+    if len(items) < 2:
+        return []
+    start = time.time()
+    blocked = []
+    for item in items:
+        if time.time() - start > CHAIN_BUDGET:
+            return []
+        try:
+            result = once(kind, shape, [item], tag)
+            if result is None or result.isNull() or not result.Solids:
+                raise ValueError("nothing")
+        except Exception:
+            blocked.append("Edge%d" % item[0])
+    return blocked if len(blocked) < len(items) else []
 
 
 def in_the_way(shape, blocked, total, kind):
@@ -380,9 +445,11 @@ def in_the_way(shape, blocked, total, kind):
             continue
         shortest = length if shortest is None else min(shortest, length)
     text = " %d of the %d edges cannot be %s at this size" % (count, total, what)
-    if shortest is not None:
+    if shortest is not None and shortest < 1.0:
+        # a tiny edge an earlier step left (pattern copies a hair apart) is the usual cause
         text += " (the shortest of them is %.3g mm long)" % shortest
     return text + (
-        "; the other %d can. Leave those out (click them again), or use a smaller size."
-        % (total - count)
+        "; the other %d can. They sit where the faces leave no room for it (a tiny step or "
+        "sliver an earlier feature left is the usual cause): leave them out (click them "
+        "again), or use a smaller size." % (total - count)
     )
