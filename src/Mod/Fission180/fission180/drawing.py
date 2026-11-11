@@ -2050,12 +2050,43 @@ def refresh_parts_list(table):
     view = _get(table, "Fission180View", None)
     if not alive(view):
         return False
-    rows = _plain_rows(parts_rows_for(view))
-    if rows == table_rows(table):
+    rows = numbered_rows(table, parts_rows_for(view))
+    if _plain_rows(rows) == table_rows(table):
         return False
     corner = list(table.Fission180Corner)
-    _draw_table(table, parts_rows_for(view), corner)
+    _draw_table(table, rows, corner)
     return True
+
+
+def numbered_rows(table, rows):
+    """The rows with the item numbers TABLES > Renumber gave them (kept on the table by
+    each row's first body), in item order. A row that came later takes the next free
+    number. Without a Renumber: the rows as they are."""
+    try:
+        given = json.loads(_get(table, "Fission180Items", "") or "{}")
+    except ValueError:
+        given = {}
+    if not given:
+        return rows
+    used, out, later = set(), [], []
+    for row in rows:
+        row = dict(row)
+        key = (row.get("bodies") or [str(row.get("PartNumber", ""))])[0]
+        number = given.get(key)
+        if isinstance(number, int) and number not in used:
+            row["Item"] = number
+            used.add(number)
+            out.append(row)
+        else:
+            later.append(row)
+    n = 1
+    for row in later:
+        while n in used:
+            n += 1
+        row["Item"] = n
+        used.add(n)
+        out.append(row)
+    return sorted(out, key=lambda r: r["Item"])
 
 
 def add_row_balloons(view, rows):
@@ -2430,6 +2461,12 @@ def refresh(page):
             changed |= follow_center_marks(view)
         except Exception as exc:
             warn("centre marks of %s: %s" % (view.Label, exc))
+        try:
+            from . import drawing_tools
+
+            changed |= drawing_tools.follow_mark_patterns(view)
+        except Exception as exc:
+            warn("centre mark patterns of %s: %s" % (view.Label, exc))
         try:
             changed |= refresh_auto_marks(view)
         except Exception as exc:

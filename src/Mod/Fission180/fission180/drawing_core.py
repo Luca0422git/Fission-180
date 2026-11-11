@@ -1314,3 +1314,68 @@ def read_dxf_entities(text):
     if current is not None:
         entities.append(current)
     return entities
+
+
+# ------------------------------------------------------------------ centre mark patterns
+def pattern_shape(points, tolerance=1e-3):
+    """What the centres of a pattern of holes lie on: ("line", a, b) for two or more on one
+    straight line (a, b: its outermost centres), ("circle", centre, radius) for three or
+    more on one circle (a bolt circle), None when they are neither (or fewer than two)."""
+    pts = []
+    for p in points:
+        q = (float(p[0]), float(p[1]))
+        if all(math.hypot(q[0] - o[0], q[1] - o[1]) > tolerance for o in pts):
+            pts.append(q)
+    if len(pts) < 2:
+        return None
+    a = pts[0]
+    b = max(pts, key=lambda p: math.hypot(p[0] - a[0], p[1] - a[1]))
+    length = math.hypot(b[0] - a[0], b[1] - a[1])
+    ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+    off = [abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) for p in pts]
+    if max(off) <= tolerance:
+        along = sorted(pts, key=lambda p: (p[0] - a[0]) * ux + (p[1] - a[1]) * uy)
+        return ("line", along[0], along[-1])
+    if len(pts) < 3:
+        return None
+    # the circle through the first centre, the one farthest from it and the one farthest
+    # from the line between those two
+    c = pts[off.index(max(off))]
+    d = 2.0 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]))
+    if abs(d) < 1e-12:
+        return None
+    aa, bb, cc = a[0] ** 2 + a[1] ** 2, b[0] ** 2 + b[1] ** 2, c[0] ** 2 + c[1] ** 2
+    cx = (aa * (b[1] - c[1]) + bb * (c[1] - a[1]) + cc * (a[1] - b[1])) / d
+    cy = (aa * (c[0] - b[0]) + bb * (a[0] - c[0]) + cc * (b[0] - a[0])) / d
+    radius = math.hypot(a[0] - cx, a[1] - cy)
+    if any(abs(math.hypot(p[0] - cx, p[1] - cy) - radius) > tolerance for p in pts):
+        return None
+    return ("circle", (cx, cy), radius)
+
+
+# ------------------------------------------------------------------ balloons: renumber, align
+def renumbered(items, old, new):
+    """Item numbers after the row numbered `old` is given `new`: the row that had `new`
+    takes `old` (numbers stay one of a kind). items: {key: number}; a copy is returned."""
+    out = dict(items)
+    first = [k for k, v in out.items() if v == old]
+    second = [k for k, v in out.items() if v == new]
+    if not first or old == new:
+        return out
+    out[first[0]] = new
+    if second:
+        out[second[0]] = old
+    return out
+
+
+def aligned(spots, line_at):
+    """Balloon places lined up: on a level line through y = line_at[1] when they are spread
+    more sideways than upwards, on an upright line through x = line_at[0] otherwise. Each
+    keeps its other coordinate. Returns (the new places, "horizontal" | "vertical")."""
+    if not spots:
+        return [], "horizontal"
+    xs = [p[0] for p in spots]
+    ys = [p[1] for p in spots]
+    if max(xs) - min(xs) >= max(ys) - min(ys):
+        return [(x, line_at[1]) for x, _y in spots], "horizontal"
+    return [(line_at[0], y) for _x, y in spots], "vertical"

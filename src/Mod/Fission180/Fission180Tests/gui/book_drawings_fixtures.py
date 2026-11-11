@@ -4,6 +4,7 @@ scenarios test; everything on the sheet is done with real input).
 
 drumstick(doc): the book's drumstick (projects 21 + 22): one body, a 400 mm long turned
             stick (a revolved profile with a spline tip) with its butt edge rounded.
+flange(doc): a disc with four holes on a bolt circle.
 cutter(doc): six components like the book's pizza cutter (project 13, drawn in chapter
             10): Handle, Fork, Blade, Axle, Guard and Nut. Returns {name: (component, body)}.
 """
@@ -104,3 +105,35 @@ def cutter(doc):
     _cylinder(part("Nut"), "NutRing", 7.0, 5.0, (0.0, -18.0, 0.0), "y")
     doc.recompute()
     return made
+
+
+FLANGE_HOLES = ((28.0, 0.0), (0.0, 28.0), (-28.0, 0.0), (0.0, -28.0))  # a 56 mm bolt circle
+FLANGE_HOLE_R = 4.0
+FLANGE_BORE_R = 10.0
+
+
+def flange(doc):
+    """A round flange (r 40, 8 thick) with a 20 mm bore and four 8 mm holes on a 56 mm bolt
+    circle, for Center Mark Pattern. Returns (body, [the four hole features])."""
+    body = doc.addObject("PartDesign::Body", "Body")
+    body.Label = "Body1"
+    disc = body.newObject("PartDesign::AdditiveCylinder", "Disc")
+    disc.Radius, disc.Height = 40.0, 8.0
+    bore = body.newObject("PartDesign::SubtractiveCylinder", "Bore")
+    bore.Radius, bore.Height = FLANGE_BORE_R, 8.0
+    holes = []
+    for i, (x, y) in enumerate(FLANGE_HOLES, start=1):
+        hole = body.newObject("PartDesign::SubtractiveCylinder", "Hole%d" % i)
+        hole.Radius, hole.Height = FLANGE_HOLE_R, 8.0
+        hole.Placement.Base = V(x, y, 0)
+        holes.append(hole)
+    body.Tip = holes[-1]
+    doc.recompute()
+    try:
+        if App.GuiUp:
+            for step in [disc, bore] + holes[:-1]:
+                step.ViewObject.Visibility = False
+            holes[-1].ViewObject.Visibility = True
+    except Exception:
+        pass
+    return body, holes
