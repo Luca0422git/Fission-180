@@ -9,7 +9,11 @@ ribbon entries): Fusion's window shows them, and a person looking for one learns
 nothing here. Sources: docs/fission180/parity/misc.md.
 """
 
-from . import __version__ as _version, interface_scale as _interface_scale, update_core as _update_core
+from . import (
+    __version__ as _version,
+    interface_scale as _interface_scale,
+    update_core as _update_core,
+)
 from . import touchpad_core as _touchpad
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
@@ -60,6 +64,7 @@ def _send_to_choices():
             (slicer_core.FILE_ONLY, slicer_core.FILE_ONLY_LABEL, True, ""),
         ]
     )
+
 
 # Fusion's Pan, Zoom, Orbit Shortcuts presets: (value, label, FreeCAD navigation style or None
 # when Fission 180 cannot give it, why not).
@@ -406,13 +411,14 @@ OPTIONS = [
     _option(
         "sketch_auto_project",
         "design",
-        "Auto project the face's edges when sketching on a face",
+        "Auto project geometry on active sketch plane",
         "bool",
         True,
         (INFERENCE, "Bool", "AutoProject"),
         group="Sketch",
         tip="A new sketch on a flat face of the part gets the face's edges as projected "
-        "(purple) curves, so the shapes you draw against them make profiles.",
+        "(purple) curves, so the shapes you draw against them make profiles. Delete them "
+        "in the sketch if you do not want them: they stay deleted.",
     ),
     # -- General > API ----------------------------------------------------------------------
     _option(

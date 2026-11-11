@@ -178,6 +178,7 @@ SPLINE_COMMANDS = (
     "Sketcher_CompCreateBSpline",
 )
 SPLINE_STEP = "Add Sketch B-Spline"
+ELLIPSE_STEP = "Add sketch ellipse"  # FreeCAD's Ellipse tool's undo step
 # the spline tools whose clicks are fit points (the curve goes through them)
 FIT_SPLINE_COMMANDS = (
     "Fission180_SketchFitSpline",
@@ -1092,8 +1093,15 @@ class SketchSession:
             from . import sketch_draw_helpers as helpers
 
             new = range(seen, len(geometry))
-            splines = [i for i in new if geometry[i].TypeId == helpers.BSPLINE]
-            ellipses = [i for i in new if geometry[i].TypeId == helpers.ELLIPSE]
+            # only what the drawing tools just made (their step is among the newest of the
+            # undo list, under its own constraints' steps): a spline or an ellipse that
+            # came some other way (a paste, a pattern, a script) is left as it is
+            steps = list(self.doc.UndoNames)[:3]
+            splines, ellipses = [], []
+            if SPLINE_STEP in steps:
+                splines = [i for i in new if geometry[i].TypeId == helpers.BSPLINE]
+            if ELLIPSE_STEP in steps:
+                ellipses = [i for i in new if geometry[i].TypeId == helpers.ELLIPSE]
             if not splines and not ellipses:
                 return
             from . import recent
@@ -2439,9 +2447,64 @@ def _run(command):
                 return
         if command in LABELS:
             recent.record(command, LABELS[command])
+        if command == "Std_Delete" and _delete_projected():
+            return  # (only projected curves were selected: done)
         Gui.runCommand(command)
     except Exception as exc:
         warn("%s: %s" % (command, exc))
+
+
+def _delete_projected():
+    """Del with projected (purple) curves selected. FreeCAD removes a projected curve by
+    removing the reference it came from, and a face's reference carries all its edges:
+    with the four Auto-projected edges of a face selected, the first delete took all four
+    and the other three failed with "Not able to delete an external geometry with the
+    given index" in the Report view. Here each reference is removed once, in one undo
+    step, and the projected curves are taken out of the selection before FreeCAD's own
+    Delete does the rest. True when nothing else was selected."""
+    import Sketcher
+
+    sketch = editing_sketch()
+    if sketch is None:
+        return False
+    names = []
+    for sel in Gui.Selection.getSelectionEx():
+        if sel.Object is sketch:
+            names += [n.rsplit(".", 1)[-1] for n in sel.SubElementNames]
+    projected = [n for n in names if n.startswith("ExternalEdge")]
+    if not projected:
+        return False
+    others = [n for n in names if not n.startswith("ExternalEdge")]
+
+    def ids_now():
+        return [Sketcher.ExternalGeometryFacade(g).Id for g in list(sketch.ExternalGeo)[2:]]
+
+    now = ids_now()
+    wanted = set()
+    for name in projected:
+        try:
+            wanted.add(now[int(name[len("ExternalEdge") :]) - 1])
+        except (ValueError, IndexError):
+            continue
+    doc = sketch.Document
+    doc.openTransaction("Delete Projected Curves")
+    try:
+        for _ in range(len(wanted) + 1):
+            now = ids_now()
+            left = [i for i, ident in enumerate(now) if ident in wanted]
+            if not left:
+                break
+            sketch.delExternal(left[-1])
+        sketch.solve()
+    except Exception:
+        doc.abortTransaction()
+        raise
+    doc.commitTransaction()
+    Gui.Selection.clearSelection()
+    for name in others:
+        Gui.Selection.addSelection(doc.Name, sketch.Name, name)
+    log("sketch: %d projected curve(s) deleted" % len(wanted))
+    return not others
 
 
 def _selected_curves(sketch):

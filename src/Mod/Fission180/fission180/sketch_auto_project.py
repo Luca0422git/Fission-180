@@ -17,8 +17,9 @@ PARAM = ("User parameter:BaseApp/Preferences/Mod/Fission180/SketchInference", "A
 
 
 def enabled():
-    """Preferences > Design > "Auto project the face's edges when sketching on a face"
-    (default on: Luca's wish; Fusion's own option exists and is off by default)."""
+    """Preferences > Design > "Auto project geometry on active sketch plane" (Fusion's
+    name for it since wave 7; default on: Luca's wish of 2026-10-16, Fusion's own is said
+    to be off by default)."""
     try:
         return App.ParamGet(PARAM[0]).GetBool(PARAM[1], True)
     except Exception:
