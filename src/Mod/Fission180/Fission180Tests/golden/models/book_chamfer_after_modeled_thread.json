@@ -1,0 +1,72 @@
+{
+  "id": "book_chamfer_after_modeled_thread",
+  "title": "A 3 mm chamfer made after a modeled M33x3.5 thread",
+  "tags": [
+    "thread",
+    "chamfer",
+    "book",
+    "robust"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            0,
+            16.5
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 40
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 16.5,
+        "count": 1
+      },
+      "modeled": true
+    },
+    {
+      "op": "blend_chamfer",
+      "id": "c1",
+      "distance": 3,
+      "edges": {
+        "on_faces": {
+          "type": "plane",
+          "normal": [
+            0,
+            0,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "volume": 29457.4696101,
+    "solids": 1,
+    "bbox": [
+      -16.369936,
+      -16.369936,
+      0,
+      16.369936,
+      16.369936,
+      40
+    ],
+    "rel_tol": 1e-06,
+    "source": "baseline-freecad-1.1.4",
+    "note": "the book's Geocache trick: the thread runs the whole shaft and the chamfer cuts through it. OpenCASCADE cannot chamfer the end of a threaded shaft; Fission 180 builds the bevel on the shaft under the thread and cuts the grooves again (fillet_robust.py). No hand formula for grooves cut by a cone: the number is what FreeCAD 1.1.4 gives, and the two models that reach it by different routes (the thread made first; the thread dragged before the chamfer) must agree. It is less than book_thread_stops_at_chamfer (29567.909): the grooves go on under the bevel"
+  }
+}

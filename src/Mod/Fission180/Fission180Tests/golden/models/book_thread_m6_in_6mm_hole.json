@@ -1,0 +1,80 @@
+{
+  "id": "book_thread_m6_in_6mm_hole",
+  "title": "Hot End: a 6 mm hole threaded: M6x1 is offered and the hole gets its minor diameter",
+  "tags": [
+    "thread",
+    "hole",
+    "book"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "rect": [
+            0,
+            0,
+            40,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 10
+    },
+    {
+      "op": "sketch",
+      "id": "s2",
+      "plane": "XY",
+      "offset": 10,
+      "geometry": [
+        {
+          "circle": [
+            20,
+            15,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "c1",
+      "profile": "s2",
+      "operation": "cut",
+      "extent": "through_all",
+      "flip": true
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 3,
+        "count": 1
+      },
+      "modeled": true
+    }
+  ],
+  "expect": {
+    "volume": 11763.333951923687,
+    "solids": 1,
+    "bbox": [
+      0,
+      0,
+      0,
+      40,
+      30,
+      10
+    ],
+    "rel_tol": 2e-05,
+    "source": "analytic",
+    "note": "Fusion offers the size nearest the face (M6 for a 6 mm hole; it was M7, by the tap drill) and gives a threaded hole the thread's minor diameter (Autodesk): V = 12000 - pi 3^2 10 - thread_core.class_removed_volume(M6x1, 6H, internal, 3, 10), which is negative (the hole is filled in to the minor diameter, then the grooves are cut)"
+  }
+}

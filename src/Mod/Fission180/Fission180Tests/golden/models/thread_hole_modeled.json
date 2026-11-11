@@ -64,7 +64,7 @@
     }
   ],
   "expect": {
-    "volume": 11763.333951923687,
+    "volume": 11834.087804416085,
     "bbox": [
       0,
       0,
@@ -75,6 +75,6 @@
     ],
     "solids": 1,
     "source": "analytic",
-    "note": "a modeled thread lies in the middle of its class's tolerance zone (ISO 965-1, thread_tables.class_zone): the d5 hole is M6's tap drill, so the thread is M6x1 6H: it is bored to the middle of the minor diameter's zone and the groove moved out; slice loss beyond the hole thread_core.removed_area(3.036528, 1, True, 2.5, 2.516234) = 4.031650723; V = 12000 - pi 2.5^2 10 - 10 * that"
+    "note": "Fusion takes the size from the face's diameter and gives a threaded hole the thread's minor diameter (Autodesk): the d5 hole is M5x0.8 6H (until beta.4 it was matched by its tap drill: M6). A modeled thread lies in the middle of its class's tolerance zone (ISO 965-1, thread_tables.class_zone): the hole is filled in to the middle of the minor diameter's zone (2.117408) and the groove moved out; slice change beyond the hole thread_core.removed_area(2.531172, 0.8, True, 2.5, 2.117408) = -3.043734527 (negative: more is added than the grooves take); V = 12000 - (pi 2.5^2 10 + 10 * that)"
   }
 }

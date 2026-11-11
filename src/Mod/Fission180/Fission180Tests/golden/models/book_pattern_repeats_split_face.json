@@ -1,0 +1,99 @@
+{
+  "id": "book_pattern_repeats_split_face",
+  "title": "Saturn V: a feature pattern with a Split Face among its features",
+  "tags": [
+    "pattern",
+    "split",
+    "book"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "center_rect": [
+            0,
+            0,
+            80,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 10
+    },
+    {
+      "op": "sketch",
+      "id": "s2",
+      "plane": "XY",
+      "offset": 10,
+      "geometry": [
+        {
+          "rect": [
+            -32,
+            -5,
+            -22,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e2",
+      "profile": "s2",
+      "distance": 6
+    },
+    {
+      "op": "split_face",
+      "id": "f2",
+      "faces": {
+        "type": "plane",
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "at": {
+          "axis": "z",
+          "value": "max"
+        },
+        "count": 1
+      },
+      "tool": "XZ"
+    },
+    {
+      "op": "rectangular_pattern",
+      "id": "p1",
+      "features": [
+        "e2",
+        "f2"
+      ],
+      "direction": "X",
+      "quantity": 3,
+      "distance": 15,
+      "distribution": "spacing"
+    }
+  ],
+  "expect": {
+    "volume": 49800,
+    "faces": 24,
+    "solids": 1,
+    "bbox": [
+      -40,
+      -30,
+      0,
+      40,
+      30,
+      16
+    ],
+    "source": "analytic",
+    "note": "three bosses, each with its top split in two by the line the Split Face drew (repeated on each copy: pattern.repeat_splits): the plate's 6 faces + 3 x (4 sides + 2 half tops) = 24. It was refused: 'Split Face does not change the part, so there is nothing to repeat'. V = 48000 + 3 x 600"
+  }
+}

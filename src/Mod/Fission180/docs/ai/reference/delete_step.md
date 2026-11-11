@@ -59,5 +59,5 @@ Deleted Hole1 (undo brings them back). Bodies now: Body1: 24000 mm3, 60 x 40 x 1
 
 ## See also
 
-- Golden models built with its steps (read one with docs_read golden/<id>): `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `hole_second_survives_first`, `tl_delete_before_fillet`, `tl_delete_hole`
+- Golden models built with its steps (read one with docs_read golden/<id>): `book_thread_survives_deleted_chamfer`, `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `hole_second_survives_first`, `tl_delete_before_fillet`, `tl_delete_hole`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -12,6 +12,7 @@
 7. Click the top face, then H: the second hole is drilled where that click was; Enter.
 Geometry checked with hand-derived formulas (hole_steps.py).
 """
+
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtCore
@@ -340,15 +341,22 @@ def after_edit():
 
 
 def browser_sketch():
-    """The hole's sketch in the browser (named after the hole): double-clicking it opens
-    the hole, where its point is moved."""
-    hs.browser_double_click("Hole 1 Sketch")
+    """The hole's own sketch has no row in the browser (Fusion's Single Hole has no sketch;
+    wave 7, book parity report): the hole is opened from the timeline, where its point is
+    moved."""
+    tree = hs.browser()
+    h.check(
+        "the hole's sketch is not listed in the browser",
+        tree.row("Hole 1 Sketch") is None,
+        tree.labels(),
+    )
+    hs.timeline_menu("Hole 1", "Edit Feature")
 
 
 def browser_opened():
     p = hs.hole_panel()
     h.check(
-        "double-clicking the hole's sketch opens that hole's dialog",
+        "Edit Feature in the timeline opens that hole's dialog",
         p is not None and p.editing and p.target is hs.holes()[0],
     )
     h.check("its sketch stays hidden", not hs.visible(hs.helper_sketches()[0]))

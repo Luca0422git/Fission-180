@@ -145,3 +145,26 @@ decimal point typed with the mouse over the 3D view goes into the box of the han
 or hovered (else the main one), with its text selected (`taskui.TypeOverView`; FreeCAD's view
 keys 0-6 no longer turn the view while the dialog is open). Which handle a digit goes to is
 Fission 180's guess at Fusion's rule.
+
+## Wave 7, the book parity report (branch `sf/book-modify`, 2026-11-11)
+
+What Fusion does, checked again for the report's items (Autodesk = Autodesk's own pages or
+staff, Forum = the Autodesk Community forum, Book = the report quoting *Mastering Autodesk
+Fusion*, Guess = not confirmed):
+
+| Behaviour | Source | Fission 180 now |
+|---|---|---|
+| The Thread tool offers "the closest standard thread in relation to the size of the circular face you selected" | Autodesk (tech tip "Threading Parts in Fusion 360") | The nearest nominal (major) diameter, for a shaft **and for a hole** (`thread_tables.closest`). The report was right that a 6 mm hole must be offered M6: until beta.4 a hole was matched by its tap drill (M7 for 6 mm), a guess of the first pass |
+| "Fusion 360 will currently adjust the diameter of a threaded hole to the minor diameter of the thread" | Autodesk staff, forum "HOLE WITH THREADING OPTION" | A modeled thread gives the cylinder the thread's own size: a hole wider than the minor diameter is filled in to it, a narrower one bored up; a shaft is turned down or built up to the major diameter (`thread.parts`, `thread_core.removed_area`) |
+| A chamfered rod: "you can drag the thread in the timeline to before the chamfer and you get a thread that runs through the chamfer" | Forum (several threads, 2016-2023) and Book (Geocache, Metric Bolt, Pizza Cutter) | Works: `timeline_ops.move` lets the Thread find its cylinder on its new step before, and the chamfer after a modeled thread is built through the thread (`fillet_robust.py`). Scenario `book_modify_thread_chamfer` |
+| A chamfer on the edge of a modeled **threaded hole** fails in Fusion too; people reorder, or make the thread cosmetic first | Forum ("How to chamfer modeled threaded holes"); Book (Hot End: "no chamfer on threaded holes") | A blend of a hole's rim after its modeled thread is refused with the reason (the rim is the thread's own edge); the book's reorder works |
+| Deleting a step before a Thread keeps the thread | Guess (Fusion keeps features on their faces) | The Thread's faces are always faces of the step before it; found again by place (`ThreadFeature.execute`) |
+| Thread Type list has pipe threads | Forum (NPT added "after years"; ISO pipe = Whitworth form) | "ISO Pipe Threads" (G, ISO 228-1, parallel, 55 degrees) and "ANSI Taper Pipe Threads (NPT)" (ASME B1.20.1, cut on a cone of 1 in 16). The names of the two entries are a Guess |
+| The thread type follows the design's units | Book (Fire Piston, Pizza Cutter: inch designs) / Guess for the exact rule | ANSI Unified in an inch / foot design, ISO metric otherwise; the last type used is remembered per unit system |
+| A single Hole has no sketch row in the browser | Book ("Fusion hides it") | The hole's own sketch is not listed under Sketches (`browser_core`); edit the hole from the timeline |
+
+Known gaps: a modeled taper thread's incomplete (vanishing) threads are cut as full threads
+that run out on the pipe; the classes of a pipe thread (G A / B) are not modeled apart; the
+modeled thread still has one B-spline face per turn and flank (Fusion: 4 faces), so Offset
+Face / Press Pull on a modeled thread stays refused ("Work in progress on complex shapes" is
+FreeCAD's own Thickness limit): use the Class to loosen a thread.

@@ -334,7 +334,7 @@ def t4_hole():
         b.choose(p.extent, "All")
         b.choose(p.hole_type, "Simple")
         b.choose(p.tap_type, "Simple")
-        hs.type_into(p.diameter.widget, "8.5")
+        hs.type_into(p.diameter.widget, "10")
 
 
 def t4_hole_ok():
@@ -343,7 +343,7 @@ def t4_hole_ok():
 
 def t4_wall():
     v = h.solid_volume()
-    h.check("T4 d8.5 through hole", hs.close(v, BOSS - hs.cylinder(8.5, 10)), v)
+    h.check("T4 d10 through hole", hs.close(v, BOSS - hs.cylinder(10, 10)), v)
     s["v"] = v
     h.fit()
 
@@ -351,7 +351,7 @@ def t4_wall():
 def t4_click_wall():
     # The far wall of the hole (away from the iso camera) is in view through its opening.
     a = math.radians(135)
-    h.click(V(7 + 4.25 * math.cos(a), 7 + 4.25 * math.sin(a), 8))
+    h.click(V(7 + 5 * math.cos(a), 7 + 5 * math.sin(a), 8))
 
 
 def t4_thread():
@@ -374,7 +374,9 @@ def t4_inside():
     if p is None:
         return
     h.check("T4 inside thread", "Inside" in p.info.text(), p.info.text())
-    h.check("T4 M10x1.5 from the tap drill", p.designation.currentText() == "M10x1.5")
+    # Fusion offers the size nearest the face's diameter, for a hole too, and gives the
+    # threaded hole the thread's minor diameter (wave 7; it was matched by the tap drill)
+    h.check("T4 M10x1.5 from the hole's diameter", p.designation.currentText() == "M10x1.5")
     h.check("T4 class 6H", p.thread_class.currentText() == "6H", p.thread_class.currentText())
     if not p.modeled.isChecked():
         hs.click_checkbox(p.modeled)
@@ -391,7 +393,7 @@ def t4_done():
     from fission180 import thread_tables
 
     m10 = thread_tables.find("iso", "M10x1.5")  # 6H: the middle of its class's zone
-    expect = s["v"] - thread_core.class_removed_volume(m10, "6H", True, 4.25, 10.0)
+    expect = s["v"] - thread_core.class_removed_volume(m10, "6H", True, 5.0, 10.0)
     h.check("T4 modeled inside thread through the plate", hs.close(v, expect, 1e-5), (v, expect))
     part_ok("T4")
     s["v"] = v

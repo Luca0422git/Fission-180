@@ -62,5 +62,5 @@ Moved Fillet1 after Extrude1. Bodies now: Body1: 23328.7 mm3, 60 x 40 x 10 mm.
 
 ## See also
 
-- Golden models built with its steps (read one with docs_read golden/<id>): `extrude_multi_move`, `tl_move_fillet_earlier`
+- Golden models built with its steps (read one with docs_read golden/<id>): `book_thread_dragged_before_chamfer`, `extrude_multi_move`, `tl_move_fillet_earlier`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

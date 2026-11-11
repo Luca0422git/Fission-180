@@ -15,9 +15,23 @@ ISO 262 / ISO 2306 and ASME B1.1 give; they are the same rows FreeCAD's Hole use
 import math
 
 STANDARDS = (("iso", "ISO Metric profile"), ("ansi", "ANSI Unified Screw Threads"))
+# The Thread tool also cuts pipe threads (Fusion's Thread Type list has them; the Hole's taper
+# pipe threads are hole_tables'): the parallel ISO pipe thread (ISO 228-1, "G", the 55 degree
+# Whitworth form) and the American taper pipe thread (ASME B1.20.1, NPT, 60 degrees, 1 in 16).
+PIPE_STANDARDS = (("pipe", "ISO Pipe Threads"), ("npt", "ANSI Taper Pipe Threads (NPT)"))
+THREAD_STANDARDS = STANDARDS + PIPE_STANDARDS
 # FreeCAD thread series per standard, coarse first (Fusion lists the coarse pitch first).
-SERIES = {"iso": ("ISOMetricProfile", "ISOMetricFineProfile"), "ansi": ("UNC", "UNF", "UNEF")}
+SERIES = {
+    "iso": ("ISOMetricProfile", "ISOMetricFineProfile"),
+    "ansi": ("UNC", "UNF", "UNEF"),
+    "pipe": ("G",),
+    "npt": ("NPT",),
+}
 SERIES_SUFFIX = {"UNC": "UNC", "UNF": "UNF", "UNEF": "UNEF"}
+# The thread form (thread_core.FORMS) and the taper (half angle, degrees) of each standard.
+FORM = {"iso": "iso", "ansi": "iso", "pipe": "whitworth", "npt": "npt"}
+TAPER = {"npt": math.degrees(math.atan(1.0 / 32.0))}  # 1 in 16 on the diameter
+INCH = 25.4
 # Clearance hole fits: Fusion's names -> FreeCAD's ThreadFit per thread series.
 FITS = (("close", "Close"), ("normal", "Normal"), ("loose", "Loose"))
 FIT_ISO = {"close": "Fine", "normal": "Medium", "loose": "Coarse"}
@@ -28,8 +42,17 @@ CLASSES = {
     ("iso", False): ("4g", "4h", "5g", "5h", "6e", "6f", "6g", "6h", "7e", "7g", "7h", "8g"),
     ("ansi", True): ("1B", "2B", "3B"),
     ("ansi", False): ("1A", "2A", "3A"),
+    # ISO 228-1: an internal G thread has one class, an external one A or B; NPT has none
+    ("pipe", True): ("G",),
+    ("pipe", False): ("A", "B"),
+    ("npt", True): ("NPT",),
+    ("npt", False): ("NPT",),
 }
 DEFAULT_CLASS = {
+    ("pipe", True): "G",
+    ("pipe", False): "A",
+    ("npt", True): "NPT",
+    ("npt", False): "NPT",
     ("iso", True): "6H",
     ("iso", False): "6g",
     ("ansi", True): "2B",
@@ -61,9 +84,24 @@ class Designation:
         self.drill = drill
         self.label = _label(standard, size, series, pitch)
 
+    @property
+    def form(self):
+        """The thread form (thread_core.FORMS)."""
+        return FORM.get(self.standard, "iso")
+
+    @property
+    def taper(self):
+        """Half angle of a taper thread's cone in degrees (0: a parallel thread)."""
+        return TAPER.get(self.standard, 0.0)
+
     def minor(self, internal=True):
         """Minor diameter of the basic profile (ISO 68-1): D1 = D - 2 * 5/8 * H for a nut,
-        d3 = D - 2 * 17/24 * H for a bolt (H = sqrt(3)/2 * P)."""
+        d3 = D - 2 * 17/24 * H for a bolt (H = sqrt(3)/2 * P). A pipe thread: the major
+        diameter less twice its thread depth (0.640327 P for G, 0.8 P for NPT)."""
+        if self.form == "whitworth":
+            return self.diameter - 2.0 * 0.640327 * self.pitch
+        if self.form == "npt":
+            return self.diameter - 2.0 * 0.8 * self.pitch
         h = math.sqrt(3.0) / 2.0 * self.pitch
         return self.diameter - 2.0 * (5.0 / 8.0 if internal else 17.0 / 24.0) * h
 
@@ -79,6 +117,10 @@ def _trim(number):
 def _label(standard, size, series, pitch):
     if standard == "iso":
         return "M%sx%s" % (size, _trim(pitch))
+    if standard == "pipe":
+        return "G %s" % size
+    if standard == "npt":
+        return "%s-%s NPT" % (size, _trim(25.4 / pitch))
     tpi = int(round(25.4 / pitch))
     return "%s-%d %s" % (size, tpi, SERIES_SUFFIX[series])
 
@@ -144,16 +186,19 @@ def standard_of(series):
 
 
 def closest(standard, diameter, internal=False):
-    """The designation a cylinder of this diameter takes (Fusion picks the size from the
-    face): a shaft is threaded at its own diameter (the major diameter); a hole is drilled
-    at the tap drill size, so a hole matches the size whose tap drill (or minor diameter)
-    is nearest. Coarse pitch first among equals."""
+    """The designation a cylinder of this diameter takes: the standard size whose nominal
+    (major) diameter is nearest, for a shaft and for a hole alike. Fusion "will find the
+    closest standard thread in relation to the size of the circular face you selected"
+    (Autodesk tech tip), and its modeled thread then gives the hole the thread's minor
+    diameter (Autodesk, forum: "Fusion will adjust the diameter of a threaded hole to the
+    minor diameter of the thread"): a 6 mm hole is offered M6, as the book's Hot End has
+    it. (Until beta.4 a hole was matched by its tap drill: M7 for a 6 mm hole.) Coarse
+    pitch first among equals."""
     best = None
     for d in all_designations():
         if d.standard != standard:
             continue
-        target = (d.drill or d.minor(True)) if internal else d.diameter
-        gap = abs(target - diameter)
+        gap = abs(d.diameter - diameter)
         rank = (round(gap, 6), SERIES[standard].index(d.series), -d.pitch)
         if best is None or rank < best[0]:
             best = (rank, d)
@@ -306,6 +351,14 @@ def class_zone(designation, thread_class, internal):
     "major" and "minor" diameters (a bolt is turned to its "major", a hole bored to its
     "minor"). An unknown class gives the basic profile (shift 0)."""
     d, p = designation.diameter, designation.pitch
+    if designation.standard in ("pipe", "npt"):
+        # the basic profile (the classes of a pipe thread are not modeled apart)
+        return {
+            "shift": 0.0,
+            "pitch": (d + designation.minor(internal)) / 2.0,
+            "major": d,
+            "minor": designation.minor(internal),
+        }
     known = classes(designation.standard, internal)
     if thread_class not in known:
         return {
@@ -629,7 +682,60 @@ UNEF = (
     ("1 11/16", 42.862, 1.411, 41.6),
 )
 
+
+# ISO 228-1 (G, parallel pipe threads): (size, major diameter mm, pitch mm = 25.4 / threads per
+# inch, tap drill mm = the minor diameter D1). Threads per inch: 28, 19, 14, 11.
+def _g(size, tpi, major, minor):
+    return (size, major, 25.4 / tpi, minor)
+
+
+PIPE_G = (
+    _g("1/16", 28, 7.723, 6.561),
+    _g("1/8", 28, 9.728, 8.566),
+    _g("1/4", 19, 13.157, 11.445),
+    _g("3/8", 19, 16.662, 14.950),
+    _g("1/2", 14, 20.955, 18.631),
+    _g("5/8", 14, 22.911, 20.587),
+    _g("3/4", 14, 26.441, 24.117),
+    _g("7/8", 14, 30.201, 27.877),
+    _g("1", 11, 33.249, 30.291),
+    _g("1 1/8", 11, 37.897, 34.939),
+    _g("1 1/4", 11, 41.910, 38.952),
+    _g("1 1/2", 11, 47.803, 44.845),
+    _g("1 3/4", 11, 53.746, 50.788),
+    _g("2", 11, 59.614, 56.656),
+    _g("2 1/2", 11, 75.184, 72.226),
+    _g("3", 11, 87.884, 84.926),
+    _g("4", 11, 113.030, 110.072),
+)
+
+
+# ASME B1.20.1 (NPT): (size, outside diameter of the pipe mm, pitch mm, tap drill mm). The
+# thread is cut on a cone of 1 in 16 on the diameter (thread.py); the "diameter" is the pipe's
+# outside diameter D. Threads per inch: 27, 18, 14, 11.5, 8.
+def _npt_row(size, tpi, outside_inch):
+    pitch = 25.4 / tpi
+    return (size, outside_inch * 25.4, pitch, outside_inch * 25.4 - 2.0 * 0.8 * pitch)
+
+
+PIPE_NPT = (
+    _npt_row("1/16", 27.0, 0.3125),
+    _npt_row("1/8", 27.0, 0.405),
+    _npt_row("1/4", 18.0, 0.540),
+    _npt_row("3/8", 18.0, 0.675),
+    _npt_row("1/2", 14.0, 0.840),
+    _npt_row("3/4", 14.0, 1.050),
+    _npt_row("1", 11.5, 1.315),
+    _npt_row("1 1/4", 11.5, 1.660),
+    _npt_row("1 1/2", 11.5, 1.900),
+    _npt_row("2", 11.5, 2.375),
+    _npt_row("2 1/2", 8.0, 2.875),
+    _npt_row("3", 8.0, 3.500),
+)
+
 TABLES = {
+    "G": PIPE_G,
+    "NPT": PIPE_NPT,
     "ISOMetricProfile": ISO_COARSE,
     "ISOMetricFineProfile": ISO_FINE,
     "UNC": UNC,

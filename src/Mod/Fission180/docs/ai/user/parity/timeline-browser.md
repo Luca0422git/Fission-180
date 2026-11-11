@@ -26,7 +26,7 @@ by Luca.**
 | Errors red, warnings yellow, reason on hover | Same, also in the browser (sketches, planes) | Reasons are rewritten in plain words ("Its profile is gone (deleted?). Edit it and pick a new profile."). While a design has red or suppressed steps, recomputes run with the Report view's error output muted (the timeline shows them instead). |
 | Double-click edits | `taskui.edit_object` (each feature's own dialog via `EDITORS`, else FreeCAD's) | |
 | Rename | In place (Enter keeps, Esc cancels, F2) | `Label`; a renamed step shows its own name, others "Extrude 2". |
-| Groups | Group Features / Expand / Collapse / Rename / Ungroup / Suppress / Delete / Roll History Marker Here; drag a group's folder to move the whole group (2026-10-16, section below) | `Fission180Group` / `Fission180GroupName` on each member (undo works). Dragging a step out of its group takes it out; dropping it between two grouped steps puts it in. A group dragged as a whole: `timeline_core.plan_group_move`, `timeline_ops.move_group`. |
+| Groups | Create Group / Expand / Collapse / Rename / Ungroup / Suppress / Delete / Roll History Marker Here; drag a group's folder to move the whole group (2026-10-16, section below) | `Fission180Group` / `Fission180GroupName` on each member (undo works). Dragging a step out of its group takes it out; dropping it between two grouped steps puts it in. A group dragged as a whole: `timeline_core.plan_group_move`, `timeline_ops.move_group`. |
 | Undo/Redo | Every action is one undo step; after Undo/Redo the design is recomputed so no stale red steps remain | |
 | Step names never change ("Extrude 3" stays Extrude 3 when moved or when a step is added before it) | Same, but deleting an earlier step renumbers the later ones of that kind | Steps of a kind are numbered in the order they were made (FreeCAD's object `ID`; FreeCAD's label numbers also count cancelled previews). A step Fission 180 rebuilds as another kind (extrude -> cut) is a new object: among default labels of one kind the label order decides, and the label is kept. |
 | The marker can stand anywhere, also just before a sketch (that sketch is then not drawn), and at the very beginning (Move to Beginning: an empty design) | Same (2026-10-14: also before the first step; Go to beginning and Play start from the empty design) | The Tips say which solids are active; `Document.Meta["Fission180.MarkerBefore"]` names the sketch/plane right after the marker (ignored when it no longer fits the Tips, e.g. after an undo). Sketches/planes after the marker are hidden and shown again when it passes them (`Fission180RolledHidden`). |
@@ -264,3 +264,16 @@ Ctrl+Z / Ctrl+Y, the browser's "Sketch 1" / "Sketch 2", Enter renames nothing, p
   link because that base step was the deleted one (a Snap Fit's groove step under a Lip).
   Open: a plane or sketch made on a face of the last step counts as depending on that step,
   so Suppress takes it (and what is built on it) along even when the face was made earlier.
+
+## Wave 7, the book parity report: the timeline (2026-11-11)
+
+- Fusion's entry is **Create Group** (Autodesk help, "Use the Timeline": "right-click the
+  selection and choose Create Group"); it was "Group Features" here.
+- A fast drag (the button let go far from where it was pressed before any move was told)
+  moves the step like a slow one. A drag that cannot be says why next to the pointer and
+  keeps it up (`commands.tell`): the tip was hidden at once by the mouse still moving.
+- The settings (gear) menu is a plain pop-up: it does not wait inside the button's click.
+- Edit Feature on the step an open dialog is still making keeps the dialog (see gear.md).
+- A step dragged before or after another keeps its picks: a Thread finds its cylinder again,
+  a fillet / chamfer its edges (also Fission 180's own step with several sets), within the
+  distance a modeled thread moved the surface (`timeline_ops._names_on`).

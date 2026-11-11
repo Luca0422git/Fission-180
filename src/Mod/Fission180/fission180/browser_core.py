@@ -330,6 +330,11 @@ def _folders(objects, active_body, component):
             if obj.get("describe"):
                 node["tip"] = node["tip"] or obj["describe"]
             flat_patterns.append(node)
+        elif type_id in SKETCH_TYPES and obj.get("helper") == "HoleSketch":
+            # the sketch Fission 180 keeps for a Single Hole's point: Fusion's hole has no
+            # sketch row (book parity report: 'each single Hole adds a "Hole 1 Sketch" row
+            # under Sketches'). The hole is edited from the timeline.
+            pass
         elif type_id in SKETCH_TYPES:
             # Fusion: a padlock on the icon of a fully constrained sketch
             sketches.append(
@@ -804,9 +809,7 @@ def eye_rows(rows):
     shows it again with its own eye), then the others in their order. ``rows``: nodes with
     a "depth" (folders above them) where known."""
     shown = [n for n in rows if n.get("visible") is not None]
-    parts = sorted(
-        [n for n in shown if n["kind"] == "component"], key=lambda n: n.get("depth", 0)
-    )
+    parts = sorted([n for n in shown if n["kind"] == "component"], key=lambda n: n.get("depth", 0))
     return parts + [n for n in shown if n["kind"] != "component"]
 
 

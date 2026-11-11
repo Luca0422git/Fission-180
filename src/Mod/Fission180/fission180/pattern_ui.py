@@ -997,7 +997,27 @@ class PatternPanel(Panel):
         if key.startswith("quantity"):
             problem = ""
             if self.options["pattern_type"] == "bodies" and self.kind != "mirror":
-                problem = "A pattern of bodies takes a plain number as its quantity."
+                # Each copy of a body is a body of its own (an object of the design), so the
+                # count cannot follow a parameter by itself. The book types a parameter here
+                # (Metric Bolt: Quantity = "Quantity") and Fusion takes it: so does this, as
+                # the number the formula gives now, and says that it is kept as a number
+                # (it was refused: "takes a plain number as its quantity").
+                if value < 0.5:
+                    problem = "'%s' is less than 1: the quantity must be 1 or more." % text
+                else:
+                    count = max(1, int(round(float(value))))
+                    _CountAdapter(getattr(self, key)).set_value(count)
+                    self.options["expressions"].pop(key, None)
+                    self.options[key] = count
+                    self._taken = (
+                        "Quantity %d is what '%s' gives now. A pattern of bodies keeps the "
+                        "number (each copy is a body of its own): after changing the "
+                        "parameter, edit the pattern and type it again." % (count, text)
+                    )
+                    self._typed(count)
+                    self.show_formulas()
+                    self.show_status()
+                    return
             elif self.options["pattern_type"] == "components":
                 problem = "A pattern of components takes a plain number as its quantity."
             elif value < 0.5:
@@ -1314,7 +1334,7 @@ class PatternPanel(Panel):
 
             body_hover.take_batch(
                 picks,
-                lambda obj, short, _point: self._picked(obj, short),
+                lambda obj, short, point: self._picked(obj, short, point),
                 self._pick_body_of,
                 self.picks_bodies,
                 self._has_body,
@@ -1333,11 +1353,60 @@ class PatternPanel(Panel):
     def _has_body(self, body):
         return any(o is body for o, _s in self.options.get("objects") or [])
 
-    def _picked(self, obj, short):
+    def _picked(self, obj, short, point=None):
         if self.active == "objects":
             self._object_picked(obj, short)
         else:
+            if self.active in ("direction", "direction2", "axis"):
+                short = self._edge_meant(obj, short, point)
             self._reference_picked((obj, short))
+
+    EDGE_REACH_PX = 12  # a click this near a straight edge of the face it hit means the edge
+
+    def _edge_meant(self, obj, short, point):
+        """The straight edge a click for a direction was aimed at. FreeCAD gives the face
+        when the click lands a few pixels beside the edge (its own reach is about 5 px);
+        the direction then became the face's normal and the copies were stacked upwards
+        (the book's Play Brick: "clicking the brick's edges picked the faces next to them").
+        A click well inside the face still means the face (its normal). An axis: the same
+        for a round face's rim, which is no axis (the face's own axis stays)."""
+        if point is None or not short.startswith("Face"):
+            return short
+        try:
+            import Part
+
+            shape = obj.Shape
+            face = shape.getElement(short)
+            if self.active == "axis" and face.Surface.TypeId != "Part::GeomPlane":
+                return short  # a round face is an axis itself
+            view = self.view
+            place = pattern.owner_body(obj)
+            local = point
+            if place is not None:
+                local = place.getGlobalPlacement().inverse().multVec(point)
+            here = view.getPointOnViewport(point)
+            best = None
+            for edge in face.Edges:
+                if not pattern._is_line(edge):
+                    continue
+                found = edge.distToShape(Part.Vertex(local))
+                near = found[1][0][0] if found[1] else None
+                if near is None:
+                    continue
+                if place is not None:
+                    near = place.getGlobalPlacement().multVec(near)
+                there = view.getPointOnViewport(near)
+                gap = math.hypot(there[0] - here[0], there[1] - here[1])
+                if gap <= self.EDGE_REACH_PX and (best is None or gap < best[0]):
+                    best = (gap, edge)
+            if best is None:
+                return short
+            for i, candidate in enumerate(shape.Edges, start=1):
+                if candidate.isSame(best[1]):
+                    return "Edge%d" % i
+        except Exception as exc:
+            warn("%s: could not look for the edge under the click: %s" % (self.title, exc))
+        return short
 
     # -- objects --------------------------------------------------------------------------------
     def _usable_feature(self, obj):
@@ -2027,7 +2096,8 @@ class PatternPanel(Panel):
         return self.target
 
     def show_status(self):
-        self.info.setText(self.waiting)
+        taken = getattr(self, "_taken", "")  # a body pattern's quantity taken from a formula
+        self.info.setText("\n".join(t for t in (self.waiting, taken) if t))
         if self.formula_error:
             self.message.setText("⚠ " + self.formula_error)
             return

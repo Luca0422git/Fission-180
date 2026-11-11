@@ -777,7 +777,7 @@ TIMELINE
     Delete
     Find in Browser
     Find in Window
-    Group Features
+    Create Group
   Group [in=timeline:group]
     Expand Group
     Suppress Features?
