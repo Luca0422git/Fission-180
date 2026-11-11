@@ -14,8 +14,6 @@ Honest limits: the 3D view shows a pattern's light and dark only. Bumps, roughne
 reflections and cut-outs (a mesh's holes are drawn dark, not open) belong to rendering.
 """
 
-import FreeCAD as App
-
 from . import appearance_mapping as mapping
 from . import appearance_textures as textures
 from . import warn
@@ -325,31 +323,3 @@ def drawn(step):
 def forget(doc_name):
     for key in [k for k in _STAMPS if k[0] == doc_name]:
         _STAMPS.pop(key, None)
-
-
-def hide_all(doc, hidden):
-    """Switch every pattern of a design off or on again (Display Component Colors draws the
-    bodies in its own colours meanwhile)."""
-    if doc is None or not App.GuiUp:
-        return
-    from pivy import coin
-
-    for obj in doc.Objects:
-        try:
-            if not obj.isDerivedFrom("PartDesign::Feature"):
-                continue
-            flat = _flat_root(obj.ViewObject)
-            index = _existing(flat) if flat is not None else -1
-            if index < 0:
-                continue
-            holder = flat.getChild(index)
-            style = None
-            for i in range(holder.getNumChildren()):
-                if _type(holder.getChild(i)) == "DrawStyle":
-                    style = holder.getChild(i)
-            if style is None:
-                style = coin.SoDrawStyle()
-                holder.insertChild(style, 0)
-            style.style = coin.SoDrawStyle.INVISIBLE if hidden else coin.SoDrawStyle.FILLED
-        except Exception:
-            continue
