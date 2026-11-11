@@ -194,6 +194,25 @@ def _select(box, value):
         box.blockSignals(False)
 
 
+def _carry_label(label, name, new):
+    """The label of a step replaced by one of the other kind (FreeCAD's Fillet <-> Fission
+    180's own step) goes to the new step when the person gave it. A default label
+    ("Fillet001", or "f1" of a step named f1) does not: the timeline numbers the new step
+    "Fillet 1" by itself. (Copied always, a step named "f1" showed as "f1" after the swap;
+    fillet_sets.rescue had this rule already. fix-1, wave 7.)"""
+    try:
+        from . import timeline_core
+
+        if timeline_core.is_default_label(label, name):
+            return
+    except Exception:
+        pass
+    try:
+        new.Label = label
+    except Exception:
+        pass
+
+
 class _Observer:
     """Selection events only queue work; the panel handles them a moment later, outside
     FreeCAD's click handling (feature guide rule 2)."""
@@ -2207,11 +2226,9 @@ class BlendPanel(Panel):
                 body, self.base, self.spec, flat, self.refs2, self.features, self.features2
             )
 
+        name = old.Name
         new, _expressions = fillet_sets.replace(old, build)
-        try:
-            new.Label = label
-        except Exception:
-            pass
+        _carry_label(label, name, new)
         self.target = new
         log(
             "%s is now Fission 180's own step %s (more than FreeCAD's one size)" % (label, new.Name)
@@ -2221,8 +2238,8 @@ class BlendPanel(Panel):
         """The own step this dialog made only for a size another route builds (_for_route)
         becomes FreeCAD's Fillet / Chamfer again, now that the kernel builds the size in one
         run: a plain fillet is FreeCAD's step (Press Pull's fillet editing, the AI's
-        edit_step and the timeline's own step work on it), in the same place of the
-        timeline, under the same name."""
+        edit_step work on it), in the same place of the timeline, under the name the person
+        gave it (_carry_label)."""
         old = self.target
         label = old.Label
         self._looks.restore()
@@ -2231,11 +2248,9 @@ class BlendPanel(Panel):
         def build(body):
             return blend.make(body, self.base, refs, self.kind, options)
 
+        name = old.Name
         new, _expressions = fillet_sets.replace(old, build)
-        try:
-            new.Label = label
-        except Exception:
-            pass
+        _carry_label(label, name, new)
         self.target = new
         self._for_route = False
         self._sync_formulas()

@@ -125,6 +125,37 @@ class PlainItemTests(unittest.TestCase):
         self.assertIsNone(blend.plain_items("chamfer", None, names, angle))
 
 
+class CheckPlainTests(unittest.TestCase):
+    """blend.check_plain (fix-1): FreeCAD's own Fillet / Chamfer step holds only what the
+    kernel builds in one run; Press Pull's search for the largest radius asks it."""
+
+    def setUp(self):
+        self.saved = blend.check_build
+        self.route = None
+
+        def check_build(kind, info, refs, options):
+            fillet_robust._STATE["used"] = self.route
+
+        blend.check_build = check_build
+
+    def tearDown(self):
+        blend.check_build = self.saved
+        fillet_robust.reset()
+
+    def test_one_run_is_plain(self):
+        blend.check_plain("fillet", None, ["Edge7"], {"radius": 2.0})  # no error
+
+    def test_another_route_is_too_big_for_the_plain_step(self):
+        self.route = "sections"  # the 10 mm round that uses up the 10 mm face
+        with self.assertRaises(blend.BlendError) as caught:
+            blend.check_plain("fillet", None, ["Edge7"], {"radius": 10.0})
+        self.assertTrue(str(caught.exception).startswith("Radius 10 mm is too big here"))
+        self.route = "thread"
+        with self.assertRaises(blend.BlendError) as caught:
+            blend.check_plain("chamfer", None, ["Edge7"], {"distance": 1.0})
+        self.assertTrue(str(caught.exception).startswith("Distance 1 mm is too big here"))
+
+
 class GearNameTests(unittest.TestCase):
     """Fusion's SpurGear sample names its component "Spur Gear (20 teeth)"."""
 
