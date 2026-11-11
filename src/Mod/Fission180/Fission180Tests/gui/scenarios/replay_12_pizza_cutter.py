@@ -11,6 +11,7 @@ import FreeCADGui as Gui
 from PySide import QtWidgets
 
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import replay_12_handle_steps as handle
 from Fission180Tests.gui import replay_12_inner2_steps as inner2
 from Fission180Tests.gui import replay_12_inner_steps as inner
 from Fission180Tests.gui import replay_e_steps as r
@@ -356,6 +357,15 @@ cap += [
 ]
 cap += [appearance_open, cap_look, r.ok("cap_look_ok"), cap_look_done, cap_menu]
 
+
+def split(steps, at):
+    """(before, from) the step called `at` (the parts of a section, for development)."""
+    cut = [x.__name__ for x in steps].index(at)
+    return steps[:cut], steps[cut:]
+
+
+handle_a, handle_b = split(handle.steps(), "fillet_key")
 SECTIONS = [("cap", cap), ("inner", inner.steps()), ("inner2", inner2.steps())]
+SECTIONS += [("handle", handle_a), ("handle2", handle_b)]
 
 h.run("replay_12_pizza_cutter", r.assemble(SECTIONS), paced_by="state")

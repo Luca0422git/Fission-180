@@ -551,7 +551,8 @@ class AppearancePanel(BodyPanel):
     def _hit(self, widget, x, y):
         """(object, short element name) drawn at a pixel of the 3D view, or None."""
         ratio = widget.devicePixelRatioF()
-        info = self.view.getObjectInfo((x * ratio, (widget.height() - y) * ratio))
+        pixel = (x * ratio, (widget.height() - y) * ratio)
+        info = self.view.getObjectInfo(pixel)
         if not info or not info.get("Object"):
             return None
         obj = self.doc.getObject(info["Object"])
@@ -559,6 +560,20 @@ class AppearancePanel(BodyPanel):
             return None
         from . import hole_common
 
+        if bodies.body_of(obj) is None:
+            # Something that is no body is drawn on top there (a joint's glyph, a
+            # construction plane, a sketch): the look goes to the body behind it, as in
+            # Fusion, where only bodies and faces light up under a dragged appearance. (The
+            # book's Pizza Cutter: Mahogany dropped on the handle next to the End Cap landed
+            # on the glyph of the joint there: "Rigid 1 is not a body".)
+            try:
+                behind = list(self.view.getObjectsInfo((int(pixel[0]), int(pixel[1]))) or [])
+            except Exception:
+                behind = []
+            for other in behind:
+                found = self.doc.getObject(other.get("Object") or "")
+                if found is not None and bodies.body_of(found) is not None:
+                    return hole_common.resolve(found, other.get("Component", "") or "")
         return hole_common.resolve(obj, info.get("Component", "") or "")
 
     def face_near(self, position, body=None):

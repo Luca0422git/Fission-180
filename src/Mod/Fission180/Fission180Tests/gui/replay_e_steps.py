@@ -120,7 +120,11 @@ def vol_in3(label):
 
 
 def box_in(label):
-    b = shape_of(label).BoundBox
+    shape = shape_of(label)
+    try:  # (the plain BoundBox of a turned or threaded face is the box of its poles)
+        b = shape.optimalBoundingBox(False, False)
+    except Exception:
+        b = shape.BoundBox
     return tuple(round(v / IN, 4) for v in (b.XMin, b.YMin, b.ZMin, b.XMax, b.YMax, b.ZMax))
 
 
@@ -291,12 +295,14 @@ def on_grid(u, v):
     return (round(u / g) * g, round(v / g) * g)
 
 
-def draw_at(u, v, name):
-    """A step that clicks the grid crossing nearest (u, v) inches."""
+def draw_at(u, v, name, exact=""):
+    """A step that clicks the grid crossing nearest (u, v) inches. `exact`: "u" / "v": that
+    coordinate is clicked as given (the pointer is on a guide there: level with, or straight
+    above, the point before; the guide comes before the grid, as in Fusion)."""
 
     def step():
         a, b = on_grid(u, v)
-        sclick(a, b)
+        sclick(u if "u" in exact else a, v if "v" in exact else b)
 
     return named(name, step)
 
@@ -620,4 +626,26 @@ def assemble(sections):
     for tag, part in sections[start:]:
         steps += list(part)
         steps.append(checkpoint(tag))
+    if STOP_AT_FIRST:
+        steps = [_stopping(step) for step in steps]
     return steps
+
+
+STOP_AT_FIRST = os.environ.get("FISSION180_REPLAY_STOP", "") == "1"
+
+
+def _stopping(step):
+    """Development only (FISSION180_REPLAY_STOP=1): the replay ends at its first failed
+    check, so the log is about that hitch and not about what follows from it."""
+
+    def wrapped():
+        if any(not c["ok"] for c in h.checks):
+            h.state["stop"] = "the first failed check (development)"
+            return None
+        return step()
+
+    wrapped.__name__ = step.__name__
+    for name in ("done", "done_what", "ready", "timeout_s", "while_busy"):
+        if hasattr(step, name):
+            setattr(wrapped, name, getattr(step, name))
+    return wrapped
