@@ -21,6 +21,7 @@ block) and "Wall" (a 20 x 30 x 10 block from x 60); "Bolt" (a cylinder, radius 4
 
 import FreeCAD as App
 import FreeCADGui as Gui
+from PySide import QtCore
 
 from Fission180Tests.gui import book_components_steps as k
 from Fission180Tests.gui import component2_steps as c
@@ -227,11 +228,18 @@ def d_on_stator():
 
 
 def d_escape():
-    h.press("Escape")
+    h.press(QtCore.Qt.Key_Escape)
 
 
 d_escape.done = lambda: c.component_panel() is None
 d_escape.done_what = "the dialog closed"
+
+
+def d_nothing():
+    h.check("Esc moved nothing", k.part("Stator").Placement.isIdentity())
+    from fission180 import taskui
+
+    h.check("no dialog is open after Esc", taskui.current() is None, taskui.current())
 
 
 h.run(
@@ -262,6 +270,7 @@ h.run(
         d_press_m,
         d_on_stator,
         d_escape,
+        d_nothing,
     ],
     paced_by="state",
 )
