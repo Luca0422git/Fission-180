@@ -230,10 +230,27 @@ def global_placement(part):
     return parent_global(part) * part.Placement
 
 
+def same_place(a, b, tol=1e-12):
+    """True when two placements are the same to the last digits. Not Placement.isSame: its
+    tolerance is on the rotations' dot product, so isSame(p, 1e-7) calls two placements the
+    same when they are up to 0.036 degrees apart (2 x sqrt(tol) radians). Putting the parts
+    back after a joint's animation went through it: a last frame that close to the start
+    was left standing (the shaft found turned 0.0175 to 0.03 degrees after OK and after
+    Undo on the slow CI machine: vex_shaft, vex_qa_real, CI #307 and #324)."""
+    try:
+        qa, qb = a.Rotation.Q, b.Rotation.Q
+        if (a.Base - b.Base).Length > tol:
+            return False
+        same = max(abs(x - y) for x, y in zip(qa, qb)) <= tol
+        return same or max(abs(x + y) for x, y in zip(qa, qb)) <= tol  # q and -q: one turn
+    except Exception:
+        return False
+
+
 def set_global_placement(part, plc):
     """Put a part at a placement given in design coordinates."""
     local = parent_global(part).inverse() * plc
-    if not part.Placement.isSame(local, 1e-12):
+    if not same_place(part.Placement, local):
         part.Placement = local
 
 
@@ -545,7 +562,137 @@ def _shape_snaps(shape, element):
     element (hole_snaps: an index of the shape, Fission 180's hole centres)."""
     from . import hole_snaps
 
-    return hole_snaps.snaps(shape, element)
+    try:
+        kept = hole_snaps.index_for(shape).__dict__.setdefault("_keypoints", {})
+    except Exception:
+        kept = {}
+    if element not in kept:
+        kept[element] = _keypoints(shape, element, hole_snaps.snaps(shape, element))
+    return kept[element]
+
+
+# What Fusion shows as snap points are the keypoints a person sees. The modelling kernel adds
+# points of its own: a full circle has one "corner" where it starts and ends (its seam vertex)
+# and a "middle" opposite it, a full cylinder has a seam line with a middle and two ends.
+# Offered as snaps they were the dots nearest the pointer on a round edge or face, so a click
+# there took "(corner)" or "(midpoint)" and the part landed off the axis (the book parity
+# report: Fire Piston, Hot End, Pizza Cutter). They are left out: a round edge offers its
+# centre, wherever on it the pointer is, as Fusion does; an arc keeps its ends and middle and
+# offers its centre unless the pointer is right on one of those.
+ROUND_FACES = ("Part::GeomCylinder", "Part::GeomCone")
+
+
+def _closed(edge):
+    try:
+        return bool(edge.Closed) or len(edge.Vertexes) < 2
+    except Exception:
+        return False
+
+
+def _keypoints(shape, element, snaps):
+    try:
+        el = shape.getElement(element)
+    except Exception:
+        return snaps
+    try:
+        if element.startswith("Edge"):
+            return _edge_keypoints(shape, el, snaps)
+        if element.startswith("Face"):
+            return _face_keypoints(shape, el, snaps)
+    except Exception as exc:
+        warn("joint snap points: %s" % exc)
+    return snaps
+
+
+def _edge_keypoints(shape, edge, snaps):
+    out = []
+    round_edge = _is_circle(edge)
+    closed = _closed(edge)
+    for snap in snaps:
+        kind = snap["kind"]
+        if closed and kind in ("midpoint", "vertex"):
+            continue  # the circle's seam and the point opposite it: not corners one sees
+        if kind == "circle" and round_edge:
+            snap = dict(snap, reach=float(edge.Curve.Radius))  # lit from all along the edge
+        elif kind == "loop":
+            snap = _true_loop(shape, snap)
+        out.append(snap)
+    return out or snaps
+
+
+def _point_key(point):
+    return (round(point.x, 6), round(point.y, 6), round(point.z, 6))
+
+
+def _face_keypoints(shape, face, snaps):
+    ghosts = set()  # seam ends and seam middles of this face, the lone corner of a full circle
+    real = set()  # corners an open edge (not a seam) ends at
+    round_face = face.Surface.TypeId in ROUND_FACES
+    try:
+        for edge in face.Edges:
+            if _closed(edge):
+                ghosts.update(_point_key(v.Point) for v in edge.Vertexes)
+            elif round_face and edge.isSeam(face):
+                ghosts.update(_point_key(v.Point) for v in edge.Vertexes)
+                middle = 0.5 * (edge.FirstParameter + edge.LastParameter)
+                ghosts.add(_point_key(edge.valueAt(middle)))
+            else:
+                real.update(_point_key(v.Point) for v in edge.Vertexes)
+    except Exception:
+        ghosts = set()
+    ghosts -= real
+    out = []
+    for snap in snaps:
+        kind = snap["kind"]
+        if ghosts and kind in ("vertex", "midpoint") and _point_key(snap["point"]) in ghosts:
+            continue
+        if kind == "loop":
+            snap = _true_loop(shape, snap)
+        out.append(snap)
+    return out or snaps
+
+
+def _true_loop(shape, snap):
+    """A hole's centre (the centre of area of its outline on the face) put on the hole's
+    axis when the hole is round but its outline is not quite: a modelled thread runs out
+    through the rim and pulls the centre of area off the axis (0.37 mm on the book's pizza
+    cutter bolt hole). Round = every arc of the outline is of one circle, it has no straight
+    side, and that circle's centre is near the centre of area."""
+    loop = snap.get("loop") or {}
+    try:
+        face = shape.getElement(loop.get("face") or "")
+        first = shape.getElement(loop.get("edge") or "")
+        wire = None
+        for candidate in face.Wires:
+            if any(e.isSame(first) for e in candidate.Edges):
+                wire = candidate
+                break
+        if wire is None:
+            return snap
+        centre = radius = None
+        other = False
+        for edge in wire.Edges:
+            kind = edge.Curve.TypeId
+            if kind == "Part::GeomCircle":
+                c, r = App.Vector(edge.Curve.Center), float(edge.Curve.Radius)
+                if centre is None:
+                    centre, radius = c, r
+                elif (c - centre).Length > 1e-6 or abs(r - radius) > 1e-6:
+                    return snap  # arcs of different circles (a slot): the centre of area
+            elif kind in ("Part::GeomLine", "Part::GeomLineSegment"):
+                return snap
+            else:
+                other = True
+        if centre is None or not other:
+            return snap  # a plain circle is its own centre already
+        normal = App.Vector(*loop["n"])
+        on_face = App.Vector(snap["point"])
+        centre = centre - normal * (centre - on_face).dot(normal)  # in the face's plane
+        if (centre - on_face).Length > 0.5 * max(radius, 1e-9):
+            return snap
+        return dict(snap, point=centre)
+    except Exception:
+        return snap
 
 
 HOLE_KINDS = ("loop", "hole_top", "hole_mid", "hole_bottom")
@@ -583,6 +730,8 @@ def _find_snap(shape, element, kind, at, record=None):
                 found = hole_snaps.stored_snap(record, shape)
                 if found is not None:
                     log("a joint's hole is gone: it stays where the hole was")
+            elif found.get("kind") == "loop":
+                found = _true_loop(shape, found)
             chosen = found
     return chosen
 
@@ -630,7 +779,7 @@ def snap_candidates(pick):
         snaps = [snaps[0]] + [snaps[i] for i in sorted(kept)]
     from . import hole_snaps_core
 
-    radii = [float((s.get("loop") or {}).get("r", 0.0)) for s in snaps]
+    radii = [float((s.get("loop") or {}).get("r", 0.0) or s.get("reach", 0.0)) for s in snaps]
     keep, reach = hole_snaps_core.dedupe_with_reach(
         [_tuple(s["point"]) for s in snaps], radii, 1e-7
     )
@@ -672,7 +821,56 @@ def snap_record(pick, snap):
     record = {"kind": snap["kind"], "element": pick.element, "at": snap.get("at", "")}
     if snap.get("loop") and snap["kind"] in HOLE_KINDS:
         record["loop"] = _json_ready(snap["loop"])  # finds the same hole after an edit
+    try:
+        # where the snap is on the shape: finds the same corner or edge middle again when
+        # an edit numbers the face's edges anew (the snap's own "at" is then another one)
+        if snap.get("point") is not None and pick.element:
+            _shape, to_local = geometry(pick.obj)
+            to_shape = (global_of(pick.ref) * to_local).inverse()
+            record["p"] = list(_tuple(to_shape.multVec(App.Vector(snap["point"]))))
+    except Exception:
+        pass
     return record
+
+
+def _snap_of_record(shape, element, record):
+    """The snap of `element` a stored record means: the one of its kind on its `at`, else
+    (an edit numbered the edges anew) the one of its kind nearest where it was ("p"). None
+    when the element has no such snap."""
+    kind = record.get("kind")
+    if not record.get("p") or kind in HOLE_KINDS:
+        return _find_snap(shape, element, kind, record.get("at", ""), record)
+    same = [x for x in (_shape_snaps(shape, element) if element else []) if x["kind"] == kind]
+    where = App.Vector(*record["p"])
+    near = min(same, key=lambda x: (x["point"] - where).Length) if same else None
+    if near is not None and (near["point"] - where).Length <= 1e-6:
+        return near  # right where it was, whatever its edge is called now
+    chosen = _find_snap(shape, element, kind, record.get("at", ""), record)
+    return chosen if chosen is not None else near
+
+
+def _remember_snap(shape, record):
+    """Keep a simple snap's `at` and place ("p") in line with the shape as it is now.
+    True when the record changed."""
+    kind = record.get("kind")
+    element = record.get("element", "")
+    if kind in ("asbuilt", "origin", "twofaces", "twoedges", None) or not element:
+        return False
+    if kind in HOLE_KINDS:
+        return False
+    chosen = _snap_of_record(shape, element, record)
+    if chosen is None:
+        return False
+    changed = False
+    place = list(_tuple(chosen["point"]))
+    old = record.get("p")
+    if not old or max(abs(a - b) for a, b in zip(old, place)) > 1e-9:
+        record["p"] = place
+        changed = True
+    if chosen.get("at", "") != record.get("at", ""):
+        record["at"] = chosen.get("at", "")
+        changed = True
+    return changed
 
 
 def _json_ready(value):
@@ -730,12 +928,18 @@ def element_signature(shape, element):
         if kind == "Face":
             point = _face_point(el)
             u, v = el.Surface.parameter(point)
-            return {
+            sig = {
                 "type": "Face",
                 "surface": el.Surface.TypeId,
                 "point": list(_tuple(point)),
                 "normal": list(_tuple(el.normalAt(u, v))),
             }
+            if el.Surface.TypeId in ("Part::GeomCylinder", "Part::GeomCone"):
+                sig["axis"] = list(_tuple(el.Surface.Axis))
+                sig["centre"] = list(_tuple(el.Surface.Center))
+                if el.Surface.TypeId == "Part::GeomCylinder":
+                    sig["radius"] = float(el.Surface.Radius)
+            return sig
         if kind == "Edge":
             mid = el.valueAt(0.5 * (el.FirstParameter + el.LastParameter))
             sig = {"type": "Edge", "curve": el.Curve.TypeId, "point": list(_tuple(mid))}
@@ -805,10 +1009,104 @@ def find_element(shape, sig):
     return None
 
 
+# How alike an element must be to be taken for the one a joint was made on after an edit
+# changed it (a fillet shortened the edge, a dimension moved the face): the same kind of
+# surface or curve, facing or running about the same way, about the same size if round, and
+# no farther from where it was than a quarter of the part's size. The same rule the other
+# features' picks follow (picks.py / curves.refind).
+ALIKE_DOT = 0.9
+ALIKE_REACH = 0.25
+ALIKE_RADIUS = 0.34
+
+
+def likeness(shape, element, sig, size=None):
+    """How far `element` of `shape` is from what `sig` describes (a distance in mm, smaller
+    is more alike), or None when it is not the same sort of thing at all."""
+    import Part
+
+    other = element_signature(shape, element)
+    if other is None or not sig or other["type"] != sig.get("type"):
+        return None
+    try:
+        if size is None:
+            size = max(float(shape.BoundBox.DiagonalLength), 1e-6)
+        reach = ALIKE_REACH * size
+        el = shape.getElement(element)
+        point = _vec(sig["point"])
+        if sig["type"] == "Vertex":
+            d = (_vec(other["point"]) - point).Length
+            return d if d <= reach else None
+        if sig["type"] == "Face":
+            if other["surface"] != sig["surface"]:
+                return None
+            if sig["surface"] == "Part::GeomPlane":
+                if _vec(other["normal"]).dot(_vec(sig["normal"])) < ALIKE_DOT:
+                    return None
+            penalty = 0.0
+            if "axis" in sig and "axis" in other:
+                if abs(_vec(other["axis"]).dot(_vec(sig["axis"]))) < ALIKE_DOT:
+                    return None
+                if "radius" in sig and "radius" in other:
+                    off = abs(other["radius"] - sig["radius"])
+                    if off > ALIKE_RADIUS * max(sig["radius"], 1e-9):
+                        return None
+                    penalty = off
+            d = el.distToShape(Part.Vertex(point))[0]
+            return d + penalty if d <= reach else None
+        if other["curve"] != sig["curve"]:
+            return None
+        if "radius" in sig:
+            if abs(_vec(other["axis"]).dot(_vec(sig["axis"]))) < ALIKE_DOT:
+                return None
+            off = abs(other.get("radius", 0.0) - sig["radius"])
+            if off > ALIKE_RADIUS * max(sig["radius"], 1e-9):
+                return None
+            d = (_vec(other["centre"]) - _vec(sig["centre"])).Length
+            return d + off if d <= reach else None
+        if "dir" in sig and "dir" in other:
+            if abs(_vec(other["dir"]).dot(_vec(sig["dir"]))) < ALIKE_DOT:
+                return None
+        d = el.distToShape(Part.Vertex(point))[0]
+        return d if d <= reach else None
+    except Exception:
+        return None
+
+
+def _same_kind(shape, element, sig):
+    """True when `element` is the same kind of thing `sig` describes (a flat face, a round
+    edge...): a name FreeCAD kept through an edit that now names another kind of element
+    names another element."""
+    other = element_signature(shape, element)
+    if other is None or not sig or other.get("type") != sig.get("type"):
+        return False
+    return other.get("surface") == sig.get("surface") and other.get("curve") == sig.get("curve")
+
+
+def find_alike(shape, sig):
+    """The element of `shape` most like what `sig` describes (likeness), or None."""
+    if not sig:
+        return None
+    kind = sig.get("type")
+    items = {"Face": shape.Faces, "Edge": shape.Edges, "Vertex": shape.Vertexes}.get(kind, [])
+    try:
+        size = max(float(shape.BoundBox.DiagonalLength), 1e-6)
+    except Exception:
+        size = None
+    best = None
+    for i in range(1, len(items) + 1):
+        name = "%s%d" % (kind, i)
+        score = likeness(shape, name, sig, size)
+        if score is not None and (best is None or score < best[0] - 1e-9):
+            best = (score, name)
+    return best[1] if best is not None else None
+
+
 def _record_elements(record):
     names = []
-    for name in [record.get("element", "")] + list(record.get("faces") or []) + list(
-        record.get("edges") or []
+    for name in (
+        [record.get("element", "")]
+        + list(record.get("faces") or [])
+        + list(record.get("edges") or [])
     ):
         if name and name not in names:
             names.append(name)
@@ -833,16 +1131,64 @@ def _owner_and_path(ref):
     return obj, path
 
 
+def _repair_as_built(joint, index):
+    """A side that keeps its place on its component only needs some element of it to name
+    (FreeCAD wants one in every reference): when the one it names is gone (its "Vertex1"
+    went with an edit), it names another. True when the reference changed."""
+    prop = "Reference1" if index == 0 else "Reference2"
+    key = PROPS["snap1" if index == 0 else "snap2"]
+    ref = getattr(joint, prop, None)
+    obj, path = _owner_and_path(ref)
+    if obj is None:
+        return False
+    subs = list(ref[1])
+    name = element_name(subs[0]) if subs else ""
+    try:
+        shape = obj.Shape
+        if shape.isNull():
+            return False
+        if name and not name.startswith("?"):
+            try:
+                if shape.getElement(name) is not None:
+                    return False
+            except Exception:
+                pass
+    except Exception:
+        return False
+    record = _json(joint, key)
+    if not record.get("local"):
+        # the joint origin as it last stood on this component (the stored placement)
+        record["local"] = _plc_list(joint.Placement1 if index == 0 else joint.Placement2)
+        _set_json(joint, key, record)
+    wanted = "Face" if getattr(joint, "JointType", "") == "Distance" else "Vertex"
+    new = None
+    if wanted == "Face":
+        for i, face in enumerate(shape.Faces):
+            if face.Surface.TypeId == "Part::GeomPlane":
+                new = "Face%d" % (i + 1)
+                break
+    if new is None and shape.Vertexes:
+        new = "Vertex1"
+    if new is None or new == name:
+        return False
+    setattr(joint, prop, [ref[0], [path + new for _s in subs] or [path + new, path + new]])
+    log("joint %s: its reference on %s names %s now" % (joint.Label, obj.Label, new))
+    return True
+
+
 def repair_side(joint, index):
     """Make one side of a joint name the elements it was made on, on the shape as it is now
-    (see above); keeps the signatures of elements that have none yet. True when the
-    reference was changed."""
+    (see above), and remember where they are now for the next edit. An element whose name
+    is lost, or now belongs to something else, is looked for where it was: exactly, then
+    the most alike (find_alike). True when the reference was changed."""
     prop = "Reference1" if index == 0 else "Reference2"
     key = PROPS["snap1" if index == 0 else "snap2"]
     ref = getattr(joint, prop, None)
     record = _json(joint, key)
-    if not ref or record.get("kind") in ("asbuilt", "origin"):
+    if not ref or record.get("kind") == "origin":
         return False
+    if record.get("kind") == "asbuilt":
+        return _repair_as_built(joint, index)
     obj, path = _owner_and_path(ref)
     if obj is None:
         return False
@@ -859,28 +1205,56 @@ def repair_side(joint, index):
         name = element_name(sub).lstrip("?")
         if name and name not in wanted:
             wanted.append(name)
-    rename, changed = {}, False
+    rename, changed, gone = {}, False, False
+    try:  # FreeCAD follows element names through a body's own history when it has them
+        mapped = int(getattr(shape, "ElementMapSize", 0) or 0) > 0
+    except Exception:
+        mapped = False
     for name in wanted:
         sig = sigs.get(name)
+        lost = any(element_name(s) == "?" + name for s in subs)
         if sig is None:
             # an element named before signatures were kept: its own place now, while it is
             # still found (a lost one cannot be told without it)
-            lost = any(element_name(s) == "?" + name for s in subs)
             if not lost:
                 sig = element_signature(shape, name)
                 if sig is not None:
                     sigs[name] = sig
                     changed = True
             continue
-        if _fits(shape, name, sig) and not any(element_name(s) == "?" + name for s in subs):
+        if not lost and _fits(shape, name, sig):
             continue
         found = find_element(shape, sig)
         if found is None:
-            continue  # gone for good: the joint shows red, as before
+            if not lost and (
+                likeness(shape, name, sig) is not None or (mapped and _same_kind(shape, name, sig))
+            ):
+                # the same element, changed by an edit: FreeCAD kept its name (it follows
+                # the names through the body's history), or it still looks like itself.
+                # Where it is now is what the next edit is compared with
+                fresh = element_signature(shape, name)
+                if fresh is not None and fresh != sig:
+                    sigs[name] = fresh
+                    changed = True
+                continue
+            found = find_alike(shape, sig)
+        if found is None:
+            # gone for good, or its name now belongs to something else: the joint says so
+            # (note_lost) and stays where it is, rather than jump onto another face
+            gone = True
+            continue
+        if found == name and not lost:
+            continue
         rename[name] = found
+    if bool(record.get("lost")) != gone:
+        if gone:
+            record["lost"] = True
+        else:
+            record.pop("lost", None)
+        changed = True
     if rename:
         for old, new in rename.items():
-            sigs[new] = element_signature(shape, new) or sigs.pop(old)
+            sigs[new] = element_signature(shape, new) or sigs.get(old)
             if new != old:
                 sigs.pop(old, None)
         record["element"] = rename.get(record.get("element", ""), record.get("element", ""))
@@ -896,39 +1270,86 @@ def repair_side(joint, index):
             % (joint.Label, ", ".join(rename), obj.Label, ", ".join(rename.values()))
         )
         record["sigs"] = sigs
+        _remember_snap(shape, record)
         _set_json(joint, key, record)
         setattr(joint, prop, [ref[0], new_subs])
         return True
+    if not any(element_name(x).startswith("?") for x in subs) and _remember_snap(shape, record):
+        changed = True
     if changed:
         record["sigs"] = sigs
         _set_json(joint, key, record)
     return False
 
 
-def repair_references(doc):
-    """repair_side on both sides of every joint; the joints whose references moved."""
+def repair_references(doc, skip=None):
+    """repair_side on both sides of every joint that is not rolled back; the joints whose
+    references moved. `skip`: a joint left alone (the one an open dialog edits)."""
     fixed = []
-    for joint in joints(doc):
+    links = [o for o in _python_objects(doc) if getattr(o, PROPS["role"], "") == MEMBER_ROLE]
+    for joint in joints(doc) + links:
         try:
-            if getattr(joint, "Suppressed", False):
+            if joint is skip or getattr(joint, "Suppressed", False) or rolled_back(joint):
                 continue
             moved = False
             for index in (0, 1):
                 if repair_side(joint, index):
                     moved = True
-            if moved and any(
-                element_name(s).startswith("?")
-                for ref in (joint.Reference1, joint.Reference2)
-                if ref
-                for s in ref[1]
-            ):
+            if not lost_reference(joint):
+                freeze_as_built(joint)
+            if moved and lost_reference(joint):
                 continue  # still lost somewhere: leave its helper alone
             if moved:
                 fixed.append(joint)
-                sync_helper(joint)
+                if is_joint(joint):
+                    sync_helper(joint)
         except Exception as exc:
             warn("joint %s: references not repaired: %s" % (getattr(joint, "Label", "?"), exc))
     return fixed
+
+
+WARNING_PROP = "Fission180Warning"  # timeline_ops.WARNING: the step's yellow note
+
+
+def lost_text(joint):
+    """What a joint with a lost reference says (the timeline's note, the dialogs)."""
+    sides = []
+    for index, ref in enumerate((joint.Reference1, joint.Reference2)):
+        try:
+            if ref and lost_side(joint, index):
+                sides.append(ref[0].Label)
+        except Exception:
+            continue
+    where = " and ".join(sides) or "a component"
+    return (
+        "%s lost the face or edge it was made on (on %s): a later change removed it. Its "
+        "components stay where they are. Right-click it > Edit Joint and pick that side again."
+        % (joint.Label, where)
+    )
+
+
+def note_lost(doc):
+    """Say on each joint step whose reference is lost that it is (the timeline shows the
+    note in yellow), and take the note away once the reference is found or picked again.
+    Returns the joints that are lost now."""
+    lost = []
+    for joint in joints(doc):
+        try:
+            text = ""
+            if (
+                not getattr(joint, "Suppressed", False)
+                and not rolled_back(joint)
+                and lost_reference(joint)
+            ):
+                text = lost_text(joint)
+                lost.append(joint)
+            if text or WARNING_PROP in joint.PropertiesList:
+                bodies.add_prop(joint, "App::PropertyString", WARNING_PROP, "Fission180")
+                if getattr(joint, WARNING_PROP) != text:
+                    setattr(joint, WARNING_PROP, text)
+        except Exception as exc:
+            warn("joint %s: %s" % (getattr(joint, "Label", "?"), exc))
+    return lost
 
 
 # -- position modes: Between Two Faces, Two Edge Intersection -------------------------------------
@@ -1090,9 +1511,38 @@ def mode_candidates(face_picks, pick):
         return []
 
 
-def as_built_record(plc):
-    """A side whose place is stored once, where it was (as-built joints, rigid groups)."""
-    return {"kind": "asbuilt", "element": "", "at": "", "frame": _plc_list(plc)}
+def as_built_record(plc, ref=None):
+    """A side whose place is stored once, where it was (as-built joints, rigid groups):
+    `plc` is the joint origin in design coordinates; with `ref` (the side's reference) it is
+    also kept relative to the referenced object ("local"), which is what the joint uses from
+    then on: the joint origin belongs to its component and goes where the component goes.
+    (Until wave 7 only the place in the design was kept and worked out again against the
+    component's place at every recompute: a component that had moved since, by a drag, a
+    Move or another joint, silently took a new place in the joint, and a rigid group let go
+    of its members.)"""
+    record = {"kind": "asbuilt", "element": "", "at": "", "frame": _plc_list(plc)}
+    if ref is not None:
+        record["local"] = _plc_list(global_of(ref).inverse() * plc)
+    return record
+
+
+def freeze_as_built(joint):
+    """An as-built side saved before its place was kept relative to its component takes the
+    place the joint has now (Placement1 / 2, as last computed). True when a record changed."""
+    changed = False
+    for index in (0, 1):
+        key = PROPS["snap1" if index == 0 else "snap2"]
+        record = _json(joint, key)
+        if record.get("kind") != "asbuilt" or record.get("local"):
+            continue
+        ref = joint.Reference1 if index == 0 else joint.Reference2
+        if not ref or lost_reference(joint):
+            continue
+        plc = joint.Placement1 if index == 0 else joint.Placement2
+        record["local"] = _plc_list(plc)
+        _set_json(joint, key, record)
+        changed = True
+    return changed
 
 
 def local_placement(ref, record):
@@ -1102,6 +1552,8 @@ def local_placement(ref, record):
         return App.Placement()
     kind = record.get("kind")
     if kind == "asbuilt":
+        if record.get("local"):
+            return _plc_from_list(record["local"])
         return global_of(ref).inverse() * _plc_from_list(record["frame"])
     if kind == "origin":
         return App.Placement()  # the datum itself is the joint origin
@@ -1122,7 +1574,7 @@ def local_placement(ref, record):
             hint = to_local.inverse().Rotation.multVec(App.Vector(*record["x"]))
         return to_local * from_frame(_frame_from(point, z, hint))
     element = record.get("element") or element_name(ref[1][0])
-    chosen = _find_snap(shape, element, kind, record.get("at", ""), record)
+    chosen = _snap_of_record(shape, element, record)
     if chosen is None:  # the element changed: fall back to its centre
         snaps = _shape_snaps(shape, element)
         chosen = snaps[0] if snaps else None
@@ -1173,6 +1625,170 @@ def _add_props(joint):
     bodies.add_prop(joint, "App::PropertyLinkGlobal", PROPS["parent"], "Fission180")
 
 
+# -- joints follow the history marker --------------------------------------------------------------
+# A joint is a feature of the timeline, and in Fusion every feature after the history marker
+# is rolled back: it does nothing until the marker passes it again. Editing a step rolls the
+# marker to it (edit_rollback), so while an early joint is edited the later components are
+# not there yet and the later joints have nothing to hold on to. Until wave 7 those joints
+# were still solved and checked: "Broken link in Reference1", "the joints cannot all be
+# satisfied together", and OK refused in the dialog of the joint being edited (the book
+# parity report's bugs 11, 12 and 14). Now a rolled-back joint is left out of everything
+# (active_links, the solver, the checks) and says nothing in the Report view.
+ROLLS_PROP = "Fission180Rolls"  # timeline_ops.ROLLS: a step outside the bodies that rolls back
+_ROLLED = {}  # document name -> frozenset of the names of the rolled-back joint steps
+_SOLVER_HIDES = [0]  # > 0 while _only_active switches joints off for FreeCAD's solver
+
+
+def mark_rolling(obj):
+    """Tell the timeline this step (a joint, a rigid group, a motion link) rolls back with
+    the history marker, like a component does. Not the hidden helpers: they go by the step
+    they serve."""
+    try:
+        if getattr(obj, PROPS["role"], ""):
+            return
+        bodies.add_prop(obj, "App::PropertyBool", ROLLS_PROP, "Base")
+        if not getattr(obj, ROLLS_PROP):
+            setattr(obj, ROLLS_PROP, True)
+    except Exception as exc:
+        warn("joints: %s" % exc)
+
+
+def place_step(obj):
+    """A joint (rigid group, motion link) made while the timeline is rolled back goes in at
+    the history marker, as every new step does in Fusion: after the rolled-back steps the
+    marker would switch it off at once (timeline_ops.place_root_step)."""
+    try:
+        from . import timeline_ops
+
+        timeline_ops.place_root_step(obj)
+    except Exception as exc:
+        warn("joints: %s" % exc)
+    forget_marker(obj.Document)
+
+
+def forget_marker(doc=None):
+    """The history marker (or the list of steps) changed: look again next time."""
+    try:
+        if doc is None:
+            _ROLLED.clear()
+        else:
+            _ROLLED.pop(doc.Name, None)
+    except Exception:
+        _ROLLED.clear()
+
+
+def rolled_back_names(doc):
+    """Names of the joint steps (joints, rigid groups, motion links) the history marker
+    stands before. Kept until the marker or the steps change (forget_marker)."""
+    try:
+        name = doc.Name
+    except Exception:
+        return frozenset()
+    found = _ROLLED.get(name)
+    if found is None:
+        found = frozenset()
+        try:
+            if any(getattr(o, ROLLS_PROP, False) for o in _python_objects(doc)):
+                from . import timeline_ops
+
+                tl = timeline_ops.timeline(doc, deps=False)
+                found = frozenset(i.name for i in tl.items if i.state == "rolled_back")
+        except Exception as exc:
+            warn("joints: could not read the history marker: %s" % exc)
+        _ROLLED[name] = found
+    return found
+
+
+def _step_of(obj):
+    """The timeline step a joint object belongs to: a hidden helper's joint or rigid group,
+    else itself."""
+    try:
+        if getattr(obj, PROPS["role"], "") in (HELPER_ROLE, MEMBER_ROLE):
+            return getattr(obj, PROPS["parent"], None) or obj
+    except Exception:
+        pass
+    return obj
+
+
+def rolled_back(obj):
+    """True while the history marker stands before this joint (or its rigid group, or the
+    joint a helper serves): it does nothing, as in Fusion."""
+    try:
+        rolled = rolled_back_names(obj.Document)
+        return bool(rolled) and _step_of(obj).Name in rolled
+    except Exception:
+        return False
+
+
+LOST_MARK = '"lost": true'  # in a side's snap record: its element is gone (repair_side)
+
+
+def lost_side(joint, index):
+    """True when side `index` of the joint lost what it was made on: FreeCAD no longer
+    finds the element its reference names ("?Face6"), or the name now belongs to something
+    else and the element was not found again (the record's "lost")."""
+    try:
+        ref = joint.Reference1 if index == 0 else joint.Reference2
+        if ref and len(ref) > 1 and any("?" in (sub or "") for sub in ref[1]):
+            return True
+        text = getattr(joint, PROPS["snap1" if index == 0 else "snap2"], "") or ""
+        return LOST_MARK in text
+    except Exception:
+        return False
+
+
+def lost_reference(joint):
+    """True when a side of the joint lost the face or edge it was made on: the joint cannot
+    follow its geometry until it is found again (repair_references) or picked again."""
+    return lost_side(joint, 0) or lost_side(joint, 1)
+
+
+def lost_joints(doc):
+    """The joints a person made that are neither rolled back nor switched off and have lost
+    a reference (their components stay where they are until it is picked again)."""
+    return [
+        j
+        for j in joints(doc)
+        if not getattr(j, "Suppressed", False) and not rolled_back(j) and lost_reference(j)
+    ]
+
+
+class _only_active:
+    """While entered, FreeCAD's own code (the solver, isPartConnected) does not see the
+    joints Fission 180 leaves out: rolled back by the history marker, or with a lost
+    reference. FreeCAD skips a joint that is Suppressed; they are, for that moment."""
+
+    def __init__(self, doc):
+        self.off = []
+        try:
+            rolled = rolled_back_names(doc)
+            for obj in _python_objects(doc):
+                if not (is_joint(obj) or is_helper(obj)) or getattr(obj, "Suppressed", False):
+                    continue
+                if (rolled and _step_of(obj).Name in rolled) or lost_reference(obj):
+                    self.off.append(obj)
+        except Exception as exc:
+            warn("joints: %s" % exc)
+
+    def __enter__(self):
+        _SOLVER_HIDES[0] += 1
+        for obj in self.off:
+            try:
+                obj.Suppressed = True
+            except Exception:
+                pass
+        return self
+
+    def __exit__(self, *exc):
+        for obj in self.off:
+            try:
+                obj.Suppressed = False
+            except Exception:
+                pass
+        _SOLVER_HIDES[0] -= 1
+        return False
+
+
 class JointProxy(_JointBase):
     """Fission 180's joint: FreeCAD's JointObject.Joint with Fusion's joint-origin rules.
     Saved in files as "fission180.joints.JointProxy": keep the name."""
@@ -1190,9 +1806,12 @@ class JointProxy(_JointBase):
             _set_json(joint, PROPS["rest"], {"angle": None, "slide": None})
         index = _joint_module().JointTypes.index(core.FREECAD_TYPE[fusion_type])
         _JointBase.__init__(self, joint, index)
+        mark_rolling(joint)
 
     def onDocumentRestored(self, joint):
         _add_props(joint)
+        mark_rolling(joint)
+        forget_marker(joint.Document)
         _JointBase.onDocumentRestored(self, joint)
 
     def onChanged(self, joint, prop):
@@ -1203,6 +1822,8 @@ class JointProxy(_JointBase):
                 joint.recompute()
             except Exception:
                 pass
+        elif prop == "Suppressed" and _SOLVER_HIDES[0]:
+            return  # _only_active: off for the solver for a moment, not by the person
         elif prop == "Suppressed" and getattr(joint, PROPS["role"], "") == "":
             # a Pin-Slot's hidden slot joint is off whenever the joint is (the timeline's
             # Suppress sets only the joint)
@@ -1215,8 +1836,12 @@ class JointProxy(_JointBase):
 
     def findPlacement(self, joint, ref, index=0):
         try:
-            if ref is None or not _utils().isRefValid(ref, 1):
+            if ref is None:
                 return App.Placement()
+            if not _utils().isRefValid(ref, 1) or rolled_back(joint) or lost_side(joint, index):
+                # its element is lost, or the marker stands before it (its body may not be
+                # there yet): the joint origin stays where it last was on its component
+                return App.Placement(joint.Placement1 if index == 0 else joint.Placement2)
             role = getattr(joint, PROPS["role"], "")
             if role == HELPER_ROLE:
                 return helper_placement(joint, index)
@@ -1231,12 +1856,21 @@ class JointProxy(_JointBase):
             axis = motion_axis(joint)
             if axis != "z":
                 f = core.to_motion_axis(f, axis)
+            if index == 0 and _HOLD:
+                held = _HOLD.get(joint.Name)
+                if held is not None:
+                    f = core.compose(f, held)  # held at its value for this solve (_holding)
             return from_frame(f)
         except Exception as exc:
             warn("joint %s: could not place its joint origin: %s" % (joint.Label, exc))
             return App.Placement()
 
     def execute(self, joint):
+        # FreeCAD raises "Broken link in: Reference1" for a lost element (a traceback in the
+        # Report view at every recompute). Fission 180 says it on the step instead
+        # (note_lost) and finds the element again where it can (repair_references).
+        if rolled_back(joint) or lost_reference(joint):
+            return
         _JointBase.execute(self, joint)
 
     def dumps(self):
@@ -1354,6 +1988,8 @@ def _new_joint_object(doc, fusion_type, fission180_type="Joint", role="", label=
     JointProxy(joint, fusion_type, fission180_type, role)
     if role:
         bodies.hide_from_timeline(joint)
+    else:
+        place_step(joint)
     return joint
 
 
@@ -1582,13 +2218,14 @@ def connected(part, excluding=None):
         return False
     skipped = _with_helpers(excluding)
     was = [bool(getattr(j, "Suppressed", False)) for j in skipped]
-    for j in skipped:
-        j.Suppressed = True
-    try:
-        return bool(asm.isPartConnected(part))
-    finally:
-        for j, state in zip(skipped, was):
-            j.Suppressed = state
+    with _only_active(part.Document):
+        for j in skipped:
+            j.Suppressed = True
+        try:
+            return bool(asm.isPartConnected(part))
+        finally:
+            for j, state in zip(skipped, was):
+                j.Suppressed = state
 
 
 def _joints_between(doc, excluding=None):
@@ -1596,14 +2233,10 @@ def _joints_between(doc, excluding=None):
     and its helpers."""
     pairs = []
     skipped = _with_helpers(excluding)
-    for obj in _python_objects(doc):
-        if any(obj is s for s in skipped) or not (is_joint(obj) or is_helper(obj)):
+    for obj in active_links(doc):
+        if any(obj is x for x in skipped):
             continue
-        if getattr(obj, "Suppressed", False):
-            continue
-        a, b = part1(obj), part2(obj)
-        if a is not None and b is not None and a is not b:
-            pairs.append((a, b))
+        pairs.append((part1(obj), part2(obj)))
     return pairs
 
 
@@ -1773,9 +2406,14 @@ def satisfied(joint, tol=1e-4):
 def active_links(doc):
     """The joints and helpers the solver works on (not suppressed, both sides there)."""
     out = []
+    rolled = rolled_back_names(doc)
     for obj in _python_objects(doc):
         if not (is_joint(obj) or is_helper(obj)) or getattr(obj, "Suppressed", False):
             continue
+        if rolled and _step_of(obj).Name in rolled:
+            continue  # the history marker stands before it: it does nothing (Fusion)
+        if lost_reference(obj):
+            continue  # it cannot follow its geometry: its components stay where they are
         p1, p2 = part1(obj), part2(obj)
         if p1 is not None and p2 is not None and p1 is not p2:
             out.append(obj)
@@ -1939,8 +2577,8 @@ def drag_plan(part):
     if is_grounded(part):
         return {
             "kind": "held",
-            "why": "%s is grounded: it does not move. Unground it in the browser to drag it."
-            % part.Label,
+            "why": "%s is grounded to its parent: it does not move. Right-click it in the "
+            "browser > Unground From Parent to drag it." % part.Label,
         }
     graph = _graph(doc)
     held = {g.ObjectToGround.Name for g in grounds(doc) if g.ObjectToGround is not None}
@@ -2033,7 +2671,8 @@ def _run_solver(asm, doc):
     for p in nested:
         p.Placement = places[p.Name]  # the solver reads it as a place in design coordinates
     try:
-        return int(asm.solve())
+        with _only_active(doc):
+            return int(asm.solve())
     finally:
         solved = {p.Name: App.Placement(p.Placement) for p in nested}
         for p in nested:
@@ -2042,17 +2681,92 @@ def _run_solver(asm, doc):
             set_global_placement(p, solved[p.Name])
 
 
-def solve(doc, keep=None):
+# -- a joint held at its value while the solver closes a loop --------------------------------------
+# Driving or dragging one joint of a closed loop (a four-bar linkage) moves its component;
+# the other links have to follow. FreeCAD's solver is free to satisfy the loop by turning
+# the driven joint back instead (the nearest solution), and it did: the crank went nowhere,
+# or two links moved and the rocker stayed (the book parity report, Strandbeest). So for
+# that solve the driven joint is held where it was put: it counts as rigid at its present
+# value (its type Fixed, its joint origin 1 turned back by what the joint reads now), and
+# the solver can only move the rest of the loop.
+_HOLD = {}  # joint name -> the frame joint origin 1 is composed with while it is held
+HOLDABLE = ("Revolute", "Slider", "Cylindrical")
+
+
+def in_loop(joint):
+    """True when the joint's two components are also tied through other joints (a closed
+    loop: a four-bar linkage)."""
+    try:
+        p1, p2 = part1(joint), part2(joint)
+        if p1 is None or p2 is None:
+            return False
+        reached = _reach(_graph(joint.Document), p1, cut=joint)
+        return any(p is p2 for p in reached)
+    except Exception:
+        return False
+
+
+class _holding:
+    """While entered, each of `held` (joints in a closed loop) is rigid at its present
+    value for FreeCAD's solver."""
+
+    def __init__(self, held):
+        self.held = []
+        for joint in held or ():
+            try:
+                if (
+                    joint is not None
+                    and getattr(joint, "JointType", "") in HOLDABLE
+                    and not getattr(joint, PROPS["role"], "")
+                    and in_loop(joint)
+                ):
+                    self.held.append((joint, joint.JointType))
+            except Exception:
+                continue
+
+    def __enter__(self):
+        for joint, _kind in self.held:
+            try:
+                rel = core.relative(to_frame(jcs_global(joint, 0)), to_frame(jcs_global(joint, 1)))
+                _HOLD[joint.Name] = core.inverse(rel)
+                joint.JointType = "Fixed"
+                # (FreeCAD's solve reads the stored joint origin; findPlacement adds the
+                # same turn should anything work it out again meanwhile)
+                joint.Placement1 = from_frame(
+                    core.compose(to_frame(joint.Placement1), _HOLD[joint.Name])
+                )
+            except Exception as exc:
+                _HOLD.pop(joint.Name, None)
+                warn("joint %s: could not be held: %s" % (joint.Label, exc))
+        return self
+
+    def __exit__(self, *exc):
+        for joint, kind in self.held:
+            try:
+                _HOLD.pop(joint.Name, None)
+                if joint.JointType != kind:
+                    joint.JointType = kind
+                refresh_placements(joint)
+            except Exception as problem:
+                warn("joint %s: %s" % (getattr(joint, "Label", "?"), problem))
+        return False
+
+
+def solve(doc, keep=None, hold=None):
     """Run FreeCAD's solver; 0 when it worked (see solve_message): -2 when it said it did
     but the joints are not all satisfied. A group of jointed parts that nothing grounds is
-    held by one of its parts for the solve (`keep`, or its oldest joint's component 2)."""
+    held by one of its parts for the solve (`keep`, or its oldest joint's component 2).
+    `hold`: a joint (or joints) just driven: in a closed loop it stays at its value and
+    the rest of the loop follows (see _holding)."""
     asm = assembly(doc)
     if asm is None:
         return 0
     pool = []
+    held = hold if isinstance(hold, (list, tuple)) else ([hold] if hold is not None else [])
     try:
         pool = _hold_free_groups(doc, keep)
-        code = _run_solver(asm, doc)
+        with _holding(held):
+            code = _run_solver(asm, doc)
     except Exception as exc:
         warn("joints: solve failed: %s" % exc)
         return -1
@@ -2207,17 +2921,84 @@ def driven_part(joint):
     return (part1(joint) if side == 0 else part2(joint)), side
 
 
-def clamp_values(joint, angle=None, slide=None):
-    """(angle, slide) kept inside the joint's limits; None for a motion it does not have."""
+def own_link(joint):
+    """The active motion link that ties this joint's turn to its own slide (Fusion's Link
+    with Same Joint: a Cylindrical joint that screws), or None."""
+    try:
+        for link in motion_links(joint.Document):
+            if link.Joint1 is joint and link.Joint2 is joint:
+                if not getattr(link, "Suppressed", False) and not rolled_back(link):
+                    return link
+    except Exception:
+        pass
+    return None
+
+
+def own_ratio(joint):
+    """(leading motion, following motion, ratio, offset) of a joint whose own motions are
+    tied (following = ratio x leading + offset), or None."""
+    link = own_link(joint)
+    if link is None:
+        return None
+    data = link_data(link)
+    first = data["motion1"] or "angle"
+    second = data["motion2"] or ("slide" if first == "angle" else "angle")
+    if first == second:
+        return None
+    ratio = motion_core.link_ratio(data["value1"], data["value2"], data["reverse"])
+    return first, second, ratio, data["offset"]
+
+
+def tie_own_motions(joint, angle=None, slide=None, lead=None):
+    """A joint whose turn and slide are tied (a screw): the motion asked for takes the other
+    along. Both asked for: `lead` ("angle" / "slide") says which one counts, else the
+    link's first. Returns (angle, slide); unchanged for any other joint."""
+    tied = own_ratio(joint)
+    if tied is None or (angle is None and slide is None):
+        return angle, slide
+    first, second, ratio, offset = tied
+    values = {"angle": angle, "slide": slide}
+    leading = "second" if lead == second and values[second] is not None else "first"
+    values[first], values[second] = motion_core.tied_values(
+        ratio, offset, values[first], values[second], leading
+    )
+    return values["angle"], values["slide"]
+
+
+def clamp_values(joint, angle=None, slide=None, lead=None):
+    """(angle, slide) kept inside the joint's limits; None for a motion it does not have. A
+    joint whose own motions are tied (tie_own_motions) keeps them tied: a limit reached by
+    one stops the other too."""
     lim = limits(joint)
-    if angle is not None:
-        angle = core.clamp(angle, lim["angle"]["min"], lim["angle"]["max"])
-        if not has_angle(joint):
-            angle = None
-    if slide is not None:
-        slide = core.clamp(slide, lim["slide"]["min"], lim["slide"]["max"])
-        if not has_slide(joint):
-            slide = None
+    tied = own_ratio(joint) is not None and (angle is not None or slide is not None)
+    if tied:
+        angle, slide = tie_own_motions(joint, angle, slide, lead)
+
+    def inside(a, s):
+        if a is not None:
+            a = core.clamp(a, lim["angle"]["min"], lim["angle"]["max"])
+        if s is not None:
+            s = core.clamp(s, lim["slide"]["min"], lim["slide"]["max"])
+        return a, s
+
+    wanted = (angle, slide)
+    angle, slide = inside(angle, slide)
+    if tied and (angle, slide) != wanted:
+        # a limit cut one motion short: the other stops with it
+        for held in ("slide", "angle"):
+            got = {"angle": angle, "slide": slide}
+            asked = {"angle": wanted[0], "slide": wanted[1]}
+            if got[held] is not None and asked[held] is not None and got[held] != asked[held]:
+                kept = {held: got[held]}
+                angle, slide = tie_own_motions(
+                    joint, kept.get("angle"), kept.get("slide"), lead=held
+                )
+                angle, slide = inside(angle, slide)
+                break
+    if not has_angle(joint):
+        angle = None
+    if not has_slide(joint):
+        slide = None
     return angle, slide
 
 
@@ -2231,7 +3012,29 @@ def drive(joint, angle=None, slide=None, do_solve=True, links=True, keep=None):
     if links:
         follow_links(joint)
     if do_solve:
-        solve(joint.Document, keep=keep)
+        if solve(joint.Document, keep=keep, hold=joint) != 0:
+            # the loop cannot follow that far: the solver brings the joint back to where
+            # everything still fits
+            solve(joint.Document, keep=keep)
+    return value(joint)
+
+
+def lone_side(joint):
+    """(part, side) that moves when the joint plays alone (Fusion's Animate Joint, Preview
+    Motion): component 1, or component 2 when component 1 is grounded."""
+    p1, p2 = part1(joint), part2(joint)
+    if is_grounded(p1) and not is_grounded(p2):
+        return p2, 1
+    return p1, 0
+
+
+def drive_alone(joint, angle=None, slide=None):
+    """Put the joint at an angle and / or slide (within its limits) by moving only its own
+    component, as if nothing else held it: no other joint, no motion link, no solve.
+    Returns (angle, slide) as the joint reads then."""
+    angle, slide = clamp_values(joint, angle, slide)
+    part, side = lone_side(joint)
+    place_joint(joint, angle, slide, side, movers=[part])
     return value(joint)
 
 
@@ -2267,7 +3070,8 @@ def drive_until_contact(joint, angle=None, slide=None):
             return blocked(doc, pairs) is not None
 
         put(motion_core.last_free(stuck))
-    solve(doc)
+    if solve(doc, hold=joint) != 0:
+        solve(doc)
     got = value(joint)
     return got[0], got[1], hit
 
@@ -2312,6 +3116,7 @@ class MotionLinkProxy:
         bodies.add_prop(obj, "App::PropertyString", LINK_PROP, "Fission180")
         if not obj.hasExtension("App::SuppressibleExtensionPython"):
             obj.addExtension("App::SuppressibleExtensionPython")
+        mark_rolling(obj)
 
     def onDocumentRestored(self, obj):
         self.setup(obj)
@@ -2381,7 +3186,14 @@ def _check_link(joint1, joint2, motion1, motion2):
     if joint1 is None or joint2 is None:
         raise JointError("Pick two joints to link.")
     if joint1 is joint2:
-        raise JointError("Pick two different joints.")
+        # Fusion's Link with Same Joint: one joint's turn tied to its own slide (a screw)
+        if len(motions_of(joint1)) < 2:
+            raise JointError(
+                "%s has one motion only: Link with Same Joint needs a joint that both turns "
+                "and slides (Cylindrical, Pin-Slot)." % joint1.Label
+            )
+        if motion1 == motion2:
+            raise JointError("Link the joint's turn with its slide (two different motions).")
     for joint, motion in ((joint1, motion1), (joint2, motion2)):
         if fusion_type(joint) == "rigid":
             raise JointError("%s is rigid: it has no motion to link." % joint.Label)
@@ -2394,6 +3206,8 @@ def set_motion_link(link, joint1, joint2, value1, value2, reverse=False, motion1
     """(Re)define a motion link; both joints keep where they are now."""
     motion1 = motion1 or default_motion(joint1)
     motion2 = motion2 or default_motion(joint2)
+    if joint1 is joint2 and motion1 == motion2:
+        motion2 = "slide" if motion1 == "angle" else "angle"
     _check_link(joint1, joint2, motion1, motion2)
     ratio = motion_core.link_ratio(value1, value2, reverse)
     offset = motion_core.link_offset(
@@ -2417,12 +3231,11 @@ def set_motion_link(link, joint1, joint2, value1, value2, reverse=False, motion1
 
 
 def create_motion_link(doc, joint1, joint2, value1, value2, reverse=False, motion1="", motion2=""):
-    _check_link(
-        joint1,
-        joint2,
-        motion1 or (default_motion(joint1) if joint1 is not None else ""),
-        motion2 or (default_motion(joint2) if joint2 is not None else ""),
-    )
+    first = motion1 or (default_motion(joint1) if joint1 is not None else "")
+    second = motion2 or (default_motion(joint2) if joint2 is not None else "")
+    if joint1 is not None and joint1 is joint2 and first == second:
+        second = "slide" if first == "angle" else "angle"
+    _check_link(joint1, joint2, first, second)
     joint_group(doc, create=True)
     link = doc.addObject("App::FeaturePython", "MotionLink")
     link.Label = "Motion Link %d" % core.label_number(
@@ -2430,6 +3243,7 @@ def create_motion_link(doc, joint1, joint2, value1, value2, reverse=False, motio
     )
     MotionLinkProxy(link)
     bodies.mark(link, "MotionLink")
+    place_step(link)
     set_motion_link(link, joint1, joint2, value1, value2, reverse, motion1, motion2)
     return link
 
@@ -2438,7 +3252,7 @@ def links_of(joint):
     """The active motion links that tie `joint` to another one."""
     out = []
     for link in motion_links(joint.Document):
-        if getattr(link, "Suppressed", False):
+        if getattr(link, "Suppressed", False) or rolled_back(link):
             continue
         if link.Joint1 is joint or link.Joint2 is joint:
             if link.Joint1 is not None and link.Joint2 is not None:
@@ -2451,6 +3265,8 @@ def follow_links(joint, seen=None):
     turn); nothing is solved here."""
     seen = set(seen or ()) | {joint.Name}
     for link in links_of(joint):
+        if link.Joint1 is link.Joint2:
+            continue  # its own two motions: tied where its values are set (clamp_values)
         data = link_data(link)
         ratio = motion_core.link_ratio(data["value1"], data["value2"], data["reverse"])
         if link.Joint1 is joint:
@@ -2506,10 +3322,63 @@ def go_to_rest(joint):
     return True
 
 
-def wobble(joint, phase, span):
-    """Move a Ball (pitch / yaw) or Planar (slide in its plane) joint for the preview."""
+def rest_values(doc):
+    """{joint name: (angle, slide)} of the active joints that have a Rest value, as they
+    read now (taken when a drag starts: see settle_rest)."""
+    out = {}
+    for joint in joints(doc):
+        try:
+            if getattr(joint, "Suppressed", False) or rolled_back(joint) or lost_reference(joint):
+                continue
+            lim = limits(joint)
+            if lim["angle"]["rest"] is None and lim["slide"]["rest"] is None:
+                continue
+            out[joint.Name] = value(joint)
+        except Exception:
+            continue
+    return out
+
+
+def settle_rest(doc, before=None):
+    """Fusion's Rest: a joint with a Rest value goes back to it once nothing moves its
+    component any more (a drag is let go). `before` (rest_values at the start of the move):
+    only the joints that moved since go back; None: every joint that is away from its rest.
+    Returns the joints put back."""
+    moved = []
+    for joint in joints(doc):
+        try:
+            if getattr(joint, "Suppressed", False) or rolled_back(joint) or lost_reference(joint):
+                continue
+            lim = limits(joint)
+            angle = lim["angle"]["rest"] if has_angle(joint) else None
+            slide = lim["slide"]["rest"] if has_slide(joint) else None
+            if angle is None and slide is None:
+                continue
+            now = value(joint)
+            if before is not None:
+                was = before.get(joint.Name)
+                if was is not None and all(abs(a - b) < 1e-6 for a, b in zip(was, now)):
+                    continue  # this drag did not move it: it stays (it was driven there)
+            away = (angle is not None and abs(now[0] - angle) > 1e-6) or (
+                slide is not None and abs(now[1] - slide) > 1e-6
+            )
+            if not away:
+                continue
+            drive(joint, angle=angle, slide=slide, do_solve=False)
+            moved.append(joint)
+        except JointError as exc:
+            log("rest of %s: %s" % (getattr(joint, "Label", "?"), exc))
+    if moved:
+        solve(doc)
+        log("back to rest: %s" % ", ".join(j.Label for j in moved))
+    return moved
+
+
+def wobble(joint, phase, span, alone=False):
+    """Move a Ball (pitch / yaw) or Planar (slide in its plane) joint for the preview;
+    `alone`: only its own component (see drive_alone)."""
     kind = fusion_type(joint)
-    part, side = driven_part(joint)
+    part, side = lone_side(joint) if alone else driven_part(joint)
     jcs1 = to_frame(jcs_global(joint, 0))
     jcs2 = to_frame(jcs_global(joint, 1))
     t = 2.0 * math.pi * phase
@@ -2521,7 +3390,10 @@ def wobble(joint, phase, span):
         return
     if side == 1:
         T = core.inverse(T)  # component 2 moves instead
-    move_part(part, from_frame(T), joint)
+    if alone:
+        move_parts([part], from_frame(T))
+    else:
+        move_part(part, from_frame(T), joint)
 
 
 def part_size(part):
@@ -2789,9 +3661,12 @@ def set_motion_study(study, data):
 def study_pose(doc, data, step):
     """Put every joint of a study at its value for `step` (the links follow), then solve.
     Returns the solver's code."""
+    driven = []
     for name in data.get("joints", []):
         joint = doc.getObject(name)
         if joint is None or not is_joint(joint) or getattr(joint, "Suppressed", False):
+            continue
+        if rolled_back(joint) or lost_reference(joint):
             continue
         target = motion_core.study_value(data.get("keys", {}).get(name, []), step)
         if target is None:
@@ -2802,9 +3677,13 @@ def study_pose(doc, data, step):
                 drive(joint, angle=target, do_solve=False)
             elif motion == "slide":
                 drive(joint, slide=target, do_solve=False)
+            driven.append(joint)
         except JointError as exc:
             log("motion study: %s" % exc)
-    return solve(doc)
+    code = solve(doc, hold=driven)
+    if code != 0 and driven:
+        code = solve(doc)
+    return code
 
 
 ANGLES_KEY = "Fission 180:angles"  # in a placements record: the joints' counted angles
@@ -2831,7 +3710,7 @@ def apply_placements(doc, stored):
         obj = doc.getObject(name)
         if obj is not None and is_part(obj):
             plc = _plc_from_list(values)
-            if not obj.Placement.isSame(plc, 1e-7):
+            if not same_place(obj.Placement, plc):  # (see same_place: never isSame here)
                 obj.Placement = plc
     angles = stored.get(ANGLES_KEY, {})
     for joint in joints(doc):
@@ -2985,6 +3864,7 @@ class RigidGroupProxy:
         bodies.add_prop(obj, "App::PropertyBool", "IncludeChildren", "Rigid Group", hidden=False)
         if not obj.hasExtension("App::SuppressibleExtensionPython"):
             obj.addExtension("App::SuppressibleExtensionPython")
+        mark_rolling(obj)
 
     def onDocumentRestored(self, obj):
         self.__init__(obj)
@@ -3031,6 +3911,7 @@ def create_rigid_group(doc, members, include_children=True):
     )
     RigidGroupProxy(obj)
     bodies.mark(obj, "RigidGroup")
+    place_step(obj)
     obj.Members = members
     obj.IncludeChildren = bool(include_children)
     rebuild_rigid_group(obj)
@@ -3052,10 +3933,11 @@ def rebuild_rigid_group(group):
         _set_json(helper, PROPS["offset"], dict(default_offset(), mate=False))  # as they stand
         setattr(helper, PROPS["parent"], group)
         helper.Visibility = False
-        _set_json(helper, PROPS["snap1"], as_built_record(frame))
-        _set_json(helper, PROPS["snap2"], as_built_record(frame))
-        helper.Reference1 = any_element_ref(member)
-        helper.Reference2 = any_element_ref(anchor)
+        ref1, ref2 = any_element_ref(member), any_element_ref(anchor)
+        _set_json(helper, PROPS["snap1"], as_built_record(frame, ref1))
+        _set_json(helper, PROPS["snap2"], as_built_record(frame, ref2))
+        helper.Reference1 = ref1
+        helper.Reference2 = ref2
         refresh_placements(helper)
         helper.Suppressed = bool(getattr(group, "Suppressed", False))
     solve(doc)
@@ -3131,11 +4013,14 @@ def set_as_built(joint, fusion_type, part_a, part_b, origin_pick=None, origin_sn
         if origin_pick is not None and origin_pick.part is part:
             _set_json(joint, key, snap_record(origin_pick, origin_snap))  # follows geometry
             ref = origin_pick.ref
+            if fusion_type in ("planar", "pinslot"):
+                ref = _planar_face_of(part, ref)
         else:
-            _set_json(joint, key, as_built_record(frame))  # stays where it is now
             ref = any_element_ref(part)
-        if fusion_type in ("planar", "pinslot"):
-            ref = _planar_face_of(part, ref)
+            if fusion_type in ("planar", "pinslot"):
+                ref = _planar_face_of(part, ref)
+            # stays on its component, where it is now
+            _set_json(joint, key, as_built_record(frame, ref))
         refs.append(ref)
     if fusion_type in ("planar", "pinslot"):
         joint.Distance = 0.0
@@ -3223,7 +4108,7 @@ def place_joint_origin(obj):
     parent = obj.getParentGeoFeatureGroup()
     if parent is not on:
         local = on.Placement * local
-    if not obj.Placement.isSame(local, 1e-9):
+    if not same_place(obj.Placement, local):
         obj.Placement = local
 
 
@@ -3393,12 +4278,35 @@ class _DeleteWatch:
 
     def slotCreatedDocument(self, doc):
         self.closing.discard(doc.Name)
+        forget_marker(doc)
 
     def slotDeletedDocument(self, doc):
         self.closing.add(doc.Name)
+        forget_marker(doc)
+
+    # which joints the history marker stands before (rolled_back_names) is kept until the
+    # marker moves (a body's Tip, the marker's note in the document's Meta) or the steps
+    # change (made, deleted, moved between components, undo, redo, a file opened)
+    def slotCreatedObject(self, obj):
+        forget_marker(obj.Document)
+
+    def slotUndoDocument(self, doc):
+        forget_marker(doc)
+
+    def slotRedoDocument(self, doc):
+        forget_marker(doc)
+
+    def slotFinishRestoreDocument(self, doc):
+        forget_marker(doc)
+
+    def slotChangedDocument(self, doc, prop):
+        if prop == "Meta":
+            forget_marker(doc)
 
     def slotChangedObject(self, obj, prop):
         try:
+            if prop in ("Tip", "Group", ROLLS_PROP, "Fission180Timeline"):
+                forget_marker(obj.Document)
             if prop != "Group" or obj.TypeId != "App::Part":
                 return
             doc = obj.Document
@@ -3414,6 +4322,7 @@ class _DeleteWatch:
     def slotDeletedObject(self, obj):
         try:
             doc = obj.Document
+            forget_marker(doc)
             if doc is None or App.isRestoring() or getattr(doc, "Transacting", False):
                 return
             if doc.Name in self.closing or assembly(doc) is None:

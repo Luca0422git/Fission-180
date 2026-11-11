@@ -341,6 +341,153 @@ type demands) and treats a broken one as a failure: the dialog says **"The joint
 be satisfied together: <joint> fights the others"**, OK is refused, Cancel puts everything
 back. (Fusion shows a similar warning and leaves the joint red.)
 
+## Wave 7: the book parity report (0.1.0-beta.4.0.0, branch `sf/book-joints`)
+
+Opus 5.5 worked through *Mastering Autodesk Fusion, 2nd ed.* in 0.1.0-beta.3.3.9
+(`docs/fission180/dev/research/book-parity-report.txt`). Its joint items were reproduced in
+real FreeCAD 1.1.4 first; several of its diagnoses were wrong (session log:
+`docs/fission180/sessions/book-joints.md`). Sources read 2026-11-11 through search excerpts
+(Autodesk's sites are not reachable from the sandbox):
+
+19. Autodesk Fusion help, *Joint Motion Limits* (GUID-543C82D9-F1E8-42B3-9C34-31BB108AFAA3):
+    limits "can be defined in the Joint and As-Built Joint dialogs when creating a joint, or
+    edited afterward" (Edit Joint, Edit Motion Limits); "the Flip icon swaps the minimum and
+    maximum motion limit values, and it is available when minimum or maximum is checked";
+    Rest "specifies the resting position for components within the range of motion";
+    **Preview Motion** "animates only that degree of motion without the influence of any
+    other component relationships"; **With All Limits** "the preview shows the joint motion
+    with all degrees of motion and limits applied". (The book calls the button "Preview
+    Limits"; Autodesk's help calls it Preview Motion.)
+20. Autodesk's assemblies video (*Edit Motion Limits*): Rest "sets the joint to a specified
+    position whenever you aren't actively moving that component"; a cover with Rest -90
+    "snaps to its rest position once it is released after being moved".
+21. Autodesk Fusion help, *Edit joints* (GUID-C0DCB65B-87F6-43AC-8A62-CC68B27EEB6E): the
+    joint's menu has Drive Joints, Edit Joint, Edit Motion Limits, Lock Motion, Suppress,
+    **Animate Joint** ("animates the joint only, and does not take into account other joints
+    or any other component relationships") and **Animate Joint Relationships** ("animates
+    the joint in context with any additional relationships that affect the components
+    involved in the joint, including other joints, grounded components, and contact sets").
+22. Fusion API, *MotionLink*: "the second joint can be null when both linked motions come
+    from the same joint"; Autodesk Community, *How to Motion Link a Threaded Nut and Bolt*
+    and *Screw motion simulation*: "a single cylindrical joint and a single motion link:
+    while establishing the motion link, check the box Link to Same Joint, and it will let
+    you relate the rotation to the travel"; "Pitch of 1.75 = 360 deg turn, the nut travels
+    1.75 mm".
+23. Autodesk Fusion help, *Motion studies* (GUID-1B0EEBBF-3923-47E3-BB58-E5955D9EA738) and
+    Autodesk's tutorial: "click in the Motion Study dialog to place a keyframe at a time
+    setting, then enter an angle and press Enter, and the model updates"; the points are on
+    a graph of the joint over the steps.
+24. Autodesk Fusion help, *Create an as-built joint* / *Joint Origin reference*, and Autodesk
+    Community (*Joint referenced from center of hole*, *Can't get joint origins to snap to
+    center of hole*): the snap candidates are "edge midpoints, circular centers, vertices,
+    and face centers"; "hover over a face, then hold Ctrl to snap to points on that face";
+    "if snap points along the axis of a hole are obscured by other features, hover over the
+    hole, hold Ctrl, then click a snap point"; a circular edge offers its centre.
+
+### Joints follow the history marker
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| A joint is a feature of the timeline; everything after the history marker is rolled back and does nothing | Autodesk (the timeline; "Under the Hood of Fusion 360") | Joints, as-built joints, rigid groups and motion links roll back with the marker (`Fission180Rolls`: greyed in the timeline). A rolled-back joint is left out of the solver, the checks, drags and animations (`joints.rolled_back`, `active_links`, `_only_active`), and says nothing in the Report view |
+| A step made while the marker is rolled back goes in at the marker | Autodesk | Same for joints, rigid groups and motion links (`joints.place_step`) |
+| OK of an edit rolls forward; what the later joints hold follows | Autodesk | Same, inside the edit's undo step (`_JointsPanel.roll_forward`): a wheel held on a shaft whose joint was edited follows the shaft on OK |
+| A component inside a subassembly is picked by its browser row | Autodesk | Same (`components.whole_pick` in `joints_ui._selection_entries`, by the components builder; the report's bug 15: the row took the outer component) |
+| Editing a joint rolls the marker to it; the later components and joints are not there meanwhile | Autodesk | Same. **This was the report's bugs 11, 12 and part of 14**: the joints after the marker were still solved while their components were hidden ("Broken link in Reference1", "cannot all be satisfied together"), OK was refused in the dialog of the joint being edited, and the next command dropped the edit without a word |
+| Rolled back before a joint, its components stand where they were before it | Autodesk | **Gap**: they stay where the joint put them (they are right again once the marker passes the joint) |
+
+The report's own diagnosis ("the dialog's transaction stays open after OK") was not what
+happened: OK had been refused (the message was in the dialog's last line) and the dialog was
+still open. A refused OK is now also said next to the mouse, and a dialog that another
+command cancels says so ("As-Built Joint was cancelled: ...").
+
+### A grounded first component
+
+25. Autodesk Fusion help, *Joint* (ASM-JOINT-COMMAND) and *Ground and unground components*:
+    the joint command "moves the first component you select to the second"; "if necessary,
+    Fusion relaxes existing relationships or grounded component status to allow the first
+    component to move"; "when you create a joint with a component that is grounded to
+    parent, if it is the first component that you select, it is automatically ungrounded
+    from parent. The second component you select maintains its current ground to parent
+    status."
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| The first component picked is grounded: it is ungrounded and moves | Autodesk (25) | Same in the Joint dialog, inside its undo step (Cancel and Ctrl+Z ground it again); the dialog's note says so. Before, the second component moved instead |
+| The second component keeps its ground | Autodesk (25) | Same |
+| As-built Joint: nothing moves | Autodesk (2) | Nothing is ungrounded |
+| A grounded component dragged | Noble (12) | It stays, and a note says why and how to free it ("Unground From Parent") |
+
+### As-built joints keep their place on the component
+
+An as-built joint (and a rigid group's hidden links) used to keep the joint origin as a place
+in the design and work it out again against the component's place at every recompute. Once a
+component had moved (a drag, a Move, another joint), the next recompute silently gave the
+joint a new zero and a rigid group let go of its members. The origin is now kept relative to
+its component (`as_built_record(..., ref)`, key `local`; files saved before take the stored
+`Placement1/2` once: `freeze_as_built`). Fusion: an as-built joint keeps "where they are now".
+
+### References that survive edits (report bug 14)
+
+| What happens to the jointed part | Fission 180 |
+|---|---|
+| A later step numbers its faces and edges anew (a fillet, a hole) | found again exactly by where it is (`repair_side`, as before) |
+| The face or edge itself changes (shortened by a fillet, moved by a dimension) | found again by likeness: the same kind of surface or curve, facing the same way, about the same size, nearest to where it was within a quarter of the part's size (`find_alike`, the rule of `picks.py`); what it looks like now is remembered for the next edit |
+| The snap sat on an edge or corner of a face and the face's edges are numbered anew | the snap of its kind at the same place is taken (`"p"` in the snap record), not the face's centre |
+| An as-built side's "any element" is gone | it names another element of the same body (`_repair_as_built`) |
+| The body moves to another component | `reroot` (as before) |
+| The face is really gone | the joint keeps its components where they are (its joint origin stays where it last was), is left out of the solver, shows a yellow note on its step and says once next to the mouse: "... lost the face or edge it was made on ... Right-click it > Edit Joint and pick that side again" (`note_lost`); no "Broken link" traceback at every recompute |
+
+The repair also runs while another dialog is open (its own joint is left to it).
+
+### Snap points (report: Fire Piston, Hot End, Pizza Cutter)
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| A round edge offers its centre | Autodesk, Forum (24) | Same, from anywhere on the edge: the only dot of a full circle is its centre (the kernel's seam "corner" and the point opposite it are not offered); an arc keeps its ends and middle and offers its centre unless the pointer is right on one of those |
+| A cylinder's face offers points on its axis | Autodesk (24) | Its middle and the centres of its end circles (the seam line's middle and ends are not offered) |
+| The centre of a threaded hole is on its axis | **Guess** (Fusion snaps to circles) | A hole whose outline is round but for a thread's run-out snaps on the hole's axis, not at the outline's centre of area (`joints._true_loop`) |
+| Click and hold lists what is under the pointer (Select Other) | Autodesk (selection) | Works in the joint dialogs: the part behind is taken from the list (`book_joints_snap` E) |
+
+### Joint limits (wave 7)
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| Flip (there when Minimum or Maximum is on) | Autodesk (19) | A Flip button per limits group. **(Guess at the detail)**: Autodesk says it "swaps" the two values; a plain swap changes nothing when both are on, so Fission 180 puts the limits on the other side of the joint's zero (Minimum 0 becomes Maximum 0; 0 .. 60 becomes -60 .. 0; a Rest goes with them), which is what the book needs ("Maximum vs Minimum decides the direction") |
+| Preview Motion: that motion alone | Autodesk (19) | A Preview Motion button per group (Joint, Edit Joint Limits, As-built Joint): the motion plays between its limits, only the joint's own component moves, nothing else is asked |
+| With All Limits | Autodesk (19) | A tick beside it: the joint plays with all its motions and everything tied to it |
+| Rest: the joint returns to it once its component is let go | Autodesk (20) | Same after a Component Drag (only the joints the drag moved: `joints.settle_rest`); OK of the limits dialog puts it there as before |
+| A limit ticked starts at ... | **Guess** | the joint's value now (so ticking moves nothing) |
+
+### Animate Joint, Animate Joint Relationships
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| Animate Joint: the joint only | Autodesk (21) | The joint's own component swings alone; nothing else moves (`Animator(alone=True)`) |
+| Animate Joint Relationships: with the other joints, grounds and contact sets | Autodesk (21) | A second menu entry: everything tied to the joint follows, contact sets stop it where parts touch (`drive_until_contact`) |
+| Esc stops; the components stand where they were | Autodesk (9) | Same |
+
+### Motion Link > Link with Same Joint
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| One joint that turns and slides, its rotation tied to its travel (a screw) | API, Forum (22) | A tick "Link with Same Joint" (Autodesk's own name could not be read; the forum says both "Link to Same Joint" and "link with same joint", the book the latter): the one picked joint gets an Angle and a Distance (360 deg, the pitch); Reverse; Animate. The link holds `Joint1 = Joint2` |
+| The joint then screws wherever it is moved | Forum (22) | Drive Joints, drags (the pointer leads with the motion it asks more of), animations, limits (a limit reached by one motion stops the other) all go through `joints.clamp_values` / `tie_own_motions` |
+| A joint with one motion | **Guess** | The tick is refused and says why |
+
+### Closed loops
+
+A joint driven or dragged in a closed loop (a four-bar linkage) is held at its value for that
+solve (it counts as rigid there: `joints._holding`), so the rest of the loop follows. Before,
+FreeCAD's solver was free to turn the driven joint back, and did (the report: "the rocker
+stayed put"). When the loop cannot follow that far the drag stops where it last could.
+
+### Motion Study (wave 7)
+
+| Fusion | Evidence | Fission 180 |
+|---|---|---|
+| A graph of each joint over the steps; click a joint's line at a step to place a point | Autodesk (23) | The graph (`StudyGraph`): a line per joint (each scaled to its own values), dots at the key points, the playhead; a click on a line picks that joint and step and puts the keyboard in the value box. The table of points stays under it (**Fission 180**: Fusion has no table) |
+| Type the value, press Enter: the model updates | Autodesk (23) | Enter in the Step or value box sets the point and shows the model at that step; it no longer presses OK (which lost a half-made study) |
+
 ## How it is built (FreeCAD 1.1.4's Assembly solver underneath)
 
 | Fusion | Fission 180 / FreeCAD |
@@ -423,22 +570,24 @@ Merge notes for the Components work (both branches touch `browser_core.py`,
 | Fusion | Why not (yet) |
 |---|---|
 | Between Two Faces with faces of two bodies of one component | the two faces (and the snap) must be on one body |
-| A drag through several joints at once (Fusion's solver drags the whole mechanism toward the pointer) | the first joint with a motion on the way to the ground moves; the rest of a closed loop follows the solver |
-| Contact in Animate Joint and in a motion study | contact stops drags and Drive Joints only |
+| A drag through several joints at once (Fusion's solver drags the whole mechanism toward the pointer) | the first joint with a motion on the way to the ground moves; the rest of a closed loop follows it (wave 7: the dragged joint is held at its value for the solve) |
+| Contact in a motion study and in Animate Joint (alone) | contact stops drags, Drive Joints and Animate Joint Relationships; Animate Joint is the joint alone by definition |
 | Limit flags (Fusion's own flag look) | a faint ghost of the part at Minimum and Maximum; the Rest has no ghost |
 | Cylindrical: drag its slide limits | the handle and the part drag set the angle; the slide limits are typed |
 | Pin-Slot and Ball limits; Planar (no limits in Fusion either) | FreeCAD limits exist for Revolute, Slider and Cylindrical only |
 | Ball: Pitch / Yaw axis choices, Pin-Slot custom axes | a Ball turns about its origin whatever the axes; Pin-Slot takes Slide X or Y of the joint origin |
 | The POSITION toolbar panel that appears after a move | Capture Position / Revert are menu entries, greyed while nothing moved |
-| Lock Motion, Animate Joint Relationships | not built |
-| Motion Study's graph (values drawn over the steps, points dragged on it) | the points are typed (Joint, Step, Value) and listed |
+| Lock Motion | not built (Animate Joint Relationships: built in wave 7) |
+| Components back where they were before a joint while the marker is rolled back before it | they stay where the joint put them; the joint itself is rolled back (does nothing) |
+| A joint origin on an imported solid that is not in a component | Joint Origin needs a body or a component to hold it; the Joint dialog snaps to such a solid directly |
+| Dragging a point on Motion Study's graph | the graph is drawn and clicked (wave 7); a point is moved by setting it again or deleting it |
 | Motion Link with more than two joints, links to a Motion Study's own drivers | two joints per link (Fusion's too); links chain |
 | Joint names "Rigid1", "Rev1"... | Fission 180 names them "Rigid 1", "Revolute 1", ... **(assumed)** |
 | Joint origins listed inside the component | the browser has a document-level "Joint Origins" folder (bodies have no child rows yet) |
 | Files opened in plain FreeCAD | the joints' proxy classes are Fission 180's: plain FreeCAD shows the parts where they are and warns about the missing module |
-| Edit Joint Limits as its own small dialog | the joint's dialog opens on its Motion tab |
+| Edit Joint Limits as its own small dialog | the joint's dialog opens on its Motion tab (an as-built joint's one page), with Fusion's Flip, Preview Motion and With All Limits |
 | Drive Joints / Animate Joint greyed for a Rigid joint in the menu | the entries are there and say "rigid: it has no motion" |
-| A joint in error stays (red) when its geometry goes | Fission 180 deletes the joint with the body or component it was on (one undo step) |
+| A joint in error stays (red) when its geometry goes | a joint whose face is gone stays, with a yellow note, and keeps its components in place (wave 7); a joint whose whole body or component is deleted goes with it (one undo step) |
 | Two joints fighting: Fusion leaves the newest red but keeps it | Fission 180 refuses OK until it is changed or cancelled |
 
 ## Tests (real FreeCAD 1.1.4, real clicks: `tools/fission180/run_tests.sh --scenario ...`)
@@ -456,5 +605,12 @@ Merge notes for the Components work (both branches touch `browser_core.py`,
 | `joints2_motion` | a pinion (Revolute) and its rack (Slider) tied by a Motion Link (360 deg : 2 pi r); one turn slides the rack 2 pi r and reads 360; a canvas drag carries the rack; Reverse; the Slider drives the pinion back; Motion Study (point at step 100, playhead, Play Once to one turn, Motion Studies folder); save / reopen (99) |
 | `joints2_nested` | a component nested in another (New Component, Parent): jointed, it moves on its own (its parent stays), turns when dragged, comes along when its parent is dragged; Drive Joints (55) |
 | `joints_delete` | a filleted block, Revolute at 90; the joint deleted from the browser row: both bodies keep solid, volume, place and Tip, nothing in error; the fillet still edits (r 3, undo); Ctrl+Z / Ctrl+Y; the same from the timeline; a fillet after the joint (the joint finds its face again, the block stays); Delete key on the row, Del in the 3D view (143) |
+| `book_joints_edit` | the report's bugs 11, 12, 13: an as-built joint edited while later components and joints exist (they roll back with the marker), its type kept through Edit Joint Limits, a Rigid Group cancelled, Capture Position refused and Ctrl+S; Cancel of the limits dialog takes only its own change; undo / redo; an as-built Slider without a position refused in the dialog and next to the mouse, cancelled by another command with a message; the design closed under a dialog; reopen; no undo step left open after any of it (105) |
+| `book_joints_snap` | a round edge's centre from anywhere on it, a cylinder's axis points, the hole of a notched (threaded) rim on its axis, Select Other for the part behind, undo / redo, reopen (41) |
+| `book_joints_limits` | Flip, Preview Motion, With All Limits, Rest after a drag (twice, and after reopening), undo / redo; an animation stopped at any moment of its swing puts the part back exactly (the cause of CI's `vex_shaft` flake) (71) |
+| `book_joints_motion` | Link with Same Joint (a screw: animate, drive, reverse), a four-bar loop dragged, Animate Joint and Animate Joint Relationships, a refusal, reopen (87) |
+| `book_joints_survive` | two joints made by clicks, then the part edited: a fillet, a higher block, the hole widened and moved, a chamfer and a rename, the body moved to another component, the marker rolled back and forward (a joint made meanwhile goes in at the marker), the hole deleted (the joint says it is lost, nothing jumps), Edit Joint picks the side again, undo / redo, reopen (90) |
+| `book_joints_ground` | with "First component Ground to Parent" on: the first component is grounded; a drag of it is refused with the reason; J with it picked first ungrounds it and moves it (Cancel and Ctrl+Z ground it again); a grounded second component keeps its ground; As-built Joint ungrounds nothing (60) |
+| `book_joints_study` | Motion Study's graph, Enter setting a point (value box, Step box), a click on a joint's line, Play; the browser rows of components inside a subassembly in As-built Joint and Rigid Group (57) |
 | `joints_limits_drag` | Edit Joint Limits: the angle handle on the axis; tick Maximum, drag the disc to 90 (the block turns, Maximum follows, a ghost); tick Minimum, drag to -45 (two ghosts); OK keeps both, no ghost left, Ctrl+Z; again: drag the block itself to 60 (Maximum and the handle follow, not a new pick), Cancel puts it all back (48) |
 

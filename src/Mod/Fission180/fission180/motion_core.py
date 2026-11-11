@@ -302,3 +302,81 @@ def set_key(keys, step, value):
 
 def drop_key(keys, step):
     return [(float(s), float(v)) for s, v in keys or [] if abs(float(s) - float(step)) > 1e-9]
+
+
+# -- a joint whose own two motions are tied (Fusion's Link with Same Joint: a screw) --------------
+def tied_values(ratio, offset, first=None, second=None, lead="first"):
+    """The two motions of one joint tied by following = ratio x leading + offset: given the
+    leading motion's value (`first`), the following one's (`second`) or both (then `lead`
+    says which one counts), both values. (None, None) when neither is given; a zero ratio
+    cannot be read backwards, the leading value then stays as given."""
+    if first is None and second is None:
+        return None, None
+    if second is None or (first is not None and lead == "first"):
+        return float(first), linked_value(first, ratio, offset)
+    back = unlinked_value(second, ratio, offset)
+    return (float(first) if back is None and first is not None else back), float(second)
+
+
+# -- the Motion Study graph (joint value over the steps) -------------------------------------------
+def graph_x(step, width, margin, steps=STUDY_STEPS):
+    """The pixel x of a step on a graph `width` wide with `margin` on both sides."""
+    span = max(1.0, float(width) - 2.0 * margin)
+    return margin + span * min(max(float(step), 0.0), float(steps)) / float(steps)
+
+
+def graph_step(x, width, margin, steps=STUDY_STEPS):
+    """The (whole) step a click at pixel x means."""
+    span = max(1.0, float(width) - 2.0 * margin)
+    return int(round(min(max((float(x) - margin) / span, 0.0), 1.0) * steps))
+
+
+def graph_range(keys):
+    """(lowest, highest) value of a joint's key points; a flat line gets room around it."""
+    values = [float(v) for _s, v in keys] or [0.0]
+    low, high = min(values), max(values)
+    if high - low < 1e-9:
+        pad = max(1.0, abs(low) * 0.1)
+        return low - pad, high + pad
+    return low, high
+
+
+def graph_y(value, low, high, height, margin):
+    """The pixel y of a value (higher values are higher up) between `low` and `high`."""
+    span = max(1.0, float(height) - 2.0 * margin)
+    if high - low < 1e-12:
+        return margin + span / 2.0
+    return margin + span * (1.0 - (float(value) - low) / (high - low))
+
+
+def graph_line(keys, width, height, margin, steps=STUDY_STEPS):
+    """The pixel points of a joint's line over all steps: flat before its first and after
+    its last key point, straight between them (what study_value gives)."""
+    ordered = sorted((float(a), float(b)) for a, b in keys)
+    if not ordered:
+        return []
+    low, high = graph_range(ordered)
+    points = []
+    if ordered[0][0] > 0:
+        points.append((0.0, ordered[0][1]))
+    points.extend(ordered)
+    if ordered[-1][0] < steps:
+        points.append((float(steps), ordered[-1][1]))
+    return [
+        (graph_x(a, width, margin, steps), graph_y(b, low, high, height, margin)) for a, b in points
+    ]
+
+
+def graph_lane(lanes, step, y, height, margin):
+    """Which joint's line a click at pixel y on `step` means: the index in `lanes` (each a
+    list of key points) of the line nearest the click there, or None when there is none."""
+    best = None
+    for index, keys in enumerate(lanes):
+        value = study_value(keys, step)
+        if value is None:
+            continue
+        low, high = graph_range(keys)
+        d = abs(graph_y(value, low, high, height, margin) - float(y))
+        if best is None or d < best[0]:
+            best = (d, index)
+    return best[1] if best is not None else None

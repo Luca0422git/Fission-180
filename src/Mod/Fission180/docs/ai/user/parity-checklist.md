@@ -368,7 +368,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `browser:origin`: Create Sketch
 - `browser:component`: Move/Copy, Create Drawing, Move to Component
 - `browser:body`: Activate Body, Rebuild with Timeline (AI)..., Ground, Paste, Move to Component
-- `browser:joint`: Rename
+- `browser:joint`: Animate Joint Relationships, Rename
 - `browser:rigid_group`: Rename
 - `browser:motion_link`: Edit Motion Link, Suppress, Find in Timeline, Rename, Delete
 - `browser:contact_set`: Edit Contact Set, Suppress, Rename, Delete

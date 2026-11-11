@@ -168,6 +168,22 @@ def start(gl, view, pos):
         return None
 
 
+def _close_step(doc, abort=False):
+    """End the drag's undo step and its pending name (commitTransaction / abortTransaction
+    leave the name pending when the step holds no change: the next change anywhere would
+    open a step under it)."""
+    try:
+        if abort:
+            doc.abortTransaction()
+        else:
+            doc.commitTransaction()
+    finally:
+        try:
+            App.closeActiveTransaction(abort)
+        except Exception:
+            pass
+
+
 # -- one drag -------------------------------------------------------------------------------------
 class DragSession:
     """One press-move-release on a component: everything starts from where the parts stood
@@ -203,6 +219,7 @@ class DragSession:
         movers = self.plan.get("movers") or [part]
         joints.remember_places(doc, movers)
         self.start_places = joints.placements(doc)
+        self.rest_before = joints.rest_values(doc)  # Fusion's Rest: see finish()
         self.view_dir = App.Vector(view.getViewDirection()).normalize()
         joint = self.plan.get("joint")
         if joint is not None:
@@ -293,7 +310,20 @@ class DragSession:
         movers = self.plan["movers"]
         side = self.plan["side"]
         if target_angle is not None or target_slide is not None:
-            target_angle, target_slide = joints.clamp_values(joint, target_angle, target_slide)
+            lead = None
+            tied = joints.own_ratio(joint)
+            if tied is not None and target_angle is not None and target_slide is not None:
+                # a screw (its turn tied to its slide): the pointer leads with the motion it
+                # asks more of, counted in the same units
+                first, _second, ratio, _offset = tied
+                turned, slid = abs(target_angle - a0), abs(target_slide - s0)
+                if first == "angle":
+                    lead = "slide" if slid > abs(ratio) * turned else "angle"
+                else:
+                    lead = "angle" if turned > abs(ratio) * slid else "slide"
+            target_angle, target_slide = joints.clamp_values(
+                joint, target_angle, target_slide, lead=lead
+            )
 
             def put(fraction):
                 self._restore()
@@ -329,7 +359,7 @@ class DragSession:
             self._with_contact(put)
         else:
             return
-        code = joints.solve(self.doc, keep=self.plan.get("anchor"))
+        code = joints.solve(self.doc, keep=self.plan.get("anchor"), hold=joint)
         if code not in (0,):
             # the other joints cannot follow there: the drag stops where it last could
             self._restore()
@@ -369,12 +399,16 @@ class DragSession:
         if self.kind == "held" or self.start_places is None:
             return
         try:
+            if self.moved:
+                # Fusion's Rest: a joint with a rest position goes back to it once its
+                # component is let go (only the joints this drag moved)
+                back = joints.settle_rest(self.doc, self.rest_before)
+                if back:
+                    self.rested = [j.Name for j in back]
             moved = self.moved and self._changed()
+            _close_step(self.doc, abort=not moved)
             if moved:
-                self.doc.commitTransaction()
                 preview.recompute(self.doc)
-            else:
-                self.doc.abortTransaction()
             self._report(moved)
         except Exception as exc:
             warn("Component Drag: %s" % exc)
@@ -391,7 +425,7 @@ class DragSession:
         try:
             self._restore()
             joints.solve(self.doc)
-            self.doc.abortTransaction()
+            _close_step(self.doc, abort=True)
             preview.recompute(self.doc)
             self._report(False)
             log("Component Drag cancelled")
@@ -411,6 +445,8 @@ class DragSession:
 
     def _report(self, moved):
         record = {"part": self.part.Name, "kind": self.kind, "moved": moved}
+        if getattr(self, "rested", None):
+            record["rested"] = list(self.rested)
         if self.joint is not None:
             record["joint"] = self.joint.Name
             record["values"] = joints.value(self.joint)
