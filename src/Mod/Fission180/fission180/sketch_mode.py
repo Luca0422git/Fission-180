@@ -115,6 +115,10 @@ PARAMS = [
     # "non-intrusive" setting must stay on: off, FreeCAD shows its user warnings ("Wrong
     # selection"...) as blocking message boxes instead.
     (NOTIFICATIONS, "Bool", "NonIntrusiveNotificationsEnabled", True),
+    # FreeCAD's modal "Sketcher Constraint Substitution" box (Tangent on curves whose ends
+    # are joined) never shows: Fusion says nothing there (sf/book-sketch-b; Fission 180's
+    # own Tangent does the same swap without a word, sketch_constrain_tools.py)
+    (SKETCHER_GENERAL, "Bool", "NotifyConstraintSubstitutions", False),
     (NOTIFICATIONS, "Int", "MaxOpenNotifications", 0),
     # Fusion: every closed area of a sketch is a profile you can click, also after Finish
     # Sketch and before any command (then E or Q uses it). FreeCAD can do that when a
@@ -133,6 +137,10 @@ PARAMS = [
     (SKETCHER_GENERAL, "Bool", "BSplineDegreeVisible", False),
     (SKETCHER_GENERAL, "Bool", "BSplineKnotMultiplicityVisible", False),
     (SKETCHER_GENERAL, "Bool", "BSplinePoleWeightVisible", False),
+    # FreeCAD draws the control polygon of every spline, a fit point spline's too (wave 7,
+    # the book parity report: "Fusion shows just the curve"). Off; Fission 180 draws the
+    # control frame itself for the splines whose control circles are shown (ControlFrames).
+    (SKETCHER_GENERAL, "Bool", "BSplineControlPolygonVisible", False),
 ]
 
 # Sketch palette options (Fusion's defaults); remembered between sessions.
@@ -174,6 +182,14 @@ SPLINE_COMMANDS = (
     "Sketcher_CompCreateBSpline",
 )
 SPLINE_STEP = "Add Sketch B-Spline"
+ELLIPSE_STEP = "Add sketch ellipse"  # FreeCAD's Ellipse tool's undo step
+LINE_STEP = "Add sketch line"  # ...and its Line tool's
+# the spline tools whose clicks are fit points (the curve goes through them)
+FIT_SPLINE_COMMANDS = (
+    "Fission180_SketchFitSpline",
+    "Sketcher_CreateBSplineByInterpolation",
+    "Sketcher_CreatePeriodicBSplineByInterpolation",
+)
 # Commands after which a new dimension gets the in-place value box.
 DIMENSION_COMMANDS = {
     "Sketcher_Dimension",
@@ -196,6 +212,7 @@ _state = {
     "session": None,
     "profilelib": None,
     "polygon": None,  # {"circumscribed": bool} while Fission 180's polygon tool runs
+    "centerline": False,  # new lines are centerlines (Linetype > Centerline, nothing selected)
 }
 
 
@@ -237,6 +254,62 @@ def construction_mode():
         return shown == constr.pixmap(16, 16).toImage()
     except Exception:
         return False
+
+
+def centerline_mode():
+    """New lines are drawn as centerlines (Linetype > Centerline with nothing selected)."""
+    return bool(_state.get("centerline"))
+
+
+def toggle_centerline():
+    """The palette's Centerline button (Fusion's Linetype): the selected lines become
+    centerlines (normal lines again when all of them are), or, with nothing selected, new
+    lines are drawn as centerlines until it is clicked again (sketch_centerline.py)."""
+    from . import commands, sketch_centerline
+
+    sketch = editing_sketch()
+    if sketch is None:
+        return
+    try:
+        geos = []
+        others = 0
+        for sel in Gui.Selection.getSelectionEx():
+            if sel.Object is not sketch:
+                continue
+            for name in sel.SubElementNames:
+                short = name.rsplit(".", 1)[-1]
+                if short.startswith("Edge"):
+                    geo = int(short[4:]) - 1
+                    if sketch.Geometry[geo].TypeId == sketch_centerline.LINE:
+                        geos.append(geo)
+                    else:
+                        others += 1
+        if not geos:
+            if others:
+                commands.tell("Only lines can be centerlines: select a line.")
+                return
+            _state["centerline"] = not centerline_mode()
+            commands.tell(
+                "New lines are centerlines (dashed: a dimension to one is a diameter, "
+                "Revolve takes it as its axis). Click Centerline again for normal lines."
+                if _state["centerline"]
+                else "New lines are normal lines again."
+            )
+            return
+        now = set(sketch_centerline.lines(sketch))
+        on = not all(g in now for g in geos)
+        doc = sketch.Document
+        doc.openTransaction("Centerline")
+        try:
+            sketch_centerline.set_centerline(sketch, geos, on)
+            sketch.solve()
+        except Exception:
+            doc.abortTransaction()
+            raise
+        doc.commitTransaction()
+        Gui.Selection.clearSelection()
+    except Exception as exc:
+        warn("centerline: %s" % exc)
 
 
 def normal_mode():
@@ -545,11 +618,12 @@ RECOMPUTE_STEP = "Sketch recompute"
 # (sketch_infer.py: Fusion adds them with the line itself).
 INFER_STEP = "Inferred Constraints"
 GLUED_STEPS = (RECOMPUTE_STEP, INFER_STEP)
-# FreeCAD's spline tool records the constraints of the spline's ends (on the points it was
-# clicked on) as a step of its own after the spline ("Add Auto-Constraints"): one Ctrl+Z
-# took only those back and left the spline (Fusion: one Ctrl+Z, the spline is gone). That
-# step goes with the spline step before it. (After FreeCAD's line the same step is still
-# its own: the Line tool's two steps are a known difference, parity/sketch.md.)
+# FreeCAD's drawing tools record the constraints of the points they were clicked on as a
+# step of its own after the shape ("Add Auto-Constraints"): one Ctrl+Z took only those back
+# and left the shape (Fusion: one Ctrl+Z, the spline is gone). That step goes with the
+# shape's step before it: the spline's since 3.2.1, every tool's since wave 7 (the book
+# parity report: "Ctrl+Z after drawing a polyline only removed its auto-constraints, not
+# the lines", with Fission 180's own inferred constraints glued in front of them).
 AUTO_STEP = "Add Auto-Constraints"
 _merging = {"busy": False}
 
@@ -569,7 +643,7 @@ def _glued_next(doc):
     following = doc.RedoNames[0]
     if following in GLUED_STEPS:
         return True
-    return following == AUTO_STEP and bool(doc.UndoNames) and doc.UndoNames[0] == SPLINE_STEP
+    return following == AUTO_STEP and bool(doc.UndoNames)
 
 
 def _merge_recompute_step(doc, undo):
@@ -604,6 +678,48 @@ def _one_more_step(doc_name, undo):
                 break
         if doc.isTouched() or any("Touched" in o.State for o in doc.Objects):
             doc.recompute()
+    except Exception as exc:
+        warn("undo: %s" % exc)
+    finally:
+        _merging["busy"] = False
+
+
+NO_MORE_UNDO = (
+    "Nothing more to undo in this sketch. Finish Sketch first to undo what came before it."
+)
+
+
+def _back_into_sketch(doc_name, name):
+    """Ctrl+Z went one step past what was done in the open sketch (SketchSession.
+    _count_undo): the step that made the sketch, which deletes it and ends the editing, or
+    the last step of the design before a sketch opened for editing. That step is put back
+    and the sketch stays open (or opens again), with a note beside the pointer. Before,
+    the sketch closed, the camera turned away, and Redo brought back the curves but not
+    the open sketch (the book parity report, 2026-11-10). From a timer."""
+    from . import commands
+
+    _merging["busy"] = True  # (the redo is ours: no step glued to it follows)
+    try:
+        doc = App.getDocument(doc_name)
+        if doc is None or not doc.RedoNames:
+            return
+        doc.redo()
+        if doc.isTouched() or any("Touched" in o.State for o in doc.Objects):
+            doc.recompute()
+        sketch = doc.getObject(name)
+        if sketch is not None and editing_sketch() is not sketch:
+            from . import sketch_ui
+
+            # the sketch came back as it was when the Undo deleted it: hidden, as FreeCAD
+            # hides every sketch while it is open. Opened again like that, Finish Sketch
+            # would "restore" it hidden for good
+            try:
+                if sketch.ViewObject is not None and not sketch.ViewObject.Visibility:
+                    sketch.ViewObject.Visibility = True
+            except Exception as exc:
+                warn("undo: %s" % exc)
+            sketch_ui.edit_sketch(sketch)
+        commands.tell(NO_MORE_UNDO)
     except Exception as exc:
         warn("undo: %s" % exc)
     finally:
@@ -666,6 +782,12 @@ def _start(sketch):
     try:
         _state["session"] = SketchSession(sketch)
         log("sketch %s: Fusion sketch mode on" % sketch.Label)
+        try:
+            from . import sketch_helpers
+
+            sketch_helpers.opened(_state["session"])  # hidden helper lines stay unseen
+        except Exception as exc:
+            warn("sketch helper lines: %s" % exc)
     except Exception as exc:
         warn("sketch mode: %s" % exc)
 
@@ -684,6 +806,35 @@ def _end():
             session.close()
         except Exception as exc:
             warn("sketch mode: closing: %s" % exc)
+        doc_name, name = session.doc_name, session.name
+        QtCore.QTimer.singleShot(0, lambda: _show_finished(doc_name, name))
+
+
+def _show_finished(doc_name, name):
+    """Fusion: a finished sketch stays shown until a feature uses it (Extrude hides its
+    profile sketch). FreeCAD hides a sketch while it is open and puts back how it was
+    shown before; a sketch that was hidden then for a reason that is over (opened hidden
+    after an Undo and Redo of its making; its only feature deleted since) stayed hidden
+    after Finish Sketch, with an empty view (the book parity report: "the sketch had
+    become hidden; right-click > Show"). From a timer, after FreeCAD closed the sketch."""
+    try:
+        doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+        sketch = doc.getObject(name) if doc is not None else None
+        from . import sketch_ui
+
+        if sketch is None or sketch.ViewObject is None or editing_sketch() is sketch:
+            return
+        if sketch.ViewObject.Visibility:
+            sketch_ui.shown_before_edit(doc_name, name)  # (asked once)
+            return
+
+        shown = sketch_ui.shown_before_edit(doc_name, name)
+        if not shown or sketch_ui.used_by_feature(sketch):
+            return  # hidden before it was opened (by hand, or by its feature): stays so
+        sketch.ViewObject.Visibility = True
+        log("sketch %s shown again: nothing uses it yet" % sketch.Label)
+    except Exception as exc:
+        warn("sketch mode: %s" % exc)
 
 
 # -- helpers for the 3D view ----------------------------------------------------------
@@ -783,6 +934,15 @@ def label_point(sketch, index):
         return center + direction * (radius + c.LabelDistance)
     if c.Type not in ("Distance", "DistanceX", "DistanceY"):
         return None
+    try:
+        # every form of a length dimension: from the origin, to a projected point, a point
+        # to a line (sf/book-sketch-b; the code below knew two points of sketch curves)
+        from . import sketch_dimension_tool
+
+        spot = sketch_dimension_tool.label_point(sketch, index)
+        return App.Vector(spot[0], spot[1], 0) if spot is not None else None
+    except Exception:
+        pass
 
     def point(geo, pos):
         g = sketch.Geometry[geo]
@@ -823,6 +983,13 @@ class SketchSession:
         self.editor = None
         self.palette = None
         self.last_press = None
+        self._drawing_cursor = False  # what the view's cursor said last (drawing_cursor)
+        self.undo_steps = 0  # steps of the undo list made in this sketch (_count_undo)
+        self._tidy_seen = len(sketch.Geometry)  # curves already looked at by _tidy_new
+        try:
+            self._undo_names = tuple(self.doc.UndoNames)
+        except Exception:
+            self._undo_names = ()
         self._enter_follow = False
         self.shading = ProfileShading(self)
         from .sketch_areas import AreaPicker, ensure_areas
@@ -841,6 +1008,7 @@ class SketchSession:
         except Exception as exc:
             warn("right-angle marks: %s" % exc)
         self.polygon = PolygonPreview(self)
+        self.frames = ControlFrames(self)  # control point splines' control frames
         from .sketch_line import LineChain
 
         self.line = LineChain(self)
@@ -919,6 +1087,7 @@ class SketchSession:
             self.areas.refresh(self.shading.shaded)
             self.display.apply()
             self.fixed.apply()
+            self.frames.update()
         except Exception as exc:
             warn("sketch display: %s" % exc)
         if self.right_angles is not None:
@@ -932,14 +1101,21 @@ class SketchSession:
         before = self.constraint_count
         grew = count > before
         self.constraint_count = count
+        self._count_undo(kind)
         if self.infer is not None:
             try:
                 self.infer.commit_signal(kind)
             except Exception as exc:
                 warn("sketch inference: %s" % exc)
+        if kind in ("undo", "redo", "abort"):
+            try:
+                self._tidy_seen = len(self.sketch.Geometry)
+            except Exception:
+                pass
         if kind == "commit":
             self._typed_since_commit = False  # the next shape: nothing typed yet
             QtCore.QTimer.singleShot(0, self._repair)
+            QtCore.QTimer.singleShot(0, self._tidy_new)
             self.line.committed()
             self.fillet_watch.committed()
         if kind == "commit" and grew:
@@ -952,6 +1128,128 @@ class SketchSession:
         if kind in ("undo", "redo") and self.tool is not None:
             tool = self.tool
             QtCore.QTimer.singleShot(0, lambda: _tool_undone(tool))
+
+    def _count_undo(self, kind):
+        """How many steps of the design's undo list were made in this sketch since it
+        opened. An Undo that takes one more is put back (_back_into_sketch): Ctrl+Z never
+        leaves the sketch. Only counts and a timer (called from FreeCAD's signal)."""
+        try:
+            names = tuple(self.doc.UndoNames)
+        except Exception:
+            return
+        before, self._undo_names = self._undo_names, names
+        if kind == "commit":
+            if len(names) > len(before):
+                self.undo_steps += len(names) - len(before)
+            elif names != before:
+                # (the list is full: the oldest step fell out as this one came in)
+                self.undo_steps = min(self.undo_steps + 1, len(names))
+        elif kind == "redo":
+            self.undo_steps += 1
+        elif kind == "undo":
+            self.undo_steps -= 1
+            if self.undo_steps < 0:
+                doc_name, name = self.doc_name, self.name
+                QtCore.QTimer.singleShot(0, lambda: _back_into_sketch(doc_name, name))
+
+    def _tidy_new(self):
+        """A spline or an ellipse FreeCAD's tools just made is shown as Fusion shows it
+        (sketch_draw_helpers.py): a spline's helper constraints are not drawn, a fit point
+        spline's control circles neither; an ellipse loses its two focus points, and one
+        drawn level or upright is held so (Fusion infers it while drawing: the book's
+        ellipse is fully defined by its dimensions). In a step glued to the shape's own
+        (one Ctrl+Z). From a timer after FreeCAD's commit."""
+        if self.closed:
+            return
+        try:
+            sketch = self.sketch
+            geometry = sketch.Geometry
+            seen, self._tidy_seen = self._tidy_seen, len(geometry)
+            if len(geometry) <= seen:
+                return
+            from . import sketch_draw_helpers as helpers
+
+            new = range(seen, len(geometry))
+            # only what the drawing tools just made (their step is among the newest of the
+            # undo list, under its own constraints' steps): a spline or an ellipse that
+            # came some other way (a paste, a pattern, a script) is left as it is
+            steps = list(self.doc.UndoNames)[:3]
+            splines, ellipses, centerlines = [], [], []
+            if centerline_mode() and LINE_STEP in steps:
+                # Linetype > Centerline is on: the lines the Line tool just drew
+                centerlines = [
+                    i
+                    for i in new
+                    if geometry[i].TypeId == "Part::GeomLineSegment"
+                    and not sketch.getConstruction(i)
+                ]
+            if SPLINE_STEP in steps:
+                splines = [i for i in new if geometry[i].TypeId == helpers.BSPLINE]
+            if ELLIPSE_STEP in steps:
+                ellipses = [i for i in new if geometry[i].TypeId == helpers.ELLIPSE]
+            if not splines and not ellipses and not centerlines:
+                return
+            from . import recent
+
+            fit = recent.running_tool() in FIT_SPLINE_COMMANDS
+            doc = self.doc
+            infer = self.infer
+            if infer is not None:
+                infer._applying = True  # (our own step: no shape of the tool's)
+            doc.openTransaction(INFER_STEP)
+            try:
+                for spline in splines:
+                    helpers.tidy_spline(sketch, spline, fit)
+                for ellipse in reversed(ellipses):
+                    major, _minor = helpers.tidy_ellipse(sketch, ellipse)
+                    self._level_ellipse(major)
+                if centerlines:
+                    from . import sketch_centerline
+
+                    sketch_centerline.set_centerline(sketch, centerlines, True)
+                sketch.solve()
+            except Exception:
+                doc.abortTransaction()
+                raise
+            finally:
+                if infer is not None:
+                    infer._applying = False
+            doc.commitTransaction()
+            self._tidy_seen = len(sketch.Geometry)
+            if infer is not None:
+                infer.seen = sketch.GeometryCount
+                infer.invalidate()
+        except Exception as exc:
+            warn("sketch helpers: %s" % exc)
+
+    def _level_ellipse(self, major):
+        """The major axis of an ellipse just drawn within HVDegrees of level or upright
+        gets Horizontal / Vertical (dropped again if the sketch cannot take it)."""
+        import math
+
+        import Sketcher
+
+        from . import sketch_infer
+
+        if major is None:
+            return
+        sketch = self.sketch
+        line = sketch.Geometry[major]
+        d = line.EndPoint - line.StartPoint
+        if d.Length < 1e-9:
+            return
+        tol = math.radians(float(sketch_infer.setting("HVDegrees")))
+        angle = abs(math.atan2(d.y, d.x))
+        if min(angle, math.pi - angle) <= tol:
+            name = "Horizontal"
+        elif abs(angle - math.pi / 2.0) <= tol:
+            name = "Vertical"
+        else:
+            return
+        index = sketch.addConstraint(Sketcher.Constraint(name, major))
+        if sketch.solve() < 0 or sketch.RedundantConstraints or sketch.ConflictingConstraints:
+            sketch.delConstraint(index)
+            sketch.solve()
 
     def _close_editor_after_undo(self):
         """Undo and Redo put the sketch's curves and dimensions back as whole lists, so the
@@ -1011,11 +1309,53 @@ class SketchSession:
                 return
             c = constraints[index]
             if c.Type in DIMENSIONAL and c.Driving:
+                # Fusion: a dimension to a centerline is the diameter (sketch_centerline.py)
+                index = self._diameter_dimension(index)
                 if self._make_driven_if_redundant(index):
                     return
                 self.edit_dimension(index)
         except Exception as exc:
             warn("dimension box: %s" % exc)
+
+    def _diameter_dimension(self, index):
+        """The dimension just placed, when it runs from a point or line to a centerline,
+        becomes the diameter, in a step glued to the dimension's own. Returns the index
+        of the dimension to go on with (the new one, or `index`)."""
+        from . import sketch_centerline
+
+        sketch = self.sketch
+        try:
+            if not sketch_centerline.lines(sketch):
+                return index
+            c = sketch.Constraints[index]
+            plan = sketch_centerline.diameter_plan(
+                c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, sketch_centerline.lines(sketch)
+            )
+            if plan is None:
+                return index
+            doc = self.doc
+            infer = self.infer
+            if infer is not None:
+                infer._applying = True
+            doc.openTransaction(INFER_STEP)
+            try:
+                new = sketch_centerline.diameter(sketch, index)
+                sketch.solve()
+            except Exception:
+                doc.abortTransaction()
+                raise
+            finally:
+                if infer is not None:
+                    infer._applying = False
+            doc.commitTransaction()
+            self._tidy_seen = len(sketch.Geometry)
+            if infer is not None:
+                infer.seen = sketch.GeometryCount
+                infer.invalidate()
+            return new if new is not None else index
+        except Exception as exc:
+            warn("diameter dimension: %s" % exc)
+            return index
 
     def _make_driven_if_redundant(self, index):
         """A dimension on a size the other dimensions/constraints already set would
@@ -1212,9 +1552,27 @@ class SketchSession:
             return False
         if self.line.active or (self.tool is not None and self.tool.active):
             return True
+        return self.drawing_cursor()
+
+    def drawing_cursor(self):
+        """FreeCAD's drawing cursor is on the 3D view: one of its sketch tools runs.
+
+        While the left button is down the view shows a pointing hand whatever runs
+        (View3DInventorViewer::setCursorRepresentation, the navigation's SELECTION mode),
+        and it keeps it after the release for as long as Ctrl stays held (Revit style:
+        Ctrl alone changes no mode). The hand therefore says nothing: the answer is what
+        the cursor said last. (Taking the hand for a tool sent the release of a Ctrl+click
+        on a curve through the inference's "Ctrl frees the point" path, with FreeCAD's
+        pick radius shrunk to nothing: the click selected nothing. Book parity report,
+        2026-11-10: "Ctrl+click does not add to a sketch selection".)"""
         try:
             gl = self.gl
-            return gl is not None and _is_valid(gl) and gl.cursor().shape() != QtCore.Qt.ArrowCursor
+            if gl is None or not _is_valid(gl):
+                return False
+            shape = gl.cursor().shape()
+            if shape != QtCore.Qt.PointingHandCursor:
+                self._drawing_cursor = shape != QtCore.Qt.ArrowCursor
+            return self._drawing_cursor
         except Exception:
             return False
 
@@ -1249,7 +1607,11 @@ class SketchSession:
             sketch_pick_ui.stop_waiting()
         except Exception as exc:
             warn("sketch tool: %s" % exc)
-        if not self.tool_running() and not self._spline_in_progress() and not self._spline_panel_shown():
+        if (
+            not self.tool_running()
+            and not self._spline_in_progress()
+            and not self._spline_panel_shown()
+        ):
             return
         kept = []
         try:
@@ -1349,7 +1711,11 @@ class SketchSession:
             if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
                 return
             cursor_on = self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
-            if cursor_on or self._spline_panel_shown() or (self.tool is not None and self.tool.active):
+            if (
+                cursor_on
+                or self._spline_panel_shown()
+                or (self.tool is not None and self.tool.active)
+            ):
                 self._orphan_ticks = 0
                 return
             points = self._spline_points()
@@ -1476,7 +1842,10 @@ class SketchSession:
             QtWidgets.QApplication.processEvents()
         if _count_splines(sketch) > splines:
             made = "freecad"
-            log("spline: made from the points clicked (%d curve(s) added)" % (len(sketch.Geometry) - before))
+            log(
+                "spline: made from the points clicked (%d curve(s) added)"
+                % (len(sketch.Geometry) - before)
+            )
         else:
             left = self._spline_points() or points
             if len(left) >= 2:
@@ -1808,6 +2177,17 @@ class SketchSession:
                         return True
                     QtCore.QTimer.singleShot(0, lambda: self.edit_dimension(index, pos))
                     return True
+        try:
+            # the text of a vertical or slanted dimension is turned along it: FreeCAD only
+            # finds its middle (sf/book-sketch-b, the book report: "hard to hit")
+            from . import sketch_dimension_tool
+
+            found = sketch_dimension_tool.dimension_at(self, pos)
+            if found is not None and self.sketch.Constraints[found].Driving:
+                QtCore.QTimer.singleShot(0, lambda: self.edit_dimension(found, pos))
+                return True
+        except Exception as exc:
+            warn("dimension box: %s" % exc)
         return False
 
     def chain_clicked(self, pos):
@@ -1840,6 +2220,8 @@ class SketchSession:
         self.close_editor(commit=True)
         remove_stray_editors(self.gl)
         parts = [self.polygon, self.areas, self.shading, self.display, self.fixed, self.check]
+        parts.append(self.frames)
+        parts.append(self.select)
         parts.append(self.right_angles)
         if self.sketch3d is not None:
             parts.append(self.sketch3d)
@@ -1853,6 +2235,10 @@ class SketchSession:
             QtWidgets.QApplication.instance().focusChanged.disconnect(self._focus_changed)
         except Exception:
             pass
+        try:
+            self.filter._placed()  # (the view's pick radius, if a dimension was being placed)
+        except Exception as exc:
+            warn("sketch mode: %s" % exc)
         hooked = [(self.gl, self.filter), (self.viewer, self.keys)]
         hooked += [(field, self.keys) for field in self._fields]
         for widget, event_filter in hooked:
@@ -1950,6 +2336,8 @@ class _ViewFilter(QtCore.QObject):
         self.session = session
         self.right_pressed = None
         self.refused_release = False  # the release of a refused Project click
+        self.chain_double = False  # a double-click's press on the line chain's end
+        self.placing = None  # the view's pick radius, shrunk while a dimension is placed
 
     def eventFilter(self, obj, event):
         try:
@@ -1986,11 +2374,46 @@ class _ViewFilter(QtCore.QObject):
             if kind == QtCore.QEvent.MouseButtonDblClick and event.button() == QtCore.Qt.LeftButton:
                 if session.line.at_current(event.position().toPoint()):
                     # Fusion: a double-click on the end of the line being drawn ends the
-                    # chain; the Line tool stays on. Before the inference sees it: its
-                    # tangent-arc gesture also starts with a press on that point, and
-                    # FreeCAD must not get this second press as another click there.
-                    QtCore.QTimer.singleShot(0, session.line.break_chain)
+                    # chain; the Line tool stays on. But a second press that comes soon
+                    # after the click and then DRAGS is Fusion's tangent arc (press and
+                    # drag on the line's end), which a hand does without waiting out the
+                    # double-click time (the book's Carabiner: "no arc" with a real
+                    # mouse): the press goes to the inference like any press there, and
+                    # only a release without a drag ends the chain. FreeCAD must never
+                    # get this second press as another click on that point.
+                    self.chain_double = True
+                    taken = session.infer is not None and session.infer.mouse(obj, event)
+                    if not taken:
+                        self.chain_double = False
+                        QtCore.QTimer.singleShot(0, session.line.break_chain)
                     return True
+            if self.chain_double and (
+                (kind == QtCore.QEvent.MouseMove and not (event.buttons() & QtCore.Qt.LeftButton))
+                or kind == QtCore.QEvent.MouseButtonPress
+            ):
+                # the release of that double-click never came (a test's double-click
+                # sends none; a release outside the window): it was a double-click
+                self.chain_double = False
+                try:
+                    session.infer.arc.reset()
+                except Exception as exc:
+                    warn("sketch view: %s" % exc)
+                session.line.break_chain()
+            if (
+                kind == QtCore.QEvent.MouseButtonRelease
+                and event.button() == QtCore.Qt.LeftButton
+                and self.chain_double
+            ):
+                self.chain_double = False
+                dragged = False
+                try:
+                    dragged = session.infer.arc.state == "dragging"
+                    session.infer.mouse(obj, event)  # places the arc, or lets go
+                except Exception as exc:
+                    warn("sketch view: %s" % exc)
+                if not dragged:
+                    QtCore.QTimer.singleShot(0, session.line.break_chain)
+                return True
             if kind in _PRESSES and event.button() == QtCore.Qt.LeftButton:
                 if session.projection_refused(event.position().toPoint()):
                     self.refused_release = True
@@ -2004,6 +2427,9 @@ class _ViewFilter(QtCore.QObject):
                 return True
             if kind == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
                 session.open_spline_step()  # (FreeCAD's spline tool: the points' undo step)
+                self._placing_dimension(obj, event)
+            elif kind == QtCore.QEvent.MouseButtonRelease and self.placing is not None:
+                QtCore.QTimer.singleShot(0, self._placed)
             # Fusion's inference (sketch_infer.py) may hand FreeCAD a copy of the event
             # with the point moved onto a guide; the copy comes back through here.
             if session.infer is not None and session.infer.mouse(obj, event):
@@ -2060,6 +2486,61 @@ class _ViewFilter(QtCore.QObject):
         except Exception as exc:
             warn("sketch view: %s" % exc)
         return False
+
+    def _placing_dimension(self, obj, event):
+        """A left press while FreeCAD's Dimension tool runs: when it places the dimension
+        (sketch_select_core.places_dimension) FreeCAD must find nothing under the pointer,
+        or it takes the click for one more pick. The view's pick radius is shrunk to
+        nothing until the release is handled, and FreeCAD is shown the pointer once more
+        (a move), so that what it had lit goes dark."""
+        if self.placing is not None:
+            self._placed()  # (the release of the click before never came: put back first)
+        session = self.session
+        try:
+            from . import recent
+            from . import sketch_select_core
+
+            if recent.running_tool() not in DIMENSION_COMMANDS or not session.drawing_cursor():
+                return
+            sketch = session.sketch
+            preview = len(sketch.Constraints) > session.constraint_count
+            picked = sum(
+                len(sel.SubElementNames)
+                for sel in Gui.Selection.getSelectionEx()
+                if sel.Object is sketch
+            )
+            pre = Gui.Selection.getPreselection()
+            under = []
+            if getattr(pre, "ObjectName", "") == session.name:
+                under = [n.rsplit(".", 1)[-1] for n in (pre.SubElementNames or ()) if n]
+            if not under or not sketch_select_core.places_dimension(preview, picked, under):
+                return
+            viewer = session.view.getViewer()
+            self.placing = (viewer, viewer.getPickRadius())
+            viewer.setPickRadius(0.01)
+            move = QtGui.QMouseEvent(
+                QtCore.QEvent.MouseMove,
+                event.position(),
+                event.globalPosition(),
+                QtCore.Qt.NoButton,
+                QtCore.Qt.NoButton,
+                event.modifiers(),
+            )
+            QtWidgets.QApplication.sendEvent(obj, move)
+            log("dimension: the click places it (not a pick of %s)" % ", ".join(under))
+        except Exception as exc:
+            self._placed()
+            warn("dimension placement: %s" % exc)
+
+    def _placed(self):
+        placing, self.placing = self.placing, None
+        if placing is None:
+            return
+        try:
+            viewer, radius = placing
+            viewer.setPickRadius(radius)
+        except Exception as exc:
+            warn("dimension placement: %s" % exc)
 
 
 _PRESSES = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)
@@ -2171,9 +2652,64 @@ def _run(command):
                 return
         if command in LABELS:
             recent.record(command, LABELS[command])
+        if command == "Std_Delete" and _delete_projected():
+            return  # (only projected curves were selected: done)
         Gui.runCommand(command)
     except Exception as exc:
         warn("%s: %s" % (command, exc))
+
+
+def _delete_projected():
+    """Del with projected (purple) curves selected. FreeCAD removes a projected curve by
+    removing the reference it came from, and a face's reference carries all its edges:
+    with the four Auto-projected edges of a face selected, the first delete took all four
+    and the other three failed with "Not able to delete an external geometry with the
+    given index" in the Report view. Here each reference is removed once, in one undo
+    step, and the projected curves are taken out of the selection before FreeCAD's own
+    Delete does the rest. True when nothing else was selected."""
+    import Sketcher
+
+    sketch = editing_sketch()
+    if sketch is None:
+        return False
+    names = []
+    for sel in Gui.Selection.getSelectionEx():
+        if sel.Object is sketch:
+            names += [n.rsplit(".", 1)[-1] for n in sel.SubElementNames]
+    projected = [n for n in names if n.startswith("ExternalEdge")]
+    if not projected:
+        return False
+    others = [n for n in names if not n.startswith("ExternalEdge")]
+
+    def ids_now():
+        return [Sketcher.ExternalGeometryFacade(g).Id for g in list(sketch.ExternalGeo)[2:]]
+
+    now = ids_now()
+    wanted = set()
+    for name in projected:
+        try:
+            wanted.add(now[int(name[len("ExternalEdge") :]) - 1])
+        except (ValueError, IndexError):
+            continue
+    doc = sketch.Document
+    doc.openTransaction("Delete Projected Curves")
+    try:
+        for _ in range(len(wanted) + 1):
+            now = ids_now()
+            left = [i for i, ident in enumerate(now) if ident in wanted]
+            if not left:
+                break
+            sketch.delExternal(left[-1])
+        sketch.solve()
+    except Exception:
+        doc.abortTransaction()
+        raise
+    doc.commitTransaction()
+    Gui.Selection.clearSelection()
+    for name in others:
+        Gui.Selection.addSelection(doc.Name, sketch.Name, name)
+    log("sketch: %d projected curve(s) deleted" % len(wanted))
+    return not others
 
 
 def _selected_curves(sketch):
@@ -2207,7 +2743,9 @@ def paste():
         # said once the tool's panel has settled (its start hid an earlier tip)
         QtCore.QTimer.singleShot(
             150,
-            lambda: commands.tell("Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."),
+            lambda: commands.tell(
+                "Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."
+            ),
         )
 
     QtCore.QTimer.singleShot(0, place)
@@ -2386,10 +2924,16 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
 
     def _current_text(self):
         try:
-            expressions = dict(self.sketch.ExpressionEngine)
+            from . import parameters
+
+            expressions = parameters.expressions_of(self.sketch)
             path = ".Constraints[%d]" % self.index
             if path in expressions:
-                return "=" + expressions[path]
+                # the formula as the person writes it (Fusion shows "Arm_Length", not
+                # FreeCAD's "=Parameters.Arm_Length": book parity report, Drone)
+                from . import parameters_core
+
+                return parameters_core.from_freecad(expressions[path])
             q = self.sketch.getDatum(self.index)
             if self.is_angle():
                 return "%g deg" % round(q.getValueAs("deg").Value, 6)
@@ -2429,33 +2973,35 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
 
     def _value(self, text):
         """Parse the typed text: (quantity or None, expression or None). Raises
-        ValueError with a message for the box when the value is not possible."""
-        text = text.strip()
-        if text.startswith("="):
-            return None, text[1:].strip()
-        try:
-            q = App.Units.Quantity(text)
-        except Exception:
-            raise ValueError("Not a value: %s" % text)
-        angle = self.is_angle()
-        if q.Unit == App.Units.Quantity(1.0).Unit:  # a bare number (or 10+5*2)
-            if angle:
-                q = App.Units.Quantity("%r deg" % q.Value)
-            else:  # in the design's units, like Fusion ("2" in an inch design is 2 in)
-                from . import browser_core
+        ValueError with a message for the box when the value is not possible.
 
-                mm = browser_core.plain_length(q.Value, self.sketch.Document)
-                q = App.Units.Quantity("%r mm" % mm)
-        wanted = App.Units.Quantity("1 deg" if angle else "1 mm").Unit
-        if q.Unit != wanted:
-            raise ValueError(
-                "Type %s, e.g. %s" % (("an angle", "30") if angle else ("a length", "25"))
-            )
-        value = q.getValueAs("deg" if angle else "mm").Value
+        Read the one way every value box reads (parameters.read, wave 7): a number is in
+        the design's units, a parameter name or a formula needs no leading "=" (Fusion's
+        way: `Head_Length`, `Support_Width/2`, `9 * 1.02`; a bare name used to keep the
+        measured value), and `Name = value` makes the user parameter Name and uses it."""
+        from . import parameters, parameters_core
+
+        text = text.strip()
+        angle = self.is_angle()
+        kind = "angle" if angle else "length"
+        doc = self.sketch.Document
+        name, rest = parameters_core.split_assignment(text)
+        if name is not None:
+            # checked here; made inside the undo step (apply), so a refusal leaves nothing
+            parameters.check_new(doc, name)
+            parameters.read(doc, rest, kind)
+            return None, text
+        got = parameters.read(doc, text, kind)
+        if not got.plain:
+            return None, got.formula
+        value = got.value
         # Fusion refuses sizes of 0 or less: a dimension of 0 collapses the curve (FreeCAD's
         # solver then fails and the sketch breaks).
         if value <= 1e-7:
-            raise ValueError("The value must be more than 0.")
+            raise ValueError(
+                "The value must be more than 0. To make two things meet use Coincident; to "
+                "line them up, Horizontal/Vertical or Collinear."
+            )
         if angle and value >= 360.0:
             raise ValueError("The angle must be less than 360 deg.")
         try:
@@ -2464,8 +3010,8 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
             current = 1.0
         if current < 0 and self._constraint().Type in ("DistanceX", "DistanceY", "Angle"):
             # FreeCAD keeps the direction in the sign; the user types the size.
-            q = App.Units.Quantity("%r %s" % (-value, "deg" if angle else "mm"))
-        return q, None
+            value = -value
+        return App.Units.Quantity("%r %s" % (value, "deg" if angle else "mm")), None
 
     def keyPressEvent(self, event):
         """Enter typed in the box finished it (returnPressed, inside the box's own key
@@ -2541,18 +3087,17 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         doc.openTransaction("Edit Dimension")
         try:
             if expression is not None:
-                from . import parameters, parameters_core
+                from . import parameters
 
-                # Fusion's parameter names (=width*2) in FreeCAD's spelling (Parameters.width)
-                formula = parameters_core.to_freecad(expression, parameters.user_names(doc))
-                # a formula FreeCAD cannot compute (an unknown name): said, not kept. Asked
-                # of the formula itself, not of the sketch's State (it can be left from an
-                # earlier try, or the sketch can be broken for another reason)
-                try:
-                    self.sketch.evalExpression(formula)
-                except Exception:
-                    raise ValueError("That formula cannot be computed: %s" % expression)
-                self.sketch.setExpression(".Constraints[%d]" % self.index, formula)
+                # Fusion's formula (width*2, Arm_Length + 5, Name = value) in FreeCAD's
+                # spelling, its numbers in the design's units; `Name = value` makes the
+                # parameter here, inside this undo step. A formula that cannot be computed
+                # (an unknown name) is said, not kept (parameters.read raises).
+                kind = "angle" if self.is_angle() else "length"
+                formula = parameters.read(doc, expression, kind, create=True).freecad
+                # (bound the way FreeCAD renumbers it when a constraint before it is
+                # deleted: parameters.set_expression, bug 3 of the book parity report)
+                parameters.set_expression(self.sketch, ".Constraints[%d]" % self.index, formula)
                 self.sketch.recompute()
                 # a formula is checked like a typed value: no size of 0 or less
                 kind = self._constraint().Type
@@ -3317,6 +3862,95 @@ class PolygonPreview:
         self.stop()
 
 
+class ControlFrames:
+    """The control frame of a control point spline: a dashed line through its control
+    points, as Fusion draws it. FreeCAD's own control polygon is switched off (it draws
+    one for every spline, a fit point spline's too: PARAMS); this draws one only for the
+    splines whose control circles are shown (not on the hidden layer:
+    sketch_draw_helpers.py). Redrawn when the sketch changes (not while a point is being
+    dragged: it follows at the release)."""
+
+    NAME = "Fission180ControlFrames"
+    COLOR = "#f5a623"  # the dashed orange of construction curves
+
+    def __init__(self, session):
+        self.session = session
+        self.drawn = []  # the polylines drawn last (sketch points), for the tests
+
+    def polylines(self):
+        from . import sketch_draw_helpers as helpers
+
+        sketch = self.session.sketch
+        hidden = helpers.hidden(sketch)
+        out = []
+        for i, geo in enumerate(sketch.Geometry):
+            if geo.TypeId != helpers.BSPLINE:
+                continue
+            poles = helpers.aligned_to(sketch, i).get("BSplineControlPoint", [])
+            if not poles or all(p in hidden for p in poles):
+                continue
+            points = [(p.x, p.y) for p in geo.getPoles()]
+            if len(points) >= 2:
+                if geo.isPeriodic():
+                    points.append(points[0])
+                out.append(points)
+        return out
+
+    def update(self):
+        if self.session.closed or editing_sketch() is not self.session.sketch:
+            return
+        try:
+            from pivy import coin
+
+            lines = self.polylines()
+            root = self.session.view.getSceneGraph()
+            node, parent = find_node(root, self.NAME)
+            if not lines:
+                if node is not None and parent is not None:
+                    parent.removeChild(node)
+                self.drawn = []
+                return
+            if node is None:
+                _coords, edit_root = find_node(root, "EditCurvesCoordinate")
+                if edit_root is None:
+                    return
+                node = coin.SoSeparator()
+                node.setName(self.NAME)
+                style = coin.SoDrawStyle()
+                style.lineWidth = 1
+                style.linePattern = 0x0F0F
+                color = coin.SoBaseColor()
+                color.rgb.setValue(*_rgb(self.COLOR))
+                pick = coin.SoPickStyle()
+                pick.style = coin.SoPickStyle.UNPICKABLE
+                for child in (pick, style, color, coin.SoCoordinate3(), coin.SoLineSet()):
+                    node.addChild(child)
+                edit_root.addChild(node)
+            coords, lineset = node.getChild(3), node.getChild(4)
+            flat = [(x, y, 0.004) for line in lines for x, y in line]
+            coords.point.setValues(0, len(flat), flat)
+            coords.point.setNum(len(flat))
+            counts = [len(line) for line in lines]
+            lineset.numVertices.setValues(0, len(counts), counts)
+            lineset.numVertices.setNum(len(counts))
+            self.drawn = lines
+        except Exception as exc:
+            warn("spline control frame: %s" % exc)
+
+    def remove(self):
+        # (only while the sketch is still open: FreeCAD deletes its edit nodes, ours under
+        # them, when it closes; a deleted node must not be touched)
+        try:
+            if editing_sketch() is self.session.sketch:
+                root = self.session.view.getSceneGraph()
+                node, parent = find_node(root, self.NAME)
+                if node is not None and parent is not None:
+                    parent.removeChild(node)
+        except Exception:
+            pass
+        self.drawn = []
+
+
 def _patch_profilelib():
     """FreeCAD's polygon tool finishes through ProfileLib.RegularPolygon.makeRegularPolygon
     (Python). While Fission 180's circumscribed polygon runs, the clicked point is the
@@ -3340,7 +3974,17 @@ def _patch_profilelib():
     ):
         mode = _state["polygon"]
         if not mode or not mode.get("circumscribed"):
-            return original(sketch, sides, centerPoint, firstCornerPoint, construction)
+            geos, cons = len(sketch.Geometry), len(sketch.Constraints)
+            made = original(sketch, sides, centerPoint, firstCornerPoint, construction)
+            try:
+                from . import sketch_draw_helpers
+
+                ids = list(range(geos, len(sketch.Geometry)))
+                if len(ids) == int(sides) + 1:  # FreeCAD's: the sides, then their circle
+                    sketch_draw_helpers.tidy_polygon(sketch, ids, int(sides), False, cons)
+            except Exception as exc:
+                warn("polygon: %s" % exc)
+            return made
         from . import sketch_polygon
 
         sketch_polygon.add_polygon(sketch, sides, centerPoint, firstCornerPoint, True, construction)

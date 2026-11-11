@@ -171,7 +171,7 @@ steps = [p_setup, r_rect, r_c1, r_c2, r_done, d_dim, d_pick, d_place, d_type, d_
 for tag, text, words in (
     ("A", "10", CONFLICT),
     ("B", "=w/2", CONFLICT),
-    ("C", "=foo*2", "That formula cannot be computed"),
+    ("C", "=foo*2", "no parameter named 'foo'"),  # (wave 7: the unknown name is named)
     ("D", "=w*0", "must be more than 0"),
 ):
     steps += [opener(tag), typer(tag, text), checker(tag, words)]

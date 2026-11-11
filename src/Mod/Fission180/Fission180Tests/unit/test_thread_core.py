@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Thread sizes and thread geometry without FreeCAD: fission180/thread_tables.py (the ISO / ANSI
 tables behind Hole and Thread) and fission180/thread_core.py (groove, length, volume)."""
+
 import math
 import os
 import sys
@@ -44,9 +45,40 @@ class TableTests(unittest.TestCase):
 
     def test_size_from_a_face(self):
         self.assertEqual(tables.closest("iso", 6.0).label, "M6x1")  # a d6 shaft
-        self.assertEqual(tables.closest("iso", 5.0, internal=True).label, "M6x1")  # tap drill
-        self.assertEqual(tables.closest("iso", 6.8, internal=True).label, "M8x1.25")
+        # a hole takes the size of its diameter too (Fusion: "the closest standard thread
+        # in relation to the size of the circular face"; the modeled thread then gives the
+        # hole the thread's minor diameter). The book's Hot End: a 6 mm hole is M6 (it was
+        # M7, by the tap drill, until beta.4); the Fire Piston: a 25/64 in hole is 3/8-16
+        self.assertEqual(tables.closest("iso", 6.0, internal=True).label, "M6x1")
+        self.assertEqual(tables.closest("iso", 5.0, internal=True).label, "M5x0.8")
+        self.assertEqual(tables.closest("iso", 6.8, internal=True).label, "M7x1")
+        self.assertEqual(tables.closest("ansi", 25.4 * 25 / 64, internal=True).label, "3/8-16 UNC")
         self.assertEqual(tables.closest("ansi", 6.35).label, "1/4-20 UNC")
+
+    def test_pipe_threads(self):
+        """ISO pipe (G, ISO 228-1) and NPT (ASME B1.20.1) for the Thread tool only: the
+        Hole's lists (STANDARDS) stay ISO metric and Unified."""
+        self.assertEqual([k for k, _label in tables.STANDARDS], ["iso", "ansi"])
+        self.assertEqual(
+            [k for k, _label in tables.THREAD_STANDARDS], ["iso", "ansi", "pipe", "npt"]
+        )
+        g = tables.find("pipe", "G 1/4")
+        self.assertAlmostEqual(g.diameter, 13.157, 9)
+        self.assertAlmostEqual(g.pitch, 25.4 / 19, 12)
+        self.assertEqual((g.form, g.taper), ("whitworth", 0.0))
+        # ISO 228-1: D1 = D - 1.280654 P = 11.445
+        self.assertAlmostEqual(g.minor(True), 11.445, 3)
+        self.assertEqual(tables.closest("pipe", 13.0).label, "G 1/4")
+        self.assertEqual(tables.classes("pipe", False), ("A", "B"))
+        n = tables.find("npt", "1/4-18 NPT")
+        self.assertAlmostEqual(n.diameter, 0.540 * 25.4, 9)
+        self.assertEqual(n.form, "npt")
+        self.assertAlmostEqual(math.tan(math.radians(n.taper)), 1.0 / 32.0, 12)
+        self.assertEqual(tables.closest("npt", 21.0).label, "1/2-14 NPT")
+        self.assertEqual(tables.find("npt", "1-11.5 NPT").size, "1")
+        zone = tables.class_zone(g, "A", False)
+        self.assertEqual(zone["shift"], 0.0)
+        self.assertAlmostEqual(zone["major"], 13.157, 9)
 
     def test_fits_and_classes(self):
         self.assertEqual(tables.clearance_fit("ISOMetricProfile", "close"), "Fine")
@@ -88,9 +120,27 @@ class GrooveTests(unittest.TestCase):
         w2 = core.groove_width(3.0, self.P, True, 2.8)
         self.assertAlmostEqual((w2 - w1) / 0.1, 2 * math.tan(math.radians(30)), 9)
 
+    def test_pipe_grooves(self):
+        """The 55 degree pipe form: depth 0.640327 P, flats P/6 where the standard rounds."""
+        p = 25.4 / 19
+        g = core.groove(6.5, p, internal=False, form="whitworth")
+        self.assertAlmostEqual(g[0][0], 6.5 - 0.640327 * p, 12)
+        self.assertAlmostEqual(core.groove_width(6.5, p, False, g[0][0], "whitworth"), p / 6, 12)
+        w_major = core.groove_width(6.5, p, False, 6.5, "whitworth")
+        self.assertAlmostEqual(w_major, p / 6 + 2 * 0.640327 * p * math.tan(math.radians(27.5)), 9)
+        self.assertLess(w_major, p)  # a crest is left between two turns
+        inner = core.groove(6.5, p, internal=True, form="whitworth")
+        self.assertAlmostEqual(inner[1][0], 6.5, 12)  # the root of a nut's groove: the major
+        self.assertAlmostEqual(core.groove_width(6.5, p, True, 6.5, "whitworth"), p / 6, 12)
+        npt = core.groove(6.6, 25.4 / 18, internal=False, form="npt")
+        self.assertAlmostEqual(npt[0][0], 6.6 - 0.8 * 25.4 / 18, 12)
+        self.assertAlmostEqual(core.thread_depth(1.0, "iso"), 5 * self.H / 8, 12)
+
     def _numeric(self, major, internal, face, n=200000):
         """The same cross-section by brute force: a ring of radius r loses w(r)/P of itself."""
         root = core.groove(major, self.P, internal)[0][0]  # where the groove starts inward
+        if internal:
+            face = major - core.thread_depth(self.P)  # the hole is brought to the minor first
         lo, hi = (face, major) if internal else (root, face)
         step = (hi - lo) / n
         total = 0.0
@@ -103,9 +153,24 @@ class GrooveTests(unittest.TestCase):
         self.assertAlmostEqual(
             core.removed_area(3.0, self.P, False, 3.0), self._numeric(3.0, False, 3.0), 6
         )
+        # a hole at the thread's minor diameter: only the grooves
+        minor = 3.0 - 5 * self.H / 8
         self.assertAlmostEqual(
-            core.removed_area(3.0, self.P, True, 2.5), self._numeric(3.0, True, 2.5), 6
+            core.removed_area(3.0, self.P, True, minor), self._numeric(3.0, True, minor), 6
         )
+
+    def test_the_thread_has_its_size_whatever_the_cylinder(self):
+        """Fusion: a threaded hole gets the thread's minor diameter (a wider hole is filled
+        in: less is removed, by the ring between the two), a shaft its major diameter (a
+        thinner shaft is built up)."""
+        minor = 3.0 - 5 * self.H / 8
+        at_minor = core.removed_area(3.0, self.P, True, minor)
+        wide = core.removed_area(3.0, self.P, True, 3.0)  # a 6 mm hole threaded M6
+        self.assertAlmostEqual(wide - at_minor, -math.pi * (9.0 - minor**2), 9)
+        self.assertLess(wide, 0.0)  # more is added than the grooves take
+        plain = core.removed_area(3.0, self.P, False, 3.0)
+        thin = core.removed_area(3.0, self.P, False, 2.9)
+        self.assertAlmostEqual(thin - plain, -math.pi * (9.0 - 2.9**2), 9)
 
     def test_shaft_turned_down_hole_bored_up(self):
         plain = core.removed_area(3.0, self.P, False, 3.0)

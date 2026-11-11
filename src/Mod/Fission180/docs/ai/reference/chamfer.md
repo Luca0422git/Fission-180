@@ -68,5 +68,5 @@ Done: AI: Chamfer 1 mm. Its id is 'Chamfer1'. Bodies now: Body1: 23901.3 mm3, 60
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
 - Recipe: [stepped shaft with a keyway](fission180://docs/recipes/shaft-with-keyway.md)
 - Recipe: [threaded fastener (hex bolt M8 x 30)](fission180://docs/recipes/threaded-fastener.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `live_blend_chamfer_angle`, `live_blend_chamfer_top_face`, `live_blend_chamfer_two_flip`, `live_spline_top_chamfer`, `picks_fillet_chamfer_kept_after_reopen`, `blend_insert_chamfer_before_fillet`
+- Golden models built with its steps (read one with docs_read golden/<id>): `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `book_chamfer_after_modeled_thread`, `book_thread_dragged_before_chamfer`, `book_thread_stops_at_chamfer`, `book_thread_survives_deleted_chamfer`, `live_blend_chamfer_angle`, `live_blend_chamfer_top_face`, `live_blend_chamfer_two_flip`, `live_spline_top_chamfer` and 2 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

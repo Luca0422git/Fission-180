@@ -132,7 +132,8 @@ def get_sketch(ctx, args):
                 pass
             row["driving"] = bool(c.Driving)
             for path, expr in sketch.ExpressionEngine:
-                if path in (".Constraints[%d]" % i, ".Constraints.%s" % c.Name):
+                # (bound with or without the leading dot: parameters.set_expression)
+                if path.lstrip(".") in ("Constraints[%d]" % i, "Constraints.%s" % c.Name):
                     from ... import parameters_core
 
                     row["expression"] = parameters_core.from_freecad(expr)
@@ -615,7 +616,7 @@ def set_sketch_dimension(ctx, args):
     def work():
         solved_before = sketch.solve() == 0
         if "value" in args:
-            sketch.setExpression(path, None)
+            parameters.set_expression(sketch, path, None)
             unit = "deg" if c.Type == "Angle" else "mm"
             try:
                 sketch.setDatum(index, App.Units.Quantity("%r %s" % (float(args["value"]), unit)))
@@ -624,7 +625,7 @@ def set_sketch_dimension(ctx, args):
         elif args["expression"].strip():
             parameters._set(sketch, path, args["expression"], parameters.user_names(doc))
         else:
-            sketch.setExpression(path, None)
+            parameters.set_expression(sketch, path, None)
         doc.recompute()
         if "Invalid" in list(sketch.State) or (solved_before and sketch.solve() != 0):
             raise conflict()

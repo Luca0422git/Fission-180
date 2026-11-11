@@ -13,8 +13,9 @@ Snap glyphs (sketch-3, F7; Fission 180's own pictograms, Fusion's midpoint trian
 pointer a few pixels from the middle of a line shows a small triangle there (on screen
 too), from an end a small square, from a circle's quadrant a diamond, from its centre a
 small circle. 45 degrees (F6): L from a point, 2.5 degrees off 45: the line snaps to 45,
-the 45 glyph (a small arc from level and the digits "45") shows; click: exactly 45 degrees
-with an Angle constraint, the glyph gone.
+the 45 glyph (a small arc from level and the digits "45") shows; click: exactly 45 degrees,
+the glyph gone, and no Angle dimension left behind (wave 7: the snap is a snap, as in
+Fusion; the driving 45 degree angle it used to add made later dimensions driven).
 """
 
 import math
@@ -361,7 +362,11 @@ def d_after():
     )
     h.check("the line is exactly at 45 degrees", abs(ang - 45.0) < 1e-7, (ang, line))
     angles = [c for c in sk.Constraints if c.Type == "Angle" and c.First == index]
-    h.check("...held by an Angle constraint", len(angles) == 1, [c.Type for c in sk.Constraints])
+    h.check(
+        "...and no Angle dimension is left on it (a snap, not a constraint)",
+        len(angles) == 0,
+        [c.Type for c in sk.Constraints],
+    )
     h.check("the glyph is gone after the click", not marks(), marks())
     esc()
 

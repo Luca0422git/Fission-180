@@ -77,7 +77,10 @@ def set_startup(entry, on):
 
 
 def entries():
-    return core.list_scripts(scripts_folder()) + core.list_addins(addins_folder())
+    # (the scripts that come with Fission 180: "SpurGear" opens the Gear tool, the door
+    # Fusion's own sample of that name is in tutorials; fission180/samples)
+    samples = core.list_scripts(os.path.join(os.path.dirname(__file__), "samples"))
+    return samples + core.list_scripts(scripts_folder()) + core.list_addins(addins_folder())
 
 
 def is_running(entry):

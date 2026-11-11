@@ -104,10 +104,29 @@ def view_height(view):
         return 100.0
 
 
+def _unit(doc=None):
+    """The design's length unit: the grid is in round numbers of it (an inch design's grid
+    and snap were metric: the book parity report, Fire Piston)."""
+    try:
+        from . import design_units
+
+        return design_units.length_unit(doc)
+    except Exception:
+        return "mm"
+
+
+def major_spacing(doc=None):
+    """Major Grid Spacing (mm) for a design: the setting, or one inch / foot in a design in
+    inches / feet while the setting is still the default 10 mm."""
+    from . import design_units_core
+
+    return design_units_core.grid_spacing(float(get("MajorSpacing")), _unit(doc))
+
+
 def current_step(view=None):
     """The major spacing of the layout grid now (mm)."""
     if not get("Adaptive"):
-        return max(1e-3, float(get("MajorSpacing")))
+        return max(1e-3, major_spacing())
     if get("GridLock") and _STATE["locked_step"]:
         return _STATE["locked_step"]
     if view is None:
@@ -115,8 +134,10 @@ def current_step(view=None):
             view = Gui.ActiveDocument.ActiveView
         except Exception:
             view = None
-    step = nav_core.grid_step(view_height(view) if view is not None else 100.0)
-    return step
+    from . import design_units_core
+
+    height = view_height(view) if view is not None else 100.0
+    return design_units_core.adaptive_step(height, _unit(), nav_core.grid_step)
 
 
 def _detach(doc_name):
@@ -334,7 +355,18 @@ def apply_to_sketch(sketch):
         adaptive = bool(get("Adaptive"))
         if bool(vp.GridAuto) != adaptive:
             vp.GridAuto = adaptive
-        spacing = float(get("MajorSpacing"))
+        # (FreeCAD's adaptive sketch grid steps in GridSize x subdivisions^n: with one
+        # inch as its base an inch design's grid and snap are in inches)
+        spacing = major_spacing(sketch.Document)
+        try:
+            # (wave 7, sketch-a) FreeCAD's GridSize is the distance between two grid
+            # LINES, Major Grid Spacing the distance between two major ones; an inch
+            # design gets an inch grid: sketch_grid.py
+            from . import sketch_grid
+
+            spacing = sketch_grid.line_spacing(sketch, adaptive, spacing, int(get("Subdivisions")))
+        except Exception as exc:
+            warn("sketch grid: %s" % exc)
         current = float(getattr(vp.GridSize, "Value", vp.GridSize))
         if abs(current - spacing) > 1e-9:
             vp.GridSize = spacing
@@ -453,7 +485,7 @@ class GridSettingsDialog(QtWidgets.QDialog):
         row.addWidget(self.adaptive)
         row.addWidget(self.fixed)
         form.addRow("Grid", row)
-        self.major = DistanceField(float(get("MajorSpacing")))
+        self.major = DistanceField(major_spacing())
         self.major.widget.setObjectName("Fission180Grid_major")
         form.addRow("Major Grid Spacing", self.major.widget)
         self.minor = QtWidgets.QSpinBox()
@@ -490,7 +522,10 @@ class GridSettingsDialog(QtWidgets.QDialog):
                 )
                 return
             put("Adaptive", self.adaptive.isChecked())
-            put("MajorSpacing", spacing)
+            if abs(spacing - major_spacing()) > 1e-9:
+                # (left as shown: the setting stays the default, which is one inch in an
+                # inch design and 10 mm in a metric one)
+                put("MajorSpacing", spacing)
             put("Subdivisions", int(self.minor.value()))
             put("ReferenceNumbers", self.numbers.isChecked())
             _subdivisions()
@@ -539,8 +574,10 @@ class IncrementsDialog(QtWidgets.QDialog):
                     "An increment must be more than 0.",
                 )
                 return
+            if abs(linear - increments.linear_step()) <= 1e-9:
+                linear = None  # left as shown: the setting stays (the default follows the units)
             increments.set_steps(linear, angular)
-            log("increments: %g mm, %g deg" % (linear, angular))
+            log("increments: %g mm, %g deg" % (increments.linear_step(), angular))
         except Exception as exc:
             warn("set increments: %s" % exc)
         super().accept()

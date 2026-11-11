@@ -284,6 +284,10 @@ class FormulaInput:
         self.field = field
         self.unit = getattr(field, "unit", None)
         self.raw = None
+        try:  # the field leaves what is no plain number to this (taskui.DistanceField)
+            field.formula_input = self
+        except Exception:
+            pass
         edit = field.widget.findChild(QtWidgets.QLineEdit)
         if edit is not None:
             edit.textEdited.connect(self._edited)
@@ -299,28 +303,19 @@ class FormulaInput:
         panel = self.panel
         if getattr(panel, "_closed", True):
             return False
-        text = (text or "").strip().lstrip("=").strip()
-        if not text:
+        text = (text or "").strip()
+        if not text.strip("= "):
             return False
         try:
-            from . import extrude, parameters
-
-            if parameters.is_plain_number(text):
-                try:
-                    value = self.field.parse(text)
-                except ValueError as exc:
-                    panel.formula_failed(self.key, str(exc))
-                    return False
-                self.field.take(value)
+            got = self._read(text)
+            if got is None:
+                return False
+            if got.plain:
+                self.field.take(got.value)
                 panel.formula_cleared(self.key)
                 return True
-            try:
-                value = extrude.evaluate(panel.doc, text, self.unit)
-            except extrude.ExtrudeError as exc:
-                panel.formula_failed(self.key, str(exc))
-                return False
-            self.field.set_value(value)
-            panel.formula_typed(self.key, text, value)
+            self.field.set_value(got.value)
+            panel.formula_typed(self.key, got.formula, got.value)
             return True
         except Exception as exc:
             from . import warn
@@ -328,25 +323,38 @@ class FormulaInput:
             warn("value %r: %s" % (text, exc))
             return False
 
+    def _read(self, text):
+        """What was typed, understood the one way every value box does (parameters.read: a
+        number in the design's units, a parameter, a formula with Fusion's unit rules, or
+        `Name = value`, which makes the user parameter inside the dialog's undo step). None
+        when it is no value: the panel was told why."""
+        from . import parameters, parameters_core
+
+        panel = self.panel
+        try:
+            return parameters.read(panel.doc, text, self.unit, create=True)
+        except parameters_core.ParameterError as exc:
+            panel.formula_failed(self.key, str(exc))
+            return None
+
     def _finished(self):
         raw, self.raw = self.raw, None
         panel = self.panel
         if raw is None or getattr(panel, "_closed", True):
             return
-        text = raw.strip().lstrip("=").strip()
+        text = raw.strip()
         try:
-            from . import extrude, parameters
-
-            if not text or parameters.is_plain_number(text):
+            if not text.strip("= "):
                 panel.formula_cleared(self.key)
                 return
-            try:
-                value = extrude.evaluate(panel.doc, text, self.unit)
-            except extrude.ExtrudeError as exc:
-                panel.formula_failed(self.key, str(exc))
+            got = self._read(text)
+            if got is None:
                 return
-            self.field.set_value(value)
-            panel.formula_typed(self.key, text, value)
+            if got.plain:
+                panel.formula_cleared(self.key)
+                return
+            self.field.set_value(got.value)
+            panel.formula_typed(self.key, got.formula, got.value)
         except Exception as exc:
             from . import warn
 
@@ -362,7 +370,12 @@ def set_formula(obj, prop, text):
         return
     engine = dict(obj.ExpressionEngine)
     if text:
-        expr = parameters_core.to_freecad(text, parameters.user_names(obj.Document))
+        try:  # Fusion's way: a number without a unit is in the design's units
+            expr = parameters.read(obj.Document, text, parameters.kind_of_path(obj, prop)).freecad
+        except Exception:
+            expr = ""
+        if not expr:
+            expr = parameters_core.to_freecad(text, parameters.user_names(obj.Document))
         if engine.get(prop) != expr:
             obj.setExpression(prop, expr)
     elif prop in engine:

@@ -401,6 +401,7 @@ class SketchMirror(draw.DrawTool):
         for index in reversed(core.copied_constraints(before, after, new_ids)):
             sketch.delConstraint(index)
         ties = []
+        joined = 0
         for orig, new in pairs:
             g, n = sketch.Geometry[orig], sketch.Geometry[new]
             swapped = False
@@ -415,10 +416,32 @@ class SketchMirror(draw.DrawTool):
             for kind, first, fpos, second, spos in core.ties(g.TypeId, orig, new, swapped, orig in aligned):
                 if kind == "Equal":
                     ties.append(Sketcher.Constraint("Equal", first, second))
-                else:
-                    ties.append(Sketcher.Constraint("Symmetric", first, fpos, second, spos, line))
+                    continue
+                if self._on_mirror_line(g, fpos, a, b):
+                    # an end ON the mirror line is one point with its mirror image: joined
+                    # (the profile closes), before the Symmetric that keeps it on the line
+                    # (left out should the point not be free to go there)
+                    ties.append(Sketcher.Constraint("Coincident", first, fpos, second, spos))
+                    joined += 1
+                ties.append(Sketcher.Constraint("Symmetric", first, fpos, second, spos, line))
         self.made = [n for _o, n in pairs]
+        self.joined = joined
         return ties
+
+    def _on_mirror_line(self, g, pos, a, b):
+        """The end `pos` of the original curve g lies on the mirror line a-b."""
+        try:
+            if pos == core.START:
+                p = g.StartPoint
+            elif pos == core.END:
+                p = g.EndPoint
+            else:
+                return False
+            length = g.length() if hasattr(g, "length") else 1.0
+            off = core.line_distance((p.x, p.y), a, b)
+            return off <= core.on_line_tolerance(length)
+        except Exception:
+            return False
 
     def _pairs(self, ids, new_ids, a, b):
         """(original, copy) for each curve mirrored: in order when FreeCAD made one copy

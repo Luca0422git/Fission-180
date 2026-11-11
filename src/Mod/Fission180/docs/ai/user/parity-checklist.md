@@ -361,6 +361,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `quick`: Menu, New, Open
 - `nav`: Theme, Ground Plane, Show All, Two Views Horizontal, Two Views Vertical
 - `marking`: Set Orbit Center, Reset Orbit Center
+- `sketch-marking`: Toggle Driven
 - `browser:sheet_metal_rule`: Sheet Metal Rules
 - `browser:plastic_rule`: Assign Plastic Rule, Manage Plastic Rules
 - `browser:settings`: Change Active Units
@@ -368,7 +369,7 @@ not cover, or a name the alias file should map. Greyed entries are left out.
 - `browser:origin`: Create Sketch
 - `browser:component`: Move/Copy, Create Drawing, Move to Component
 - `browser:body`: Activate Body, Rebuild with Timeline (AI)..., Ground, Paste, Move to Component
-- `browser:joint`: Rename
+- `browser:joint`: Animate Joint Relationships, Rename
 - `browser:rigid_group`: Rename
 - `browser:motion_link`: Edit Motion Link, Suppress, Find in Timeline, Rename, Delete
 - `browser:contact_set`: Edit Contact Set, Suppress, Rename, Delete

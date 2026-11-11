@@ -30,10 +30,18 @@ def set_on(on):
 
 
 def linear_step():
+    """The linear step (mm): the setting, or 0.1 in / 0.01 ft in a design in inches / feet
+    while the setting is still the default 1 mm."""
     try:
-        return float(_group().GetFloat("LinearIncrement", nav_core.DEFAULT_LINEAR))
+        stored = float(_group().GetFloat("LinearIncrement", nav_core.DEFAULT_LINEAR))
     except Exception:
-        return nav_core.DEFAULT_LINEAR
+        stored = nav_core.DEFAULT_LINEAR
+    try:
+        from . import design_units, design_units_core
+
+        return design_units_core.increment(stored, design_units.length_unit())
+    except Exception:
+        return stored
 
 
 def angular_step():

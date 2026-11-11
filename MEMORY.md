@@ -20,6 +20,33 @@ routine) [ ] a replay of every book project with real input (the acceptance test
 / `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [ ] "Fission 180
 tests" green [ ] **Luca: release** (quick route if no compiled file changed, else the full
 build). 3.3.10 is published (`Release` = `7813ef69`).
+Wave 7 progress (2026-11-11, orchestrator): merged into `develop`, each after unit + base:
+**cam** (b449d601: Manufacture workspace, `manufacture*.py`, 21 `Fission180_Cam*` commands on
+FreeCAD's CAM engine run headless, own height-field Simulate, 9 posts; AI tools not built:
+`catalog.AI_TOOLS_TO_COME` holds the five `cam_*` ops), **components** (931fddaf:
+`components.host_body` = everything goes into the ACTIVE component, `sketch_project_across.py`
++ `components.ReferenceCopy` = Project across components, mirror of components, first
+component grounded by itself with preference `FirstComponentGrounded`, which
+`harness.prepare()` switches OFF for scenarios), **joints** (4cb179bd: joints / rigid groups /
+motion links roll back with the history marker, which was the real cause of report bugs 11
+and 12; as-built origins kept relative to the component; `joints.same_place` exact restore =
+the cause of the `vex_shaft` CI flake (`Placement.isSame(p, 1e-7)` calls rotations up to 0.036
+deg apart the same); first-picked grounded component is ungrounded by Joint), **modify first
+pass** (8b2663f2: `fillet_robust.py`, thread before chamfer, pipe threads, split face kept,
+gear bugs 19/20, "Create Group"). Running: params, sketch-a, sketch-b, extrude, animation,
+looks, shell, drawings, hardware, modify round 2 (bug 18 on the report's own design, the
+book's fillets/chamfers, knurl speed, draft boxes, section double entry, body pattern count
+following its parameter). **Open follow-ups for the orchestrator** (do before release):
+(1) AI tools for Manufacture, and the cam dialog fields the engine ignores (tolerance,
+lead-in / ramp feedrates); (2) run the components / joints / journey scenarios with
+`FirstComponentGrounded` ON (users' default) and fix what breaks, then drop the harness
+switch or keep it with a reason; (3) Extrude Cut chosen by hand across components (sent to
+extrude); (4) draw tools snapping / dimensions auto-projecting to other components:
+`sketch_external.project_across(sketch, obj, "EdgeN")` is the function (for sketch-a/-b after
+they report); (5) harness-wide "no open transaction after a dialog" and "no unexpected
+QMessageBox" checks (sent to shell); (6) Flip of joint limits mirrors about zero: a guess,
+Luca to compare with Fusion; (7) CI lesson: an edit of `docs/fission180/feature-outline.md`
+needs `tools/fission180/make_ai_docs.py` in the same commit (run #33 failed on it).
 
 **2026-11-10 (evening): patch 0.1.0-beta.3.3.10, Luca's bugs after 3.3.9 (released 17:48 UTC),
 on `develop`** (Luca kept the fixes local until "commit and get the update ready").

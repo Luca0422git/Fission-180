@@ -613,11 +613,17 @@ class Animator:
     the Animate button, Animate Joint). Every frame starts from where the parts stood when
     the animation began, so nothing drifts; stop() puts them back exactly."""
 
-    def __init__(self, joint, on_done=None, loop=False):
+    def __init__(self, joint, on_done=None, loop=False, alone=False, motions=None):
+        """`alone`: only the joint's own component moves, as if nothing else held it (no
+        other joint, no motion link, no contact: Fusion's Animate Joint and Preview Motion);
+        else everything tied to it follows (Animate Joint Relationships). `motions`: the
+        degrees of motion played ("angle", "slide"); None plays all the joint has."""
         self.joint = joint
         self.doc = joint.Document
         self.on_done = on_done
         self.loop = loop
+        self.alone = bool(alone)
+        self.motions = tuple(motions) if motions else None
         self.error = ""
         self.start_places = joints.placements(self.doc)
         self.angle0, self.slide0 = joints.value(joint)
@@ -634,7 +640,8 @@ class Animator:
         if joints.fusion_type(self.joint) == "rigid":
             return False
         try:
-            joints.driven_part(self.joint)
+            if not self.alone:
+                joints.driven_part(self.joint)
         except Exception as exc:
             self.error = str(exc)
             return False
@@ -645,7 +652,9 @@ class Animator:
 
     def _tick(self):
         try:
-            if not self.running or self.joint.Document is None:
+            if not self.running:
+                return  # stopped: a tick that was already on its way moves nothing
+            if self.joint.Document is None:
                 self.stop()
                 return
             elapsed = time.perf_counter() - self.started
@@ -657,17 +666,24 @@ class Animator:
             kind = joints.fusion_type(self.joint)
             lim = joints.limits(self.joint)
             if kind in ("ball", "planar"):
-                joints.wobble(self.joint, phase, self.span)
-                joints.solve(self.doc)
+                joints.wobble(self.joint, phase, self.span, alone=self.alone)
+                if not self.alone:
+                    joints.solve(self.doc)
             else:
                 angle = slide = None
-                if kind in core.HAS_ANGLE:
+                wanted = self.motions
+                if kind in core.HAS_ANGLE and (wanted is None or "angle" in wanted):
                     a = lim["angle"]
                     angle = core.sweep(phase, self.angle0, a["min"], a["max"], 90.0)
-                if kind in core.HAS_DISTANCE:
+                if kind in core.HAS_DISTANCE and (wanted is None or "slide" in wanted):
                     s = lim["slide"]
                     slide = core.sweep(phase, self.slide0, s["min"], s["max"], self.span)
-                joints.drive(self.joint, angle=angle, slide=slide)
+                if self.alone:
+                    joints.drive_alone(self.joint, angle=angle, slide=slide)
+                elif joints.contact_mode(self.doc) != "off":
+                    joints.drive_until_contact(self.joint, angle=angle, slide=slide)
+                else:
+                    joints.drive(self.joint, angle=angle, slide=slide)
         except Exception as exc:
             warn("joint animation: %s" % exc)
             self.stop()
@@ -696,15 +712,38 @@ class Animator:
 _STANDALONE = {"animator": None, "shortcut": None}
 
 
-def animate(joint, loop=True):
-    """Animate Joint (browser right-click): plays until Esc or another command."""
+def animate_relationships(joint, loop=True):
+    """Fusion's Animate Joint Relationships (browser right-click): the joint plays with
+    everything that affects its components: the other joints, motion links, grounds and
+    contact sets. Until Esc or another command."""
+    return animate(joint, loop, alone=False)
+
+
+def animate(joint, loop=True, alone=True):
+    """Fusion's Animate Joint (browser right-click): this joint alone, as if no other joint
+    or relationship held its components (`alone`; Animate Joint Relationships passes
+    False). Plays until Esc or another command; the components then stand where they
+    were."""
     stop_animation()
     if not commands.finish_open_dialog():  # a command in progress ends (and its Esc with it)
         return None
     if joint is None or joints.fusion_type(joint) == "rigid":
         commands.tell("A rigid joint has no motion to animate.")
         return None
-    animator = Animator(joint, on_done=stop_animation, loop=loop)
+    if joints.rolled_back(joint) or joints.lost_reference(joint):
+        commands.tell(
+            "%s cannot move now: %s"
+            % (
+                joint.Label,
+                (
+                    "the history marker stands before it."
+                    if joints.rolled_back(joint)
+                    else "it lost the face or edge it was made on (Edit Joint, pick it again)."
+                ),
+            )
+        )
+        return None
+    animator = Animator(joint, on_done=stop_animation, loop=loop, alone=alone)
     if not animator.start():
         if animator.error:
             commands.tell(animator.error)
@@ -716,7 +755,10 @@ def animate(joint, loop=True):
         _STANDALONE["shortcut"] = shortcut
     except Exception:
         pass
-    log("animating %s (Esc stops it)" % joint.Label)
+    log(
+        "animating %s %s (Esc stops it)"
+        % (joint.Label, "alone" if alone else "with its relationships")
+    )
     return animator
 
 
@@ -975,20 +1017,119 @@ class _JointsPanel(BodyPanel):
         if animator is not None:
             animator.on_done = None
             animator.stop()
+        for limits in (getattr(self, "angle_limits", None), getattr(self, "slide_limits", None)):
+            if limits is not None:
+                limits.stop_preview()
+
+    def preview_motion(self, limits, on):
+        """A limits group's Preview Motion button (Fusion): its motion plays between its
+        limits, alone, or with all the joint's motions and what is tied to it when With All
+        Limits is ticked. Pressed again (or Esc, OK, any change) it stops and the
+        components stand where they were."""
+        mine = self.animator is not None and getattr(self.animator, "limits", None) is limits
+        if not on:
+            if mine:
+                self.stop_animation()
+            return
+        self.stop_animation()
+        if self._closed:
+            return
+        if self.dirty:  # what was just typed goes onto the joint first
+            self._timer.stop()
+            self._recompute()
+        joint = getattr(self, "joint", None)
+        if joint is None or joints.fusion_type(joint) == "rigid" or self.error:
+            limits.stop_preview()
+            self.info.setText("Pick the joint's components (and its position) first.")
+            return
+        everything = limits.all_limits.isChecked()
+        motion = "angle" if limits.unit == "deg" else "slide"
+        animator = Animator(
+            joint,
+            on_done=self._preview_done,
+            loop=True,
+            alone=not everything,
+            motions=None if everything else (motion,),
+        )
+        animator.limits = limits
+        self.animator = animator
+        if not animator.start():
+            self.animator = None
+            limits.stop_preview()
+            if animator.error:
+                self.message.setText("⚠ " + animator.error)
+            return
+        limits.preview.blockSignals(True)
+        limits.preview.setChecked(True)
+        limits.preview.blockSignals(False)
+
+    def _preview_done(self):
+        self.animator = None
+        for limits in (getattr(self, "angle_limits", None), getattr(self, "slide_limits", None)):
+            if limits is not None:
+                limits.stop_preview()
 
     def changed(self):
         self.stop_animation()
         super().changed()
 
     def accept(self):
+        """OK. A refusal is said next to the mouse too (the book parity report: an OK the
+        dialog refused in its message line went unnoticed, and the joint looked made)."""
         self.stop_animation()
-        return super().accept()
+        was_closed = self._closed
+        done = super().accept()
+        if not done and not was_closed and not getattr(self, "_finishing", False):
+            said = self.message.text().lstrip("⚠ ").strip()
+            if said:
+                commands.tell("%s is not finished: %s" % (self.title, said))
+        return done
 
     def reject(self):
         self.stop_animation()
         return super().reject()
 
-    # -- dragging the joint to set its limits (joints_limit_drag) ------------------------------------
+    def finish(self):
+        """Another command starts: this one is kept if it is complete, else cancelled, and
+        then it says so (it used to vanish without a word, with the type or the limits
+        just chosen)."""
+        if self._closed:
+            return
+        self._finishing = True
+        try:
+            done = self.accept()
+        finally:
+            self._finishing = False
+        if done:
+            return
+        said = self.message.text().lstrip("⚠ ").strip()
+        self.reject()
+        commands.tell(
+            "%s was cancelled%s" % (self.title, ": " + said if said else " (it was not finished).")
+        )
+
+    # -- OK of an edit: the later steps come back inside the edit's undo step ------------------
+    def roll_forward(self):
+        """OK while the history marker stood at the step being edited: the marker goes back
+        where it was now, still inside this undo step; the joints after it find their parts
+        again and take them along (a wheel held on a shaft whose joint was edited follows
+        the shaft), and only then are the positions remembered. Left to the watch a moment
+        after the dialog, that move was outside the undo step and the next joint command
+        asked whether to capture it."""
+        try:
+            from . import edit_rollback
+
+            edit_rollback.restore(self.doc)
+            preview.catch_up(self.doc)
+            joints.forget_marker(self.doc)
+            joints.repair_references(self.doc)
+            joints.note_lost(self.doc)
+            if joints.needs_solve(self.doc):
+                joints.solve(self.doc)
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+
+    # -- dragging the joint to set its limits (joints_limit_drag) ---------------------------------
     def _start_limit_drag(self):
         try:
             from . import joints_limit_drag
@@ -1069,7 +1210,16 @@ class _Limits:
         font = self.caption.font()
         font.setBold(True)
         self.caption.setFont(font)
-        layout.addRow(self.caption)
+        # Fusion: Flip swaps the minimum and maximum values (there when one of them is on)
+        self.flip = QtWidgets.QPushButton("Flip")
+        self.flip.setObjectName("Fission180Joint_%s_flip" % unit)
+        self.flip.setToolTip(
+            "Flip the limits to the other side of the joint's zero (Minimum and Maximum "
+            "change places)"
+        )
+        self.flip.setEnabled(False)
+        self.flip.clicked.connect(lambda *_: self._flip())
+        layout.addRow(self.caption, self.flip)
         for key, label in (("min", "Minimum"), ("max", "Maximum"), ("rest", "Rest")):
             check = QtWidgets.QCheckBox(label)
             check.setObjectName("Fission180Joint_%s_%s" % (unit, key))
@@ -1078,6 +1228,69 @@ class _Limits:
             check.toggled.connect(lambda on, k=key: self._toggled(k, on))
             layout.addRow(check, field.widget)
             self.rows[key] = (check, field)
+        # Fusion: Preview Motion plays this degree of motion alone, without the other
+        # relationships; With All Limits plays the joint with all its motions and limits
+        self.preview = QtWidgets.QPushButton("Preview Motion")
+        self.preview.setObjectName("Fission180Joint_%s_preview" % unit)
+        self.preview.setCheckable(True)
+        self.preview.setToolTip(
+            "Play this motion between its limits (press again or Esc to stop). Alone: "
+            "nothing else holds the component back."
+        )
+        self.preview.toggled.connect(lambda on: self._preview(on))
+        self.all_limits = QtWidgets.QCheckBox("With All Limits")
+        self.all_limits.setObjectName("Fission180Joint_%s_all" % unit)
+        self.all_limits.setToolTip(
+            "Play the joint with all its motions and limits, and everything tied to it"
+        )
+        self.all_limits.toggled.connect(lambda *_: self._preview(self.preview.isChecked()))
+        layout.addRow(self.preview, self.all_limits)
+
+    def _flip(self):
+        """Fusion's Flip: Minimum and Maximum change places, on the other side of the
+        joint's zero. The limit values are measured along the joint's own direction, so a
+        stop that turned out to be on the wrong side (the cap slides into the handle
+        instead of out of it) goes to the other side with one click: Minimum 0 becomes
+        Maximum 0, a range 0..60 becomes -60..0; a Rest goes with them."""
+        try:
+            panel = self.panel
+            (cmin, fmin), (cmax, fmax) = self.rows["min"], self.rows["max"]
+            crest, frest = self.rows["rest"]
+            on_min, on_max = cmin.isChecked(), cmax.isChecked()
+            low, high = fmin.value(), fmax.value()
+            was, panel._quiet = panel._quiet, True
+            try:
+                cmin.setChecked(on_max)
+                cmax.setChecked(on_min)
+                if on_max:
+                    fmin.set_value(-high)
+                if on_min:
+                    fmax.set_value(-low)
+                fmin.widget.setEnabled(on_max)
+                fmax.widget.setEnabled(on_min)
+                if crest.isChecked():
+                    frest.set_value(-frest.value())
+            finally:
+                panel._quiet = was
+            self.on_change()
+        except Exception as exc:
+            warn("joint limits: %s" % exc)
+
+    def _preview(self, on):
+        try:
+            self.panel.preview_motion(self, bool(on))
+        except Exception as exc:
+            warn("joint limits: %s" % exc)
+
+    def stop_preview(self):
+        """The preview stopped (by the panel): the button comes up without playing again."""
+        try:
+            if self.preview.isChecked():
+                self.preview.blockSignals(True)
+                self.preview.setChecked(False)
+                self.preview.blockSignals(False)
+        except Exception:
+            pass
 
     def _toggled(self, key, on):
         """A limit switched on starts at the joint's value now, so switching it on moves
@@ -1085,8 +1298,11 @@ class _Limits:
         try:
             _check, field = self.rows[key]
             field.widget.setEnabled(on)
+            self.flip.setEnabled(self.rows["min"][0].isChecked() or self.rows["max"][0].isChecked())
+            if self.panel._quiet:
+                return
             joint = getattr(self.panel, "joint", None)
-            if on and joint is not None and not self.panel._quiet:
+            if on and joint is not None:
                 angle, slide = joints.value(joint)
                 field.set_value(round(angle if self.unit == "deg" else slide, 6))
             self.on_change()
@@ -1098,6 +1314,8 @@ class _Limits:
         for check, field in self.rows.values():
             check.setVisible(shown)
             field.widget.setVisible(shown)
+        for widget in (self.flip, self.preview, self.all_limits):
+            widget.setVisible(shown)
 
     def values(self):
         out = {}
@@ -1112,6 +1330,7 @@ class _Limits:
             field.widget.setEnabled(value is not None)
             if value is not None:
                 field.set_value(value)
+        self.flip.setEnabled(data.get("min") is not None or data.get("max") is not None)
 
 
 # -- Joint (J) -------------------------------------------------------------------------------------
@@ -1285,6 +1504,7 @@ class JointPanel(_JointsPanel):
         self._pending_animation = False
         self._realign = False  # a Position / type / axis change: the component goes to it
         self._rejoin = False
+        self._repicked = set()  # the sides clicked again while editing
         super().__init__(doc, "Joint" if feature is None else "Edit Joint", feature is not None)
         JointPanel.last = self
         self.target = feature
@@ -1293,6 +1513,7 @@ class JointPanel(_JointsPanel):
             self.activate(self.slots["comp1"].first_box())
             if show_motion:
                 self.tabs.setCurrentIndex(1)
+            self._ask_lost_side(feature)
         else:
             self.activate("comp1")
             Gui.Selection.clearSelection()  # Fusion's Joint starts with its own picks
@@ -1301,6 +1522,19 @@ class JointPanel(_JointsPanel):
         self.dirty = True
         self._timer.stop()
         self._recompute()
+
+    def _ask_lost_side(self, joint):
+        """The joint lost the face or edge one side was made on: say which, and let that
+        side's box wait for the click that picks it again."""
+        try:
+            lost = [n for n, i in (("comp1", 0), ("comp2", 1)) if joints.lost_side(joint, i)]
+            if not lost:
+                return
+            self.tabs.setCurrentIndex(0)
+            self.activate(self.slots[lost[0]].first_box())
+            self.refuse(joints.lost_text(joint))
+        except Exception as exc:
+            warn("Joint: %s" % exc)
 
     # -- form --------------------------------------------------------------------------------------
     def build_form(self):
@@ -1502,6 +1736,7 @@ class JointPanel(_JointsPanel):
             self.clear_markers()
         if self.joint is not None:
             self._rejoin = True
+            self._repicked.add(name)
         self.changed()
 
     def cleared(self, name):
@@ -1626,25 +1861,38 @@ class JointPanel(_JointsPanel):
                 axes[AXIS_KEYS[label]] = box.currentData()
         made = False
         if self.joint is None:
+            freed = ""
+            if self.first and joints.is_grounded(pick1.part):
+                # Fusion: "if it is the first component that you select, it is automatically
+                # ungrounded from parent" (the first component is the one that moves); the
+                # second keeps its ground. Inside this undo step: Cancel grounds it again.
+                joints.unground(pick1.part)
+                freed = (
+                    "%s was grounded to its parent: it is ungrounded so that it can move onto "
+                    "%s (the first component picked is the one that moves)."
+                    % (pick1.part.Label, pick2.part.Label)
+                )
+                log(freed)
             self.joint = joints.create_joint(
                 self.doc, kind, pick1, self.snaps["comp1"], pick2, self.snaps["comp2"], offset, axes
             )
             self.target = self.joint
             made = True
-            self._announce = ""
+            self._announce = freed
         else:
             if self._rejoin:
                 self._rejoin = False
-                joints._set_json(
-                    self.joint,
-                    joints.PROPS["snap1"],
-                    joints.snap_record(pick1, self.snaps["comp1"]),
-                )
-                joints._set_json(
-                    self.joint,
-                    joints.PROPS["snap2"],
-                    joints.snap_record(pick2, self.snaps["comp2"]),
-                )
+                # only the side(s) clicked again get a new record: the other keeps what it
+                # remembers of its face (where it is, its heading, its hole)
+                again = self._repicked or {"comp1", "comp2"}
+                for name, key, pick in (("comp1", "snap1", pick1), ("comp2", "snap2", pick2)):
+                    if name in again:
+                        joints._set_json(
+                            self.joint,
+                            joints.PROPS[key],
+                            joints.snap_record(pick, self.snaps[name]),
+                        )
+                self._repicked = set()
                 joints.set_references(self.joint, pick1, pick2)
                 made = True
             joints.set_type(self.joint, kind, pick1, pick2)
@@ -1706,6 +1954,7 @@ class JointPanel(_JointsPanel):
         self.stop_animation()
         if ok and self.joint is not None:
             try:
+                self.roll_forward()
                 joints.go_to_rest(self.joint)
                 joints.save_baseline(self.doc)
             except Exception as exc:
@@ -1741,6 +1990,13 @@ class AsBuiltPanel(_JointsPanel):
                 if joints.fusion_type(feature) != "rigid"
                 else "components"
             )
+            if joints.lost_reference(feature):
+                self.refuse(
+                    joints.lost_text(feature).replace(
+                        "Right-click it > Edit Joint and pick that side again.",
+                        "Click its position again (a snap point on one of the two components).",
+                    )
+                )
         else:
             self.activate("components")
             self.start_from_selection()
@@ -1881,7 +2137,17 @@ class AsBuiltPanel(_JointsPanel):
         if len(self.parts) < 2:
             raise NeedsPick("Click two components (in the view or the browser).")
         if kind != "rigid" and self.position_snap is None:
-            raise NeedsPick("Click a snap point for the joint's position (its axis).")
+            if self.joint is not None and not self.editing:
+                # the joint the preview made while the type was still Rigid goes: it stood
+                # in the browser and the timeline as "Rigid N" and looked finished
+                self.joint = None
+                self.target = None
+                self.restart()
+                self._remake = True
+            raise NeedsPick(
+                "%s needs a position: click a snap point on one of the two components "
+                "(the joint's axis goes through it)." % core.TITLES[kind]
+            )
         position = (self.position_pick, self.position_snap) if kind != "rigid" else (None, None)
         if self.joint is None:
             self.joint = joints.create_as_built_joint(
@@ -1911,6 +2177,7 @@ class AsBuiltPanel(_JointsPanel):
         self.stop_animation()
         if ok and self.joint is not None:
             try:
+                self.roll_forward()
                 joints.go_to_rest(self.joint)
                 joints.save_baseline(self.doc)
             except Exception as exc:
@@ -2026,7 +2293,8 @@ class JointOriginPanel(_JointsPanel):
         offset["angle"] = self.angle.value()
         offset["flip"] = self.flip.isChecked()
         same = (
-            self.origin is not None and getattr(self.origin, "Fission180On", "") == self.pick.obj.Name
+            self.origin is not None
+            and getattr(self.origin, "Fission180On", "") == self.pick.obj.Name
         )
         if self.origin is not None and not same and not self.editing:
             self.doc.removeObject(self.origin.Name)
@@ -2143,6 +2411,7 @@ class RigidGroupPanel(_JointsPanel):
     def before_close(self, ok):
         if ok:
             try:
+                self.roll_forward()
                 joints.save_baseline(self.doc)
             except Exception as exc:
                 warn("Rigid Group: %s" % exc)
@@ -2374,6 +2643,23 @@ class DrivePanel(_JointsPanel):
 
 
 # -- Ground, Capture Position, Revert --------------------------------------------------------------
+def _close_step(doc, abort=False):
+    """End the undo step a command without a dialog opened. FreeCAD's commitTransaction /
+    abortTransaction leave the step's name pending when the step holds no change: the next
+    change anywhere would open a step under that name and throw the Redo list away. The
+    pending name is closed too (as preview.end_transaction does for the dialogs)."""
+    try:
+        if abort:
+            doc.abortTransaction()
+        else:
+            doc.commitTransaction()
+    finally:
+        try:
+            App.closeActiveTransaction(abort)
+        except Exception:
+            pass
+
+
 def toggle_ground(obj):
     """Ground / Unground a component (browser right-click, the Ground command)."""
     part = joints.part_of(obj) if obj is not None else None
@@ -2394,11 +2680,11 @@ def toggle_ground(obj):
         joints.solve(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         warn("Ground: %s" % exc)
         commands.tell(str(exc))
         return False
-    doc.commitTransaction()
+    _close_step(doc)
     _refresh_browser()
     return True
 
@@ -2415,10 +2701,10 @@ def capture_position(doc):
         attach_views(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         commands.tell(str(exc))
         return None
-    doc.commitTransaction()
+    _close_step(doc)
     log("position captured as %s" % obj.Label)
     return obj
 
@@ -2434,10 +2720,10 @@ def revert_position(doc):
         joints.revert_position(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         commands.tell(str(exc))
         return False
-    doc.commitTransaction()
+    _close_step(doc)
     return True
 
 
@@ -2704,15 +2990,9 @@ class Watch:
             if tidy:
                 doc.openTransaction("Remove joints of deleted components")
                 removed = joints.tidy(doc)
+                _close_step(doc, abort=not removed)
                 if removed:
-                    doc.commitTransaction()
                     preview.recompute(doc)
-                else:
-                    doc.abortTransaction()
-                    try:
-                        App.closeActiveTransaction(True)
-                    except Exception:
-                        pass
             for origin in joints.joint_origins(doc):
                 if joints.joint_origin_owner(origin) is None:
                     continue
@@ -2723,9 +3003,14 @@ class Watch:
                 and joints_drag.active() is None
             )
             # a later step on a jointed body numbered its faces anew (a fillet): the joints
-            # find their faces again before anything is solved (joints.repair_references)
-            if calm and not Gui.Control.activeDialog() and joints.repair_references(doc):
-                preview.recompute(doc)
+            # find their faces again before anything is solved (joints.repair_references),
+            # also while a dialog is open (its own joint is left to it); a joint whose face
+            # is really gone says so on its step and next to the mouse, once
+            if calm:
+                fixed = joints.repair_references(doc, skip=_dialog_joint())
+                _say_lost(doc, joints.note_lost(doc))
+                if fixed:
+                    preview.recompute(doc)
             # a geometry change moved a joint origin (an edited face, a moved body): the
             # parts follow their joints, as in Fusion (FreeCAD's own solve on recompute is
             # off: see theme.VIEWER_SETTINGS)
@@ -2736,6 +3021,35 @@ class Watch:
 
 
 _WATCH = {"observer": None}
+_LOST_SAID = {}  # document name -> names of the joints already said to be lost
+
+
+def _dialog_joint():
+    """The joint the open joint dialog makes or edits, or None."""
+    try:
+        from . import taskui
+
+        panel = taskui.current()
+        joint = getattr(panel, "joint", None) if isinstance(panel, _JointsPanel) else None
+        return joint if joint is not None and joint.Document is not None else None
+    except Exception:
+        return None
+
+
+def _say_lost(doc, lost):
+    """Say once, next to the mouse, that a joint lost what it was made on."""
+    try:
+        said = _LOST_SAID.setdefault(doc.Name, set())
+        names = {j.Name for j in lost}
+        fresh = [j for j in lost if j.Name not in said]
+        said &= names  # found again: it may be said again another time
+        said |= names
+        if fresh:
+            warn_text = joints.lost_text(fresh[0])
+            log(warn_text)
+            commands.tell(warn_text)
+    except Exception as exc:
+        warn("joints watch: %s" % exc)
 
 
 def install():
@@ -2939,10 +3253,10 @@ def edit_position(feature):
         joints.solve(doc)
         preview.recompute(doc)
     except Exception as exc:
-        doc.abortTransaction()
+        _close_step(doc, abort=True)
         warn("Position: %s" % exc)
         return
-    doc.commitTransaction()
+    _close_step(doc)
 
 
 def drive(joint):

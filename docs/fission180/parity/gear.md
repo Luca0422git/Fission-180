@@ -126,3 +126,23 @@ pinion; FreeCAD's internal gear uses 0.6 m for the same reason). Root fillet rad
   its decimals to Python.
 - **Intersect** is not offered (a Pad / Pocket cannot intersect; Fusion's sample has no
   operation at all).
+
+## Wave 7, the book parity report: bugs 19 and 20 (2026-11-11)
+
+- Fusion's SpurGear sample (UTILITIES > ADD-INS > Scripts and Add-Ins) names the component it
+  makes "Spur Gear (20 teeth)" (Book: the Gear Train's browser). A gear made as a New
+  Component is named like that (`gear_core.component_name`; a name the user gave stays), and
+  the Scripts and Add-Ins list has a "SpurGear" entry that opens the Gear tool
+  (`fission180/samples/SpurGear.py`).
+- Bug 19 as reproduced: the dialog starts with the last gear's values (Fusion's sample
+  remembers them), so the gear shown right after placing IS a copy of the previous one;
+  with a root fillet that then does not fit (0.88 typed while 20 teeth, then 100 teeth) OK
+  was refused with the reason in the dialog, but the stale gear stayed shown and was a step
+  in the timeline, which read as "OK made a copy". Also real: Operation New Component
+  picked while the values did not fit went back to New Body without a word. Now the
+  operation stays picked and a refused OK says so next to the pointer.
+- Bug 20 as reproduced: Edit Feature on the step an open dialog is still making first
+  "finished" that dialog, which (not being able to finish) cancelled it and removed the
+  step. The timeline now leaves the dialog alone and says to finish it first. Edit Feature
+  on a finished gear opens its dialog (scenario `book_modify_gear`; `book_modify_edit_feature`
+  does the same for 16 kinds of steps).

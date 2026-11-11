@@ -76,7 +76,7 @@ class LimitDrag:
 
     # -- the handle ----------------------------------------------------------------------------
     def wanted(self):
-        """"angle" / "slide" when the dialog shows that kind of limits for a joint, else None."""
+        """ "angle" / "slide" when the dialog shows that kind of limits for a joint, else None."""
         panel = self.panel
         joint = getattr(panel, "joint", None)
         if joint is None or getattr(panel, "_closed", False):
@@ -240,7 +240,8 @@ class LimitDrag:
         part, side = joints.driven_part(joint)
         joints.place_joint(joint, angle, slide, side, part)
         joints.follow_links(joint)
-        joints.solve(joint.Document)
+        if joints.solve(joint.Document, hold=joint) != 0:
+            joints.solve(joint.Document)
 
     # -- where the limits are --------------------------------------------------------------------
     def _limit_values(self):

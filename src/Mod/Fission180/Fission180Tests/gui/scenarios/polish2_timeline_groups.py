@@ -189,13 +189,13 @@ def built():
 
 
 def group_one():
-    t.menu("Extrude 2", "Group Features")
+    t.menu("Extrude 2", "Create Group")
 
 
 def group_two():
     t.click("Sketch 3")
     t.click("Extrude 3", QtCore.Qt.ShiftModifier)
-    t.menu("Extrude 3", "Group Features")
+    t.menu("Extrude 3", "Create Group")
 
 
 def grouped():

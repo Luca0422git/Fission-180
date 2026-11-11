@@ -126,6 +126,30 @@ def teeth_of(options):
     return int(round(float(options.get("teeth", 0))))
 
 
+# The name of a gear's own component. Fusion's SpurGear sample names the component it makes
+# "Spur Gear (20 teeth)" (the book's Gear Train shows it in the browser); Fission 180's other
+# two types are named alike.
+COMPONENT_NAMES = {"spur": "Spur Gear", "internal": "Internal Gear", "rack": "Rack"}
+
+
+def component_name(options):
+    """ "Spur Gear (20 teeth)" for the gear these options make."""
+    kind = options.get("type", "spur")
+    try:
+        count = sizes(options)["rack_teeth"] if kind == "rack" else teeth_of(options)
+    except Exception:
+        count = teeth_of(options)
+    return "%s (%d teeth)" % (COMPONENT_NAMES.get(kind, "Gear"), int(count))
+
+
+def is_component_name(label):
+    """True for a name component_name() gives (it then follows the gear when it changes)."""
+    import re
+
+    names = "|".join(re.escape(n) for n in COMPONENT_NAMES.values())
+    return bool(re.match(r"^(%s) \(\d+ teeth\)( \(\d+\))?$" % names, label or ""))
+
+
 def internal_addendum(z, alpha_deg):
     """An internal gear's addendum coefficient: 1, or less so its tips stop at the base
     circle (FreeCAD's internal gear uses 0.6 for the same reason; see the module doc)."""

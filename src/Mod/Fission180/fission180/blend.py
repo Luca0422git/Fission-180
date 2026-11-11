@@ -485,6 +485,26 @@ def make(body, base, refs, kind, options, name=None):
     return feature
 
 
+def make_best(body, base, refs, kind, options, name=None):
+    """make(), or Fission 180's own step when only another route than the kernel's one run
+    builds this blend (a chamfer after a modeled thread: fillet_robust). Checks first
+    (trial()): raises BlendError when nothing builds it."""
+    from . import fillet_robust
+
+    info = ShapeInfo(base.Shape)
+    with fillet_robust.source(base):
+        check_build(kind, info, refs, options)
+        route = fillet_robust.used()
+    if not route:
+        return make(body, base, refs, kind, options, name)
+    from . import fillet_core, fillet_sets
+
+    spec = fillet_core.default_spec(kind)
+    spec["sets"][0].update({k: v for k, v in options.items() if k in spec["sets"][0]})
+    spec["sets"][0]["count"] = len(refs)
+    return fillet_sets.make(body, base, spec, list(refs), name=name or kind.capitalize())
+
+
 # -- later steps keep their edges -------------------------------------------------------
 # Fusion keeps every later step attached to "its" edges when an earlier step changes: a
 # fillet inserted earlier in the timeline (marker rolled back), or an earlier fillet edited
@@ -839,14 +859,17 @@ def trial(kind, info, refs, options):
                     "Use an angle below %g° here." % (angle, round(limit, 2))
                 )
     edges = [element(info.shape, n) for n in names]
+    from . import fillet_robust
+
+    fillet_robust.reset()
     try:
         result = _build(kind, info.shape, edges, options)
     except Exception as exc:
-        raise BlendError(too_big(kind, label, size, exc))
+        return _another_route(kind, info, names, options, too_big(kind, label, size, exc))
     if result is None:
         return None
     if result.isNull() or not result.Solids:
-        raise BlendError(too_big(kind, label, size))
+        return _another_route(kind, info, names, options, too_big(kind, label, size))
     # A body may already hold several separate solids (two profiles extruded apart, like a
     # Fusion body with two lumps): only a blend that adds pieces cuts the part apart.
     if len(result.Solids) > max(1, len(info.shape.Solids)):
@@ -857,10 +880,48 @@ def trial(kind, info, refs, options):
     # crashed FreeCAD on such results of a shell (shelling._closed); a search tries sizes
     # nobody typed.
     if not all(sh.isClosed() for so in result.Solids for sh in so.Shells):
-        raise BlendError(too_big(kind, label, size))
+        return _another_route(kind, info, names, options, too_big(kind, label, size))
     if not result.isValid():
-        raise BlendError(too_big(kind, label, size))
+        return _another_route(kind, info, names, options, too_big(kind, label, size))
     return result
+
+
+def plain_items(kind, info, names, options):
+    """The edges of a plain fillet / chamfer as fillet_sets.kernel items ((edge index,
+    size 1, size 2)), or None for a Distance and Angle chamfer (each edge has its own second
+    distance: check_build)."""
+    if kind == "fillet":
+        r = float(options["radius"])
+        return [(int(n[4:]), r, r) for n in names]
+    ctype = options.get("chamfer_type", "equal")
+    d1 = float(options.get("distance", 1.0))
+    if ctype == "equal":
+        return [(int(n[4:]), d1, d1) for n in names]
+    if ctype == "two":
+        d2 = float(options.get("distance2", d1))
+        if options.get("flip"):
+            d1, d2 = d2, d1
+        return [(int(n[4:]), d1, d2) for n in names]
+    return None
+
+
+def _another_route(kind, info, names, options, reason):
+    """The kernel's one run failed: the same blend by another route (fillet_robust.retry:
+    through a modeled thread, on the refined part, group by group), or BlendError(`reason`),
+    with the edges in the way when they were found. A result built this way is one
+    FreeCAD's own Fillet / Chamfer cannot hold: fillet_robust.used() says so and the caller
+    makes Fission 180's step (fillet_sets) instead."""
+    from . import fillet_robust, fillet_sets
+
+    items = plain_items(kind, info, names, options)
+    if not items:
+        raise BlendError(reason)
+    try:
+        return fillet_robust.retry(kind, info.shape, items, None, fillet_sets.kernel_once, reason)
+    except fillet_robust.Refused as refused:
+        raise BlendError(
+            reason + fillet_robust.in_the_way(info.shape, refused.blockers, len(items), kind)
+        )
 
 
 def check_build(kind, info, refs, options):
