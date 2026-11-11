@@ -177,13 +177,20 @@ def key(letter, name=None, mods=QtCore.Qt.NoModifier):
 
 
 def ok(name="ok", timeout_s=None):
-    return named(
-        name,
-        lambda: h.task_button("OK"),
-        lambda: not Gui.Control.activeDialog(),
-        "the dialog closed after OK",
-        timeout_s,
-    )
+    """A step that presses OK. A dialog that stays open refused it: that is a failed check
+    with what the dialog says, and the dialog is cancelled so the replay can go on."""
+
+    def step():
+        h.task_button("OK")
+        h.settle("the app to settle after OK", timeout_s)
+        if Gui.Control.activeDialog():
+            p = panel()
+            said = p.message.text() if p is not None and hasattr(p, "message") else ""
+            h.check("%s: OK closes the dialog" % name, False, said or told())
+            h.task_button("Cancel")
+            h.settle("the app to settle after Cancel", timeout_s)
+
+    return named(name, step, timeout_s=timeout_s)
 
 
 def type_field(widget, text, end=QtCore.Qt.Key_Tab):
@@ -205,7 +212,6 @@ def tick(checkbox, on=True):
     opt = QtWidgets.QStyleOptionButton()
     checkbox.initStyleOption(opt)
     rect = style.subElementRect(QtWidgets.QStyle.SE_CheckBoxIndicator, opt, checkbox)
-    h.pointer_to(checkbox, rect.center())
     QtTest.QTest.mouseClick(checkbox, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, rect.center())
     QtWidgets.QApplication.processEvents()
 
@@ -239,6 +245,23 @@ def iso_view(name="iso_view"):
     """A step that turns the view to the home (isometric) view and fits the design: a person
     orbits to see a face; the view is not what is tested."""
     return named(name, lambda: h.fit())
+
+
+def view_from(x, y, z, name):
+    """A step that looks at the design from the side (x, y, z), Z up, and fits it (a person
+    orbits to see a face; the view is not what is tested)."""
+
+    def step():
+        view = h.view()
+        back = V(x, y, z).normalize()  # the camera's own Z points at the viewer
+        right = V(0, 0, 1).cross(back).normalize()
+        up = back.cross(right)
+        view.setCameraOrientation(App.Rotation(right, up, back, "ZXY"))
+        view.fitAll()
+        QtWidgets.QApplication.processEvents()
+        h.view_still()
+
+    return named(name, step)
 
 
 def look(direction, name=None):
