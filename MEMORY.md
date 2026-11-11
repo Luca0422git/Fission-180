@@ -4,6 +4,23 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-11: 0.1.0-beta.4.0.0, the book parity report (wave 7), on `develop`** (Luca: had Opus
+5.5 work through *Mastering Autodesk Fusion, 2nd ed.* in 3.3.9 with real input; the report is
+`docs/fission180/dev/research/book-parity-report.txt` (20 bugs, 123 friction notes, 44 fails);
+"Fix bugs, achieve parity ... do not take its statements as fact ... the goal is for opus 5.5
+to re-run the Fusion tutorial book test and get through it with zero hitches or failures, and
+no workarounds needed ... we are going to jump to beta 4.0.0"). His answers (2026-11-11):
+**Animation and Manufacture (CAM) workspaces are now in scope** (outline 7.19, 7.20; Render
+stays out), Python first and C++ only where there is no other route, helper agents yes,
+version written `0.1.0-beta.4.0.0`. Thirteen builders, briefs
+`docs/fission180/dev/briefs/book-common.md` + `book-<area>.md`, branches `sf/book-<area>`:
+params, components, joints, looks, sketch-a, sketch-b, extrude, modify, shell, drawings,
+animation, cam, hardware. Status: [x] briefs [ ] builders done and merged (each with the merge
+routine) [ ] a replay of every book project with real input (the acceptance test) [ ] VERSION
+/ `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [ ] "Fission 180
+tests" green [ ] **Luca: release** (quick route if no compiled file changed, else the full
+build). 3.3.10 is published (`Release` = `7813ef69`).
+
 **2026-11-10 (evening): patch 0.1.0-beta.3.3.10, Luca's bugs after 3.3.9 (released 17:48 UTC),
 on `develop`** (Luca kept the fixes local until "commit and get the update ready").
 Status: [x] hover ghost of a hidden body whose sketch shows (body_visibility.drawn: also

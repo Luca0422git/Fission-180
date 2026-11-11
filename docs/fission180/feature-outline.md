@@ -12,7 +12,7 @@ Handoff document for the implementing model. Read sections 0-5 fully before writ
 2. **Press/Pull is mandatory** and is a centerpiece (see 7.0). The single smart tool that offsets faces, moves faces, and edits fillets and chamfers by dragging or typing a value, with live preview, recorded in the timeline.
 3. **A fork of FreeCAD is explicitly allowed and expected** wherever an add-on cannot reach Fusion parity. Do not stop at "the add-on API doesn't allow it." Go into the C++ core.
 4. **This is a long-term moonshot, not a quick win.** Do not trade parity for speed of delivery. Order the work by dependency and risk, and do the hard parts first rather than last.
-5. **Out of scope** (do not build): sculpting / T-spline, simulation and FEA other than the Static Stress study (7.18), generative design, rendering and animation, CAM, electronics, cloud collaboration. See section 8.
+5. **Out of scope** (do not build): sculpting / T-spline, simulation and FEA other than the Static Stress study (7.18), generative design, rendering, electronics, cloud collaboration. See section 8. (The Animation and Manufacture workspaces came into scope on 2026-11-11: 7.19, 7.20.)
 6. **Everything stays local and open.** No telemetry, no accounts, no cloud dependency. Project files live on the owner's NAS.
 7. **Copy behavior, never assets.** No Autodesk icons, artwork, wording, code, or binaries. Black-box observation of how Fusion behaves is the method; reverse engineering Fusion's software is forbidden (see 2.5).
 8. **Honesty over optimism.** If something cannot reach parity with the OpenCASCADE kernel, say so with evidence (a failing benchmark), and propose the real fix (kernel work, a different algorithm), not a workaround that quietly lowers the bar.
@@ -222,6 +222,12 @@ Fusion's Simulation workspace, limited to its **Static Stress** study (research 
 
 *Acceptance:* golden studies (a cantilever beam, a plate with a hole under tension, a pressurized part) match hand calculations within a few percent, and the study's steps match Fusion's.
 
+### 7.19 Animation workspace [P1, L2] (added 2026-11-11, Luca, after the book parity report)
+Fusion's ANIMATION workspace: storyboards, Transform Components, Auto Explode (one level, all levels), Manual Explode, Show / Hide, callouts, recorded views, an animation timeline with editable actions, Publish Video (local file, no cloud), and exploded positions usable by the Drawing workspace's Exploded View. An animation never changes the design. Spec: `docs/fission180/parity/animation.md`.
+
+### 7.20 Manufacture workspace: milling [P1, L2] (added 2026-11-11, Luca, after the book parity report)
+Fusion's MANUFACTURE workspace for 3-axis milling: Setup (WCS, stock), 2D operations (Face, Adaptive Clearing, Pocket, Contour with tabs, Slot, Bore, Engrave, Chamfer), Drill, 3D operations where the engine has them, Tool Library, Simulate, Post Process, Setup Sheet, with Fusion's dialogs (Tool, Geometry, Heights, Passes, Linking). Built on FreeCAD's CAM module behind Fission 180's own workspace; the person never sees FreeCAD's CAM workbench. Turning, additive and multi-axis stay out. Spec: `docs/fission180/parity/manufacture.md`.
+
 ### 7.17 Quality and packaging [P0]
 Installer, portable zip, side-by-side install with FreeCAD, Linux package, docs (cheat sheet, "Fusion to Fission 180" mapping), update mechanism, compatibility notes.
 
@@ -229,7 +235,7 @@ Installer, portable zip, side-by-side install with FreeCAD, Linux package, docs 
 
 ## 8. Explicitly out of scope
 
-Sculpt (T-spline), simulation and FEA other than the Static Stress study of 7.18 (no flow / CFD, thermal, modal, nonlinear or event simulation, no shape optimization), generative design, rendering and animation, CAM and manufacturing toolpaths, PCB/electronics, cloud collaboration, accounts, cloud storage, team data management, mobile apps. Do not spend time on them and do not design the architecture around them.
+Sculpt (T-spline), simulation and FEA other than the Static Stress study of 7.18 (no flow / CFD, thermal, modal, nonlinear or event simulation, no shape optimization), generative design, rendering (the Render workspace: scenes, environments, ray tracing), turning / additive / multi-axis manufacturing, PCB/electronics, cloud collaboration, accounts, cloud storage, team data management, mobile apps. Do not spend time on them and do not design the architecture around them.
 
 ## 9. Hard technical programs
 

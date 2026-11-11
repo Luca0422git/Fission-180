@@ -1,0 +1,2649 @@
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Fission 180 vs Fusion — Book Parity Report
+     Nov 10, 2026        ·   ​@Luca Sciabica
+
+
+
+
+  Summary
+  A Fusion user can follow the book's modelling chapters (1–6 and 9) in Fission 180, but each
+  project hits several rough edges. Chapters 7, 8, 10 and 11 fail at their core because the
+  Render, Animation and Manufacture workspaces don't exist.
+
+  I ran Fission 180 0.1.0-beta.3.3.9 (Linux AppImage, FreeCAD 1.1.4 core) with real mouse and
+  keyboard input. I worked through Mastering Autodesk Fusion, 2nd ed. chapter by chapter
+  and logged every step as one of the outcomes in the table below.
+
+
+     Outcome                    Meaning                                             Count
+
+     OK                         Worked the way the book says                        198
+
+     Friction                   Worked, but differently from Fusion or with a       123
+                                hiccup
+
+     Workaround                 The book's way failed and another way worked (the   63
+                                steps are logged)
+
+     Fail                       Could not be done in Fission                        44
+
+     Bug                        Something that reproducibly behaves wrongly         20
+                                (counted inside Fail/Workaround)
+
+     Not tested                 Skipped for time or missing downloads               15
+
+
+  Coverage: I did chapters 1–5 step by step, from The Basics through the Pizza Cutter. For
+  the Tesla Turbine I built the housing to the book's dimensions, then tested every new tool
+  on simplified parts. For chapters 6–12 I tested each chapter's new tools on small stand-in
+  models rather than rebuilding every part.
+
+  What works well: sketching and constraints, Extrude/Revolve/Loft/Sweep/Coil, Thread
+  and Hole, feature and body patterns, Split Body, Combine and Midplane. Joints, Motion
+  Link, Motion Study and Rigid Group work too. Highlights are the Gear tool, the Drawing
+  workspace (views, section, detail, dimensions, parts list with balloons, PDF export),
+  Canvas with Calibrate, and Decals.
+
+
+
+
+                                                                                            Page 1 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Weakest areas:
+
+     1. Work across components: geometry lands in the wrong component, and you can't
+          project from or snap to another component.
+     2. Joint editing: edits to as-built joints are silently lost, and joint references go stale.
+     3. Parameters: the "+" button is broken.
+     4. Appearances: flat colours only.
+     5. Silent failures: many commands simply do nothing, with no message.
+
+
+  Bugs to fix first
+  These reproducibly do the wrong thing. They are grouped by area, and the worst of each
+  group comes first. "Seen in" names the book project where I hit it.
+
+
+  Parameters and units
+     1. Parameters "+" button does nothing. MODIFY > Change Parameters > "+" only shows
+        'bool' object has no attribute 'strip' in red. Cause: in parameters_ui.py ,
+           add_button.clicked.connect(self.add_parameter) passes Qt's checked=False in
+          as the parameter name. Fix: connect to lambda: self.add_parameter() . The + and −
+          buttons are also drawn as blank white squares. Typing Head_Diam = 8.5 in a
+          dimension box doesn't create a parameter either, so there is no in-app way to make a
+          user parameter. Seen in: Metric Bolt.
+     2. Design units silently go back to mm. Set the design to Inch, then press Ctrl+Z on any
+        step: Document Settings shows mm again and every dialog takes mm. Ctrl+Y doesn't
+        bring inches back. It also happened without any Undo, after a Change Parameters edit
+          and after some Chamfer OKs (5 times in one project). Typing "0.02" then means 0.02
+          mm. Seen in: Fire Piston.
+     3. Deleting a sketch constraint mis-wires parameter links. After a delete, the
+        expressions on later dimensions don't renumber. Support_Width / 2 jumped onto a
+          point-on-object constraint, and another link pointed past the end of the list ("Array
+          out of bound: 34, 31"). Any delete in a parametric sketch can silently cut or swap
+          parameter links. Undo restores them. Seen in: Drone.
+     4. Negative mm parameters become 0. A user parameter in mm is stored as a Length, so
+        "−2.5" becomes 0 mm and the extrude that uses it breaks. Workaround: store 2.5 and
+        type -Thickness in the distance box. Seen in: Drone.
+
+
+
+
+                                                                                                    Page 2 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Geometry lands in the wrong component
+  This is one family: Fission puts new geometry in the component you clicked on, not the
+  active component as Fusion does.
+
+     5. A sketch on another component's face switches the active component. With "PTFE
+        Tube" active, starting a sketch on the Nozzle's face made the Nozzle active, so the
+        sketches and the swept tube went into the Nozzle. Seen in: Hot End.
+     6. Extrude of a face with New Body goes into the face's component. With "Housing
+        Gaskets" active, extruding the housing's face put the new body in Housing. Seen in:
+          Tesla Turbine.
+     7. Offset Plane goes into the face's component. An offset plane from a gasket face
+        went into the gasket, and so did the sketch and bodies built on it. Seen in: Tesla
+        Turbine.
+     8. Axis Through Cylinder goes into the cylinder's component. So you can't make the
+          book's "component that contains only an axis". Seen in: Robotic Hand.
+     9. New Component silently ticks "From Bodies". If steps are still selected in the
+        timeline, the selected body is moved into the new component, and the next Revolve
+        joins into it. Seen in: Fire Piston.
+   10. The first extrude in a new component defaults to Cut. It overlapped a body in
+       another component and cut it, silently changing that component. Fusion starts a new
+       component's first extrude as New Body. Seen in: Strandbeest.
+
+  For 5–9 the workaround is to right-click the body > Move to Component. This sometimes
+  leaves an empty, invalid Body behind.
+
+
+  Joints
+   11. Edit Joint on an as-built joint is lost. Change the Type (e.g. Rigid → Cylindrical) and
+          press OK: the change shows, but its transaction stays open
+          ( App.getActiveTransaction() = "Edit As-Built Joint"). The next command (Edit
+          Joint Limits, Motion Link, even Ctrl+S) aborts it, and the joint goes back to Rigid with
+          no Redo. Reproduced 3 times. Seen in: Pizza Cutter.
+   12. Edit Joint Limits on an as-built joint shows the wrong dialog. It opens showing Type
+          "Rigid" with no limits, and its Cancel also reverts the earlier edit. Seen in: Pizza Cutter.
+   13. As-built Slider with no axis silently becomes Rigid. No warning. Seen in: Fire Piston.
+
+
+
+
+                                                                                                 Page 3 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+   14. Joint references go stale. After later edits the solver reports "Broken link in
+       Reference1/2". Element names become ?Face5 / ?Edge41 , and every joint dialog
+          warns the joints "cannot all be satisfied together". Seen in: Pizza Cutter.
+   15. Nested components can't be picked in the browser. In the As-built Joint and Rigid
+          Group dialogs, clicking a component inside a subassembly does nothing. Picking in the
+          canvas works. Seen in: Tesla Turbine.
+
+
+  Appearances
+   16. Looks silently lost. A body shows plain grey while the Appearance panel still lists its
+       look, for example after Isolate/Exit Isolate + Move. Dropping the same look again does
+          nothing, because appearance.apply() caches the applied look per step.
+          Workaround: drop a different look, then the right one again. Seen in: Fire Piston, Pizza
+          Cutter.
+   17. A face look dropped on an edge colours the whole body. With Apply To = Faces, a
+       drop that lands on an edge applies the look to the whole body, and that wipes every
+          face look already given. Fusion keeps face looks under a body look. Seen in: Saturn V.
+
+
+  Timeline, undo and the Gear tool
+   18. Undo of Combine leaves an orphan step. An invalid "Combine 1" ("There is no solid in
+          the target body") stays in the timeline and must be deleted by hand. Seen in: Drone.
+   19. Gear with an invalid fillet makes a copy of the previous gear. The dialog warns that
+          the 0.88 mm root fillet doesn't fit (max 0.741), but OK creates a copy of the previous
+          gear instead of refusing. Seen in: Gear Train.
+   20. Edit Feature on a Gear step deletes it. Right-click a Gear step in the timeline > Edit
+          Feature: nothing opens, and the step vanishes along with its body. Seen in: Gear Train.
+
+
+  Missing workspaces and tools
+  These are things the book uses that Fission doesn't have at all, or has only as a menu entry
+  with nothing behind it. Each table lists the closest workaround I found, if there is one.
+
+
+  Workspaces
+  The workspace switcher offers only Design / Simulation / Drawing.
+
+
+
+
+                                                                                              Page 4 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     Missing                                   Book chapters       Workaround
+                                               affected
+
+     Render workspace (scene                   Ch7, all of Ch8,    File > Capture Image gives a
+     settings, environments, HDRI,             Ch12                screenshot of the view. No lights,
+     depth of field, cloud/in-canvas                               materials or environments.
+     render, emissive looks)
+
+     Animation workspace                       All of Ch10, Ch12   None. FreeCAD's own interface
+     (storyboards, Transform                                       has no animation workbench
+     Components, Auto Explode,                                     either.
+     Publish Video)
+
+     Manufacture (CAM) workspace               All of Ch11         UTILITIES > FREECAD > FreeCAD
+                                                                   Tools > Switch to FreeCAD's
+                                                                   interface > CAM. Job, stock, tools,
+                                                                   operations, simulator and post-
+                                                                   processor all exist, but with
+                                                                   FreeCAD's dialogs and names, so
+                                                                   none of the book's steps can be
+                                                                   followed as written. A "Back to
+                                                                   Fission 180" button returns
+                                                                   cleanly.
+
+
+
+  Modelling
+
+     Missing                                 Where the book           Workaround
+                                             needs it
+
+     Creating user parameters from           Metric Bolt, Drone,      None in the UI (see bug 1).
+     the UI ("+" bug) or by typing           Strandbeest
+      Name = value in a dimension
+     box
+
+     Centerline linetype (the palette        Metric Bolt, Pizza       Dimension the radius as
+     only toggles Construction)              Cutter                    =Diameter / 2 , and pick the
+                                                                      revolve axis by hand.
+
+     "Scale entire sketch at first           Ch1 setup                None needed in practice.
+     dimension" preference
+
+
+
+
+                                                                                                    Page 5 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     Missing                                      Where the book           Workaround
+                                                  needs it
+
+     ISO pipe / NPT threads (only ISO             Tesla Turbine            None.
+     Metric and ANSI Unified)
+
+     Mirror and Rectangular Pattern               Tesla Turbine, Robotic   Mirror or pattern the bodies,
+     of components                                Hand                     then New Component + Move
+                                                                           to Component. Joints are not
+                                                                           copied.
+
+     Spur Gear add-in                             Gear Train               CREATE > Gear is built in and
+                                                                           works well (bugs 19–20 aside).
+
+
+
+  Assembly
+
+     Missing                                 Where the book           Workaround
+                                             needs it
+
+     Motion Link "Link with                  Pizza Cutter, Tesla      None.
+     Same Joint" (rotate tied to             Turbine
+     slide in one joint)
+
+     Preview Limits and Flip in              Fire Piston, Pizza       Try limits one at a time. Maximum vs
+     joint and as-built joint                Cutter, Tesla Turbine    Minimum decides the direction.
+     dialogs
+
+     Rest position springing                 Fire Piston              None. Rest does nothing after a
+     back after a drag                                                drag.
+
+     McMaster-Carr insert                    Hot End, Tesla           INSERT > Hardware has metric
+                                             Turbine, Space Prop      socket/button/countersunk screws,
+                                             Hilt                     nuts, washers, inserts and magnets,
+                                                                      but no set screws or Phillips pan
+                                                                      heads.
+
+     Separate "Animate Joint"                Strandbeest              The single Animate Joint behaves
+     vs "Animate Joint                                                like the relationship one, which is
+     Relationship"                                                    what the book wants.
+
+
+
+
+                                                                                                        Page 6 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Appearances and materials
+
+     Missing                                 Where the book needs it      Workaround
+
+     Textured looks (wood, leather,          Saturn V, Surfboard, Pizza   None. 28 flat colours only.
+     oak, mahogany, polystyrene              Cutter, Football,
+     decal), look Scale %, Texture Map       Smartphone Case
+     Controls
+
+     Look editor (double-click a look,       Donut, Football              Custom #RRGGBB colour.
+     Duplicate, rename, Advanced
+     colour/roughness/bump maps)
+
+     Appearance search box, "Rubber          Tesla Turbine,               Custom colour.
+     – Soft", ABS, anodized red,             Strandbeest, Hot End,
+     powder coat, metallic paint, LED        Space Prop Hilt
+     looks
+
+     "In This Design" starting with the      Donut                        None needed.
+     default look
+
+     Brass, Gold, ABS, Carbon Fiber          Drone, Space Prop Hilt       Make a custom material.
+     physical materials (20 in the                                        The density can't be
+     library)                                                             edited on a library
+                                                                          material.
+
+     Component Color Swatch                  Hot End                      None. The only gear menu
+                                                                          is the timeline's.
+
+
+
+  Files, projects and drawings
+
+     Missing                                 Where the book        Workaround
+                                             needs it
+
+     New Project button (one root            Ch1 setup             Make a folder in the Data Panel.
+     project only)
+
+     USDZ export (for AR)                    Saturn V              Export OBJ and convert outside
+                                                                   Fission.
+
+     Reading .f3d files                      Smartphone Case       None. STEP works.
+
+
+
+
+                                                                                                 Page 7 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     Missing                                 Where the book     Workaround
+                                             needs it
+
+     Drawing EXPORT > Export DWG             Drawings chapter   Export PDF and Export DXF work.
+     and Export CSV (menu entries                               File > Export does offer DWG for
+     with no command)                                           the 3D design.
+
+     Drawing CREATE > Exploded               Ch10, Ch12         None.
+     View (menu entry with no
+     command)
+
+     Right-click a component >               Space Prop Hilt    DESIGN ▾ > Drawing > From
+     Create Drawing                                             Design.
+
+     A "Parts List" menu entry               Ch10               TABLES > Table makes the parts
+                                                                list with balloons.
+
+
+
+
+  Recurring friction patterns
+  Most of the 123 friction notes fall into a few patterns. Fixing a pattern once would remove
+  many hiccups at the same time. They are ordered by how often a Fusion user would hit
+  them.
+
+     1. Silent failures. About 40 log entries say a command did nothing, or did something else,
+          with no message. Examples: Tangent and Collinear constraints that add nothing,
+          Rectangular Pattern of components making nothing, Extrude OK doing nothing after
+          an option change, and Fix/Unfix ignoring a mixed selection. Fusion nearly always
+          explains a refusal. A one-line message in each of these places would save a lot of
+          confusion.
+     2. Work across components. Bugs 5–10 put new geometry in the clicked component
+          instead of the active one. On top of that, Project (P) from another component projects
+          nothing, and nested components can't be picked in the browser. The book's
+          assemblies (Hot End, Pizza Cutter, Tesla Turbine, Space Prop Hilt) all depend on
+          "project the previous part's face", so this pattern costs the most time.
+     3. The Extrude Operation keeps changing. Choosing Symmetric flips Cut to Join, Flip
+        leaves Join, a fin extrude came up as Cut, and a new component's first extrude
+        defaults to Cut. Pressing Enter in the distance box commits the dialog, so the wrong
+          operation goes through. The sign of a negative distance also isn't consistent (−8 grew
+          into the body in one case).
+
+
+
+
+                                                                                               Page 8 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     4. Sketches do things on their own. Snap is very strong: clicks 6–8 mm off the axis land
+        on it. Lines near 45° get a driving 45° angle that makes the book's later Parallel
+          constraint redundant. A dimension placed on top of another line becomes an angle
+          constraint. Auto-projected face edges are on by default and come back after you
+          delete them.
+     5. Fillets and chamfers are refused as "too big". Sizes Fusion accepts are often refused
+        or capped: 20 mm chamfer limited to 1.79 mm, 0.25" fillet at a tube joint, 0.25 mm
+        chamfer on a patterned model, 4 mm silently capped to 3.99. Tapering two profiles
+          also fails where Fusion tapers them as one.
+     6. FreeCAD shows through. Examples: FreeCAD's modal "Constraint Substitution" pop-
+        ups, internal construction geometry on ellipses and polygons, a spline control polygon,
+        seam lines on round faces, and the SVG importer's own dialog. Others are two
+          recovery dialogs after a crash, "+" and "…" buttons drawn as blank squares, and "&"
+          vanishing from component names in buttons.
+     7. Undo is unpredictable. One Ctrl+Z too many leaves the sketch, and Redo doesn't
+          reopen it. Sometimes Undo takes two steps, sometimes it only removes constraints
+          and leaves the lines. Undo can also hide the SKETCH tab, reset the units (bug 2) or
+          leave an orphan step (bug 18). One drag + undo froze the app for about 80 s.
+     8. Selecting things. Ctrl+click doesn't add to a sketch selection (Shift or plain click
+        does), but the book says "hold Ctrl" many times. Offset-plane squares and the dialog's
+        value boxes sit on top of faces and take the click. Small faces in a fitted view are hard
+        to hit, and clicking a part of a subassembly selects the whole subassembly.
+     9. Components. The first component isn't grounded automatically. A new component
+        goes inside whatever component is active. Move rotates about the bounding-box
+        centre, not the component origin.
+   10. Inch designs are half metric. The sketch grid and snap stay metric. Model Parameters
+       list mm, Thread defaults to ISO Metric, and tooltips say "Type a value (mm)".
+   11. Data Panel and saving. New Folder has no inline name box, and folders have no Delete
+       or Move. Save defaults to the project root, not the open folder.
+
+
+  Workaround cheat sheet
+  These are the workarounds that worked, for a Fusion user following the book in Fission
+  today. They are also a good list of what a Fusion user will try first, so each one marks a
+  place where Fission could simply behave like Fusion.
+
+
+
+
+                                                                                           Page 9 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Sketching
+
+
+
+
+                                             Page 10 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     When the book says…                             In Fission, do this
+
+     Hold Ctrl to add to a selection                 Use Shift+click (a plain click also adds).
+
+     Click near the axis and the point should        Turn Snap off in the Sketch Palette. In inch
+     land where you clicked                          designs the grid is still metric, so turn Snap
+                                                     off there too.
+
+     Press and drag at a line end for a tangent      CREATE > Arc > Tangent Arc from the line
+     arc                                             end.
+
+     Use a Centerline for diameter dimensions        Dimension the radius as =Diameter / 2 .
+
+     Delete the auto-projected edges                 Untick Preferences > Design > "Auto project
+                                                     the face's edges when sketching on a face"
+                                                     and start a new sketch. Deleting them
+                                                     doesn't stick.
+
+     Collinear, or Horizontal/Vertical to the        Use Horizontal/Vertical between end points,
+     origin, does nothing                            or dimension both lines to the axis. To get a
+                                                     point onto the axis, dimension it 1 mm away,
+                                                     delete that dimension, then add H/V.
+
+     A 45° driving angle appeared by itself          Click the angle's label > Delete before adding
+                                                     the book's constraint.
+
+     Circular Pattern with Suppression               Pattern, then Shift+click the unwanted
+                                                     copies and Delete.
+
+     Patterned sketch copies should follow later     Add every dimension before you pattern. The
+     dimensions                                      copies are not tied to the original.
+
+     Pick a sketch profile inside a hidden body      Show the body, then right-click it >
+                                                     Selectable/Unselectable.
+
+     Show a used sketch, then extrude it             Open Extrude first, then right-click the
+                                                     sketch > Show, then click the profile.
+
+     Extrude profiles that sit over a hole or void   Hole > Placement "From Sketch (Multiple
+                                                     Holes)", then click the circles.
+
+     Loft to the origin point                        Sketch a Point at the origin on the YZ plane,
+                                                     hide Construction and Origin, then click the
+                                                     point.
+
+
+
+
+                                                                                                  Page 11 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Features
+
+     When the book says…                              In Fission, do this
+
+     Drag the Thread before the Chamfer in the        Revolve > Thread > right-click Revolve > Roll
+     timeline                                         History Marker Here > Chamfer > timeline
+                                                      gear > Roll History Marker to End.
+
+     Extrude Symmetric / Flip / through All           Set Operation by hand after every other
+                                                      option, and press Tab instead of Enter in the
+                                                      distance box. Check "Bodies to Cut" before
+                                                      OK.
+
+     Split Face, then keep adding features            Do Split Face at the end of the timeline.
+                                                      Later extrudes merge split faces back
+                                                      together.
+
+     Pattern features that include a Split Face       Leave the Split Face out of the pattern.
+
+     Fillet a face whose edges include a thread or    Click one outer edge and let Tangent Chain
+     tangent edge                                     pick the rest.
+
+     Taper two profiles into one cone                 Turn off auto-project and draw the circle in a
+                                                      new sketch, so no projected edge splits it
+                                                      into two profiles.
+
+
+
+  Components and joints
+
+     When the book says…                          In Fission, do this
+
+     Ground the first component                   Right-click it > Ground (it isn't automatic).
+
+     Geometry landed in the wrong                 Right-click the body > Move to Component > the
+     component                                    right one.
+
+     Project the previous part's face (P)         Dimension from the origin instead. Cross-
+                                                  component Project does nothing.
+
+     Snap a joint to a round edge's centre        Hover the face and move the pointer into the
+                                                  hole for "(centre)". Or hover a face, hold Ctrl to
+                                                  lock its snap dots, move to the centre and click
+                                                  for "(circle centre)".
+
+
+
+
+                                                                                                  Page 12 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     When the book says…                             In Fission, do this
+
+     Edit an as-built joint or its limits            Delete it and make a new As-built Joint with the
+                                                     right Type and its limits in the same dialog.
+
+     Set a slide limit with Preview                  Try Maximum vs Minimum, since that decides
+                                                     the direction. There is no Preview or Flip.
+
+     Close a 4-bar loop with Joint                   Use an As-built Revolute for the last link.
+
+     Mirror or pattern components                    Mirror or pattern the bodies, then New
+                                                     Component + Move to Component.
+
+     Rotate a pasted copy about its origin           Expect it to turn about the bounding-box centre,
+                                                     and correct it with a second Move.
+
+
+
+  Appearances, materials and parameters
+
+     When the book says…                                 In Fission, do this
+
+     Edit a look's colour, or search for a look          Appearance > Custom colour #RRGGBB >
+                                                         Use > click the body or face.
+
+     A look disappeared                                  Drop a different look, then the right one
+                                                         again.
+
+     Face looks keep getting wiped                       Zoom in until the face is big, drop in its
+                                                         middle, and check after every drop.
+
+     Use a material that isn't in the list (Brass,       MODIFY > Manage Materials > New Material
+     Carbon Fiber)                                       with the density, then Assign to Selection.
+
+     Check a part's mass (Properties)                    MODIFY > Physical Material lists each body's
+                                                         mass.
+
+     Type a parameter into a dimension box               Start it with = ( =Head_Length ).
+
+     Use bare numbers in min() / max()                   Add units: min(100 mm; max(45 mm;
+                                                         Arm_Length)) . Bare numbers silently give 0.
+
+     A negative parameter                                Store it positive and type -Name in the box.
+
+     Parameters in the Move dialog                       Type the number. Move silently reads -2 *
+                                                         Arm_Length as −2 mm.
+
+
+
+
+                                                                                                      Page 13 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+     When the book says…                                  In Fission, do this
+
+     Design units keep changing                           Watch "Units:" in the browser, or type units
+                                                          explicitly ("0.02 in").
+
+
+
+  Files and workspaces
+
+     When the book says…                       In Fission, do this
+
+     New Project                               Make a New Folder at the Data Panel root, then
+                                               right-click > Rename.
+
+     Save into the open folder                 Type the folder path in Location.
+
+     Export USDZ for AR                        Export OBJ and convert it outside Fission.
+
+     Spur Gear add-in                          SOLID > CREATE > Gear.
+
+     Render                                    File > Capture Image (screenshot only).
+
+     Manufacture                               UTILITIES > FREECAD > FreeCAD Tools > Switch to
+                                               FreeCAD's interface > CAM, then "Back to Fission
+                                               180".
+
+     A dialog's OK/Cancel are off-screen       Press Enter.
+
+
+
+
+  Chapter 1 step by step: The Basics to the Carabiner
+  Every chapter 1 project could be built except the Carabiner's final latch cut. Most of the
+  friction is in sketch behaviour (snap, auto-projection, selection), appearances, and small
+  differences in the UI tour. Each entry below is one book step, labelled with the outcomes
+  defined in the Summary.
+
+
+  Project 0: The Basics (UI tour, pp 14–20)
+          Friction. New design opens on a dark, empty view with the ViewCube on TOP; no grid
+          and no origin dot visible. Book: white grid with the Origin dot in the middle, home
+          (isometric) view.
+          OK. Data Panel icon (2nd icon, top left, Ctrl+Alt+P) opens the Data Panel.
+          Friction. Data Panel docks under the Browser (bottom left, small) instead of Fusion's
+          full-height panel sliding over the left side.
+
+
+                                                                                                   Page 14 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. "New Project": there is no New Project button. Fission has one
+          project = a root folder ("Project" breadcrumb; "..." = choose the project folder, e.g. a
+          NAS folder). Workaround: New Folder at the root named "Mastering Autodesk Fusion
+          Edt. 2" acts as the project.
+          Friction. New Folder creates "New Folder" at once with no name box and no inline edit
+          (Fusion: you type the name right away). Focus goes back to the 3D view, so typing
+          does nothing. Workaround: right-click the folder > Rename (a "Rename" dialog), type
+          the name.
+          Friction. Folder right-click menu has only Open / Rename / Show in Folder: no Delete,
+          Move, Copy (Fusion has them). Right-click on empty space shows no menu (Fusion:
+          New Folder etc.). A stray folder made by mistake had to be left there.
+          OK. Double-click a folder opens it; New Folder inside works; "1 - Fundamentals"
+          created.
+          OK. Data Panel closes with its X (top right). Friction: the X is a tiny, faint square that is
+          hard to see; Fusion's X is obvious.
+          OK. Browser > Document Settings > Units: mm. Friction: Hovering "Units" shows no
+          "Change Active Units" pop-up button (Fusion shows one); double-click does nothing.
+          Workaround: right-click "Units: mm" > Change Active Units. The dialog (Unit Type, Set
+          as Default, OK) matches Fusion; mm + Set as Default + OK worked.
+          OK. Eye icon next to Origin shows/hides the origin planes, axes and point.
+          Friction. Origin planes are small and the Fit (F6) frames them off-centre in an
+          otherwise empty view.
+          OK. Workspace switcher DESIGN ▾ exists. Friction: Lists only Design / Simulation /
+          Drawing (Fusion: also Render, Animation, Manufacture, Generative Design). Render,
+          Animation and Manufacture are needed by chapters 7, 8, 10, 11 and 12 of the book.
+          OK. Toolbar groups CREATE, MODIFY, CONSTRUCT, INSPECT, INSERT, ASSEMBLE,
+          SELECT exist. Friction: ASSEMBLE sits after INSERT (Fusion: after MODIFY); no
+          CONFIGURE (book says unused).
+          OK. Navigation bar: Grid and Snaps > Grid Settings has Adaptive/Fixed, Major Grid
+          Spacing, Minor Subdivisions like Fusion; set Fixed / 50 mm / 5, OK. Spacing box greys
+          out until Fixed is picked (correct Fusion behaviour).
+          Friction. The layout grid is OFF by default (Grid and Snaps > Layout Grid unchecked),
+          so the book's "white grid" never shows until you turn it on; the grid is a finite square
+          patch.
+          Fail (harmless). "Reference Numbers" option does not exist (no scale numbers are
+          drawn anyway).
+
+
+                                                                                                 Page 15 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. Mouse: wheel zooms, middle-drag pans, Shift+middle-drag orbits (Fusion preset
+          is the default).
+          OK. ViewCube: Home icon (appears on hover) gives the top-front-right isometric;
+          clicking TOP face, the TOP/FRONT edge and dragging the cube all work as in Fusion.
+          Friction. No profile icon at the top right (only command search). Preferences live on
+          the Home tab (Preferences button); the hamburger "Menu" holds FreeCAD's raw
+          menus, including FreeCAD's own Edit > Preferences, which is a different, confusing
+          dialog.
+          OK. Fission's Preferences dialog mirrors Fusion's page tree (General > Design, API,
+          Material, Graphics, Unit and Value Display, Default Units > Design, Network, ...).
+          Friction. "Default modeling orientation" (Z up, already default) is on General > Design,
+          not General.
+          Friction. User Language lists dozens of languages although Fission's own UI is English
+          only.
+          Fail. Design preferences: "Auto Project Edges on reference" is approximated by "Auto
+          project the face's edges when sketching on a face" (on). "Scale entire sketch at first
+          dimension" does not exist. (Its effect is checked in the next projects.)
+          OK. Timeline: double-clicking a sketch in the timeline opens it for editing (camera
+          turns to it).
+
+
+  Project 1: Classic Donut (pp 22–29)
+          OK. Units already mm. Create Sketch (first button under SOLID) shows the three
+          origin planes; clicking the XZ square opens the sketch on the Front plane, ViewCube
+          says FRONT, the SKETCH tab and a Sketch Palette like Fusion's appear (Options:
+          Linetype, Look At, Sketch Grid, Snap, Slice, Show
+          Profile/Points/Dimensions/Constraints/Projected, 3D Sketch, Finish Sketch).
+          Friction. In a sketch on the Front plane the vertical axis is drawn GREEN (the sketch's
+          own Y), not blue (world Z). The book tells you a green vertical axis means your Z-up
+          preference is wrong, so a Fusion user goes looking for a problem that is not there.
+          Friction. Fit/Home when the design has only a sketch (no body): F6, the navigation-
+          bar Fit and the ViewCube Home zoomed out to a ~24 m tall view, so the 40 mm circle
+          was a dot. Once a body existed, Fit and Home framed the model correctly.
+          Friction. F6 (Fit) inside a sketch frames the grid as well as the geometry: with the
+          book's grid (Fixed, 50 mm) and Layout Grid on, Fit zoomed out to ~16 mm per pixel
+          (circle 2 px wide); with only the Sketch Grid on it was still ~10x too far out.
+
+
+
+
+                                                                                            Page 16 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Workaround: untick Sketch Grid / Layout Grid, then Fit frames the geometry (0.08
+          mm/px).
+          Friction. Undo inside a sketch: one Ctrl+Z too many leaves the sketch (editing ends,
+          camera goes back to the 3D view); Redo restores the geometry but not the open
+          sketch. (Fusion keeps you in the sketch.)
+          Friction. Snap (on by default) with the book's grid is far too strong: clicks 6–8 mm (35–
+          45 px) above/below the X axis all landed exactly ON the axis (circle centre, all 6 spline
+          points, a test line from (−30, 8) to (30, −8) came out flat at y = 0). Fusion would place
+          them where clicked. Workaround: untick Snap in the Sketch Palette; then points land
+          where clicked.
+          OK. C (circle): click centre, click radius; Esc ends the tool. Circle snapped onto the X
+          axis.
+          OK. Constraints > Horizontal/Vertical, click circle centre then origin: a Horizontal
+          constraint is added (Fusion behaviour).
+          OK. D (dimension): origin, centre, place, type 40, Enter → 40 mm; circle edge, place,
+          40, Enter → diameter 40. Value box appears at the dimension like Fusion's. Sketch
+          reports "Fully constrained" and the circle turns from blue to white (Fusion: black on
+          its light background).
+          Friction (from Basics). No "Scale entire sketch at first dimension": the first dimension
+          (40) moved the centre only; the circle kept its drawn size until dimensioned. End
+          result here is the same.
+          OK. Finish Sketch (green check, top right). ViewCube Home.
+          OK. CREATE > Revolve: the single profile is picked automatically, origin axes show,
+          clicking the Z axis previews the torus with an angle arrow and value box; OK makes a
+          120 x 120 x 40 torus (volume 315,827 mm³ = 2×π²×40×20², exact).
+          Friction. The new body is called "Body" (Fusion: "Body1"); later ones "Body2"...
+          Browser shows "Bodies > Body". Eye on Bodies hides/shows the body (OK).
+          Friction. The profile sketch disappears (hidden) as soon as Revolve starts; Fusion
+          keeps it visible while you pick the axis.
+          Fail → workaround. Appearance (A): opens Fission's Appearance panel (Apply To
+          Bodies/Faces, In This Design, a Library of 28 flat looks, a Custom colour). There is no
+          "Fusion Appearances" library tree, no Wood category, no Oak, no download arrow, no
+          textures. Workaround: the library's "Wood, light" swatch, dragged onto the donut
+          (drag-and-drop works with a real mouse) → plain tan colour, no grain.
+
+
+
+
+                                                                                              Page 17 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail. "In This Design" starts EMPTY (Fusion lists the default Steel - Satin), and double-
+          clicking a look there opens no editor: no Scale (book: 44%), no colour editing of an
+          existing look.
+          OK. Create Sketch on the Front plane; CREATE > Spline > Fit Point Spline; 6 clicks;
+          Enter finishes the spline (Esc afterwards keeps it, unlike Fusion where Esc deletes an
+          unfinished spline).
+          Friction. The fit-point spline is shown FreeCAD-style: a control polygon with circles
+          and a cloud of "= 22, 20, 18, 16..." equality labels, and the Sketch Edit panel said "Solver
+          failed to converge" right after drawing it (it still solved; nothing was wrong). Fusion
+          shows just the curve.
+          Fail → workaround. Constraints > Fix/Unfix, then click the spline: nothing happens
+          (with nothing selected the tool only locks POINTS you click). Workaround: click the
+          spline first (select it), then Constraints > Fix/Unfix → the spline turns green, "Fully
+          constrained".
+          OK. Finish Sketch; sketch stays visible. MODIFY > Split Body: Body to Split (click
+          donut), Splitting Tool(s) (click the spline), Extend Splitting Tool; OK → two bodies
+          (159,474 + 156,353 = 315,827).
+          Friction. Clicking the eye of a nested browser row (Sketch 2 under Sketches) at the
+          same x as a top row's eye did nothing: the eye moves right with indentation.
+          OK. Create Sketch on the Top (XY) plane, C three overlapping circles near the outer
+          edge, Esc. Fission added inference constraints (one centre on the X axis, two centres
+          vertical) by itself.
+          Fail → workaround. Ctrl+click to multi-select the circles does NOT add to the
+          selection (checked with real X-server input too). Shift+click does. Also a plain click on
+          a second curve ADDS it to the selection (FreeCAD habit); in Fusion a plain click
+          replaces the selection.
+          Friction. Fix/Unfix on a selection where one circle is already fixed silently does
+          nothing; with only the two unfixed circles selected it fixed them (sketch "Fully
+          constrained").
+          OK. CREATE > Extrude: the 5 regions (3 circles + 2 overlaps) are shaded and each
+          click picks one ("5 selected"); Operation switched to Cut by itself; Direction has
+          Symmetric and then shows Measurement Half Length / Whole Length exactly like
+          Fusion.
+          Fail → workaround. Choosing Direction = Symmetric (distance still 0) flipped the
+          Operation back to JOIN, and pressing Enter in the Distance box (20) commits the
+          dialog: the result was 5 cylinders JOINED onto the donut, not a bite. Workaround:
+
+
+
+                                                                                                Page 18 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Ctrl+Z, redo the extrude, set Operation = Cut by hand after Symmetric, type 20 and
+          Tab, check "Bodies to Cut: 2 bodies" (both halves), then OK.
+          OK. The cut takes the bite out of both halves (bodies to cut include Body2 once the
+          distance reaches it).
+          Fail → workaround. Pink icing: book double-clicks the Steel-Satin look and edits its
+          colour. No look editor exists. Workaround: Appearance > Apply To = Faces, Custom
+          colour #FF6FB5 + Use, click the top face → pink icing on the top half only (looks right).
+          OK. Save icon → Save dialog: Name, Place (This computer), Location, New Folder.
+          Typed "Classic Donut", Location chosen with "..." (a standard folder chooser), saved in
+          .../Mastering Autodesk Fusion Edt. 2/1 - Fundamentals.
+          Friction. The Location "..." button is drawn as an empty white square (no dots).
+          Fusion's Save dialog shows the project/folder tree inline instead of a separate OS
+          folder chooser.
+
+
+  Project 2: Saturn V Rocket (pp 30–38)
+          OK. Sketch on Top plane, C two circles at the origin (they snap to it), D 58 and 24,
+          Finish, E, click the ring, Distance 365, OK → volume 799,237 mm³ (exact).
+          Fail → workaround. Appearance search ("White Paint") does not exist (no search
+          box), and right-click on a look gives no "Add to Favorites" (no favourites list).
+          Workaround: library "Matte plastic, white", dragged onto the body.
+          OK. Create Sketch on the top face (camera turns to it). The face's edges are
+          ALREADY projected (Fission's "Auto project" preference is on by default; Fusion's
+          equivalent is off by default), so P (Project) + click the face + Done added nothing new.
+          Finish.
+          OK. E, click ring and inner circle (2 profiles), Distance 32, Taper −16 → correct frustum
+          (taper sign matches Fusion: negative = inward). Dialog has the same Start / Direction /
+          Extent Type / Distance / Taper Angle / Operation rows as Fusion; arrow + value boxes
+          on canvas.
+          Fail → workaround. "Black Oxide" does not exist; used "Matte plastic, black" with
+          Apply To = Faces.
+          OK. Extrude a body face directly (no sketch): E, click the top face, 66, OK.
+          OK. CONSTRUCT > Offset Plane, click the top face, −13 → Plane 1 at z = 450.
+          Friction. The offset plane's yellow square is drawn over the part and takes clicks
+          meant for the cylinder face behind it (Split Face said "Click faces of a body"); clicking
+          lower on the face worked.
+
+
+
+                                                                                              Page 19 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. MODIFY > Split Face: Faces to Split + Splitting Tool (Plane 1 picked in the
+          browser), OK.
+          Fail → workaround. The split is LOST as soon as the next feature is added: Extrude 4
+          (Join on top) merges the two halves back into one face (FreeCAD's Refine, on for
+          every extrude), so the black band became the whole 66 mm cylinder. Fusion keeps
+          split faces. Workaround: redo Split Face at the END of the timeline (after all extrudes),
+          then paint the band.
+          Friction. Cylindrical faces show a seam line (FreeCAD's seam edge); Fusion shows
+          none.
+          OK. The 7 stacked extrusions with tapers (57/−9, 23, 7/−35.7, 15/−6, 3/−30, 27, 5/−25):
+          top at 600 mm.
+          Friction. From the fitted whole-rocket view, clicks on the small top faces (r ~ 6 mm,
+          ~10 px) did not pick them ("Select profiles"); zooming in first worked.
+          Fail → workaround. Stainless Steel - Brushed Linear Long → "Stainless steel, brushed"
+          (flat colour). Stainless Steel Mesh - Square Large (cut-out decal, Rotation 45°) does
+          not exist: no cut-out decals, no rotation of a look. No workaround in the Appearance
+          tool.
+          OK. Thruster sketch on the bottom face: circle, Coincident centre-to-rocket-
+          circumference (as PointOnObject), D 25 → fully constrained. (H/V was not needed:
+          Fission had already put the centre on the X axis by inference.)
+          Fail → workaround. Extrude the thruster: the projected rocket edge splits the circle
+          into two profiles (like Fusion). Fission tapers each picked profile on its own and so
+          refused −11° ("-11° does not fit: limited to -6.8°"); Fusion extrudes both profiles
+          together as one cone. Also, right after picking the first profile, the arrow and value
+          boxes sit on top of the other profile and swallow the click meant for it.
+          Fail. Deleting the auto-projected edges from that sketch does not stick: Finish Sketch
+          puts them back (even after turning the preference off). Workaround: Preferences >
+          Design > untick "Auto project the face's edges when sketching on a face", make a
+          NEW sketch on the bottom face (no projection), circle d25 with its centre
+          dimensioned 29 mm from the origin, hide the old sketch → one profile, −52 mm (typed
+          negative to go up into the rocket), taper −11° accepted, Join → correct cone (top r
+          2.39).
+          OK. Operation was set to Cut automatically and had to be changed to Join, exactly as
+          the book says.
+
+
+
+
+                                                                                             Page 20 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Friction. The extrude direction: positive distance goes along the face normal (down,
+          away from the rocket); you type −52 (Fusion: drag the arrow up). Same as Fusion
+          really, the book drags.
+          OK. F (Fillet) on the cone's top edge, 2.9 mm: dialog with Type, Sets, Edges, Tangent
+          Chain, Radius Type, Radius, Continuity, Corner Type like Fusion; OK works.
+          OK. Fin: sketch on Front plane, L four lines (closed, shaded), Coincident bottom line +
+          origin (origin on the line's extension), D 28 / 30 / 12.5 / 30.5 → fully constrained; E
+          Symmetric / Whole Length / 2.4 mm. Friction: Operation came up as Cut again; set
+          Join.
+          OK. Split Face on the fin's angled and vertical faces with the XZ plane picked in the
+          browser.
+          Fail. Appearance with Apply To = Faces: when the drop lands on an EDGE (easy on a
+          1.2 mm face), Fission applies the look to the WHOLE BODY – and a body look wipes
+          every face look already given. This silently destroyed all earlier face colours twice.
+          Fusion: face looks survive a body look. Workaround: zoom in until the face is big, drop
+          in its middle, check the result; redo looks lost.
+          OK. CREATE > Pattern > Circular Pattern: Pattern Type = Features, features picked by
+          clicking them in the TIMELINE (works like Fusion), Axis = click the rocket's round face,
+          Quantity 4.
+          Fail → workaround. With Split Face 3 among the features, OK does nothing
+          ("SplitFace002 does not change the part, so there is nothing to repeat"). Fusion
+          patterns the split too. Workaround: click Split Face 3 in the timeline again to drop it;
+          pattern of the other 3 works (4 thrusters + 4 fins), but the copies' fins are not split, so
+          their faces cannot be half black.
+          Fail → workaround. File > Export has no USDZ (STEP, IGES, STL, 3MF, OBJ, DXF, DWG
+          only), so the AR step cannot be done. Workaround: export OBJ (worked, 545 KB) and
+          convert to USDZ outside (e.g. Apple Reality Converter).
+
+
+  Project 3: Finger Surfboard (pp 40–46)
+          Friction. No "+" button to open a new design tab next to the tabs (Fusion has one);
+          use the New icon (quick access) or Ctrl+N.
+          OK. CONSTRUCT > Offset Plane from the Right (YZ) plane, 24 mm; the Browser grows
+          a Construction folder.
+          OK. Create Sketch, click the offset plane in the canvas; CREATE > Ellipse (centre,
+          major-axis end, minor point); D on the major axis = 26, minor axis = 3.5, origin-to-
+          centre = 5.2 (repeated for the planes at 72 / 116 / 140 mm with 38x4 @7, 29.6x4 @6,
+
+
+                                                                                               Page 21 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          18x4 @4.2). All sizes come out exact.
+          Friction. Fission put the ellipse centre on the vertical axis by itself (so the book's H/V
+          step had nothing to do), but after all of the book's dimensions the ellipse still has 1
+          degree of freedom (its rotation) and stays blue/"Under-constrained"; the book says it
+          turns black (fully defined). Workaround if wanted: add Horizontal on the major axis
+          line.
+          Friction. The ellipse arrives with FreeCAD's internal geometry (major/minor axis lines
+          and two focus points) shown as extra construction items.
+          OK. CREATE > Loft: dialog like Fusion's (Profiles list in order, Guide Type
+          Rails/Centerline, Chain Selection, Closed, Tangent Edges Merge, First/Last Profile,
+          Operation). Clicking the 4 ellipse areas in order 4-3-2-1 lofts them with a live preview.
+          Fail → workaround. Clicking the Workspace ORIGIN as the last loft section does
+          nothing (book: loft to the origin point). Even a sketch point at the origin could not be
+          clicked while the construction planes and the origin were visible (their glyphs are in
+          front and take the click). Workaround: make a sketch on the YZ plane with a Point at
+          the origin, hide Construction and Origin, then click the point: "5 point of Sketch004" is
+          added and the board ends in a point. Volume 12,618 mm³.
+          Fail. Polystyrene decal appearance with Scale 25% does not exist (no textures/decals,
+          no scale).
+          OK. INSERT > Canvas opens a file chooser straight away (Fusion first shows "Insert
+          from my computer"); the Canvas dialog then has Face, Opacity, Display Through,
+          Selectable, Horizontal/Vertical Flip, X/Y Distance, Z Angle, Scale X / Y / Plane XY like
+          Fusion. Face = XZ picked in the browser, Scale Plane XY 8.25, Horizontal Flip: all
+          applied. (The book's PNG is a CADclass download this sandbox cannot reach; a stand-
+          in PNG was used.)
+          Friction. Canvas positioning uses move arrows / a rotate handle / a scale arrow and
+          X/Y Distance boxes; there is no white square to drag freely as in the book.
+          OK. Sketch on the Front plane > CREATE > Project / Include > Intersect, click the
+          board → purple intersection curve. Friction: In a side view the board is a thin sliver and
+          the first clicks missed it; zooming in worked.
+          OK. Fit Point Spline with first and last points snapping onto the purple curve
+          (PointOnObject), Enter; select spline + Fix/Unfix (as in the donut, select first); Finish;
+          Canvases eye hides the canvas.
+          OK. Extrude fin: Symmetric, Whole Length, 2.4 mm, Join (Operation was already Join).
+
+
+
+
+                                                                                              Page 22 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. Tail hole: in the dimension tool, clicking the board's EDGE (a model
+          edge, not sketch geometry) does not reference it; Fission silently made a nonsense 0
+          mm "Distance" between the centre and the X axis instead, which Ctrl+Z then would
+          not remove. Fusion projects the edge on the fly ("Auto project edges on reference").
+          Workaround: delete the sketch (timeline right-click > Delete; the timeline menu
+          matches Fusion's: Edit Sketch, Suppress Features, Roll History Marker Here, Rename,
+          Delete, Find in Browser, Find in Window), start again, P (Project) the tail edge first,
+          then D centre-to-projected-edge = 2 and diameter 2 → fully constrained.
+          OK. E on the hole: profile auto-picked, Extent Type = All, Flip button exists. Friction:
+          After Flip the Operation stayed Join; had to set Cut by hand (Fusion shows red Cut).
+          OK. F, fin's two edges + the hole's inner face (3 selected), 1 mm, OK.
+          OK. File > Export > STL (Binary): Finger Surfboard.stl written (1 MB).
+
+
+  Project 4: Tensegrity Tower (pp 48–55)
+          OK. CREATE > Polygon > Circumscribed Polygon (sides box = 6), click origin, click a
+          corner.
+          Friction. The polygon comes with FreeCAD's construction circles and an internal
+          construction line, and right after a Horizontal/Vertical on its top edge the Sketch Edit
+          panel showed "Redundant constraints (17)" in red (FreeCAD's own polygon
+          constraints overlap). Fusion shows none.
+          Fail → workaround. D on the leftmost and rightmost CORNERS (book: 100 mm across)
+          made no dimension: each corner is also on the construction circumcircle and the
+          clicks only selected vertices. Workaround: dimension the construction circumcircle's
+          diameter = 100 (same thing) → hexagon fully constrained, 100 mm across.
+          Friction. L + X (construction) from the top-left corner through the ORIGIN to the top-
+          right corner: the chain ENDS when a click lands on existing geometry (the origin), so
+          only the first line was made; same later when the arm outline's second click landed on
+          the projected edge (one side of the arm was missing). Fusion keeps the chain going.
+          Workaround: start L again from that point.
+          OK. X toggles construction inside the Line tool and on selected curves (like Fusion).
+          The mode persists into the next tool (a later Circle came out as construction until X
+          was pressed with it selected) – same as Fusion, easy to miss.
+          OK. Triangle with auto Horizontal; Equal (left/right sides); Parallel left side to left
+          guide. The second Parallel is silently not added (already implied) – the book warns
+          Fusion shows an error.
+
+
+
+
+                                                                                               Page 23 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. D between parallel lines (3, 3) and between the two top lines (6) → "Fully
+          constrained".
+          Fail → workaround. Sketch Circular Pattern: double-clicking a line does NOT chain-
+          select the connected triangle (tested with a real X double-click too: it selects and
+          deselects). Workaround: click the three lines one by one. Center Point = origin,
+          Quantity 6, OK → 5 copies.
+          Friction. The patterned copies are not tied to the original: the sketch went from fully
+          constrained to "25 Degrees of Freedom" (Fusion's sketch pattern keeps them
+          defined).
+          Fail → workaround. Coincident (click circle centre, click line): one click landed on the
+          left guide line and Fission made the centre the guide's MIDPOINT (a Symmetric
+          constraint) instead of putting it on the line; the next Coincident then silently failed.
+          Ctrl+Z also reverted the earlier X toggle. Workaround: select centre + line first
+          (Shift+click), then Coincident: two PointOnObject constraints put the centre at the
+          guide / top-line intersection, D 3.5.
+          OK. Origin eye; CREATE > Mirror (Objects, Mirror Line = Y axis) and again about the X
+          axis → 4 holes.
+          OK. E, click the frame region, 6 mm → 18,376 mm³ (hand check: hexagon − 6 triangles −
+          4 holes = 18,378).
+          Fail → workaround. Appearance "double-click Steel-Satin, move the colour slider": no
+          look editor; the Custom colour R/G/B sliders in the Appearance panel are the
+          workaround (not repeated here).
+          OK. Sketch on Front plane, P + click the front face (projected), L arm outline (5 lines,
+          one re-drawn as above), Parallel on the two angled lines.
+          Friction. While dimensioning (6, 10, 6, 75) the arm flipped to lean the other way (the
+          book warns sketches can jump). A 5th dimension on the bottom came out as a driven "
+          (6.8 mm)" reference dimension in brackets because it was already determined –
+          Fusion shows these the same way.
+          OK. CREATE > Point on the bottom line snaps to its midpoint (triangle glyph).
+          Fail → workaround. Horizontal/Vertical between that point and the origin did nothing
+          (the point was 32 mm to the side, so the tool picked "horizontal", which conflicts, and
+          silently refused). A dimension typed as 0 is refused too. Workaround: dimension
+          origin-to-point, double-click it, type 1 (point moves to x = −1), click the dimension +
+          Delete, then H/V → Vertical, fully constrained.
+          OK. Double-clicking a sketch dimension opens its value box; clicking a dimension
+          selects it and Delete removes it (Fusion-like).
+
+
+                                                                                              Page 24 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. E, Symmetric / Whole Length / 6 mm, Join → arm joined.
+          Fail. MODIFY > Chamfer on the arm's inner corner, 20 mm: "20 mm does not fit: limited
+          to 1.79 mm" although the faces on both sides are long. A 1.79 mm chamfer was made
+          instead. No workaround found.
+          OK. H (Hole): dialog like Fusion's (Single Hole / From Sketch, Face, Reference edges,
+          X/Y, Extents Distance/To/All, Simple/Counterbore/Countersink,
+          Simple/Clearance/Tapped/Taper Tapped, Flat/Angle drill point, Diameter, Depth, Tip
+          Angle). Real drag of the blue dot works; Extents All, 3.5 mm, OK → hole cut. Friction:
+          The position box shows "-55.00 um" (micrometres) instead of 0.00 mm. (Note: my arm
+          came out leaning the other way, so the hole went through the arm's top.)
+          OK. Window-select the whole part (a real drag box) selects 71 edges/faces.
+          Fail. Chamfer 0.5 mm on all of them: "too big here: the bevel does not fit"; 0.3 and 0.2
+          too. Fusion chamfers every edge of the body. No workaround short of picking edges
+          one by one.
+          Friction. Browser right-click Body > Save As Mesh exists, but opens the general
+          Export dialog (3MF preselected); it has no "Send to 3D Print Utility" box. Fission's File
+          > 3D Print is the place for sending to a slicer.
+
+
+  Project 5: Carabiner (pp 56–64)
+          Fail → workaround. The Line tool's "click-and-hold to drag a tangent arc" trick (core of
+          this project, done with real X-server mouse input): pressing and dragging at the end of
+          a line just continued a straight line with length/angle boxes; no arc. Workaround:
+          CREATE > Arc > Tangent Arc for each arc (start on the line's end, click the end point) –
+          tangent constraints added.
+          Friction. Tangent between an arc and a line that already share an endpoint pops up
+          FreeCAD's modal "Sketcher Constraint Substitution: Endpoint to endpoint tangency
+          was applied. The coincident constraint was deleted." with an OK button (Fusion:
+          silent). Also the tangent arc moved the top line end while constraining (the shape
+          distorted until dimensioned).
+          OK. D on arcs gives radius (R20, R12) and the line 50 → "Fully constrained".
+          Friction. Center to Center Slot from the bottom arc's centre "traced along the arc to
+          its midpoint": no midpoint snap on the arc; the end centre is only put ON the arc (1
+          DOF left). D on the slot end arc = radius 1 works.
+          Fail → workaround. Sketch Circular Pattern has NO Suppression checkbox (book:
+          Quantity 8, then untick 5 instances). Type = Symmetric does not give 3 instances
+          either: it counts each side (Quantity 3 / 90° gave 5 slots over 180°; Quantity 2 or 1 / 45°
+
+
+                                                                                               Page 25 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          also gave 5 over 90°). Workaround: pattern, then select the unwanted copies
+          (Shift+click) and Delete; two small arcs of the deleted copies overlap others at the
+          same spot and could not be clicked, so they stayed behind.
+          Fail. After Ctrl+Z of that pattern the SKETCH tab and palette vanished (ribbon back
+          on SOLID) while FreeCAD still had the sketch open; Finish Sketch was gone.
+          Workaround: double-click the sketch in the timeline again.
+          OK. CREATE > Rectangle > Center Rectangle: click origin, type 8, Tab, 8, Enter in the
+          on-canvas boxes → 8 x 8 square, fully constrained (exactly like Fusion).
+          OK. CREATE > Sweep: dialog like Fusion's (Type Single Path / Path + Guide Rail / Path +
+          Guide Surface, Profile, Path, Chain Selection, Distance, Taper, Twist, Orientation,
+          Operation); profile auto-picked, one click on the carabiner picks all 4 curves (chain);
+          OK → swept body (12,996 mm³).
+          OK. Sketch on Top plane, P + click the two top edges of the straight side → 2 projected
+          lines.
+          OK. L from the projected corner, typing 6 into the on-canvas length box while drawing
+          works.
+          Friction. O (Offset) 0.5 mm: besides the 5 offset lines it adds 6 short connector lines
+          (end caps and corner joins); the result did NOT close into a profile with the projected
+          lines (3 open wires), so the latch could not be extruded later. Fusion's offset gives the
+          parallel curve only.
+          OK. MODIFY > Chamfer, click the bottom face (all its edges), 2 mm.
+          Friction. Fillet top face + chamfer's top edges at 4 mm: Fission silently capped it to
+          3.99 mm ("1: 3 picks - 3.99 mm"); Tangent Chain made one edge click drop a chain
+          picked before.
+          Fail → workaround. Clicking the flat underside shows no area in the bottom right
+          (Fusion shows "Area 812.278 mm²" for a selected face). Workaround: INSPECT >
+          Measure.
+          Fail. Final cut of the latch + 3 slots: with the body hidden, Extrude offered 27 sketch
+          regions, many of them zero-area slivers (from the overlapping pattern arcs), and none
+          from the latch sketch (not closed, see Offset). Not completed; the 0.4 mm spring fillet
+          could not follow.
+
+
+
+
+                                                                                              Page 26 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Chapters 2–3 step by step: Play Brick to Prototype Drone
+  Chapter 2's solid tools (Box, Draft, Shell, Text, Emboss, Thread, Coil, Section Analysis)
+  mostly match Fusion. The two big failures are the thread-into-chamfer trick and a 25×
+  knurl pattern that never finished. Chapter 3 is about parameters, which is Fission's
+  weakest area. The bolt works once parameters exist, but you can't create them in the UI,
+  and the parametric drone does not survive a parameter change.
+
+
+  Project 6: Play Brick (pp 68–75)
+          Friction. CREATE > Box: pick the Top plane, click the origin corner – but there is no on-
+          canvas "type 31.8, Tab, 15.8, Enter, 9.6" flow: focus stays in the 3D view, typed numbers
+          go nowhere and Tab jumps into the dialog. Workaround: type Length / Width / Height
+          into the Box dialog, OK → 31.8 x 15.8 x 9.6 box at the origin (this body is named "Body1",
+          others "Body" – inconsistent).
+          OK. Stud: sketch on the top face, circle D 4.8 dimensioned 3.9 / 3.9 from the origin, E
+          1.8 mm.
+          Friction. MODIFY > Draft (Type Fixed Plane / Parting Line, Pull Direction, Faces,
+          Tangent Chain, Draft Sides, Angle – like Fusion). The two selection boxes are fiddly:
+          after picking the pull face, clicking the Faces box and a face sometimes did nothing,
+          and an OK refused for missing faces cleared the pull direction. Re-picking both (pull
+          face from an angle, side face from the side) worked; 1°.
+          Fail → workaround. Rectangular Pattern of Features (Extrude + Draft picked in the
+          timeline, Distance Type = Spacing, Q4 x 8 mm and Q2 x 8 mm): clicking the brick's
+          edges for the directions picked the FACES next to them ("Face of Draft 1"), both
+          directions became the face normal and the studs were stacked upwards (bbox z 35
+          mm). Workaround: Ctrl+Z, pick the directions exactly on the edges (they then read
+          "Edge of Draft 1") → correct 4 x 2 grid.
+          OK. MODIFY > Shell, click the bottom face, Inside Thickness 1.2 → correct shell.
+          OK. Text in a sketch: CREATE > Text, two clicks for the frame, Bold / Italic / centre /
+          middle buttons, Height 1, "PLAY" → OK. Dialog matches Fusion (Text / Text On Path,
+          Font, Character Spacing, Flip).
+          Fail. Tangent constraints between the text frame's lines and the projected stud circle:
+          no constraint was added for any of the 4 lines (and no message). The frame stays free
+          (5 DOF).
+          OK. E on the text letters, 0.1 mm, Join.
+          Skipped. Patterning the text extrude (same Rectangular Pattern as above).
+
+
+
+                                                                                               Page 27 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. M (Move): Body1 picked in the browser, Y Angle 180 → the brick flips in place
+          (pivot at the body's centre, like Fusion's triad). Move dialog has Free Move / Translate /
+          Rotate / Point to Point / Point to Position and X/Y/Z Distance and Angle boxes.
+          OK. Sketch on the inner face; 3 pairs of circles (concentric by inference); Shift+click 3
+          circles + Equal (Ctrl+click does not multi-select, see the donut), D 6.51 and 4.8 → all six
+          right.
+          OK. E the 3 rings 8.4 mm Join (sign is just the other way round to the book because of
+          the flip).
+          OK. Draft with many faces (pull = tube top): 6 faces drafted 1° in one feature (book: 23
+          faces; some of my clicks toggled faces off).
+          Friction. Appearance "search red plastic": no search; the library's "Glossy plastic, red"
+          is there.
+          Skipped (time). The 12 tiny 0.2 x 0.6 rectangles and their mirrors (Mirror, Point-at-
+          midpoint and H/V were tested elsewhere), the ribs between the tubes, and the final
+          Move back.
+
+
+  Project 7: Geocache Hide (pp 76–84)
+          OK. CREATE > Cylinder: pick the Top plane, click the centre, Diameter 33, Height 16,
+          OK (OK is refused with "Click the centre on the plane" until the centre is clicked –
+          same as Fusion).
+          Friction. Double-clicking a body in the Browser does not rename it (book: double-click
+          Body1); right-click > Rename gives an inline name box → "Bottom Screw".
+          OK. Chamfer top edge 3 mm. CREATE > Thread: dialog like Fusion's (Faces, Modeled,
+          Full Length, ISO Metric / ANSI, Size, Designation, Class, Direction); clicking the
+          cylinder face auto-sizes it to M33x3.5 like Fusion; Modeled ticked → real helical
+          thread.
+          Fail → workaround. Dragging Thread 1 in front of Chamfer 1 in the timeline (the book's
+          key trick so the thread runs into the chamfer) does nothing (two real-mouse drags).
+          Fission's docs say such moves are refused when a step uses a face of the step it
+          would move before (the thread sits on the chamfer's cylinder face). Workaround tried:
+          delete the chamfer → the thread breaks ("Pick a cylindrical face to thread", body back
+          to a plain cylinder; Fusion would keep it); Edit Feature + re-pick the face fixes it; then a
+          new Chamfer after the thread: "3 mm is too big here: the bevel does not fit" (also
+          smaller values). So: no thread-runs-into-chamfer result here. (The working order was
+          found later, in the Pizza Cutter: see the cheat sheet.)
+
+
+
+
+                                                                                               Page 28 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. MODIFY > Offset Face −0.25 mm on the thread: Fission's modeled
+          thread is 19 B-spline faces (Fusion: 4 faces); the Offset Face dialog shows "Work in
+          progress on complex shapes" and the clicks made no selection; nothing was offset.
+          Workaround for the clearance: pick a looser thread Class (e.g. 6e) in the Thread dialog
+          instead of offsetting faces.
+          Friction. Cylinder with Height −8 (to grow away from the first body) came out going
+          +8 into the first body.
+          OK. CREATE > Coil: dialog like Fusion's (Revolution and Height / Revolution and Pitch /
+          Height and Pitch / Spiral, Diameter, Revolutions, Height, Angle, Section Circular /
+          Square / Triangular (External/Internal), Section Position, Section Size, Operation).
+          Plane, centre, the book's values (0.1 rev, −10 mm, Triangular (Internal), Inside, 1 mm,
+          Cut) → knurl groove cut.
+          OK. CREATE > Mirror (3D): Pattern Type = Features, Coil 1 picked in the timeline,
+          Mirror Plane = XZ from the browser, OK.
+          Fail. CREATE > Pattern > Circular Pattern of Coil 1 + Mirror 1, Axis Z, Quantity 25 (the
+          knurl): Fission computed for more than 10 minutes, used 5.8 GB of RAM (of 7.6) at
+          100–190% CPU and never finished; I had to kill it. (Sandbox: 2 cores, software OpenGL
+          – slower than a real PC – but Fusion does this in seconds.) The rest of the project was
+          continued in a fresh design.
+          Friction. After the forced restart Fission showed TWO recovery dialogs at once
+          (Fission's "Recover unsaved work?" and FreeCAD's "Document Recovery").
+          OK. Top Cap: sketch on Front plane, 6-line profile, Revolve about Z (axis picked in the
+          browser).
+          OK. Internal thread: Thread on the cap's inner wall, Modeled, Full Length unticked,
+          Thread Length 18; the dialog says "Inside thread, D 33 mm, 20.9 mm long" and
+          proposes M36x3. Friction: The click on a wall that has another wall in front of it picks
+          the front one (outer face, "Outside thread"): you must click where the inner wall is
+          directly visible.
+          OK. CONSTRUCT > Offset Plane −30 from XZ (picked in the browser). Sketch on it,
+          Text "UNSCREW CAP OFFICIAL GEOCACHE.", Height 7.5, centred. Friction: No
+          Impact or Stencil font (only the fonts installed on the computer; Fusion ships its own
+          set).
+          OK. CREATE > Emboss: Sketch Profiles (the text), Faces (the cylinder), Effect
+          Emboss/Deboss, Depth, Alignment (Horizontal/Vertical Distance, Rotation) like
+          Fusion; 0.75 mm → raised text wrapped round the cap, readable from the front.
+
+
+
+
+                                                                                               Page 29 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Friction: The visible offset plane again took the click meant for the cylinder face;
+          hiding Construction first fixed it.
+          OK, with friction. Sketch > INSERT > Insert SVG (file chooser), then FreeCAD's own
+          importer asks "This SVG file does not appear to have been produced by Inkscape... Do
+          you wish to use 96 dpi?" in a dialog whose text is white on a white background
+          (unreadable; answered Yes). Fission's Insert SVG dialog then matches Fusion (Plane,
+          X/Y Distance, Z Angle, Scale Plane XY, Horizontal/Vertical Flip): 0.3, both flips, −15 / 2,
+          OK → 9 curves in the sketch.
+          Skipped. Emboss of the logo (Emboss tested above).
+          OK. Timeline: click first, Shift+click last, right-click > "Group Features" (Fusion: Create
+          Group) → one folder in the timeline.
+          OK. INSPECT > Section Analysis (Faces, Distance, X/Y Angle, Flip, Section Color) on
+          the XZ plane → cut-away view showing the internal thread; an "Analysis" folder
+          appears in the browser like Fusion. Friction: Picking the plane in the browser while
+          Plane 1 was selected first gave "Plane1"; the second pick replaced it – fine, but two
+          Section entries were created during the retry.
+          Skipped. Save As Mesh STL High per body (the Save As Mesh / Export dialog with STL
+          and Refinement High was checked in the Tensegrity project).
+
+
+  Project 8: Metric Bolt (pp 88–93)
+          Bug. MODIFY > Change Parameters opens Fission's Parameters dialog (User
+          Parameters / Model Parameters; no Favorites), but its "+" (add a user parameter)
+          button does nothing except show "'bool' object has no attribute 'strip'" in red
+          (confirmed with a real X-server click). Cause in parameters_ui.py:
+           add_button.clicked.connect(self.add_parameter) passes Qt's checked=False as
+           name , so the name/unit/value prompts are skipped and False.strip() fails. One-
+          line fix: connect to lambda: self.add_parameter() . The + and − buttons are also
+          drawn as blank white squares. No in-app workaround: typing "Head_Diam = 8.5" in a
+          sketch dimension box does not create a parameter either. For the rest of this project
+          the 9 parameters were created by calling Fission's own parameters.add_user()
+          (what + would do), clearly a test shortcut.
+          Fail → workaround. There is no Centerline linetype: the palette's Linetype button only
+          toggles Construction. So dimensions to the axis are radii, not diameters (book:
+          Head_Diam measured as a diameter). Workaround: dimension the radius as
+          =Head_Diam / 2 . Making the bottom line construction (my attempt at "centerline")
+          opens the profile so Revolve finds no profile; it must stay a normal line.
+
+
+
+                                                                                                 Page 30 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Friction. In a SKETCH dimension box a parameter must be typed with a leading "="
+          ( =Head_Length ); typing the bare name (Fusion's way) silently keeps the measured
+          value. No autocomplete drop-down of parameter names appears while typing. (In
+          dialog fields like Extrude Distance the bare name works: -Wrench_Depth was
+          accepted.) With "=" every dimension became parametric ( Parameters.Head_Diam /
+          2 , Head_Length , Shank_Length , Bolt_Diam / 2 ). Double-clicking a dimension and
+          typing an expression works too.
+          OK. S opens command search; typing "rev" lists Revolve first; Enter starts it.
+          OK. Revolve about the X axis (axis not automatic since there is no centerline) → bolt,
+          exact volume.
+          OK. Hex socket: Circumscribed Polygon on the head end face, across-flats driven by
+          =Wrench_Width (on the polygon's inscribed construction circle, as in the Tensegrity
+          workaround), Extrude Distance -Wrench_Depth → Cut chosen automatically.
+          OK. Chamfer with Sets: "+" adds a set with its own size, exactly like Fusion: set 1 =
+          shank end 1 mm, set 2 = both head ends 0.5 mm (set 3, hex edges 0.25 mm, removed
+          again with "−": the small socket edges were too fiddly to click from this view).
+          OK. Thread on the shank, Modeled, Full Length unticked, Thread Length =
+          "Thread_Length" (a parameter name accepted) → M5x0.8, 22.5 mm.
+          Skipped. Dragging the thread before the chamfer (refused in the Geocache project
+          already) and the 40 straight knurls on the head (Circular Pattern of features was
+          tested in Saturn V).
+          OK. Change Parameters: double-click the Length expression, type 25, OK → the bolt
+          rebuilds to a 25 mm shank and the thread to 12.5 mm automatically (parametric chain
+          works).
+          Fail → workaround. Circular Pattern of BODIES with Quantity = "Quantity" (a
+          parameter): "A pattern of bodies takes a plain number as its quantity." Workaround:
+          type the number (6).
+
+
+  Project 9: Prototype Drone (pp 96–109)
+
+  Setup / component
+
+          Friction. ASSEMBLE > New Component dialog has Name / Type / Parent / From Bodies
+          / Activate but no Internal / External choice (Fusion's first option). Name "Drone
+          Frame" + OK worked; the component is created active (blue dot) with its own Origin,
+          like Fusion.
+
+
+
+
+                                                                                              Page 31 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Friction. The first component is NOT grounded automatically (Fusion grounds it,
+          anchor icon). Workaround: right-click the component > Ground (the menu then offers
+          Unground). The root row shows a single cube icon, not Fusion's stacked "assembly"
+          icon.
+          OK. Data Panel: New Folder + right-click > Rename made "3 - Parametric Design" >
+          "Prototype Drone" (Rename is a small modal dialog, as logged in Ch1). Friction: Ctrl+S
+          "Save" dialog defaults Location to the project ROOT, not the folder open in the Data
+          Panel (Fusion saves into the open folder). Workaround: type the folder path in
+          Location (or browse with the small square button). The design then shows in the
+          folder as "Prototype Drone v1".
+
+  Sketch (Top plane)
+
+          OK. L, X toggles Construction on; C then X toggles it off; concentric circles snap to
+          line ends; 9.2 / 3.5 / 1.8 diameters typed in value boxes.
+          Friction. The line chain stops when it reaches the Origin (logged before); the 2nd line
+          was drawn separately.
+          Friction. Drawing a line near 45° silently adds a DRIVING 45° angle dimension (also
+          135° on later lines). Fusion only shows a temporary snap and adds no dimension.
+          Consequence: the book's second 13 mm dimension became a grey "(13 mm)"
+          reference dimension, and later Parallel constraints were refused as redundant.
+          Workaround: click the angle's label, Delete, then delete/redo the reference dimension
+          (there is no right-click "toggle driven": the right-click on a dimension only shows the
+          general marking menu).
+          OK. D on two concentric circles gives the radial gap; =Support_Width/2 made it
+          parametric. Friction: typing "S" shows no parameter autocomplete list (Fusion: type S,
+          Enter fills Support_Width). Bare Support_Width/2 (Fusion's way) silently keeps the
+          measured 2.139 mm.
+          OK. CREATE > Circular Pattern (sketch): Objects, Center Point "Select", Type
+          Full/Angle/Symmetric, Quantity, live preview, OK – like Fusion. Fail → workaround: The
+          copies are only "Equal" to the original: their positions are free (6 extra degrees of
+          freedom for the 3 small holes; 58 DOF after the 4x pattern of the arm, 79 after the
+          frame lines). Fusion ties copies to the pattern. Effects later in this project: (a) a
+          Tangent constraint on the original pulled the copied motor circle 0.06 mm off centre,
+          (b) patterned line ends missed the copied rings by 3 µm–0.06 mm so the sketch areas
+          did not close (a frame strip merged with an open triangle; the arms merged with the 4
+          inner openings), (c) changing Arm_Length moves only the original arm. Workaround
+
+
+
+
+                                                                                              Page 32 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          used: Coincident (point-on-curve) constraints on the 4 loose line ends in quadrant 3;
+          the merged arm/inner-opening area could not be split, so the 4 small inner openings
+          around the AIO board are filled in the final frame.
+          Fail → workaround. Symmetry constraint the book's way (left line, right line, centre
+          line) does nothing at all (no constraint, no message): Fission's Symmetry is FreeCAD's
+          (two POINTS and a line). Workaround: Symmetry on the two bottom end points + the
+          construction line. For the angled arm lines the point-symmetry is refused ("conflicts
+          with the 1.8 mm diameter, the 2 mm dimension, ... 15 more" – a clear message), so the
+          second pair was centred with a dimension =Support_Width/2 from the construction
+          line instead.
+          Friction. D on two parallel lines then a click to place the dimension ON another line
+          (the centre construction line) does not place the dimension: the third click is taken as
+          a third pick and the tool adds EQUAL constraints instead (sketch became "Redundant
+          constraints"). Placing in empty space works. Fusion places the dimension wherever
+          you click.
+          Friction. Undo after these steps sometimes took back two steps at once (Equal +
+          Symmetric).
+          Friction. The perpendicular construction line's end snapped to the MIDPOINT of the
+          arm line (midpoint constraint) which later fights the arm length. Workaround: undo,
+          end the line away from the middle (plain point-on-line), then Perpendicular.
+          OK. Parallel and Perpendicular constraints, mirror-less symmetric arm,
+          Support_Width dims.
+          Friction. MODIFY menu inside a sketch has no "Change Parameters" (Fusion has it
+          there). Workaround: S search "Change Parameters" (it is listed twice in the results)
+          opens the dialog.
+          Fail → workaround. Parameters "+" broken (see Metric Bolt); Arm_Length and
+          Limits_Arm_Length were created with Fission's add_user() (test shortcut). Editing
+          the Expression cell (double-click) works.
+          Fail → workaround. The book's expression min(100;max(45;Arm_Length)) evaluates
+          to "0 mm" with no red text or warning in the dialog (error only in the Report log:
+          "quantities need to have same unit to compare"). Fusion treats bare numbers as mm.
+          Workaround: min(100 mm;max(45 mm;Arm_Length)) → 53 mm.
+          OK. Double-click the 53 mm dimension (box shows =Parameters.Arm_Length ), type
+           =Limits_Arm_Length : then Arm_Length 50 → 50, 40 → 45 (min), 110 → 100 (max), 53 →
+          53. Friction: Parametric dimensions show "53 mm", not Fusion's "fx: 53.00", so you
+          cannot see which dimensions are driven by parameters.
+
+
+
+                                                                                               Page 33 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Bug. Deleting a sketch dimension/constraint does not renumber the parameter links
+          of the dimensions after it. After deleting the auto 45° angle, Support_Width / 2
+          moved from the ring-gap dimension (Change Parameters now lists it as plain "2 mm")
+          onto a point-on-object constraint; after deleting two lines the Arm_Length link
+          pointed past the end of the list ("Array out of bound: 34, 31" in the Report view). Undo
+          restored it. Any delete in a parametric sketch can silently cut or mis-wire parameter
+          links.
+          Fail → workaround. After changing Arm_Length 50/40/110/53 the angled support lines'
+          ends had jumped to the far side of the mount ring (the other circle intersection), so
+          the lines cross the ring. Dragging the point back is impossible (it snaps back).
+          Accepted: the extruded area is the same.
+          OK. CREATE > Mirror (sketch): Objects, Mirror Line Select, preview, OK; mirrored
+          copies are tied with Symmetric constraints.
+          OK. Window-select (drag) selects the whole sketch (16 curves); Circular Pattern x4
+          about the Origin. Friction: In my run the typed Quantity "4" kept the old value 3 until
+          the field was committed.
+          OK. Square frame lines, Parallel, Tangent, =Support_Width spacing, pattern x4
+          (diamond frame). Friction: The Tangent tool pops FreeCAD's "Sketcher Constraint
+          Substitution" dialog (hidden behind the window here; it blocked input until
+          dismissed).
+
+  Extrude / details
+
+          Friction. After Finish Sketch the sketch had become hidden (Fusion keeps it shown
+          until used); right-click > Show.
+          OK. E + clicking areas: 36 areas picked from the iso and top views ("36 selected").
+          Fail → workaround. Typing Thickness= -2.5 mm in Distance (Fusion's quick way to
+          create a parameter) → "'Thickness= -2.5 mm' is not a value here: Failed to parse
+          expression". Bug: A user parameter in mm cannot be negative: it is stored as a Length,
+          so "−2.5" becomes 0 mm (Change Parameters then says "Extrude 1 would break:
+          Cannot create a pad with a total length of zero"). Workaround: Thickness = 2.5 mm
+          and Distance -Thickness (accepted, shows "Distance = -Thickness", extrudes down).
+          Friction. (first attempt) extruding the 35 strip areas as New Body gave 5 separate
+          bodies; a Combine Join kept 5 solids in one body. Cause: my arms area was excluded
+          (see the merged-area problem).
+          Bug. Undo of Combine left an orphan, invalid "Combine 1" step in the timeline ("There
+          is no solid in the target body"); it had to be deleted by hand from the timeline.
+
+
+
+                                                                                              Page 34 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. Fillet 2.5 mm on two inner vertical corners.
+          Fail. Highlight the whole model (window drag) + Chamfer 0.25 mm: "Distance 0.25 mm
+          is too big here" – also at 0.1 mm. The micro-edges left by the drifting pattern copies
+          stop any chamfer. Skipped.
+          OK → workaround. Physical material: MODIFY > Physical Material lists In This Design /
+          Library (20 materials, no Carbon Fiber) and shows Mass (Steel 64.87 g). Double-
+          clicking the material does nothing and the density is read-only (no Advanced >
+          Physical > Density edit). Workaround: MODIFY > Manage Materials > New Material:
+          Name "Carbon Fiber", Density 1.6 g/cm³, based on Steel, Create, then select the body
+          and "Assign to Selection" → frame 13.14 g.
+          Fail → workaround. No Carbon Fiber appearance (28 looks); used "Matte plastic,
+          black" (drag onto the frame).
+          OK. Root right-click > Activate.
+
+  Imports and assembly
+
+          Blocked → workaround. The 4 STEP files come from CADclass.org, which this sandbox
+          cannot reach. I made stand-in STEP files of the same names and sizes (motor + 3-
+          blade prop with 3 holes on 3.3 mm, AIO board 32x32 with holes on 26 mm, battery
+          60x15x12) to test the workflow.
+          OK. Data Panel Upload (multi-select in the file dialog) → 4 STEP files listed in the
+          folder. OK: right-click > "Insert into Current Design" inserts the STEP as a new
+          component and opens a Move dialog (Fusion-like); motor holes line up with the frame
+          holes when viewed from below.
+          Fail → workaround. Move dialog distances do not take parameters: "Arm_Length",
+          "=Arm_Length", "Parameters.Arm_Length" all silently give 0.00 mm; WORSE, -2 *
+          Arm_Length is silently read as "−2 mm". Plain arithmetic works ( -2 * 53 → −106).
+          Workaround: type numbers (53, −106).
+          OK. Ctrl+C / Ctrl+V of a component → pasted copy (":2") with the Move dialog.
+          Friction. Move with Z Angle 180 turns about the bounding-box centre, not the
+          component origin, so the copied motor landed 6.4 mm off (at 6.42, −46.58 instead of 0,
+          −53). Workaround: a second Move (X −6.4197, Y −6.4197). Also the Objects button
+          drops "&" from names ("Motor Propeller").
+          OK. Ctrl+click multi-selects the 7 components in the browser; ASSEMBLE > Rigid
+          Group lists them. Fail → workaround: The Components button shows all 7 names on
+          one line and pushes the panel so wide that OK/Cancel are off-screen (x = 2319 on a
+          1920 screen). Workaround: press Enter.
+
+
+
+                                                                                                 Page 35 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. No right-click > Properties (mass) on a component or body.
+          Workaround: MODIFY > Physical Material shows each body's mass – but every line is
+          "Body1: ..." with no component name. Frame 13.14 g (carbon fibre) – well under the
+          195.5 g budget, so the book's conclusion holds. INSPECT > Center of Mass works but
+          shows no total mass.
+          Fail. "Experiment by changing parameters": Change Parameters Arm_Length 53 → 60
+          is refused live: "Not changed: with Arm_Length = 60, Extrude 1 would break: Sub
+          shape not found: Sketch.InternalFace56". The extrude stores sketch areas by number
+          and the numbers change. Even without that, the patterned arms and the inserted
+          motors would not follow (copies free, Move takes no parameters). The parametric
+          drone – the point of this project – does not work in Fission.
+          Skipped. Chamfer (fails, above); question page.
+
+
+  Chapter 4 step by step: Fire Piston and 3D Printer Hot End
+  Both assemblies could be built. Inch designs, threads, coils, holes, As-built joints and
+  Section Analysis all work. The cost is constant babysitting: the units switch back to mm,
+  joints need snap tricks, and work lands in the wrong component. McMaster-Carr parts
+  had to be modelled by hand or skipped.
+
+
+  Project 10: Fire Piston (pp 112–123)
+          OK. Document Settings > Units right-click > Change Active Units > Inch. Inch values
+          and fractions work in sketch value boxes ("25/64/2" → 0.19531 in, "5/16/2", "1/16",
+          "3/32").
+          Bug. The design's units silently go back to mm. Reproduced: set Inch, then Ctrl+Z of
+          any step → Document Settings shows "Units: mm" and every dialog (Offset Plane, Coil,
+          Thread, 2nd chamfer set) shows/takes mm; Ctrl+Y does not bring inches back. It also
+          happened (without my Undo) after a Change Parameters edit and after some
+          Chamfer OKs – 5 times in this project. Typing "0.02" then means 0.02 mm (shown
+          "20.00 µm"). Workaround: watch "Units:" in the browser, set Inch again, or type units
+          explicitly ("0.02 in", "-0.5 in").
+          Friction. In an inch design the sketch grid/snap is still metric (points jumped to 10 mm
+          / 100 mm steps). Workaround: palette Snap off.
+          Friction. Change Parameters > Model Parameters always lists values in mm (101.6 mm,
+          4.9609 mm) even in an inch design; Coil, Offset Plane, Thread and Hole parameters are
+          not listed at all.
+
+
+
+                                                                                                Page 36 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Friction. Ctrl+Z after drawing a polyline only removed its auto-constraints, not the
+          lines. Ctrl+A (select all) + Delete in the sketch works to start over.
+          OK. Piston Body: polyline + dims (4, 0.5, 0.70/2, 25/64/2, 0.35/2) fully constrained;
+          Revolve about X (S search); internal Thread: Fission auto-suggests the size from the
+          hole, ANSI Unified 3/8-16 UNC, Modeled. Friction: the Thread dialog defaults to ISO
+          Metric in an inch design.
+          OK. Chamfer sets: 3/32 inner edge + set 2 (outer edge + left FACE) 0.02 in.
+          OK. Construct > Offset Plane on the left face, −0.5 in into the body.
+          OK. Create > Coil on the offset plane: click centre, type Diameter 0.70 in, Revolutions
+          1.5, Height −3 in, Section Triangular (Internal), Inside, 0.02 in; Operation switched to
+          Cut by itself. Friction: The book's "click-drag from the origin to the edge" is "click
+          centre, click edge or type Diameter".
+          OK. Mirror (Pattern Type Features, Coil picked in the timeline, XZ plane) and Circular
+          Pattern of Features (Coil + Mirror, X axis, 6) → knurl. Friction: the live preview of the
+          pattern kept the app busy for > 30 s.
+          OK → workaround. "Search Anodized" in Appearance: no search box; dragged
+          "Aluminium, anodized blue".
+          OK. Root dot activates the root. Timeline: click first, Shift+click last, right-click >
+          "Group Features" (book: "Create Group"), right-click group > Rename = inline name
+          box.
+          Friction. New Component: Piston Body had to be grounded by hand again (right-click
+          > Ground).
+          OK, with friction. Body End Cap: polyline; the R0.04 arc was made with the sketch
+          Fillet (adds both Tangents and an R dimension). Friction: the Fillet's typed radius
+          (0.04) was not used (0.0317 kept) until the R label was double-clicked; rotated
+          dimension labels are hard to hit (several tries needed). Friction: D + click a point +
+          click empty space sometimes creates the dimension at the measured value with no
+          value box; a second (redundant) one became a grey reference dimension.
+          Workaround: edit the value in Change Parameters (double-click the Expression). OK:
+          Revolve, chamfers (0.05 / 0.02 x2), cosmetic thread (Modeled off) 3/8-16, Brass look,
+          group.
+          OK. Dragging the ungrounded End Cap moves it; Ctrl+Z puts it back (and switches
+          units to mm, above). Friction: the drag + undo froze the app for ~80 s.
+          Fail → workaround. Insert > McMaster-Carr Component does not exist. INSERT >
+          Hardware... has only metric screws, nuts, washers, heat-set inserts and magnets (no
+          O-rings, no inch sizes). Workaround: modelled both O-rings myself (new component,
+
+
+                                                                                                    Page 37 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          circle 0.070 in on Front, revolve about Z), then Move with Y Angle 90 and X Distance –
+          like the book's placement step.
+          OK, with friction. Joint (J): two clicks, Fusion-like panel (Mode, Snap, Offset X/Y/Z,
+          Angle, Flip, Motion tab). But clicking a round surface snaps to the nearest snap point –
+          usually an EDGE MIDPOINT, so the O-ring landed off-axis. Workaround: click where a
+          FACE CENTRE is nearest (inner side of the O-ring; the flat end face of the shank) → "
+          (centre)" snaps; then Offset Z −0.465 in (end cap) / Offset Y −0.15625 in (piston
+          groove) to slide the O-ring into place. Hidden components and occluding parts had to
+          be hidden/shown during the picks.
+          OK. End Cap joined to the Piston Body by face centres (head underside → body end):
+          it moved 1 in and the O-ring (rigidly joined) moved with it.
+          OK. Isolate (right-click) / Exit Isolate (book: Unisolate) work.
+          Bug. With Piston End's steps still selected in the timeline (from grouping), ASSEMBLE
+          > New Component "Piston" silently ticked "From Bodies" and MOVED the Piston End
+          body into the new Piston component (Piston End became empty); the next Revolve
+          then JOINED the piston rod into it. Workaround: edit Revolve 5 > Operation New
+          Body, then right-click the moved body > Move to Component > Piston End. Fusion
+          does not move bodies unless you ask.
+          OK. Hole: click face, drag the blue dot to the centre (snaps, X/Y = 0), Countersink 0.25
+          / depth 3/16 / dia 1/8; then Simple + Tapped, ANSI 5/16-18 UNC, depth 0.5, Modeled. The
+          dialog remembers the last hole's settings (like Fusion). Chamfer 0.02 on the tip.
+          OK. As-built Joint (Rigid) Piston + Piston End.
+          Bug. As-built Joint with Type "Slider" but no axis picked: OK silently created a RIGID
+          joint ("Rigid 5") with no warning. After picking a snap (it only offered a face corner) a
+          "Slider 1" was made and dragging the Piston End slides the piston along X.
+          Partial. Joint limits: right-click the joint > Edit Joint Limits (Minimum / Maximum /
+          Rest; no "Preview Limits" button, no Flip). Ticking Minimum/Rest took the CURRENT
+          slide (1.22 in) although the box first showed 0.00 in; after typing 0 the piston jumped
+          to 0 on OK. Minimum works (cannot push it into the body), but Rest does nothing
+          after a drag: released at 0.78 in it stays there (Fusion springs back to Rest).
+          OK. Opacity Control: 100/80/60/40/20 % or Custom Opacity... (70 % via Custom).
+          Bug. The Piston Body's anodized blue look turned back to grey in the view during the
+          joint / hide-show / isolate steps (the stored look is still blue); a hide/show of another
+          part did not reproduce it.
+          Skipped. Section Analysis of the O-ring (Section Analysis worked in Ch1–3).
+
+
+
+
+                                                                                              Page 38 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Project 11: 3D Printer Hot End (pp 124–141)
+
+  0.4 mm Nozzle
+
+          OK. New Component (+ Ground by hand again). Circumscribed Polygon on Top: click
+          centre, click straight up → 6 sides with a horizontal top edge; 5.95 across flats;
+          Horizontal constraint; fully constrained.
+          Friction. E did not pre-pick the only profile (Fusion picks it) – had to click it.
+          OK. Hide the body (right-click > Hide). Front-plane sketch of the bore / thread relief /
+          tip triangle; Fission's inference already lined up the top and right edges.
+          Fail. CONSTRAINTS > Collinear on the two right-hand vertical lines (and on the top
+          lines) is refused: "Collinear: not added, the Vertical on Line 12 already makes it so" –
+          wrong, two vertical lines are only parallel. Workaround: dimension both lines to the
+          axis (3.5 mm).
+          Friction. The cone line got an automatic 45° angle again, so a height dimension
+          became a grey reference dimension.
+          Fail → workaround. Revolve (Cut) with the body hidden, as the book says: the 3
+          shaded profiles cannot be clicked at all (the sketch lives inside the hidden body).
+          Workaround: show the body, make it right-click > Selectable/Unselectable
+          (unselectable), then the profiles behind it can be clicked. Friction: After the first
+          profile the dialog moves on to Axis (as Fusion does); each extra profile needs a click
+          on the Profiles button first.
+          Fail → workaround. Physical Material has no Brass (20 materials). Manage Materials >
+          New Material "Brass" → "There is already a material called Brass" although none is
+          listed or found by search. Workaround: "Brass C360", 8.5 g/cm³, Assign to Selection.
+          (My earlier "Carbon Fiber" is listed under My Materials – custom materials persist
+          across designs: good.) The Brass look must be added separately (Appearance), the
+          material does not bring a look.
+          OK. Chamfer sets 0.75 (top outer) + 0.1 (inner top hole, tip edge).
+          Friction. Thread defaults to the LAST used standard (ANSI #12-24 in this mm design).
+          Edited the feature to ISO M6x1 – feature editing from the timeline works.
+          OK. Sketch on the hex face + Text (frame, Text box, Height 1.5, font list) "0.4"; E + one
+          click on the letters picks the whole text; −0.1 mm Cut engraves it.
+          OK. Brass look (drag), root activation, timeline Group Features.
+
+
+
+
+                                                                                               Page 39 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail. Gear icon (bottom right) > "Component Color Swatch" does not exist: the only
+          gear is the timeline's (Roll History Marker to End / Expand / Collapse All Groups / Do
+          Not Capture History).
+
+  Heater Block
+
+          OK. New Component, Construct > Offset Plane 9 mm from XY (plane picked in the
+          browser), hide Nozzle, sketch on the plane: rectangle (R) + 3 circles, Horizontal +
+          Equal on the outer circles, dims → fully constrained; Extrude 10 mm; Physical Material
+          Aluminium (pick, then click the body) 9.60 g.
+          Friction. Placing a dimension on top of the Y axis turned it into an Angle constraint
+          (my click landed on the axis) – as in the drone, the placement click is treated as a pick.
+          OK. 1.375 mm chamfers on the two bolt holes from below; modeled M6 thread in the
+          centre hole (Fission suggested M7 for the 6 mm hole; M6 chosen as the book says).
+          OK. Sketch on the right face, 3 circles, Vertical constraint on the two small ones, dims;
+          Extrude Cut −4, −5 and All + Flip ("No faces found in this direction" until Flip – good
+          message). My mistake first: after one extrude the sketch is hidden (Fusion too), so the
+          next clicks picked the FACE and press-pulled a 4 mm slab; the book's "Show Sketch 2
+          during the next 3 extrusions" matters.
+          Friction. Ctrl+Z after a "Driven Dimension" conversion turned the redundant
+          dimension back into a driving duplicate (sketch went "Redundant constraints"); more
+          undos fixed it.
+          OK. Underside sketch circle on the Y axis, Extent "To Object" = inside of the 6.05 mm
+          hole, Cut.
+          OK. Modeled M3 thread in the top-right hole. Skipped: M3 thread in the short set-
+          screw hole: its 2 mm wall could not be clicked from any view I tried.
+          OK. Book's workaround for "no chamfer on threaded holes": drag Thread 2 to the end
+          of the timeline (a real slow drag works; a fast drag did nothing), right-click Extrude 7 >
+          Roll History Marker Here, Chamfer 0.25 (top face, 4 side faces, small hole edge), gear
+          > Roll History Marker to End: chamfer sits before the threads and everything
+          recomputes.
+          OK. As-built Joint (Rigid) Heater Block + Nozzle. Display Settings > Joints toggles joint
+          icons.
+
+  Thermistor / Heater Element
+
+  (The book's STEP files come from CADclass.org, which this sandbox cannot reach, so I
+  used stand-in STEP files I made.)
+
+
+
+                                                                                              Page 40 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. Upload (3 files), Insert into Current Design, Move X 7 / Y −2.5 / Z 11, As-built Rigid
+          joint.
+          Fail → workaround. Joint by the heater element's circular EDGE and the hole's outer
+          edge: clicking an edge snaps to its "(corner)" (the seam vertex) or "(midpoint)" most
+          of the time, only sometimes to "(circle centre)"; cylinder faces gave "(centre)" for the
+          element but "(corner)" for the hole. Fusion shows the centre snap whenever you
+          hover a circular edge. Workaround: Move the element (X −10, Y −9.5, Z 14) and an As-
+          built Rigid joint.
+
+  Heat Break
+
+          Fail → workaround. Project (P) from ANOTHER component: clicking the Nozzle's top
+          face/edge (shown ghosted while sketching) projects nothing – neither in the canvas
+          nor on screen. Fusion projects any component's geometry. Workaround: dimension
+          the profile's bottom line 13 mm from the origin (the nozzle top) instead of a coincident
+          to a projected point.
+          Friction. Two auto 45° angle dimensions again made the book's Parallel constraint
+          redundant (silently not added); some dimensions turned into Angle constraints or
+          reference dimensions when the placement click touched other lines; the sketch was
+          left 2 DOF short (bottom height + chamfer angle) – I stopped fighting it. Revolve about
+          Z (New Body), modeled M6 thread, As-built Rigid to the Nozzle: OK.
+
+  Heat Sink
+
+          OK. Snake fins: CREATE > Rectangular Pattern (sketch) of the 4 groove lines;
+          Direction 1 = X (1), Direction 2 = Y, Distance Type "Spacing" (Fusion: Distribution),
+          Quantity 9, 1.8 mm; preview. Fail → workaround: Because copies are not tied to the
+          original (see Drone), dimensioning AFTER the pattern does not move the copies, so
+          my first (undimensioned) groove left 0.03 mm gaps and the profile did not close.
+          Workaround: undo, dimension the groove (0.8 / 1.0) FIRST, pattern again; one 3.5 µm
+          gap still had to be closed with a window-select of both points + Coincident.
+          OK. CREATE > Arc > 3-Point Arc; Horizontal/Vertical between the arc ends and its
+          centre (quarter circle). Friction: My simplified profile let the arc cut into the last
+          groove, so the area split into 3 regions; Revolve with all 3 kept only the lower solid.
+          Workaround: extra Extrude ring.
+          Fail → workaround. Sketch on the top face + Center Rectangle (it is put on the Y axis
+          by itself) + Extrude Cut "To Object" = underside: the dialog chose Join; editing it to
+          Cut with distance either way said "The cut does not go through any body" though it
+
+
+
+
+                                                                                               Page 41 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          obviously does (sketch on a top face gets a 180° flipped placement); OK then left the
+          feature as Join. Feature edits that end with a warning were silently not saved.
+          Workaround: delete it, Center Rectangle on the XY plane, Extent All, Cut → flat; Mirror
+          (Features, XZ plane) → both flats.
+          OK. 0.5 mm chamfer on the top hole (a FACE pick chamfers both its edges); Thread
+          suggests M10x1 for the hole; modeled.
+          OK. Two circles on the front flat (Equal + Horizontal), the 4 profiles (inside/outside
+          the projected outline) cut All after Flip – exactly the book's "4 profiles".
+          OK. Back flat: diagonal construction line, circle clicked at its middle → Midpoint
+          (Symmetric) constraint, 3 mm. Fail → workaround: "To Object" could not pick the
+          threaded hole's wall (clicks landed on thread edges / nothing); used Distance −1.5 mm.
+          (Later I deleted the wrong sketch by mistake; Fission flagged the dependent cut
+          Invalid, as Fusion would.)
+          Skipped. Projecting the Heater Block holes onto the Heat Sink (cross-component
+          Project fails, see Heat Break) and the Ctrl+click two-face thread.
+          Fail. No "aluminium anodized red" (no anodized physical materials; looks only
+          anodized black/blue).
+
+  Bowden Connector, PTFE Tube, hardware
+
+          OK. Insert STEP, Move Z 44.5, As-built Rigid. Section Analysis on XZ shows the whole
+          hatched assembly (nice); browser right-click > Hide.
+          Bug. Starting a sketch on the Nozzle's top face while "PTFE Tube" was the active
+          component silently switched the active component to "0.4 mm Nozzle": both
+          sketches and the swept tube were created inside the Nozzle. Fusion keeps the active
+          component. Workaround: right-click the tube body > Move to Component > PTFE
+          Tube (leaves an empty, invalid Body1 in PTFE Tube).
+          Fail → workaround. Line tool: press-and-drag at the end of a line does not start a
+          tangent arc (as in the Carabiner). Workaround: CREATE > Arc > Tangent Arc from the
+          line end.
+          OK. Sweep: Single Path, profile = the 2/4 mm annulus, path = line + arc with Chain
+          Selection ("2 curves"), New Body. PTFE exists in Physical Material (2.01 g).
+          OK, with friction. Material colour: no Advanced > Appearances > colour wheel on the
+          material. Manage Materials > Appearance tab > New Appearance (Name + "Colour
+          (#RRGGBB)" text box, no colour wheel): "Royal Blue" #4169E1, Assign to Selection →
+          blue tube.
+
+
+
+
+                                                                                               Page 42 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail. McMaster-Carr plugin (set screws 91390A098, bolts 91294A136, 92000A113,
+          92095A184) does not exist. INSERT > Hardware has metric
+          socket/button/countersunk screws, nuts, washers, inserts, magnets, but no set
+          screws or Phillips pan heads; my attempt to place an M3x20 countersunk screw on
+          the chamfered rim did not pick the rim. Hardware steps skipped.
+
+
+  Chapter 5 step by step: Pizza Cutter and Tesla Turbine
+  The Pizza Cutter was built completely, and it is where the joint bugs showed up: edits to
+  as-built joints are lost, and joint references go stale. It is also where I found the working
+  thread-then-chamfer order. For the Tesla Turbine I built the housing to the book's
+  dimensions, then tested each new tool on simplified parts. Subassemblies, Motion Link
+  between two joints, Circular Pattern of components and Duplicate With Joints work.
+  Mirror and Rectangular Pattern of components, pipe threads and "Link with Same Joint"
+  don't exist.
+
+
+  Project 12: Pizza Cutter (pp 144–155)
+
+  End Cap
+
+          OK. Change Active Units > Inch + "Set as Default" (the book's "default units to
+          Inches").
+          OK. New Component (no Internal/External – known), Ground by hand (known). Front-
+          plane sketch with Line + CREATE > Arc > 3-Point Arc; Coincident arc centre → bottom
+          line (makes it tangent to the Z axis, as the book says); dimensions → fully constrained.
+          No Centerline linetype (known), so the book's diameter dims (1.00, 0.25) were done as
+          radii (0.5, 0.125).
+          Friction. A dimension between the origin and the arc's end point made a grey DRIVEN
+          0 dimension (both clicks resolved to points sitting on the origin). Clicking the arc end
+          + the Z axis line works.
+          OK. Revolve: the single profile IS pre-picked (unlike Extrude); click the bottom line →
+          "X Axis".
+          Friction. Chamfer/Fillet tooltips say "Type a value (mm)" in an inch design (values are
+          inches).
+          Fail → workaround. Thread on the shank: the first face click landed on the head rim
+          behind (my view); the dialog then said "Outside thread, ⌀ 25.4 mm" (mm in an inch
+          design) and offered M25 / 1-8 UNC. "Click it again to drop it" did not drop it from the
+
+
+
+                                                                                             Page 43 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          other view – the ✕ next to Faces did. Then 1/4-20 UNC was suggested correctly.
+          Thread type defaults to ISO in an inch design (known).
+          Fail → workaround. "Drag the Thread before the Chamfer": refused silently again (the
+          thread uses the chamfer's face; app log: "The graph must be a DAG", "Thread.Faces
+          missing element reference"). Inserting the thread before the chamfer (roll marker
+          after Revolve, Thread, roll to end) made the CHAMFER invalid ("Some edges or faces
+          it was applied to no longer exist" – good message) and re-picking failed at any size
+          ("0.254 mm is too big here"): a chamfer cannot go AFTER a modeled thread. Working
+          order (used for all 4 threaded parts): Revolve → Thread → right-click Revolve > Roll
+          History Marker Here → Chamfer → gear > Roll History Marker to End. Result = book's
+          picture (thread runs into the chamfer). Note the gear menu is modal (needs a real
+          click).
+          Friction. Appearance library has 28 looks; "Stainless steel, brushed" exists (drag-drop
+          OK). Component context menu has no Move/Copy, Create Drawing, Create Selection
+          Set (Fusion has them).
+
+  Inner Body
+
+          Fail → workaround. Project (P) of the End Cap's head face from the Inner Body sketch:
+          nothing projected, no message (cross-component Project, known). Workaround:
+          dimension 0.25 from the origin.
+          OK. Rectangle, dims, Revolve, Chamfer 0.02 by clicking the cylindrical face (both end
+          edges).
+          OK. Hole: click the end face, drag the blue dot onto the centre → it snaps (X/Y 0.00).
+          Countersink + Tapped + ANSI 1/4-20 + Depth 0.625 + Countersink Diameter 0.25 in
+          one feature, modeled thread.
+          OK. CONSTRUCT > Midplane (two end faces) and Mirror (Pattern Type Features, Hole
+          1 from the timeline, Plane 1) – volume drop identical to the first hole. Hide Plane 1 under
+          Construction.
+          Friction. Each single Hole adds a "Hole 1 Sketch" row under Sketches (Fusion hides it).
+          OK. As-built Joint (Rigid) End Cap + Inner Body; Unground End Cap / Ground Inner
+          Body (named "Unground"/"Ground", not "...From/To Parent").
+
+  Wooden Handle
+
+          Friction. Ctrl+click does NOT add to a sketch selection (it re-selects one item); plain
+          clicks or Shift+click add. The book says "hold down Ctrl" four times in this project.
+
+
+
+
+                                                                                              Page 44 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. Collinear on the 4 top lines (each already Horizontal): added
+          nothing, no message. Workaround: Horizontal/Vertical between the arc END POINTS
+          of neighbouring lines (3 point pairs).
+          OK. Equal on 4 lines / 3 arcs, Horizontal on the 3 arc centres, dims 4.00 / 0.25 / R1.5 /
+          0.25 → fully constrained (plus 2 extra dims replacing the projected point). Revolve
+          about X, Fillet 0.25 on the 3 curved faces (radius typed and used this time).
+          Fail. No Mahogany: library has only "Wood, light/dark"; looks are flat colours (no wood
+          texture), so "double-click the appearance, rotation 90, scale 40%" has nothing to edit
+          (double-click and right-click on the look do nothing).
+          Bug. Looks silently lost: later the handle (and the steel parts) showed plain grey while
+          the Appearance panel still listed "Wood, dark (Body1)". Dropping the SAME look again
+          changed nothing (Fission caches the applied look per step). Workaround: drop a
+          different look (Wood, light), then Wood, dark again → back. Cause not pinned down
+          (seen after Isolate/Exit Isolate + Move); hide/show and timeline rolls alone did not
+          reproduce it.
+
+  Wheel Bracket
+
+          OK. Isolate (right-click) hides the rest; menu turns into Exit Isolate.
+          Friction. A 3-point arc's middle click decides the arc; my wrong middle point made a
+          270° arc. Tangent then pops FreeCAD's "Constraint Substitution" message box
+          ("Endpoint to endpoint tangency was applied...") with OK – Fusion has no such box.
+          After it closed no window was active and the next dimension boxes never got
+          keyboard focus (values had to be set afterwards).
+          OK. Horizontal between arc centres and the origin; Tangent (arc + line) after
+          redrawing the arc.
+          OK. Thread / roll back / Chamfer workaround as above. Top-plane sketch: Project the
+          cylindrical face (same component) works; rectangle from the projected corner
+          snapped and got constraints.
+          Friction. Extrude pre-picked both profiles (good) but choosing Symmetric + All
+          switched the operation from Cut to Join and OK did nothing silently (stale "Up to
+          face" warning shown). Setting Cut again → correct symmetric through-all cut.
+          OK. Hole on the new flat face: the dot snapped to the arc centre (X 6.00, Y 0), the Hole
+          dialog remembered last values (Countersink, 1/4-20, 0.625).
+          Fail → workaround. Fillet 0.02 by clicking the flat face: "0.508 mm is too big here" (the
+          face also has the threaded countersink edge). Workaround: click one outer edge –
+          Tangent Chain picks the whole outline → fillet OK.
+
+
+
+                                                                                                Page 45 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. Rigid As-built Joint Wooden Handle + Wheel Bracket.
+
+  Shoulder Bolt
+
+          Friction. New Component made while another component is isolated: its menu shows
+          only "Exit Isolate" (cannot Isolate the new one directly); exit, then isolate.
+          OK. Right-plane profile, 7 dims (radii for the diameters), Revolve about Y,
+          thread/chamfer order workaround, sketch on the head (outer circle auto-projected),
+          CREATE > Rectangle > Center Rectangle, Tangent to the projected circle, 0.08 dim,
+          Extrude −0.16 auto-switched to Cut, 0.01 chamfers on head round + front faces. Move
+          (M) with typed X 6 / Y −0.6.
+          Fail → workaround. Joint snaps: clicking a round EDGE gives "(corner)" (the seam
+          vertex), never the edge's centre (known). Found two ways that work: (1) for a hole,
+          hover the face and move the pointer INTO the hole → "(centre)"; (2) hover a face, hold
+          Ctrl (locks its snap dots), move to where the centre is, click → "(circle centre)" / "
+          (centre)". Fusion: hovering the edge is enough.
+          Friction. The bolt joint used "(loop)" snaps; the loop centre on threaded geometry is
+          ~0.37 mm off the true axis (bolt ended 0.015" off-centre in the hole).
+
+  Blade
+
+          OK. Right-plane half profile, construction line (palette X), sketch Mirror (Objects +
+          Mirror Line) adds Symmetric constraints. Friction: The mirrored copy's end points ON
+          the mirror line were not merged with the originals (two points 0.002" apart, profile not
+          closed) – fixed with Coincident on each pair (zoomed in). Placing a dimension on the
+          construction line again made a pick.
+          OK. Revolve about Y → 2.75" disc, 0.05" thick; stainless look.
+          OK. Joint (J) Revolute: blade front face centre (hover into the hole) + Ctrl-locked
+          centre of the bolt face; Motion tab Type Revolute, Animate = the book's play button
+          (loops until OK); Position tab Offset Z 0.005 → blade exactly centred on the 0.06"
+          shoulder.
+          OK. Ctrl+S Save: dialog Name / Place / Location (project root by default) → "Pizza
+          Cutter". Second Ctrl+S opens a "Save" version-description dialog (like Fusion).
+          Bug. Edit Joint on the as-built Rigid 1 → Type Cylindrical + axis + OK: the change is
+          shown ("Cylindrical 1") but its transaction stays OPEN
+          ( App.getActiveTransaction() = "Edit As-Built Joint"). The next command (Edit
+          Joint Limits, Motion Link, even Ctrl+S) aborts it and the joint is silently back to Rigid,
+          with no Redo. Reproduced 3 times.
+
+
+
+                                                                                               Page 46 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Bug. Edit Joint Limits on an as-built joint opens the as-built dialog showing Type
+          "Rigid" and no limits; its Cancel also reverts the earlier edit.
+          Fail → workaround. Delete Rigid 1, make a NEW As-built Joint Type Cylindrical with the
+          slide limits in the same dialog (Ctrl-locked rim centre as axis). Friction: No "Preview
+          Limits": my first try (Minimum 0 + Rest) let the End Cap slide INTO the handle;
+          Maximum 0 + Rest is the right one here. Dragging the End Cap then slides it out and
+          rotates it; it does not return to Rest (known).
+          Bug. Joint references go stale: after later edits the solver reported "Rigid 3: Broken
+          link in Reference1", "Rigid 4 ... Reference2", "Revolute 1 ... Reference2" (element names
+          now "?Face5", "?Edge41") and every joint dialog warned "The joints cannot all be
+          satisfied together: Revolute 1, Rigid 4 fights the others". Parts did not move, but the
+          joints are broken references.
+          Fail. Motion Link has no "Link with Same Joint": it only links two different joints
+          (Rotate/Slide + value), so the End Cap cannot be made to screw out (rotation tied to
+          slide 1/20"). No workaround.
+
+
+  Project 13: Tesla Turbine (pp 156–176): tested tool by tool, simplified geometry
+  (I built the Housing & Inlet Tube to the book's dimensions, then tested every new tool of
+  the chapter on simplified walls and bolts. McMaster parts were replaced by a plain cylinder
+  "Bolt".)
+
+  Housing & Inlet Tube
+
+          OK. Default units stayed Inch (Set as Default from the Pizza Cutter worked).
+          Subassembly: New Component "Stator Subassembly", then New Component inside it
+          (Parent defaults to the active one).
+          OK. Front sketch: 2 circles, rectangle, triangle, construction centerline (palette X);
+          Coincident point-to-line constraints; dims incl. "9 * 1.02" typed into the diameter box
+          → 9.18. Friction: The expression is not kept (dimension stores 9.18; Fusion keeps "9.00
+          in * 1.02").
+          Friction. E with several profiles: my first profile clicks were ignored right after the
+          dialog opened; clicking again worked. Clicking where a body face is in front of a profile
+          picks the FACE (shown as "Face1" in the list) – Fusion prefers the sketch profile.
+          OK. Symmetric + Whole Length 2.25 extrude of the 2 ring profiles; Right-plane Ø0.84
+          circle (Vertical to origin, 4.17 up) Extrude All Cut through the wall.
+          OK. Revolve of the inlet profiles about the construction centerline (axis =
+          "Construction line of Sketch"), Join.
+
+
+                                                                                                Page 47 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. "Show Sketch 1, then extrude-cut its inner circle": starting Extrude
+          HIDES the shown (already used) sketch again, so its profiles cannot be clicked.
+          Workaround: open Extrude first, then right-click Sketch 1 > Show, then click the
+          profile.
+          Fail. 0.25" fillet where the inlet tube meets the housing: "6.35 mm is too big here" –
+          also 0.15/0.10/0.05, with or without Tangent Chain (the tube is tangent to the bore at
+          its top).
+          Fail. 0.04" chamfer on the housing's two flat faces: "1.016 mm is too big here" (even
+          without the tube edge). Not resolved.
+          Fail → workaround. 5 holes Ø1/16 on the tube end: sketch Rectangular Pattern works
+          (Spacing, Symmetric) but Friction: Quantity counts PER SIDE in Symmetric mode
+          (Quantity 5 → 9 circles; Quantity 3 → the book's 5). The copies again do not follow a
+          later dimension (dimension first). Extrude could not pick the 5 hole profiles: they sit
+          over the open bore, so every click went to the body face behind ("Face23") or set "To
+          Object" silently; making the body Unselectable made nothing pickable, and right-
+          clicking in the browser closed the Extrude dialog. Workaround: Hole > Placement
+          "From Sketch (Multiple Holes)", click the circles, Simple 1/16 x 1.25 → holes cut (very
+          slow, ~60 s).
+          Fail. Thread Type has only "ISO Metric profile" and "ANSI Unified Screw Threads": no
+          ISO Pipe / NPT, so the inlet/outlet pipe threads cannot be made.
+
+  Housing Gaskets
+
+          Bug. Extrude the housing's front face 0.025 with Operation New Body while "Housing
+          Gaskets" is the active component: the new body is created in the HOUSING
+          component (the face's component), not the active one. Workaround: right-click the
+          body > Move to Component > Housing Gaskets. (Same family as the Hot End "sketch
+          on another component's face" bug.)
+          Fail. No appearance search box and no "Rubber - Soft" look; no colour slider on a look.
+          Workaround: Custom colour "#C81E1E" > Use > click the body (works, "Custom
+          #C81E1E").
+          OK. CREATE > Mirror, Pattern Type Bodies, Mirror Plane = XZ from the browser → 2
+          bodies in one component.
+          Bug. As-built Joint / Rigid Group: clicking a NESTED component's row in the browser
+          (inside a subassembly) does not pick it (stays "Select"); picking in the canvas works.
+          My browser clicks also left the wrong component active once (the next New
+
+
+
+
+                                                                                              Page 48 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Component went into "Housing & Inlet Tube"). Friction: A component named "Housing
+          & Inlet Tube" loses its "&" in dialog buttons (Qt mnemonic).
+
+  Power Side Wall
+
+          Bug. CONSTRUCT > Offset Plane from the back gasket's face, with "Power Side Wall"
+          active: the plane (and the sketch on it, and both extruded New Bodies) went into the
+          GASKET component/body. Workaround: Move to Component for each body (the
+          context submenu works).
+          OK. Sketch Center Rectangle (no construction diagonals, unlike Fusion), concentric
+          circles; sketch MODIFY > Fillet: click 2 edges per corner → "4 selected", Radius 0.5 → 4
+          arcs; sketch Circular Pattern (Objects, Center Point, Quantity 4) → 4 holes.
+          OK. Hole Counterbore: 0.55 / depth 0.25 / counterbore 0.625 x 0.2, X/Y 0 on the face.
+          OK. Thread on 4 hole faces at once (suggested 1/4-32 UNEF for the 0.241" holes; 1/4-20
+          chosen). Friction: The big datum Offset Plane stays visible and blocks clicks until
+          hidden.
+
+  Steam Side Wall
+
+          Fail. Mirror with Pattern Type "Components": "Mirror of components is not built yet:
+          use a body or features." Also Mirror refuses to open at all when the active component
+          has no solid of its own (subassembly or root active): tooltip "Mirror needs a solid to
+          repeat". Workaround: activate the wall, Mirror its BODIES about XZ, New Component
+          "Steam Side Wall", Move to Component.
+          OK. As-built Joint Type Slider with slide Minimum + Rest; axis via the hover-into-hole
+          trick ("Face2 (centre)"). Dragging the wall slides it away and not into the housing.
+          Friction: No Flip and no Preview Limits in the as-built dialog. The first component was
+          not grounded, so my 2nd drag moved the whole housing (Ground by hand).
+          OK. Circular Pattern, Pattern Type Faces, hole wall + bottom, Axis Y, Quantity 6 → 6
+          holes.
+          OK. Stand-in bolt + As-built Slider; Motion Link Slider 1 + Slider 2 with Distances 1 / 2
+          ("Slider 2 moves 2 mm for each mm Slider 1 moves"): dragging the wall 39.6 mm moved
+          the bolt 2x relative to the wall. Reverse and Animate exist in the dialog.
+          OK. Circular Pattern, Pattern Type Components, bolt, Axis Y, Quantity 4 → Bolt:1..4.
+          OK. Rigid Group of the 4 bolts (picked in the canvas).
+          OK. Duplicate With Joints: click the bolt, then hover-into-hole on the target → "1 copy
+          made", Bolt:5 + Slider 3.
+
+
+
+
+                                                                                               Page 49 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Friction. Ctrl+C / Ctrl+V of Bolt:5 opens Move (good) but the pasted copy starts at
+          the ORIGINAL bolt's place, not at Bolt:5's (its duplicate position is lost).
+          Fail. Rectangular Pattern, Pattern Type Components: clicking a bolt in the canvas
+          picked the whole "Stator Subassembly"; OK then made nothing (no message). Not
+          resolved – so the 16 disc/spacer pattern of the Rotor could not be done this way.
+          OK. Right-click a sketch > Save As DXF → file dialog (opens in the home folder, not the
+          project) → valid DXF written.
+          Not tested. Dragging many browser rows into a new component (rows kept jumping
+          while scrolling).
+          Fail. Motion Link "Link with Same Joint" (rotor turns while it slides): does not exist
+          (see Pizza Cutter).
+          Fail. McMaster-Carr bearings, bolts, set screws, retaining rings: no McMaster tool
+          (known).
+
+
+  Chapter 6 step by step: Strandbeest, Gear Train and Robotic Hand
+  For this chapter I tested the key tools on small stand-in models rather than rebuilding
+  every part. A 4-bar linkage animates correctly, the built-in Gear tool replaces the Spur
+  Gear add-in, and Motion Study works with a table instead of a graph. What fails is mostly
+  familiar: cross-component snapping and construction, as-built joint editing, and
+  patterning a subassembly with its joints. The Gear tool adds two bugs of its own.
+
+
+  Project 14: Strandbeest (pp 180–187): a 4-bar slice of the leg
+  (I built Pins + A Link (crank) + DGF Plate (rocker) + B Link (coupler) – the loop that drives
+  the leg – and tested the chapter's tools on it.)
+
+          OK. Change Active Units > Millimeter (without Set as Default) for this design only.
+          OK. Pins: 2 circles, Equal, dims, Extrude −6 → 2 separate bodies. Friction: −6 went
+          AWAY from the front view (book: "towards you").
+          OK. Fusion's three-dot command options: hover CREATE > Slot > Center to Center
+          Slot, the "⋮" button → Pin to Toolbar / Change Keyboard Shortcut... Pressing Shift+S
+          warns "Shift+S is the key of Scripts and Add-Ins. Override gives it to Center to Center
+          Slot" → Override → Shift+S starts the slot tool in the sketch ("Center to Center Slot:
+          click the centre of one end").
+
+
+
+
+                                                                                              Page 50 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail → workaround. The slot's first click cannot snap to the Pin's centre (other
+          component's sketch/body, same cross-component limit as Project). Workaround:
+          dimension the end's centre from the origin.
+          Friction. Dimensioning the slot's centre line by clicking it + placing gave a horizontal
+          DistanceX (15 across, slot became 21.2 long); Fusion offers the aligned length.
+          Fail. Typing "Width=5mm" into the slot-width dimension box does not create a
+          parameter (value stays, no Parameters object) – same as Metric Bolt. Thickness
+          parameter therefore skipped (plain −2).
+          Fail. No ABS look and no appearance search (known).
+          Bug. Extrude −2 of A Link's profile defaulted to Operation CUT because it overlapped
+          the Pin body of ANOTHER component, and it cut the pin (silently changing the Pins
+          component). Fusion starts a new component's first extrude as New Body. Undo + New
+          Body.
+          Friction. Extrude Start "Offset" (for a second layer): no profile could be picked; a very
+          thin slot needed its exact inner point. Built the coupler on the same layer instead
+          (joints don't care).
+          OK. As-built Revolute joints Pins+A Link, Pins+DGF Plate (Ctrl-locked pin face
+          centre), A+B Link (hover into the hole → "circle centre"), and B+DGF to close the loop.
+          Fail → workaround. Joint (J) to close the loop: with two coplanar overlapping links,
+          hovering picks the wrong one (DGF instead of B) and the thin coupler could not be
+          locked; OK was refused ("Click a snap point on the second component"). The As-built
+          Revolute closed the loop instead.
+          Friction. Dragging the crank moved A and B but the rocker (DGF) stayed put (loop not
+          followed while dragging). OK: Right-click Revolute 1 > Animate Joint DOES drive the
+          whole loop (rocker swings 1–25°, coupler follows) – this is Fusion's "Animate Joint
+          Relationship" behaviour.
+          Fail (harmless). There is no separate "Animate Joint" (one joint alone, others
+          suppressed) vs "Animate Joint Relationship" pair; Fission's single Animate Joint
+          behaves like the relationship one. Fine for the book.
+
+
+  Project 15: Gear Train (pp 188–195): key tools only
+          Fail → workaround. UTILITIES > ADD-INS > Scripts and Add-Ins opens a Fusion-like
+          dialog (Run / Create / Edit / Get Add-Ons) but the list is EMPTY: no "Spur Gear"
+          sample. Fission has its own tool instead: SOLID > CREATE > Gear (Spur / Internal /
+
+
+
+
+                                                                                              Page 51 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Rack, Metric, 20°, Module, Teeth, Backlash, Root Fillet, Thickness, Hole, read-only
+          Pitch Diameter, Operation incl. New Component) – works: 20 teeth, m1.5, 8 mm, hole 4
+          → pitch Ø30, one timeline step "Gear 1" in a new component.
+          Bug. 100-tooth gear with the book's 0.88 mm root fillet: the dialog warns "does not fit ...
+          at most 0.741 mm", but my first OK silently created a copy of the PREVIOUS (20-tooth,
+          8 mm) gear. With 0.5 mm it made the 100-tooth, 4 mm gear (pitch Ø150). Component
+          names are "Component1/2", not "Spur Gear (20 teeth)".
+          Bug. Timeline right-click > Edit Feature on "Gear 2" opened nothing and the step
+          VANISHED from the timeline (its objects stayed in the document, body gone).
+          Friction. The 2nd gear's New Component was created INSIDE the first gear's
+          component (it was left active). Dragging a component row onto another row in the
+          browser works ("Move to Compound Gear") – Friction: the 2nd drag landed on the
+          wrong row after the tree re-expanded.
+          OK. Move: Z Distance 4 + Z Angle typed "360/20/2" → 9° (expressions work in Move).
+          Friction: Clicking a gear selected the top-level "Compound Gear" (whole
+          subassembly), and the rotation pivot was ~0.003 mm off the origin.
+          OK. MODIFY > Split Body: body + "Curve of Sketch" (picked in the canvas; the
+          browser sketch row is not accepted), Extend Splitting Tool → 2 bodies, volumes add
+          up. Friction: The sketch on the gear face logged "Failed to project external geometry"
+          (auto-project).
+          Not tested. The 11-gear copy/paste train and its 5 motion links (Motion Link + Reverse
+          were shown working in the Tesla Turbine; Copy/Paste ignores the copied component's
+          position – see there).
+
+
+  Project 16: Robotic Hand (pp 196–206): key tools only
+          OK. ASSEMBLE > Motion Study (on the Strandbeest loop): Joints (browser row),
+          Joint, Step, Angle, Set Point / Delete Point, a points table, a playhead slider, Mode Play
+          Once / Loop / Ping-Pong, Speed, Play. Points 0/0, 50/180, 100/360 → Play drives the
+          crank and the whole linkage; OK keeps "Motion Study 1" in a "Motion Studies" browser
+          folder; right-click > Edit Motion Study reopens it. Friction: No line graph of the joint
+          over steps (Fusion's main view); a table instead. Friction: Pressing Enter in the
+          Step/Angle box closes the dialog (Enter = OK) – easy to lose a half-made study; Tab is
+          safe.
+          Bug. CONSTRUCT > Axis Through Cylinder/Cone/Torus with the new "Axle"
+          component active: the axis was created inside the clicked cylinder's component
+          (Pins/Body1), not in Axle – the book's "component that contains only a construction
+
+
+
+                                                                                               Page 52 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          axis" cannot be made this way (same family as the gasket / offset-plane bug).
+          Fail. Edit Joint Limits on as-built joints is broken (see Pizza Cutter); Rectangular
+          Pattern of a subassembly with its joints could not be done (component pattern picks
+          the top-level and makes nothing – see Tesla Turbine). So the 4-finger pattern with
+          inherited links/limits fails.
+          Not re-tested. Ellipse, Fit Point Spline, Loft with Rails (Loft rails worked in the
+          Surfboard, Ch1), Hole Extent All (works elsewhere).
+
+
+  Chapters 7–12 step by step: Canvas, Render, Drawings, Animation,
+  CAM and the final project
+  For these chapters I tested each chapter's new tools on small stand-in models rather than
+  rebuilding every part. The modelling and Drawing parts hold up well: Canvas with
+  Calibrate, Decals, Interference, and the whole Drawing workspace. Chapters 8 (Render),
+  10 (Animation) and 11 (CAM) fail at their core because those workspaces don't exist in
+  Fission. CAM can be reached only through FreeCAD's own interface.
+
+
+  Project 17: American Football (pp 210–217)
+          OK. INSERT > Canvas (file chooser, Front plane, Z Angle 1°) – stand-in football picture
+          (the CADclass download is not reachable from this sandbox). Right-click canvas >
+          Calibrate: "Click the first point", "second point", "Type the real distance" 11.25 →
+          canvas rescaled exactly (83.33 mm between tips → 285.75 mm). Edit Canvas exists
+          (tested in Ch1).
+          OK. Line 11.25, construction vertical from the midpoint (palette X), CREATE > Spline >
+          Fit Point Spline (click points, Enter), sketch Mirror of the spline about the
+          construction line. Friction: Tangent between the two spline ends added nothing (no
+          message).
+          OK. Revolve with Angle 90 about the X axis (quarter football), Fillet 1/8 on the 2
+          curved edges, Circular Pattern (Bodies) x4 about X, MODIFY > Combine (Target + 3
+          tools; tools disappear).
+          OK. Navigation bar > Display Settings > Visual Style (Shaded / ... exists).
+          Fail. Appearance: no Leather looks, no Scale %, no right-click Duplicate on a look, no
+          Advanced section (colour/roughness/bump image files), no rename. Only flat colours
+          + Custom #RRGGBB. The custom leather (image + roughness + bump maps) cannot
+          be made.
+
+
+
+
+                                                                                                 Page 53 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Fail. Render workspace (Scene Settings, Environment Library, Field environment): the
+          workspace switcher offers only Design / Simulation / Drawing. Workaround for a
+          picture: File > Capture Image (screenshot of the view) – no materials, lights or
+          environments.
+          OK. INSERT > Decal: file chooser, click a face of the (curved) body, Chain Faces,
+          Opacity, X/Y, Z Angle, Scale, Flips → the picture wraps on the curved football ("Decals"
+          folder in the browser). Friction: A right-click in the browser while the Decal dialog is
+          open cancels the dialog.
+          Not re-tested. Sketch Offset (O), Sweep and Pattern on Path for the laces (Sweep
+          worked in the Carabiner and the Hot End, sketch Offset in the Carabiner; Pattern on
+          Path is in CREATE > Pattern).
+
+
+  Project 18: Smartphone Case (pp 218–224): key tools only
+          Fail. The F3D phone model (CADclass download) is not reachable and Fission cannot
+          read .f3d files at all. INSERT > Insert Component of another Fission design exists
+          (linked component, "Break Link").
+          OK. INSPECT > Interference: pick 2+ bodies, Compute → "No interference: the bodies
+          do not overlap." (Include Coincident Faces / Create Bodies From Interferences options
+          exist.)
+          Friction. MODIFY > Combine Cut with a body of another component was offered but
+          warned "Cut would leave nothing of the target body" for a small bolt through a wall
+          (suspicious; not resolved).
+          Fail. Texture Map Controls (Box projection, grain direction ring) do not exist; looks
+          have no texture to map.
+          Fail. Oak Wood look at 28% scale: no oak, no scale. Render workspace missing (see
+          above).
+
+
+  Projects 19 + 20: Edison Bulb, A.I. Villain (pp 228–253): Render chapter
+          Fail. The whole chapter is about the Render workspace (Scene Settings, Environment
+          Library, custom HDRI, exposure, focal length, depth of field, In-Canvas Render,
+          local/cloud Render, emissive LED look in cd/m², glass). None of it exists: no Render
+          workspace, looks are flat colours (a "Glass, clear" look exists; no emissive/luminance
+          setting in the UI). Only the modelling steps can be done (Canvas + Calibrate, Offset,
+          Fit Point Spline, Revolve, Coil, Sweep, Circular Pattern, Rigid Group – all tested in
+          earlier projects) and File > Capture Image is the only "picture" output.
+
+
+
+
+                                                                                                  Page 54 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+  Projects 21 + 22: Drumsticks, Space Prop Emitter (pp 256–271): Drawing
+  workspace
+          OK. DESIGN ▾ > Drawing > From Design... → "Create Drawing" dialog like Fusion's
+          (Contents Full Assembly, Template "Fission 180 title block", Standard ASME, Units,
+          Sheet Size B, Views Manual or Automatic (base, projected, iso)). OK opens a
+          DRAWING workspace with a B sheet, zone borders and a filled title block (title, date,
+          scale 1:2, units, ASME 3rd angle symbol).
+          OK. Base View: Orientation, Style (Visible / Hidden / Shaded...), Scale 1:2, Tangent
+          Edges, label, centre-mark options; click to place, OK.
+          OK. Projected View: click the base view, click places a projected view; Enter ends.
+          Friction: My third click (top-right iso) only showed an "Isometric (top right) View"
+          label and vanished on Enter; the base view also shifted when I clicked it to start.
+          OK. DIMENSIONS > Dimension: tip vertex to tip vertex, click to place → 10.876 (the
+          filleted body).
+          OK. Section View: click view, 2 clicks for the cut line, Enter, place → "SECTION A-A"
+          with hatching, A-A arrows on the base view, Full / Slice / Distance depth options.
+          OK. Detail View: view, centre, radius, place; label B, its own scale. (My too-big radius
+          made a huge view; cancelled – user error.)
+          OK. EXPORT > Export PDF (Name, Sheets, Location, "Open the PDF afterwards") →
+          correct 1-page PDF of the sheet. Export DXF exists; Fail: Export DWG and Export CSV
+          entries do nothing (no command).
+          Not tested. Centerlines, leader notes, balloons/parts list on this sheet (tools exist in
+          the SYMBOLS / TABLES / GEOMETRY groups; the parts list with balloons was tested
+          in Ch10 below).
+
+
+  Projects 23 + 24: Japanese Pull Saw, Machinist Hammer (pp 274–297):
+  Animation / exploded
+          Fail. Animation workspace (storyboards, Transform Components, Auto Explode, View
+          blocks, reversing a storyboard, Publish Video) does not exist – workspace switcher
+          has only Design / Simulation / Drawing. No workaround inside Fission (FreeCAD's
+          interface has no animation workbench either).
+          Fail. Drawing > CREATE > "Exploded View" is in the menu but does nothing (no
+          command behind it), so an exploded drawing from a storyboard cannot be made.
+
+
+
+
+                                                                                               Page 55 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          OK. Drawing > Automatic views of the 6-component Pizza Cutter (base, top, right, iso)
+          and TABLES > Table = parts list: "Parts list with 6 rows and 6 balloons" – ITEM / QTY /
+          PART NUMBER / DESCRIPTION / MATERIAL with the component names, balloons
+          added automatically. Friction: Automatic views at 1:1 overlap each other on a B sheet
+          (Fusion fits the scale); balloons overlap; the menu is called "Table" (no "Parts List"
+          entry); MATERIAL shows "Steel" for parts with no physical material set.
+
+
+  Projects 25 + 26: Wooden Longboard, Electric Guitar (pp 300–327): CAM
+          Fail → workaround. There is no Manufacture (CAM) workspace in Fission's switcher.
+          Workaround: UTILITIES > FREECAD > FreeCAD Tools > "Switch to FreeCAD's
+          interface" > CAM. This leaves the Fusion-style UI for FreeCAD's classic interface
+          (banner: "This is FreeCAD's own interface ... Back to Fission 180: the button at the top
+          left"). CAM > Job with the football body → Job + Stock ("Extend model's bounding
+          box", extensions, alignment, Tools / Workplan / Output tabs). So stock, tools,
+          operations (Adaptive, Profile, Pocket, ...), simulator and post-processing exist, but
+          with FreeCAD's own dialogs and names – none of the book's steps (Setup, 2D
+          Adaptive, 2D Contour, Tool Library, Simulate, Post Process) can be followed as written.
+          "Back to Fission 180" returned cleanly.
+
+
+  Project 27: Space Prop Hilt (pp 330–345): final project
+  (A combination of earlier tools; I checked only what was new or still open.)
+
+          OK. Chamfer "+" adds a second selection set with its own size ("Add a selection set
+          with its own size") – the book's 0.4 mm + 2 mm chamfer in one feature.
+          OK. Appearance "Apply To: Faces" exists (and dropping a look onto faces worked in
+          Ch1).
+          OK. Hole "From Sketch (Multiple Holes)" on sketch points (worked in the Tesla
+          Turbine).
+          Fail. Physical Material Brass, Gold, ABS missing (known: 20 materials, custom ones
+          possible); Powder Coat / Black Metallic Paint / Red-Green LED looks missing (flat
+          colours only).
+          Fail. Right-click a component > Create Drawing does not exist (use DESIGN > Drawing
+          > From Design).
+          Fail. Render, Exploded Animation and Exploded Diagram parts of the project: see Ch8
+          / Ch10.
+          Fail. McMaster-Carr screws (known).
+
+
+
+                                                                                               Page 56 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          Not tested. The full 15-component model (time). Every modelling tool it needs was
+          exercised in earlier projects. The main obstacles for the book's "project the previous
+          part's face" steps are the cross-component limits (Project, sketch on another
+          component's face, offset plane).
+
+
+  Test setup, limits and what could not be tested
+
+  Setup
+          Build: Fission 180 0.1.0-beta.3.3.9, the Linux AppImage release, on the FreeCAD 1.1.4
+          core. No code was changed.
+          Machine: a headless Linux sandbox with a virtual 1920×1200 display (Xvfb), software
+          OpenGL, 2 CPU cores and 7.6 GB of RAM. That is slower than a normal PC, so the
+          speed notes (the 25× knurl pattern that never finished, the ~60 s Hole, the ~80 s
+          freeze after a drag + undo) should be rechecked on real hardware before they are
+          treated as bugs.
+          Input: every book step was done with real mouse and keyboard events sent through
+          the display server, the same way a person would. Fission's own GUI-test harness was
+          used only to read state (dialog fields, browser rows, timeline titles) and to confirm
+          results such as volumes.
+          One shortcut: because the Parameters "+" button is broken (bug 1), the user
+          parameters for the Metric Bolt and the Drone were created by calling Fission's own
+           parameters.add_user() , which is what "+" is meant to do. Everything after that was
+          done through the UI.
+
+
+  Limits
+          Book downloads: the CADclass.org files (drone and hot-end STEP parts, canvas
+          pictures, the phone .f3d ) could not be reached from the sandbox. I used stand-in
+          files of the same names and sizes, so the workflow was tested but not the exact parts.
+          Depth by chapter: chapters 1–5 were done step by step (the Tesla Turbine with
+          simplified geometry after the housing). Chapters 6–12 were tested tool by tool on
+          small stand-in models. Fifteen items are marked Skipped or Not tested in the chapter
+          sections, each with the reason.
+          My own mistakes are not counted. Examples: a wrong 3-point-arc middle point, a too-
+          big detail-view radius, a placement click that landed on geometry, and a Ctrl+Z that
+          undid the wrong step. I corrected these and did not count them as Fission issues;
+
+
+
+                                                                                             Page 57 of 58
+Fission 180 vs Fusion — Book Parity Report
+
+
+
+
+          where they explain a result, the entry says so.
+          Not covered by the book, so not tested: the Simulation workspace, Generative
+          Design, cloud collaboration, and the Windows and macOS builds.
+
+
+  Files made during the test
+  These are in the sandbox, not on your computer: Pizza Cutter.FCStd (the full
+  assembly), a DXF from Save As DXF, a drawing PDF from Export PDF, and the Saturn V OBJ
+  export.
+
+
+
+
+                                                                                         Page 58 of 58
+
