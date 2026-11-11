@@ -150,7 +150,10 @@ def _dialog_open():
     try:
         from . import taskui
 
-        if taskui.current() is not None:
+        # (a dialog that is being built counts: it registers itself before it is on screen,
+        # and this is asked from a timer that can fire during its first preview)
+        panel = taskui._OPEN.get("dialog")
+        if panel is not None and not getattr(panel, "_closed", False):
             return True
         return bool(Gui.Control.activeDialog())
     except Exception:
