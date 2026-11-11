@@ -84,6 +84,22 @@ def set_units(doc, schema, as_default=False):
     App.Units.setSchema(schema)
     if as_default:
         App.ParamGet("User parameter:BaseApp/Preferences/Units").SetInt("UserSchema", schema)
+    _grid_follows()
+
+
+def _grid_follows():
+    """The grids are in round numbers of the design's units: redrawn when they change."""
+    if not App.GuiUp:
+        return
+    try:
+        from . import grid_ui
+
+        sketch = grid_ui.editing_sketch()
+        if sketch is not None:
+            grid_ui.apply_to_sketch(sketch)
+        grid_ui.redraw_all()
+    except Exception:
+        pass
 
 
 def remembered(doc):

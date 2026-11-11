@@ -132,9 +132,19 @@ def b_plane():
 
 
 def b_draw():
+    from fission180 import grid_ui, increments
+
     sk = h.in_sketch()
     h.check("B: sketch open on XY", sk is not None)
     if sk:
+        # the grid and the snap of an inch design are in inches (they were 10 / 100 mm)
+        size = float(sk.ViewObject.GridSize.Value)
+        h.check("B: the sketch grid steps from 1 in (not 10 mm)", abs(size - IN) < 1e-9, size)
+        h.check(
+            "B: Major Grid Spacing is 1 in", abs(grid_ui.major_spacing(sk.Document) - IN) < 1e-9
+        )
+        step = increments.linear_step()
+        h.check("B: a drag in steps goes by 0.1 in", abs(step - 0.1 * IN) < 1e-9, step)
         h.draw_rectangle(sk, 0, 0, 40, 30)
 
 
@@ -390,6 +400,25 @@ def named(fn, name):
     return step
 
 
+def g_all_undone():
+    """The five Ctrl+Z did undo the five steps (the units were read after each)."""
+    pads = [o for o in design().Objects if o.TypeId == "PartDesign::Pad"]
+    h.check("G: five Ctrl+Z took the five steps back (no extrude left)", not pads, pads)
+    h.check("G: no solid left", h.solid_volume() < 1e-9, h.solid_volume())
+
+
+def g_all_redone():
+    pads = [o for o in design().Objects if o.TypeId == "PartDesign::Pad"]
+    length = pads[0].Length.Value if pads else None
+    h.check(
+        "G: five Ctrl+Y brought everything again (0.75 in)",
+        pads and b.close(length, 0.75 * IN),
+        length,
+    )
+    planes = ins.datums("PartDesign::Plane")
+    h.check("G: with the offset plane", len(planes) == 1, [o.Label for o in planes])
+
+
 def g_box_shows_inches():
     """FreeCAD's own value box (what every dialog field is) writes a length in inches."""
     box = Gui.UiLoader().createWidget("Gui::QuantitySpinBox")
@@ -517,9 +546,10 @@ steps += [e_plane, e_face, e_type, e_ok, e_made, checker("Offset Plane OK")]
 steps += [f_open, f_listed, f_changed, checker("Change Parameters OK")]
 for i in range(5):
     steps += [named(undo, "undo_%d" % (i + 1)), checker("Ctrl+Z %d" % (i + 1))]
+steps += [g_all_undone]
 for i in range(5):
     steps += [named(redo, "redo_%d" % (i + 1)), checker("Ctrl+Y %d" % (i + 1))]
-steps += [g_box_shows_inches]
+steps += [g_all_redone, g_box_shows_inches]
 steps += [h_second, h_second_check, h_second_still, h_back, h_back_check]
 steps += [i_save, i_open, i_reopened, i_type, i_ok, i_made]
 

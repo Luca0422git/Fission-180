@@ -624,6 +624,7 @@ class ParametersDialog(QtWidgets.QDialog):
         except Exception as exc:
             warn("Change Parameters: %s" % exc)
         super().accept()
+        self._back_to_the_design()
 
     def reject(self):
         try:
@@ -632,6 +633,19 @@ class ParametersDialog(QtWidgets.QDialog):
         except Exception as exc:
             warn("Change Parameters: %s" % exc)
         super().reject()
+        self._back_to_the_design()
+
+    def _back_to_the_design(self):
+        """The keyboard goes back to the main window (Ctrl+Z right after OK is the window's
+        shortcut: without a window manager handing the focus back it did nothing)."""
+        try:
+            window = Gui.getMainWindow()
+            window.activateWindow()
+            view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument is not None else None
+            if view is not None and hasattr(view, "setFocus"):
+                view.setFocus()
+        except Exception:
+            pass
 
 
 class ChangeParametersCommand:

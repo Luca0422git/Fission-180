@@ -110,18 +110,46 @@ def tidy(value, step, toward):
     return round(k * step, _digits(step) + 2)
 
 
-def fmt(value, unit="mm", step=None):
+def _design_unit():
+    """The design's length unit ("mm" without FreeCAD: the unit tests)."""
+    try:
+        from . import design_units
+
+        return design_units.length_unit()
+    except Exception:
+        return "mm"
+
+
+# the decimals a length is written with in a note, by the design's unit (mm: the box's own)
+_UNIT_DIGITS = {"cm": 3, "m": 5, "in": 3, "ft": 4}
+_MM_PER_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4, "ft": 304.8}
+
+
+def fmt(value, unit="mm", step=None, design=None):
     """A value as the dialog shows it in a note: '3.47 mm', '12.3°', '9.99' (unit "": a
-    count, the turns of a coil)."""
+    count, the turns of a coil). A length is written in the design's units (`design`, by
+    default the active design's: an inch design read "Largest that fits here: 3.47 mm" for
+    a box that takes inches)."""
     step = step or step_for(unit)
-    text = "%.*f" % (_digits(step), value)
+    digits = _digits(step)
+    suffix = "°" if unit == "deg" else " mm" if unit == "mm" else ""
+    if unit == "mm":
+        design = design or _design_unit()
+        if design != "mm" and design in _MM_PER_UNIT:
+            value = value / _MM_PER_UNIT[design]
+            digits, suffix = _UNIT_DIGITS[design], " " + design
+    text = "%.*f" % (digits, value)
     if text.startswith("-") and float(text) == 0.0:
         text = text[1:]
-    return text + ("°" if unit == "deg" else " mm" if unit == "mm" else "")
+    return text + suffix
 
 
-def fmt_typed(value, unit="mm"):
-    """A typed value as typed: '5 mm', '0.25 mm', '30°'."""
+def fmt_typed(value, unit="mm", design=None):
+    """A typed value as typed: '5 mm', '0.25 mm', '30°' ('0.25 in' in an inch design)."""
+    if unit == "mm":
+        design = design or _design_unit()
+        if design != "mm" and design in _MM_PER_UNIT:
+            return "%g %s" % (round(value / _MM_PER_UNIT[design], 6), design)
     return "%g" % value + ("°" if unit == "deg" else " mm" if unit == "mm" else "")
 
 
@@ -215,9 +243,7 @@ def search(
 ):
     """search_steps() run to its end at once (see there)."""
     return run_steps(
-        search_steps(
-            works, good, bad, step, budget, good_known, clock, seen, strict, per_try
-        )
+        search_steps(works, good, bad, step, budget, good_known, clock, seen, strict, per_try)
     )
 
 
@@ -527,9 +553,11 @@ class Limiter:
                 self._say(note_reached(on[0], on[1], unit, self.step(unit)), key)
             return value
         self._say(
-            note_typed(value, limit, unit, self.step(unit))
-            if typed
-            else note_reached(limit, side, unit, self.step(unit)),
+            (
+                note_typed(value, limit, unit, self.step(unit))
+                if typed
+                else note_reached(limit, side, unit, self.step(unit))
+            ),
             key,
         )
         return held
@@ -624,9 +652,11 @@ class Limiter:
         unit = self.unit if unit is None else unit
         side = side_of(value, limit) if value != limit else "hi"
         self._say(
-            note_typed(value, limit, unit, self.step(unit))
-            if typed
-            else note_reached(limit, side, unit, self.step(unit)),
+            (
+                note_typed(value, limit, unit, self.step(unit))
+                if typed
+                else note_reached(limit, side, unit, self.step(unit))
+            ),
             key,
         )
 
