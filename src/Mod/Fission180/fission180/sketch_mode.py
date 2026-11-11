@@ -841,13 +841,33 @@ def _show_finished(doc_name, name):
             return
         if sketch.ViewObject.Visibility:
             sketch_ui.shown_before_edit(doc_name, name)  # (asked once)
+            _drawn_in_hidden_body(sketch)
             return
 
         shown = sketch_ui.shown_before_edit(doc_name, name)
         if not shown or sketch_ui.used_by_feature(sketch):
             return  # hidden before it was opened (by hand, or by its feature): stays so
         sketch.ViewObject.Visibility = True
+        _drawn_in_hidden_body(sketch)
         log("sketch %s shown again: nothing uses it yet" % sketch.Label)
+    except Exception as exc:
+        warn("sketch mode: %s" % exc)
+
+
+def _drawn_in_hidden_body(sketch):
+    """A finished sketch that is on must be on the screen, whatever the body it is kept in
+    (wave 7, fix-9: Luca's Sketch 2 went into the hidden Body1 and stayed invisible after
+    Finish Sketch, its eye open; it showed only once Body1 was shown and hidden again).
+    FreeCAD draws a body's sketches through the body: a hidden body is turned on with its
+    solid still off (body_visibility.show_sketch, the way the sketch's own eye does it)."""
+    try:
+        from . import body_visibility
+
+        body = body_visibility.body_of_sketch(sketch)
+        if body is None or body_visibility._on(body):
+            return
+        body_visibility.show_sketch(sketch, True)
+        log("sketch %s shown: its body %s stays hidden" % (sketch.Label, body.Label))
     except Exception as exc:
         warn("sketch mode: %s" % exc)
 

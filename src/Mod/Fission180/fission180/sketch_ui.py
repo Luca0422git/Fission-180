@@ -717,6 +717,8 @@ def create_sketch(body, target):
     doc = body.Document
     doc.openTransaction("Create Sketch")
     try:
+        if _for_a_sketch_body(body, target):
+            body, target = _sketch_body(body, target)
         if across:  # (the reference first: it stands before the sketch in the body)
             target, shown, point = _across(body, target, shown)
         sketch = body.newObject("Sketcher::SketchObject", "Sketch")
@@ -730,6 +732,59 @@ def create_sketch(body, target):
         raise
     doc.commitTransaction()
     return sketch
+
+
+ORIGIN_ROLES = tuple(PLANES)
+
+
+def _for_a_sketch_body(body, target):
+    """True when a sketch on `target` must not go into `body`: the body holds a solid the
+    person hid and the sketch goes on an origin plane (wave 7, fix-9).
+
+    Fusion keeps a sketch in the component, never in a body, so hiding a body never hides a
+    sketch and the next Extrude of it starts as New Body. FreeCAD keeps a sketch inside a
+    body and draws it through that body: Luca's Sketch 2, drawn on the XY plane after he
+    hid Body1, went into Body1 (the active body), did not show after Finish Sketch, and its
+    Extrude proposed cutting the hidden Body1. Such a sketch now goes into a body of its
+    own, empty, in the same component: the kind of body Create Sketch makes for a new
+    design's first sketch (no row in the browser until something solid is made in it;
+    the sketch shows in Sketches as any other). Hiding or deleting Body1 then leaves the
+    sketch alone, and its Extrude's New Body fills that body (Body2), as in Fusion."""
+    try:
+        from . import bodies
+
+        plane, sub = target
+        if sub or plane.TypeId not in PLANE_TYPES:
+            return False
+        if getattr(plane, "Role", "") not in ORIGIN_ROLES:
+            return False
+        return bodies.solid_hidden(body)
+    except Exception as exc:
+        warn("Create Sketch: %s" % exc)
+        return False
+
+
+def _sketch_body(body, target):
+    """(new empty body beside `body`, its own origin plane in the role of `target`'s plane).
+    Made inside the Create Sketch undo step; the new body becomes the active one (new work
+    goes where the newest sketch is, as after any Create Sketch)."""
+    from . import components
+
+    doc = body.Document
+    home = components.container_of(body)
+    new = components.new_body_in(doc, home)
+    try:
+        new.Placement = body.Placement  # (the planes the squares showed stay where they were)
+    except Exception:
+        pass
+    doc.recompute()
+    plane = components.same_role_plane(new, target[0])
+    try:
+        components.activate_body(new)
+    except Exception as exc:
+        warn("could not activate %s: %s" % (new.Label, exc))
+    log("Create Sketch: %s is hidden, the sketch goes into a body of its own" % body.Label)
+    return new, (plane, "")
 
 
 def _across(body, target, shown):
@@ -900,6 +955,10 @@ def show_design_at(sketch):
             return  # FreeCAD changed nothing either (its Show module is missing)
         body, step = design_step(sketch)
         if body is None:
+            return
+        if not body_visibility.body_shown(body):
+            # (wave 7, fix-9) the person hid the body (a sketch of it shows on its own):
+            # editing the sketch leaves its solid hidden, as Fusion does
             return
         solids = [
             o
