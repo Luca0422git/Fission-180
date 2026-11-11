@@ -19,6 +19,9 @@ SIMULATION_TABS = ("sim_setup", "sim_results")
 # The MANUFACTURE workspace's tabs (manufacture_ui, wave 7 cam): shown instead of the design's.
 MANUFACTURE_TABS = ("cam_milling",)
 CONTEXTUAL += MANUFACTURE_TABS
+# The ANIMATION workspace's tab (animation_ui, wave 7 animation): shown instead of the design's.
+ANIMATION_TABS = ("anim_animation",)
+CONTEXTUAL += ANIMATION_TABS
 
 
 def resolve(command, available):
@@ -489,6 +492,11 @@ class RibbonWidget(QtWidgets.QWidget):
         for tid in MANUFACTURE_TABS:
             if tid in self.tab_buttons:
                 self.tab_buttons[tid].setVisible(False)
+        # The ANIMATION tab shows only in the ANIMATION workspace (animation_ui).
+        self._anim_mode = False
+        for tid in ANIMATION_TABS:
+            if tid in self.tab_buttons:
+                self.tab_buttons[tid].setVisible(False)
         self.select_tab("solid")
 
         self._timer = QtCore.QTimer(self)
@@ -694,6 +702,24 @@ class RibbonWidget(QtWidgets.QWidget):
             manufacture.triggered.connect(lambda: manufacture_ui.enter_workspace())
         except Exception as exc:
             warn("workspace menu: %s" % exc)
+        # Fusion's ANIMATION workspace (wave 7 animation, animation_ui): before Simulation in
+        # the list, as in Fusion. Picking another workspace leaves it (animation_ui also
+        # notices one entered some other way).
+        animation = menu.addAction(ui_icon("workspace_animation"), "Animation")
+        animation.setObjectName("Fission180WorkspaceAnimation")
+        animation.setCheckable(True)
+        animation.setChecked(getattr(self, "_anim_mode", False) and not self._drawing_mode)
+        design.setChecked(design.isChecked() and not animation.isChecked())
+        menu.removeAction(animation)
+        menu.insertAction(simulation, animation)
+        try:
+            from . import animation_ui
+
+            for other in (design, simulation, manufacture):
+                other.triggered.connect(lambda *_a: animation_ui.leave_workspace())
+            animation.triggered.connect(lambda *_a: animation_ui.enter_workspace())
+        except Exception as exc:
+            warn("workspace menu: %s" % exc)
         drawings = menu.addMenu(ui_icon("dw_base_view"), "Drawing")
         try:
             from . import drawing_ui
@@ -890,6 +916,7 @@ class RibbonWidget(QtWidgets.QWidget):
         else:
             self.select_tab("sketch" if self._sketch_mode else self._user_tab)
         log("ribbon: drawing mode %s" % ("on" if on else "off"))
+        self._keep_animation_tabs()  # (wave 7 animation)
 
     def set_flat_pattern_mode(self, on):
         """While a flat pattern is open (sheet metal), Fusion shows its FLAT PATTERN tab
@@ -918,6 +945,7 @@ class RibbonWidget(QtWidgets.QWidget):
             back = self._user_tab if self._user_tab in self.page_index else "solid"
             self.select_tab("sketch" if self._sketch_mode else back)
         log("ribbon: flat pattern mode %s" % ("on" if on else "off"))
+        self._keep_animation_tabs()  # (wave 7 animation)
 
     def set_simulation_mode(self, on, tab=None):
         """Fusion's SIMULATION workspace (simulation_ui): its SETUP and RESULTS tabs are the only
@@ -956,6 +984,7 @@ class RibbonWidget(QtWidgets.QWidget):
         else:
             back = self._user_tab if self._user_tab in self.page_index else "solid"
             self.select_tab("sketch" if self._sketch_mode else back)
+        self._keep_animation_tabs()  # (wave 7 animation)
 
     def set_manufacture_mode(self, on):
         """Fusion's MANUFACTURE workspace (manufacture_ui): its MILLING tab is the only one
@@ -995,6 +1024,60 @@ class RibbonWidget(QtWidgets.QWidget):
         else:
             back = self._user_tab if self._user_tab in self.page_index else "solid"
             self.select_tab("sketch" if self._sketch_mode else back)
+        self._keep_animation_tabs()  # (wave 7 animation)
+
+    def set_animation_mode(self, on):
+        """Fusion's ANIMATION workspace (animation_ui): its ANIMATION tab is the only one
+        shown (the workspace button says ANIMATION); back to the tabs of whatever is shown
+        after (the design's, or another workspace's when that was entered meanwhile).
+        FISSION180 wave 7 (animation)."""
+        if ANIMATION_TABS[0] not in self.tab_buttons or on == getattr(self, "_anim_mode", False):
+            return
+        self._anim_mode = on
+        log("ribbon: animation mode %s" % ("on" if on else "off"))
+        if on:
+            self._keep_animation_tabs()
+            return
+        # the tabs as the mode that is left wants them: its own setter draws them again
+        for tid in ANIMATION_TABS:
+            self.tab_buttons[tid].setVisible(False)
+        if getattr(self, "_drawing_mode", False):
+            self._drawing_mode = False
+            self.set_drawing_mode(True)
+        elif getattr(self, "_cam_mode", False):
+            self._cam_mode = False
+            self.set_manufacture_mode(True)
+        elif getattr(self, "_sim_mode", False):
+            self._sim_mode = False
+            self.set_simulation_mode(True)
+        elif getattr(self, "_flat_mode", False):
+            self._flat_mode = False
+            self.set_flat_pattern_mode(True)
+        else:
+            for tid, button in self.tab_buttons.items():
+                if tid == "sketch":
+                    button.setVisible(self._sketch_mode)
+                else:
+                    button.setVisible(tid not in CONTEXTUAL)
+            self.workspace.setText("DESIGN ▾")
+            back = self._user_tab if self._user_tab in self.page_index else "solid"
+            self.select_tab("sketch" if self._sketch_mode else back)
+
+    def _keep_animation_tabs(self):
+        """After any mode drew the tabs: in the ANIMATION workspace only its tab shows
+        (a drawing's tab in front keeps DRAWING); outside it its tab is hidden."""
+        on = getattr(self, "_anim_mode", False)
+        drawing = getattr(self, "_drawing_mode", False)
+        for tid in ANIMATION_TABS:
+            if tid in self.tab_buttons:
+                self.tab_buttons[tid].setVisible(on and not drawing)
+        if not on or drawing or ANIMATION_TABS[0] not in self.tab_buttons:
+            return
+        for tid, button in self.tab_buttons.items():
+            if tid not in ANIMATION_TABS:
+                button.setVisible(False)
+        self.workspace.setText("ANIMATION ▾")
+        self.select_tab(ANIMATION_TABS[0])
 
     def current_tab(self):
         for tid, button in self.tab_buttons.items():

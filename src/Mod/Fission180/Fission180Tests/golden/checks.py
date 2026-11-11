@@ -355,3 +355,4 @@ from . import export_checks  # noqa: E402,F401  (registers export_report_expect 
 from . import live_checks  # noqa: E402,F401  (registers live_blend_expect)
 from . import offset_checks  # noqa: E402,F401  (registers sketch_offset_expect)
 from . import manufacture_checks  # noqa: E402,F401  (registers cam_expect)
+from . import animation_checks  # noqa: E402,F401  (registers anim_expect)

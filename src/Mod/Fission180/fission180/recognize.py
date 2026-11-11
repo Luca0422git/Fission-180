@@ -3001,11 +3001,22 @@ def _hole_void(reader, h):
     its faces."""
     axis, origin = h["_axis"], h["_origin"]
     total = 0.0
+    # A modeled thread leaves its bore's cylinder in strips wound between the grooves (a
+    # Fission 180 thread brings the hole to the thread's minor diameter, so every turn's crest
+    # is such a strip): each strip goes all the way round and is more than a pitch long, so
+    # adding them up as whole cylinders counted the bore more than once (wave 7: the hole was
+    # then "not closed by its rims", 12000 mm3 for 12007.6 expected). The bore is as long as
+    # the strips reach together.
+    threaded = bool(h.get("_thread"))
+    strips = {}  # radius -> [(t0, t1)]
     for i in h["_faces"]:
         f = reader.facts[i]
         share = min(1.0, (f.span or 2 * math.pi) / (2 * math.pi))  # (half faces of a split bore)
         if f.kind == "cylinder":
             t0, t1 = reader._extent([i], axis, origin)
+            if threaded:
+                strips.setdefault(round(f.radius, 6), []).append((min(t0, t1), max(t0, t1)))
+                continue
             total += share * math.pi * f.radius**2 * (t1 - t0)
         elif f.kind == "cone":
             rings = {}
@@ -3017,7 +3028,22 @@ def _hole_void(reader, h):
                 rings[round(core.dot(core.sub(f.apex, origin), axis), 6)] = 0.0
             (ta, ra), (tb, rb) = sorted(rings.items())[:2]
             total += share * math.pi * (tb - ta) * (ra * ra + ra * rb + rb * rb) / 3.0
+    for radius, pieces in strips.items():
+        total += math.pi * radius**2 * _covered(pieces)
     return total
+
+
+def _covered(pieces):
+    """The length the intervals [(start, end), ...] cover together."""
+    length, reached = 0.0, None
+    for start, end in sorted(pieces):
+        if reached is None or start > reached:
+            length += end - start
+            reached = end
+        elif end > reached:
+            length += end - reached
+            reached = end
+    return length
 
 
 def _chain_complete(shape, names):

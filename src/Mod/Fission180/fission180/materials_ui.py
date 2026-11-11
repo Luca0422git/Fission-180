@@ -37,11 +37,7 @@ _state = {"dialog": None}
 
 # -- the user's own appearances and favourites ----------------------------------------------------
 def my_looks():
-    try:
-        data = json.loads(App.ParamGet(PREFS).GetString(MY_LOOKS, "") or "[]")
-    except Exception:
-        data = []
-    return [d for d in data if isinstance(d, dict) and d.get("key")]
+    return appearance.my_looks()
 
 
 def add_look(name, color_hex):
@@ -71,22 +67,15 @@ def delete_look(key):
 
 
 def look_favorites():
-    text = App.ParamGet(PREFS).GetString(LOOK_FAVORITES, "")
-    return [k for k in text.split(";") if k]
+    return appearance.favorites()
 
 
 def set_look_favorite(key, on):
-    keys = [k for k in look_favorites() if k != key]
-    if on:
-        keys.append(key)
-    App.ParamGet(PREFS).SetString(LOOK_FAVORITES, ";".join(keys))
+    appearance.set_favorite(key, on)
 
 
 def find_look(key):
-    for look in appearance.library() + my_looks():
-        if look["key"] == key:
-            return look
-    return None
+    return appearance.find_any(key)
 
 
 def selected_bodies():
@@ -298,9 +287,16 @@ class _Tab(QtWidgets.QWidget):
         if self.kind == "physical":
             row = material.entry(key)
             self.title.setText("<b>%s</b>" % (row["label"] if row else key))
-            mat = material.material_of(row)
+            # (one of Fission 180's own library rows is only made in FreeCAD's library when a
+            # body is made of it: its values are read from what material.py states)
+            mat = None if (row or {}).get("own") else material.material_of(row)
             for prop, _label, unit in PHYSICAL_VALUES:
-                self.detail_labels[prop].setText(_physical(mat, prop, unit))
+                if (row or {}).get("own"):
+                    number = material.value_of(key, prop, unit)
+                    text = "-" if number is None else ("%.4g %s" % (number, unit)).strip()
+                    self.detail_labels[prop].setText(text.replace("^3", "³"))
+                else:
+                    self.detail_labels[prop].setText(_physical(mat, prop, unit))
             look = appearance.find(row["look"]) if row else None
             self.based_on.setText(row["label"] if row else "")
         else:

@@ -154,6 +154,12 @@ SOLID_MODIFY = group(
         SEP,
         item("Physical Material", ("Fission180_PhysicalMaterial", "Std_SetMaterial"), "material"),
         item("Appearance", ("Fission180_Appearance", "Std_SetAppearance"), "appearance", "A"),
+        item(  # owner: looks (wave 7)
+            "Texture Map Controls",
+            "Fission180_TextureMapControls",
+            "appearance",
+            note="How a textured look's pattern lies on a body: projection, turn, size.",
+        ),
         item(
             "Manage Materials",
             ("Fission180_ManageMaterials", "Material_Edit"),
@@ -242,6 +248,18 @@ INSPECT = group(
             "Shift+N",
             toggle="component_colors_ui:is_on",
         ),
+        item(  # owner: looks (wave 7); also in the timeline's Settings menu, as in Fusion
+            "Component Color Swatch",
+            "Fission180_ComponentColorSwatch",
+            "component_colors",
+            toggle="component_colors_ui:swatch_on",
+        ),
+        item(  # owner: looks (wave 7); Fusion: right-click a component or a body
+            "Properties",
+            "Fission180_Properties",
+            "material",
+            note="Mass, volume, area, centre of mass and size of what is selected.",
+        ),
     ],
 )
 
@@ -286,7 +304,13 @@ INSERT = group(
             "Hardware...",
             "Fission180_Hardware",
             "hardware",
-            note="A real-size screw, nut, washer, heat-set insert or magnet, and its hole.",
+            note="A standard part (screws, O-rings, bearings ... metric or inch) and its hole.",
+        ),
+        item(
+            "Insert Catalogue Part...",
+            "Fission180_InsertCataloguePart",
+            "catalogue_part",
+            note="A supplier's website in your browser; the STEP you download comes in.",
         ),
     ],
 )
@@ -1226,7 +1250,12 @@ DRAWING_CREATE = group(
             "dw_section_view",
             note="Click a view, then a closed boundary around what should show inside.",
         ),
-        item("Exploded View", None, "dw_base_view"),
+        item(
+            "Exploded View",
+            "Fission180_DrawingExplodedView",
+            "dw_base_view",
+            note="A view of an animation storyboard's end: the design taken apart.",
+        ),
     ],
 )
 DRAWING_MODIFY = group(
@@ -1244,8 +1273,18 @@ DRAWING_MODIFY = group(
             note="Or double-click the title block",
         ),
         SEP,
-        item("Move", None, "move", note="Drag a view by its frame on the sheet"),
-        item("Rotate", None, "move"),
+        item(
+            "Move",
+            "Fission180_DrawingMove",
+            "move",
+            note="Pick views, tables, text or balloons, then two points (or drag a view).",
+        ),
+        item(
+            "Rotate",
+            "Fission180_DrawingRotate",
+            "move",
+            note="Pick views, then type the angle.",
+        ),
         item("Delete", "Fission180_DrawingDelete", "delete", "Del"),
     ],
 )
@@ -1256,7 +1295,12 @@ DRAWING_GEOMETRY = group(
     [
         item("Centerline", "Fission180_DrawingCenterline", "dw_centerline"),
         item("Center Mark", "Fission180_DrawingCenterMark", "dw_center_mark"),
-        item("Center Mark Pattern", None, "dw_center_mark"),
+        item(
+            "Center Mark Pattern",
+            "Fission180_DrawingCenterMarkPattern",
+            "dw_center_mark",
+            note="Click the holes of a pattern, Enter: marks and the line or circle through them.",
+        ),
         item(
             "Edge Extension",
             "Fission180_DrawingEdgeExtension",
@@ -1324,7 +1368,6 @@ DRAWING_TEXT = group(
             "dw_text",
             note="Click an edge, then where the text goes; type the text.",
         ),
-        item("Note", None, "dw_text"),
         item(
             "Bend Note",
             "Fission180_DrawingBendNote",
@@ -1360,6 +1403,12 @@ DRAWING_TABLES = group(
             note="A parts list of the components a view shows, with balloons.",
         ),
         item(
+            "Parts List",
+            "Fission180_DrawingPartsList",
+            "dw_table",
+            note="The components a view shows, numbered, with a balloon on each.",
+        ),
+        item(
             "Bend Table",
             "Fission180_DrawingBendTable",
             "dw_table",
@@ -1371,8 +1420,18 @@ DRAWING_TABLES = group(
             "dw_balloon",
             note="Click a component on a view, then where the balloon goes.",
         ),
-        item("Renumber", None, "dw_balloon"),
-        item("Align Balloons", None, "dw_balloon"),
+        item(
+            "Renumber",
+            "Fission180_DrawingRenumber",
+            "dw_balloon",
+            note="Type the number, click the balloon that gets it; the parts list sorts.",
+        ),
+        item(
+            "Align Balloons",
+            "Fission180_DrawingAlignBalloons",
+            "dw_balloon",
+            note="Click balloons, Enter, click where their line goes.",
+        ),
     ],
 )
 DRAWING_EXPORT = group(
@@ -1382,8 +1441,18 @@ DRAWING_EXPORT = group(
     [
         item("Export PDF", "Fission180_DrawingExportPDF", "dw_export_pdf"),
         item("Export DXF", "Fission180_DrawingExportDXF", "dw_export_dxf"),
-        item("Export DWG", None, "export"),
-        item("Export CSV", None, "export"),
+        item(
+            "Export DWG",
+            "Fission180_DrawingExportDWG",
+            "export",
+            note="Needs a DWG converter program on this computer; a DXF otherwise.",
+        ),
+        item(
+            "Export CSV",
+            "Fission180_DrawingExportCSV",
+            "export",
+            note="The parts list (or a bend table) as a file for a spreadsheet.",
+        ),
     ],
 )
 
@@ -2004,6 +2073,104 @@ CAM_MARKING_LIST = [
     item("Reset Orbit Center", "Fission180_ResetOrbitCenter", "orbit_center"),
 ]
 
+# -- ANIMATION workspace (wave 7, animation: storyboards, exploded views, Publish Video) --------
+# Fusion's ANIMATION toolbar: STORYBOARD, TRANSFORM, ANNOTATION, VIEW, PUBLISH
+# (docs/fission180/parity/animation.md). owner: animation (animation_ui.py); the tab is added
+# to TABS here, in a block of its own.
+ANIM_STORYBOARD = group(
+    "anim_storyboard",
+    "STORYBOARD",
+    ["New Storyboard"],
+    [
+        item("New Storyboard", "Fission180_AnimNewStoryboard", "anim_storyboard"),
+    ],
+)
+ANIM_TRANSFORM = group(
+    "anim_transform",
+    "TRANSFORM",
+    ["Transform Components", "Auto Explode: One Level", "Auto Explode: All Levels"],
+    [
+        item("Transform Components", "Fission180_AnimTransform", "anim_transform"),
+        item("Restore Home", "Fission180_AnimRestoreHome", "anim_home"),
+        SEP,
+        item("Auto Explode: One Level", "Fission180_AnimExplodeOne", "anim_explode_one"),
+        item("Auto Explode: All Levels", "Fission180_AnimExplodeAll", "anim_explode_all"),
+        item("Manual Explode", "Fission180_AnimManualExplode", "anim_explode_manual"),
+        SEP,
+        item("Show/Hide", "Fission180_AnimShowHide", "anim_showhide"),
+    ],
+)
+ANIM_ANNOTATION = group(
+    "anim_annotation",
+    "ANNOTATION",
+    ["Create Callout"],
+    [
+        item("Create Callout", "Fission180_AnimCallout", "anim_callout"),
+    ],
+)
+ANIM_VIEW = group(
+    "anim_view",
+    "VIEW",
+    ["View"],
+    [
+        item(
+            "View",
+            "Fission180_AnimView",
+            "anim_view",
+            note="On: orbiting, panning and zooming with the playhead past the scratch zone "
+            "is recorded as a View action. Off: the view is yours.",
+            toggle="animation_ui:recording",
+        ),
+    ],
+)
+ANIM_PUBLISH = group(
+    "anim_publish",
+    "PUBLISH",
+    ["Publish Video"],
+    [
+        item("Publish Video", "Fission180_AnimPublishVideo", "anim_publish"),
+    ],
+)
+TABS.append(
+    {
+        "id": "anim_animation",
+        "title": "ANIMATION",
+        "contextual": True,
+        "groups": [
+            ANIM_STORYBOARD,
+            ANIM_TRANSFORM,
+            ANIM_ANNOTATION,
+            ANIM_VIEW,
+            ANIM_PUBLISH,
+            SELECT,
+        ],
+    }
+)
+# The right-click marking menu in the ANIMATION workspace (animation_ui.open_marking_menu):
+# the workspace's own commands; nothing that changes the design's geometry.
+ANIM_MARKING_MENU = [
+    item("Repeat", "__repeat__", "compute"),
+    item("Transform Components", "Fission180_AnimTransform", "anim_transform"),
+    item("Show/Hide", "Fission180_AnimShowHide", "anim_showhide"),
+    item("Undo", "Std_Undo", "qa_undo", "Ctrl+Z"),
+    item("Auto Explode: One Level", "Fission180_AnimExplodeOne", "anim_explode_one"),
+    item("Restore Home", "Fission180_AnimRestoreHome", "anim_home"),
+    item("Create Callout", "Fission180_AnimCallout", "anim_callout"),
+    item("Publish Video", "Fission180_AnimPublishVideo", "anim_publish"),
+]
+ANIM_MARKING_LIST = [
+    item("Redo", "Std_Redo", "qa_redo", "Ctrl+Y"),
+    item("Auto Explode: All Levels", "Fission180_AnimExplodeAll", "anim_explode_all"),
+    item("Manual Explode", "Fission180_AnimManualExplode", "anim_explode_manual"),
+    item("New Storyboard", "Fission180_AnimNewStoryboard", "anim_storyboard"),
+    SEP,
+    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Look At", "Std_AlignToSelection", "nav_lookat"),
+    SEP,
+    item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
+    item("Reset Orbit Center", "Fission180_ResetOrbitCenter", "orbit_center"),
+]
+
 # Fusion's File menu (the application menu), in its order; cloud-only entries (upload,
 # share, recover documents) are left out. Shown first by the quick-access Menu button,
 # above FreeCAD's own menus (ribbon_ui).
@@ -2017,6 +2184,12 @@ FILE_MENU = [
         "Fission180_NewDrawing",
         "dw_new",
         note="From Design: views of this design on a sheet",
+    ),
+    item(
+        "New Drawing From Animation",
+        "Fission180_NewDrawingFromAnimation",
+        "dw_new",
+        note="An exploded drawing of one of the design's animation storyboards",
     ),
     item("Open", ("Fission180_Open", "Std_Open"), "qa_open", "Ctrl+O"),
     item("Recover Documents", "Fission180_RecoverDocuments", "document"),

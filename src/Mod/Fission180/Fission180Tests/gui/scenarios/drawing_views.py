@@ -4,7 +4,8 @@
 The filleted block with a hole (drawing_fixtures.block) on an ISO A3 drawing (first angle
 projection), base view Front at 1:1 at (120, 200).
 
-A  Projected View: the base view is the parent (the only one); moving below it shows the
+A  Projected View: nothing follows the mouse until the base view is clicked (Fusion: the
+   parent view is clicked first; wave 7); then moving below it shows the
    Top view (first angle: the view from above goes below); a click places it; moving
    right shows the Left view, a click; moving to the lower right an isometric view, a
    click; back over the base view the preview goes; Enter ends. Three views, lined up.
@@ -63,8 +64,24 @@ def a_command():
     h.ribbon("Projected View")
 
 
-def a_below():
+def a_before_parent():
     h.check("Projected View dialog", d.panel_of("ProjectedPanel") is not None, d.panel())
+    d.move_to(BASE[0] + 3, BASE[1] - 60)
+
+
+def a_parent():
+    h.check("no preview before the parent view is clicked", kinds() == [], kinds())
+    d.click_at(*BASE)
+
+
+def a_below():
+    h.check("the click on the base view made nothing", kinds() == [], kinds())
+    b = base()
+    h.check(
+        "the base view stays where it is",
+        close(b.X.Value, BASE[0], 0.5) and close(b.Y.Value, BASE[1], 0.5),
+        (b.X.Value, b.Y.Value),
+    )
     d.move_to(BASE[0] + 3, BASE[1] - 60)
 
 
@@ -252,6 +269,8 @@ h.run(
     + d.drawing_steps("first", base_at=BASE, scale="1:1")
     + [
         a_command,
+        a_before_parent,
+        a_parent,
         a_below,
         a_top_preview,
         a_right,

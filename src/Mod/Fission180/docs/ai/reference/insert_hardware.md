@@ -7,7 +7,7 @@ It builds the design step(s) `sf_hardware` (the golden models' step language).
 
 ## What it does
 
-Insert a fastener with the hole it needs: click a flat face of the current body at at ([x, y, z], design coordinates) or a round edge (a hole's rim). standard iso4762 (socket head cap screw), iso7380 (button head), iso10642 (countersunk), iso4032 (hex nut), iso7089 (washer), insert (heat-set insert), magnet; size ("3" for M3, "6x3" for a magnet), length (mm), flip, make_hole (default true), fit close | normal | loose, sink_head (counterbore / countersink for the head), hole_depth all | length, clearance (a magnet's pocket, mm). The part becomes its own component.
+Insert a standard part with the hole it needs: click a flat face of the current body at at ([x, y, z], design coordinates) or a round edge (a hole's rim: the part sits on its axis). standard: metric screws iso4762 (socket head cap), iso7380 (button), iso10642 (countersunk), din7984 (low head), iso4017 (hex head), iso7045 / iso1580 (pan head, Phillips / slotted); inch screws asme_shcs, asme_bhcs, asme_fhcs, asme_lhcs, asme_hex, asme_pan_ph, asme_pan_sl; set screws iso4029 / iso4026 / iso4027 / iso4028 (cup / flat / cone / dog) and asme_ss_cup / _flat / _cone / _dog; shoulder screws iso7379, asme_shoulder; nuts iso4032, iso4035 (thin), iso7040 (nylon lock), asme_nut, asme_jam, asme_locknut; washers iso7089, din127 (split lock), asme_washer_sae, asme_washer_uss, asme_lockwasher; O-rings as568 (dash number), oring_metric; ball bearings bearing, bearing_inch; retaining rings din471 / din472, asme_ring_ext / asme_ring_int; pins iso2338, asme_dowel; keys din6885, asme_key; standoff_hex, spacer_round, insert (heat-set), magnet. size: "3" for M3, "1/4" or "#10" for inch threads, "012" for an AS568 dash number, "10x2" for a metric O-ring, "6202" for a bearing, "10" for a 10 mm shaft or bore, "6x3" for a magnet. length (mm), thread ("" = coarse, or e.g. "1/4-28 UNF"), modeled (cut the real thread), variant (a bearing: open | zz | 2rs), flip, offset (mm along the axis), make_hole (default true for screws, set screws, nuts, washers, inserts, magnets; other parts get none), fit close | normal | loose, sink_head (counterbore / countersink for the head), hole_depth all | length, clearance (a magnet's pocket, mm). The part becomes its own component.
 
 ## Arguments
 
@@ -16,10 +16,14 @@ Insert a fastener with the hole it needs: click a flat face of the current body 
 | `face` | object |  |  |  | the flat face clicked (a face selector: filters type, normal, along, radius, at, all, count, any_of; see get_help topic selectors). Give count. |
 | `at` | array of 3 numbers | mm |  |  | where on it |
 | `edge` | object |  |  |  | instead: a round edge (a hole's rim) (an edge selector: filters type, parallel, radius, on_faces, not_on_faces, at, all, count, any_of; see get_help topic selectors). Give count. |
-| `standard` | `iso4762` \| `iso7380` \| `iso10642` \| `iso4032` \| `iso7089` \| `insert` \| `magnet` |  | `"iso4762"` |  |  |
-| `size` | string |  |  |  | e.g. 3 (M3) or 6x3 |
+| `standard` | `iso4762` \| `iso7380` \| `iso10642` \| `din7984` \| `iso4017` \| `iso7045` \| `iso1580` \| `asme_shcs` \| `asme_bhcs` \| `asme_fhcs` \| `asme_lhcs` \| `asme_hex` \| `asme_pan_ph` \| `asme_pan_sl` \| `iso4029` \| `iso4026` \| `iso4027` \| `iso4028` \| `asme_ss_cup` \| `asme_ss_flat` \| `asme_ss_cone` \| `asme_ss_dog` \| `iso7379` \| `asme_shoulder` \| `iso4032` \| `iso4035` \| `iso7040` \| `asme_nut` \| `asme_jam` \| `asme_locknut` \| `iso7089` \| `din127` \| `asme_washer_sae` \| `asme_washer_uss` \| `asme_lockwasher` \| `as568` \| `oring_metric` \| `bearing` \| `bearing_inch` \| `din471` \| `din472` \| `asme_ring_ext` \| `asme_ring_int` \| `iso2338` \| `asme_dowel` \| `din6885` \| `asme_key` \| `standoff_hex` \| `spacer_round` \| `insert` \| `magnet` |  | `"iso4762"` |  |  |
+| `size` | string |  |  |  | e.g. 3 (M3), 1/4, #10, 012 (AS568), 6202 (a bearing) or 6x3 |
 | `length` | number | mm |  | > 0 | mm |
+| `thread` | string |  |  |  | "" = the coarse thread, or a fine one, e.g. 1/4-28 UNF |
+| `modeled` | boolean |  | `false` |  | cut the real thread |
+| `variant` | `open` \| `zz` \| `2rs` |  | `"zz"` |  |  |
 | `flip` | boolean |  | `false` |  |  |
+| `offset` | number | mm |  |  | mm along the axis, out of the part |
 | `make_hole` | boolean |  | `true` |  |  |
 | `fit` | `close` \| `normal` \| `loose` |  | `"normal"` |  |  |
 | `sink_head` | boolean |  |  |  | counterbore / countersink for the head; default true, false for iso7380 (a button head sits on the face) |
@@ -69,5 +73,5 @@ Done: AI: Hardware iso4762. Its id is 'Hardware'. Bodies now: Body1: 23827.3 mm3
 
 ## See also
 
-- Golden models built with its steps (read one with docs_read golden/<id>): `hardware_button_head_m4`, `hardware_countersunk_m4_on_rim`, `hardware_edit_length`, `hardware_insert_m3_hole`, `hardware_magnet_6x3_pocket`, `hardware_nut_top`, `hardware_shcs_m3_counterbore`, `hardware_washer_bottom`
+- Golden models built with its steps (read one with docs_read golden/<id>): `hardware_bearing_608_bore`, `hardware_button_head_m4`, `hardware_countersunk_m4_on_rim`, `hardware_dowel_3x10`, `hardware_edit_length`, `hardware_hex_m6`, `hardware_inch_nut_quarter`, `hardware_inch_shcs_quarter`, `hardware_insert_m3_hole`, `hardware_key_4x4x16`, `hardware_lock_washer_m6`, `hardware_magnet_6x3_pocket` and 9 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)
