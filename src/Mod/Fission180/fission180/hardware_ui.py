@@ -758,6 +758,10 @@ class HardwarePanel(Panel):
         if standard != o["standard"]:
             o = self.options = core.change_standard(o, standard)
         size = None
+        threaded = hardware_place.thread_of_hole(place) if place["is_hole"] else None
+        if threaded is not None and threaded[0] == core.thread_standard(o["standard"]):
+            if threaded[1] in core.sizes(o["standard"]):
+                size = threaded[1]  # the hole's thread: what goes in it (Thread step)
         for diameter in (place["hole_diameter"], place["diameter"]):
             if diameter is None or size is not None:
                 continue

@@ -31,7 +31,7 @@ walls_d, walls_e = split(walls_d, "steam_mirror_open")
 SECTIONS += [("gaskets", walls_b), ("wall", walls_c), ("wall2", walls_d), ("steam", walls_e)]
 assembly_all = assembly.steps()
 assembly_a, assembly_b = split(assembly_all, "power_back")
-assembly_b, assembly_c = split(assembly_b, "circular_open")
+assembly_b, assembly_c = split(assembly_b, "screws_back")
 SECTIONS += [("sliders", assembly_a), ("screw", assembly_b), ("patterns", assembly_c)]
 
 h.run("replay_13_tesla_turbine", r.assemble(SECTIONS), paced_by="state")
