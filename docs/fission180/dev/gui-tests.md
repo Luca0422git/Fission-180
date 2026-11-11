@@ -242,3 +242,15 @@ compiled again (an artifact of attempt 1 is there for attempt 2: the scenario de
   fully constrained yet must not depend on how the solver settled it, and a click on a piece
   whose size the solver chose must still find it (a person zooms in on a piece too small to
   click: `replay_12_handle_steps`, `handle_flat_zoom`).
+- **GitHub's 3D view is one pixel taller than a Claude sandbox's** (1538 x 770 against
+  1538 x 769), and where a line or a sketch axis falls inside its pixel decides what a click
+  beside it picks and what the Line tool infers (an edge-on origin plane found 1 pixel off the
+  X axis there, 2 here; a line drawn down the Y axis got "on the axis" for its end there,
+  Vertical here). To see GitHub's result here, make the main window one pixel taller in a
+  throwaway copy of the scenario, as its first step after the new design:
+  `mw = Gui.getMainWindow(); g = mw.geometry(); mw.setGeometry(g.x(), g.y(), g.width(),
+  g.height() + 770 - h.gl_widget().height())`, then process events and `h.settle()` (the
+  window is not maximized here: 1800 x 1000; wave 7, fix-7 reproduced two GitHub-only
+  failures this way, each with GitHub's own message). An aim that depends on a pixel finds
+  it by state, on a few rows and, if none has it, after moving the view a fraction of a
+  pixel (`fix3_dimension_through_planes.x_axis_pixel_under`).

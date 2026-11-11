@@ -289,6 +289,9 @@ Home view with the Layout Grid on; and Undo pressed while a dialog is open cance
 - **Commands that did nothing without a word now say why** next to the pointer (features,
   joints, Gear, the timeline, sketch constraints), and a dialog cancelled by another command
   says the change was not kept. A browser right-click no longer ends the command you are in.
+- **MODIFY > Scale of a sketch failed now and then** with "conflicting constraints" (the dialog
+  stayed open and the sketch was left half scaled), for example a sketch with an ellipse, or a
+  triangle made twice as big. Every size is now changed at once.
 - **Sketches**: one Ctrl+Z too many left the sketch, and Ctrl+Y closed it; a finished sketch was
   hidden after undo and redo; deleted projected edges came back; Fit zoomed out to 24 m; a
   dimension placed over an axis became an angle; Tangent popped up FreeCAD's "Constraint

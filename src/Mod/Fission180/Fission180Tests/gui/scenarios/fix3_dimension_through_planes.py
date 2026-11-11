@@ -91,7 +91,12 @@ def aim(point, plane, what):
     (the situation this scenario is about)."""
     vm = view_map()
     found = vm.pixel_for((point.x, point.y + OFF_PX * vm.px))
-    pos = QtCore.QPoint(int(found.x()), int(found.y()))
+    aim_pixel(QtCore.QPoint(int(found.x()), int(found.y())), plane, what)
+
+
+def aim_pixel(pos, plane, what):
+    """Click widget pixel `pos`, checking first that the edge-on `plane` is under the pointer
+    there (the situation this scenario is about)."""
     under = glyphs_under(pos)
     h.check(
         "%s: the %s, seen edge-on, is under the pointer" % (what, plane),
@@ -284,27 +289,53 @@ def d_two_value():
 
 
 # == D  D line to axis: the X axis (under the XY plane), the line on the YZ plane's line =======
-def on_x_axis_under(plane):
-    """A point of the sketch's X axis where the edge-on `plane` is under the pointer (aim()'s
-    pixel), clear of the origin point and of the YZ plane and Z axis drawn edge-on through it:
-    found on the screen, not assumed (fix-5: x = 3 mm had the XY plane under the pointer
-    here, nothing on GitHub's renderer, whose origin squares end nearer the origin). 3 mm
-    first, then nearer the origin, then farther; none: 3 mm (aim() then says what is there)."""
-    vm = view_map()
-    for tenths in list(range(30, 14, -1)) + list(range(31, 61)):
-        x = tenths / 10.0
-        found = vm.pixel_for((x, OFF_PX * vm.px))
-        under = glyphs_under(QtCore.QPoint(int(found.x()), int(found.y())))
-        if any(n.startswith(plane) for n in under) and not any(
-            n.startswith(("YZ_Plane", "Z_Axis")) for n in under
-        ):
-            return V(x, 0, 0)
-    return V(3, 0, 0)
+QUARTER_PIXELS = 4  # how many times the view moves a quarter pixel to find such a pixel
+
+
+def x_axis_pixel_under(plane):
+    """A widget pixel beside the sketch's X axis (at most OFF_PX pixels off it) where the
+    edge-on `plane` is under the pointer and the YZ plane and Z axis drawn edge-on through
+    the origin are not: found on the screen, not assumed, or None.
+
+    A plane seen edge-on is a line one pixel wide, and the pixel rows FreeCAD's pick finds it
+    in depend on where the axis falls inside its pixel: OFF_PX (2) pixels above the axis had
+    the XY plane here (view 1538 x 769), only the rows from 1 above to 1 below it on GitHub's
+    (1538 x 770; the search along the axis at 2 pixels found nothing there, CI #78; this
+    screen made 770 tall gives the same: wave 7, fix-7). So the rows within OFF_PX of the
+    axis are searched, farthest first (a hand's aim beside the line), along 1.5 to 6 mm from
+    the origin (fix-5: GitHub's origin squares end nearer the origin), the axis's own row
+    last. None there: the view moves a quarter pixel (the axis falls elsewhere in its pixel)
+    and the search runs again, QUARTER_PIXELS times."""
+    rows = [-OFF_PX, OFF_PX] + [d for k in range(int(OFF_PX) - 1, 0, -1) for d in (-k, k)] + [0]
+    xs = [t / 10.0 for t in list(range(30, 14, -1)) + list(range(31, 61))]
+    for quarter in range(QUARTER_PIXELS + 1):
+        if quarter:
+            r.look_at(st.g(V(0, 3 + 0.025 * quarter, 0)), h.gl_widget().height() / 10.0)
+        vm = view_map()
+        for dy in rows:
+            for x in xs:
+                found = vm.pixel_for((x, 0.0))
+                pos = QtCore.QPoint(int(round(found.x())), int(round(found.y())) + int(dy))
+                under = glyphs_under(pos)
+                if any(n.startswith(plane) for n in under) and not any(
+                    n.startswith(("YZ_Plane", "Z_Axis")) for n in under
+                ):
+                    App.Console.PrintMessage(
+                        "[Fission 180] fix3: the X axis aimed at x = %.1f mm, %d pixel(s) off "
+                        "it, the view moved %d quarter pixel(s)\n" % (x, dy, quarter)
+                    )
+                    return pos
+    return None
 
 
 def d_axis_first():
     s["count"] = len(b.sk().Constraints)
-    aim(on_x_axis_under("XY_Plane"), "XY_Plane", "D, the X axis")
+    pos = x_axis_pixel_under("XY_Plane")
+    if pos is None:  # (no such pixel: aimed 3 mm out, where the check says what is there)
+        vm = view_map()
+        found = vm.pixel_for((3.0, OFF_PX * vm.px))
+        pos = QtCore.QPoint(int(found.x()), int(found.y()))
+    aim_pixel(pos, "XY_Plane", "D, the X axis")
 
 
 def d_axis_second():
