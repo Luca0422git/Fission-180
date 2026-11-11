@@ -25,12 +25,42 @@ _state = {"watch": None}
 
 def element_at(view, gl, pos):
     """(object, "FaceN" / "EdgeN" / "VertexN") under the widget pixel `pos`: the step that
-    owns the element (a body's newest step for a body), or None."""
+    owns the element (a body's newest step for a body), or None. An origin or construction
+    plane or axis in front is looked through: seen edge-on it lies over the part's edges as a
+    line (the surfboard's offset plane at x = 140 over the board's tail edge, which D then
+    could not reach: replay-b, wave 7)."""
     ratio = gl.devicePixelRatioF() or 1.0
+    spot = (pos.x() * ratio, (gl.height() - pos.y()) * ratio)
     try:
-        info = view.getObjectInfo((pos.x() * ratio, (gl.height() - pos.y()) * ratio))
+        infos = view.getObjectsInfo(spot) or []
     except Exception:
-        return None
+        infos = []
+    if not infos:
+        try:
+            infos = [view.getObjectInfo(spot)]
+        except Exception:
+            return None
+    for info in infos:
+        found = _element_of(info)
+        if found is not None:
+            return found
+        if not _is_glyph_info(info):
+            return None
+    return None
+
+
+def _is_glyph_info(info):
+    try:
+        from . import profile_pick
+
+        doc = App.getDocument(str(info["Document"]))
+        obj = doc.getObject(str(info.get("Object", "")))
+        return obj is not None and profile_pick.is_glyph(obj)
+    except Exception:
+        return False
+
+
+def _element_of(info):
     if not info:
         return None
     doc = App.ActiveDocument
