@@ -269,6 +269,30 @@ def offset(spot, du, dv):
     return moved
 
 
+# how long the first flat is on the screen once zoomed in on it to dimension it
+FLAT_PIXELS = 150
+
+
+def flat_zoom_width():
+    """The view's width (in) that shows the first flat FLAT_PIXELS long."""
+    length = max(r.sk().Geometry[flats()[0]].length() / IN, 0.002)
+    return length * h.gl_widget().width() / float(FLAT_PIXELS)
+
+
+def screen_above(spot, pixels):
+    """The place `spot` gives, moved `pixels` up the screen (in the sketch: the view looks
+    at it face on, sketch Y up), whatever the zoom."""
+
+    def moved():
+        sketch = r.sk()
+        plc = sketch.getGlobalPlacement()
+        local = plc.inverse().multVec(spot())
+        mm_per_pixel = h.view().getCameraNode().height.getValue() / float(h.gl_widget().height())
+        return plc.multVec(local + V(0, pixels * mm_per_pixel, 0))
+
+    return moved
+
+
 def sketch_done():
     r.dump_sketch("handle")
     r.fully_constrained("Wooden Handle")
@@ -546,13 +570,20 @@ def steps():
         "handle_wall",
         lambda sk: r.near(sk.Geometry[inner.line_index("right")].length() / IN, 0.25),
     )
+    # A person rolls the wheel over the flat until it is long enough to click, then zooms out
+    # again. (How long it is here, the book does not say: what the solver left after R1.5,
+    # 4.00 and 0.25. FreeCAD's solver settles a sketch that is not fully constrained a
+    # little differently each time, wave 7 fix-4: 0.01 to 0.30 in. At 0.01 in, 2 pixels,
+    # the click on the flat's middle took its corner on the projected rim: a driven 0.25.)
+    out += [r.zoom_on(flat(0), flat_zoom_width, "handle_flat_zoom")]
     out += r.dimension(
         [flat(0)],
-        offset(flat(0), 0.0, 0.4),
+        screen_above(flat(0), 200),
         "0.25",
         "handle_flat",
         lambda sk: r.near(sk.Geometry[flats()[0]].length() / IN, 0.25),
     )
+    out += [r.sketch_view(6.0, (2.2, 0.9), "handle_view_whole")]
     out += [sketch_done, r.finish_sketch("handle_finish")]
     out += [r.named("handle_revolve", r.revolve_open), revolve_panel, revolve_axis]
     out += [r.ok("handle_revolve_ok"), revolved]

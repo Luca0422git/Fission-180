@@ -41,6 +41,8 @@ from .compat import QtCore, QtGui, QtWidgets
 SKETCHER = "User parameter:BaseApp/Preferences/Mod/Sketcher"
 SKETCHER_GENERAL = SKETCHER + "/General"
 SNAP = SKETCHER + "/Snap"
+SOLVER_ADVANCED = SKETCHER + "/SolverAdvanced"
+LEAST_NORM_STEP = 1  # FreeCAD's DogLeg Gauss step choices: 0 FullPivLU, 1 LeastNorm-FullPivLU
 VIEW = "User parameter:BaseApp/Preferences/View"
 PALETTE_PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180/SketchPalette"
 NOTIFICATIONS = "User parameter:BaseApp/Preferences/NotificationArea"
@@ -141,6 +143,19 @@ PARAMS = [
     # the book parity report: "Fusion shows just the curve"). Off; Fission 180 draws the
     # control frame itself for the splines whose control circles are shown (ControlFrames).
     (SKETCHER_GENERAL, "Bool", "BSplineControlPolygonVisible", False),
+    # A sketch that is not fully constrained moves its curves the least it can when a
+    # constraint or a dimension is added, and the same way each time (in Fusion the same
+    # steps give the same sketch; wave 7, fix-4). FreeCAD's own solver step ("FullPivLU")
+    # depends on where in memory the sketch's numbers happen to lie: the same Equal on the
+    # same four flats of the book's Pizza Cutter handle gave flats from 0.16 to 0.20 in
+    # long, a different length almost every time (38 of 40 tries). The least-norm step
+    # ("LeastNorm-FullPivLU") gives one. It is FreeCAD's own option (its Advanced solver
+    # controls), read each time a sketch opens for editing: every solve and drag of an
+    # open sketch uses it. (Left in FreeCAD's solver: a new Equal between two circles or
+    # arcs, Horizontal / Vertical between two points or a Coincident start from one of the
+    # two values, the one that lies higher in memory. Only a change of FreeCAD's solver
+    # can fix that.)
+    (SOLVER_ADVANCED, "Int", "DogLegGaussStep", LEAST_NORM_STEP),
 ]
 
 # Sketch palette options (Fusion's defaults); remembered between sessions.
