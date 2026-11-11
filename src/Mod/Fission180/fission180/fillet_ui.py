@@ -196,14 +196,20 @@ def _select(box, value):
 
 def _carry_label(label, name, new):
     """The label of a step replaced by one of the other kind (FreeCAD's Fillet <-> Fission
-    180's own step) goes to the new step when the person gave it. A default label
-    ("Fillet001", or "f1" of a step named f1) does not: the timeline numbers the new step
-    "Fillet 1" by itself. (Copied always, a step named "f1" showed as "f1" after the swap;
-    fillet_sets.rescue had this rule already. fix-1, wave 7.)"""
+    180's own step) goes to the new step when the person gave it, and when it is FreeCAD's
+    label of that kind ("Chamfer" onto the new Chamfer001): the step keeps the name the
+    Parameters dialog groups its sizes under and formulas reach it by, and the timeline
+    still numbers it "Chamfer 1". A default label that is not one of the new step's kind
+    ("f1" of a step named f1) does not go: the timeline would show "f1" instead of "Fillet
+    1". (Copied always, a step named "f1" showed as "f1" after the swap: fix-1, wave 7;
+    never copied when default, a chamfer given a second set was listed as Chamfer001 in
+    Change Parameters: fix-6, book_params_units F.)"""
     try:
         from . import timeline_core
 
-        if timeline_core.is_default_label(label, name):
+        if timeline_core.is_default_label(label, name) and not timeline_core.is_default_label(
+            label, new.Name
+        ):
             return
     except Exception:
         pass
