@@ -156,6 +156,7 @@ def new_component(name, parent_reads=None, activate_root=True):
 
     def root():
         h.click_empty()
+        show_row(t.tree().topLevelItem(0).text(1))
         cs.click_radio(t.tree().topLevelItem(0).text(1))
 
     root.done = lambda: k.active_label() == ""
@@ -199,11 +200,23 @@ def new_component(name, parent_reads=None, activate_root=True):
     return [named(s, "%s_%s" % (name.replace(" ", "_").lower(), s.__name__)) for s in steps]
 
 
+def show_row(label):
+    """Scroll the browser so that the row called `label` shows (a person turns the wheel:
+    a long design's first rows are above the top of the panel)."""
+    tree = t.tree()
+    item = tree.row(label)
+    if item is not None:
+        tree.scrollToItem(item)
+        QtWidgets.QApplication.processEvents()
+        h.settle()
+
+
 def activate(label):
     """A step: click the ring of the component's browser row (the design's for "")."""
 
     def step():
         h.click_empty()
+        show_row(label or t.tree().topLevelItem(0).text(1))
         cs.click_radio(label or t.tree().topLevelItem(0).text(1))
 
     step.done = lambda: k.active_label() == label
