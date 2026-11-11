@@ -117,7 +117,9 @@ def prism_done():
 # -- Path 25: Press Pull the sloped face --------------------------------------------------
 def p25_pick_slope():
     h.fit()
-    h.click(V(35, -10, 10))
+    # (the prism lies at y 0..20: a Front plane sketch is extruded away from the
+    # front viewer, like Fusion; it was y -20..0)
+    h.click(V(35, 10, 10))
 
 
 def p25_type():
@@ -157,7 +159,7 @@ def p26_sketch():
 
 def p26_pick():
     h.fit()
-    s["centre"] = V(35 + SHIFT * 1.0, -10, 10)  # the moved slope's middle
+    s["centre"] = V(35 + SHIFT * 1.0, 10, 10)  # the moved slope's middle
     h.click(s["centre"])
 
 

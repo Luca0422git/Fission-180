@@ -764,25 +764,32 @@ def touched_bodies(profiles, options, lead=None, contact=None):
 
 
 def in_the_way(profiles, options, lead=None):
-    """([bodies the extrusion passes through], [bodies it passes through or only touches]),
-    oldest first, each body as it was before `lead`; None when it cannot be told here. One
-    extrusion solid for both lists (the dialog needs both: Cut lists the first, Join and
-    the automatic operation the second)."""
+    """([bodies the extrusion passes through], [bodies it passes through or only touches],
+    [bodies it really overlaps]), oldest first, each body as it was before `lead`; None when
+    it cannot be told here. One extrusion solid for all lists (the dialog needs them all:
+    Cut lists the first, Join the second, the automatic operation the second and third).
+
+    "Really overlaps" (the automatic Cut): a point well inside the extrusion lies in the
+    body, or they share at least START_SHARE of the extrusion's volume. A tapered column
+    next to a face profile flares over its edge by a sliver (0.002 %): the first list has
+    it (a Cut would take that sliver), but it must not turn an extrude of that face
+    outwards into a Cut by itself."""
     profiles = normalize(profiles)
     if not profiles:
-        return [], []
+        return [], [], []
     options = options_with_defaults(options)
     doc = profiles[0][0].Document
     candidates = candidate_bodies(doc, lead)
     if not candidates:
-        return [], []
+        return [], [], []
     try:
         prism = tool_prism(profiles, options, [shape for _body, shape in candidates])
     except Exception:
         return None
     # A sliver (a tapered neighbour flaring over the profile's edge) does not count.
     enough = max(VOLUME_TOL, prism.Volume * 1e-6)
-    through, touching = [], []
+    real = max(VOLUME_TOL, prism.Volume * START_SHARE)
+    through, touching, overlapping = [], [], []
     inner = None
     for body, shape in candidates:
         try:
@@ -797,56 +804,121 @@ def in_the_way(profiles, options, lead=None):
                 if _holds_any(shape, inner):
                     through.append(body)  # a point inside both: no boolean needed
                     touching.append(body)
+                    overlapping.append(body)
                     continue
-            shared = _shared_volume(shape, prism)  # one boolean per body for both lists
+            shared = _shared_volume(shape, prism)  # one boolean per body for all lists
             if shared is None:
                 continue
             if shared > enough:
                 through.append(body)
                 touching.append(body)
+                if shared > real:
+                    overlapping.append(body)
             elif shared > VOLUME_TOL or _face_contact(shape, prism):
                 touching.append(body)
         except Exception:
             continue
-    return through, _joinable(touching, lead)
+    # (the Join list: only bodies a Join may change, the active component's; components'
+    # _joinable, wave 7. The automatic Cut's own scope is the dialog's: auto_scope.)
+    return through, _joinable(touching, lead), overlapping
 
 
-def starts_in_material(profiles, options, lead=None):
-    """Fusion's automatic Cut: True when the first 0.01 mm of the extrusion lies inside a
-    body (any body it can act on, not only the profile's own; one point of the profile was
-    tested before, so a profile across a gap between two bodies stayed a Join). At least 1 %
-    of that slice must be inside (START_SHARE)."""
+def auto_scope(doc, lead=None):
+    """(names inside, names direct) for extrude_bodies_core.scope: the bodies that decide
+    the operation a dialog proposes by itself. Both are the bodies of the active component
+    (components.may_change, the components builder's rule for the report's bug 10: "only
+    bodies of the active component do"); a body of another component, or of a component
+    inside the active one, never turns an extrude into a Cut or a Join by itself. The
+    person can still pick Cut: the Bodies to Cut row then lists every body in the way."""
+    from . import components
+
+    try:
+        names = [
+            b.Name for b in bodies.list_bodies(doc) if components.may_change(b, doc, lead=lead)
+        ]
+        return names, names
+    except Exception:
+        return None, None  # (cannot be told: every body counts, as before components)
+
+
+def start_state(profiles, options, lead=None, inside=None, on=None):
+    """(starts inside, starts on) for the automatic operation (extrude_bodies_core):
+
+    starts inside  the first 0.01 mm of the extrusion lies in a body's material (any body
+                   it can act on, not only the profile's own; one point of the profile was
+                   tested before, so a profile across a gap between two bodies stayed a
+                   Join). At least 1 % of that slice must be inside (START_SHARE). One Side
+                   and Two Sides: side one's slice; Symmetric: both ways (a profile on a
+                   plane through the part; before wave 7 a symmetric extrude never counted,
+                   so Symmetric turned a Cut into a Join).
+    starts on      that slice lies on a face of a body (the profile is a face of the body,
+                   or a sketch on it) without being inside one.
+
+    inside / on: the names of the bodies that count for each (None: all)."""
     try:
         profiles = normalize(profiles)
         options = options_with_defaults(options)
-        if not profiles or options["direction"] == "symmetric":
-            return False
+        if not profiles:
+            return False, False
         candidates = candidate_bodies(profiles[0][0].Document, lead)
-        # (wave 7, bug 10) only material of the active component proposes a Cut
-        keep = _joinable([body for body, _shape in candidates], lead)
-        candidates = [c for c in candidates if c[0] in keep]
         if not candidates:
-            return False
-        sign = _sign1(profiles, options)
+            return False, False
+        # (wave 7, bug 10: only material of the active component proposes a Cut; the
+        # dialog passes those bodies as `inside` and `on`: auto_scope)
+        inside = None if inside is None else set(inside)
+        on = None if on is None else set(on)
+        if options["direction"] == "symmetric":
+            signs = (1.0, -1.0)
+        else:
+            signs = (_sign1(profiles, options),)
         normal = profile_normal(profiles)
         offset = start_offset_of(profiles, options)
-        pieces, points = [], []
-        for face in _starts(profiles, options):
-            face = face.copy()
-            if abs(offset) > TOL:
-                face.translate(normal * offset)
-            pieces.append(face.extrude(normal * (0.01 * sign)))
-            # points inside the profile, just past it (a quick yes before the boolean)
-            points += [p + normal * (0.005 * sign) for p in _face_samples(face)]
-        for _body, shape in candidates:
-            if _holds_any(shape, points):
-                return True
-            for piece in pieces:
-                if _overlaps(shape, piece, volume=max(1e-9, piece.Volume * START_SHARE)):
+        sides = []  # per side: (slices, points just past the profile)
+        for sign in signs:
+            pieces, points = [], []
+            for face in _starts(profiles, options):
+                face = face.copy()
+                if abs(offset) > TOL:
+                    face.translate(normal * offset)
+                pieces.append(face.extrude(normal * (0.01 * sign)))
+                # points inside the profile, just past it (a quick yes before the boolean)
+                points += [p + normal * (0.005 * sign) for p in _face_samples(face)]
+            sides.append((pieces, points))
+
+        def side_inside(pieces, points):
+            for body, shape in candidates:
+                if inside is not None and body.Name not in inside:
+                    continue
+                if _holds_any(shape, points):
                     return True
+                for piece in pieces:
+                    if _overlaps(shape, piece, volume=max(1e-9, piece.Volume * START_SHARE)):
+                        return True
+            return False
+
+        if all(side_inside(pieces, points) for pieces, points in sides):
+            return True, False
+        for body, shape in candidates:
+            if on is not None and body.Name not in on:
+                continue
+            for pieces, _points in sides:
+                for piece in pieces:
+                    try:
+                        gap = _box_overlap(shape.BoundBox, piece.BoundBox)
+                        if gap < -1e-4:
+                            continue
+                        if _face_contact(shape, piece):
+                            return False, True
+                    except Exception:
+                        continue
     except Exception:
-        return False
-    return False
+        return False, False
+    return False, False
+
+
+def starts_in_material(profiles, options, lead=None, only=None):
+    """Fusion's automatic Cut, the quick part: start_state()'s "starts inside"."""
+    return start_state(profiles, options, lead, inside=only)[0]
 
 
 def follower_tool(lead, reach=None):

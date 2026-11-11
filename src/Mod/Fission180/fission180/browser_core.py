@@ -649,6 +649,7 @@ MENUS = {
         "Physical Material",
         "Appearance",
         "Save As Mesh",
+        "Properties",  # (wave 7, looks: Fission180_Properties on this body)
         "-",
         "Move to Component",
         "Rename",

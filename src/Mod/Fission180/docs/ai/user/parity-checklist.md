@@ -11,9 +11,9 @@ file is out of date.
 
 ## Headline
 
-**Fusion commands present: 553 / 713 (77.6%)**
+**Fusion commands present: 565 / 714 (79.1%)**
 
-In the areas Fission 180 builds (without the 72 entries left out on purpose, see the end): **553 / 641 (86.3%)**.
+In the areas Fission 180 builds (without the 71 entries left out on purpose, see the end): **565 / 643 (87.9%)**.
 
 What the number means:
 
@@ -22,7 +22,7 @@ What the number means:
   nothing about whether every option of Fusion's dialog is there, or whether the
   result is as good. The depth check is `docs/fission180/dev/core-workflows.md` (everyday
   workflows, end to end) and the parity docs in `docs/fission180/parity/`.
-- Fusion's list is recorded by hand, by name, from memory of stock Fusion; 140 of its
+- Fusion's list is recorded by hand, by name, from memory of stock Fusion; 139 of its
   names are marked "(not sure)" below and wait for a look at real Fusion.
 - Entries are menu entries: a command in two places (Delete in MODIFY and in the
   marking menu) counts twice; panels Fusion repeats on several tabs count once.
@@ -41,14 +41,14 @@ What the number means:
 | **APPLICATION BAR** | all | **10** | **6** | **60.0%** |
 | | (top level) | 7 | 5 | 71.4% |
 | | Profile menu | 3 | 1 | 33.3% |
-| **FILE MENU** | all | **25** | **9** | **36.0%** |
+| **FILE MENU** | all | **25** | **10** | **40.0%** |
 | | (top level) | 13 | 8 | 61.5% |
-| | New Drawing | 2 | 1 | 50.0% |
+| | New Drawing | 2 | 2 | 100.0% |
 | | Share | 2 | 0 | 0.0% |
 | | View | 8 | 0 | 0.0% |
-| **WORKSPACES** | all | **7** | **5** | **71.4%** |
+| **WORKSPACES** | all | **8** | **6** | **75.0%** |
 | | (top level) | 6 | 4 | 66.7% |
-| | Drawing | 1 | 1 | 100.0% |
+| | Drawing | 2 | 2 | 100.0% |
 | **SOLID** | all | **135** | **119** | **88.1%** |
 | | CREATE | 27 | 25 | 92.6% |
 | | FINISH BASE FEATURE | 1 | 1 | 100.0% |
@@ -90,15 +90,15 @@ What the number means:
 | | MODIFY | 10 | 10 | 100.0% |
 | | CONSTRAINTS | 13 | 12 | 92.3% |
 | | FINISH SKETCH | 1 | 1 | 100.0% |
-| **DRAWING** | all | **49** | **35** | **71.4%** |
-| | CREATE | 8 | 6 | 75.0% |
-| | MODIFY | 5 | 3 | 60.0% |
-| | GEOMETRY | 4 | 3 | 75.0% |
+| **DRAWING** | all | **49** | **44** | **89.8%** |
+| | CREATE | 8 | 7 | 87.5% |
+| | MODIFY | 5 | 5 | 100.0% |
+| | GEOMETRY | 4 | 4 | 100.0% |
 | | DIMENSIONS | 12 | 11 | 91.7% |
-| | TEXT | 4 | 2 | 50.0% |
+| | TEXT | 3 | 2 | 66.7% |
 | | SYMBOLS | 4 | 3 | 75.0% |
-| | TABLES | 5 | 2 | 40.0% |
-| | EXPORT | 4 | 2 | 50.0% |
+| | TABLES | 6 | 5 | 83.3% |
+| | EXPORT | 4 | 4 | 100.0% |
 | | SHEET BAR | 3 | 3 | 100.0% |
 | **SIMULATION SETUP** | all | **24** | **16** | **66.7%** |
 | | STUDY | 1 | 1 | 100.0% |
@@ -124,7 +124,7 @@ What the number means:
 | | Ring | 9 | 9 | 100.0% |
 | | Overflow list | 8 | 7 | 87.5% |
 | | While a command runs | 2 | 2 | 100.0% |
-| **BROWSER** | all | **121** | **95** | **78.5%** |
+| **BROWSER** | all | **121** | **96** | **79.3%** |
 | | Design (top node) | 13 | 9 | 69.2% |
 | | Units | 1 | 1 | 100.0% |
 | | Named Views | 1 | 1 | 100.0% |
@@ -132,7 +132,7 @@ What the number means:
 | | Origin | 1 | 1 | 100.0% |
 | | Folder (Bodies, Sketches, Construction...) | 1 | 1 | 100.0% |
 | | Component | 30 | 18 | 60.0% |
-| | Body | 20 | 14 | 70.0% |
+| | Body | 20 | 15 | 75.0% |
 | | Mesh body | 5 | 5 | 100.0% |
 | | Sketch | 11 | 8 | 72.7% |
 | | Construction plane, axis or point | 6 | 6 | 100.0% |
@@ -212,22 +212,13 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 - CREATE > Project / Include > Intersection Curve (not sure)
 - CONSTRAINTS > AutoConstrain (not sure)
 
-### DRAWING (14)
+### DRAWING (5)
 
-- CREATE > Exploded View (greyed, not sure)
 - CREATE > Create Sketch (not sure)
-- MODIFY > Move (greyed)
-- MODIFY > Rotate (greyed)
-- GEOMETRY > Center Mark Pattern (greyed)
 - DIMENSIONS > Arrange Dimensions
-- TEXT > Note (greyed, not sure)
 - TEXT > Hole and Thread Note (not sure)
 - SYMBOLS > Welding Symbol (not sure)
-- TABLES > Renumber (greyed)
-- TABLES > Align Balloons (greyed)
 - TABLES > Hole Table (not sure)
-- EXPORT > Export DWG (greyed)
-- EXPORT > Export CSV (greyed)
 
 ### SIMULATION SETUP (7)
 
@@ -253,7 +244,7 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 
 - Overflow list > Fix/Unfix (not sure)
 
-### BROWSER (26)
+### BROWSER (25)
 
 - Design (top node) > Show All Components (not sure)
 - Design (top node) > Physical Material (not sure)
@@ -274,7 +265,6 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 - Body > Move/Copy
 - Body > Create Selection Set
 - Body > Texture Map Controls
-- Body > Properties
 - Body > Cut
 - Body > Display Detail Control (not sure)
 - Sketch > Redefine Sketch Plane
@@ -336,7 +326,6 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 - accounts are out of scope (2 entries, 0 present): APPLICATION BAR > Profile menu > My Profile, APPLICATION BAR > Profile menu > Autodesk Account
 - cloud collaboration is out of scope (5 entries, 0 present): APPLICATION BAR > Job Status, APPLICATION BAR > Notifications, FILE MENU > Share > Public Link, FILE MENU > Share > Collaboration, FILE MENU > View > Show/Hide Comments
 - electronics is out of scope (2 entries, 0 present): FILE MENU > New Electronics Design, SOLID > CREATE > Create PCB
-- animation is out of scope (1 entries, 0 present): FILE MENU > New Drawing > From Animation
 - generative design is out of scope (1 entries, 0 present): WORKSPACES > Generative Design
 - rendering is out of scope (1 entries, 0 present): WORKSPACES > Render
 - sculpting (T-spline) is out of scope (48 entries, 0 present): SOLID > CREATE > Create Form, FORM > CREATE > Box, FORM > CREATE > Plane, FORM > CREATE > Cylinder, FORM > CREATE > Sphere, FORM > CREATE > Torus, FORM > CREATE > Quadball, FORM > CREATE > Pipe, FORM > CREATE > Face, FORM > CREATE > Extrude, FORM > CREATE > Revolve, FORM > CREATE > Sweep, FORM > CREATE > Loft, FORM > MODIFY > Edit Form, FORM > MODIFY > Insert Edge, FORM > MODIFY > Subdivide, FORM > MODIFY > Insert Point, FORM > MODIFY > Merge Edge, FORM > MODIFY > Bridge, FORM > MODIFY > Fill Hole, FORM > MODIFY > Erase and Fill, FORM > MODIFY > Weld Vertices, FORM > MODIFY > UnWeld Edges, FORM > MODIFY > Crease, FORM > MODIFY > UnCrease, FORM > MODIFY > Bevel Edge, FORM > MODIFY > Slide Edge, FORM > MODIFY > Smooth, FORM > MODIFY > Pull, FORM > MODIFY > Flatten, FORM > MODIFY > Straighten, FORM > MODIFY > Match, FORM > MODIFY > Interpolate, FORM > MODIFY > Thicken, FORM > MODIFY > Freeze, FORM > MODIFY > UnFreeze, FORM > SYMMETRY > Mirror - Internal, FORM > SYMMETRY > Circular - Internal, FORM > SYMMETRY > Mirror - Duplicate, FORM > SYMMETRY > Circular - Duplicate, FORM > SYMMETRY > Clear Symmetry, FORM > SYMMETRY > Isolate Symmetry, FORM > UTILITIES > Display Mode, FORM > UTILITIES > Repair Body, FORM > UTILITIES > Make Uniform, FORM > UTILITIES > Convert, FORM > UTILITIES > Enable Better Performance, FORM > FINISH FORM > Finish Form
@@ -351,18 +340,18 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 Fission 180's own additions (beyond Fusion), entries Fusion has in a place the list does
 not cover, or a name the alias file should map. Greyed entries are left out.
 
-- `tab:solid`: Gear, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis
-- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Design Advice, Insert Component, Insert STEP
+- `tab:solid`: Gear, Texture Map Controls, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties
+- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Design Advice, Insert Component, Insert STEP, Insert Catalogue Part...
 - `tab:utilities`: Export, Export Everything, Add-on Manager, AI, Add an AI App, AI Chat, AI Activity, Rebuild with Timeline (AI)..., Compare with Reference, Finish Rebuild, Stop Rebuild..., FreeCAD Tools, Project and Recovery Settings, Version History, Recover Documents, Save As, Fission 180 Diagnostics, Report a Problem, Command Search
-- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Insert Component, Insert STEP, Toggle Construction
+- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part..., Toggle Construction
 - `tab:drawing`: Bend Note, Bend Table
-- `tab:flat_pattern`: Environmental Map Analysis
-- `tab:sim_setup`: Environmental Map Analysis
+- `tab:flat_pattern`: Environmental Map Analysis, Component Color Swatch, Properties
+- `tab:sim_setup`: Environmental Map Analysis, Component Color Swatch, Properties
 - `tab:sim_results`: Legend Min/Max, Undeformed Model, Loads and Constraints
-- `tab:cam_milling`: Environmental Map Analysis
+- `tab:cam_milling`: Environmental Map Analysis, Component Color Swatch, Properties
 - `file`: Home, Version History, Export Everything, Insert Mesh, Insert STEP, Insert SVG, Insert DXF, Canvas, Insert Design, Project and Recovery Settings, Connect a Cloud or NAS, AI Panel, Add an AI App, AI Activity, AI Chat, FreeCAD Tools
 - `quick`: Menu, New, Open
 - `nav`: Theme, Ground Plane, Show All, Two Views Horizontal, Two Views Vertical

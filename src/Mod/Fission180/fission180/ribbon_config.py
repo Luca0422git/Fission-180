@@ -154,6 +154,12 @@ SOLID_MODIFY = group(
         SEP,
         item("Physical Material", ("Fission180_PhysicalMaterial", "Std_SetMaterial"), "material"),
         item("Appearance", ("Fission180_Appearance", "Std_SetAppearance"), "appearance", "A"),
+        item(  # owner: looks (wave 7)
+            "Texture Map Controls",
+            "Fission180_TextureMapControls",
+            "appearance",
+            note="How a textured look's pattern lies on a body: projection, turn, size.",
+        ),
         item(
             "Manage Materials",
             ("Fission180_ManageMaterials", "Material_Edit"),
@@ -242,6 +248,18 @@ INSPECT = group(
             "Shift+N",
             toggle="component_colors_ui:is_on",
         ),
+        item(  # owner: looks (wave 7); also in the timeline's Settings menu, as in Fusion
+            "Component Color Swatch",
+            "Fission180_ComponentColorSwatch",
+            "component_colors",
+            toggle="component_colors_ui:swatch_on",
+        ),
+        item(  # owner: looks (wave 7); Fusion: right-click a component or a body
+            "Properties",
+            "Fission180_Properties",
+            "material",
+            note="Mass, volume, area, centre of mass and size of what is selected.",
+        ),
     ],
 )
 
@@ -286,7 +304,13 @@ INSERT = group(
             "Hardware...",
             "Fission180_Hardware",
             "hardware",
-            note="A real-size screw, nut, washer, heat-set insert or magnet, and its hole.",
+            note="A standard part (screws, O-rings, bearings ... metric or inch) and its hole.",
+        ),
+        item(
+            "Insert Catalogue Part...",
+            "Fission180_InsertCataloguePart",
+            "catalogue_part",
+            note="A supplier's website in your browser; the STEP you download comes in.",
         ),
     ],
 )
@@ -1223,7 +1247,12 @@ DRAWING_CREATE = group(
             "dw_section_view",
             note="Click a view, then a closed boundary around what should show inside.",
         ),
-        item("Exploded View", None, "dw_base_view"),
+        item(
+            "Exploded View",
+            "Fission180_DrawingExplodedView",
+            "dw_base_view",
+            note="A view of an animation storyboard's end: the design taken apart.",
+        ),
     ],
 )
 DRAWING_MODIFY = group(
@@ -1241,8 +1270,18 @@ DRAWING_MODIFY = group(
             note="Or double-click the title block",
         ),
         SEP,
-        item("Move", None, "move", note="Drag a view by its frame on the sheet"),
-        item("Rotate", None, "move"),
+        item(
+            "Move",
+            "Fission180_DrawingMove",
+            "move",
+            note="Pick views, tables, text or balloons, then two points (or drag a view).",
+        ),
+        item(
+            "Rotate",
+            "Fission180_DrawingRotate",
+            "move",
+            note="Pick views, then type the angle.",
+        ),
         item("Delete", "Fission180_DrawingDelete", "delete", "Del"),
     ],
 )
@@ -1253,7 +1292,12 @@ DRAWING_GEOMETRY = group(
     [
         item("Centerline", "Fission180_DrawingCenterline", "dw_centerline"),
         item("Center Mark", "Fission180_DrawingCenterMark", "dw_center_mark"),
-        item("Center Mark Pattern", None, "dw_center_mark"),
+        item(
+            "Center Mark Pattern",
+            "Fission180_DrawingCenterMarkPattern",
+            "dw_center_mark",
+            note="Click the holes of a pattern, Enter: marks and the line or circle through them.",
+        ),
         item(
             "Edge Extension",
             "Fission180_DrawingEdgeExtension",
@@ -1321,7 +1365,6 @@ DRAWING_TEXT = group(
             "dw_text",
             note="Click an edge, then where the text goes; type the text.",
         ),
-        item("Note", None, "dw_text"),
         item(
             "Bend Note",
             "Fission180_DrawingBendNote",
@@ -1357,6 +1400,12 @@ DRAWING_TABLES = group(
             note="A parts list of the components a view shows, with balloons.",
         ),
         item(
+            "Parts List",
+            "Fission180_DrawingPartsList",
+            "dw_table",
+            note="The components a view shows, numbered, with a balloon on each.",
+        ),
+        item(
             "Bend Table",
             "Fission180_DrawingBendTable",
             "dw_table",
@@ -1368,8 +1417,18 @@ DRAWING_TABLES = group(
             "dw_balloon",
             note="Click a component on a view, then where the balloon goes.",
         ),
-        item("Renumber", None, "dw_balloon"),
-        item("Align Balloons", None, "dw_balloon"),
+        item(
+            "Renumber",
+            "Fission180_DrawingRenumber",
+            "dw_balloon",
+            note="Type the number, click the balloon that gets it; the parts list sorts.",
+        ),
+        item(
+            "Align Balloons",
+            "Fission180_DrawingAlignBalloons",
+            "dw_balloon",
+            note="Click balloons, Enter, click where their line goes.",
+        ),
     ],
 )
 DRAWING_EXPORT = group(
@@ -1379,8 +1438,18 @@ DRAWING_EXPORT = group(
     [
         item("Export PDF", "Fission180_DrawingExportPDF", "dw_export_pdf"),
         item("Export DXF", "Fission180_DrawingExportDXF", "dw_export_dxf"),
-        item("Export DWG", None, "export"),
-        item("Export CSV", None, "export"),
+        item(
+            "Export DWG",
+            "Fission180_DrawingExportDWG",
+            "export",
+            note="Needs a DWG converter program on this computer; a DXF otherwise.",
+        ),
+        item(
+            "Export CSV",
+            "Fission180_DrawingExportCSV",
+            "export",
+            note="The parts list (or a bend table) as a file for a spreadsheet.",
+        ),
     ],
 )
 
@@ -2110,6 +2179,12 @@ FILE_MENU = [
         "Fission180_NewDrawing",
         "dw_new",
         note="From Design: views of this design on a sheet",
+    ),
+    item(
+        "New Drawing From Animation",
+        "Fission180_NewDrawingFromAnimation",
+        "dw_new",
+        note="An exploded drawing of one of the design's animation storyboards",
     ),
     item("Open", ("Fission180_Open", "Std_Open"), "qa_open", "Ctrl+O"),
     item("Recover Documents", "Fission180_RecoverDocuments", "document"),

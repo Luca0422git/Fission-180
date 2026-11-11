@@ -1,0 +1,77 @@
+{
+  "id": "hardware_lock_washer_m6",
+  "title": "An M6 split lock washer (DIN 127) on the top face, no hole made",
+  "tags": [
+    "hardware",
+    "washer",
+    "face"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "rect": [
+            0,
+            0,
+            40,
+            30
+          ],
+          "name": "plate"
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 10
+    },
+    {
+      "op": "sf_hardware",
+      "id": "hw1",
+      "standard": "din127",
+      "size": "6",
+      "face": {
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "count": 1
+      },
+      "at": [
+        20,
+        15,
+        10
+      ],
+      "make_hole": false
+    },
+    {
+      "op": "expect_bodies",
+      "bodies": {
+        "hw1": {
+          "volume": 123.82767536392213,
+          "solids": 1
+        }
+      }
+    }
+  ],
+  "expect": {
+    "volume": 12000,
+    "faces": 6,
+    "bbox": [
+      0,
+      0,
+      0,
+      40,
+      30,
+      10
+    ],
+    "solids": 1,
+    "source": "analytic",
+    "note": "DIN 127 B, M6: 6.1 x 11.8 x 1.6. Drawn flat with one straight slit 0.6 s = 0.96 wide: V = (pi/4 (11.8^2 - 6.1^2) - slit) 1.6, the slit's area the integral of sqrt(R^2 - y^2) - sqrt(r^2 - y^2) over its width: [y/2 sqrt(a^2 - y^2) + a^2/2 asin(y/a)] for R 5.9 less r 3.05."
+  }
+}

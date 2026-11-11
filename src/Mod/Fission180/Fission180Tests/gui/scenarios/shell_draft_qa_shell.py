@@ -127,7 +127,7 @@ def p2_shell():
 
 
 def p2_body_row():
-    sd.click_browser_row("Body")
+    sd.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def p2_hollow():
@@ -148,7 +148,7 @@ def p2_face():
     v = h.solid_volume()
     h.check("P2 open box 1 mm", sd.close(v, sd.open_top(1)), v)
     h.check("P2 still one shell step", len(sd.shells()) == 1, sd.shells())
-    sd.click_browser_row("Body")
+    sd.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def p2_hollow_again():

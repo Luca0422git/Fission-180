@@ -838,6 +838,20 @@ def i_down_10():
     h.check("Extrude took the sketch", field is not None)
     if field is not None:
         s.type_into(field, "-10")
+        # The pin starts in the air (the plane is 5 above the boss) and reaches into the
+        # boss: a Cut by itself since wave 7, like Fusion ("If the Extrude intersects a
+        # solid, it will default to Cut"; parity/extrude-presspull.md, the Operation rule,
+        # row 3; it was a Join). This path is about the plane and what follows it, so the
+        # person picks Join.
+        from Fission180Tests.gui import dialog_input as di
+
+        h.caught_up(panel)
+        h.check(
+            "a pin pushed into the boss from a plane above it: Cut by itself",
+            panel.operation.currentText() == "Cut",
+            panel.operation.currentText(),
+        )
+        h.check("the person picks Join", di.choose(panel.operation, "Join"))
 
 
 def i_extrude_ok():
