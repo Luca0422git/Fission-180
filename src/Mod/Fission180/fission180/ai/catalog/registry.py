@@ -32,6 +32,8 @@ CATEGORIES = (
     ("drawing", "Drawings"),
     ("view", "View"),
     ("simulate", "Simulation"),  # (beta 3, sim-core: Static Stress studies)
+    ("manufacture", "Manufacture"),  # (wave 7: the MANUFACTURE workspace, milling)
+    ("animation", "Animation"),  # (wave 7: the ANIMATION workspace, storyboards)
 )
 CATEGORY_KEYS = tuple(c[0] for c in CATEGORIES)
 

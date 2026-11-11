@@ -215,6 +215,14 @@ class SetupPanel(panels.CamPanel):
             )
         solid = self.selection_box(SOLID, "stock_solid", "Select a body", single=True, whole=True)
         row("solid", "Stock Solid", solid.widget)
+        note = QtWidgets.QLabel(
+            "The stock of the setup before this one, as it lies now (turn the part with the "
+            "Setup tab's orientation). What that setup's operations cut away is not taken "
+            "off: the tool treats the whole block as material."
+        )
+        note.setWordWrap(True)
+        note.setObjectName(panels.PREFIX + "preceding_note")
+        row("preceding", "", note)
 
     def _post_tab(self, opts):
         form = self._page("Post Process")
@@ -255,6 +263,7 @@ class SetupPanel(panels.CamPanel):
             "all": mode == "relative" and offset_mode == "all_sides",
             "fixed": mode == "fixed",
             "solid": mode == "solid",
+            "preceding": mode == "preceding",
         }
         for group, rows in self.stock_rows.items():
             for label, widget in rows:

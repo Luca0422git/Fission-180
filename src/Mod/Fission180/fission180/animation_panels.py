@@ -28,6 +28,25 @@ SEQUENCES = [("One-Step Explosion", False), ("Sequential Explosion", True)]
 AXIS_COLOURS = {"X": (0.94, 0.33, 0.31), "Y": (0.30, 0.78, 0.36), "Z": (0.30, 0.62, 0.95)}
 
 
+def under_pointer(doc_name):
+    """(object name, element name) of what the design's 3D view has under the pointer, or
+    None when the pointer is not over the view (or over nothing in it)."""
+    try:
+        from .compat import QtGui
+
+        widget = QtWidgets.QApplication.widgetAt(QtGui.QCursor.pos())
+        if widget is None or widget.metaObject().className() != "QOpenGLWidget":
+            return None
+        view = Gui.getDocument(doc_name).ActiveView
+        info = view.getObjectInfo(view.getCursorPos())
+        if info and info.get("Object") and info.get("Component"):
+            if info.get("Document", doc_name) == doc_name:
+                return info["Object"], info["Component"]
+    except Exception:
+        pass
+    return None
+
+
 class _Observer:
     """FreeCAD's selection, handed to the dialog a moment later (never work inside it)."""
 
@@ -35,6 +54,15 @@ class _Observer:
         self.panel = panel
 
     def addSelection(self, doc, obj, sub, pnt):
+        if not sub:
+            # A click in the 3D view on a component that is selected whole (as the dialog
+            # shows its picks) comes from FreeCAD without the face clicked, and for a
+            # component inside a subassembly even as the subassembly: what the view has
+            # under the pointer says what was clicked. (A browser row comes the same way,
+            # with the pointer over the browser.)
+            hit = under_pointer(doc)
+            if hit is not None:
+                obj, sub = hit
         self.panel._selection_event(("add", doc, obj, sub, tuple(pnt)))
 
     def removeSelection(self, doc, obj, sub):
@@ -55,6 +83,7 @@ class AnimPanel(taskui.Panel):
     animation_preview = True
     picks_components = False
     last = None
+    click_hint = ""  # what the next click on the same part would take (model_clicked)
 
     def __init__(self, doc, transaction):
         animation.STEPS.add(transaction)
@@ -141,7 +170,7 @@ class AnimPanel(taskui.Panel):
         temp = None
         try:
             temp = self.preview_board()
-            self.message.setText("")
+            self.message.setText(self.click_hint)
         except core.AnimationError as exc:
             self.message.setText(str(exc))
         animation_view.show(self.doc, temp or self.board(), self.at)
@@ -190,7 +219,11 @@ class AnimPanel(taskui.Panel):
                         % (obj.Label if obj is not None else "That")
                     )
                     continue
-                self.component_clicked(comp)
+                self.click_hint = ""
+                if sub:
+                    self.model_clicked(obj, comp)
+                else:
+                    self.component_clicked(comp)
             self._show_picks()
         except Exception as exc:
             warn("%s: %s" % (self.title, exc))
@@ -200,6 +233,35 @@ class AnimPanel(taskui.Panel):
         that is not in a component). True when the dialog used it itself (Set Pivot, a
         callout's place)."""
         return False
+
+    def model_clicked(self, obj, comp):
+        """A click on the model. The first takes the top-level component (`comp`: a
+        subassembly moves as one); a click on a part of a picked subassembly takes the
+        component one level in, and a click on the innermost lets go
+        (animation_core.click_step). The dialog says that the next click goes deeper."""
+        chain = animation.component_chain(obj)
+        self.click_hint = ""
+        if len(chain) <= 1:
+            self.component_clicked(comp)
+            return
+        by_name = {c.Name: c for c in chain}
+        drop, add, deeper = core.click_step([c.Name for c in chain], [c.Name for c in self.picks])
+        if drop is not None and by_name[drop] in self.picks:
+            self.unpick(by_name[drop])
+        if add is None:
+            self.message.setText("")
+            self.picks_changed()
+            return
+        self.component_clicked(by_name[add])
+        if deeper is not None and by_name[add] in self.picks:
+            self.click_hint = (
+                "%s is picked (with everything in it). Click the same part again for %s, "
+                "the component inside it." % (by_name[add].Label, by_name[deeper].Label)
+            )
+            self.message.setText(self.click_hint)
+
+    def unpick(self, comp):
+        self.picks.remove(comp)
 
     def component_clicked(self, comp):
         if comp in self.picks:
@@ -807,6 +869,15 @@ class ManualExplodePanel(AnimPanel):
         self.changed()
 
     # -- picks --------------------------------------------------------------------------------
+    def model_clicked(self, obj, comp):
+        if self.arrows is not None and self.arrows.clicked_recently():
+            return  # (the click was on an axis arrow)
+        super().model_clicked(obj, comp)
+
+    def unpick(self, comp):
+        self.picks.remove(comp)
+        self.axes.pop(comp.Name, None)
+
     def component_clicked(self, comp):
         if self.arrows is not None and self.arrows.clicked_recently():
             return  # (the click was on an axis arrow)

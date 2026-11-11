@@ -17,7 +17,8 @@ modify_tools, more_tools (surface, construct, assemble, inspect), history_tools
 (timeline, parameters, files, drawings, view, help), verify_tools (the tools an agent checks
 its own work with: inspect_design, query_geometry, check_design, render, diff_design),
 docs_tools (the documentation: docs_search, docs_read, examples_search), sheetmetal_tools and
-plastic_tools (the SHEET METAL and PLASTIC tabs). There is no tool
+plastic_tools (the SHEET METAL and PLASTIC tabs), manufacture_tools and animation_tools (the
+MANUFACTURE and ANIMATION workspaces). There is no tool
 that runs arbitrary code. Pure Python: no FreeCAD, no Qt (the MCP server an AI app starts
 imports it).
 """
@@ -37,6 +38,8 @@ from . import simulate_tools  # noqa: F401  (Static Stress simulation, beta 3)
 from . import rebuild_tools  # noqa: F401  (Auto Timeline: rebuild with a timeline, beta 3)
 from . import sheetmetal_tools  # noqa: F401  (the SHEET METAL tab)
 from . import plastic_tools  # noqa: F401  (the PLASTIC tab)
+from . import manufacture_tools  # noqa: F401  (the MANUFACTURE workspace, wave 7)
+from . import animation_tools  # noqa: F401  (the ANIMATION workspace, wave 7)
 from .kit import (  # noqa: F401  (the shared texts, re-exported)
     BODY_PICK_HELP,
     CURVES_HELP,
@@ -134,20 +137,9 @@ TEST_ONLY_OPS = (
 )
 # Ops a person can do that no tool builds YET, named in docs/fission180/known-issues.md. Remove
 # an op here when its tool lands (a unit test fails while a tool lists an op that is still here).
-# (Empty since the SHEET METAL, PLASTIC and SURFACE > MODIFY tools landed; wave 7's MANUFACTURE
-# workspace has its design steps, golden-tested, and no AI tools yet: builder cam.)
-AI_TOOLS_TO_COME = ("cam_setup", "cam_operation", "cam_edit", "cam_generate", "cam_post")
-# (wave 7's ANIMATION workspace too: its design steps are golden-tested, no AI tools yet:
-# builder animation.)
-AI_TOOLS_TO_COME += (
-    "anim_storyboard",
-    "anim_explode",
-    "anim_manual_explode",
-    "anim_transform",
-    "anim_restore_home",
-    "anim_show_hide",
-    "anim_reverse",
-)
+# (Empty since the SHEET METAL, PLASTIC and SURFACE > MODIFY tools landed, and again since the
+# MANUFACTURE and ANIMATION tools of wave 7: manufacture_tools.py, animation_tools.py.)
+AI_TOOLS_TO_COME = ()
 
 
 def tool(name):

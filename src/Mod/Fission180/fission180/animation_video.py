@@ -35,6 +35,21 @@ JPEG_QUALITY = 92
 _JOB = [None]
 
 
+FFMPEG_HELP = (
+    "MP4 needs the ffmpeg program, which does not come with Fission 180 and was not found on "
+    'this computer. Get it from ffmpeg.org/download.html (Windows: a "release essentials" '
+    "build, unpacked so that C:\\ffmpeg\\bin\\ffmpeg.exe exists, or `winget install ffmpeg`; "
+    "macOS: `brew install ffmpeg`; Linux: your package manager's ffmpeg), then start Fission "
+    "180 again. AVI (Motion JPEG) needs nothing and plays in VLC and Windows' players."
+)
+
+
+def mp4_help():
+    """Why MP4 is not offered here and where to get ffmpeg (the dialog's greyed entry, the
+    refusal and the AI tool say the same)."""
+    return FFMPEG_HELP
+
+
 def ffmpeg():
     """The ffmpeg program on this computer, or None."""
     found = shutil.which("ffmpeg")
@@ -45,6 +60,11 @@ def ffmpeg():
         "/usr/local/bin/ffmpeg",
         "/opt/homebrew/bin/ffmpeg",
         "C:/ffmpeg/bin/ffmpeg.exe",
+        "C:/Program Files/ffmpeg/bin/ffmpeg.exe",
+        # (where `winget install ffmpeg` links it, when that folder is not on the PATH yet)
+        os.path.join(
+            os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Links", "ffmpeg.exe"
+        ),
         os.path.expanduser("~/bin/ffmpeg"),
     ):
         if os.path.isfile(path):
@@ -66,11 +86,7 @@ def formats():
             "mp4",
             "MP4 video (H.264)" if has else "MP4 video (needs ffmpeg installed)",
             has,
-            (
-                "Encoded by the ffmpeg program found on this computer"
-                if has
-                else "Install ffmpeg to get MP4; AVI needs nothing"
-            ),
+            ("Encoded by the ffmpeg program found on this computer" if has else FFMPEG_HELP),
         ),
         ("png", "PNG images (one per frame)", True, "A folder of numbered pictures"),
     ]
@@ -81,7 +97,8 @@ def encoder_note():
         return "ffmpeg was found on this computer: MP4 is offered too."
     return (
         "No video encoder comes with Fission 180: the AVI is written directly (Motion JPEG). "
-        "With ffmpeg installed, MP4 is offered too."
+        "MP4 is offered once the ffmpeg program is installed (ffmpeg.org/download.html; the "
+        "greyed MP4 entry's tip says how)."
     )
 
 
@@ -132,10 +149,7 @@ def check(doc, settings):
     if kind not in EXTENSIONS:
         raise core.AnimationError("Choose a file type.")
     if kind == "mp4" and ffmpeg() is None:
-        raise core.AnimationError(
-            "MP4 needs the ffmpeg program, which is not on this computer: choose AVI (it "
-            "needs nothing), or install ffmpeg."
-        )
+        raise core.AnimationError(FFMPEG_HELP)
     path = (settings.get("path") or "").strip()
     if not path:
         raise core.AnimationError("Say where to save the video (Save As).")

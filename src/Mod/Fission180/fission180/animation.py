@@ -141,6 +141,24 @@ def clicked_component(obj, sub):
     return outermost(comp) if sub else comp
 
 
+def component_chain(obj):
+    """The components something clicked lies in, outermost first (its own component last);
+    [] when it is in none."""
+    comp = component_for(obj)
+    if comp is None:
+        return []
+    return list(reversed(components.ancestors(comp))) + [comp]
+
+
+def design_hidden_by(comp):
+    """The component whose hidden eye in the design keeps `comp` from being drawn: itself,
+    or the nearest component it lies in that is hidden; None when the design shows it."""
+    for one in [comp] + list(components.ancestors(comp)):
+        if not design_visible(one):
+            return one
+    return None
+
+
 def children(doc, parent):
     """The components directly inside `parent` (None: the top level)."""
     return components.components_in(doc, parent)
@@ -763,10 +781,14 @@ def show_hide(doc, name, playhead, targets, show=None, step="Show/Hide"):
         board = _board(data, name)
         made = []
         for comp in targets:
-            if not design_visible(comp):
+            hidden = design_hidden_by(comp)
+            if hidden is not None:
                 raise AnimationError(
-                    "%s is hidden in the design: show it in the Design workspace first."
-                    % comp.Label
+                    "%s is hidden in the design%s: show it in the Design workspace first."
+                    % (
+                        comp.Label,
+                        "" if hidden is comp else " (it is inside %s, hidden there)" % hidden.Label,
+                    )
                 )
             now = core.visible_at(board, comp.Name, playhead, True)
             want = (not now) if show is None else bool(show)

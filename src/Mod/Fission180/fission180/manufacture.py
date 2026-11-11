@@ -395,7 +395,24 @@ class Frame:
         model_box = _box_of(oriented)
         stock = opts["stock"]
         self.stock_solid = None
-        if stock["mode"] == "solid":
+        if stock["mode"] == "preceding":
+            # Fusion's "From preceding setup": the same block, as it lies now that the part
+            # was turned. (What the preceding setup's operations cut away is not taken off:
+            # the whole block is the safe side for the tool.)
+            before = preceding(setup)
+            if before is None:
+                raise CamError(
+                    "Stock From preceding setup: this is the first setup, there is none "
+                    "before it. Pick another stock mode, or make the first setup first."
+                )
+            try:
+                self.stock_solid = _oriented(_frame_of(before).stock_shape(), self.rotation)
+            except RecursionError:
+                raise CamError(
+                    "Stock From preceding setup: the setups take their stock in a circle."
+                )
+            stock_box = _box_of([self.stock_solid])
+        elif stock["mode"] == "solid":
             solid = getattr(setup, "CamStockSolid", None)
             if solid is None or not bodies.alive(solid) or not bodies.has_solid(solid):
                 raise CamError("Stock From solid: pick the body that is the stock.")
@@ -452,6 +469,18 @@ class Frame:
 
     def to_design(self, point):
         return self.placement.multVec(V(*point))
+
+
+def preceding(setup):
+    """The setup before this one in the browser (the one "From preceding setup" means)."""
+    found = setups(setup.Document)
+    index = found.index(setup) if setup in found else -1
+    return found[index - 1] if index > 0 else None
+
+
+def _frame_of(setup):
+    """A setup's Frame for another setup's use (always its own stock, worked out now)."""
+    return Frame(setup)
 
 
 _FRAMES = {}
@@ -1087,7 +1116,41 @@ def plan(op, fr=None):
         "stock": fr.stock_box,
         "model": fr.model_box,
     }
+    tabs = options["geometry"]["tabs"]
+    if kind == "contour2d" and tabs.get("on") and tabs.get("positioning") == "points":
+        inverse = fr.placement.inverse()  # (clicked on the model: design -> setup coordinates)
+        env["tab_points"] = [list(inverse.multVec(V(*p)))[:2] for p in tabs.get("points") or []]
+        _check_tab_points(fr, resolved["parts"], env["tab_points"])
     return {"parts": core.engine_plan(kind, options, env), "heights": heights, "warnings": warnings}
+
+
+def _check_tab_points(fr, parts, points, reach=1.0):
+    """Tabs "At points": every point must lie on a picked contour, seen from above (within
+    `reach` mm), or CamError naming the one that does not and how far off it is."""
+    import Part
+
+    outline = []
+    for part in parts:
+        for index, names in part.get("base") or []:
+            shape = fr.shapes[int(index)]
+            for name in names:
+                try:
+                    element = shape.getElement(name)
+                    outline += element.OuterWire.Edges if name.startswith("Face") else [element]
+                except Exception:
+                    continue
+    if not outline:
+        return
+    for number, (x, y) in enumerate(points, 1):
+        away = min(  # (a contour lies at one height: the point is brought to it)
+            edge.distToShape(Part.Vertex(V(x, y, edge.BoundBox.ZMin)))[0] for edge in outline
+        )
+        if away > reach:
+            raise CamError(
+                "Tab position %d is not on the picked contour (it is %s mm away): click on "
+                "the contour's edge, or take the positions away with the X of Tab Positions."
+                % (number, core.fmt(away, 1))
+            )
 
 
 # -- fingerprints: is a toolpath still good? ---------------------------------------------------
@@ -1152,6 +1215,13 @@ def setup_signature(setup):
         solid = getattr(setup, "CamStockSolid", None)
         if solid is not None and bodies.alive(solid):
             data["stock"] = _shape_sig(bodies.global_shape(solid, copy=False))
+        if data["options"].get("stock", {}).get("mode") == "preceding":
+            before = preceding(setup)  # (its stock is this setup's: a change there counts)
+            data["stock"] = (
+                [round(c, 5) for c in _box_of([_frame_of(before).stock_shape()])]
+                if before is not None
+                else "none"
+            )
         for name in ("CamZ", "CamX", "CamPoint"):
             for obj, sub in picks(getattr(setup, name)):
                 try:
@@ -1185,7 +1255,7 @@ def fingerprint(op, setup=None):
     )
 
 
-ENGINE_VERSION = 1
+ENGINE_VERSION = 2
 
 
 def result(op):
@@ -1492,7 +1562,9 @@ class Run:
                     _store(op, self._keys[name], "", text, planned["warnings"], None)
                     continue
                 gcode = core.with_clearance(
-                    found["gcode"], planned["heights"]["clearance"], planned["heights"]["retract"]
+                    _with_feeds(found, planned["parts"]),
+                    planned["heights"]["clearance"],
+                    planned["heights"]["retract"],
                 )
                 stats = core.path_stats(
                     core.moves(core.parse_gcode(gcode), feed_scale=60.0), RAPID_RATE
@@ -1507,6 +1579,30 @@ class Run:
         finally:
             if self.state != "running":
                 self._cleanup()
+
+
+def _with_feeds(found, planned_parts):
+    """An operation's toolpath as the engine made it, with the Lead-In and Ramp Feedrates
+    written onto their moves (manufacture_core.with_feeds; FreeCAD's units: mm/s)."""
+    parts = found.get("parts")
+    if not parts:
+        return found["gcode"]
+    chunks = []
+    for item in parts:
+        planned = planned_parts[item["index"]] if item["index"] < len(planned_parts) else {}
+        lead = None
+        for spec in planned.get("dressups") or []:
+            if spec.get("lead_feed") is not None:
+                lead = float(spec["lead_feed"]) / 60.0
+        ramp = planned.get("ramp_feed")
+        text, _counts = core.with_feeds(
+            item["gcode"],
+            ramp=float(ramp) / 60.0 if ramp is not None else None,
+            leadin=lead,
+            before_leads=item.get("before_leads"),
+        )
+        chunks.append(text)
+    return "\n".join(c.strip("\n") for c in chunks if c.strip())
 
 
 def _engine_sentence(found, lead="The toolpath could not be made"):

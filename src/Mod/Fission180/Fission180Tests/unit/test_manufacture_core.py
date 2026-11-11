@@ -342,6 +342,279 @@ class Operations(unittest.TestCase):
             core.feeds(core.op_options("face"))
 
 
+class FieldsThatReachTheToolpath(unittest.TestCase):
+    """Tolerance, Lead-In Feedrate and Ramp Feedrate were kept in the dialog and ignored by
+    the engine (a typed value that did nothing). Each now reaches the toolpath, or its field
+    is greyed with the reason (unused_fields)."""
+
+    def options(self, kind, tool_type="flat", **given):
+        given["tool"] = core.make_tool(
+            tool_type,
+            6.0,
+            cutting={
+                "spindle_speed": 12000,
+                "cutting_feed": 600,
+                "leadin_feed": 150,
+                "ramp_feed": 90,
+                "plunge_feed": 200,
+                "stepdown": 3,
+                "stepover": 2.4,
+                "coolant": "disabled",
+            },
+        )
+        return core.op_options(kind, given)
+
+    def env(self):
+        heights = {"clearance": 15.0, "retract": 5.0, "feed": 5.0, "top": 0.0, "bottom": -6.0}
+        return {"heights": heights, "parts": [{"base": [[0, ["Face1"]]]}]}
+
+    def test_which_fields_an_operation_uses(self):
+        contour = self.options("contour2d")
+        self.assertEqual(sorted(core.unused_fields("contour2d", contour)), ["ramp_feed"])
+        self.assertIn("Ramp Type is Plunge", core.unused_fields("contour2d", contour)["ramp_feed"])
+        ramped = self.options("contour2d", linking={"ramp": "profile"})
+        self.assertEqual(core.unused_fields("contour2d", ramped), {})
+        tabs = self.options("contour2d", geometry={"tabs": {"on": True}})
+        self.assertIn("with tabs", core.unused_fields("contour2d", tabs)["leadin_feed"])
+        off = self.options("contour2d", linking={"lead_in": False})
+        self.assertIn("Lead-In is off", core.unused_fields("contour2d", off)["leadin_feed"])
+        adaptive = self.options("adaptive2d")
+        self.assertEqual(sorted(core.unused_fields("adaptive2d", adaptive)), ["leadin_feed"])
+        drill = self.options("drill", "drill")
+        self.assertEqual(
+            sorted(core.unused_fields("drill", drill)), ["leadin_feed", "ramp_feed", "tolerance"]
+        )
+        for kind, info in core.OPERATIONS.items():
+            options = self.options(kind, info["tools"][0])
+            unused = core.unused_fields(kind, options)
+            self.assertEqual("tolerance" in unused, kind not in core.TOLERANCE_KINDS, kind)
+            for reason in unused.values():
+                self.assertTrue(reason.startswith("Not used"), reason)
+
+    def test_the_tolerance_reaches_the_engine(self):
+        for kind in core.TOLERANCE_KINDS:
+            tools = core.OPERATIONS[kind]["tools"]
+            options = self.options(kind, tools[0], passes={"tolerance": 0.05})
+            part = core.engine_plan(kind, options, self.env())[0]
+            self.assertEqual(part["tolerance"], 0.05, kind)
+        adaptive = self.options("adaptive2d", passes={"tolerance": 0.05})
+        self.assertEqual(
+            core.engine_plan("adaptive2d", adaptive, self.env())[0]["props"]["Tolerance"], 0.05
+        )
+        for kind in ("parallel", "contour3d"):
+            options = self.options(kind, "ball", passes={"tolerance": 0.05})
+            props = core.engine_plan(kind, options, self.env())[0]["props"]
+            self.assertEqual(props["LinearDeflection"], 0.05, kind)
+        drill = core.engine_plan("drill", self.options("drill", "drill"), self.env())[0]
+        self.assertNotIn("tolerance", drill)
+        # Fusion's own defaults: 0.01 mm, roughing (adaptive) 0.1 mm
+        self.assertEqual(core.op_options("contour2d")["passes"]["tolerance"], 0.01)
+        self.assertEqual(core.op_options("adaptive2d")["passes"]["tolerance"], 0.1)
+        self.assertEqual(core.op_options("adaptive3d")["passes"]["tolerance"], 0.1)
+
+    def test_a_tolerance_or_feed_out_of_range_is_refused(self):
+        picks = {"faces": 1}
+        wide = self.options("contour2d", passes={"tolerance": 5.0})
+        self.assertIn(
+            "Tolerance is between 0.001 and 1 mm", core.op_problems("contour2d", wide, picks)[0]
+        )
+        zero = self.options("contour2d", passes={"tolerance": 0.0001})
+        self.assertTrue(core.op_problems("contour2d", zero, picks))
+        no_lead = self.options("contour2d", feeds={"leadin_feed": 0})
+        self.assertIn("Lead-In Feedrate", core.op_problems("contour2d", no_lead, picks)[0])
+        no_ramp = self.options("adaptive2d", feeds={"ramp_feed": 0})
+        self.assertIn("Ramp Feedrate", core.op_problems("adaptive2d", no_ramp, picks)[0])
+        # a feed the operation does not use is not checked
+        unused = self.options("drill", "drill", feeds={"ramp_feed": 0, "leadin_feed": 0})
+        self.assertEqual(core.op_problems("drill", unused, {"holes": 1}), [])
+        # nor a tolerance it has no use for
+        loose = self.options("drill", "drill", passes={"tolerance": 9})
+        self.assertEqual(core.op_problems("drill", loose, {"holes": 1}), [])
+
+    def test_the_feeds_reach_the_plan(self):
+        ramped = self.options("pocket2d")  # (its default Ramp Type is Helix)
+        ramp = core.engine_plan("pocket2d", ramped, self.env())[0]["dressups"][0]
+        self.assertEqual(ramp["module"], "RampEntry")
+        self.assertEqual(ramp["props"]["RampFeedRate"], "Custom")
+        self.assertEqual(ramp["props"]["CustomFeedRate"], "90.000000 mm/min")
+        contour = core.engine_plan("contour2d", self.options("contour2d"), self.env())[0]
+        leads = [d for d in contour["dressups"] if d["module"] == "LeadInOut"][0]
+        self.assertEqual(leads["lead_feed"], 150.0)
+        self.assertNotIn("ramp_feed", contour)
+        typed = self.options("contour2d", feeds={"leadin_feed": 240})
+        leads = core.engine_plan("contour2d", typed, self.env())[0]["dressups"][-1]
+        self.assertEqual(leads["lead_feed"], 240.0)
+        out_only = self.options("contour2d", linking={"lead_in": False, "lead_out": True})
+        leads = core.engine_plan("contour2d", out_only, self.env())[0]["dressups"][-1]
+        self.assertNotIn("lead_feed", leads)
+        adaptive = core.engine_plan("adaptive2d", self.options("adaptive2d"), self.env())[0]
+        self.assertEqual(adaptive["ramp_feed"], 90.0)
+
+    # a contour as FreeCAD's engine writes it (mm and mm/s): plunge, around a 10 x 10 square
+    BASE = "\n".join(
+        (
+            "G0 Z5.000000",
+            "G0 X10.000000 Y0.000000",
+            "G1 F3.333333 Z-2.000000",
+            "G1 F10.000000 X10.000000 Y10.000000 Z-2.000000",
+            "G1 F10.000000 X0.000000 Y10.000000 Z-2.000000",
+            "G1 F10.000000 X0.000000 Y0.000000 Z-2.000000",
+            "G1 F10.000000 X10.000000 Y0.000000 Z-2.000000",
+            "G0 Z5.000000",
+        )
+    )
+    # the same with a lead-in arc from (13, -3) and a lead-out arc to (13, 3)
+    LEADS = "\n".join(
+        (
+            "G0 Z5.000000",
+            "G0 X13.000000 Y-3.000000",
+            "G1 F3.333333 Z-2.000000",
+            "G3 F10.000000 I0.000000 J3.000000 X10.000000 Y0.000000 Z-2.000000",
+            "G1 F10.000000 X10.000000 Y10.000000 Z-2.000000",
+            "G1 X0.000000 Y10.000000 Z-2.000000",
+            "G1 F10.000000 X0.000000 Y0.000000 Z-2.000000",
+            "G1 F10.000000 X10.000000 Y0.000000 Z-2.000000",
+            "G3 F10.000000 I3.000000 J0.000000 X13.000000 Y3.000000 Z-2.000000",
+            "G0 Z5.000000",
+        )
+    )
+
+    def feeds(self, text):
+        return [
+            (seg["kind"], round(seg["feed"], 3))
+            for seg in core.moves(core.parse_gcode(text), feed_scale=60.0)
+            if seg["feed"] is not None
+        ]
+
+    def test_the_lead_in_feedrate_is_written_onto_the_lead_in_only(self):
+        text, counts = core.with_feeds(self.LEADS, leadin=2.5, before_leads=self.BASE)
+        self.assertEqual(counts, {"ramp": 0, "leadin": 1})
+        lines = text.splitlines()
+        self.assertEqual(
+            lines[3], "G3 I0.000000 J3.000000 X10.000000 Y0.000000 Z-2.000000 F2.500000"
+        )
+        # the plunge keeps the plunge feed, the contour and the lead-out the cutting feed
+        self.assertEqual(lines[2], "G1 F3.333333 Z-2.000000")
+        self.assertEqual(
+            self.feeds(text),
+            [("plunge", 200.0), ("cut", 150.0)] + [("cut", 600.0)] * 5,
+        )
+        # (the line after the lead-in had no feed of its own: it gets the cutting feed back)
+        self.assertEqual(lines[5], "G1 X0.000000 Y10.000000 Z-2.000000")
+        self.assertEqual(lines[4], "G1 F10.000000 X10.000000 Y10.000000 Z-2.000000")
+        # nothing else changed
+        self.assertEqual(
+            lines[:2] + lines[6:], self.LEADS.splitlines()[:2] + self.LEADS.splitlines()[6:]
+        )
+
+    def test_a_move_without_its_own_feed_after_a_changed_one_gets_its_feed_back(self):
+        leads = self.LEADS.replace(
+            "G1 F10.000000 X10.000000 Y10.000000 Z-2.000000", "G1 X10.000000 Y10.000000 Z-2.000000"
+        )
+        text, _counts = core.with_feeds(leads, leadin=2.5, before_leads=self.BASE)
+        self.assertEqual(text.splitlines()[4], "G1 X10.000000 Y10.000000 Z-2.000000 F10.000000")
+        self.assertEqual(self.feeds(text)[1:3], [("cut", 150.0), ("cut", 600.0)])
+
+    def test_the_same_feed_changes_nothing_and_no_base_changes_nothing(self):
+        text, counts = core.with_feeds(self.LEADS, leadin=10.0, before_leads=self.BASE)
+        self.assertEqual(text, self.LEADS)
+        self.assertEqual(counts["leadin"], 1)
+        self.assertEqual(
+            core.with_feeds(self.LEADS, leadin=2.5), (self.LEADS, {"ramp": 0, "leadin": 0})
+        )
+        self.assertEqual(core.with_feeds(self.LEADS), (self.LEADS, {"ramp": 0, "leadin": 0}))
+
+    def test_the_ramp_feedrate_is_written_onto_the_moves_that_go_down_sideways(self):
+        helix = "\n".join(
+            (
+                "G0 Z5.000000",
+                "G0 X2.000000 Y0.000000 Z5.000000",
+                "G1 F3.333333 X2.000000 Y0.000000 Z0.000000",
+                "G1 X0.000000 Y2.000000 Z-0.500000 F3.333333",
+                "G1 X-2.000000 Y0.000000 Z-1.000000 F3.333333",
+                "G2 I2.000000 J0.000000 X-2.000000 Y0.000000 Z-2.000000 F3.333333",
+                "G1 X5.000000 Y0.000000 Z-2.000000 F10.000000",
+                "G1 X5.000000 Y0.000000 Z-1.000000 F3.333333",
+                "G0 Z5.000000",
+            )
+        )
+        text, counts = core.with_feeds(helix, ramp=1.5)
+        self.assertEqual(counts, {"ramp": 3, "leadin": 0})
+        self.assertEqual(
+            [feed for _kind, feed in self.feeds(text)], [200.0, 90.0, 90.0, 90.0, 600.0, 200.0]
+        )
+        # (a full turn of a helix as one arc ends over where it started: still a ramp; the
+        # straight plunge before and the lift after are not)
+        self.assertTrue(text.splitlines()[5].endswith("F1.500000"))
+        self.assertEqual(text.splitlines()[2], helix.splitlines()[2])
+        self.assertEqual(text.splitlines()[7], helix.splitlines()[7])
+
+
+class TabsAtPointsAndPrecedingStock(unittest.TestCase):
+    """What the book's two CAM projects need beyond the first build: tabs at clicked points
+    and the second setup's stock From preceding setup."""
+
+    def options(self, **tabs):
+        tabs.setdefault("on", True)
+        return core.op_options(
+            "contour2d", {"tool": core.make_tool("flat", 6.0), "geometry": {"tabs": tabs}}
+        )
+
+    def env(self, **more):
+        heights = {"clearance": 15.0, "retract": 5.0, "feed": 5.0, "top": 0.0, "bottom": -6.0}
+        env = {"heights": heights, "parts": [{"base": [[0, ["Face1"]]]}]}
+        env.update(more)
+        return env
+
+    def test_positioning_at_points_is_offered(self):
+        self.assertEqual([k for k, _t in core.TAB_POSITIONING], ["distance", "count", "points"])
+        self.assertEqual(dict(core.TAB_POSITIONING)["points"], "At points")
+        self.assertEqual(core.op_options("contour2d")["geometry"]["tabs"]["points"], [])
+        with self.assertRaises(core.CamError):
+            self.options(positioning="somewhere")
+
+    def test_points_are_kept_as_three_numbers(self):
+        got = self.options(positioning="points", points=[[1, 2, 3], (4, 5)])
+        self.assertEqual(got["geometry"]["tabs"]["points"], [[1.0, 2.0, 3.0], [4.0, 5.0, 0.0]])
+        for bad in ([["a", 1, 2]], [[1]], [[1, 2, 3, 4]], [[float("nan"), 0, 0]]):
+            with self.assertRaises(core.CamError):
+                self.options(positioning="points", points=bad)
+
+    def test_without_a_point_it_says_what_to_do(self):
+        said = core.op_problems("contour2d", self.options(positioning="points"), {"faces": 1})
+        self.assertEqual(len(said), 1)
+        self.assertIn("click on the contour where each tab goes", said[0])
+        ready = self.options(positioning="points", points=[[5, 0, 0]])
+        self.assertEqual(core.op_problems("contour2d", ready, {"faces": 1}), [])
+        # (the points are only asked for when tabs are on and placed at points)
+        off = self.options(on=False, positioning="points")
+        self.assertEqual(core.op_problems("contour2d", off, {"faces": 1}), [])
+
+    def test_the_points_reach_the_plan_in_setup_coordinates(self):
+        options = self.options(positioning="points", points=[[60, 0, 15]])
+        plan = core.engine_plan("contour2d", options, self.env(tab_points=[[-40.0, -60.0]]))
+        tags = plan[0]["dressups"][0]
+        self.assertEqual(tags["module"], "Tags")
+        self.assertEqual(tags["tabs"]["positioning"], "points")
+        self.assertEqual(tags["tabs"]["points"], [[-40.0, -60.0]])
+        # a click on the model's edge is the tool's radius (and 1 mm) from the toolpath
+        self.assertEqual(tags["tabs"]["reach"], 4.0)
+        counted = core.engine_plan("contour2d", self.options(positioning="count"), self.env())
+        self.assertEqual(counted[0]["dressups"][0]["tabs"]["points"], [])
+
+    def test_stock_from_the_preceding_setup_is_a_mode(self):
+        modes = {k: (title, built) for k, title, built, _why in core.STOCK_MODES}
+        self.assertEqual(modes["preceding"], ("From preceding setup", True))
+        opts = core.setup_options({"stock": {"mode": "preceding"}})
+        self.assertEqual(opts["stock"]["mode"], "preceding")
+        # it has no box of its own: manufacture.Frame takes the preceding setup's block
+        with self.assertRaises(core.CamError):
+            core.stock_box(MODEL, opts["stock"])
+        with self.assertRaises(core.CamError) as caught:
+            core.setup_options({"stock": {"mode": "rel_cylinder"}})
+        self.assertIn("turning", str(caught.exception))
+
+
 class Paths(unittest.TestCase):
     def test_parse_keeps_commands_parameters_and_lines(self):
         got = core.parse_gcode("(a comment)\nN10 G0 X1 Y-2.5 ; go\nG1 Z-1 F100\nX5\n%\nM3 S1000\n")

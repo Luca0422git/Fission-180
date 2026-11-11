@@ -2076,6 +2076,12 @@ def main():
         run_session(
             run, sheetmetal_plastic_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
         )
+        # the MANUFACTURE and ANIMATION tools (workspace_tools.py, wave 7)
+        from Fission180Tests.headless import workspace_tools
+
+        run_session(
+            run, workspace_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
+        )
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)

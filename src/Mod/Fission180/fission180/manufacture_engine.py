@@ -26,7 +26,7 @@ import traceback
 
 import FreeCAD as App
 
-VERSION = 1
+VERSION = 2
 
 
 class _Capture:
@@ -255,6 +255,9 @@ class Engine:
                 _set(obj, name, value)
             tabs = spec.get("tabs") or {}
             self.doc.recompute()
+            if tabs.get("positioning") == "points":
+                self._tabs_at(obj, tabs)
+                return obj
             count = int(tabs.get("count") or 4)
             if tabs.get("positioning") == "distance":
                 try:
@@ -287,11 +290,45 @@ class Engine:
             _set(obj, name, value)
         return obj
 
+    def _tabs_at(self, obj, tabs):
+        """Tabs at clicked points: each point (x, y in the job's coordinates, clicked on the
+        model's edge) is moved onto the nearest place of the toolpath's contour, where
+        FreeCAD's tabs must sit."""
+        import Part
+
+        data = obj.Proxy.pathData
+        positions = []
+        reach = float(tabs.get("reach") or 4.0)
+        for number, (x, y) in enumerate(tabs.get("points") or [], 1):
+            vertex = Part.Vertex(App.Vector(float(x), float(y), data.minZ))
+            best = None
+            for edge in data.bottomEdges:
+                distance, pairs, _info = edge.distToShape(vertex)
+                if best is None or distance < best[0]:
+                    best = (distance, pairs[0][0])
+            if best is None or best[0] > reach:
+                raise ValueError(
+                    "tab position %d is not on this contour (it is %.1f mm from the toolpath): "
+                    "click on the contour's edge" % (number, best[0] if best else 0.0)
+                )
+            positions.append(App.Vector(best[1].x, best[1].y, data.minZ))
+        if not positions:
+            raise ValueError("no tab position was given")
+        obj.Positions = positions
+        obj.Disabled = []
+        self.doc.recompute()
+        if len(obj.Disabled):
+            raise ValueError(
+                "%d of the tabs overlap another tab or the start of the cut: put them "
+                "further apart" % len(obj.Disabled)
+            )
+
     def _part(self, part, controller, label):
         import importlib
 
         module = importlib.import_module("Path.Op.%s" % part["module"])
         self.chooser.controller = controller
+        self._tolerance(part.get("tolerance") or 0.01)
         op = module.Create(label, parentJob=self.job)
         op.ToolController = controller
         # always: FreeCAD fills a new drilling operation with every hole it finds itself
@@ -302,17 +339,38 @@ class Engine:
             _set(op, name, value)
         self.doc.recompute()
         final = op
+        before_leads = None
         for spec in part.get("dressups") or []:
+            if spec.get("lead_feed") is not None:
+                before_leads = final.Path.toGCode()  # (to tell the lead-ins from the contour)
             final = self._dressup(spec, final)
             self.doc.recompute()
         state = list(getattr(final, "State", []))
         if "Invalid" in state or "Invalid" in list(getattr(op, "State", [])):
             raise ValueError("FreeCAD's CAM could not compute it")
-        return final.Path
+        return final.Path, before_leads
+
+    def _tolerance(self, value):
+        """The operation's Tolerance: the accuracy of the curves Path.Area makes (its
+        default is what FreeCAD's CAM preferences set once) and the job's geometry tolerance
+        (profiles, the 3D operations). Path.Area uses its accuracy more than once (cutting
+        a curve into points, offsetting, fitting arcs again): measured on a contour around
+        an ellipse the toolpath is up to 2.35 times the accuracy away from the true path,
+        whatever the accuracy. A third of the Tolerance keeps the toolpath within it."""
+        import Path
+
+        try:
+            Path.Area.setDefaultParams(Accuracy=float(value) / 3.0, Deflection=float(value) / 3.0)
+        except Exception:
+            pass
+        try:
+            self.job.GeometryTolerance = float(value)
+        except Exception:
+            pass
 
     def operation(self, spec):
         started = time.time()
-        out = {"gcode": "", "error": None, "messages": [], "seconds": 0.0}
+        out = {"gcode": "", "error": None, "messages": [], "seconds": 0.0, "parts": []}
         capture = _Capture()
         try:
             with capture:
@@ -320,9 +378,18 @@ class Engine:
                 chunks = []
                 for index, part in enumerate(spec.get("parts") or []):
                     label = "Op%s_%d" % (spec.get("id", ""), index)
-                    path = self._part(part, controller, label)
-                    if _has_cut(path):
+                    path, before_leads = self._part(part, controller, label)
+                    if _has_cut(path) and path.toGCode().strip():
                         chunks.append(path.toGCode())
+                        # (what manufacture_core.with_feeds needs to write the Lead-In and
+                        # Ramp Feedrates onto this part's moves)
+                        out["parts"].append(
+                            {
+                                "index": index,
+                                "gcode": path.toGCode().strip("\n"),
+                                "before_leads": before_leads,
+                            }
+                        )
                 out["gcode"] = "\n".join(c.strip("\n") for c in chunks if c.strip())
                 if not out["gcode"]:
                     raise ValueError("no toolpath came out for this selection")

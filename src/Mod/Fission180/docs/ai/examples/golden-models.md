@@ -802,13 +802,13 @@ Each model is listed under its first tag; its other tags follow it.
 | `age` | (a test helper) | 2 | `sf_coil_old_narrow_upgraded`, `sf_pipe_old_upgraded` |
 | `align_bodies` | `align` | 3 | `direct_align_block_on_table`, `direct_align_flip_angle`, `direct_align_split_onto_plane` |
 | `anim_expect` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
-| `anim_explode` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
-| `anim_manual_explode` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
-| `anim_restore_home` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
-| `anim_reverse` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
-| `anim_show_hide` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
-| `anim_storyboard` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
-| `anim_transform` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
+| `anim_explode` | `anim_explode` | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
+| `anim_manual_explode` | `anim_manual_explode` | 1 | `anim_sequential_transform_reverse` |
+| `anim_restore_home` | `anim_restore_home` | 1 | `anim_sequential_transform_reverse` |
+| `anim_reverse` | `anim_storyboard` | 1 | `anim_sequential_transform_reverse` |
+| `anim_show_hide` | `anim_show_hide` | 1 | `anim_sequential_transform_reverse` |
+| `anim_storyboard` | `anim_storyboard` | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
+| `anim_transform` | `anim_transform` | 1 | `anim_sequential_transform_reverse` |
 | `blend_chamfer` | `chamfer` | 15 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `book_carabiner_full_round_4` |
 | `blend_edit` | `edit_step` | 1 | `blend_edit_keeps_later_chamfer` |
 | `blend_fillet` | `fillet` | 15 | `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain` |
@@ -816,12 +816,12 @@ Each model is listed under its first tag; its other tags follow it.
 | `blend_radius_expect` | (a test helper) | 2 | `fillet2_variable_points`, `live_fillet2_variable_points` |
 | `body_material` | `physical_material` | 2 | `export_report_design`, `inspect_com_materials` |
 | `body_tool_edit` | `edit_step` | 4 | `bodies_combine_edit_operation`, `bodies_move_edit`, `bodies_move_two_bodies`, `bodies_split_edit_tool` |
-| `cam_edit` | (a test helper) | 1 | `cam_block_side_setup` |
+| `cam_edit` | `cam_edit` | 1 | `cam_block_side_setup` |
 | `cam_expect` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
-| `cam_generate` | (a test helper) | 1 | `cam_block_side_setup` |
-| `cam_operation` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
-| `cam_post` | (a test helper) | 1 | `cam_plate_face_contour_drill` |
-| `cam_setup` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_generate` | `cam_generate` | 1 | `cam_block_side_setup` |
+| `cam_operation` | `cam_operation` | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_post` | `cam_post` | 1 | `cam_plate_face_contour_drill` |
+| `cam_setup` | `cam_setup` | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `chamfer` | (a test helper) | 2 | `chamfer_one_edge`, `chamfer_top_edges` |
 | `check` | (a test helper) | 88 | `blend_edit_keeps_later_chamfer`, `blend_fillet_edit_radius`, `blend_insert_chamfer_before_fillet`, `bodies_combine_edit_operation`, `bodies_combine_follows_tool` |
 | `circular_pattern` | `circular_pattern` | 3 | `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes` |

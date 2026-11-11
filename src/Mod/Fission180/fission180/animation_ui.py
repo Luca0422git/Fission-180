@@ -34,11 +34,9 @@ STATE = {
     "docs": {},  # document name -> True while that design is in the workspace
     "current": {},  # document name -> name of the storyboard shown
     "playheads": {},  # (document name, storyboard) -> seconds
-    "timeline": False,  # the design timeline was shown when the workspace hid it
     "connected": False,
     "watch": None,
     "timer": None,
-    "held": [],  # the design's shortcuts switched off while ANIMATION shows
     "recording": True,  # VIEW > View: view changes are recorded (Fusion: on by default)
     "loop": False,
     "play": None,  # {"doc", "from", "t0"} while playing
@@ -387,6 +385,71 @@ def toggle_play():
     return play()
 
 
+# -- Space: play / pause ---------------------------------------------------------------------
+TEXT_BOXES = (
+    QtWidgets.QLineEdit,
+    QtWidgets.QTextEdit,
+    QtWidgets.QPlainTextEdit,
+    QtWidgets.QAbstractSpinBox,
+)
+
+
+def space_plays(focus=None, modal=None, popup=None):
+    """True when Space should play or pause now: the workspace is in front, no dialog, menu
+    or other window has the keyboard, and what has it is not a box a person types in.
+    (Fusion plays with Space wherever the pointer is; the timeline alone took it before.)"""
+    if not STATE["on"] or modal is not None or popup is not None or dialog_open():
+        return False
+    if focus is None:
+        return True
+    if isinstance(focus, TEXT_BOXES):
+        return False
+    if isinstance(focus, QtWidgets.QComboBox) and focus.isEditable():
+        return False
+    try:
+        return focus.window() is Gui.getMainWindow()
+    except Exception:
+        return False
+
+
+class _SpaceFilter(QtCore.QObject):
+    """Takes the Space key for the workspace before FreeCAD's own Space (Toggle Visibility)
+    or a button that happens to have the keyboard gets it."""
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            if kind not in (QtCore.QEvent.KeyPress, QtCore.QEvent.ShortcutOverride):
+                return False
+            if event.key() != QtCore.Qt.Key_Space:
+                return False
+            if event.modifiers() not in (QtCore.Qt.NoModifier, QtCore.Qt.KeypadModifier):
+                return False
+            app = QtWidgets.QApplication
+            if not space_plays(app.focusWidget(), app.activeModalWidget(), app.activePopupWidget()):
+                return False
+            if kind == QtCore.QEvent.KeyPress and not event.isAutoRepeat():
+                QtCore.QTimer.singleShot(0, toggle_play)
+            event.accept()
+            return True
+        except Exception as exc:
+            warn("animation workspace: space: %s" % exc)
+            return False
+
+
+def _space_key(on):
+    try:
+        app = QtWidgets.QApplication.instance()
+        if on and STATE.get("space") is None:
+            STATE["space"] = _SpaceFilter()
+            app.installEventFilter(STATE["space"])
+        elif not on and STATE.get("space") is not None:
+            app.removeEventFilter(STATE["space"])
+            STATE["space"] = None
+    except Exception as exc:
+        warn("animation workspace: space: %s" % exc)
+
+
 def set_loop(on):
     STATE["loop"] = bool(on)
     _timeline_update()
@@ -504,21 +567,9 @@ def _finish_open():
 
 def _other_workspace(doc=None):
     """The other workspace the design is in now ("simulation" / "manufacture"), or None."""
-    try:
-        from . import simulation_ui
+    from . import workspace_switch
 
-        if simulation_ui.in_workspace(doc):
-            return "simulation"
-    except Exception:
-        pass
-    try:
-        from . import manufacture_ui
-
-        if manufacture_ui.in_workspace(doc):
-            return "manufacture"
-    except Exception:
-        pass
-    return None
+    return workspace_switch.other("animation", doc)
 
 
 def enter_workspace():
@@ -532,13 +583,11 @@ def enter_workspace():
             return True
         if not _finish_open():
             return False
-        try:  # one workspace at a time: Simulation and Manufacture are left first
-            from . import manufacture_ui, simulation_ui
+        from . import workspace_switch
 
-            if simulation_ui.in_workspace(doc):
-                simulation_ui.leave_workspace()
-            if manufacture_ui.in_workspace(doc):
-                manufacture_ui.leave_workspace()
+        if not workspace_switch.leave_others("animation"):  # one workspace at a time
+            return False
+        try:  # (a drawing's tab in front: the design's own view comes to the front)
             from . import drawing_ui
 
             if drawing_ui.is_on():
@@ -614,6 +663,7 @@ def _apply(on):
             warn("animation ribbon: %s" % exc)
     _timeline(on)
     _hold_design_keys(on)
+    _space_key(on)
     if on:
         _start_timer()
         refresh()
@@ -628,58 +678,12 @@ def _apply(on):
         )
 
 
-# Keys that change the design (as in Simulation: Fusion's design shortcuts do nothing here).
-# Del and Backspace are handled by the timeline (they delete the picked actions).
-DESIGN_KEYS = (
-    "Del",
-    "Backspace",
-    "Q",
-    "E",
-    "F",
-    "H",
-    "M",
-    "J",
-    "A",
-    "Ctrl+C",
-    "Ctrl+V",
-    "Ctrl+B",
-    "D",
-    "L",
-    "C",
-    "R",
-    "T",
-    "X",
-    "O",
-    "P",
-)
-
-
 def _hold_design_keys(on):
-    try:
-        from . import shortcuts
+    """Fusion's design shortcuts do nothing here (one rule for every workspace). Del and
+    Backspace are handled by the timeline (they delete the picked actions)."""
+    from . import workspace_switch
 
-        if on:
-            for key in DESIGN_KEYS:
-                entry = shortcuts._bound.get(shortcuts.normalise(key))
-                if entry is not None and entry[1].isEnabled():
-                    entry[1].setEnabled(False)
-                    STATE["held"].append(entry[1])
-        else:
-            held, STATE["held"] = STATE["held"], []
-            other = _other_workspace()
-            if other is not None:
-                # another workspace took over while these were off (it found nothing to
-                # switch off itself): it holds them now and switches them on when it is left
-                module = __import__("fission180.%s_ui" % other, fromlist=["STATE"])
-                module.STATE["held"].extend(held)
-                return
-            for shortcut in held:
-                try:
-                    shortcut.setEnabled(True)
-                except RuntimeError:
-                    pass  # (rebound meanwhile: the new one is on)
-    except Exception as exc:
-        warn("animation workspace: keys: %s" % exc)
+    workspace_switch.hold_design_keys("animation", on)
 
 
 def open_marking_menu(global_pos):
@@ -701,55 +705,27 @@ def open_marking_menu(global_pos):
 
 
 def _timeline(on):
-    """The design timeline gives way to the ANIMATION TIMELINE, and comes back after. When
-    another workspace took over meanwhile, it is told that the design timeline was shown
-    (it hides it itself and brings it back when it is left)."""
+    """The design timeline gives way to the ANIMATION TIMELINE, and comes back after (one
+    rule for every workspace, Home and drawings: workspace_switch.hold_timeline)."""
     try:
-        from . import animation_timeline_ui, shell, timeline_ui
+        from . import animation_timeline_ui, workspace_switch
 
-        dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
         if on:
-            if dock is not None and dock.isVisible():
-                STATE["timeline"] = True
-                timeline_ui.hide()
+            workspace_switch.hold_timeline("animation", True)
             animation_timeline_ui.show()
-            return
-        animation_timeline_ui.hide()
-        if not STATE["timeline"]:
-            return
-        STATE["timeline"] = False
-        if not shell.is_on():
-            return
-        other = _other_workspace()
-        if other is not None:
-            module = __import__("fission180.%s_ui" % other, fromlist=["STATE"])
-            module.STATE["timeline"] = True
-            return
-        drawing = False
-        try:
-            from . import drawing_ui
-
-            drawing = drawing_ui.is_on()
-        except Exception:
-            pass
-        if not drawing:
-            timeline_ui.show()
+        else:
+            animation_timeline_ui.hide()
+            workspace_switch.hold_timeline("animation", False)
     except Exception as exc:
         warn("animation workspace timeline: %s" % exc)
 
 
 def _keep_design_timeline_away():
-    """The design timeline shown again by someone else while the workspace is on (Home let
-    go of it after the workspace had come back): away with it, to come back with Design."""
-    try:
-        from . import timeline_ui
+    """The design timeline shown again by someone else while the workspace is on: away
+    with it, to come back with Design."""
+    from . import workspace_switch
 
-        dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
-        if dock is not None and dock.isVisible():
-            STATE["timeline"] = True
-            timeline_ui.hide()
-    except Exception as exc:
-        warn("animation workspace timeline: %s" % exc)
+    workspace_switch.hold_timeline("animation", True)
 
 
 def sync():

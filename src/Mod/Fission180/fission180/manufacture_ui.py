@@ -34,11 +34,9 @@ STATE = {
     "docs": {},  # document name -> True while that design is in the workspace
     "active": {},  # document name -> name of its active setup
     "shown": {},  # document name -> names of the operations whose toolpaths are drawn
-    "timeline": False,  # the timeline was shown when the workspace hid it
     "connected": False,
     "watch": None,
     "timer": None,
-    "held": [],  # the design's shortcuts switched off while MANUFACTURE shows
     "run": None,  # the manufacture.Run that is generating now
     "queue": [],  # (setup name, [operation names]) still to generate
     "running": set(),  # names of the operations being generated
@@ -150,11 +148,11 @@ def enter_workspace():
             return True
         if not _finish_open():
             return False
-        try:  # one workspace at a time: Simulation is left first, a drawing's tab too
-            from . import simulation_ui
+        from . import workspace_switch
 
-            if simulation_ui.in_workspace(doc):
-                simulation_ui.leave_workspace()
+        if not workspace_switch.leave_others("manufacture"):  # one workspace at a time
+            return False
+        try:  # (a drawing's tab in front: the design's own view comes to the front)
             from . import drawing_ui
 
             if drawing_ui.is_on():
@@ -244,50 +242,11 @@ def _apply(on):
         )
 
 
-# Keys that change the design (as in Simulation: Fusion's design shortcuts do nothing here).
-DESIGN_KEYS = (
-    "Del",
-    "Backspace",
-    "Q",
-    "E",
-    "F",
-    "H",
-    "M",
-    "J",
-    "A",
-    "Ctrl+C",
-    "Ctrl+V",
-    "Ctrl+B",
-    "D",
-    "L",
-    "C",
-    "R",
-    "T",
-    "X",
-    "O",
-    "P",
-)
-
-
 def _hold_design_keys(on):
-    try:
-        from . import shortcuts
+    """Fusion's design shortcuts do nothing here (one rule for every workspace)."""
+    from . import workspace_switch
 
-        if on:
-            for key in DESIGN_KEYS:
-                entry = shortcuts._bound.get(shortcuts.normalise(key))
-                if entry is not None and entry[1].isEnabled():
-                    entry[1].setEnabled(False)
-                    STATE["held"].append(entry[1])
-        else:
-            held, STATE["held"] = STATE["held"], []
-            for shortcut in held:
-                try:
-                    shortcut.setEnabled(True)
-                except RuntimeError:
-                    pass
-    except Exception as exc:
-        warn("manufacture workspace: keys: %s" % exc)
+    workspace_switch.hold_design_keys("manufacture", on)
 
 
 def open_marking_menu(global_pos):
@@ -309,29 +268,12 @@ def open_marking_menu(global_pos):
 
 
 def _timeline(on):
-    """Fusion's Manufacture workspace has no design timeline: hidden while it shows."""
-    try:
-        from . import shell, timeline_ui
+    """Fusion's Manufacture workspace has no design timeline: away while it shows (one rule
+    for every workspace, Home and drawings: the timeline comes back when the last of them
+    lets go, whatever the order)."""
+    from . import workspace_switch
 
-        dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Fission180TimelineDock")
-        if on:
-            if dock is not None and dock.isVisible():
-                STATE["timeline"] = True
-                timeline_ui.hide()
-        elif STATE["timeline"]:
-            STATE["timeline"] = False
-            if shell.is_on():
-                other = False
-                try:
-                    from . import drawing_ui, simulation_ui
-
-                    other = drawing_ui.is_on() or simulation_ui.in_workspace()
-                except Exception:
-                    pass
-                if not other:
-                    timeline_ui.show()
-    except Exception as exc:
-        warn("manufacture workspace timeline: %s" % exc)
+    workspace_switch.hold_timeline("manufacture", on)
 
 
 def _refresh_browser():
@@ -349,15 +291,12 @@ def sync():
     """The active design changed (another tab, a design closed): show its own workspace."""
     try:
         want = in_workspace()
-        if want:
-            try:  # Simulation was entered meanwhile: one workspace at a time
-                from . import simulation_ui
+        if want:  # (another workspace entered for this design: one workspace at a time)
+            from . import workspace_switch
 
-                if simulation_ui.in_workspace():
-                    STATE["docs"][_doc().Name] = False
-                    want = False
-            except Exception:
-                pass
+            if workspace_switch.other("manufacture") is not None:
+                STATE["docs"][_doc().Name] = False
+                want = False
         if want != STATE["on"]:
             _apply(want)
         elif want:

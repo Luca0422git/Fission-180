@@ -53,7 +53,7 @@ Sources:
 | S4 | WCS Orientation: Model orientation; Select Z axis/plane & X axis; Select Z axis/plane & Y axis; Select X & Y axes; Flip for each axis | Same four modes; a planar face gives its normal, a round face its axis, a straight edge its direction; Flip Z, Flip X. Any orientation works (the model is turned into the setup's coordinates before FreeCAD sees it) | A1 A4 T1 |
 | S5 | WCS Origin: Model origin, Selected point, Stock box point, Model box point; the box points are white dots to click, the default is the stock's top centre | Same; the 27 dots are drawn on the box and clicked (or chosen in three drop-downs: Left / Middle / Right...) | A1 A4 F1 |
 | S6 | The triad (X red, Y green, Z blue) and the see-through stock are shown on the model | Same, also while the dialog is open (they follow every change) | A4 |
-| S7 | Stock modes: Fixed size box, Relative size box, Fixed / Relative size cylinder, Fixed size tube, From solid, From preceding setup | Relative size box, Fixed size box, From solid. Cylinders and "From preceding setup" greyed with why | A2 |
+| S7 | Stock modes: Fixed size box, Relative size box, Fixed / Relative size cylinder, Fixed size tube, From solid, From preceding setup | Relative size box, Fixed size box, From solid, From preceding setup (workspaces-2: the preceding setup's block as it lies now; what its operations cut away is not taken off). Cylinders greyed with why | A2 |
 | S8 | Relative size box: No additional stock / Add stock to sides and top-bottom / Add stock to all sides; offsets may be negative; Round Up to Nearest | Same three modes (side, top, bottom; or six offsets); Round Up grows the sides evenly and the top. Defaults 1 mm side, 1 mm top, 0 bottom (G: Fusion's own defaults vary with its version). A stock that leaves the model outside warns where; offsets that leave no stock are refused | A2 |
 | S9 | Fixed size box: width, depth, height and the model's position per axis (offset from a side, or centre) | Same | A2 G |
 | S10 | Post Process tab: program name/number, comment, WCS offset | Same (WCS offset 1..6 = G54..G59 in the posted program) | A1 G |
@@ -150,12 +150,48 @@ not followed.
   out and the operation says so (a warning in its tool tip).
 - **Compensation In control / Wear** (G41 / G42): FreeCAD's Profile only compensates in the
   computer. Greyed.
-- **Tolerance, smoothing**: kept in the dialog; FreeCAD's engine uses its own accuracy.
-- **Feed Height above Retract Height, lead-in feedrate, ramp feedrate**: FreeCAD has one
-  horizontal and one vertical feed per tool controller; the lead-in and ramp feedrates are kept
-  with the operation but the engine cuts leads at the cutting feed and ramps at its own choice.
-- **Engrave** as Fusion's V-carve (variable depth in closed shapes), **tabs at points**,
-  **Thread milling**, **rest machining** ("From preceding setup", rest material), **dragging
+- **Tolerance** (workspaces-2): reaches the engine where FreeCAD has an accuracy to set:
+  Face, 2D Pocket, 2D Contour and Pocket Clearing through `Path.Area`'s default accuracy and
+  deflection (a third of the Tolerance each: measured on a contour around an ellipse, the
+  toolpath is up to 2.35 times the accuracy away from the true path) and the job's
+  `GeometryTolerance`; the two Adaptive operations through their `Tolerance` property (their
+  default is 0.1 mm, Fusion's roughing default (G) and FreeCAD's own); Parallel and Contour
+  through `LinearDeflection`. Slot, Trace, Engrave, 2D Chamfer, Bore and Circular follow the
+  picked edges and circles exactly: their Tolerance field is greyed with that reason. A
+  value outside 0.001 to 1 mm is refused. **Smoothing** is not built.
+- **Lead-In Feedrate** (workspaces-2): FreeCAD's lead-in dress-up has no feed of its own and
+  cuts the lead at the cutting feed. The engine now returns the path as it was before the
+  leads were added; `manufacture_core.with_feeds` finds the lead-in moves (the sideways
+  cutting moves that start at a place the path without leads never visits) and writes the
+  Lead-In Feedrate onto them. A lead-out keeps the cutting feed (Fusion has a Lead-Out
+  Feedrate field of its own, which defaults to the cutting feed: A; not built). The field is
+  greyed when the operation has no lead-in (not a 2D Contour, Lead-In off, or tabs on).
+- **Ramp Feedrate** (workspaces-2): the ramp dress-up (2D Pocket, Pocket Clearing, 2D Contour
+  with Ramp Type Helix / Profile / Zig-zag) takes it as its own "Custom" feed rate; FreeCAD's
+  Adaptive goes down its helix at the plunge feed and has no property for it, so
+  `with_feeds` writes the Ramp Feedrate onto every cutting move that goes down while it moves
+  sideways. Greyed where there is no ramp (Ramp Type Plunge, or an operation without one).
+  Sources (A, Autodesk's HSM / Fusion CAM help, search excerpts 2026-11-11): Lead-in feedrate
+  "Feed used when leading in to a cutting move", Lead-out feedrate "Feed used when leading
+  out from a cutting move", Ramp feedrate "Feed used when doing helical ramps into stock",
+  Plunge feedrate "Feed used when plunging into stock"; Tolerance "the tolerance used when
+  linearizing geometry such as splines and ellipses. The tolerance is taken as the maximum
+  chord distance" (help.autodesk.com: Feedrate Reference, About 2D Contour, About 2D Adaptive
+  Clearing). The default tolerances (0.01 mm, roughing 0.1 mm) were not found written: G.
+- **Feed Height above Retract Height**: FreeCAD has one travel height.
+- **Tabs at points** (workspaces-2): Tab Positioning "At points" with a Tab Positions box:
+  each click on the model's side or edge is a tab (a click on a tab takes it away, the X
+  takes all), a cross marks each while the dialog is open. The point is brought onto the
+  toolpath's contour for FreeCAD's tab dress-up (`Positions`); a point more than 1 mm from
+  the picked contour is refused with how far off it is, and tabs that overlap are refused.
+- **Stock From preceding setup** (workspaces-2): the second setup takes the first one's
+  block (box or solid) where it lies in the design, turned into its own coordinates. Fusion
+  takes what the preceding setup left (A, Stock tab help); here the whole block stays
+  (safe for the tool: it treats cut-away places as material; Simulate starts from the full
+  block). A design change or a change of the first setup's stock makes the second setup's
+  toolpaths "need regenerating".
+- **Engrave** as Fusion's V-carve (variable depth in closed shapes),
+  **Thread milling**, **rest machining** (rest material), **dragging
   the height planes**, **NC Programs** as browser objects (Post Process posts a setup or the
   picked operations), **machine definitions**, **templates**, **patterns of operations**,
   **stock contours / machining boundaries** for the 3D strategies (they machine the whole
@@ -166,9 +202,12 @@ not followed.
   report). The height field gives the removed volume and finds every rapid move into
   material; it cannot show undercuts (three-axis milling from above has none) and does not
   check the holder or shaft.
-- **AI tools**: the design steps exist and are golden-tested (`cam_setup`, `cam_operation`,
-  `cam_edit`, `cam_generate`, `cam_post`), but no AI tool builds them yet
-  (`catalog.AI_TOOLS_TO_COME`).
+- **AI tools** (workspaces-2): `cam_setup`, `cam_operation` (all fifteen kinds, a tool of a
+  library or described by its sizes), `cam_edit`, `cam_delete`, `cam_generate`,
+  `cam_simulate` (time, distances, volume removed, every rapid move into the stock),
+  `cam_post` (the file and the checker's result), `cam_setups` (the browser as data) and
+  `cam_tools` (the Tool Library). They run the same design steps as the golden models and the
+  same `manufacture.py` as the dialogs.
 - **TURNING, ADDITIVE, INSPECTION, FABRICATION, MULTI-AXIS**: out. FreeCAD 1.1.4 has no lathe
   operations in the AppImage, no 4 / 5-axis strategies, and 3D printing goes through File >
   3D Print.
