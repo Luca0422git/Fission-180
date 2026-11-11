@@ -19,6 +19,10 @@ C  With a converter (a stand-in program named dxf2dwg, set in FreeCAD's DWG pref
 D  A converter that writes nothing: the dialog stays and says the converter did not write
    the file and what to do; no error in the Report view.
 E  Export PDF: one page, the sheet's size; Export DXF by its own entry: as in B.
+F  An inch drawing's dialogs speak inches (they said mm whatever the drawing's units; the
+   params builder's list, wave 7): Text's Height box reads 0.138 in (3.5 mm), Section
+   View's Distance row is "Distance (in)"; MODIFY > Move's distances are in inches and a
+   typed 1 moves the view 25.4 mm.
 """
 
 import os
@@ -302,6 +306,76 @@ def e_dxf_written():
         check_dxf(dxf_of(path), "Export DXF")
 
 
+# -- F ------------------------------------------------------------------------------------------
+def f_design():
+    d.workspace("Design")
+
+
+def f_text():
+    from fission180 import drawing
+
+    h.check("an inch drawing", drawing.units_of(d.page()) == "in", drawing.units_of(d.page()))
+    h.ribbon("Text")
+
+
+def f_text_box():
+    p = d.panel_of("TextPanel")
+    if h.check("the Text dialog", p is not None, d.panel()):
+        h.check("Height is in inches", p.size.suffix() == " in", p.size.suffix())
+        h.check("3.5 mm reads 0.138 in", abs(p.size.value() - 3.5 / 25.4) < 0.001, p.size.value())
+        h.check("and is 3.5 mm to the drawing", abs(p.size.mm() - 3.5) < 0.02, p.size.mm())
+    d.cancel()
+
+
+def f_section():
+    h.ribbon("Section View")
+
+
+def f_section_row():
+    p = d.panel_of("SectionPanel")
+    if h.check("the Section View dialog", p is not None, d.panel()):
+        label = p.layout.labelForField(p.distance)
+        text = label.text() if label is not None else ""
+        h.check("its depth row is in inches", text == "Distance (in)", text)
+    d.cancel()
+
+
+def f_move():
+    state["x"] = d.bases()[0].X.Value
+    d.group_menu("MODIFY", "Move")
+
+
+def f_move_pick():
+    b = d.bases()[0]
+    d.click_at(b.X.Value + 5.0, b.Y.Value + 5.0)
+
+
+def f_move_type():
+    from PySide import QtWidgets
+
+    p = d.panel_of("MovePanel")
+    if not h.check("the Move dialog with the view picked", p is not None and len(p.picked) == 1):
+        return
+    h.check("X Distance is in inches", p.dx.suffix() == " in", p.dx.suffix())
+    edit = p.dx.findChild(QtWidgets.QLineEdit)
+    d.type_into(edit, "1")
+    QtTest.QTest.keyClick(edit, QtCore.Qt.Key_Tab)
+
+
+def f_moved():
+    now = d.bases()[0].X.Value
+    h.check(
+        "1 in typed: the view is 25.4 mm to the right",
+        abs(now - state["x"] - 25.4) < 1e-6,
+        now - state["x"],
+    )
+    d.cancel()
+
+
+def f_back():
+    h.check("Cancel: back", abs(d.bases()[0].X.Value - state["x"]) < 1e-6)
+
+
 h.run(
     "book_drawings_export",
     [new_design]
@@ -323,6 +397,21 @@ h.run(
         e_pdf_written,
         e_dxf_dialog,
         e_dxf_written,
+        f_design,
+    ]
+    + d.drawing_steps(
+        "inch", standard="ASME", units="in", base_at=(150.0, 150.0), scale="1:1", orientation="Top"
+    )
+    + [
+        f_text,
+        f_text_box,
+        f_section,
+        f_section_row,
+        f_move,
+        f_move_pick,
+        f_move_type,
+        f_moved,
+        f_back,
     ],
     paced_by="state",
 )

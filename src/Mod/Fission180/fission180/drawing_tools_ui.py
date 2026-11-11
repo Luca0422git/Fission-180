@@ -74,9 +74,11 @@ class MovePanel(_PickPanel):
         self.phase = "pick"
         self.base = None
         self.start = None
-        self.dx = _spin(-5000.0, 5000.0, 0.0, 1.0, " mm")
+        self.dx = drawing_ui.LengthBox(page, -5000.0, 5000.0, 0.0)
+        self.dx.setKeyboardTracking(False)
         self.dx.setObjectName("Fission180DrawingMoveX")
-        self.dy = _spin(-5000.0, 5000.0, 0.0, 1.0, " mm")
+        self.dy = drawing_ui.LengthBox(page, -5000.0, 5000.0, 0.0)
+        self.dy.setKeyboardTracking(False)
         self.dy.setObjectName("Fission180DrawingMoveY")
         self.layout.addRow("X Distance", self.dx)
         self.layout.addRow("Y Distance", self.dy)
@@ -142,7 +144,7 @@ class MovePanel(_PickPanel):
         if show:
             for box, value in ((self.dx, dx), (self.dy, dy)):
                 box.blockSignals(True)
-                box.setValue(value)
+                box.set_mm(value)
                 box.blockSignals(False)
         self.clear_overlay()
         self.schedule()
@@ -156,7 +158,7 @@ class MovePanel(_PickPanel):
         self.message.setText("")
         self._begin()
         self.phase = "done"
-        self._apply(self.dx.value(), self.dy.value())
+        self._apply(self.dx.mm(), self.dy.mm())
 
     def on_key(self, key, event):
         if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and self.phase == "pick":

@@ -94,9 +94,41 @@ Text panel: Text and Leader only (Autodesk): the greyed "Note" was not Fusion's 
    the view follows at the next recompute of the design.
 
 The scenario `book_drawings_exploded` sets `drawing_exploded.STAND_IN` (an object with these
-three functions), so it does not depend on the real module; it logs whether the real one is
-there. Reading `sf/book-animation:fission180/animation.py` (commit 9871141f) the real
-functions match 1-4.
+three functions), so it tests the drawing side alone (two storyboards, a hidden part, a
+storyboard that changes, a file opened without storyboards).
+
+**After the merge of the Animation workspace (develop 7ebe808f) the real module is used**
+(no stand-in in the product; `STAND_IN` is None unless a test sets it). What differed from
+what I assumed:
+
+- Nothing in 1-5: names, the own-frame placements, `t=None` = the end, `hidden_at`, an
+  unknown name raising `AnimationError` (never reached: the name is checked first).
+- New to me: `animation.trail_lines(doc, board)` takes the storyboard's **data**
+  (`animation.storyboard(doc, name)`), not its name, and returns polylines in design
+  coordinates. Fusion shows trail lines in a drawing of an animation (Autodesk: "turn the
+  Trail Line Visibility on to display trail lines in a drawing"), so exploded views now
+  draw them (thin dashed cosmetic lines, `drawing_exploded.sync_trails`).
+- `placements_at` returns every component (also the ones never moved); I had allowed for
+  missing ones. `global_placements_at` exists; I compute the same from `placements_at`.
+- Assumption 6 holds: Auto Explode's OK ends in a recompute; the drawing follows.
+
+`book_drawings_animation` drives the real workspace with real input: Workspace >
+Animation, the playhead to 5 s, Auto Explode: One Level with Trail Line Visibility, OK;
+Workspace > Drawing > From Animation; Automatic views; Parts List; then CREATE > Exploded
+View on a plain drawing.
+
+## After the merge: the other builders' notes
+
+- params: the drawing dialogs said "mm" whatever the drawing's units. Lengths typed in a
+  drawing dialog are now in the **drawing's** units (Create Drawing's Units, as in Fusion):
+  `drawing_ui.LengthBox` (Break View's Gap, Text's Height, Edit View's Gap, Move's
+  distances), "Distance (in)" / "Depth (in)" for Section Depth and Breakout, the refusals
+  without "mm". Proof: `book_drawings_export` part F on an inch ASME drawing.
+- sketch-a (a real Centerline linetype in sketches): a drawing view draws the design's
+  solid bodies only; no sketch is shown in a drawing view, so there is nothing to carry the
+  linetype into. Listed as a gap; whether Fusion shows a sketch's centre line as a centre
+  line in a drawing view I could not confirm.
+- modify (holes no longer add a sketch row): nothing in the drawing code reads sketch rows.
 
 ## FreeCAD / TechDraw facts and traps
 
@@ -118,7 +150,11 @@ hidden-line thread; `makeCosmeticCircle`; `view.Rotation`; `importDWG.convertToD
 
 - DWG needs a converter program on the computer; with one, each sheet is its own DWG (no
   layouts).
-- Exploded views: the storyboard's end only, no trail lines, no breakout on them.
+- Exploded views: the storyboard's end only; trail lines are drawn on top of the parts
+  (not hidden behind them); no breakout on them.
+- Sketches are not shown in drawing views.
+- The automatic views fill the sheet at the largest standard scale: on a small sheet there
+  may be no free place left for the parts list (choose a bigger sheet in Create Drawing).
 - Center Mark Pattern has no Auto-complete; Renumber has Fusion's "Balloon" type only;
   Align Balloons lines up on a level or upright line through a click.
 - Move takes views, tables, text and balloons (dimensions, leaders and symbols are dragged);
@@ -144,7 +180,10 @@ hidden-line thread; `makeCosmeticCircle`; `view.Rotation`; `importDWG.convertToD
 - Right-click a component in the browser > Create Drawing starts a drawing of just that
   component.
 - CREATE > Exploded View (and New Drawing From Animation) draws the design taken apart, as
-  an Animation storyboard leaves it; parts lists and balloons work on it.
+  an Animation storyboard leaves it, with the storyboard's trail lines; parts lists and
+  balloons work on it.
+- A drawing in inches shows inches in its dialogs (Text height, Break gap, Section depth,
+  Breakout depth, Move distances).
 - New drawing commands: MODIFY > Move and Rotate, GEOMETRY > Center Mark Pattern (a bolt
   circle through a ring of holes), TABLES > Renumber and Align Balloons.
 - A click on a circle for a dimension gives its diameter wherever on the circle you click,

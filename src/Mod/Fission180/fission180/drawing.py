@@ -1026,7 +1026,7 @@ def add_section(parent, p1, p2, side, position, label=None, scale=None, points=N
         if depth[0] not in DEPTH_MODES:
             raise DrawingError("Choose Full, Slice or Distance.")
         if depth[0] == "Distance" and (depth[1] if len(depth) > 1 else 0.0) <= 0:
-            raise DrawingError("Type how far behind the cut the section shows (more than 0 mm).")
+            raise DrawingError("Type how far behind the cut the section shows (more than 0).")
         if complex_cut:
             raise DrawingError(
                 "Section depth works with a straight cut line: choose Full for a line "
@@ -1147,7 +1147,7 @@ def set_section_depth(section, mode, value=0.0):
     if mode not in DEPTH_MODES:
         raise DrawingError("Choose Full, Slice or Distance.")
     if mode == "Distance" and value <= 0:
-        raise DrawingError("Type how far behind the cut the section shows (more than 0 mm).")
+        raise DrawingError("Type how far behind the cut the section shows (more than 0).")
     if section.TypeId == COMPLEX and mode != "Full":
         raise DrawingError(
             "Section depth works with a straight cut line: this section's line has bends."

@@ -111,6 +111,7 @@ the report's own claim about Fusion was checked and found wrong, the row says so
 | 51 | Projected View: choose the command, **click the drawing view to use as the parent**, move away from it: right gives a 0 degree view, upper right a 45 degree isometric; the preview follows and locks to horizontal, vertical or isometric directions; click places each, Enter ends | Autodesk: "Projected views" (DWG-PROJECTED-VIEW), "Create projected views", Learn "create drawings for components and assemblies"; Book (p 258) |
 | 52 | Create Drawing from the browser: "Select any component in the browser, right-click it, and select Create Drawing. The Contents setting is automatically set to Select and the component is added to the selection set." | Autodesk: "Create a new drawing from a design" (DWG-CREATE-FROM-DESIGN) |
 | 53 | An exploded drawing comes from an animation storyboard: File > New Drawing > **From Animation** (also the workspace switcher: Drawing > From Animation), or an existing drawing's Create > **Base View** with a storyboard chosen in the **Representation** drop-down. The view shows the assembly at the storyboard's end | Autodesk: "Create a new drawing from an animation" (GUID-7B57F2B8), Learn "Create exploded view in a drawing", Forum: "How do I make a exploded view drawing" |
+| 53b | "When you create an animation in the Animation workspace, turn the Trail Line Visibility on to display trail lines in a drawing"; the base view shows the latest point of the storyboard | Autodesk: "Create a new drawing from an animation" (GUID-54D1504C); Forum: "Trail lines disappearing from drawing after reference update" |
 | 54 | Tables > **Table** (a dialog: Custom Table, Parts List, Bend Table, Automatic) and Tables > **Parts List** both exist; "Item numbers are assigned to components in the order in which they were created"; balloons are added to the view automatically | Autodesk: "Table reference" (DWG-REF-TABLE-DIALOG), "Create a parts list" (DWG-CREATE-PARTS-LIST) |
 | 55 | The parts list's MATERIAL is the component's physical material, and a component nobody gave a material has Fusion's **default physical material, Steel**: the list says Steel. (The report called "Steel" for parts with no material a friction and expected an empty cell: Fusion shows Steel too.) | Forum: "the parts list reported steel for a wooden design ... change the Material from Steel (default material)"; Fusion Preferences > Material > Default physical material |
 | 56 | **Renumber**: Tables > Renumber, Type Automatic or Balloon, a starting Number; "Select the first balloon to renumber. The balloon updates and the parts list sorts to reflect the new number." | Autodesk: "Renumber balloons or bend identifiers" (DWG-RENUMBER-BALLOONS-BEND-IDENTIFIERS), "Renumber reference" |
@@ -135,10 +136,16 @@ animation.placements_at(doc, name, t)  # -> {component name: App.Placement}: eac
                                        #    an exploded view shows). A component missing from the
                                        #    dict stands where the design has it.
 animation.hidden_at(doc, name, t)      # optional -> names of the components hidden at that time
+animation.trail_lines(doc, animation.storyboard(doc, name))
+                                       # optional -> [[App.Vector, ...]] the trail lines of the
+                                       #    components with Trail Line Visibility, design coordinates
 ```
 
-`drawing_exploded` works the design-coordinate placements out itself (parents applied) and
-never writes to a storyboard. Without the module (or without a storyboard) Exploded View
+Checked against the real module after it was merged (2026-11-11, `animation.py`): the
+functions are as assumed; the one thing the first draft of the contract did not have is
+`trail_lines`, which takes the storyboard's data (`animation.storyboard(doc, name)`), not
+its name. `drawing_exploded` works the design-coordinate placements out itself (parents
+applied; `global_placements_at` gives the same) and never writes to a storyboard. Without the module (or without a storyboard) Exploded View
 says so next to the mouse; an exploded view that cannot read its storyboard any more stays
 as it was drawn (its hidden copy keeps the moves).
 
@@ -147,7 +154,7 @@ as it was drawn (its hidden copy keeps the moves).
 | Fusion | Fission 180 |
 |---|---|
 | Right-click a component > Create Drawing (wave 7) | The browser's menu entry (components') runs New Drawing with the component selected: Create Drawing opens with Contents **Select** and only that component's bodies ticked (its sub-components' too). A component with no solid body says so. A face or body merely clicked in the view does not change Contents |
-| Exploded views (wave 7) | CREATE > **Exploded View** opens Base View with the design's first storyboard chosen under **Representation** (Model = the design as it is; the row shows when the design has storyboards); File > New Drawing From Animation and Drawing > From Animation... open Create Drawing with Representation set, and its Automatic views are all exploded. The view shows the storyboard's end: each component where the storyboard puts it, hidden ones left out; a new view takes the scale at which the exploded parts fit. Projected views of it show the same exploded parts; the parts list and balloons work on it (each arrow on its part where the storyboard puts it); it follows the storyboard and the design, and is saved with the design. Double-click it: Representation can be changed (another storyboard, or Model: back to the design as it is). No storyboard, or no Animation workspace: the command says what is missing and where to make one |
+| Exploded views (wave 7) | CREATE > **Exploded View** opens Base View with the design's first storyboard chosen under **Representation** (Model = the design as it is; the row shows when the design has storyboards); File > New Drawing From Animation and Drawing > From Animation... open Create Drawing with Representation set, and its Automatic views are all exploded. The view shows the storyboard's end: each component where the storyboard puts it, hidden ones left out, and the storyboard's **trail lines** (the components with Trail Line Visibility on) as thin dashed lines; a new view takes the scale at which the exploded parts fit. Projected views of it show the same exploded parts; the parts list and balloons work on it (each arrow on its part where the storyboard puts it); it follows the storyboard and the design, and is saved with the design. Double-click it: Representation can be changed (another storyboard, or Model: back to the design as it is). No storyboard, or no Animation workspace: the command says what is missing and where to make one |
 | File > New Drawing > From Design; Workspace > Drawing > From Design | Same: the application menu's **New Drawing**, and the workspace button **DESIGN > Drawing > From Design...** (that menu also lists the design's drawings). An empty design is refused: "There is nothing to draw yet: the design has no solid bodies..." |
 | Create Drawing: Contents, Template, Standard, Units, Sheet Size, Automatic / Manual | Same: Contents Full Assembly / Visible Only / Select (Select shows the bodies, "Component / Body", to tick); Template *Fission 180 title block* or *Blank sheet (frame only)*; Standard ISO / ASME (ISO for an mm design, ASME for an inch one); Units mm / in; Sheet Size ISO A4..A0 (A3) or ASME A..E (B); Views Manual or Automatic (base view, two projected views and an isometric one, one undo step: laid out as a block of four with each view's real size, 25 mm apart, at the largest standard scale at which the block fits above the title block (wave 7: the isometric view was given a corner as small as the part's depth and lay on its neighbours; a long assembly got no view at all); a design too big even at 1:200 says so) |
 | The drawing opens in its own tab | Same: a tab "<design> Drawing" ("... Drawing 2" for the next). While it is the active tab the ribbon shows only the **DRAWING** tab, the workspace button says DRAWING, the timeline and the navigation bar step aside; another tab brings the design's ribbon back |
@@ -196,7 +203,7 @@ as it was drawn (its hidden copy keeps the moves).
 | Templates (Browse, Template contextual environment, custom title blocks, Add Title Block) | Only Fission 180's own title block or a blank frame; editing the template's layout is not built |
 | Shaded and Shaded with Hidden Edges styles | TechDraw cannot render shading: the faces are filled with one light colour |
 | Tangent Edges "Shortened" | TechDraw shows tangent edges full length or not at all |
-| Exploded views: trail lines, a time other than the storyboard's end, a breakout on an exploded view | An exploded view shows the storyboard's end and no trail lines (the contract gives placements only); a breakout is refused on it with the reason. A body at the design's top level is not animated (Fusion animates components) and stays where it is |
+| Exploded views: a time other than the storyboard's end, a breakout on an exploded view, trail lines hidden behind parts | An exploded view shows the storyboard's end; its trail lines are cosmetic lines drawn on top (TechDraw does not hide them behind the parts); a breakout is refused on it with the reason. A body at the design's top level is not animated (Fusion animates components) and stays where it is |
 | Breakout: a sketched spline profile picked in the dialog; components left out of the cut; "move the start point to the front" | The boundary is a polygon of clicked points (no spline), where it cuts material TechDraw draws ordinary lines (Fusion: a thin break line); every part is cut; the depth is measured from the front of the parts when the breakout is made and again after every change (so the start-point button is not needed). A section or detail view made from a view with a breakout shows the breakout too (TechDraw cuts and enlarges what the parent view draws); a break view of a view with a breakout shows the whole parts |
 | Section Depth on a bent cut line; a bend's seam line; Distance cutting a line in two | Depth works on straight lines only (refused with a message on bent ones), and so does the hiding of a cut hole's seam line; TechDraw's complex section draws a thin line where the offset line jogs (Fusion draws none). TechDraw can only switch a whole line off: a line that is partly within the Distance shows whole. After a design change a big section's deeper lines are switched off once TechDraw has drawn it (Fission 180 looks again 1.5, 3, 6 and 12 s later) |
 | Detail boundary options (jagged / smooth, full boundary, connection line) | TechDraw draws a circle on the parent and the detail without a boundary |
@@ -208,6 +215,7 @@ as it was drawn (its hidden copy keeps the moves).
 | Leader with several segments; text styles (fonts, bold, lists, justification) in notes | One straight leader line with a landing; plain text |
 | Tolerance on angles shown stacked | Angles take Symmetric / Deviation / Limits; Fit is refused for angles (there is no ISO fit for an angle) |
 | Ordinate dimensions with separate X and Y origins, jogged ordinate leaders, an origin on an edge's middle | One origin point per set; straight leaders |
+| A design's sketches in a drawing view (and so a sketch's centre line as a centre line) | A view draws the design's solid bodies only; sketches are not shown in drawing views at all |
 | Custom tables; patent balloons; sub-assembly structure in the parts list; column choice and order; Renumber's Automatic type | The parts list lists the components the view shows, first level only, with fixed columns; Renumber gives the typed number to the clicked balloon (Fusion's "Balloon" type). A balloon's arrow stays at the point it was put on (it does not follow its part when the design changes) |
 | A DWG without a converter program; AutoCAD DWG with every sheet as a layout; uniform line weights in the PDF | FreeCAD (and its AppImage) has no DWG writer: a DWG is its DXF converted by LibreDWG, the ODA File Converter or QCAD when one is installed (looked for 2026-11-11: none is in the AppImage; writing the DWG format ourselves could not be checked against AutoCAD here, and a file AutoCAD refuses would be worse than an honest DXF). With a converter each sheet becomes its own DWG (the R12 DXF has no layouts) |
 | PDF layers in a PDF/A file; layers for a view that is off the sheet | FreeCAD's PDF preferences can make Qt write PDF/A-1b, which forbids layers: such a file gets no layers, but the markers are still taken out (Qt paints them opaque there); the added text's osifont subset has a CIDSet, the XMP keeps Qt's PDF/A and xmpMM entries and says pdf:Trapped like the document information (links and metadata still), so the file stays PDF/A as far as Fission 180's additions go (not checked with veraPDF, not available here). PDF/X-4 (the same preference) keeps its PDF/X version, document ids and pdf:Trapped, and gets layers (X-4 allows them) but no link annotations (a print-ready page has none). Without an embeddable font no text is added to either. Qt does not print what is off the sheet, so a view that lies wholly outside it has nothing to sort |
@@ -356,6 +364,11 @@ Wave 7 (2026-11-11):
   (centre marks following their holes) also waits for that instead of a fixed 1.5 s.
 - A drawing dialog whose `__init__` raises (`DrawingError`) had already opened its undo step
   and taken the sheet's mouse: `drawing_ui._open_panel` puts such a half-made dialog away.
+- `makeCosmeticLine` returns nothing for a view TechDraw has not made ready yet (a base
+  view still following the mouse): an exploded view's trail lines are then drawn at the
+  next refresh (`drawing_exploded.trails_drawn` / `sync_trails`).
+- The drawing dialogs' lengths are in the drawing's units (`drawing_ui.LengthBox`,
+  `unit_of` / `to_units` / `from_units`): an inch drawing read " mm" and "(mm)" before.
 - `DrawViewPart.makeCosmeticCircle(centre, radius, style, weight)` exists in 1.1.4 (the
   bolt circle); `view.Rotation` turns a view about its middle.
 - FreeCAD's DWG export is `importDWG.convertToDwg(dxf, dwg)`: LibreDWG (`dxf2dwg in -y -o
@@ -375,12 +388,13 @@ sheet where the drawing says (pixels); the list following a rename, a material a
 component; Balloon by hand at 1:2; Export CSV read back; a second list refused and no
 half-made dialog left), `book_drawings_export` (Export CSV with no table; Export DWG with
 no converter: the notice and the DXF; with a stand-in converter: the DWG from the sheet's
-real DXF; a converter that writes nothing; PDF and DXF still right),
+real DXF; a converter that writes nothing; PDF and DXF still right; an inch drawing's Text, Section View and Move dialogs in inches),
 `book_drawings_exploded` (a stand-in for the Animation workspace's contract: Exploded View
 refused without a storyboard; Base View with Representation; the parts where the storyboard
 puts them; undo / redo; a projected view; the parts list and balloons on the exploded view;
 following the storyboard; another storyboard with a hidden part, Cancel; Model, undo; New
 Drawing From Animation with Automatic views; save and reopen without the storyboards),
+`book_drawings_animation` (the real Animation workspace with real input: Auto Explode: One Level with trail lines, Drawing > From Animation, Automatic views showing the storyboard's end with the trail lines, a parts list with balloons on it, CREATE > Exploded View on a plain drawing),
 `book_drawings_component` (right-click a component > Create Drawing; an empty component
 refused; centre mark, Dimension on the circle's seam point, text, title block, a second
 sheet; the drawing following a design change), `book_drawings_tools` (Center Mark Pattern

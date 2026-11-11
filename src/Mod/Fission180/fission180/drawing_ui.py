@@ -1067,6 +1067,47 @@ def snap_point(view, local, tolerance):
     return best[1] if best else local
 
 
+# ------------------------------------------------------------------ lengths in the drawing's units
+def unit_of(page):
+    """The unit a drawing's dialogs show lengths in: the drawing's own ("mm" or "in",
+    chosen in Create Drawing), as Fusion's drawing dialogs do."""
+    return "in" if drawing.units_of(page) == "in" else "mm"
+
+
+def to_units(mm, page):
+    return mm / core.MM_PER_IN if unit_of(page) == "in" else mm
+
+
+def from_units(value, page):
+    return value * core.MM_PER_IN if unit_of(page) == "in" else value
+
+
+def units_text(mm, page):
+    """A length as a dialog's text field shows it (no unit: the row's caption has it)."""
+    return core._short(round(to_units(mm, page), 4))
+
+
+class LengthBox(QtWidgets.QDoubleSpinBox):
+    """A length box in the drawing's units (an inch drawing read " mm" everywhere: wave
+    7, the params builder's list). mm() / set_mm() talk millimetres with the code."""
+
+    def __init__(self, page, lo_mm, hi_mm, value_mm):
+        super().__init__()
+        self.page = page
+        inch = unit_of(page) == "in"
+        self.setDecimals(3 if inch else 2)
+        self.setSingleStep(0.05 if inch else 1.0)
+        self.setRange(to_units(lo_mm, page), to_units(hi_mm, page))
+        self.setSuffix(" in" if inch else " mm")
+        self.set_mm(value_mm)
+
+    def mm(self):
+        return from_units(self.value(), self.page)
+
+    def set_mm(self, value_mm):
+        self.setValue(to_units(value_mm, self.page))
+
+
 # ------------------------------------------------------------------ dialogs: shared base
 def _combo(items, current=None, editable=False):
     box = QtWidgets.QComboBox()
@@ -1808,7 +1849,7 @@ class SectionPanel(DrawingPanel):
         mode, value = drawing.section_depth(section) if section is not None else ("Full", 10.0)
         self.depth = _combo(drawing.DEPTH_MODES, mode)
         self.depth.setObjectName("Fission180SectionDepth")
-        self.distance = QtWidgets.QLineEdit(core._short(value or 10.0))
+        self.distance = QtWidgets.QLineEdit(units_text(value or 10.0, page))
         self.distance.setObjectName("Fission180SectionDistance")
         self.hatch = QtWidgets.QCheckBox("Hatch the cut faces")
         self.hatch.setChecked(section is None or section.CutSurfaceDisplay != "Hide")
@@ -1817,7 +1858,7 @@ class SectionPanel(DrawingPanel):
         self.layout.addRow("Scale", self.scale)
         self.layout.addRow("Style", self.style)
         self.layout.addRow("Section Depth", self.depth)
-        self.layout.addRow("Distance (mm)", self.distance)
+        self.layout.addRow("Distance (%s)" % unit_of(page), self.distance)
         self.layout.addRow(self.hatch)
         self.show_label = _label_rows(self, section, with_text=False)
         self.auto_boxes = _auto_mark_rows(self, section)
@@ -2065,7 +2106,7 @@ class SectionPanel(DrawingPanel):
     def _depth_value(self):
         mode = self.depth.currentText()
         try:
-            value = float(self.distance.text().replace(",", "."))
+            value = from_units(float(self.distance.text().replace(",", ".")), self.page)
         except ValueError:
             value = 0.0
         return (mode, value)
@@ -2103,7 +2144,7 @@ class SectionPanel(DrawingPanel):
             return False
         mode, value = self._depth_value()
         if mode == "Distance" and value <= 0:
-            self.message.setText("Type how far behind the cut the section shows (more than 0 mm).")
+            self.message.setText("Type how far behind the cut the section shows (more than 0).")
             return False
         return super().accept()
 
@@ -2348,10 +2389,7 @@ class BreakPanel(DrawingPanel):
         self.view = None
         self.a = None
         self.broken = None
-        self.gap = QtWidgets.QDoubleSpinBox()
-        self.gap.setRange(1.0, 100.0)
-        self.gap.setSuffix(" mm")
-        self.gap.setValue(10.0)
+        self.gap = LengthBox(page, 1.0, 100.0, 10.0)
         self.gap.setObjectName("Fission180DrawingGap")
         self.layout.addRow("Gap", self.gap)
         self.gap.valueChanged.connect(self._gap)
@@ -2378,7 +2416,7 @@ class BreakPanel(DrawingPanel):
             self.say("Click where the break ends.")
             return True
         try:
-            self.broken = drawing.add_break(self.view, self.a, local, self.gap.value())
+            self.broken = drawing.add_break(self.view, self.a, local, self.gap.mm())
         except drawing.DrawingError as exc:
             self.message.setText(str(exc))
             return True
@@ -2402,9 +2440,9 @@ class BreakPanel(DrawingPanel):
             else:
                 self.overlay_line((x - half_w - 3, q[1]), (x + half_w + 3, q[1]))
 
-    def _gap(self, value):
+    def _gap(self, _value):
         if self.broken is not None:
-            self.broken.Gap = value
+            self.broken.Gap = self.gap.mm()
             self.schedule()
 
     def accept(self):
@@ -2691,10 +2729,7 @@ class TextPanel(DrawingPanel):
         self.text = QtWidgets.QPlainTextEdit("\n".join(note.Text) if note is not None else "")
         self.text.setObjectName("Fission180DrawingText")
         self.text.setMaximumHeight(90)
-        self.size = QtWidgets.QDoubleSpinBox()
-        self.size.setRange(1.0, 50.0)
-        self.size.setSuffix(" mm")
-        self.size.setValue(float(note.TextSize) if note is not None else 3.5)
+        self.size = LengthBox(page, 1.0, 50.0, float(note.TextSize) if note is not None else 3.5)
         self.size.setObjectName("Fission180DrawingTextHeight")
         self.layout.addRow("Text", self.text)
         self.layout.addRow("Height", self.size)
@@ -2733,7 +2768,7 @@ class TextPanel(DrawingPanel):
         width = abs(x1 - x0)
         centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
         lines = self.text.toPlainText().splitlines() or ["Text"]
-        self.note = drawing.add_text(self.page, lines, centre, self.size.value(), width or None)
+        self.note = drawing.add_text(self.page, lines, centre, self.size.mm(), width or None)
         self.clear_overlay()
         self.say("Type the text, then OK.")
         self.schedule()
@@ -2756,7 +2791,7 @@ class TextPanel(DrawingPanel):
             return
         lines = self.text.toPlainText().splitlines() or [""]
         self.note.Text = lines
-        self.note.TextSize = self.size.value()
+        self.note.TextSize = self.size.mm()
         self.schedule()
 
     def on_key(self, key, event):
@@ -2940,10 +2975,7 @@ class EditViewPanel(DrawingPanel):
         self.style.currentTextChanged.connect(self._style)
         self.gap = None
         if view.TypeId == drawing.BROKEN:
-            self.gap = QtWidgets.QDoubleSpinBox()
-            self.gap.setRange(1.0, 100.0)
-            self.gap.setSuffix(" mm")
-            self.gap.setValue(float(view.Gap))
+            self.gap = LengthBox(page, 1.0, 100.0, float(view.Gap))
             self.layout.addRow("Gap", self.gap)
             self.gap.valueChanged.connect(self._gap)
         self.show_label = _label_rows(self, view)
@@ -2958,8 +2990,8 @@ class EditViewPanel(DrawingPanel):
         drawing.set_view_style(self.view, text)
         self.schedule()
 
-    def _gap(self, value):
-        self.view.Gap = value
+    def _gap(self, _value):
+        self.view.Gap = self.gap.mm()
         self.schedule()
 
 

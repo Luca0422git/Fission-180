@@ -16,6 +16,7 @@ Drive Joint = Drive Joints
 BROWSER > Analysis > Edit = Edit Feature
 Do Not Capture Design History = Capture Design History
 FILE MENU > New Drawing > From Design = New Drawing
+FILE MENU > New Drawing > From Animation = New Drawing From Animation
 
 # Timeline playback buttons (Fission 180's tooltips)
 Move to Beginning = Go to beginning
