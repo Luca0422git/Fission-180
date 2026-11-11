@@ -216,6 +216,30 @@ def link_ratio(value1, value2, reverse=False):
     return -ratio if reverse else ratio
 
 
+def link_note(label1, label2, motion1, motion2, ratio, unit="mm", mm_per_unit=1.0, same=False):
+    """What the Motion Link dialog says its values mean, in the design's units (it said
+    millimetres in an inch design: the book's Pizza Cutter, "slides 1.27 mm for each turn"
+    for the 0.05 in typed). `ratio`: joint 2's motion per unit of joint 1's, as stored
+    (millimetres and degrees); `unit` / `mm_per_unit`: the design's length unit."""
+    per = float(mm_per_unit) if mm_per_unit else 1.0
+    size1 = 1.0 if motion1 == "angle" else per  # one shown unit of each motion, as stored
+    size2 = 1.0 if motion2 == "angle" else per
+    shown = float(ratio) * size1 / size2
+    unit1 = "deg" if motion1 == "angle" else unit
+    unit2 = "deg" if motion2 == "angle" else unit
+    if same:
+        if motion1 == "angle":
+            return "%s slides %.4g %s for each turn (%.4g %s for each degree it turns)." % (
+                label1,
+                shown * 360.0,
+                unit2,
+                shown,
+                unit2,
+            )
+        return "%s turns %.4g deg for each %s it slides." % (label1, shown, unit1)
+    return "%s moves %.4g %s for each %s %s moves." % (label2, shown, unit2, unit1, label1)
+
+
 def link_offset(ratio, now1, now2):
     """The offset that keeps both joints where they are when the link is made:
     value2 = ratio * value1 + offset."""

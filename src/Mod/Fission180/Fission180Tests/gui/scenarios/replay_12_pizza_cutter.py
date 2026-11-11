@@ -16,6 +16,7 @@ from Fission180Tests.gui import replay_12_bolt_steps as bolt
 from Fission180Tests.gui import replay_12_bracket_steps as bracket
 from Fission180Tests.gui import replay_12_handle_steps as handle
 from Fission180Tests.gui import replay_12_inner2_steps as inner2
+from Fission180Tests.gui import replay_12_joints_steps as joints
 from Fission180Tests.gui import replay_12_inner_steps as inner
 from Fission180Tests.gui import replay_e_steps as r
 from Fission180Tests.gui import sketch_input as si
@@ -378,5 +379,7 @@ bolt_b, bolt_c = split(bolt_b, "exit_isolate")
 SECTIONS += [("bolt", bolt_a), ("bolt2", bolt_b), ("bolt3", bolt_c)]
 blade_a, blade_b = split(blade.steps(), "joint_key")
 SECTIONS += [("blade", blade_a), ("blade2", blade_b)]
+joints_a, joints_b = split(joints.steps(), "joint_from_cap")
+SECTIONS += [("joints", joints_a), ("joints2", joints_b)]
 
 h.run("replay_12_pizza_cutter", r.assemble(SECTIONS), paced_by="state")

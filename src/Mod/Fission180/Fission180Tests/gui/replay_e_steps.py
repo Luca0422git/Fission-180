@@ -659,8 +659,14 @@ def assemble(sections):
         def load():
             user_defaults()
             Gui.activateWorkbench("Fission180Workbench")
+            import shutil
+            import tempfile
+
             path = os.path.join(CHECKPOINTS, "replay_%s.FCStd" % before)
-            App.openDocument(path)
+            # (a copy: the replay saves the design, and that must not change the checkpoint)
+            work = os.path.join(tempfile.mkdtemp(prefix="f180-replay-"), "replay_%s.FCStd" % before)
+            shutil.copy(path, work)
+            App.openDocument(work)
             from fission180 import components_ui
 
             label = (
