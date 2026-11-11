@@ -739,6 +739,8 @@ def _tangent_ends(shape, items):
                 for face in faces:
                     u, v = face.Surface.parameter(point)
                     normals.append(face.normalAt(u, v))
+                if min(n.Length for n in normals) < 1e-9:
+                    continue  # (a cone's tip, a sphere's pole: no direction there)
                 if normals[0].getAngle(normals[1]) < SMOOTH_END:
                     found.append("Edge%d" % item[0])
                     break
