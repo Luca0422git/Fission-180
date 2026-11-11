@@ -254,7 +254,7 @@ def limits(name):
     return jm().limits(bj.joint(name))["angle"]
 
 
-def knuckle(tag, rows, labels, corner, name, low, high):
+def knuckle(tag, rows, labels, corner, name, low, high, side):
     """Steps: As-built Joint, the two components' browser rows, Type Revolute, the position
     on the corner of the hinge (a click on the phalanx's side face next to it), Minimum
     and Maximum typed; OK."""
@@ -280,17 +280,32 @@ def knuckle(tag, rows, labels, corner, name, low, high):
         h.check("%s: Type Revolute chosen" % tag, j.choose_type(p, "Revolute"))
 
     def aim():
-        # on the phalanx's side face, just beside the corner (the part in front of the
-        # hinge hides what lies lower)
-        bj.hover_point(corner + V(0, 1.6, -0.4))
+        # A person moves the pointer over the phalanx's side face (its normal is the
+        # hinge's axis) near the hinge's corner until that corner's dot is lit there.
+        S["aimed"] = None
+        for dy, dz in ((2.0, -1.4), (1.6, -0.6), (3.0, -2.0), (1.2, -1.2), (4.0, -1.0), (2.5, -3.0)):
+            at = corner + V(0, dy, dz)
+            bj.hover_point(at)
+            hov = bj.hover_of(j.panel())
+            spot = bj.hot(j.panel())
+            on_side = (
+                hov is not None
+                and hov.pick is not None
+                and hov.pick.part.Label == side
+                and hov.pick.element.startswith("Face")
+            )
+            if on_side and spot is not None and (spot["point"] - corner).Length < 1e-4:
+                S["aimed"] = at
+                return
 
     def position():
         hov = bj.hover_of(j.panel())
         spot = bj.hot(j.panel())
-        h.check("%s: the corner of the hinge is lit" % tag,
-                spot is not None and (spot["point"] - corner).Length < 1e-4,
+        h.check("%s: on %s's side face its hinge corner can be lit" % (tag, side),
+                S["aimed"] is not None,
                 (spot and (spot["kind"], spot["point"]), hov and hov.pick))
-        h.click(corner + V(0, 1.6, -0.4))
+        if S["aimed"] is not None:
+            h.click(S["aimed"])
 
     def minimum():
         p = j.panel()
@@ -331,8 +346,252 @@ def knuckle(tag, rows, labels, corner, name, low, high):
 
 # the hinges are on the top edges: a finger can only curl upwards; the positions are on
 # the side faces of the phalanges (their normal is the hinge's axis)
-steps += knuckle("k1", ("Finger", "Palm"), ("Finger", "Palm"), V(10, 20, 10), "Revolute 1", -90, 90)
-steps += knuckle("k2", ("Distal", "Proximal"), ("Distal", "Proximal"), V(10, 50, 10), "Revolute 2",
-                 -90, 90)
+steps += knuckle(
+    "k1", ("Finger", "Palm"), ("Finger", "Palm"), V(10, 20, 10), "Revolute 1", -90, 90, "Proximal"
+)
+steps += knuckle(
+    "k2", ("Distal", "Proximal"), ("Distal", "Proximal"), V(10, 50, 10), "Revolute 2", -90, 90,
+    "Distal",
+)
+
+
+# == 4: Edit Joint Limits on an as-built joint; Drive Joints stops at the limit ====================
+def angle(name):
+    return jm().value(bj.joint(name))[0]
+
+
+def tip_z():
+    """How high the fingertip stands (the top of the Distal phalanx)."""
+    return k.box(r.part("Distal"))[5]
+
+
+def edit_limits():
+    h.click_empty()
+    j.browser_menu("Revolute 1", "Edit Joint Limits")
+
+
+edit_limits.done = lambda: j.panel() is not None
+edit_limits.done_what = "the Edit Joint Limits dialog is open"
+
+
+def edit_limits_type():
+    p = j.panel()
+    shown = {key: (c.isChecked(), round(f.value(), 6)) for key, (c, f) in limit_rows(p).items()}
+    # the report: "Edit Joint Limits on as-built joints is broken": the dialog showed
+    # nothing of the joint's limits and its changes were lost
+    h.check("4 the dialog shows the joint's limits, -90 .. 90",
+            shown["min"] == (True, -90.0) and shown["max"] == (True, 90.0), shown)
+    bodies_steps.type_value(limit_rows(p)["max"][1].widget, "60")
+    bodies_steps.type_value(limit_rows(p)["min"][1].widget, "-60")
+
+
+def edit_limits_ok():
+    h.caught_up(j.panel())
+    j.ok()
+
+
+edit_limits_ok.done = lambda: j.panel() is None
+edit_limits_ok.done_what = "the Edit Joint Limits dialog closed"
+
+
+def limits_kept():
+    got = limits("Revolute 1")
+    h.check("4 the new limits are kept: -60 .. 60", got["min"] == -60 and got["max"] == 60, got)
+    r.no_open_step("Edit Joint Limits")
+    S["home"] = [bj.place(r.part(x)) for x in ("Finger", "Distal")]
+    S["tip"] = tip_z()
+
+
+def drive(name, text, tag):
+    """Steps: right-click the joint > Drive Joints, the angle typed."""
+
+    def open_():
+        h.click_empty()
+        j.browser_menu(name, "Drive Joints")
+
+    open_.done = lambda: j.panel() is not None and j.panel().title == "Drive Joints"
+    open_.done_what = "the Drive Joints dialog is open"
+
+    def type_():
+        bodies_steps.type_value(j.panel().angle.widget, text)
+
+    return [r.named(open_, "%s_drive_open" % tag), r.named(type_, "%s_drive_type" % tag)]
+
+
+def cancel_drive():
+    j.cancel()
+
+
+cancel_drive.done = lambda: j.panel() is None
+cancel_drive.done_what = "the Drive Joints dialog closed"
+
+
+def driven_up():
+    h.caught_up(j.panel())
+    S["a45"] = angle("Revolute 1")
+    S["up"] = 1.0 if tip_z() > S["tip"] + 1 else -1.0  # which way lifts the fingertip
+    # the fingertip is 60 from the hinge: 60 sin 45 = 42.4 higher (or the finger hangs down)
+    h.check("4 Drive Joints 45: the whole finger turns about the palm's edge",
+            abs(S["a45"] - 45) < 1e-4 and abs(tip_z() - S["tip"]) > 20, (S["a45"], tip_z()))
+    h.check("4 the palm stands still", jm().is_grounded(r.part("Palm"))
+            and k.box(r.part("Palm")) == [0, 0, 0, 70, 20, 10], k.box(r.part("Palm")))
+    h.shot("4-finger-driven")
+
+
+def driven_past():
+    h.caught_up(j.panel())
+    h.check("4 Drive Joints 80 stops at the limit, 60", abs(angle("Revolute 1") - 60) < 1e-4,
+            (angle("Revolute 1"), j.panel().message.text()))
+
+
+def back_home():
+    now = [bj.place(r.part(x)) for x in ("Finger", "Distal")]
+    h.check("4 Cancel puts the finger back", not any(bj.moved(a, c) for a, c in zip(now, S["home"])))
+    r.no_open_step("Drive Joints")
+
+
+steps += [edit_limits, edit_limits_type, edit_limits_ok, limits_kept]
+steps += drive("Revolute 1", "45", "up") + [driven_up]
+steps += [r.named(lambda: bodies_steps.type_value(j.panel().angle.widget, "80"), "drive_past_type")]
+steps += [driven_past, cancel_drive, back_home]
+
+
+# == 5: Rectangular Pattern of the Finger subassembly: four fingers ================================
+def pattern_steps_of(kind):
+    from fission180 import component_pattern, pattern
+
+    return [
+        o for o in r.doc().Objects
+        if component_pattern.is_component_pattern(o) and pattern.kind_of(o) == kind
+    ]
+
+
+def copies(step):
+    from fission180 import component_pattern
+
+    return component_pattern.copies(step)
+
+
+def pattern_open():
+    Gui.Selection.clearSelection()
+    h.click_empty()
+    h.fit()
+    ps.menu("Rectangular Pattern")
+
+
+pattern_open.done = lambda: ps.panel() is not None
+pattern_open.done_what = "the Rectangular Pattern dialog is open"
+
+
+def components_type(p, what):
+    h.check("%s: Pattern Type reads Components" % what, p.options["pattern_type"] == "components",
+            p.options["pattern_type"])
+    if p.options["pattern_type"] != "components":
+        bl.choose(p.pattern_type, "Components")
+
+
+def pattern_type():
+    p = ps.panel()
+    h.check("5 Rectangular Pattern open", p is not None and p.kind == "rectangular", p)
+    components_type(p, "5")
+
+
+def pattern_pick():
+    t.click_row("Finger")  # the whole subassembly: its browser row
+
+
+def pattern_direction():
+    p = ps.panel()
+    # the report: "component pattern picks the top-level and makes nothing"
+    h.check("5 the Finger subassembly is picked", p.options["objects"] == [(r.part("Finger"), "")],
+            [(o.Label, x) for o, x in p.options["objects"]])
+    ps.click_box("direction")
+
+
+def pattern_x():
+    h.fit()
+    h.click_edge(V(35, 0, 10))  # the palm's front top edge: it runs along X
+
+
+def pattern_values():
+    p = ps.panel()
+    d = p.options["direction"]
+    h.check("5 the palm's edge is the direction", d is not None and str(d[1]).startswith("Edge"), d)
+    ps.type_quantity(p.quantity, 4)
+    ps.type_value(p.distance_field.widget, "60")
+
+
+def pattern_ok():
+    p = ps.panel()
+    h.caught_up(p)
+    h.check("5 nothing wrong said", "⚠" not in p.message.text(), p.message.text())
+    h.task_button("OK")
+
+
+pattern_ok.done = lambda: ps.panel() is None
+pattern_ok.done_what = "the Rectangular Pattern dialog closed"
+
+
+def fingers():
+    """The four fingers: the Finger and the pattern's copies, in order."""
+    found = pattern_steps_of("rectangular")
+    return [r.part("Finger")] + (list(copies(found[0])) if found else [])
+
+
+def pattern_made():
+    found = pattern_steps_of("rectangular")
+    if not h.check("5 one Rectangular Pattern step", len(found) == 1, found):
+        return
+    made = copies(found[0])
+    h.check("5 three copies: Finger:2, Finger:3, Finger:4",
+            [x.Label for x in made] == ["Finger:2", "Finger:3", "Finger:4"], [x.Label for x in made])
+    for i, part in enumerate(fingers()):
+        k.box_is("5 finger %d stands %d mm along X" % (i + 1, 20 * i), part,
+                 [20 * i, 20, 0, 20 * i + 10, 80, 10])
+    rows = cs.children_of(["Finger:2"]) or []
+    h.check("5 a copy shows its two phalanges in the browser",
+            any(x.startswith("Proximal") for x in rows) and any(x.startswith("Distal") for x in rows), rows)
+    h.check("5 the timeline shows the pattern", any("Pattern" in x for x in r.timeline()), r.timeline())
+    r.no_open_step("Rectangular Pattern")
+    h.fit()
+    h.shot("5-four-fingers")
+
+
+def tips():
+    """How high each finger's tip stands."""
+    return [round(k.box(part)[5], 4) for part in fingers()]
+
+
+def knuckle2_driven():
+    h.caught_up(j.panel())
+    got = tips()
+    h.check("5 the second knuckle at 60 degrees: the first finger's tip is up or down by 25",
+            abs(abs(got[0] - 10) - 30 * 0.8660254) < 0.1 or abs(got[0] - 10) > 14, got)
+    # the copies are the same component (Fusion: every occurrence of a component shows its
+    # joints at the same value): the knuckle and its limits are theirs too
+    h.check("5 every finger bends the same (the knuckle is inherited by the copies)",
+            max(got) - min(got) < 1e-3 and abs(got[0] - 10) > 14, got)
+    h.shot("5-fingers-bent")
+
+
+def knuckle2_past():
+    h.caught_up(j.panel())
+    h.check("5 Drive Joints 120 stops at the knuckle's limit, 90", abs(angle("Revolute 2") - 90) < 1e-4,
+            angle("Revolute 2"))
+    got = tips()
+    h.check("5 ...on every finger", max(got) - min(got) < 1e-3, got)
+
+
+def fingers_straight():
+    got = tips()
+    h.check("5 Cancel: every finger is straight again", got == [10.0, 10.0, 10.0, 10.0], got)
+    r.no_open_step("Drive Joints")
+
+
+steps += [pattern_open, pattern_type, pattern_pick, pattern_direction, pattern_x, pattern_values]
+steps += [pattern_ok, pattern_made]
+steps += drive("Revolute 2", "60", "k2") + [knuckle2_driven]
+steps += [r.named(lambda: bodies_steps.type_value(j.panel().angle.widget, "120"), "k2_past_type")]
+steps += [knuckle2_past, r.named(cancel_drive, "k2_cancel"), fingers_straight]
 
 h.run("replay_16_robotic_hand", steps, paced_by="state")
