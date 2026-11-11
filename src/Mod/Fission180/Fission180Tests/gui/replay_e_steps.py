@@ -249,17 +249,19 @@ def xclick_px(pixel, held=()):
 
 def zoom_on(spot, width_in, name):
     """A step that zooms the view, as it is turned now, onto `spot` (a 3D point or a function
-    giving one) so that `width_in` inches fit across: a person rolls the wheel over it."""
+    giving one) so that `width_in` inches (or what a function gives) fit across: a person
+    rolls the wheel over it."""
 
     def step():
         target = spot() if callable(spot) else spot
+        width = width_in() if callable(width_in) else width_in
         cam = h.view().getCameraNode()
         rot = App.Rotation(*cam.orientation.getValue().getValue())
         back = rot.multVec(V(0, 0, 1))
         eye = target + back * 500.0
         cam.position.setValue((eye.x, eye.y, eye.z))
         gl = h.gl_widget()
-        cam.height.setValue(width_in * IN * gl.height() / float(max(1, gl.width())))
+        cam.height.setValue(width * IN * gl.height() / float(max(1, gl.width())))
         QtWidgets.QApplication.processEvents()
         h.view_still()
 
