@@ -85,10 +85,18 @@ stop it. The Fire Piston's "preview kept the app busy for more than 30 s" is the
 
 ### After
 
-| case | dialog answers after typing the quantity | OK to closed dialog | window's memory |
+| case | the dialog answers after the quantity is typed | OK to closed dialog | what it was before |
 |---|---|---|---|
-| Geocache knurl with the thread, 25 | 0.6 - 0.9 s (was 30 - 40 s a value) | 55 - 65 s wall under the other builders' load (the same boolean, in the other program; 38 s of processor) | unchanged (the 830 MB are the other program's) |
-| Metric Bolt, 40 straight knurls | 1.6 s, built live | at once | |
+| Geocache knurl with the thread, 25 | 0.6 - 0.9 s, 24 shaded copies | 55 - 65 s wall under the other builders' load, 38 s of processor (the same one boolean, in the other program) | 30 - 40 s for every value shown, in the window's process |
+| Fire Piston knurl as the book lays it (along X, X axis), 6 | 0.8 s, 5 shaded copies | 29 s (the build outside 22 s; 47 s of processor) | every value shown built: "> 30 s" in the report |
+| Metric Bolt, 40 straight knurls | 1.6 s, built live | at once | the same |
+
+The window's memory no longer grows with the build (the 830 MB are the other program's and
+go back to the system when it ends). Redo of the knurl: no build (was 44 s).
+
+The Fire Piston laid along Z with the pattern about Z (the benchmark's `firepiston`) is a
+harder solid than the book's (538 faces, 96 s of processor against 202 faces, 47 s): the
+grooves start at another angle and cross more often. Both are in the benchmark.
 
 ## 2. Hole "From Sketch (Multiple Holes)", 5 holes, ~60 s
 
@@ -113,18 +121,159 @@ Ekins on `isExecutedWhenPreEmpted`) and the new dialog took the first one's pick
 selection: a second section on the same plane, without a click. The new dialog now waits
 for its own plane (`section_ui.start`).
 
-(More below as the items are done.)
+## 3. A pattern of bodies follows its quantity parameter
+
+- Reproduced: "A pattern of bodies takes a plain number as its quantity" (3.3.9), then the
+  number taken once (first pass).
+- Fusion: the book types the parameter as Quantity (Book).
+- Cause: every copy is a body of its own (objects of the design), and no recompute may add
+  or remove objects.
+- Fix: the step keeps the formula (`round(...)` on its Quantity, like a pattern of
+  features); `pattern.follow_counts` matches the copy bodies to the count after every
+  recompute (`timeline_ops.settle`; without the GUI an observer does it). In Change
+  Parameters the dialog's undo step is still open when that runs, so one Ctrl+Z takes the
+  parameter and the bodies back; an undo of the parameter from anywhere brings the copies
+  back to the old count the same way. The copies roll back with the marker and go with
+  the step, as before.
+- Proof: `book_modifyc_pattern_quantity` (58 checks: 6, 8, undo, redo, 4, the marker, Edit
+  Feature, back to nothing and forward again), golden `book_pattern_bodies_follow_quantity`
+  (3 -> 5 -> 2 bodies, hand-derived), `patterns_params` updated.
+- Not done: a pattern of COMPONENTS still takes a plain number (components' file).
+
+## 4. Bug 18: the orphan step after an undo
+
+- (a) Reproduced, with real input, in `book_modifyc_undo_in_dialog` before the fix: the
+  toolbar's Undo with the **Fillet** dialog open put "Fillet" on the Redo list and Redo
+  brought the preview back as the step "Fillet 1"; with Combine and only its target picked
+  the Undo took away the step BEFORE the command under the open dialog. Only the Ctrl+Z
+  key was caught, and only by the dialogs that make a `preview.UndoCancels` (Fillet,
+  Draft, Shell, Scale and others have none).
+- Fusion: not found what Ctrl+Z does inside one of its own dialogs (Guess: Undo is not
+  offered there). An add-in's command is run when another command ends it (Autodesk
+  forum, Brian Ekins, `isExecutedWhenPreEmpted`).
+- Fix: `commands.make_way_for` (the one door of the toolbar, the menus and the shortcuts)
+  asks `preview.dialog_takes` for Undo / Redo: with a dialog open, Undo cancels the command
+  (its `reject()`), Redo does nothing, FreeCAD's Undo does not run. Should FreeCAD's own
+  Undo still reach a design under a dialog, the dialog's unfinished step is dropped from
+  the Redo list (`preview._drop_redo`: FreeCAD has no call for it; the first change of a
+  new step empties the list, so an object is added in a step that is then aborted).
+- Proof: `book_modifyc_undo_in_dialog` (59 checks: Combine with a target only, Combine,
+  Extrude, Fillet, Rectangular Pattern, Hole, and Combine with the key), and the first
+  pass's guard `book_modify_combine_undo` (51 checks) still passes.
+- (b) "One drag + undo froze the app for about 80 s" (line 421): **not rebuilt**. What was
+  found on the way and removes a freeze of that kind: every Redo of a step that made a new
+  feature built the feature again (`undo_fast`: 44 s for the knurl), fixed. The report's
+  frame of 36 patterned sketch areas with a run of sketch undos before the extrude was not
+  rebuilt in this pass.
+
+## 5. Section Analysis listed twice
+
+Reproduced with real input: Section Analysis pressed again while its dialog is open keeps
+the first section (Fusion also runs a command that another one ends: Autodesk forum, Brian
+Ekins) and the new dialog took the first one's pick as its own selection: a second section
+on the same plane, without a click. The new dialog now waits for its own plane
+(`section_ui.start`). `book_modifyc_section`, 28 checks. The same pattern (a command
+reading the selection an open dialog made) may sit in `com_ui`, `interference_ui` and
+`surface_analysis_ui`: not walked.
+
+## 7. The hole position box showing "-55 um"
+
+The dot's drag was rounded to a micrometre. Now a drag lands on the smallest clean step of
+the design's unit that is at least two pixels on the screen (`hole_snaps_core.drag_step`,
+unit tested; Guess for what Fusion does). `book_modifyc_hole_drag`, 27 checks. FreeCAD's
+value box still shows a typed length below 0.1 mm in micrometres: that is
+`taskui.DistanceField` (params / shell).
+
+## 9. Mirror in an assembly
+
+`book_modifyc_mirror_assembly` (40 checks): with the Arm (a component inside a component)
+active, Mirror of its body (the image goes into the Arm) and of a feature; with the root
+active and solids only in components, Mirror starts, takes the body and makes the image.
+No code change was needed (components' `pattern_ui.start`).
+
+## The orchestrator's additions
+
+- **GitHub's failures on develop** (049c500b):
+  - `hole_tapped`, `hole_qa_more`: the Hole dialog shared the Thread tool's size rule,
+    which the first pass changed to "the nearest nominal size" (right for Thread: Autodesk).
+    A 5 mm Simple hole made Tapped is drilled 5 mm and is M6x1:
+    `hole_tables.size_for_drill`, used by `hole_ui._tap_type_changed`. In Fusion's Hole
+    dialog the thread size is picked and the diameter follows.
+  - `book_modify_combine_undo`: `parameters.add_user(doc, "Thickness", "", "2.5 mm")`: a
+    unitless parameter can no longer take a length; the scenario now makes it in mm. Its
+    guard is alive: 51 checks.
+  - `patterns_qa_paths`: params' wording ("There is no parameter named 'abc'") and a
+    length formula kept with its unit ("4 mm * pi"): the checks follow.
+  - `surface4_qa`: bisected with that one scenario: green at 4cb179bd, red at 8b2663f2
+    (the first modify merge). `timeline_ops.uses` no longer counts a step's `Picks` on the
+    step before it as a dependency (as a fillet's edges never were), so Suppress on the
+    surface Press Pull no longer switches the Delete Face after it off; the Delete Face
+    finds its wall again (it was there before the pull) and stays on. The check now
+    expects the filleted box without that wall (1415.19 = 1585.19 - 170). 88 checks.
+- **Timeline Delete on a step that made a component**: Hardware fixed (`timeline_ops.delete`
+  hands it to `hardware.remove`, one undo step); a pattern of a component and a component's
+  own step already took their components (checked); a pasted occurrence has no step; Insert
+  of another design not walked. `book_modifyc_delete_component_steps`, 31 checks.
+- **Symmetric: Quantity each side or in all**: **not changed**. Sources: Autodesk's help is
+  ambiguous for the sketch pattern and silent on the count for solids ("Symmetric
+  distributes pattern instances symmetrically in two directions from the source object");
+  the book's example is a sketch pattern (Quantity 5: five holes); an Autodesk Learn
+  video only "increases the number to five". No source says what the solid pattern does.
+  A change to "in all" touches `pattern_core` (linear_offsets, circular_angles,
+  symmetric_walk_terms, instance_count), the expressions of FreeCAD's pattern steps
+  (`pattern._symmetric_list_expression`), `component_pattern.all_moves`, the handles of
+  the dialog, the stored meaning of every existing symmetric step (a version on the step,
+  converted on edit), six golden models and four scenarios. It needs a whole pass and, for
+  an even quantity, a decision (sketch-b guessed "the extra copy on the + side").
+
+## Not done (with what is known)
+
+- **6. Seams after a kept split face**: not started (the first pass's note stands: the
+  steps in question are FreeCAD's own features; it needs a hidden follower step that draws
+  the kept split lines again on the refined result).
+- **8. Scratch documents take the design's units**: none of this builder's files makes a
+  hidden document; `drafting._scratch_document` is in `drafting.py` (modify-b's by the
+  file rule `draft*`).
+- **Compute Option**: Optimized and Identical still give the same solid by the same route
+  (one boolean of the tools' copies); a face-patterning Optimized was measured (the unit
+  cell) and is far slower in OpenCASCADE.
+
+## FreeCAD facts and traps
+
+- A boolean of many crossing swept grooves is dominated by B-spline surface intersections:
+  about 0.15 s a crossing for short grooves, 2 s for 1.5-turn ones. Fusing copies that meet
+  along coincident B-spline faces (unit cells) is slower by an order of magnitude, and
+  Refine does not merge B-spline pieces that come from rotated copies.
+- `shape.cut([many])` already runs OpenCASCADE's parallel mode (processor time above wall
+  time).
+- After a modal window opened from inside a recompute closes, no window is active where
+  there is no window manager (Xvfb): the next key goes nowhere. Activate the main window
+  and give the focus back (`pattern_progress._Window.close`).
+- `doc.openTransaction()` alone does not empty the Redo list; the first change inside the
+  step does.
+- A Redo brings a removed object back without a Shape signal and marked touched.
+- FreeCAD's toolbar Undo with a pending transaction: commits it and undoes it (it lands on
+  the Redo list); with a pending transaction that holds no change it undoes the step before.
+- FreeCAD's modeled thread in a Hole of size M1 gives an invalid body of two solids.
 
 ## Changelog lines
 
 - A pattern with many swept copies (a knurl) no longer freezes the dialog: it shows shaded copies while you type and builds the real ones once, when you press OK.
-- A long pattern build shows a small window that says what is being built and for how long, with a Cancel button.
+- A long pattern build shows a small window that says what is being built and for how long, with a Cancel button, and Fission 180 stays responsive meanwhile.
 - Ctrl+Y (Redo) of a step no longer builds that step a second time.
-- Hole > From Sketch with several modeled threads shows the holes at once and cuts the threads when you press OK.
-- Pressing Section Analysis again while its dialog is open no longer makes a second section on the same plane.
 - A pattern of bodies follows a parameter typed as its Quantity: change the parameter and bodies are added or taken away.
+- Undo pressed while a command's dialog is open now cancels that command, in every dialog; Redo no longer brings a half-made step back (the "orphan Combine 1" kind of step).
+- Hole > From Sketch with several modeled threads shows the holes at once and cuts the threads when you press OK.
+- A Simple hole of 5 mm made Tapped is M6x1 again (its diameter is the tap drill).
+- A hole dragged by its blue dot lands on clean values (no more "-55 um" in the position box).
+- Pressing Section Analysis again while its dialog is open no longer makes a second section on the same plane.
+- Deleting a Hardware step in the timeline takes the part's component, its holes and its joint with it; Ctrl+Z brings all back.
 
 ## Known issues
 
-- A knurl of 25 crossing grooves still takes the geometry kernel about half a minute to build once you press OK (the Fire Piston's long grooves: more than a minute). You can keep the window open and cancel; Fusion does this in seconds.
+- A knurl of 25 crossing grooves still takes the geometry kernel about half a minute to build once you press OK (Fusion does it in seconds). The window stays usable and you can cancel.
+- With Symmetric, a pattern of features, bodies or components counts the Quantity on each side (3 gives 5), while a sketch pattern counts all instances (5 gives 5).
+- After a Split Face, a later feature that would have merged the split away is built without tidying its faces, so a thin seam line can show where it lands flush on an older face.
+- A pattern of components does not take a parameter as its Quantity.
 - A tapped hole of size M1 with Modeled ticked gives a broken body: untick Modeled for threads that small.
+- A length below 0.1 mm typed into a value box is shown in micrometres.
