@@ -433,6 +433,44 @@ def h_read():
     h.check("H it is said", "Exported 1 file" in m.told(), m.told())
 
 
+def h_painted_faces():
+    """A body with one face painted (the Donut's icing): the file holds it as two meshes,
+    one per colour, together the whole body."""
+    from fission180 import export, export_usd
+
+    cube = doc().getObject("Body001")
+    vobj = cube.ViewObject
+    faces = len(cube.Shape.Faces)
+    looks = []
+    for index in range(faces):
+        top = index == faces - 1
+        looks.append(
+            App.Material(
+                DiffuseColor=(1.0, 0.9, 0.1) if top else (0.2, 0.4, 0.9),
+                Transparency=0.0,
+            )
+        )
+    vobj.ShapeAppearance = looks
+    h.check("H one look per face on the cube", len(export.body_looks(cube)) == faces, faces)
+    path = os.path.join(s["out"], "Painted.usdz")
+    written = export.export_mesh_files(doc(), [cube], "USDZ", path)
+    h.check("H the painted cube is written", os.path.isfile(path) and written[0][1] == 12, written)
+    info = export_usd.read_usdz(path)
+    names = [m["name"] for m in info["meshes"]]
+    h.check("H ... as one mesh per colour", names == ["Cube", "Cube (2)"], names)
+    counts = sorted(m["triangles"] for m in info["meshes"])
+    h.check("H ... 10 triangles blue, 2 yellow", counts == [2, 10], counts)
+    h.check("H ... two looks", len(info["looks"]) == 2, info["looks"])
+    yellow = [m for m in info["meshes"] if m["triangles"] == 2]
+    color = yellow[0]["color"] if yellow else ()
+    h.check(
+        "H ... the painted face is yellow",
+        len(color) == 3 and abs(color[0] - 1.0) < 0.01 and abs(color[2] - 0.1) < 0.01,
+        color,
+    )
+    h.check("H ... still aligned and stored", info["aligned"] and info["stored"])
+
+
 # -- I ---------------------------------------------------------------------------------------
 def mesh_dialog():
     from fission180 import export_ui
@@ -572,6 +610,7 @@ h.run(
         h_type,
         h_export,
         h_read,
+        h_painted_faces,
         i_menu,
         i_look,
         i_send,
