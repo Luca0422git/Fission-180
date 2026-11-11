@@ -163,6 +163,31 @@ def browser_labels():
     return browser_ui.widget().labels()
 
 
+def key(letter, modifiers=QtCore.Qt.NoModifier):
+    """A key pressed with the pointer over the 3D view (E, F, D, Ctrl+Z...). The test
+    screen has no window manager: after a dialog in a window of its own (the look editor,
+    Export) nothing makes the main window the active one again, as a desktop does when the
+    dialog closes, and a key's command then never starts. So the main window is made the
+    active one first."""
+    main = Gui.getMainWindow()
+    if QtWidgets.QApplication.activeWindow() is not main:
+        main.activateWindow()
+        h.wait_for(
+            lambda: QtWidgets.QApplication.activeWindow() is main, "the main window to be active"
+        )
+    h.press(letter, modifiers)
+
+
+def checkpoint(name):
+    """While a replay is being written: REPLAY_SAVE=<folder> keeps a copy of the design
+    here, for a probe to start from. Does nothing in a test run."""
+    import os
+
+    folder = os.environ.get("REPLAY_SAVE")
+    if folder:
+        doc().saveCopy(os.path.join(folder, name + ".FCStd"))
+
+
 def keyboard(text="", key=None):
     """Type like a keyboard: every key goes to the widget that has the keyboard then."""
     for char in text:
