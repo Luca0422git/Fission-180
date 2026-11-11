@@ -89,10 +89,11 @@ class _SearchKeys(QtCore.QObject):
 
 
 def design_is_inch(doc):
+    """True for a design whose units are inches or feet (the dialog then starts in Inch)."""
     try:
-        from . import insert
+        from . import browser_core
 
-        return insert.design_unit(doc) in ("Inch", "Foot")
+        return browser_core.doc_length_unit(doc) in ("in", "ft")
     except Exception:
         return False
 
@@ -116,6 +117,7 @@ class HardwarePanel(Panel):
         self.manual_sink = False
         self.auto_hole_off = False  # "Make the hole too" was unticked by a click on a hole
         self.note = ""
+        self.user_system = None  # the Units the person chose by hand in this dialog
         self.last_click = None
         self.error = ""
         self.found = []
@@ -447,6 +449,7 @@ class HardwarePanel(Panel):
         if self._quiet:
             return
         system = self.system.currentData()
+        self.user_system = system
         now = core.std(self.options["standard"])
         found = core.standards(now["kind"], system)
         if not found:
@@ -458,8 +461,11 @@ class HardwarePanel(Panel):
     def _kind_changed(self, *_):
         if self._quiet:
             return
+        # another kind of part comes in the units the person chose in Units, else in the
+        # design's units (an inch O-ring looked up in a metric design does not turn the
+        # bearings that follow into inch ones)
         kind = self.kind.currentData()
-        system = core.system_of(self.options["standard"])
+        system = self.user_system or ("inch" if design_is_inch(self.doc) else "metric")
         found = core.standards(kind, system) or core.standards(kind)
         self._switch(found[0][0])
 

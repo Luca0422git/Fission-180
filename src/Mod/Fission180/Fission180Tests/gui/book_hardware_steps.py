@@ -184,7 +184,11 @@ def box_of(component):
     """The box of a component's solids in the design: [x0, y0, z0, x1, y1, z1], rounded."""
     from fission180 import joints
 
-    b = joints.part_shape(component).BoundBox
+    shape = joints.part_shape(component)
+    try:  # the tight box (the plain one is loose around a torus or a rounded edge)
+        b = shape.optimalBoundingBox(False, False)
+    except Exception:
+        b = shape.BoundBox
     return [round(v, 4) for v in (b.XMin, b.YMin, b.ZMin, b.XMax, b.YMax, b.ZMax)]
 
 
