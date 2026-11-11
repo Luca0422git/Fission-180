@@ -266,6 +266,29 @@ def new_body_in(doc, container, label=None):
     return body
 
 
+def body_beside(body):
+    """An empty body in ``body``'s component, standing where ``body`` stands, for new work
+    that must not go into ``body`` (wave 7, fix-9: a sketch or a construction on an origin
+    plane while ``body`` is hidden; FreeCAD would draw it through the hidden body, so it
+    never showed). A body nothing was ever put in (is_unused) is taken first, else a new
+    one is made. It becomes the active body. Call it inside the command's undo step."""
+    doc = body.Document
+    home = container_of(body)
+    free = [b for b in bodies_in(doc, home) if b is not body and is_unused(b)]
+    new = free[0] if free else new_body_in(doc, home)
+    try:
+        if not new.Placement.isSame(body.Placement, 1e-12):
+            new.Placement = body.Placement  # (the origin squares stood at body's frame)
+    except Exception as exc:
+        warn("%s: could not line the new body up: %s" % (new.Label, exc))
+    doc.recompute()
+    try:
+        activate_body(new)
+    except Exception as exc:
+        warn("could not activate %s: %s" % (new.Label, exc))
+    return new
+
+
 def body_for_new(src_body, component=False):
     """The body a feature's New Body / New Component result goes into: a new body in the
     ACTIVE component, or a new body inside a new component under the active component.
