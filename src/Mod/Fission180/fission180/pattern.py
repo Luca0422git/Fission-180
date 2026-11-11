@@ -644,7 +644,9 @@ def _sync_followers(feature, kind=None, options=None):
         from . import modify_bodies
 
         others = _bodies(options)[1:]
-        modify_bodies.sync(feature, [(b, None) for b in others], modify_bodies.MirrorFollower, "Mirror")
+        modify_bodies.sync(
+            feature, [(b, None) for b in others], modify_bodies.MirrorFollower, "Mirror"
+        )
         return
     from . import pattern_adjust
 
@@ -962,7 +964,9 @@ def set_note(obj, text):
         if not text:
             return
         # 4 = hidden, 16 = changing it does not mark the step for recompute
-        obj.addProperty("App::PropertyString", WARNING_PROP, "Fission180", "Timeline warning", 4 | 16)
+        obj.addProperty(
+            "App::PropertyString", WARNING_PROP, "Fission180", "Timeline warning", 4 | 16
+        )
     if getattr(obj, WARNING_PROP) != text:
         setattr(obj, WARNING_PROP, text)
 
@@ -1383,9 +1387,12 @@ class PatternFeature:
             center = objects_center(options)[0] if kind == "path" else None
             moves = placements(kind, options, tools, center)
             if adjusts(options):
-                obj.Shape = _adjusted(obj, base.Shape, moves)
+                shape = _adjusted(obj, base.Shape, moves)
+            elif tools:
+                shape = apply_tools(base.Shape, tools, moves, kind, refine=obj.Refine)
             else:
-                obj.Shape = apply_tools(base.Shape, tools, moves, kind, refine=obj.Refine)
+                shape = base.Shape.copy()  # only Split Faces are repeated
+            obj.Shape = repeat_splits(obj, shape, moves)
         except PatternError:
             raise
         except Exception as exc:
@@ -1663,7 +1670,7 @@ def engine_tools(obj, options, base):
     tools = []
     for feature in obj.Originals:
         tools += feature_tools(feature)
-    if not tools:
+    if not tools and not split_originals(obj):
         raise PatternError("Select the features to pattern.")
     return tools
 
@@ -1688,6 +1695,8 @@ def feature_tools(feature):
             tool = None
         if tool is not None and not tool.isNull() and tool.Solids:
             return [(tool.copy(), "cut" if is_subtractive(feature) else "add")]
+    if _divides_faces(feature):
+        return []  # a Split Face: its lines are drawn on each copy (repeat_splits)
     before_obj = getattr(feature, "BaseFeature", None)
     after = feature.Shape
     if before_obj is None or before_obj.Shape.isNull():
@@ -1705,6 +1714,55 @@ def feature_tools(feature):
             "%s does not change the part, so there is nothing to repeat." % (feature.Label)
         )
     return tools
+
+
+def _divides_faces(feature):
+    """True for a Split Face step: it changes no volume, it draws edges on faces."""
+    try:
+        from . import split_face
+
+        return split_face.is_split_face(feature)
+    except Exception:
+        return False
+
+
+def split_originals(obj):
+    """The Split Face steps among the features a pattern / mirror of features repeats."""
+    try:
+        if _enum_get(obj, "PatternType") != "features":
+            return []
+        return [f for f in obj.Originals if alive(f) and _divides_faces(f)]
+    except Exception:
+        return []
+
+
+def repeat_splits(obj, shape, moves):
+    """Fusion patterns a Split Face with the other features (the book's Saturn V: the fins
+    of every copy are split, so each can be painted in two colours; Fission 180 said "Split
+    Face 3 does not change the part, so there is nothing to repeat" and refused the whole
+    pattern). The lines each picked Split Face drew are drawn again on each copy. The
+    pattern is then a step that keeps splits (split_face.keep_splits)."""
+    from . import split_face
+
+    splits = split_originals(obj)
+    flag = split_face.SPLITS
+    try:
+        if splits and flag not in obj.PropertiesList:
+            obj.addProperty("App::PropertyBool", flag, "Base", "", 4)
+        if flag in obj.PropertiesList and bool(getattr(obj, flag)) != bool(splits):
+            setattr(obj, flag, bool(splits))
+    except Exception:
+        pass
+    if not splits:
+        return shape
+    edges = []
+    for feature in splits:
+        if _suppressed(feature):
+            continue
+        made = split_face.made_edges(feature)
+        for move in moves:
+            edges += [_moved(edge, move) for edge in made]
+    return split_face.imprint(shape, edges)
 
 
 def apply_tools(base_shape, tools, moves, kind, refine=True):
@@ -2570,7 +2628,9 @@ class BodyPatternFeature:
         add("App::PropertyIntegerList", "SuppressedCopies", "Copies left out (Suppression)")
         # 4 = hidden, 16 = changing it does not mark the step for recompute
         if WARNING_PROP not in obj.PropertiesList:
-            obj.addProperty("App::PropertyString", WARNING_PROP, "Fission180", "Timeline warning", 20)
+            obj.addProperty(
+                "App::PropertyString", WARNING_PROP, "Fission180", "Timeline warning", 20
+            )
         # Rolls back with the history marker (timeline_core): its copies hide while it does.
         if "Fission180Rolls" not in obj.PropertiesList:
             obj.addProperty("App::PropertyBool", "Fission180Rolls", "Base", "", 4)

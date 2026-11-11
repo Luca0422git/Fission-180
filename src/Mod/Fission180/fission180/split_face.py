@@ -69,6 +69,185 @@ def is_split_face(obj):
     return bodies.kind(obj) == FISSION180_TYPE
 
 
+# -- a split stays split ------------------------------------------------------------------------
+# Fusion keeps a split face split whatever comes after it. FreeCAD's Refine (on for every
+# step, so that no seam shows where two faces lie in one plane) merges faces of one plane or
+# one cylinder again: the book's Saturn V lost its split band at the next Extrude, and with
+# it the band's colour (book parity report, page 20). The kernel has no way to mark an edge
+# "keep" (ModelRefine joins any two neighbouring faces on the same surface), so the steps
+# after a Split Face in its body are built without Refine: the split stays, and a seam can
+# show where one of those later steps lands flush on an older face (the lesser evil; it goes
+# when the Split Face is deleted or suppressed: Refine comes back).
+KEPT = "Fission180SplitKept"  # hidden: this step's Refine was switched off to keep a split
+SPLITS = "Fission180RepeatsSplits"  # hidden: a pattern / mirror that repeats a Split Face
+
+
+def _keeps_a_split(obj):
+    """True for a step that divides faces and must stay divided: a Split Face, or a pattern
+    that repeats one."""
+    if is_split_face(obj):
+        return True
+    try:
+        return bool(getattr(obj, SPLITS, False))
+    except Exception:
+        return False
+
+
+def _suppressed(obj):
+    try:
+        return bool(getattr(obj, "Suppressed", False))
+    except Exception:
+        return False
+
+
+_KEEPER = {"observer": None, "busy": False}
+
+
+def _set_refine(obj, seen):
+    """One step: Refine off (and marked) after a split, on again when it was off for one
+    that is gone. True when it changed."""
+    if "Refine" not in obj.PropertiesList or is_split_face(obj):
+        return False
+    marked = KEPT in obj.PropertiesList and bool(getattr(obj, KEPT))
+    busy = _KEEPER["busy"]
+    _KEEPER["busy"] = True
+    try:
+        if seen and obj.Refine:
+            if KEPT not in obj.PropertiesList:
+                obj.addProperty("App::PropertyBool", KEPT, "Base", "", 4)
+            setattr(obj, KEPT, True)
+            obj.Refine = False
+            return True
+        if not seen and marked:
+            setattr(obj, KEPT, False)
+            if not obj.Refine:
+                obj.Refine = True
+            return True
+    except Exception:
+        return False
+    finally:
+        _KEEPER["busy"] = busy
+    return False
+
+
+def _split_before(obj):
+    """True when a step that keeps a split comes before `obj` in its body's history."""
+    step = getattr(obj, "BaseFeature", None)
+    for _ in range(100000):
+        if step is None:
+            return False
+        if _keeps_a_split(step) and not _suppressed(step):
+            return True
+        step = getattr(step, "BaseFeature", None)
+    return False
+
+
+class _Keeper:
+    """Document observer: a step made, moved or switched after a Split Face loses its
+    Refine at once (FreeCAD 1.1 has no "before recompute" signal for Python: the step's own
+    change is the moment)."""
+
+    def slotChangedObject(self, obj, prop):
+        if _KEEPER["busy"] or prop not in ("Refine", "BaseFeature", "Suppressed", SPLITS):
+            return
+        try:
+            doc = obj.Document
+            if getattr(doc, "Restoring", False) or getattr(doc, "Transacting", False):
+                return
+            if prop in ("Refine", "BaseFeature"):
+                if "Refine" in obj.PropertiesList and "BaseFeature" in obj.PropertiesList:
+                    _set_refine(obj, _split_before(obj))
+            if _keeps_a_split(obj) or prop == SPLITS:
+                # a Split Face put in, taken out or switched: the steps after it
+                step, later = obj, []
+                body = bodies.body_of(obj)
+                group = list(body.Group) if body is not None else []
+                if obj in group:
+                    later = group[group.index(obj) + 1 :]
+                for step in later:
+                    if "BaseFeature" in step.PropertiesList:
+                        _set_refine(step, _split_before(step))
+        except Exception:
+            pass
+
+
+def install():
+    """Watch every design for steps after a Split Face (once)."""
+    if _KEEPER["observer"] is None:
+        _KEEPER["observer"] = _Keeper()
+        App.addDocumentObserver(_KEEPER["observer"])
+
+
+def keep_splits(doc):
+    """Switch Refine off on the steps after a Split Face in its body (and on again where no
+    Split Face is before them any more): the whole design at once (after a recompute, an
+    undo, a file opened: timeline_ops.settle). True when a step changed."""
+    changed = False
+    for body in doc.Objects:
+        if body.TypeId != "PartDesign::Body":
+            continue
+        seen = False
+        for obj in body.Group:
+            if "BaseFeature" not in obj.PropertiesList:
+                continue
+            if _keeps_a_split(obj) and not _suppressed(obj):
+                seen = True
+                continue
+            if _set_refine(obj, seen):
+                changed = True
+    return changed
+
+
+def made_edges(feature):
+    """The edges a Split Face step drew on its faces (body coordinates): the edges of its
+    solid that the solid before it does not have. A pattern or mirror of features repeats
+    them (pattern.py)."""
+    base = getattr(feature, "BaseFeature", None)
+    if base is None or base.Shape.isNull() or feature.Shape.isNull():
+        return []
+
+    def key(edge):
+        try:
+            mid = edge.valueAt((edge.FirstParameter + edge.LastParameter) / 2.0)
+        except Exception:
+            mid = edge.CenterOfMass
+        return (round(mid.x, 5), round(mid.y, 5), round(mid.z, 5), round(edge.Length, 5))
+
+    old = {key(e) for e in base.Shape.Edges}
+    found, seen = [], set()
+    for edge in feature.Shape.Edges:
+        k = key(edge)
+        if k in old or k in seen:
+            continue
+        seen.add(k)
+        found.append(edge.copy())
+    return found
+
+
+def imprint(shape, edges):
+    """`shape` (a solid) with `edges` drawn on its faces (the edges that lie on them divide
+    them; the others change nothing). The solid itself when nothing can be drawn."""
+    import Part
+
+    edges = [e for e in edges if e is not None and not e.isNull() and e.Length > 1e-6]
+    if not edges or shape.isNull() or not shape.Solids:
+        return shape
+    try:
+        result, _map = shape.generalFuse([Part.makeCompound(edges)])
+    except Exception:
+        return shape
+    solids = [s for s in result.Solids if s.Volume > TOL]
+    if len(solids) != len(shape.Solids) or not solids:
+        return shape
+    out = solids[0] if len(solids) == 1 else Part.makeCompound(solids)
+    try:
+        if not out.isValid() or abs(out.Volume - shape.Volume) > 1e-6 * max(1.0, shape.Volume):
+            return shape
+    except Exception:
+        return shape
+    return out
+
+
 # -- geometry ----------------------------------------------------------------------------------
 def _global(obj, element):
     """``element`` (a shape of ``obj``) in design coordinates."""
@@ -337,6 +516,10 @@ class SplitFaceFeature:
             obj.SplitType = "surface"
         add("App::PropertyLinkSubGlobal", "Direction", "Along Vector's direction")
         bodies.mark(obj, FISSION180_TYPE)
+        try:
+            install()  # the steps after a Split Face keep it split (also without the GUI)
+        except Exception:
+            pass
 
     def onDocumentRestored(self, obj):
         self.ensure_properties(obj)

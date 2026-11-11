@@ -139,6 +139,8 @@ def settle(doc):
             repaired = repair_references(doc)
             if _resolve_patterns(doc) or repaired:
                 doc.recompute()
+            if _keep_splits(doc):
+                doc.recompute()
             if _follow_faces(doc):
                 doc.recompute()
             _pass_through_failures(doc)
@@ -147,6 +149,17 @@ def settle(doc):
         follow_mesh_steps(doc)  # after an undo, a step added or deleted: mesh steps' sides
     finally:
         _settling.discard(doc.Name)
+
+
+def _keep_splits(doc):
+    """A split face stays split (split_face.keep_splits): the steps after it in its body
+    are built without Refine. True when a step changed."""
+    try:
+        from . import split_face
+
+        return split_face.keep_splits(doc)
+    except Exception:
+        return False
 
 
 def _follow_faces(doc):
@@ -312,6 +325,12 @@ def install_guard(defer=None):
     from . import picks, sketch_area_fill
 
     install_marker_inserts()
+    try:
+        from . import split_face
+
+        split_face.install()  # a split face stays split under the steps after it
+    except Exception:
+        pass
     picks.install()  # picked edges / faces kept when FreeCAD loses their names
     sketch_area_fill.install()  # sketch areas FreeCAD cannot make (a line through a circle)
     if _guard["observer"] is None:

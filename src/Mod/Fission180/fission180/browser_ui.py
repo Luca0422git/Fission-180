@@ -299,6 +299,7 @@ def _objects(doc):
                     else None
                 ),
                 "role": getattr(obj, "Role", None),
+                "helper": getattr(obj, "Fission180Role", ""),  # made for a step (a Hole's sketch)
                 "fission180_type": getattr(obj, "Fission180Type", ""),
                 # The component the row is in (None: the root); a component's own row
                 # carries its parent component, like any other member.
@@ -2672,7 +2673,9 @@ class _OverlayGuard(QtCore.QObject):
     def eventFilter(self, obj, event):
         try:
             if event.type() == QtCore.QEvent.ParentChange and _state.get("dock") is obj:
-                QtCore.QTimer.singleShot(0, lambda: _state.get("dock") is obj and _out_of_overlay(obj))
+                QtCore.QTimer.singleShot(
+                    0, lambda: _state.get("dock") is obj and _out_of_overlay(obj)
+                )
         except Exception:
             pass
         return False
@@ -2706,7 +2709,9 @@ def _give_back_overlays():
     kept = _state.pop("overlays", None) or {}
     for area, names in kept.items():
         try:
-            App.ParamGet(OVERLAY_PARAMS + area).SetString("Widgets", "".join(n + "," for n in names))
+            App.ParamGet(OVERLAY_PARAMS + area).SetString(
+                "Widgets", "".join(n + "," for n in names)
+            )
         except Exception as exc:
             warn("browser: overlay %s: %s" % (area, exc))
 

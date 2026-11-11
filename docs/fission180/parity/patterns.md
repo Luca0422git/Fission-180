@@ -238,3 +238,13 @@ decimal point typed with the mouse over the 3D view goes into the box of the han
 or hovered (else the main one), with its text selected (`taskui.TypeOverView`; FreeCAD's view
 keys 0-6 no longer turn the view while the dialog is open). Which handle a digit goes to is
 Fission 180's guess at Fusion's rule.
+
+## Wave 7, the book parity report (2026-11-11)
+
+| Behaviour | Source | Fission 180 now |
+|---|---|---|
+| A Circular / Rectangular Pattern of features repeats a Split Face among them (Saturn V: every copy's fin is split) | Book | `pattern.repeat_splits`: the lines each picked Split Face drew are drawn on each copy. It refused the whole pattern ("does not change the part, so there is nothing to repeat") |
+| A split face stays split under later features | Book (page 20) / every-day Fusion | The steps after a Split Face in its body are built without Refine (`split_face.keep_splits`): FreeCAD's Refine has no way to keep one edge. A seam can show where a later step lands flush on an older face; Refine comes back when the Split Face is deleted or suppressed |
+| Directions are picked on edges | Book (Play Brick). Whether Fusion takes a flat face as a direction at all: Guess (Fission 180 does, by its normal) | A click a few pixels beside a straight edge of the face it hit means that edge (`PatternPanel._edge_meant`, 12 px) |
+| Quantity takes a parameter | Book (Metric Bolt: a pattern of bodies with Quantity = "Quantity") | Features and faces: as before (the formula is kept). Bodies: the number the formula gives now is taken and the dialog says that it is kept as a number (each copy is a body of its own); it was refused |
+| Performance of a 25x pattern of two crossing swept grooves (the knurl) | Book ("Fusion does this in seconds") | 30-40 s on the test machine, built once per value shown, not again by OK (scenario `book_modify_knurl`). One boolean of all copies is the fastest route measured (27 s; one by one 55 s; in batches of copies that do not touch 31 s): the time is the kernel crossing 50 swept B-spline grooves. Fusion's "Optimized" (pattern the faces) is not built |
