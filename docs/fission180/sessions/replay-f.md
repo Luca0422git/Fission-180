@@ -43,7 +43,84 @@ of another component; the pins are not cut); Start > Offset for the second layer
 As-built joints; the loop following a drag; the two animations as separate commands; the
 ABS look and the search.
 
-### Notes for other builders (not changed by me)
+
+## Project 15: Gear Train (`replay_15_gear_train`, 158 checks, PASS)
+
+The report tested "key tools only". The replay does every step it names, with its values,
+and goes on to what it left "Not tested" (the copy/paste train and its motion link), on a
+stand-in frame: two axles 4 across and 90 apart (the pitch radii 75 + 15). Steps: Axles
+(2 circles, Equal, dimensions, Extrude 16); UTILITIES > Scripts and Add-Ins > SpurGear >
+Run: 20 teeth, module 1.5, root fillet 0.88, 8 thick, hole 4 (pitch diameter 30); SpurGear
+again: 100 teeth, 4 thick, the same 0.88 (pitch diameter 150); Gear 2 > Edit Feature,
+Cancel; M, Move Object Components, the 20 tooth gear: Z 4 and Z Angle `360/20/2`; New
+Component "Compound Gear", both gears dragged onto its row; Compound Gear copied and pasted,
+X 90 and Z 4 typed; as-built Revolute joints of each compound gear on its axle; Motion Link
+360 : 72 with Reverse, Animate; Animate Joint Relationships; Drive Joints 100 (the second
+gear at -20); save, close, reopen.
+
+### Hitches found and fixed
+
+| # | Report line | What happened | Fusion (source) | Root cause | Fix (function) |
+|---|---|---|---|---|---|
+| 1 | 2349-2352 bug 19 "100-tooth gear with the book's 0.88 mm root fillet: the dialog warns ... at most 0.741 mm" | Refused; with 0.5 it worked | Autodesk's own SpurGear sample refuses a root fillet only above `toothThickness * .4` (0.4 x pi m cos(alpha) / 2 = 0.8857 mm for m 1.5, 20 deg, whatever the teeth); it fillets one tooth and patterns it, so neighbouring fillets cross on many teeth (Autodesk: the sample's code, as the gear parity notes quote; Book: 0.88 for both gears) | `gear_core.max_fillet` required a flat land between two fillets | `gear_core._involute` (`crossing_fillets`, third return value), `_fillet_crossing`, `fusion_max_fillet`, `_circular`, `_check_lands`, `max_fillet`: up to Fusion's limit each fillet runs to the middle of the gap. Unit tests in `test_gear_core.py`; `book_modify_gear` updated (its refusal step now types 0.89, its gear uses the book's 0.88) |
+| 2 | 2357-2359 "The 2nd gear's New Component was created INSIDE the first gear's component (it was left active)" | Reproduced | Fusion's sample adds its component to the design's root (`rootComponent.occurrences.addNewComponent`) and leaves the active component alone (Autodesk: sample code) | The Gear dialog put a New Component under the active component, which the first gear's OK had activated | `gear_ui.GearPanel.__init__`, `_sample_to_root`, `_restore_active`, `reject`, `accept`, `_auto`; `samples/SpurGear.py`: started from the sample the dialog proposes New Component, at the root, and puts the active component back. CREATE > Gear is unchanged |
+| 3 | (not in the report) | The Scripts and Add-Ins window stayed open over the design after Run; the next key (M) went to its Create button | Fusion's window closes when a script is run (Guess, from use) | `scripts_ui.ScriptsDialog.run_selected` kept it open | It closes after a script ran (an add-in keeps it open) |
+| 4 | (not in the report) | New Component as the first command of a new design ticked From Bodies and said "1 body will move into the new component: Body1" | Fusion has no body before the first solid | The new design's own empty Body1 stays selected; `_whole_bodies` took it | `components_ui.NewComponentPanel._whole_bodies`: a body without a solid is not taken |
+| 5 | 2363-2364 "the rotation pivot was ~0.003 mm off the origin" | The second gear, its centre clicked on the origin, landed 0.026 mm off it (on the centre of one of the first gear's tooth-tip arcs) | Fusion snaps to the origin | `primitives_core.nearest_snap` took the nearest of a cloud of snap points a hair apart | `primitives_core.nearest_snap` (`SAME_SPOT`): points within two pixels of the nearest are one spot, the first listed (the origin) wins. Unit test |
+| 6 | (not in the report) | A pasted copy's shape held its original's solids too (it "ran into" everything) | - | `joints.part_shape` walked `OutListRecursive`, which reaches the original through the copy's links | `joints.part_shape` / `_inside`: only what lies inside the part |
+| 7 | (not in the report) | The second compound gear's joint: "Pick the position on one of the two components" on its pinion's hole | Fusion takes the joint's snap point on any geometry of the two chosen occurrences | `AsBuiltPanel.allow_pick` / `picked_raw` took only bodies directly in a chosen component | `joints_ui.AsBuiltPanel.allow_pick`, `_chosen_part`, `picked_raw` |
+
+### Report items that simply work now (kept in the replay)
+
+The SpurGear entry in Scripts and Add-Ins; component names "Spur Gear (N teeth)"; Edit
+Feature on Gear 2 (bug 20); `360/20/2` in Move; the move about the component's origin
+(the gear's hole stays exactly on the origin's axis); two drags into Compound Gear; Copy /
+Paste keeping the copied component's place; Motion Link with the gear ratio and Reverse;
+Animate Joint Relationships.
+
+Not replayed (and why): Split Body with a sketch curve and the auto-project warning (the
+report says it worked; time went to the train); the eleven-gear train (two compound gears
+test the same tools: paste, joint, link).
+
+## Project 16: Robotic Hand (`replay_16_robotic_hand`, 234 checks, PASS)
+
+The report tested "key tools only" and gives no dimensions of the hand (its ellipses,
+splines and loft with rails were not re-tested), so the hand is a stand-in to the chapter's
+tools: a Palm 70 x 20 x 10 with a 6 mm hole; a Finger subassembly of two phalanges 10 x 30
+x 10 (Proximal, Distal), each a New Component inside the Finger. Steps: Palm (rectangle, two
+dimensions, a circle, Extrude 10); Finger, Proximal, Distal; As-built Revolute knuckles
+(Finger + Palm, Distal + Proximal) with Minimum / Maximum typed in the dialog; Edit Joint
+Limits on the first (-60 .. 60); Drive Joints 45, then 80 (stops at 60); Rectangular
+Pattern, Pattern Type Components, of the Finger subassembly: 4 fingers; the second knuckle
+driven: every finger bends; Copy, Paste New (the thumb), Move Z 90 / X 20; Mirror of the
+thumb subassembly across the palm's end face; Circular Pattern of it about Z, then Ctrl+Z;
+New Contact Set (Finger + Palm), Enable Contact Sets, Drive Joints into the palm stops at
+the touch and says so, the other way is free; Disable Contact; Motion Study over both
+knuckles (points set with Enter, the graph, Play, OK, Edit Motion Study); a component Axle
+holding only an Axis Through Cylinder of the palm's hole; save, close, reopen.
+
+### Hitches found and fixed
+
+| # | Report line | What happened | Fusion (source) | Root cause | Fix (function) |
+|---|---|---|---|---|---|
+| 1 | 2398-2402 "Rectangular Pattern of a subassembly with its joints could not be done ... the 4-finger pattern with inherited links/limits fails" | The pattern itself works now; but afterwards the first knuckle was re-pointed from the Finger to its Proximal (grounded to the Finger), and with contact sets on: "Proximal and Palm are both grounded: unground one to drive Revolute 1" | A joint stays on the occurrences it was made between (Autodesk help, Joint) | `joints.reroot` (run when a component's Group changes, as a pattern does) moved every reference down to the nearest part of the face, also a deliberate reference into a subassembly | `joints._rerooted`: a reference whose path names the nested component stays on its part. `joints_components`, `book_joints_survive`, `bodies_qa_2` still pass |
+| 2 | (not in the report) | A mirrored copy of the thumb measured 12000 mm3 for 6000 | - | `joints.part_shape` counted an instance's copy feature and the copy body made from it | `joints.part_shape`, `_is_copy_feature` |
+| 3 | (not in the report) | After Rectangular Pattern, Paste New and Mirror, CREATE > Pattern had vanished from the menu (no Circular Pattern) | - | A submenu that nothing on the Python side held was deleted by a garbage collection (proved: a forced `gc.collect()` removed it at once; kept, it stays) | `ribbon_ui.build_menu`: submenus kept with their menu (`_sf_submenus`) |
+| 4 | (not in the report) | After Motion Study > Play > OK, the original finger was straight and its three copies stayed bent (the copies lag one move behind their source) | Every occurrence of a component shows the same joints (Fusion) | The study moves parts without a recompute; copies follow only at the next one | `instances.follow`; `joints_motion_ui.MotionStudyPanel._pose`, `before_close`, `_copies_follow` |
+
+### Report items that simply work now (kept in the replay)
+
+New Component inside the active one (Fusion's way); joint limits set in the As-built
+dialog; Edit Joint Limits on an as-built joint (the report: "broken"); Drive Joints stopping
+at a limit; Rectangular, Circular Pattern and Mirror of components and of subassemblies
+with Pattern Type Components; Paste New (an independent copy); Contact Sets stopping a
+drive and saying why; Motion Study's graph, Enter that sets a point and keeps the dialog;
+an axis made in the active component (the report's "Bug" with Axis Through Cylinder).
+
+Not replayed: Ellipse, Fit Point Spline, Loft with Rails and Hole Extent All (the report
+did not re-test them and gives no shapes; they have their own scenarios).
+
+## Notes for other builders (not changed by me)
 
 - FreeCAD's own Line / Circle / Rectangle boxes (`sketch_field_names.FieldNames.wants`)
   still take a first letter only when an existing parameter starts with it
@@ -56,6 +133,11 @@ ABS look and the search.
 - In Joint (J), with both snaps picked and the Type still Rigid, the preview across a
   closed loop cannot be solved and the dialog says nothing until the Type is chosen
   (Revolute: fine).
+- The first component made inside another (Proximal inside Finger) is grounded to its
+  parent (components builder: "the first of its level"). Fusion's preference speaks of
+  the design's first component; worth a check by the components builder.
+- Other places that move parts without a recompute (a joint's Animate, Animation's
+  playback) may show the same lag of instance copies as Motion Study did; not checked.
 
 ## Changelog lines
 
@@ -67,6 +149,19 @@ ABS look and the search.
   click takes (on a link's round end the click sometimes took the end of the arc instead).
 - FreeCAD's own "Solve failed" lines no longer appear in the Report view when a joint that
   cannot hold is being previewed.
+- The Gear tool takes root fillets as large as Fusion's Spur Gear does (the book's 0.88 mm
+  on a 100 tooth gear); neighbouring fillets then meet in the middle of the gap.
+- Spur Gear from Scripts and Add-Ins makes each gear a new component of its own at the top
+  of the design, whichever component is active, and the window closes when a script runs.
+- A gear (or a box, a cylinder...) placed on the origin lands exactly on it, also beside
+  another gear.
+- New Component as the first command of a new design no longer offers to move the design's
+  empty body.
+- A joint of a subassembly can be placed on any part inside it, and stays on the
+  subassembly after a pattern of it.
+- CREATE > Pattern no longer disappears from the menu after some commands.
+- After a Motion Study, every copy of a patterned subassembly is back in place with its
+  original.
 
 ## Known issues
 
@@ -76,3 +171,5 @@ ABS look and the search.
   polygons, arcs) take `Width=5mm` directly.
 - A link whose slot starts on a pin's centre lies ON the pin (no hole is made there), as in
   Fusion; draw a circle for the hole if you want one.
+- A part inside a copy of a subassembly cannot be jointed on its own: the copies show the
+  original's joints (as the components builder noted).

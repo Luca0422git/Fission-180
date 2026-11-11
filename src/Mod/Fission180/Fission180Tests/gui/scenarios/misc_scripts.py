@@ -141,10 +141,14 @@ def p2_run():
 
 def p2_check():
     h.check("P2 the script made its box", len(script_bodies()) == 1, script_bodies())
-    h.check("P2 the dialog says it ran", "AddBox ran" in message(), message())
+    # (wave 7, replay-f) Fusion's window closes when a script or add-in is started (Autodesk
+    # forum, "Undesired behaviour of ADDIN window in Fusion 360 in last version": starting
+    # one "dismisses the dialog"); it said "AddBox ran" and stayed over the design, where it
+    # took the next key (the book's Gear Train: M went to its Create button). A script that
+    # fails keeps it open with the error (P3).
+    h.check("P2 the window closed once the script ran", dialog() is None, message())
     body = script_bodies()[0] if script_bodies() else None
     h.check("P2 the box is 1000", body is not None and m.near(body.Shape.Volume, 1000.0))
-    m.find_child(dialog(), "Fission180ScriptsClose").click()
 
 
 def p2_undo():
