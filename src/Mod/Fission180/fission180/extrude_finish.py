@@ -40,6 +40,28 @@ def dropped(title, reason, editing=False):
     return "%s: %s" % (what, reason) if reason else what + "."
 
 
+def activate_result(body, operation):
+    """After OK: make the body the step's result is in the active one, with its component,
+    when the step made that body (New Body, New Component) or when it belongs to the active
+    component anyway. A Cut, Join or Intersect that changed a body of ANOTHER component
+    leaves the active component as it is, like Fusion: cutting the Nozzle from a sketch of
+    the active Axle made the Nozzle the active component, and the next sketch and extrude
+    went into the Nozzle. True when the body was activated."""
+    from . import components
+
+    try:
+        if body is None:
+            return False
+        if operation not in ("new_body", "new_component"):
+            if components.container_of(body) is not components.active_component(body.Document):
+                return False
+        components.activate_body(body)
+        return True
+    except Exception as exc:
+        warn("could not activate %s: %s" % (getattr(body, "Label", "?"), exc))
+        return False
+
+
 def speaking(accept):
     """Decorator for a dialog's accept(): when OK is refused (accept returns False) the
     reason the dialog shows is also said next to the mouse, so the click is answered. For

@@ -1872,12 +1872,8 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         self._close()
         body = primitives.owner_body(feature)
         if body is not None and body is not commands.active_body():
-            try:
-                from . import components
-
-                components.activate_body(body)  # and its (new) component
-            except Exception as exc:
-                warn("could not activate %s: %s" % (body.Label, exc))
+            # its (new) body and component; never another component's body a Cut changed
+            extrude_finish.activate_result(body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
 

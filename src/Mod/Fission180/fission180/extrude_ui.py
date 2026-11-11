@@ -3161,12 +3161,8 @@ class ExtrudePanel(
         self._close()
         new_body = extrude.owner_body(feature)
         if new_body is not None and new_body is not self.body:
-            try:
-                from . import components
-
-                components.activate_body(new_body)  # and its (new) component
-            except Exception as exc:
-                warn("could not activate %s: %s" % (new_body.Label, exc))
+            # its (new) body and component; never another component's body a Cut changed
+            extrude_finish.activate_result(new_body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
 
