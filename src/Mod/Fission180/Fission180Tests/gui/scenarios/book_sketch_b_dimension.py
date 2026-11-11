@@ -136,8 +136,16 @@ def slant_pick():
     b.click(V(35, 20, 0))
 
 
+# (wave 7, the book replay) "Beside the line" is inside the box of its two ends: straight
+# below that box the dimension is the horizontal one, straight left or right of it the
+# vertical one, however near (the Play Brick's stud, "3.9 from the origin" twice, put just
+# left of the two points, was the slanted distance). The spot was (42, 10): on the box's
+# lower edge, a pixel decided.
+BESIDE = V(40, 14, 0)
+
+
 def slant_hover_beside():
-    st.hover(V(42, 10, 0))  # off the line, square to its middle
+    st.hover(BESIDE)  # off the line, between its ends
 
 
 def slant_place_beside():
@@ -146,7 +154,7 @@ def slant_place_beside():
         "36.0" in st.tool().hint_text(),
         st.tool().hint_text(),
     )
-    b.click(V(42, 10, 0))
+    b.click(BESIDE)
 
 
 def slant_aligned_check():
