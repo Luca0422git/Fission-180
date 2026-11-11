@@ -5,7 +5,7 @@ Setup: a 40 x 30 x 10 box made into the component "Bracket" (Create Components f
 Bodies, then renamed), and a second box "Free" (x 60..100) left at the root.
 
   A  M, Move Object Components (the dialog switches), click the box: the component is
-     picked, the manipulator sits at its middle (20, 15, 5). Drag the X arrow about 15 mm:
+     picked, the manipulator sits at its origin (0, 0, 0). Drag the X arrow about 15 mm:
      the component follows. Type X Distance 10, tick Capture Position, OK: Bracket stands
      at x 10 (its Placement), its body is unchanged inside it, the timeline has a Move.
   B  Undo: back at 0, no Move; Redo: at 10 again with its Move.
@@ -102,7 +102,10 @@ def a_picked():
     h.check("Bracket picked", p.options.get("components") == [bracket()], p.options)
     triad = getattr(p, "triad", None)
     if h.check("manipulator shown", triad is not None):
-        h.check("at Bracket's middle", (triad.center - V(20, 15, 5)).Length < 1e-6, triad.center)
+        # wave 7 (book parity report): the manipulator starts on the component's ORIGIN,
+        # as in Fusion (it stood at the middle of its solids, (20, 15, 5)); Bracket was made
+        # from a body at the root, so its origin is the design's
+        h.check("at Bracket's origin", (triad.center - V(0, 0, 0)).Length < 1e-6, triad.center)
     h.shot("A-picked")
 
 

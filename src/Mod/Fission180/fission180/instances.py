@@ -471,9 +471,10 @@ def crown(handed):
         warn("%s keeps its name: %s" % (heir.Label, exc))
 
 
-def paste_new(source, parent=components.KEEP):
+def paste_new(source, parent=components.KEEP, placement=None):
     """Paste New: an independent copy of a component with all its features, named
-    "<name> (1)", placed right on the original. Returns the new part."""
+    "<name> (1)", placed right on the original (``placement``, design coordinates: on the
+    occurrence that was copied). Returns the new part."""
     source = definition(source)
     if source is None:
         raise ValueError("That component's original was deleted: Paste New cannot copy it.")
@@ -488,7 +489,7 @@ def paste_new(source, parent=components.KEEP):
     if where is not None and components.is_inside(where, source):
         where = components.container_of(source)
     current = components.container_of(copy)
-    wanted = global_placement(source)
+    wanted = placement if placement is not None else global_placement(source)
     if current is not where:
         if current is not None:
             current.removeObject(copy)
