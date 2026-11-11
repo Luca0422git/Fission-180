@@ -187,7 +187,11 @@ def is_part(obj):
         if obj is None or is_assembly_piece(obj):
             return False
         if obj.TypeId == "App::Part":
-            return True
+            # (wave 7, components-2) a row inside a copy of a subassembly is no part of
+            # its own: the copy moves as one, as it did when it held its bodies flat
+            from . import components
+
+            return not components.is_holder(obj)
         if obj.getParentGeoFeatureGroup() is not None:
             return False
         if obj.TypeId == "PartDesign::Body":

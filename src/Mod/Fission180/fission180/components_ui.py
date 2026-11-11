@@ -295,6 +295,8 @@ class NewComponentPanel(taskui.Panel):
         self.parent_box.setObjectName("Fission180ComponentParent")
         self.parent_box.addItem("%s (root)" % doc.Label, "")
         for part in components.list_components(doc):
+            if components.is_holder(part):
+                continue  # (wave 7, components-2) a row inside a copy is no place of its own
             self.parent_box.addItem(part.Label, part.Name)
         if parent is not None:
             index = self.parent_box.findData(parent.Name)

@@ -1081,6 +1081,44 @@ def drop_unused_bodies(component, keep=None):
     return gone
 
 
+def is_holder(obj):
+    """True for a component inside a copy (an instance) that stands for a component nested
+    in the copy's original: the "Case" row inside a second motor (instances.py, wave 7,
+    components-2). It is a row of the browser and nothing more: the same PART as the
+    component it stands for (stands_for), never a part, a parent or a pattern's source of
+    its own."""
+    try:
+        from . import instances
+
+        return instances.is_nested_holder(obj)
+    except Exception:
+        return False
+
+
+def stands_for(obj):
+    """The component ``obj`` is the same part as, wherever parts are counted or named (a
+    parts list, a balloon, a bill of materials): the nested component of the original for a
+    holder, the original for an occurrence ("Screw:2"), else ``obj`` itself. Followed to the
+    end (a holder of an occurrence nested in the original). A copy whose original is gone
+    stands for itself."""
+    current = obj
+    for _ in range(20):
+        try:
+            from . import instances
+
+            nxt = None
+            if instances.is_nested_holder(current):
+                nxt = instances.nested_source(current)
+            elif instances.is_instance(current):
+                nxt = instances.source_of(current)
+            if nxt is None or nxt is current:
+                return current
+            current = nxt
+        except Exception:
+            return current
+    return current
+
+
 def editable(component):
     """The component whose features change when `component` is edited: an instance (a
     pasted or patterned copy) is edited through its original, as in Fusion where editing

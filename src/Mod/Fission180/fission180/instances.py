@@ -501,8 +501,11 @@ def _sync_one(part):
             except Exception as exc:
                 warn("instance %s: %s" % (part.Label, exc))
         elif holder.Label != comp.Label:
+            # (without the GUI FreeCAD keeps labels unique and names the row "Case001":
+            # only a label that really changed counts, else every sync asked for a recompute)
+            before = holder.Label
             holder.Label = comp.Label
-            changed = True
+            changed = changed or holder.Label != before
     return changed
 
 

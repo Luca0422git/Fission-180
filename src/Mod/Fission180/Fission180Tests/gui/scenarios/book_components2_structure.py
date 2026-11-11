@@ -184,6 +184,24 @@ def a_done():
     labels = t.tree().labels()
     h.check("the browser shows the copy's rows", labels.count("Bolt") >= 1, labels)
     k.no_empty_invalid_bodies()
+    # a row inside the copy is the same PART as the original's component it stands for:
+    # a drawing's parts list counts each part twice, and no row is a part of its own
+    from fission180 import components, drawing, drawing_core
+
+    found_bodies = [o for o in k.doc().Objects if o.TypeId == "PartDesign::Body"]
+    listed = {
+        r["PartNumber"]: r["Qty"]
+        for r in drawing_core.parts_rows(drawing.components_of(found_bodies))
+    }
+    h.check("the parts list: Housing 2, Bolt 2", listed == {"Housing": 2, "Bolt": 2}, listed)
+    rows_of_copy = rows(made[0])
+    bolt_row = rows_of_copy.get("Bolt")
+    h.check(
+        "the copy's Bolt row stands for the original's Bolt",
+        bolt_row is not None
+        and components.is_holder(bolt_row)
+        and components.stands_for(bolt_row) is k.part("Bolt"),
+    )
     h.shot("A-pattern")
 
 

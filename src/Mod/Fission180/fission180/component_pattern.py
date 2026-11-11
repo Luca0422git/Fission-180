@@ -274,6 +274,13 @@ def check(kind, options):
     if len(found) > 1:
         raise PatternError("Select one component: each component gets its own %s." % verb)
     source = found[0]
+    if components.is_holder(source):
+        # (wave 7, components-2) a part inside a copy of a subassembly stands for the
+        # original's part: that one is patterned (every copy then shows its copies)
+        raise PatternError(
+            "%s is part of a copy: %s the original's %s."
+            % (source.Label, verb, components.stands_for(source).Label)
+        )
     if instances.is_instance(source):
         raise PatternError(
             "%s is a copy of %s: pattern the original component."
