@@ -64,11 +64,122 @@ Not hitches (checked): the sketch turns the view to look down on its plane, so t
 bottom edge is hidden behind the Emitter; a person turns the view with the ViewCube (Fusion
 the same). A round face shows its seam line (known, MEMORY "Display parity notes").
 
+Scenario `replay_27_hilt`: 260 checks, PASS.
+
+## The Drawings chapter (`replay_drawings`)
+
+Projects 21 + 22 (Drumsticks, Space Prop Emitter) and the drawing parts of 23 + 24 (report
+2498 - 2548). Stand-in: a drumstick of three components modelled by hand (Stick 14 x 400 with
+a 5 mm round tip, Sleeve 24 x 14 x 60, Butt 24 x 20). DESIGN > Drawing > From Design (ASME,
+B), Base View at 1:2, Projected View (right, top, the isometric beyond the corner, Enter:
+the report's vanishing third view is kept), Dimension (D) tip to tip 420, Centerline,
+Section View (Enter after the cut line, placed left), Detail View B, Leader, Export PDF, Export
+DXF; a second drawing with Automatic views (fitted, nothing overlapping), Parts List (three
+rows, three balloons), Export CSV, Export DWG (no converter here: the dialog says so and writes
+the DXF). 166 checks, PASS.
+
+| # | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 5 | A Section View whose cut line is near one end of a long part was placed on top of the base view, wherever the click | The section view follows the pointer along its viewing direction (Autodesk, Section View: "move the cursor to place the view") | `SectionPanel.on_move` measured the pointer from the cut line's middle and added that to the parent view's position | `drawing_core.section_position` (from the parent's middle); `drawing_ui.SectionPanel.on_move`; unit test in `test_offset_moves_along_the_side_only` |
+| 6 | Export DXF of that drawing printed "makeElementFace: resulting face is invalid" in the Report view | (an error message is never Fusion's answer) | `drawing.section_faces` made one face of the outlines of every body cut (the Sleeve's bore and the Stick's outline are the same circle) | each body is cut by itself |
+
+Not hitches: the report's "MATERIAL shows Steel for parts with no physical material set" is
+Fusion's behaviour too (Steel is the default physical material in Fusion; the check says so).
+
+## The Animation chapter (`replay_animation`)
+
+Projects 23 + 24 (Japanese Pull Saw, Machinist Hammer; report 2524 - 2531). Stand-in: a
+hammer of three components modelled by hand. Workspace > Animation (sketches not drawn),
+Transform Components (Head 60 up at 2 s, Cap 40 down at 4 s), a View action (ViewCube FRONT),
+Create Callout with typed text, Space plays to the end, New Storyboard + Auto Explode: All
+Levels with trail lines, Duplicate + Reverse of Storyboard1, Publish Video (AVI, frames
+counted), Workspace > Drawing > From Animation (four views of the storyboard's end, trail
+lines), Parts List, back to Design (nothing moved). 133 checks, PASS.
+
+| # | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 7 | Drawing > From Animation with Storyboard2 in front drew Storyboard1 | The drawing is made from the storyboard chosen; it starts on the active one (Guess; Autodesk's help: "From Animation" uses the animation's storyboards) | `NewDrawingCommand.run` and `ExplodedViewCommand.run` took `storyboards(doc)[0]` | `drawing_exploded.front_storyboard` (the tab in front); both commands use it |
+
+## The Manufacture chapter (`replay_manufacture`)
+
+Projects 25 + 26 (report 2550 - 2560). Stand-in: a board 200 x 60 x 12 with a recess and two
+6 mm holes modelled by hand (Hole > From Sketch on two sketch Points). Workspace >
+Manufacture, New Setup (stock: a box round the part, 1 mm over its top), Tool Library (both
+sample libraries), 2D Adaptive (6 mm end mill) in the recess, 2D Contour round the outline
+with Multiple Depths, Drill (Select Same Diameter), Simulate (no rapid into the stock), Post
+Process (the checker passes the G-code), a second setup (Flip Z, stock From preceding setup)
+with Face, back to Design (the board unchanged, the timeline as it was). 97 checks, PASS.
+
+| # | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 8 | CREATE > Point: a point clicked at y 15 on a 10 mm grid stayed at 14.82 (every other tool snaps the click to the grid; the holes then were 30.2 mm apart, not 30) | Snap puts every sketch point on the grid (Fusion's Snap, the same rule as the other tools: book-sketch-c) | the sketch inference did not know the Point tool (`sketch_infer_core.TOOLS`), so FreeCAD's own grid rule (a fifth of the spacing) applied | `sketch_infer_core.TOOLS["Sketcher_CreatePoint"] = "point"`, `POINTS["point"] = 1`, `tool_kind`; unit test `test_the_point_tool_is_a_shape_of_one_click` |
+
+Not replayed (not built, book-cam.md "Known issues"): rest machining, NC Program objects,
+machine definitions.
+
+## Project 18: Smartphone Case (`replay_18_phone_case`)
+
+Report 2464 - 2477. The phone (an .f3d download: out of scope) is modelled by hand, 70 x 150
+x 10, in component Phone; Case: a 76 x 156 x 8 block in its own component; INSPECT >
+Interference (84000 mm3), Combine Cut with the Phone as tool (another component's body),
+Keep Tools: a 3 mm frame; Interference again: none; a pin (component Button) along the
+case's bottom through its wall, Combine Cut: a notch, no warning (the report's "Cut would
+leave nothing of the target body" did not come back); Oak, Texture Map Controls Box at 28 %.
+104 checks, PASS.
+
+| # | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 9 | Interference listed the pair as "Body1 / Body1" (each component's first body is Body1) | Fusion names a body with its component where the name is not enough (Guess) | `analysis` used `o.Label` | `analysis._pair_name` (bodies.shown_name: "Body1 (Phone)") in `InterferenceFeature.execute` and `overlaps` |
+
+## Project 17: American Football (`replay_17_football`)
+
+Report 2423 - 2461. Inch design (browser Units row > Change Active Units). INSERT > Canvas on
+the Front plane, Z Angle 1, Calibrate 11.25 in; the profile: L typed 11.25, X, a construction
+line 3.4 up from the middle, Fit Point Spline, Mirror about the construction line, Tangent
+between the two splines (the report's "added nothing" is fixed: smooth and level at the top);
+Revolve 90 about X, Fillet 1/8 on the two curved edges, Circular Pattern (Bodies) x 4,
+Combine (target + 3 tools: one body, the tools out of the browser), Display Settings > Visual
+Style, Leather, brown; Duplicate, renamed "Football leather" at 50 % (Advanced opened);
+INSERT > Decal on the curved side with Chain Faces, a right-click in the browser while it is
+open keeps it. 90 checks, PASS.
+
+| # | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 10 | Fillet "1/8" typed in an inch design and OK clicked: a 1 in fillet that ate the ball's tips (the preview had taken the "1" typed first, and OK that) | A value box takes what is typed when OK is clicked (Autodesk: expressions such as 1/8 in are allowed in every value box) | `blend_field.ValueField` settles a formula only on Enter / Tab / leaving the box; FreeCAD's task OK button does not take the focus | `ValueField._whole_formula` (a complete formula is previewed while typing), `ValueField.settle`; `fillet_ui.BlendPanel.accept` settles every box first (Chamfer too) |
+
+Not replayed: the laces (Sketch Offset, Sweep, Pattern on Path; "not re-tested" in the
+report; replayed by the Carabiner and Hot End scenarios).
+
+## Out of scope (skipped, per the brief)
+
+The Render workspace (Projects 19 + 20 entirely, the render parts of 17, 18 and 27);
+`.f3d` files (the phone); McMaster-Carr (INSERT > Hardware stands in); the book's downloads
+(stand-ins built to the report's dimensions).
+
 ## FreeCAD facts
 
 - A datum plane's `ViewObject.Selectable = False` does not stop `getObjectInfo` / a click
   from picking it (FreeCAD 1.1.4). Its view has two `SoPickStyle` nodes; the inner one
   decides. Setting both to UNPICKABLE lets the click through to what is behind.
+- A task panel's OK button takes no focus: a `QuantitySpinBox` being typed in gets no
+  `editingFinished` before the dialog's `accept` runs.
+- `Part.makeFace` of the slices of several touching bodies at once can be invalid where two
+  outlines coincide; per body it is fine.
+
+## Tests
+
+Each replay alone, one run each (`.probe/run1.sh`, the harness's own runner without the
+retry): replay_27_hilt 260, replay_drawings 166, replay_animation 133, replay_manufacture 97,
+replay_18_phone_case 104, replay_17_football 90: PASS. Older scenarios of the files changed,
+each alone, PASS: book_animation_workspace 75, book_animation_explode 79,
+book_animation_book_project 51, book_animation_switching 76, book_animation_publish 67,
+book_joints_edit 105, book_looks_faces 106, book_looks_materials 104,
+book_drawings_partslist 64, book_drawings_component 53, book_drawings_animation 65,
+book_drawings_views 69, book_drawings_exploded 95, book_drawings_export 83,
+book_hardware_holes 56, drawing_section 34, drawing2_sections 77, drawing_export 76,
+drawing2_sheets 87, drawing2_update 40, drawing2_reopen 44, drawing_reopen 44,
+drawing2_breakout 96, drawing_pdf_layers 55, sketch_infer_tools 162, sketch_snaps 113,
+hole_sketch 49, inspect_com_interference 79, inspect_qa3 352, inspect_qa4 330.
 
 ## Changelog lines
 
@@ -79,7 +190,23 @@ the same). A round face shows its seam line (known, MEMORY "Display parity notes
   the next column).
 - The ANIMATION workspace no longer draws sketches, construction planes or the joints'
   marks: only the parts, as in the video it publishes.
+- Drawing: a Section View follows the pointer to where it is clicked (a cut near the end of
+  a long part put it on top of its base view).
+- Drawing: Export DXF of a section through two parts that touch no longer prints an error.
+- Drawing > From Animation and CREATE > Exploded View start on the storyboard that is in
+  front in the ANIMATION workspace (it was always the first).
+- Sketch: CREATE > Point snaps to the grid like every other tool.
+- Interference names each body with its component when two bodies have the same name.
+- Fillet and Chamfer: a fraction or a sum typed in a box ("1/8") is previewed as you type,
+  and OK takes it (it took the first digit).
 
 ## Known issues
 
-- (to be completed at the end of the session)
+- The laces of the American Football (Sketch Offset, Sweep, Pattern on Path) were not
+  replayed here; those tools are covered by the Carabiner and Hot End scenarios.
+- A canvas is placed with its middle on the plane's origin: drag it (or type X Distance)
+  to line the picture up with the sketch, as in Fusion.
+- Rendering, `.f3d` files and McMaster-Carr parts stay out of Fission 180: use File >
+  Capture Image, STEP files and INSERT > Hardware.
+- Export DWG needs a converter program (LibreDWG, the ODA File Converter or QCAD); without
+  one the dialog writes a DXF.
