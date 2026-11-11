@@ -157,9 +157,12 @@ def _object(doc, node):
 
 
 def selection(doc, node):
-    """Rows picked in the browser select nothing in the 3D view (their toolpaths are
-    drawn instead: manufacture_ui.shown_ops reads the picked rows)."""
-    _later(_ui().refresh_view, True)
+    """Rows picked in the browser select nothing in the 3D view: their toolpaths are drawn
+    instead (a setup's row: all of its operations'; another row: none). They stay drawn
+    when the row loses its highlight to a click in the 3D view."""
+    picked = picked_ops(doc)
+    names = [o.Name for o in picked or []]
+    _later(_ui().show_ops, doc, names)
     return []
 
 

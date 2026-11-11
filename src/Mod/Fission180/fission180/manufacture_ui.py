@@ -112,20 +112,12 @@ def show_ops(doc, names):
 
 
 def shown_ops(doc=None):
-    """The operations whose toolpaths are drawn: the rows picked in the browser (a setup's
-    row: all of its operations), else the operation made or edited last."""
+    """The operations whose toolpaths are drawn: the rows picked in the browser last (a
+    setup's row: all of its operations), or the operation made or edited last."""
     doc = doc or _doc()
     if doc is None:
         return []
     cam = _cam()
-    try:
-        from . import manufacture_browser
-
-        picked = manufacture_browser.picked_ops(doc)
-        if picked is not None:
-            return picked
-    except Exception:
-        pass
     out = []
     for name in STATE["shown"].get(doc.Name, []):
         obj = doc.getObject(name)

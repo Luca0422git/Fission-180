@@ -69,6 +69,7 @@ class Player(QtWidgets.QDialog):
             ("play", "Play", "Play or pause", self.toggle),
             ("step", "Next Move", "Play one move of the tool", self.step),
             ("end", "To End", "Cut everything at once", self.to_end),
+            ("close", "Close", "Close the player: the see-through stock is back", self.reject),
         ):
             button = QtWidgets.QPushButton(text)
             button.setObjectName("Fission180CamSim_" + key)
@@ -111,8 +112,8 @@ class Player(QtWidgets.QDialog):
 
     # -- playing ---------------------------------------------------------------------------
     def toggle(self):
-        if self.playback.done():
-            self.restart()
+        if not self.playing and self.playback.done():
+            self.playback.reset()  # (Play at the end starts over)
         self.playing = not self.playing
         self.buttons["play"].setText("Pause" if self.playing else "Play")
         self.last_tick = time.time()
