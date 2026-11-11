@@ -681,9 +681,29 @@ def thread_offered():
         % (p.standard.currentText(), p.designation.currentText(), p.info.text()),
         flush=True,
     )
+    # (Fusion starts with the last thread's type: the inlet's NPT; the book picks the type)
+    if p.standard.currentData() != "ansi":
+        r.choose(p.standard, "ANSI Unified Screw Threads")
+    h.caught_up(p)
+
+
+def thread_size():
+    p = r.thread_panel()
+    if p.size.currentText() != "1/4":
+        r.choose(p.size, "1/4")
+        h.caught_up(p)
+
+
+def thread_designation():
+    p = r.thread_panel()
     if not p.designation.currentText().startswith("1/4-20"):
         r.choose(p.designation, "1/4-20 UNC")
     h.caught_up(p)
+    h.check(
+        "1/4-20 UNC on the four holes",
+        p.designation.currentText() == "1/4-20 UNC",
+        p.designation.currentText(),
+    )
 
 
 def wall_threaded():
@@ -838,7 +858,8 @@ def steps():
     out += [counterbore_sizes, r.ok("wall_hole_ok", 120), counterbored]
     out += [r.view_from(1, 1, 1, "wall_from_outside"), r.menu("CREATE", "Thread", "wall_thread")]
     out += [thread_click(k) for k in range(4)]
-    out += [thread_offered, r.ok("wall_thread_ok", 120), wall_threaded]
+    out += [thread_offered, thread_size, thread_designation]
+    out += [r.ok("wall_thread_ok", 120), wall_threaded]
     out += [steam_mirror_open, steam_components, steam_pick, steam_plane_box, mirror_plane]
     out += [steam_ready, r.ok("steam_mirror_ok", 120), steam_made, steam_rename, steam_named]
     return out
