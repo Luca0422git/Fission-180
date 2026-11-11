@@ -376,6 +376,43 @@ def may_change(body, doc=None, lead=None):
     return False
 
 
+def home_text(body, doc=None):
+    """How a dialog names a body: "Body1", or "Body1 (Base)" when the body is in another
+    component than the active one (every component has a Body1), "Body1 (the design)" for a
+    body at the root while a component is active."""
+    try:
+        if in_active(body, doc):
+            return body.Label
+        home = container_of(body)
+        return "%s (%s)" % (body.Label, home.Label if home is not None else "the design")
+    except Exception:
+        return getattr(body, "Label", "")
+
+
+def outside_note(body, what="step", doc=None):
+    """What a dialog says when the body it is about to change is in another component than
+    the active one, or "" (wave 7, components-2). Fusion changes the body picked, whichever
+    component is active (Hole, Cut, Fillet, Shell, Combine, the PLASTIC tools); the step
+    then belongs to that body's component here (FreeCAD keeps a step inside its body), so
+    it shows in that component's timeline: said, never silent."""
+    try:
+        if body is None or in_active(body, doc):
+            return ""
+        doc = doc or body.Document
+        home = container_of(body)
+        active = active_component(doc)
+        there = home.Label if home is not None else "the design"
+        here = active.Label if active is not None else "the design"
+        return "%s is in %s, not in the active %s: the %s changes it there." % (
+            body.Label,
+            there,
+            "component %s" % here if active is not None else here,
+            what,
+        )
+    except Exception:
+        return ""
+
+
 def whole_pick(root, sub):
     """(object, sub) of a selection entry read unresolved (Gui.Selection.getSelectionEx("",
     0) gives the top container and the path down from it). A whole object picked through

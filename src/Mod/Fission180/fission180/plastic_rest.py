@@ -394,24 +394,53 @@ def read(feature):
 
 
 def body_under(doc, refs, flip=False):
-    """The solid body the profile lies over (nearest along the inside direction), or None."""
+    """The solid body the profile lies over: the nearest one in front of or behind the
+    profile, or None.
+
+    (wave 7, components-2) Until now the sketch's own body was taken whenever it had a
+    solid. A sketch made with another component active sits in THAT component's body (new
+    things go into the active component), and the rest went into it without a word: a pad
+    drawn 3 mm in front of the Base's wall with the Lid active was built in the Lid, on a
+    hook 46 mm behind it. Now the body nearest to the profile is taken; the sketch's own
+    body when it is as near as any other (and when nothing lies under the profile at all,
+    as before)."""
     try:
         faces = profile_faces(refs)
         _sketch, origin, normal = profile_plane(refs)
     except RestError:
         return None
     sketch_body = curves.owner_body(refs[0][0])
-    if sketch_body is not None and bodies.has_solid(sketch_body):
-        return sketch_body
-    best = None
+    if sketch_body is not None and not bodies.has_solid(sketch_body):
+        sketch_body = None
+    found = []  # (gap between the profile and the body under it, -volume under it, body)
     for body in bodies.solid_bodies(doc):
         shape = bodies.global_shape(body)
         try:
-            common = shape.common([f.extrude(normal * 1000.0) for f in faces])
-            common2 = shape.common([f.extrude(normal * -1000.0) for f in faces])
-            vol = common.Volume + common2.Volume
+            pieces = [
+                shape.common([f.extrude(normal * 1000.0) for f in faces]),
+                shape.common([f.extrude(normal * -1000.0) for f in faces]),
+            ]
+            vol = sum(piece.Volume for piece in pieces)
         except Exception:
             continue
-        if vol > 1e-6 and (best is None or vol > best[0]):
-            best = (vol, body)
-    return best[1] if best else None
+        if vol <= 1e-6:
+            continue
+        gap = 0.0
+        try:
+            gap = min(
+                piece.distToShape(face)[0]
+                for piece in pieces
+                if piece.Volume > 1e-9
+                for face in faces
+            )
+        except Exception:
+            pass
+        found.append((gap, -vol, body))
+    if not found:
+        return sketch_body
+    nearest = min(entry[0] for entry in found)
+    near = [entry for entry in found if entry[0] <= nearest + 1e-6]
+    for _gap, _vol, body in near:
+        if body is sketch_body:
+            return body
+    return min(near, key=lambda entry: entry[1])[2]

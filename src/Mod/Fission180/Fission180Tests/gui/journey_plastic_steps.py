@@ -240,19 +240,19 @@ def lid_steps():
         h.check("Lid: distance typed", ai.give_distance("10"))
 
     def operation():
-        # The Lid's box only touches the Base's top: the automatic operation is Join, and a
-        # Fission 180 Join merges every body it touches, in any component (parity
-        # extrude-presspull.md, "Objects To Cut" row), so the Lid would land in the Base's
-        # body. A Fusion user making the Lid in its own component picks New Body here.
+        # (wave 7) The Lid's box touches the Base's top, but the Base is another component's
+        # body and the Lid has no body yet: Fusion proposes New Body (a Join only reaches
+        # bodies of the active component: forum "Cannot Join Bodies with Extrude", "it has
+        # to be New Body, as there is nothing in the other Component to join to"). Before
+        # wave 7 Fission 180 proposed Join here and the journey had to pick New Body by hand.
         p = extrude_panel()
         if p is None:
             return
         h.check(
-            "Lid: automatic operation Join (touches the Base), not Cut",
-            p.operation.currentText() == "Join",
+            "Lid: automatic operation New Body (the Base it touches is another component's)",
+            p.operation.currentText() == "New Body",
             p.operation.currentText(),
         )
-        ui.choose(p.operation, "New Body")
 
     def ok():
         h.task_button("OK")
@@ -525,9 +525,28 @@ def rests():
     return objects(plastic_rest.is_rest)
 
 
+def activate_steps(label, key):
+    """Activate a component the way a person does: the ring at the end of its browser row.
+    (wave 7) New sketches, planes and bodies go into the ACTIVE component, whatever is
+    clicked, as in Fusion: the journey used to click the Base's rim with the Lid active and
+    got its sketch in the Base because the click switched the active component."""
+
+    def ring():
+        cs.click_radio(label)
+
+    def active():
+        h.check("%s: %s active" % (key, label), cs.active_label() == label, cs.active_label())
+
+    return [
+        step(ring, "%s_activate_%s" % (key, label)),
+        step(active, "%s_%s_active" % (key, label)),
+    ]
+
+
 def rim_sketch_steps(key, points):
     """Create Sketch, click the Base's rim (the parting plane; the Lid hidden so the rim
-    shows), points at the global (x, y, 25), Finish Sketch, the Lid shown again."""
+    shows), points at the global (x, y, 25), Finish Sketch, the Lid shown again. The Base
+    is the active component (activate_steps)."""
 
     def hide_lid():
         tab("plastic")
@@ -535,6 +554,7 @@ def rim_sketch_steps(key, points):
             tl.click_eye("Lid")
 
     def create():
+        h.check("%s: the Base active" % key, cs.active_label() == "Base", cs.active_label())
         h.check("%s: Lid hidden" % key, not cs.component("Lid").Visibility)
         h.fit()
         h.ribbon("Create Sketch")
@@ -848,7 +868,20 @@ def construct_panel():
 
 
 def rest_steps():
+    """(wave 7) The Rest is made the "wrong" way on purpose: the LID is the active
+    component while the plane, the sketch and the rest are made on the BASE's front wall.
+    Fusion: the plane and the sketch go into the active component (the Lid), whatever was
+    clicked; the PLASTIC tools change the body they are aimed at, whichever component is
+    active (Autodesk, Snap Fit: "Assign a plastic rule to the components that contain the
+    bodies"). So the rest is built on the Base, and the dialog says that this body is not
+    in the active component. Before the fix the rest went into the body its sketch sat in
+    (the Lid's) without a word: 0 mm3 on the Base, the old journey's failure."""
+
+    def lid_active():
+        cs.click_radio("Lid")
+
     def offset_plane():
+        h.check("Rest: the Lid active", cs.active_label() == "Lid", cs.active_label())
         tab("solid")
         Gui.Selection.clearSelection()
         h.ribbon("Offset Plane")
@@ -867,10 +900,17 @@ def rest_steps():
         p = construct_panel()
         y = p.datum.getGlobalPlacement().Base.y if p is not None and p.datum else None
         h.check("the plane 3 mm in front of the wall (y -3)", y is not None and near(y, -3.0), y)
+        if p is not None and p.datum is not None:
+            h.check(
+                "the plane is in the active component (the Lid), though built on the Base",
+                cs.container_label(p.datum) == "Lid",
+                cs.container_label(p.datum),
+            )
         h.task_button("OK")
 
     def create():
         h.check("Offset Plane closed", construct_panel() is None)
+        h.check("still the Lid active", cs.active_label() == "Lid", cs.active_label())
         h.fit()
         h.ribbon("Create Sketch")
 
@@ -884,6 +924,11 @@ def rest_steps():
         s["rest_sketch"] = sk.Name
         y = sk.getGlobalPlacement().Base.y
         h.check("Rest: the sketch at y -3", near(y, -3.0), sk.getGlobalPlacement())
+        h.check(
+            "Rest: the sketch is in the active component (the Lid)",
+            cs.container_label(sk) == "Lid",
+            cs.container_label(sk),
+        )
         a = h.to_sketch(sk, V(30, -3, 6))
         b = h.to_sketch(sk, V(50, -3, 16))
         h.draw_rectangle(sk, min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
@@ -913,7 +958,20 @@ def rest_steps():
         if not h.check("Rest: still open", p is not None):
             return
         h.check("Rest: the profile picked", len(p.refs) == 1, p.refs)
-        h.check("Rest: no error", p.message.text() == "", p.message.text())
+        text = p.message.text()
+        h.check("Rest: no error", "⚠" not in text, text)
+        h.check(
+            "Rest: Builds in names the Base's body with its component",
+            p.body_label.text() == "%s (Base)" % base().Label,
+            p.body_label.text(),
+        )
+        h.check(
+            "Rest: the dialog says the body is not in the active component",
+            "is in Base" in text and "active component Lid" in text,
+            text,
+        )
+        h.check("Rest: the Lid still active", cs.active_label() == "Lid", cs.active_label())
+        h.check("Rest: the Lid untouched", near(vol(lid()), s["v_lid_lip"]), vol(lid()))
         gain = vol(base()) - s["v_base_lip"]
         # plate 20 x 10 x 2 = 400, walls (20 x 10 - 16 x 6) x 1 = 104, the old wall inside
         # them 16 x 6 x 2 = 192 taken away: +312 (the 1 deg draft moves it a little)
@@ -934,11 +992,23 @@ def rest_steps():
     def made():
         h.check("Rest dialog closed", p1.rest_panel() is None)
         h.check("one Rest step", len(rests()) == 1)
+        if rests():
+            h.check(
+                "the Rest step is in the Base (the body it changes)",
+                cs.container_label(rests()[0]) == "Base",
+                cs.container_label(rests()[0]),
+            )
         h.check("Base one valid solid", base().Shape.isValid() and len(base().Shape.Solids) == 1)
+        h.check("the Lid as it was", near(vol(lid()), s["v_lid_lip"]), vol(lid()))
         s["v_base_rest"], s["v_lid_rest"] = vol(base()), vol(lid())
         ok_errors("rest")
+        cs.click_radio("Base")
+
+    def base_again():
+        h.check("the Base active again", cs.active_label() == "Base", cs.active_label())
 
     return [
+        step(lid_active, "rest_lid_active"),
         step(offset_plane, "rest_offset_plane"),
         step(click_front, "rest_click_front"),
         step(distance, "rest_plane_distance"),
@@ -951,6 +1021,7 @@ def rest_steps():
         step(click_profile, "rest_click_profile"),
         step(previewed, "rest_previewed"),
         step(made, "rest_made"),
+        step(base_again, "rest_base_active_again"),
     ]
 
 
@@ -1037,6 +1108,7 @@ def build_steps():
         + assign_steps("Base")
         + assign_steps("Lid")
         + shell_steps()
+        + activate_steps("Base", "boss_sketch")
         + rim_sketch_steps("boss_sketch", BOSS_POINTS)
         + boss_steps()
         + rim_sketch_steps("snap_sketch", [SNAP_POINT])
@@ -1300,9 +1372,7 @@ def reopen_steps():
 
     def lip_esc():
         h.check("Lip edit: Esc closed", p2.lip_panel() is None)
-        h.check(
-            "Lip edit: Esc left it", near(vol(base()), s["v_base_before_lip_e"]), vol(base())
-        )
+        h.check("Lip edit: Esc left it", near(vol(base()), s["v_base_before_lip_e"]), vol(base()))
         ok_errors("lip edit")
         h.shot("journey_pl_9_reopened")
 
@@ -1394,7 +1464,9 @@ def timeline_steps():
 
     def snap_deleted():
         h.check("Snap Fit deleted", not snaps())
-        left = [o.Label for o in doc().Objects if getattr(o, "Fission180Type", "") == "SnapFitGroove"]
+        left = [
+            o.Label for o in doc().Objects if getattr(o, "Fission180Type", "") == "SnapFitGroove"
+        ]
         h.check("its groove step went with it", not left, left)
         h.check(
             "the Base's back wall whole again",
