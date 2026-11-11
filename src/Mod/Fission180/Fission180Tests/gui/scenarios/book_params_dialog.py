@@ -70,7 +70,7 @@ def value(name):
 def row(name):
     from fission180 import parameters
 
-    found = [r for r in parameters.user_parameters(doc()) if r["name"] == name]
+    found = [r for r in parameters.user_rows(doc()) if r["name"] == name]
     return found[0] if found else None
 
 

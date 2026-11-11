@@ -252,21 +252,46 @@ def _row_of(doc, obj, name, expressions, derived=False):
     }
 
 
-def derived_parameters(doc):
-    """[{name, unit, value, comment}] of the parameters a Derive brought in (Fusion shows
-    them greyed: they change in their source design)."""
+_LEGACY_KEYS = ("name", "unit", "expression", "value", "comment")
+
+
+def _legacy(row):
+    """A row as scripts and the AI tools have always got it: its value in mm / degrees and
+    `unit` saying which of the two ("mm", "deg" or ""), whatever unit the person sees it in."""
+    out = {key: row[key] for key in _LEGACY_KEYS}
+    out["unit"] = {"length": "mm", "angle": "deg"}.get(row["kind"], "")
+    return out
+
+
+def derived_rows(doc):
+    """The parameters a Derive brought in, as user_rows() gives the user's own (Fusion
+    shows them greyed: they change in their source design)."""
     obj = container(doc)
     return [_row_of(doc, obj, name, {}, derived=True) for name in derived_names(doc)]
 
 
-def user_parameters(doc):
-    """[{name, unit, kind, expression, shown, value, display, comment, favorite}] in the
-    order they were made. `value` is in mm / degrees, `display` in the parameter's unit."""
+def derived_parameters(doc):
+    """[{name, unit, expression, value, comment}] of the parameters a Derive brought in."""
+    return [_legacy(row) for row in derived_rows(doc)]
+
+
+def user_rows(doc):
+    """[{name, unit, kind, expression, shown, value, display, comment, favorite}] of the
+    user parameters in the order they were made, for the Parameters dialog. `unit` is the
+    unit the parameter is shown and typed in (mm, in, rad...), `value` is in mm / degrees,
+    `display` the number in that unit, `shown` what the Expression column shows."""
     obj = container(doc)
     if obj is None:
         return []
     expressions = dict(obj.ExpressionEngine)
     return [_row_of(doc, obj, name, expressions) for name in own_names(doc)]
+
+
+def user_parameters(doc):
+    """[{name, unit, expression, value, comment}] in creation order: the value in mm /
+    degrees and `unit` "mm", "deg" or "" (scripts and the AI tools: the same answer as
+    before a parameter could be shown in inches)."""
+    return [_legacy(row) for row in user_rows(doc)]
 
 
 def add_user(doc, name, unit="mm", text="1", comment="", favorite=True):
@@ -359,7 +384,7 @@ def set_unit(doc, name, unit):
         units[name] = unit
         _remember(doc, UNITS_PROP, "App::PropertyMap", units)
         return
-    row = [r for r in user_parameters(doc) if r["name"] == name][0]
+    row = [r for r in user_rows(doc) if r["name"] == name][0]
     order = own_names(doc)
     favorite = row["favorite"]
     text = row["expression"] or row["display"]

@@ -255,7 +255,7 @@ def c_check():
     from fission180 import parameters
 
     h.check("C: the box closed", editor() is None, editor() and editor().reason())
-    rows = [r for r in parameters.user_parameters(App.ActiveDocument) if r["name"] == "Width"]
+    rows = [r for r in parameters.user_rows(App.ActiveDocument) if r["name"] == "Width"]
     h.check("C: the user parameter Width is made", len(rows) == 1, rows)
     if rows:
         h.check("C: 12 mm", abs(rows[0]["value"] - 12) < 1e-9 and rows[0]["unit"] == "mm", rows[0])

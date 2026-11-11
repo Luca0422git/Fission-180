@@ -363,8 +363,8 @@ class ParametersDialog(QtWidgets.QDialog):
             self._loading = False
 
     def _fill_user(self):
-        rows = parameters.user_parameters(self.doc)
-        derived = parameters.derived_parameters(self.doc)
+        rows = parameters.user_rows(self.doc)
+        derived = parameters.derived_rows(self.doc)
         self.user.setRowCount(len(rows) + len(derived))
         grey = QtGui.QBrush(QtGui.QColor("#8a94a6"))
         for r, row in enumerate(rows + derived):
@@ -421,7 +421,7 @@ class ParametersDialog(QtWidgets.QDialog):
 
     def _fill_favorites(self, model_rows):
         entries = []
-        for row in parameters.user_parameters(self.doc):
+        for row in parameters.user_rows(self.doc):
             if row["favorite"]:
                 cells = [row["name"], unit_label(row["unit"]), row["shown"], row["display"]]
                 entries.append((("user", row["name"]), cells + ["User Parameters"]))

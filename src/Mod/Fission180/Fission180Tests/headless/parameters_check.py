@@ -88,7 +88,7 @@ def negative_length(doc):
 
     parameters.add_user(doc, "Thickness", "mm", "-2.5")
     expect(near(holder(doc).Thickness.Value, -2.5), holder(doc).Thickness)
-    row = parameters.user_parameters(doc)[0]
+    row = parameters.user_rows(doc)[0]
     expect(row["shown"] == "-2.5 mm" and row["kind"] == "length", row)
     parameters.set_user(doc, "Thickness", "-4")
     expect(near(holder(doc).Thickness.Value, -4), holder(doc).Thickness)
@@ -132,7 +132,7 @@ def every_unit(doc):
         held = held.Value if hasattr(held, "Value") else float(held)
         expect(near(held, base, 1e-6), (name, held, base))
         expect(parameters.unit_of_parameter(doc, name) == unit, (name, unit))
-    rows = {r["name"]: r for r in parameters.user_parameters(doc)}
+    rows = {r["name"]: r for r in parameters.user_rows(doc)}
     expect(rows["a_in"]["shown"] == "-2 in" and rows["a_in"]["display"] == "-2", rows["a_in"])
     expect(rows["a_cm"]["shown"] == "-3 cm", rows["a_cm"])
 
@@ -148,7 +148,7 @@ def the_books_limits(doc):
         parameters.set_user(doc, "Arm_Length", typed)
         doc.recompute()
         expect(near(holder(doc).Limits.Value, limit), (typed, holder(doc).Limits))
-    row = [r for r in parameters.user_parameters(doc) if r["name"] == "Limits"][0]
+    row = [r for r in parameters.user_rows(doc) if r["name"] == "Limits"][0]
     expect(row["shown"].replace(" ", "") == "min(100mm;max(45mm;Arm_Length))", row["shown"])
     refused(lambda: parameters.set_user(doc, "Limits", "Limits + 1"), "from itself")
     refused(lambda: parameters.set_user(doc, "Limits", "Arm_Lenght"), "Did you mean Arm_Length?")
@@ -186,7 +186,7 @@ def rename_and_delete(doc):
     parameters.rename_user(doc, "w", "width")
     doc.recompute()
     expect(parameters.own_names(doc) == ["width", "half"], parameters.own_names(doc))
-    rows = {r["name"]: r for r in parameters.user_parameters(doc)}
+    rows = {r["name"]: r for r in parameters.user_rows(doc)}
     expect(rows["half"]["shown"] == "width / 2", rows["half"])
     parameters.set_user(doc, "width", "50")
     doc.recompute()
@@ -206,11 +206,11 @@ def unit_change(doc):
 
     parameters.add_user(doc, "gap", "mm", "25.4")
     parameters.set_unit(doc, "gap", "in")
-    row = parameters.user_parameters(doc)[0]
+    row = parameters.user_rows(doc)[0]
     expect(row["shown"] == "1 in" and near(row["value"], 25.4), row)
     parameters.set_unit(doc, "gap", "deg")  # another kind: its number stays
     doc.recompute()
-    row = parameters.user_parameters(doc)[0]
+    row = parameters.user_rows(doc)[0]
     expect(row["kind"] == "angle" and near(row["value"], 1.0), row)
 
 
@@ -232,7 +232,7 @@ def favourites_and_reopen(doc):
     again = App.openDocument(path)
     try:
         expect(parameters.own_names(again) == ["t", "b", "c"], parameters.own_names(again))
-        rows = {r["name"]: r for r in parameters.user_parameters(again)}
+        rows = {r["name"]: r for r in parameters.user_rows(again)}
         expect(rows["t"]["shown"] == "2 in" and rows["t"]["favorite"], rows["t"])
         expect(not rows["b"]["favorite"] and not rows["c"]["favorite"], rows)
         expect(near(parameters.read(again, "t + 1", "length").value, 50.8 + 1), "t + 1")

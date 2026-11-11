@@ -70,6 +70,9 @@ Parity notes with sources: `docs/fission180/parity/parameters.md` (new).
   `App/Expression.l`) are kept in a property `F180_<name>`; `to_freecad` / `from_freecad`
   hide that.
 - `parameters.py`: `read(doc, text, expect, create)` is the one reader for every value box;
+  `user_parameters()` / `derived_parameters()` / `_set()` / `set_model()` keep their shape
+  and their millimetres for scripts and the AI tools (the dialog uses `user_rows()` and
+  passes the design's unit);
   user parameters with a unit of their own (mm, cm, m, in, ft, deg, rad, none; kept in a
   hidden `Fission180Units` map on the Parameters object), favourites (`Fission180Favorites`),
   the order they were made in (`Fission180Order`; FreeCAD moves a renamed property to the
@@ -129,6 +132,33 @@ Parity notes with sources: `docs/fission180/parity/parameters.md` (new).
 - FreeCAD's unit schema "Standard" writes a length under 0.1 mm in µm and one over 10 m in
   m; the only schema that always writes mm ("Metric small parts & CNC") writes pressure as
   kg/(mm*s^2), so it cannot simply be switched to.
+
+## Tests
+
+Scenarios (real input, paced by state), all PASS on the last commit:
+
+| Scenario | Checks | What |
+|---|---|---|
+| `book_params_dialog` | 88 | "+ User Parameter", refusals, a negative length, the book's min / max, units, names like W / h / t, rename, delete (used: refused), stars, filter, one undo step, Cancel |
+| `book_params_sketch` | 72 | bare names in the dimension box, the list of names, `Name = value`, `=name` in a sketch tool's box, `9 * 1.02` kept, refusals, delete a dimension + Ctrl+Z / Ctrl+Y (bug 3), Change Parameters, a design made before opened |
+| `book_params_fields` | 69 | `Thickness= -2.5 mm` in Extrude, undo / redo of it, the list of names in a dialog field, a typo, the Move dialog with parameters |
+| `book_params_units` | 156 | an inch design through Extrude, a Chamfer with two sets, Fillet, Offset Plane, a Change Parameters edit, five undos and redos, a second design in mm, save / reopen; the inch grid; model parameters in inches (bug 2: fails without `design_units`) |
+| `book_params_drone` | 85 | a plate of 9 areas whose rim follows Arm_Length, five areas extruded, six parameter changes, undo, redo, save / reopen |
+
+Unit tests: `test_parameters_read.py` (31), `test_parameters_core.py` (10),
+`test_design_units_core.py` (7), `test_parameters_freecad.py` (2, running the 17 cases of
+`Fission180Tests/headless/parameters_check.py` in FreeCAD without a window).
+Whole unit suite: 3164 tests, only `test_ai_docs_contract` fails until the generated docs
+are regenerated (done in the last commit). Golden models: 619 pass, 2 xfail (as before).
+Headless AI tools: 465 calls, 0 failed; the AI documentation examples: 180 items, 0 failed.
+Older scenarios of the files touched, all PASS: parameters_trial, sketch_explain_box,
+sketch_qa, sketch_dim_box_closes, sketch_geometry_keep, sketch_geometry_follow,
+sketch_move_dialog, sketch_tools_draw, sketch_tools_circles, sketch_text_basic, undo_fast,
+misc_derive, shell_draft_qa_scale, patterns_params, value_box_units, navbar_grid,
+vex_qa_inch, vex_qa_inch_sketch, fillet_qa_chamfer, fillet2_chamfer, extrude_presspull_qa5,
+gaps_formula_units, inspect_construct, hole_qa, modeling2_sweep_formula, revolve_qa,
+bodies_move, sheetmetal_parameters, emboss_flat, sim_setup_units, primitives_qa,
+primitives_qa_ring.
 
 ## For the other builders (their files; nothing was changed there unless listed)
 
