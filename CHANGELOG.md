@@ -289,6 +289,10 @@ Home view with the Layout Grid on; and Undo pressed while a dialog is open cance
 - **Commands that did nothing without a word now say why** next to the pointer (features,
   joints, Gear, the timeline, sketch constraints), and a dialog cancelled by another command
   says the change was not kept. A browser right-click no longer ends the command you are in.
+- **Fillet and Chamfer never go quiet**: a size that does not fit is held at the largest that
+  fits, with its note, also on lofted surfaces where even small sizes can fail (it stayed in the
+  box with no note and OK did nothing); a refused OK says why next to the pointer too; a number
+  typed over a formula counts at once.
 - **MODIFY > Scale of a sketch failed now and then** with "conflicting constraints" (the dialog
   stayed open and the sketch was left half scaled), for example a sketch with an ellipse, or a
   triangle made twice as big. Every size is now changed at once.

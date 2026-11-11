@@ -2624,10 +2624,10 @@ class BlendPanel(Panel):
                     if self.info is not None
                     else "⚠ Make a solid first (Create Sketch, then Extrude)."
                 )
-                return False
+                return self._ok_refused()
             if self.formula_error:  # a box holds text that is no value: fix it first
                 self._say("⚠ " + self.formula_error)
-                return False
+                return self._ok_refused()
             self._accepting_limit = True  # a size past what fits is searched at once here
             try:
                 if self._limit_searching():  # the search still running: its end now
@@ -2640,11 +2640,11 @@ class BlendPanel(Panel):
             obj = self.target
             if self.error or obj is None:
                 self.show_status()
-                return False
+                return self._ok_refused()
             state = list(obj.State)
             if "Invalid" in state or "Error" in state or not shape_checks.is_valid(obj.Shape):
                 self.show_status()
-                return False
+                return self._ok_refused()
             self._accepted = True
             # Panel.accept() without its plain recompute: a later step this edit broke (and
             # the dialog named) would print its failure to the Report view once more.
@@ -2663,7 +2663,37 @@ class BlendPanel(Panel):
         except Exception as exc:
             self._accepted = False
             self._say("⚠ %s" % exc)
-            return False
+            return self._ok_refused()
+
+    def _ok_refused(self):
+        """OK did not make the step: the dialog stays open and says why, in the dialog and
+        next to the pointer, like a command that cannot start (commands.tell). A click on OK
+        that changed nothing on the screen looked broken: the reason shown before OK was
+        all there was, or nothing (wave 7, fix-8: the surfboard's fillet on GitHub, OK
+        clicked and the dialog open for 240 s). False, for accept()."""
+        try:
+            text = self.message.text().strip()
+            if not text:
+                note = getattr(getattr(self, "limits", None), "note", "") or ""
+                text = "⚠ The %s cannot be made with these picks and this size%s" % (
+                    self.title.lower(),
+                    ": " + note if note else ". Try a smaller size or fewer picks.",
+                )
+                self._say(text)
+            if not getattr(self, "_finishing", False):
+                commands.tell(text.lstrip("⚠").strip())
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+        return False
+
+    def finish(self):
+        """Another command starts (Panel.finish: kept if it can be made, else dropped): no
+        reason next to the pointer then, nobody clicked OK."""
+        self._finishing = True
+        try:
+            return super().finish()
+        finally:
+            self._finishing = False
 
     def reject(self):
         self._accepted = False

@@ -35,6 +35,12 @@ from collections import OrderedDict
 BUDGET = 30.0  # seconds: the guard of a dialog's search (counted over its builds)
 MIN_TRIALS = 3  # ... and at least this many builds, even then
 VERIFY_TRIES = 6  # tidy candidates tried toward the safe side before giving up on tidiness
+# When the value a search starts from does not work either, these many values between it and
+# the refused one are tried before the refusal counts as no limit: OpenCASCADE refuses some
+# small rounds that a bigger one passes (a fillet on the surfboard's lofted skin: 0.01 and
+# 0.02 mm refused, 0.05 to 0.49 mm built; wave 7, fix-8). The search ended with "no limit",
+# the 1 mm typed stayed in the box with no note, and OK refused it again.
+SCAN_TRIES = 4
 SEARCHING_VALUE = "Finding the largest value that fits…"
 SEARCHING_ANGLE = "Finding the largest angle that fits…"
 NOTE_STYLE = "color: #8cc4ff;"  # the note is information, not an error (theme.py swaps it)
@@ -226,6 +232,19 @@ def _tidy_middle(lo, hi, step):
     return mid
 
 
+def _between(good, bad, count):
+    """`count` values strictly between `good` and `bad`, from `good` toward `bad`: evenly
+    spaced on a log scale when they lie far apart on one side of zero (0.1 and 1: 0.16, 0.25,
+    0.4, 0.63), else evenly spaced."""
+    if count <= 0 or good == bad:
+        return []
+    n = count + 1
+    if good * bad > 0 and max(abs(good), abs(bad)) > 4.0 * min(abs(good), abs(bad)):
+        ratio = bad / good
+        return [good * ratio ** (k / float(n)) for k in range(1, n)]
+    return [good + (bad - good) * k / float(n) for k in range(1, n)]
+
+
 def _settled(lo, hi, step, good):
     """True when the bisection between `lo` (works) and `hi` (does not) is done: they are
     within half a step, or no tidy value lies between the tidy value at `lo` and `hi` (the
@@ -289,8 +308,10 @@ def search_steps(
     The value nearest `bad` that still works, between `good` (a value that works) and `bad`
     (one that does not): a tidy multiple of `step` on the side of `good`, built once more to be
     sure. Returns (limit, exact) or (None, False) when nothing between them works (then the
-    refusal is not a limit). `exact` is False when the time budget stopped the bisection before
-    it reached `step` (the limit is then on the safe side of the real one, maybe far from it).
+    refusal is not a limit); when `good` itself does not work, SCAN_TRIES values between it
+    and `bad` are tried first and the first that works is the start. `exact` is False when
+    the time budget stopped the bisection before it reached `step` (the limit is then on the
+    safe side of the real one, maybe far from it).
     `seen` (a dict, optional) gets "fails": the value nearest `good` that was built and did
     not work (values between the limit and it were never tried).
     `works(value)` builds the result with that value and says if it is sound; an exception
@@ -324,7 +345,20 @@ def search_steps(
             return None, False
         yield
         if not build(good):
-            return None, False
+            # a few values between it and the refused one before "no limit" (SCAN_TRIES): the
+            # first that works is where the bisection starts
+            found = None
+            for value in _between(good, bad, SCAN_TRIES):
+                if not room() or (not strict and clock() - begun > budget):
+                    break
+                value = round(value, _digits(step) + 2)
+                yield
+                if build(value):
+                    found = value
+                    break
+            if found is None:
+                return None, False
+            good = found
     if seen is not None:
         seen["works"] = good  # the progress so far: a value that works, one that does not
     start = begun if strict else clock()
