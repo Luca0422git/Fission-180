@@ -25,6 +25,8 @@ the empty component "Wall".
   F  Save, close, reopen, recompute: the plane is where it was.
   G  ASSEMBLE > New Component: "Internal" is chosen, "External" is greyed and says why and
      what to do instead; a click on it changes nothing; Cancel.
+  H  Right-click the Nozzle's body row > Properties: the Properties dialog opens for that
+     body; the Nozzle's own row > Properties: for the component.
 """
 
 import os
@@ -262,6 +264,77 @@ def g_cancelled():
     h.check("Cancel made no component", len(k.labels()) == state["count"], k.labels())
 
 
+# -- H: Properties from the browser (the looks builder's dialog, the orchestrator's menu line) --
+def props():
+    from fission180 import properties_ui
+
+    return properties_ui.dialog()
+
+
+def h_body_menu():
+    body = k.doc().getObject(state["nozzle_body"])
+    state["body_label"] = body.Label
+    h.check(
+        "the body's menu offers Properties",
+        "Properties" in t.row_menu_entries(body.Label),
+        t.row_menu_entries(body.Label),
+    )
+    t.row_menu(body.Label, "Properties")
+
+
+h_body_menu.done = lambda: props() is not None
+h_body_menu.done_what = "the Properties dialog is open"
+
+
+def h_body_props():
+    p = props()
+    if not h.check("Properties opened from the body's row", p is not None):
+        return
+    body = k.doc().getObject(state["nozzle_body"])
+    h.check(
+        "it is about that body (one body counted: the Nozzle's)",
+        [x.Name for x in p.counted] == [body.Name],
+        [x.Label for x in p.counted],
+    )
+    h.check("its title names the body", state["body_label"] in p.title.text(), p.title.text())
+    w.click(p.close_button)
+
+
+h_body_props.done = lambda: props() is None
+h_body_props.done_what = "the Properties dialog closed"
+
+
+def h_component_menu():
+    h.check(
+        "the component's menu offers Properties",
+        "Properties" in t.row_menu_entries("Nozzle"),
+        t.row_menu_entries("Nozzle"),
+    )
+    t.row_menu("Nozzle", "Properties")
+
+
+h_component_menu.done = lambda: props() is not None
+h_component_menu.done_what = "the Properties dialog is open"
+
+
+def h_component_props():
+    p = props()
+    if not h.check("Properties opened from the component's row", p is not None):
+        return
+    body = k.doc().getObject(state["nozzle_body"])
+    h.check(
+        "it is about that component (its body counted)",
+        [x.Name for x in p.counted] == [body.Name],
+        [x.Label for x in p.counted],
+    )
+    h.check("its title names the component", "Nozzle" in p.title.text(), p.title.text())
+    w.click(p.close_button)
+
+
+h_component_props.done = lambda: props() is None
+h_component_props.done_what = "the Properties dialog closed"
+
+
 h.run(
     "book_components2_refs",
     [
@@ -295,6 +368,10 @@ h.run(
         g_choice,
         g_unchanged,
         g_cancelled,
+        h_body_menu,
+        h_body_props,
+        h_component_menu,
+        h_component_props,
     ],
     paced_by="state",
 )

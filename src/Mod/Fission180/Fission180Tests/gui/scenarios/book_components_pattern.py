@@ -315,8 +315,8 @@ def e_done():
 
         rows = {c.Label: c for c in made[0].Group if components.is_component(c)}
         h.check(
-            "its rows: the Housing and the Bolt, as in the original",
-            sorted(rows) == ["Bolt", "Housing"],
+            "its rows as in the original: the Housing, the Bolt and the Bolt's two copies (A)",
+            sorted(rows) == ["Bolt", "Bolt:2", "Bolt:3", "Housing"],
             sorted(rows),
         )
         h.check(
