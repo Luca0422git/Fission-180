@@ -362,6 +362,59 @@ class SketchIntersect(_SketchCommand):
         )
 
 
+# -- Sketch Dimension ----------------------------------------------------------------
+class SketchDimension(_SketchCommand):
+    """Fusion's Sketch Dimension (D): Fission 180's own tool (sketch_dimension_tool.py).
+    Until wave 7 FreeCAD's Sketcher_Dimension, whose placing click was a pick whenever it
+    landed on a line or an axis."""
+
+    title = "Sketch Dimension"
+    tip = (
+        "Dimension the sketch: click a line, circle or arc, or two points or lines, then "
+        "click where the dimension goes and type its value (D)"
+    )
+    icon = "sk_dimension"
+    gives_way = False  # sketch_draw.run ends the running tool itself
+
+    def run(self):
+        if _in_sketch(self.title) is None:
+            return
+        from . import sketch_dimension_tool, sketch_draw
+
+        sketch_draw.run(sketch_dimension_tool.Dimension)
+
+
+class SketchToggleDriven(_SketchCommand):
+    """Fusion's Toggle Driven (the right-click menu on a dimension): a driving dimension
+    becomes a driven one (in brackets: it shows the size) and back."""
+
+    title = "Toggle Driven"
+    tip = (
+        "Make the selected dimension driven (it only shows the size, in brackets) or "
+        "driving again"
+    )
+    icon = "sk_dimension"
+    gives_way = False
+
+    def run(self):
+        sketch = _in_sketch(self.title)
+        if sketch is None:
+            return
+        from . import sketch_dimension_tool as tool
+
+        indices = tool.dimensions_at_hand(sketch) or tool.remembered(sketch)
+        if not indices:
+            commands.tell("Toggle Driven: click a dimension first (its value), then choose it.")
+            return
+        text = tool.toggle_driven(sketch, indices)
+        if text:
+            commands.tell(text)
+        try:
+            Gui.Selection.clearSelection()
+        except Exception:
+            pass
+
+
 # -- constraints ---------------------------------------------------------------------
 class _Constraint(_SketchCommand):
     """A CONSTRAINTS tool the Fusion way, on Fission 180's own pick tools
@@ -458,6 +511,8 @@ COMMANDS = {
     "Fission180_SketchTangent": CONSTRAINTS["Fission180_SketchTangent"],
     "Fission180_SketchEqual": CONSTRAINTS["Fission180_SketchEqual"],
     "Fission180_SketchSymmetry": CONSTRAINTS["Fission180_SketchSymmetry"],
+    "Fission180_SketchDimension": SketchDimension,
+    "Fission180_SketchToggleDriven": SketchToggleDriven,
     "Fission180_FinishSketch": FinishSketch,
     "Fission180_SketchLine": SketchLine,
     "Fission180_PolygonCircumscribed": PolygonCircumscribed,

@@ -579,8 +579,25 @@ class PickConstraint(draw.DrawTool):
             return
         groups = self.plan(selection)
         if not groups:
-            # Fusion starts the tool and waits for picks; what was selected is let go
+            # Fusion starts the tool and waits for picks. What of the selection can start
+            # the constraint is its first pick (one line selected, then Parallel: click the
+            # second line); the rest is let go
+            picks = []
+            for item in selection:
+                if item not in picks and self.fits(picks, item):
+                    picks.append(item)
+                if len(picks) >= self.needs - 1:
+                    break
             self._clear_selection()
+            if picks and not self.complete(picks):
+                self.picks = picks
+                self.step = len(picks)
+                self._tell()
+                log(
+                    "%s: %d picked already (selected first). %s"
+                    % (self.title, len(picks), self.prompt())
+                )
+                return
             self.say(
                 "%s works on %s: what was selected does not fit. %s"
                 % (self.title, self.takes, self._capital(self.prompt()))

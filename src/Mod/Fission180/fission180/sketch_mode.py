@@ -787,6 +787,15 @@ def label_point(sketch, index):
         return center + direction * (radius + c.LabelDistance)
     if c.Type not in ("Distance", "DistanceX", "DistanceY"):
         return None
+    try:
+        # every form of a length dimension: from the origin, to a projected point, a point
+        # to a line (sf/book-sketch-b; the code below knew two points of sketch curves)
+        from . import sketch_dimension_tool
+
+        spot = sketch_dimension_tool.label_point(sketch, index)
+        return App.Vector(spot[0], spot[1], 0) if spot is not None else None
+    except Exception:
+        pass
 
     def point(geo, pos):
         g = sketch.Geometry[geo]
@@ -1812,6 +1821,17 @@ class SketchSession:
                         return True
                     QtCore.QTimer.singleShot(0, lambda: self.edit_dimension(index, pos))
                     return True
+        try:
+            # the text of a vertical or slanted dimension is turned along it: FreeCAD only
+            # finds its middle (sf/book-sketch-b, the book report: "hard to hit")
+            from . import sketch_dimension_tool
+
+            found = sketch_dimension_tool.dimension_at(self, pos)
+            if found is not None and self.sketch.Constraints[found].Driving:
+                QtCore.QTimer.singleShot(0, lambda: self.edit_dimension(found, pos))
+                return True
+        except Exception as exc:
+            warn("dimension box: %s" % exc)
         return False
 
     def chain_clicked(self, pos):
@@ -2459,7 +2479,10 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         # Fusion refuses sizes of 0 or less: a dimension of 0 collapses the curve (FreeCAD's
         # solver then fails and the sketch breaks).
         if value <= 1e-7:
-            raise ValueError("The value must be more than 0.")
+            raise ValueError(
+                "The value must be more than 0. To make two things meet use Coincident; to "
+                "line them up, Horizontal/Vertical or Collinear."
+            )
         if angle and value >= 360.0:
             raise ValueError("The angle must be less than 360 deg.")
         try:
