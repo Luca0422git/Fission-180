@@ -1352,6 +1352,12 @@ DRAWING_TABLES = group(
             note="A parts list of the components a view shows, with balloons.",
         ),
         item(
+            "Parts List",
+            "Fission180_DrawingPartsList",
+            "dw_table",
+            note="The components a view shows, numbered, with a balloon on each.",
+        ),
+        item(
             "Bend Table",
             "Fission180_DrawingBendTable",
             "dw_table",
@@ -1374,8 +1380,18 @@ DRAWING_EXPORT = group(
     [
         item("Export PDF", "Fission180_DrawingExportPDF", "dw_export_pdf"),
         item("Export DXF", "Fission180_DrawingExportDXF", "dw_export_dxf"),
-        item("Export DWG", None, "export"),
-        item("Export CSV", None, "export"),
+        item(
+            "Export DWG",
+            "Fission180_DrawingExportDWG",
+            "export",
+            note="Needs a DWG converter program on this computer; a DXF otherwise.",
+        ),
+        item(
+            "Export CSV",
+            "Fission180_DrawingExportCSV",
+            "export",
+            note="The parts list (or a bend table) as a file for a spreadsheet.",
+        ),
     ],
 )
 

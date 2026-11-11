@@ -1168,13 +1168,47 @@ def _start(panel_class, *args):
     page = _need_page()
     if page is None:
         return None
+    return _open_panel(lambda: panel_class(page, *args), panel_class.__name__)
+
+
+def _open_panel(make, name="drawing command"):
+    """Make a drawing dialog and show it; one that refuses to start (a DrawingError: "make
+    the parts list first") says why next to the mouse and leaves nothing behind."""
+    before = _sheet_handler()
     try:
-        return panel_class(page, *args).show()
+        return make().show()
     except drawing.DrawingError as exc:
+        _drop_half_made(before)
         commands.tell(str(exc))
     except Exception as exc:
-        warn("%s: %s" % (panel_class.__name__, exc))
+        _drop_half_made(before)
+        warn("%s: %s" % (name, exc))
     return None
+
+
+def _sheet_handler():
+    inp = STATE.get("input")
+    return inp.handler if inp is not None else None
+
+
+def _drop_half_made(before):
+    """A dialog that refused in its __init__ had already opened its undo step and taken
+    the sheet's mouse: it is put away like a cancelled one. Left as it was, the next mouse
+    move on the sheet went to a dialog with half its fields ("'TablePanel' object has no
+    attribute 'view'", found with a six-component design) and its open undo step swallowed
+    the next command's."""
+    half = _sheet_handler()
+    if half is None or half is before:
+        return
+    try:
+        half.reject()
+    except Exception as exc:
+        log("half-made drawing dialog: %s" % exc)
+    inp = STATE.get("input")
+    if inp is not None and inp.handler is half:
+        inp.handler = None
+    if taskui._OPEN.get("dialog") is half:
+        taskui._OPEN["dialog"] = None
 
 
 def _single_base(page):
@@ -1190,9 +1224,13 @@ class CreateDrawingPanel(taskui.Panel):
     icon = "dw_new"
     last = None
 
-    def __init__(self, doc):
+    def __init__(self, doc, preselect=None):
         super().__init__(doc, "New Drawing")
         type(self).last = self
+        # preselect: the bodies of the component the command was started on (the browser's
+        # right-click > Create Drawing). Fusion: "The Contents setting is automatically set
+        # to Select and the component is added to the selection set."
+        wanted = {b.Name for b in (preselect or []) if drawing.alive(b)}
         units = _design_units(doc)
         standard = core.default_standard(units)
         self.reference = QtWidgets.QLabel(doc.Label)
@@ -1207,7 +1245,8 @@ class CreateDrawingPanel(taskui.Panel):
             item = QtWidgets.QListWidgetItem(_body_caption(body))
             item.setData(QtCore.Qt.UserRole, body.Name)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            ticked = not wanted or body.Name in wanted
+            item.setCheckState(QtCore.Qt.Checked if ticked else QtCore.Qt.Unchecked)
             self.bodies.addItem(item)
         for flat in _flat_patterns(doc):
             # Fusion: a sheet metal part's flat pattern can be drawn instead (sm-flat)
@@ -1232,6 +1271,8 @@ class CreateDrawingPanel(taskui.Panel):
         self.standard.currentTextChanged.connect(self._standard_changed)
         self.finish_layout()
         self.page = None
+        if wanted:
+            self.contents.setCurrentText("Select")
 
     def _contents_changed(self, text):
         try:
@@ -1338,30 +1379,32 @@ def automatic_views(page):
         return None
     doc.openTransaction("Automatic Views")
     try:
-        projection = page.ProjectionType
-        scale = drawing.automatic_scale(page, sources, "Front")
-        axes = core.view_axes(*drawing.orientation_axes("Front"))
-        w, h, d = drawing.model_extent(sources, axes)
-        gap = 15.0
-        sx = 1.0 if projection == "Third angle" else -1.0
-        dx = sx * ((w + d) / 2.0 * scale + gap)
-        dy = sx * ((h + d) / 2.0 * scale + gap)
-        x0, y0, x1, y1 = core.drawing_area(drawing.standard_of(page), drawing.sheet_of(page))
-        block_w = (w + d) * scale + gap
-        block_h = (h + d) * scale + gap
-        cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-        bx = cx - sx * (block_w / 2.0 - w * scale / 2.0)
-        by = cy - sx * (block_h / 2.0 - h * scale / 2.0)
+        # the scale and the places at which the four views do not touch (they were laid
+        # out as if the isometric view were as small as the part's depth, and the kind of
+        # each view was read from its direction on the sheet: a long part's corner view
+        # counted as a second "Right" view and no view at all was made)
+        plan = drawing.automatic_plan(page, sources, "Front")
+        scale = plan["scale"]
+        bx, by = plan["views"]["Base"]
         base = drawing.add_base_view(page, sources, bx, by, "Front", scale=scale)
-        for vx, vy in ((0.0, dy), (dx, 0.0), (dx, dy)):
-            kind = core.projected_kind(vx, vy, projection)
-            drawing.add_projected(base, kind, bx + vx, by + vy)
+        for kind in core.AUTO_KINDS:
+            x, y = plan["views"][kind]
+            drawing.add_projected(base, kind, x, y)
         doc.recompute()
         taskui._end_transaction(doc)
     except Exception as exc:
         taskui._end_transaction(doc, abort=True)
         warn("automatic views: %s" % exc)
+        commands.tell(
+            "The automatic views could not be made (%s). Place them yourself: "
+            "CREATE > Base View, then Projected View." % exc
+        )
         return None
+    if not plan["fits"]:
+        commands.tell(
+            "The design is too big for this sheet even at the smallest scale: the views "
+            "overlap. Choose a bigger sheet, or scale the base view down (double-click it)."
+        )
     _later(refresh_drawings, doc.Name, ms=100)
     return base
 
@@ -1466,10 +1509,13 @@ class ProjectedPanel(DrawingPanel):
         if not drawing.base_views(page):
             raise drawing.DrawingError("Place a base view first (CREATE > Base View).")
         self.finish_layout()
+        # Fusion: the parent view is clicked first (one that is already selected counts).
+        # While the only base view was the parent by itself, a look-alike preview followed
+        # the mouse before any click, and the click "on the base view to start" took it
+        # away again: "the base view shifted" (book parity report, projects 21 + 22).
         preselected = [v for v in _selected_views(page) if v.TypeId == drawing.PART_VIEW]
-        start = preselected[0] if len(preselected) == 1 else _single_base(page)
-        if start is not None:
-            self._use(start)
+        if len(preselected) == 1:
+            self._use(preselected[0])
         else:
             self.say("Click the view to project from.")
 
@@ -1486,10 +1532,19 @@ class ProjectedPanel(DrawingPanel):
             self.message.setText("")
             self._use(view)
             return True
+        # where the click is, also when no mouse move came before it (a pointer that
+        # jumps to the place and clicks)
+        self.on_move(point, event)
         if self.preview is not None:
             self.placed.append(self.preview)
             self.preview = None
+            self.message.setText("")
             self.say("Placed. Click to place another one; Enter or Esc when done.")
+        elif not self.message.text():
+            self.message.setText(
+                "Move off the view to the side (or the corner) the new view should stand "
+                "on, then click."
+            )
         return True
 
     def on_move(self, point, event):
@@ -1500,8 +1555,9 @@ class ProjectedPanel(DrawingPanel):
         dx, dy = point[0] - px, point[1] - py
         if not core.outside(dx, dy, half_w, half_h):
             self._drop_preview()
+            self.message.setText("")
             return
-        kind = core.projected_kind(dx, dy, self.page.ProjectionType)
+        kind = core.projected_kind(dx, dy, self.page.ProjectionType, half_w, half_h)
         taken = {
             getattr(v, "Fission180Kind", "")
             for v in drawing.children_of(self.parent)
@@ -1509,7 +1565,13 @@ class ProjectedPanel(DrawingPanel):
         }
         if kind in taken:
             self._drop_preview()
+            # (never silently nothing: say why no view follows the mouse here)
+            self.message.setText(
+                "This view already has a %s view. Move to another side or to a corner (an "
+                "isometric view)." % drawing._kind_label(kind)
+            )
             return
+        self.message.setText("")
         ox, oy = core.projected_offset(kind, dx, dy)
         if self.preview is not None and getattr(self.preview, "Fission180Kind", "") != kind:
             self._drop_preview()
@@ -2595,15 +2657,25 @@ class TablePanel(DrawingPanel):
             self.message.setText(str(exc))
             return True
         self.clear_overlay()
+        rows = drawing.table_rows(self.table)
         self.say(
             "Parts list with %d row%s and %d balloon%s. OK to finish."
             % (
-                len(drawing.table_rows(self.table)),
-                "" if len(drawing.table_rows(self.table)) == 1 else "s",
+                len(rows),
+                "" if len(rows) == 1 else "s",
                 len(balloons),
                 "" if len(balloons) == 1 else "s",
             )
         )
+        have = {b.Text for b in balloons}
+        without = [str(r["PartNumber"]) for r in rows if str(r["Item"]) not in have]
+        if without:
+            # (never a row without its balloon and no word about it)
+            self.message.setText(
+                "No balloon for %s: this view does not show %s (hidden behind other "
+                "parts). Use TABLES > Balloon on a view that does."
+                % (", ".join(without), "it" if len(without) == 1 else "them")
+            )
         self.schedule()
         return True
 
@@ -2621,6 +2693,13 @@ class TablePanel(DrawingPanel):
         return super().accept()
 
 
+class PartsListPanel(TablePanel):
+    """TABLES > Parts List (Fusion has it beside Table, whose dialog starts on Parts List
+    too): the same command under the name the book uses."""
+
+    title = "Parts List"
+
+
 class BalloonPanel(DrawingPanel):
     """Fusion's Balloon: click a component's edge on a view, then where the balloon
     goes; its number is the component's item in the parts list."""
@@ -2633,7 +2712,7 @@ class BalloonPanel(DrawingPanel):
         if drawing.parts_list_of(page) is None:
             raise drawing.DrawingError(
                 "Balloons number the parts list's rows: make the parts list first "
-                "(TABLES > Table)."
+                "(TABLES > Parts List)."
             )
         self.origin = None
         self.made = []
@@ -2656,7 +2735,7 @@ class BalloonPanel(DrawingPanel):
             self.say("Click where balloon %s goes." % item)
             return True
         view, origin, item = self.origin
-        self.made.append(drawing.add_balloon(view, origin, point, item).Name)
+        self.made.append(drawing.add_balloon_at(view, origin, point, item).Name)
         self.origin = None
         self.clear_overlay()
         self.say("Balloon %s placed. Click the next component, or Enter / Esc." % item)
@@ -2725,17 +2804,13 @@ def edit_view(view):
     page = drawing.page_of(view)
     if page is None:
         return None
-    try:
-        if drawing.kind(view) == "BaseView":
-            return BaseViewPanel(page, view).show()
-        if drawing.is_section(view):
-            return SectionPanel(page, view).show()
-        if view.TypeId == drawing.DETAIL:
-            return DetailPanel(page, view).show()
-        return EditViewPanel(page, view).show()
-    except Exception as exc:
-        warn("edit view: %s" % exc)
-    return None
+    if drawing.kind(view) == "BaseView":
+        return _open_panel(lambda: BaseViewPanel(page, view), "edit view")
+    if drawing.is_section(view):
+        return _open_panel(lambda: SectionPanel(page, view), "edit view")
+    if view.TypeId == drawing.DETAIL:
+        return _open_panel(lambda: DetailPanel(page, view), "edit view")
+    return _open_panel(lambda: EditViewPanel(page, view), "edit view")
 
 
 class TitleBlockPanel(DrawingPanel):
@@ -2770,11 +2845,7 @@ class TitleBlockPanel(DrawingPanel):
     def start(cls, page):
         if not commands.finish_open_dialog():
             return None
-        try:
-            return cls(page).show()
-        except drawing.DrawingError as exc:
-            commands.tell(str(exc))
-        return None
+        return _open_panel(lambda: cls(page), "title block")
 
 
 # ------------------------------------------------------------------ delete
@@ -2872,15 +2943,28 @@ class ExportDialog(QtWidgets.QDialog):
         try:
             from . import export_report_ui, export_ui
 
+            if self.report_kind is None:
+                return  # (a table's CSV: nothing of the sheet is in it to lose)
             export_report_ui.report_losses(
                 self.page.Document,
                 self.page,
-                "drawing_" + self.kind,
+                "drawing_" + (self.report_kind or self.kind),
                 export_ui.files_label(self.paths),
                 which=which,
             )
         except Exception as exc:
             warn("drawing export report: %s" % exc)
+
+    report_kind = ""  # "" = the dialog's kind; a DWG is its DXF converted: "dxf"
+
+    def _write(self, path, which):
+        """Write the file(s); the paths written (drawing_export_ui's dialogs override)."""
+        from . import drawing_sheets
+
+        if self.kind == "pdf":
+            drawing_sheets.export_pdf(self.page, path, which)
+            return [path]
+        return drawing_sheets.export_dxf(self.page, path, which)
 
     def _browse(self):
         try:
@@ -2905,15 +2989,14 @@ class ExportDialog(QtWidgets.QDialog):
             if not name.lower().endswith("." + self.kind):
                 name += "." + self.kind
             path = os.path.join(folder, name)
-            from . import drawing_sheets
-
+            if not os.path.isdir(folder):
+                self.message.setText(
+                    "There is no folder %s: choose one that exists (Browse...)." % folder
+                )
+                return
             which = "all" if self.sheets.currentIndex() == 0 else "current"
-            if self.kind == "pdf":
-                drawing_sheets.export_pdf(self.page, path, which)
-                self.paths = [path]
-            else:
-                self.paths = drawing_sheets.export_dxf(self.page, path, which)
-                path = self.paths[0]
+            self.paths = self._write(path, which)
+            path = self.paths[0]
             self.path = path
             log("exported %s" % ", ".join(self.paths))
             if self.open_after.isChecked():
@@ -2921,6 +3004,8 @@ class ExportDialog(QtWidgets.QDialog):
             self.accept()
             commands.tell("Exported %s" % path)
             self._report(which)
+        except drawing.DrawingError as exc:
+            self.message.setText(str(exc))  # (a refusal that says what to do: no error)
         except Exception as exc:
             self.message.setText("Could not export: %s" % exc)
             warn("export %s: %s" % (self.kind, exc))
@@ -3001,12 +3086,43 @@ class NewDrawingCommand(_Base):
                 "first, then File > New Drawing."
             )
             return
+        picked, named = _picked_for_drawing(doc)
+        if named and not picked:
+            commands.tell(
+                "%s has no solid body to draw yet. Make a body in it first, or choose "
+                "File > New Drawing for the whole design." % named
+            )
+            return
         if active_page() is not None:
             show_design(doc)
         if not commands.finish_open_dialog():
             return
-        CreateDrawingPanel(doc)
+        CreateDrawingPanel(doc, picked)
         Gui.Control.showDialog(CreateDrawingPanel.last)
+
+
+def _picked_for_drawing(doc):
+    """(bodies, names) of the components or bodies selected when New Drawing starts (the
+    browser's right-click > Create Drawing selects its component first): the solid bodies
+    inside them, sub-components included. ([], "") with nothing of the kind selected."""
+    from . import components
+
+    solids = drawing.design_bodies(doc)
+    solid_names = {b.Name for b in solids}
+    found, names = [], []
+    try:
+        selected = [o for o in Gui.Selection.getSelection(doc.Name) if o is not None]
+    except Exception:
+        selected = []
+    for obj in selected:
+        if not components.is_component(obj):
+            continue  # (a face or body clicked in the view is no choice of contents)
+        inside = components.bodies_in(doc, obj, recursive=True)
+        names.append(obj.Label)
+        for body in inside:
+            if body.Name in solid_names and body.Name not in [b.Name for b in found]:
+                found.append(body)
+    return found, ", ".join(names)
 
 
 class BaseViewCommand(_Base):
@@ -3132,6 +3248,15 @@ class TableCommand(_Base):
         _start(TablePanel)
 
 
+class PartsListCommand(_Base):
+    title = "Parts List"
+    tip = "The components a view shows, listed with item numbers, and a balloon on each"
+    icon = "dw_table"
+
+    def run(self):
+        _start(PartsListPanel)
+
+
 class BalloonCommand(_Base):
     title = "Balloon"
     tip = "A numbered balloon pointing at a component (needs the parts list)"
@@ -3212,6 +3337,7 @@ COMMANDS = {
     "Fission180_DrawingDiameterDimension": DiameterDimensionCommand,
     "Fission180_DrawingText": TextCommand,
     "Fission180_DrawingTable": TableCommand,
+    "Fission180_DrawingPartsList": PartsListCommand,
     "Fission180_DrawingBalloon": BalloonCommand,
     "Fission180_DrawingEditView": EditViewCommand,
     "Fission180_DrawingTitleBlock": TitleBlockCommand,

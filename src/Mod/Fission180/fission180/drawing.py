@@ -700,28 +700,48 @@ def tangent_of(view):
 
 
 def model_extent(sources, axes):
-    """(width, height, depth) of the sources seen along a view's axes (mm at 1:1)."""
-    lo = [float("inf")] * 3
-    hi = [-float("inf")] * 3
-    for src in sources:
-        try:
-            shape = src.Shape
-            for vertex in shape.Vertexes:
-                p = vertex.Point
-                for i, axis in enumerate(axes):
-                    d = p.x * axis[0] + p.y * axis[1] + p.z * axis[2]
-                    lo[i] = min(lo[i], d)
-                    hi[i] = max(hi[i], d)
-        except Exception:
-            continue
-    if lo[0] == float("inf"):
-        return 10.0, 10.0, 10.0
-    return tuple(max(1e-3, hi[i] - lo[i]) for i in range(3))
+    """(width, height, depth) of the sources seen along a view's axes (mm at 1:1): the box
+    of the parts where they stand in the design, turned into the view.
+
+    (It measured the corner points of each body where the body sits inside its component:
+    a disc, which has two corner points on its seam, counted as a line, and a component
+    that was moved counted where it was made. The automatic scale came out too big and the
+    automatic views lay on one another: book parity report, chapter 10.)"""
+    try:
+        import Part
+
+        from . import bodies
+
+        shapes = []
+        for src in sources:
+            if not alive(src):
+                continue
+            try:
+                shape = bodies.global_shape(src)
+            except Exception:
+                shape = src.Shape.copy()
+            if not shape.isNull():
+                shapes.append(shape)
+        if shapes:
+            x, y, d = axes
+            matrix = App.Matrix(
+                x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, d[0], d[1], d[2], 0, 0, 0, 0, 1
+            )
+            box = Part.makeCompound(shapes).transformed(matrix, True).optimalBoundingBox(False)
+            return (
+                max(1e-3, box.XLength),
+                max(1e-3, box.YLength),
+                max(1e-3, box.ZLength),
+            )
+    except Exception as exc:
+        log("model extent: %s" % exc)
+    return 10.0, 10.0, 10.0
 
 
 def automatic_scale(page, sources, orientation="Front"):
-    """Fusion's Automatic scale: the largest standard scale at which the base view and a
-    projected view beside and above it fit the sheet."""
+    """The scale a new base view starts at: the largest standard scale at which the view
+    and a projected view beside and above it fit the sheet. (The Automatic views take
+    automatic_plan's scale: with the isometric view counted in.)"""
     direction, xdir = orientation_axes(orientation)
     axes = core.view_axes(direction, xdir)
     width, height, depth = model_extent(sources, axes)
@@ -730,6 +750,31 @@ def automatic_scale(page, sources, orientation="Front"):
     return core.fit_scale(
         (width + depth) * (1 + gap), (height + depth) * (1 + gap), x1 - x0, y1 - y0
     )
+
+
+def automatic_plan(page, sources, orientation="Front"):
+    """core.automatic_layout for this sheet and these parts: the scale and the places of
+    the base view and the three views Automatic adds (core.AUTO_KINDS)."""
+    direction, xdir = orientation_axes(orientation)
+    axes = core.view_axes(direction, xdir)
+    width, height, depth = model_extent(sources, axes)
+    iso_axes = core.view_axes(*core.projected_axes(axes, "FrontTopRight"))
+    iso_w, iso_h, _iso_d = model_extent(sources, iso_axes)
+    return core.automatic_layout(
+        (width, height),
+        (width, depth),
+        (depth, height),
+        (iso_w, iso_h),
+        core.drawing_area(standard_of(page), sheet_of(page)),
+        _get(page, "ProjectionType", "") or core.projection_of(standard_of(page)),
+    )
+
+
+def view_rect(view, margin=0.0):
+    """(x0, y0, x1, y1) of what a view draws on the page (mm)."""
+    x, y = view_position(view)
+    half_w, half_h = view_extent(view)
+    return (x - half_w - margin, y - half_h - margin, x + half_w + margin, y + half_h + margin)
 
 
 def orientation_axes(name):
@@ -1007,7 +1052,9 @@ def add_section(parent, p1, p2, side, position, label=None, scale=None, points=N
     _add(section, "App::PropertyString", "Fission180Points", json.dumps([list(p) for p in pts]))
     _add(section, "App::PropertyString", "Fission180SectionKind", section_kind)
     px, py = view_position(parent)
-    _add(section, "App::PropertyFloatList", "Fission180Offset", [position[0] - px, position[1] - py])
+    _add(
+        section, "App::PropertyFloatList", "Fission180Offset", [position[0] - px, position[1] - py]
+    )
     # Fusion's section views show no hidden edges by default
     style = {"Visible and Hidden Edges": "Visible Edges", "Shaded with Hidden Edges": "Shaded"}
     _style(section, style.get(style_of(parent), style_of(parent)), tangent_of(parent))
@@ -1102,7 +1149,10 @@ def set_section_depth(section, mode, value=0.0):
             "Section depth works with a straight cut line: this section's line has bends."
         )
     _add(
-        section, "App::PropertyString", "Fission180Depth", json.dumps({"mode": mode, "value": value})
+        section,
+        "App::PropertyString",
+        "Fission180Depth",
+        json.dumps({"mode": mode, "value": value}),
     )
     drawing_depth.refresh(section, force=True)
     return section
@@ -1705,7 +1755,9 @@ def refresh_auto_marks(view, force=False):
     for x1, y1, x2, y2 in geometry["lines"]:
         tags.append(view.makeCosmeticLine(V(x1, y1, 0), V(x2, y2, 0), LINE_DASHDOT, 0.18))
     _add(view, "App::PropertyStringList", "Fission180AutoTags", tags)
-    _add(view, "App::PropertyString", "Fission180AutoGeometry", json.dumps(geometry, sort_keys=True))
+    _add(
+        view, "App::PropertyString", "Fission180AutoGeometry", json.dumps(geometry, sort_keys=True)
+    )
     try:
         view.recompute()
     except Exception as exc:
@@ -1860,8 +1912,28 @@ def add_text(page, lines, position, size=3.5, width=None):
     return note
 
 
+def add_balloon_at(view, origin, position, text):
+    """A balloon whose arrow points at the page point `origin` and whose circle is at the
+    page point `position` (mm on the sheet), whatever the view's scale.
+
+    TechDraw keeps a balloon's two points in its view's own units (it draws them at
+    X * the view's scale from the view's middle). Page offsets were written there as they
+    were, so in a 1:2 view every balloon stood at half its distance, its arrow off its
+    part and the balloons on one another (book parity report, chapter 10)."""
+    x, y = view_position(view)
+    s = scale_of(view) or 1.0
+    return add_balloon(
+        view,
+        (x + (origin[0] - x) / s, y + (origin[1] - y) / s),
+        (x + (position[0] - x) / s, y + (position[1] - y) / s),
+        text,
+    )
+
+
 def add_balloon(view, origin, position, text):
-    """A balloon pointing at `origin` (page) with its circle at `position` (page)."""
+    """A balloon given TechDraw's way: `origin` (the arrow's tip) and `position` (the
+    circle) are the view's position plus offsets in the view's own, unscaled units (a bend
+    identifier, flatpattern_drawing.py). For points on the sheet: add_balloon_at."""
     page = page_of(view)
     doc = view.Document
     balloon = doc.addObject(BALLOON, "Balloon")
@@ -1880,11 +1952,13 @@ def add_balloon(view, origin, position, text):
 
 
 def balloon_page_points(balloon):
+    """(the arrow's tip, the circle's middle) of a balloon on the sheet (page mm)."""
     view = balloon.SourceView
     x, y = view_position(view) if view is not None else (0.0, 0.0)
+    s = (scale_of(view) or 1.0) if view is not None else 1.0
     return (
-        (x + _value(balloon.OriginX), y + _value(balloon.OriginY)),
-        (x + _value(balloon.X), y + _value(balloon.Y)),
+        (x + _value(balloon.OriginX) * s, y + _value(balloon.OriginY) * s),
+        (x + _value(balloon.X) * s, y + _value(balloon.Y) * s),
     )
 
 
@@ -1981,17 +2055,36 @@ def refresh_parts_list(table):
 
 
 def add_row_balloons(view, rows):
-    made = []
-    half_w, half_h = view_extent(view)
-    centre = view_position(view)
+    """A balloon per parts-list row on `view`, none on another and none on a neighbouring
+    view (core.balloon_layout: they stood on a ray from the view's middle through each
+    component, so the balloons of parts on one axle lay on one another)."""
     middle = centre_of(view)  # (once: it measures every part the view shows)
-    for i, row in enumerate(rows):
+    found = []
+    for row in rows:
         anchor = component_anchor(view, row.get("bodies", []), middle)
-        if anchor is None:
-            continue
-        spot = core.balloon_spot(centre, anchor, half_w, half_h, i)
-        made.append(add_balloon(view, anchor, spot, row["Item"]))
-    return made
+        if anchor is not None:
+            found.append((row, anchor))
+    if not found:
+        return []
+    page = page_of(view)
+    blocked = [view_rect(v) for v in all_views(page) if not same(v, view)]
+    try:
+        blocked += [view_rect_of_symbol(o) for o in annotations(page) if kind(o) == "PartsList"]
+    except Exception:
+        pass
+    if _get(page, "Fission180TitleBlock", False):
+        blocked.append(core.title_block_rect(standard_of(page), sheet_of(page)))
+    area = core.frame_rect(standard_of(page), sheet_of(page))
+    spots = core.balloon_layout(view_rect(view), [anchor for _row, anchor in found], blocked, area)
+    return [
+        add_balloon_at(view, anchor, spot, row["Item"]) for (row, anchor), spot in zip(found, spots)
+    ]
+
+
+def view_rect_of_symbol(table):
+    """(x0, y0, x1, y1) of a parts list on the page."""
+    layout, corner = table_layout_of(table)
+    return (corner[0], corner[1] - layout["height"], corner[0] + layout["width"], corner[1])
 
 
 def component_anchor(view, body_names, middle=None):
