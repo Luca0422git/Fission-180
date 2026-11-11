@@ -846,7 +846,10 @@ class _PatternTool(draw.DrawTool):
             by_copy = {v: k for k, v in mapping.items()}
             for kind, args in copied:
                 # (what joins or shapes a curve that cannot be tied; the tied ones need none)
-                if any(by_copy.get(a) in loose for a in args if isinstance(a, int)):
+                curves_named = [
+                    a for i, a in enumerate(args) if core._is_geo_slot(kind, len(args), i)
+                ]
+                if any(by_copy.get(a) in loose for a in curves_named):
                     shape.append(Sketcher.Constraint(kind, *args))
             for kind, (a, b) in sized:
                 if a in loose:

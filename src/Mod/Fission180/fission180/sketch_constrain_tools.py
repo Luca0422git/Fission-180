@@ -1106,6 +1106,8 @@ class HorizontalVertical(PickConstraint):
             return "the axes are horizontal and vertical already. Click a line or a point."
         if item is not None and picks and item[1] == 0:
             return "a point is picked: click the second point to line up with it."
+        if item is not None and item[1] == 0 and item[0] < -2:
+            return "a projected line follows the part and cannot be turned. Click a sketch line."
         return PickConstraint.why_not(self, picks, item)
 
     def complete(self, picks):
@@ -1204,7 +1206,10 @@ class Tangent(PickConstraint):
         p = point_of(self.sketch, selection[0])
         meeting = []
         if p is not None:
+            helpers = build.internal_geometry(self.sketch)  # (hidden helper lines too)
             for geo in range(len(self.sketch.Geometry)):
+                if geo in helpers:
+                    continue
                 for end in _ends(self.sketch, geo).values():
                     if math.hypot(end.x - p[0], end.y - p[1]) <= TOUCH:
                         meeting.append((geo, 0))

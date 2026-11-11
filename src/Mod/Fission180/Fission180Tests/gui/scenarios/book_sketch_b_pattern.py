@@ -233,6 +233,25 @@ def a_undo_value():
     st.undo()
 
 
+def a_all_selected():
+    """Every curve of the sketch selected, as FreeCAD's box selection does."""
+    sk = b.sk()
+    Gui.Selection.clearSelection()
+    for i in range(len(sk.Geometry)):
+        Gui.Selection.addSelection(sk.Document.Name, sk.Name, "Edge%d" % (i + 1))
+
+
+def a_helpers_let_go():
+    picked = {int(n[4:]) - 1 for n in b.selected() if n.startswith("Edge")}
+    h.check(
+        "hidden helper lines never stay selected (Delete cannot remove one by accident)",
+        bool(picked) and not (picked & hidden()),
+        sorted(picked & hidden()),
+    )
+    h.check("...the 18 lines a person sees are selected", len(picked) == 18, len(picked))
+    Gui.Selection.clearSelection()
+
+
 def a_undo_pattern():
     sk = b.sk()
     h.check(
@@ -455,6 +474,8 @@ h.run(
         a_undo_value,
         a_undo_pattern,
         a_redo_pattern,
+        a_all_selected,
+        a_helpers_let_go,
         b_reference,
         b_start,
         b_centre,

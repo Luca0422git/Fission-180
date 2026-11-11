@@ -15,7 +15,10 @@ Fusion shows none of that, so those lines are hidden:
   the other helper curves (Trim, Extend, Mirror, Move/Copy, the patterns), and snapping
   (sketch_draw.Geometry, sketch_infer) skips them.
 
-No Qt. The Coin part needs the GUI and does nothing without it.
+- a helper that gets selected all the same (FreeCAD's box selection takes every curve in the
+  box) is let go again at once (_NeverSelected), so Delete never removes one by accident.
+
+The Coin and selection parts need the GUI and do nothing without it.
 """
 
 from . import warn
@@ -122,12 +125,64 @@ def install(view):
     return len(found)
 
 
+class _NeverSelected:
+    """A selection observer: a hidden helper line that gets selected all the same (FreeCAD's
+    box selection takes every curve inside the box, drawn or not) is let go again at once,
+    so Delete, Cut or a drag never act on a line nobody can see. Only the selection is
+    changed, and only from a timer (never inside the observer's call)."""
+
+    def addSelection(self, doc, obj, sub, _pos=None):
+        try:
+            short = str(sub).rsplit(".", 1)[-1]
+            if not short.startswith("Edge"):
+                return
+            import FreeCAD as App
+
+            document = App.getDocument(doc)
+            sketch = document.getObject(obj) if document is not None else None
+            if sketch is None or sketch.TypeId != "Sketcher::SketchObject":
+                return
+            if int(short[4:]) - 1 not in hidden(sketch):
+                return
+            from .compat import QtCore
+
+            QtCore.QTimer.singleShot(0, lambda: _unselect(doc, obj, sub))
+        except Exception:
+            pass
+
+
+def _unselect(doc, obj, sub):
+    try:
+        import FreeCADGui as Gui
+
+        Gui.Selection.removeSelection(doc, obj, sub)
+    except Exception:
+        pass
+
+
+_observer = {"it": None}
+
+
+def _watch_selection():
+    if _observer["it"] is not None:
+        return
+    try:
+        import FreeCADGui as Gui
+
+        _observer["it"] = _NeverSelected()
+        Gui.Selection.addObserver(_observer["it"])
+    except Exception as exc:
+        _observer["it"] = None
+        warn("sketch helper lines: %s" % exc)
+
+
 def opened(session):
     """A sketch was opened for editing (sketch_mode): its hidden helpers stay unseen."""
     try:
         if not any_hidden(session.sketch):
             return
         install(session.view)
+        _watch_selection()
     except Exception as exc:
         warn("sketch helper lines: %s" % exc)
 
@@ -136,5 +191,6 @@ def made(session):
     """A tool just made hidden helpers in the open sketch."""
     try:
         install(session.view)
+        _watch_selection()
     except Exception as exc:
         warn("sketch helper lines: %s" % exc)
