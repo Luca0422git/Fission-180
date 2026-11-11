@@ -2237,6 +2237,355 @@ def body_shown_again():
     h.fit()
 
 
+# == 14: As-built joints, the slider and its limits (report 1734-1742) ==============================
+def _asbuilt():
+    from fission180 import joints_ui
+
+    p = j.panel()
+    return p if isinstance(p, joints_ui.AsBuiltPanel) else None
+
+
+def asbuilt_open():
+    h.click_empty()
+    j.menu("As-built Joint")
+
+
+asbuilt_open.done = lambda: _asbuilt() is not None
+asbuilt_open.done_what = "the As-built Joint dialog is open"
+
+
+def row(label):
+    """A click on a component's row in the browser (the rod is hidden inside the body and
+    the knob: Fusion's As-built Joint takes components from the browser too)."""
+
+    def step():
+        t.click_row(label)
+
+    return r.named(step, "row_" + label.replace(" ", "_"))
+
+
+def asbuilt_rigid_ok():
+    p = _asbuilt()
+    h.check("Piston and Piston End are taken", [x.Label for x in p.parts] == ["Piston", "Piston End"], [x.Label for x in p.parts])
+    h.check("Type starts as Rigid", p.type_box.currentText() == "Rigid", p.type_box.currentText())
+    r.ok()
+
+
+asbuilt_rigid_ok.done = lambda: _asbuilt() is None
+asbuilt_rigid_ok.done_what = "the As-built Joint dialog closed"
+
+
+def _joint_labels():
+    return [x.Label for x in j.joint_list()]
+
+
+def asbuilt_rigid_made():
+    rigid = [k for k in _joint_labels() if k.startswith("Rigid")]
+    h.check("a fourth Rigid joint", len(rigid) == 4, _joint_labels())
+    r.check_box("nothing moved", "Piston End", [KNOB_X0 * IN, -R_OUT * IN, -R_OUT * IN, (KNOB_X0 + KNOB_T) * IN, R_OUT * IN, R_OUT * IN])
+    inch("As-built Joint")
+
+
+def slider_type():
+    p = _asbuilt()
+    h.check("Piston End and Piston Body are taken", [x.Label for x in p.parts] == ["Piston End", "Piston Body"], [x.Label for x in p.parts])
+    h.check("Slider", j.choose_type(p, "Slider"))
+
+
+def slider_ok_too_early():
+    # report 1735 (bug): "Type Slider but no axis picked: OK silently created a RIGID joint"
+    S["joints"] = _joint_labels()
+    r.ok()
+
+
+def slider_position():
+    p = _asbuilt()
+    if not h.check("OK without a position keeps the dialog open", p is not None):
+        return
+    h.check("...says what is missing", "position" in p.message.text().lower(), p.message.text())
+    h.check("...and makes no joint", _joint_labels() == S["joints"], _joint_labels())
+    r.cube_click("home")
+    h.fit()
+    # the knob's outer rim: a round edge gives its centre, and its axis is the slide
+    ok = r.click_circle((KNOB_X0 + KNOB_T) * IN, R_OUT * IN)
+    h.check("the knob's outer rim is clicked", ok)
+
+
+def slider_ok():
+    p = _asbuilt()
+    snap = p.position_snap
+    h.check("the position is the rim's centre", snap is not None and snap.get("kind") == "circle", snap)
+    h.check("no problem shown", p.message.text() == "", p.message.text())
+    r.ok()
+
+
+slider_ok.done = lambda: _asbuilt() is None
+slider_ok.done_what = "the As-built Joint dialog closed"
+
+
+def _slider():
+    for x in j.joint_list():
+        if x.Label.startswith("Slider"):
+            return x
+    return None
+
+
+def _slide():
+    return j.joints_module().value(_slider())[1]
+
+
+def _knob_x():
+    return r.box_of("Piston End")[0]
+
+
+def slider_made():
+    h.check("Slider 1 is made (not a Rigid)", _slider() is not None and len([k for k in _joint_labels() if k.startswith("Rigid")]) == 4, _joint_labels())
+    h.check("it stands at 0", abs(_slide()) < 1e-6, _slide())
+    inch("the Slider")
+    r.timeline_ok("the Slider")
+    S["rod_x"] = r.box_of("Piston")[0]
+
+
+def _knob_spot():
+    shape = r.shape_of("Piston End")
+    side = r.cylinders(shape, R_OUT * IN)
+    return r.seen_spot(side[0]) if side else None
+
+
+def drag_knob(inches, key):
+    def step():
+        h.fit()
+        spot = _knob_spot()
+        if h.check("the knob's side is in view", spot is not None):
+            S["drag_t0"] = _now()
+            h.drag(h.screen_point(spot), h.screen_point(spot + V(inches * IN, 0, 0)), steps=14)
+
+    return r.named(step, "drag_knob_" + key)
+
+
+def slid_out():
+    took = _now() - S["drag_t0"]
+    x = _knob_x() / IN
+    S["out"] = _slide()
+    # report 1737: "dragging the Piston End slides the piston along X"
+    h.check("the knob followed the pointer along X", 0.7 < x - KNOB_X0 < 1.3, x)
+    box = r.box_of("Piston End")
+    h.check("only along X", abs(box[1] + R_OUT * IN) < 1e-3 and abs(box[2] + R_OUT * IN) < 1e-3, box)
+    moved = (r.box_of("Piston")[0] - S["rod_x"]) / IN
+    h.check("the Piston came with it (rigid)", abs(moved - (x - KNOB_X0)) < 1e-4, moved)
+    ring = (_ring_box(ORING_ROD)[0] + _ring_box(ORING_ROD)[3]) / 2 / IN
+    h.check("...and its O-ring", abs(ring - (ROD_X0 + 5.0 / 32 + moved)) < 1e-4, ring)
+    r.check_box("the Piston Body stayed", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    h.speed_check("the drag took less than 20 s", took < 20.0 * h.SLOWDOWN, took)
+    App.Console.PrintMessage("[Fission 180] replay: sliding the knob took %.1f s; the slide reads %.4f in\n" % (took, S["out"] / IN))
+
+
+def limits_open():
+    j.browser_menu(_slider().Label, "Edit Joint Limits")
+
+
+limits_open.done = lambda: j.panel() is not None
+limits_open.done_what = "the limits dialog is open"
+
+
+def _rows():
+    return j.panel().slide_limits.rows
+
+
+def _toggle(box):
+    from Fission180Tests.gui import bodies_steps as bs
+
+    bs.toggle(box)
+
+
+def limits_minimum():
+    _toggle(_rows()["min"][0])
+
+
+def limits_minimum_value():
+    # report 1740: "ticking Minimum took the CURRENT slide (1.22 in) although the box first
+    # showed 0.00 in": the box shows the joint's value now, as Fusion's does
+    got = _rows()["min"][1].value()
+    h.check("Minimum shows the slide now", abs(got - S["out"]) < 1e-3, (got, S["out"]))
+    r.type_field(_rows()["min"][1].widget, "0")
+
+
+def limits_maximum():
+    _toggle(_rows()["max"][0])
+
+
+def limits_maximum_value():
+    r.type_field(_rows()["max"][1].widget, "3")
+
+
+def limits_flip():
+    """Out of the body is the way the knob was just pulled: when the slide counts that way
+    as negative, 0 .. 3 in lets the piston INTO the body, and Flip turns the range over
+    (report 1739: "no Preview Limits button, no Flip")."""
+    from Fission180Tests.gui import widget_input as w
+
+    p = j.panel()
+    h.check("Flip can be pressed", p.slide_limits.flip.isEnabled())
+    S["flipped"] = S["out"] < 0
+    if S["flipped"]:
+        w.click(p.slide_limits.flip)
+
+
+def limits_rest():
+    rows = _rows()
+    got = (rows["min"][1].value() / IN, rows["max"][1].value() / IN)
+    want = (-3.0, 0.0) if S["flipped"] else (0.0, 3.0)
+    h.check("the range is 3 in out of the body", all(abs(a - b) < 1e-6 for a, b in zip(got, want)), got)
+    _toggle(rows["rest"][0])
+
+
+def limits_rest_value():
+    r.type_field(_rows()["rest"][1].widget, "0")
+
+
+def limits_preview():
+    from Fission180Tests.gui import widget_input as w
+
+    w.click(j.panel().slide_limits.preview)
+
+
+limits_preview.while_busy = True
+
+
+def limits_previewing():
+    from Fission180Tests.gui import widget_input as w
+
+    p = j.panel()
+    h.check("Preview Motion is down", p.slide_limits.preview.isChecked())
+    seen = []
+    h.wait_for(lambda: seen.append(_knob_x()) or max(seen) - min(seen) > 0.5 * IN, "the knob to move in the preview", 60)
+    h.check("the preview slides the knob between the limits", max(seen) - min(seen) > 0.5 * IN, (min(seen) / IN, max(seen) / IN))
+    h.check("...never into the body", min(seen) > KNOB_X0 * IN - 1e-3, min(seen) / IN)
+    w.click(p.slide_limits.preview)
+
+
+limits_previewing.while_busy = True
+limits_previewing.done = lambda: not j.panel().slide_limits.preview.isChecked()
+limits_previewing.done_what = "the preview stopped"
+
+
+def limits_ok():
+    r.ok()
+
+
+limits_ok.done = lambda: j.panel() is None
+limits_ok.done_what = "the limits dialog closed"
+
+
+def limits_set():
+    lim = j.joints_module().limits(_slider())["slide"]
+    App.Console.PrintMessage("[Fission 180] replay: slide limits %s\n" % (lim,))
+    low, high = sorted(v for v in (lim.get("min"), lim.get("max")) if v is not None)
+    h.check("the limits are kept: 3 in of travel", abs(high - low - 3 * IN) < 1e-6, lim)
+    h.check("Rest 0 is kept", lim.get("rest") is not None and abs(lim["rest"]) < 1e-9, lim)
+    # report 1741: "after typing 0 the piston jumped to 0 on OK": it goes to its rest
+    h.check("the piston stands at its rest: the knob against the body", abs(_knob_x() - KNOB_X0 * IN) < 1e-3, _knob_x() / IN)
+    inch("Edit Joint Limits")
+    r.timeline_ok("Edit Joint Limits")
+
+
+def sprung_back():
+    # report 1742: "Rest does nothing after a drag: released at 0.78 in it stays there
+    # (Fusion springs back to Rest)"
+    h.check("let go, the piston springs back to its rest", abs(_knob_x() - KNOB_X0 * IN) < 1e-3, _knob_x() / IN)
+    h.check("the Piston with it", abs(r.box_of("Piston")[0] - S["rod_x"]) < 1e-3)
+
+
+def not_pushed_in():
+    # report 1741: "Minimum works (cannot push it into the body)"
+    h.check("the knob cannot be pushed into the body", abs(_knob_x() - KNOB_X0 * IN) < 1e-3, _knob_x() / IN)
+    inch("the drags")
+
+
+# == 15: Opacity Control, the looks, Section Analysis (report 1743-1747) ============================
+def opacity_60():
+    from Fission180Tests.gui import widget_input as w
+
+    tree, pos = t.row_point("Piston Body")
+    result = w.right_click_sub(tree.viewport(), pos, "Opacity Control", "60%")
+    S["opacity"] = result
+
+
+def opacity_set():
+    result = S["opacity"]
+    texts = [x for x, _c in result.get("texts", [])]
+    h.check("Opacity Control: 100 / 80 / 60 / 40 / 20 % and Custom Opacity", result.get("ok") and texts == ["100%", "80%", "60%", "40%", "20%", "Custom Opacity..."], texts)
+    body = r.bodies_of("Piston Body")[0]
+    seen = [body.ViewObject.Transparency] + [f.ViewObject.Transparency for f in body.Group if hasattr(f.ViewObject, "Transparency") and f.ViewObject.Visibility]
+    h.check("the Piston Body is 60 % opaque", all(abs(v - 40) <= 1 for v in seen), seen)
+    # report 1744: "the Piston Body's anodized blue look turned back to grey in the view"
+    look_is("Aluminium, anodized blue", "Piston Body", "Opacity Control")
+    look_is("Brass", "End Cap", "Opacity Control")
+    h.shot("10-opacity")
+
+
+def _section_panel():
+    from fission180 import section_ui
+
+    p = r.panel()
+    return p if isinstance(p, section_ui.SectionPanel) else None
+
+
+def section_open():
+    Gui.Selection.clearSelection()
+    h.ribbon("Section Analysis")
+
+
+section_open.done = lambda: _section_panel() is not None
+section_open.done_what = "the Section Analysis dialog is open"
+
+
+def section_origin():
+    from Fission180Tests.gui import inspect_steps as ins
+
+    tree = t.tree()
+    tree.scrollToItem(tree.row(r.doc().Label))
+    ins.expand_folder("Origin")
+
+
+def section_plane():
+    h.check("the XY row", t.click_row("XY"), t.labels()[:12])
+
+
+def section_ok():
+    from fission180 import section
+
+    made = section.sections(r.doc())
+    h.check("one section, through the axis", len(made) == 1, [o.Label for o in made])
+    h.shot("10-section")
+    r.ok()
+
+
+section_ok.done = lambda: _section_panel() is None
+section_ok.done_what = "the Section Analysis dialog closed"
+
+
+def finished():
+    from fission180 import section
+
+    h.check("the section is kept", len(section.sections(r.doc())) == 1)
+    names = sorted(p.Label for p in _parts())
+    want = sorted(["Piston Body", "End Cap", "Piston End", "Piston", ORING_CAP, ORING_ROD])
+    h.check("six components", names == want, names)
+    for label in ("Piston Body", "End Cap", "Piston End", "Piston"):
+        h.check("%s has one body" % label, len(r.bodies_of(label)) == 1, [b.Label for b in r.bodies_of(label)])
+    h.check("nothing at the design's root", not r.bodies_of(""), [b.Label for b in r.bodies_of("")])
+    kinds = sorted(k.rstrip("0123456789 ") for k in _joint_labels())
+    h.check("four Rigid joints and a Slider", kinds == ["Rigid"] * 4 + ["Slider"], _joint_labels())
+    h.check("Piston Body is the grounded one", [p.Label for p in _parts() if r.grounded(p.Label)] == ["Piston Body"])
+    r.check_box("the Piston Body, as the book dimensions it", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    r.check_box("the End Cap on it", "End Cap", CAP_HOME)
+    h.check("the timeline's groups", sorted(_groups()) == sorted(["Piston Body", "End Cap", "Piston End"]), sorted(_groups()))
+    inch("the end")
+    r.timeline_ok("the end")
+    h.check("no undo step is left open", h.open_undo_step() == "", h.open_undo_step())
+
+
 def steps():
     return r.stages(
         "replay_10",
@@ -2537,6 +2886,54 @@ def steps():
                     joint_groove_made,
                     eye("Piston Body"),
                     body_shown_again,
+                ],
+            ),
+            (
+                "motion",
+                [
+                    asbuilt_open,
+                    row("Piston"),
+                    row("Piston End"),
+                    asbuilt_rigid_ok,
+                    asbuilt_rigid_made,
+                    asbuilt_open,
+                    row("Piston End"),
+                    row("Piston Body"),
+                    slider_type,
+                    slider_ok_too_early,
+                    slider_position,
+                    slider_ok,
+                    slider_made,
+                    drag_knob(1.0, "out"),
+                    slid_out,
+                    limits_open,
+                    limits_minimum,
+                    limits_minimum_value,
+                    limits_maximum,
+                    limits_maximum_value,
+                    limits_flip,
+                    limits_rest,
+                    limits_rest_value,
+                    limits_preview,
+                    limits_previewing,
+                    limits_ok,
+                    limits_set,
+                    drag_knob(1.0, "out_again"),
+                    sprung_back,
+                    drag_knob(-0.5, "in"),
+                    not_pushed_in,
+                ],
+            ),
+            (
+                "finish",
+                [
+                    opacity_60,
+                    opacity_set,
+                    section_open,
+                    section_origin,
+                    section_plane,
+                    section_ok,
+                    finished,
                 ],
             ),
         ],
