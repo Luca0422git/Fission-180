@@ -31,7 +31,7 @@ commit.
 
 | Scenario | Checks | Result | Time |
 |---|---|---|---|
-| `replay_12_pizza_cutter` | 525 | PASS (whole project from the first step, one run) | 632 s |
+| `replay_12_pizza_cutter` | 525 | PASS (whole project from the first step; official runner, after every fix) | 632 s |
 | `replay_13_tesla_turbine` | 250 | PASS (whole project from the first step, official runner) | 241 s |
 
 Steps that took more than about 10 s (no progress note shown): the Wheel Bracket's Thread
@@ -46,7 +46,8 @@ Older scenarios run after the changes (all PASS): `book_joints_snap` (41), `book
 that dropped a deliberate second click on the face: fixed by counting presses),
 `book_modify_thread_inch` (36), `book_looks_faces` (106). Golden models: every `thread` model
 (17, two new) PASS. Unit tests: all PASS but the generated AI docs (regenerated in their own
-commit).
+commit). FreeCAD-backed unit tests and the full golden suite were not run (the merger
+runs them).
 
 ## Hitches found and fixed
 
