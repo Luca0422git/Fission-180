@@ -65,7 +65,10 @@ def op_blend_insert(self, step):
         raise BuildError("blend_insert %r: nothing picked" % step["id"])
     options = _options(kind, step)
     try:
-        blend.trial(kind, info, refs, options)  # the dialog refuses what fails here
+        # the dialog refuses what fails here; FreeCAD's own step is made, so a size only
+        # Fission 180's own route builds (a face used up exactly, fillet_robust) is refused
+        # here too, in words, instead of a broken step afterwards (wave 7, fix-1's finding)
+        blend.check_plain(kind, info, refs, options)
         feature = blend.insert(self.body, base, refs, kind, options, step["id"])
     except blend.BlendError as exc:
         raise BuildError("blend_insert %r: %s" % (step["id"], exc))
@@ -89,7 +92,7 @@ def op_blend_edit(self, step):
     options.update(step.get("set", {}))
     keep = blend.References(self.body, target)
     try:
-        blend.trial(kind, info, refs, options)
+        blend.check_plain(kind, info, refs, options)  # (see op_blend_insert)
     except blend.BlendError as exc:
         raise BuildError("blend_edit %r: %s" % (step["target"], exc))
     blend.set_refs(target, base, blend.base_subs(info, refs))
