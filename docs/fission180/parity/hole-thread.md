@@ -174,3 +174,13 @@ FreeCAD's own Thickness limit): use the Class to loosen a thread.
 | Offset Face / Press Pull on a modeled thread (the Geocache: -0.25 mm so the printed thread turns freely) | The thread's faces are picked and offset (**Book**: the report quoting the book's step) | A click on any face of the thread takes the Thread step: its faces all move together by the distance (`FaceOffset`: the crest and the root along the radius, the flanks apart), and it stays one step. The kernel cannot offset the swept faces one by one. Too far either way is refused with the reason in the dialog. `book_modifyb_thread_offset` (22 checks), golden `book_thread_face_offset` |
 | The modeled thread's faces | 4 (two flanks, crest, root) (**Book**: the report) | Still one flank / root face per turn (19 on the Geocache's M33 x 16, 41 on 40 mm). Measured: a groove swept along ONE helix edge for the whole length, or its one-turn faces joined into one B-spline face per flank, gives Fusion's count (6 faces with the two ends), but OpenCASCADE's booleans then misjudge what is inside: of 12 cuts with such a tool 5 were wrong (nothing cut, or everything), and the single-edge sweep's volume is 2 % off on 32 turns. Not built: robustness comes first. Next step if wanted: merge the per-turn faces after the cut by face surgery (no boolean) |
 
+
+## Wave 7, second pass (branch `sf/book-modify-c`, 2026-11-11)
+
+| Behaviour | Source | Fission 180 now |
+|---|---|---|
+| The Hole dialog starts with the last hole's settings | Fusion (kept since the first pass) | Kept. With Tapped + Modeled remembered, a Hole step of several holes cut every thread again at each click and key (the report's "~60 s" for five holes From Sketch): now more than one modeled thread is previewed as the drilled holes, the dialog says "The 5 threads are modeled when you press OK", and OK cuts them once (Guess: what Fusion's preview shows for modeled threads was not found) |
+| A Simple hole of a typed diameter made Tapped | Fission 180's own (in Fusion the thread size is picked and the diameter follows) | The diameter stays as the tap drill: 5 mm gives M6x1 (`hole_tables.size_for_drill`). The Thread tool's rule (the nominal size nearest to the picked face: Autodesk) is its own function again |
+| The hole's dot dragged | G | A drag lands on clean values: the smallest clean step of the design's unit that is at least two pixels on the screen (0.5 mm in a fitted view of a small part); typed values are taken as typed. FreeCAD's value box still shows a length below 0.1 mm in micrometres (the box is `taskui.DistanceField`: params / shell) |
+
+Scenarios: `book_modifyc_hole_sketch` (58 checks), `book_modifyc_hole_drag` (27).

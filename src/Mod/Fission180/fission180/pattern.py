@@ -486,10 +486,6 @@ def total_instances(kind, options):
 def check(kind, options):
     """Raise NeedsPick / PatternError when the pattern cannot be built yet."""
     ptype = options["pattern_type"]
-    if ptype == "bodies" and quantity_formulas(options) and kind != "mirror":
-        raise PatternError(
-            "A pattern of bodies takes a plain number as its quantity (each copy is a body)."
-        )
     if ptype == "features":
         if not _features(options):
             raise NeedsPick("Select the features to pattern: click them in the timeline.")
@@ -1380,6 +1376,9 @@ class PatternFeature:
         if getattr(obj, WARNING_PROP, "") == ORPHAN_NOTE:
             set_note(obj, "")
         kind = kind_of(obj)
+        if is_light(obj):  # its dialog shows the copies as shaded faces; OK builds them
+            obj.Shape = base.Shape.copy()
+            return
         try:
             options = read_engine(obj)
             tools = engine_tools(obj, options, base)
@@ -1389,7 +1388,9 @@ class PatternFeature:
             if adjusts(options):
                 shape = _adjusted(obj, base.Shape, moves)
             elif tools:
-                shape = apply_tools(base.Shape, tools, moves, kind, refine=obj.Refine)
+                shape = apply_tools(
+                    base.Shape, tools, moves, kind, refine=obj.Refine, title=obj.Label
+                )
             else:
                 shape = base.Shape.copy()  # only Split Faces are repeated
             obj.Shape = repeat_splits(obj, shape, moves)
@@ -1765,11 +1766,58 @@ def repeat_splits(obj, shape, moves):
     return split_face.imprint(shape, edges)
 
 
-def apply_tools(base_shape, tools, moves, kind, refine=True):
-    adds, cuts = [], []
-    for tool, how in tools:
-        for move in moves:
-            (adds if how == "add" else cuts).append(_moved(tool, move))
+class Cancelled(PatternError):
+    """The person pressed Cancel while the copies were being built."""
+
+
+# Light previews: (document name, object name) of the PatternFeatures whose dialog shows the
+# copies as shaded faces instead of building them (pattern_ui.py). Such a step is the part
+# before it until its dialog builds it (OK).
+LIGHT = set()
+# What builds heavy copies with the window open (pattern_progress.build_outside, set by
+# pattern_ui.py; None without a window: the golden models, the AI tools). It runs the one
+# boolean in a command-line FreeCAD of its own, so the window stays alive, shows how long
+# the build has taken, can stop it, and the memory the kernel takes (830 MB for the book's
+# 25 times knurl) is given back when it is done.
+BUILDER = None
+# True while a dialog's OK builds its pattern: only then can the build be cancelled (a step
+# cancelled in the middle of a recompute of the whole design would fail every step after it).
+CANCELLABLE = [False]
+# Copies that score more than this (pattern_light.score of the tools' faces) are built by
+# BUILDER: about 4 s of kernel time and more.
+HEAVY_BUILD = 400
+
+
+def set_light(obj, on):
+    key = (obj.Document.Name, obj.Name)
+    if on:
+        LIGHT.add(key)
+    else:
+        LIGHT.discard(key)
+
+
+def is_light(obj):
+    try:
+        return (obj.Document.Name, obj.Name) in LIGHT
+    except Exception:
+        return False
+
+
+def _heavy_build(tools, moves):
+    try:
+        from . import pattern_light
+
+        faces = [face for tool, _how in tools for face in tool.Faces]
+        return pattern_light.score(faces, len(moves)) > HEAVY_BUILD
+    except Exception:
+        return False
+
+
+def combine(base_shape, adds, cuts, refine=True):
+    """The part with `adds` joined and `cuts` cut, each in ONE boolean (the fastest of the
+    routes measured for the book's knurl: one by one takes twice as long, in groups a fifth
+    longer and leaves some faces split), then tidied. Also what the command-line FreeCAD of
+    a heavy build runs (pattern_worker.py)."""
     result = base_shape.copy()
     if adds:
         result = result.fuse(adds)
@@ -1780,6 +1828,22 @@ def apply_tools(base_shape, tools, moves, kind, refine=True):
             result = result.removeSplitter()
         except Exception:
             pass
+    return result
+
+
+def apply_tools(base_shape, tools, moves, kind, refine=True, title=""):
+    adds, cuts = [], []
+    for tool, how in tools:
+        for move in moves:
+            (adds if how == "add" else cuts).append(_moved(tool, move))
+    result = None
+    if BUILDER is not None and _heavy_build(tools, moves):
+        # None: it could not run there (no command-line program): built here, as before
+        result = BUILDER(
+            base_shape, adds, cuts, refine, title or TITLES.get(kind, "Pattern"), CANCELLABLE[0]
+        )
+    if result is None:
+        result = combine(base_shape, adds, cuts, refine)
     if result.isNull() or not result.Solids:
         raise PatternError("The pattern leaves no solid.")
     solids = result.Solids
@@ -2643,6 +2707,7 @@ class BodyPatternFeature:
             _upgrade(obj)
         except Exception:
             pass
+        install_count_watch()
 
     def execute(self, obj):
         shapes = []
@@ -2878,10 +2943,109 @@ def _set_body_props(obj, kind, options):
         _enum_set(obj, prop, options[key])
     _set(obj, "Quantity", max(1, int(options["quantity"])))
     _set(obj, "Quantity2", max(1, int(options["quantity2"])))
+    # A quantity typed as a parameter or formula: the step follows it, and the copies (each
+    # a body of its own, which no recompute may add or remove) are brought to the new count
+    # right after the recompute (follow_counts, from timeline_ops.settle).
+    for prop, key in (("Quantity", "quantity"), ("Quantity2", "quantity2")):
+        formula = _formula(options, key, obj.Document) if kind != "mirror" else ""
+        _expr(obj, prop, "round(%s)" % formula if formula else "")
+        if formula:
+            install_count_watch()  # (without the GUI: nothing else looks after a recompute)
     for prop, key in (("Distance", "distance"), ("Distance2", "distance2"), ("Angle", "angle")):
         _set(obj, prop, float(options[key]))
         _expr(obj, prop, _formula(options, key, obj.Document))
     _set_suppressed(obj, options)
+
+
+def _match_copies(feature, sources=None):
+    """As many copy bodies as the step has copies now. True when bodies were added or
+    removed."""
+    if sources is None:
+        sources = source_bodies(feature)
+    if not sources:
+        return False
+    count = len(body_copy_shapes(feature))
+    copies = _copies_of(feature)
+    changed = False
+    for copy in copies[count:]:
+        _remove_copy(copy)
+        changed = True
+    for index in range(len(copies), count):
+        source = sources[index % len(sources)]
+        if source is None:
+            continue  # the body this place copied was deleted: nothing to add there
+        _new_copy(feature, index, source)
+        changed = True
+    return changed
+
+
+def follow_counts(doc):
+    """Patterns of bodies whose quantity follows a parameter: the count the step has now
+    (the book's Metric Bolt: Quantity = "Quantity") against the copy bodies there are; bodies
+    are added or removed to match. True when any were (the caller recomputes: the new
+    copies take their shapes). Called after every recompute (timeline_ops.settle), so an
+    undo of the parameter change brings the copies back to the old count the same way."""
+    changed = False
+    for obj in list(doc.Objects):
+        try:
+            if not is_body_pattern(obj) or not alive(obj):
+                continue
+            engine = dict(obj.ExpressionEngine)
+            if "Quantity" not in engine and "Quantity2" not in engine:
+                continue  # a plain number: the dialog made the copies
+            state = set(obj.State)
+            if state & {"Invalid", "Error"} or _suppressed(obj):
+                continue
+            core.check_total(total_instances(kind_of(obj), read_body_pattern(obj)))
+            if _match_copies(obj):
+                changed = True
+        except PatternError:
+            continue  # too many copies, a missing reference: the step says so itself
+        except Exception as exc:
+            App.Console.PrintLog("[Fission 180] pattern copies not matched: %s\n" % exc)
+    return changed
+
+
+class _CountWatch:
+    """Without the GUI (the golden models, the AI tools) nothing settles a design after a
+    recompute: the copies of a pattern of bodies are matched to its count right after each
+    one. (With the GUI timeline_ops.settle does it, a moment later.)"""
+
+    busy = False
+
+    def slotRecomputedDocument(self, doc):
+        if App.GuiUp or _CountWatch.busy:
+            return
+        _CountWatch.busy = True
+        try:
+            if getattr(doc, "Restoring", False) or getattr(doc, "Transacting", False):
+                return
+            before = {o.Name for o in doc.Objects}
+            if not follow_counts(doc):
+                return
+            # (the design's own recompute is still going on: the new copies and their
+            # bodies are built one by one)
+            for obj in doc.Objects:
+                if obj.Name not in before and is_body_copy(obj):
+                    obj.recompute()
+                    body = _body_of_copy(obj)
+                    if body is not None:
+                        for step in body.Group:
+                            step.recompute()
+                        body.recompute()
+        except Exception:
+            pass
+        finally:
+            _CountWatch.busy = False
+
+
+_COUNTS = {"observer": None}
+
+
+def install_count_watch():
+    if _COUNTS["observer"] is None:
+        _COUNTS["observer"] = _CountWatch()
+        App.addDocumentObserver(_COUNTS["observer"])
 
 
 def _build_body_copies(kind, options, feature, name=None):
@@ -2940,12 +3104,7 @@ def _build_body_copies(kind, options, feature, name=None):
             raise PatternError(
                 "%s has no solid at this point of the timeline." % sources[index].Label
             )
-    count = len(body_copy_shapes(feature))
-    copies = _copies_of(feature)
-    for copy in copies[count:]:
-        _remove_copy(copy)
-    for index in range(len(copies), count):
-        _new_copy(feature, index, sources[index % len(sources)])
+    _match_copies(feature, sources)
     return feature
 
 

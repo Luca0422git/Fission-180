@@ -267,6 +267,14 @@ class _Watch:
             doc = obj.Document
             if doc.HasPendingTransaction and not doc.Transacting and not doc.Restoring:
                 ledger(doc.Name).created(obj.Name)
+            elif doc.Transacting and not doc.Restoring:
+                # An Undo / Redo brings back an object its transaction had taken out (the
+                # Redo of a step's making, the Undo of its deletion): FreeCAD keeps the
+                # object itself, so it comes back with the shape it had, though no Shape
+                # change is signalled for it and it is marked touched. Without this every
+                # Ctrl+Y of a new step built the step again (the book's 25 times knurl:
+                # 40 s for each Redo; wave 7, modify-c).
+                ledger(doc.Name).shape_restored(obj.Name)
         except Exception:
             pass
         self._structure(obj)

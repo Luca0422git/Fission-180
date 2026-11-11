@@ -574,8 +574,10 @@ def _rename_occurrences(feature, component):
         log("hardware: occurrence names (%s)" % exc)
 
 
-def remove(feature):
-    """Delete a part's component (with its body), its occurrences, holes and joints."""
+def remove(feature, own_step=True):
+    """Delete a part's component (with its body), its occurrences, holes and joints.
+    ``own_step=False``: inside the caller's undo step (the timeline's Delete of the Hardware
+    step, timeline_ops.delete: wave 7, modify-c)."""
     doc = feature.Document
     meta = load_meta(feature)
     _drop_joints(feature, meta, keep=())
@@ -586,7 +588,7 @@ def remove(feature):
     if made is not None:
         hole.remove(made)
     if component is not None:
-        components.remove(doc, component)
+        components.remove(doc, component, _top=bool(own_step))
 
 
 # -- joints ----------------------------------------------------------------------------------------

@@ -30,7 +30,8 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, log, origin_look, pattern, preview, ui_icon_path, warn
+from . import commands, log, origin_look, pattern, pattern_light, pattern_progress
+from . import preview, ui_icon_path, warn
 from . import hole_common as common
 from . import profile_pick
 from .compat import QtCore, QtGui, QtWidgets
@@ -61,6 +62,9 @@ AXIS_COLORS = {key: origin_look.axis_colour(key) for key in AXES}  # X red, Y gr
 PICKED = (0.12, 0.53, 0.90)
 REF = (1.0, 0.62, 0.15)  # the picked direction / axis, drawn orange over the part
 OVERLAY_CLICK_S = 0.6  # a click the axis/plane overlay took: the selection it makes is ignored
+LIGHT_NOTE = "Preview: %d %s. Built when you press OK."
+
+pattern_progress.install()  # a long build of copies shows its progress
 
 
 def _combo(pairs, current=None, disabled=()):
@@ -659,6 +663,10 @@ class PatternPanel(Panel):
         self.value_boxes = ValueBoxes(self, default="distance")
         self.dots = None
         self.marks = None
+        # Heavy copies (the book's knurl) are previewed light: shaded faces at every copy,
+        # the step itself built once, by OK (pattern_light.py)
+        self.light = False
+        self.ghosts = None
         self.axis_picker = None
         self.plane_picker = None
         self.observer = None
@@ -996,29 +1004,7 @@ class PatternPanel(Panel):
         self.formula_error = ""
         if key.startswith("quantity"):
             problem = ""
-            if self.options["pattern_type"] == "bodies" and self.kind != "mirror":
-                # Each copy of a body is a body of its own (an object of the design), so the
-                # count cannot follow a parameter by itself. The book types a parameter here
-                # (Metric Bolt: Quantity = "Quantity") and Fusion takes it: so does this, as
-                # the number the formula gives now, and says that it is kept as a number
-                # (it was refused: "takes a plain number as its quantity").
-                if value < 0.5:
-                    problem = "'%s' is less than 1: the quantity must be 1 or more." % text
-                else:
-                    count = max(1, int(round(float(value))))
-                    _CountAdapter(getattr(self, key)).set_value(count)
-                    self.options["expressions"].pop(key, None)
-                    self.options[key] = count
-                    self._taken = (
-                        "Quantity %d is what '%s' gives now. A pattern of bodies keeps the "
-                        "number (each copy is a body of its own): after changing the "
-                        "parameter, edit the pattern and type it again." % (count, text)
-                    )
-                    self._typed(count)
-                    self.show_formulas()
-                    self.show_status()
-                    return
-            elif self.options["pattern_type"] == "components":
+            if self.options["pattern_type"] == "components":
                 problem = "A pattern of components takes a plain number as its quantity."
             elif value < 0.5:
                 problem = "'%s' is less than 1: the quantity must be 1 or more." % text
@@ -2054,6 +2040,7 @@ class PatternPanel(Panel):
                 self.dirty = False
                 self._apply()
             preview.recompute(self.doc)
+            self._show_ghosts()
             self.show_status()
             self._refresh()
             self._show_start_point()
@@ -2077,12 +2064,100 @@ class PatternPanel(Panel):
         except PatternError as exc:
             self.error = str(exc)
             return
+        before = self.target
         try:
             self.target = pattern.build(self.kind, self.options, feature=self.target)
         except PatternError as exc:
             self.error = str(exc)
         except Exception as exc:
             self.error = "This pattern cannot be built: %s" % exc
+        if before is not None and before is not self.target:
+            try:
+                pattern.set_light(before, False)  # replaced by another kind of step
+            except Exception:
+                pass
+        self._set_light(not self.error and self._wants_light())
+
+    # -- the light preview of heavy copies ---------------------------------------------------
+    def _copies(self):
+        """How many copies the pattern makes (the original not counted)."""
+        total = pattern.total_instances(self.kind, self.options) - 1
+        if self.kind != "mirror":
+            total -= len(self.options.get("suppressed") or [])
+        return max(0, total)
+
+    def _ghost_faces(self):
+        """The faces a light preview repeats: what the picked features made, or the picked
+        faces (global coordinates)."""
+        faces = []
+        for obj, sub in self.options["objects"]:
+            if sub.startswith("Face"):
+                face = profile_pick.global_face(obj, sub)
+                if face is not None:
+                    faces.append(face)
+            elif not sub:
+                faces.extend(self._picked_faces(obj))
+        return faces
+
+    def _wants_light(self):
+        try:
+            target = self.target
+            if target is None or target.TypeId != pattern.ENGINE:
+                return False
+            if self.kind == "path" or self.options["pattern_type"] not in ("features", "faces"):
+                return False
+            if pattern.adjusts(self.options):
+                return False  # every copy differs: only the real build shows them
+            return pattern_light.heavy(self._ghost_faces(), self._copies())
+        except Exception as exc:
+            warn("%s: %s" % (self.title, exc))
+            return False
+
+    def _set_light(self, on):
+        target = self.target
+        if target is None or not pattern.alive(target):
+            self.light = False
+            return
+        if pattern.is_light(target) != bool(on):
+            pattern.set_light(target, on)
+            target.touch()
+        self.light = bool(on)
+        if on:
+            self._went_light = True
+
+    def _show_ghosts(self):
+        if not self.light or self.body is None or self._closed:
+            if self.ghosts is not None:
+                self.ghosts.clear()
+            return
+        try:
+            if self.ghosts is None:
+                self.ghosts = pattern_light.Ghosts(self.view)
+            moves = pattern.placements(self.kind, self.options)
+            matrices = pattern_light.global_matrices(moves, self.body.getGlobalPlacement())
+            self.ghosts.show(self._ghost_faces(), matrices)
+        except Exception as exc:
+            warn("%s preview: %s" % (self.title, exc))
+
+    def _build_now(self):
+        """OK on a light preview: the copies are built, once, with a progress window and
+        Cancel. False (and the reason in the dialog) when they could not be."""
+        target = self.target
+        pattern.set_light(target, False)
+        target.touch()
+        pattern.CANCELLABLE[0] = True
+        try:
+            preview.recompute(self.doc)
+        finally:
+            pattern.CANCELLABLE[0] = False
+        text = _plain(preview.failure(target))
+        if not text:
+            self.light = False
+            return True
+        self._set_light(True)  # back to the preview: nothing half-built stays in the design
+        preview.recompute(self.doc)
+        self.message.setText("⚠ " + text)
+        return False
 
     def _drop_preview(self):
         body = pattern.owner_body(self.target)
@@ -2096,8 +2171,12 @@ class PatternPanel(Panel):
         return self.target
 
     def show_status(self):
-        taken = getattr(self, "_taken", "")  # a body pattern's quantity taken from a formula
-        self.info.setText("\n".join(t for t in (self.waiting, taken) if t))
+        taken = ""
+        light = ""
+        if self.light and not self.waiting:
+            copies = self._copies()
+            light = LIGHT_NOTE % (copies, "copy" if copies == 1 else "copies")
+        self.info.setText("\n".join(t for t in (self.waiting, taken, light) if t))
         if self.formula_error:
             self.message.setText("⚠ " + self.formula_error)
             return
@@ -2411,7 +2490,12 @@ class PatternPanel(Panel):
         if self.error:
             self.message.setText("⚠ " + self.error)
             return False
-        preview.recompute(self.doc)
+        if self.light:
+            if not self._build_now():
+                self._show_ghosts()
+                return False
+        else:
+            preview.recompute(self.doc)
         text = _plain(preview.failure(self.target))
         if text:
             self.message.setText("⚠ " + text)
@@ -2430,8 +2514,18 @@ class PatternPanel(Panel):
             return True
         self._timer.stop()
         body = self.body
+        edited = self.target if self.editing else None
         self.cleanup()
         preview.end_transaction(self.doc, abort=True)
+        if edited is not None and getattr(self, "_went_light", False):
+            # An edit that was previewed light: Cancel put the step's values and its solid
+            # back as they were before the dialog, so there is nothing to build again (the
+            # knurl would be built for half a minute to give the same solid).
+            try:
+                if pattern.alive(edited) and not edited.Shape.isNull():
+                    edited.purgeTouched()
+            except Exception as exc:
+                warn("%s: %s" % (self.title, exc))
         preview.recompute(self.doc)
         self._close()
         if body is not None and pattern.alive(body):
@@ -2454,6 +2548,14 @@ class PatternPanel(Panel):
         if self.marks is not None:
             self.marks.remove()
             self.marks = None
+        if self.ghosts is not None:
+            self.ghosts.remove()
+            self.ghosts = None
+        try:
+            if self.target is not None and pattern.alive(self.target):
+                pattern.set_light(self.target, False)
+        except Exception:
+            pass
         super().cleanup()
 
 

@@ -470,3 +470,28 @@ def taper_thread(kind, size):
 
 def taper_kind_label(kind):
     return dict(TAPER_KINDS).get(kind, kind)
+
+
+def size_for_drill(standard, diameter):
+    """The Hole dialog's rule for a hole that becomes Tapped: the thread whose tap drill (or
+    minor diameter, where the table has no drill) is nearest to the diameter the hole has,
+    so a 5 mm hole is tapped M6x1 and keeps its 5 mm. Coarse pitch first among equals.
+
+    Not the Thread tool's rule (thread_tables.closest: the nominal size nearest to the
+    picked face, Autodesk's "closest standard thread in relation to the size of the circular
+    face you selected"): in Fusion's Hole dialog the thread size is picked and the diameter
+    follows; nobody types a drill there. Fission 180's dialog lets a Simple hole of a typed
+    diameter become Tapped, and that diameter is the hole that gets drilled. Both tools
+    shared one function until the Thread tool's rule changed (wave 7) and a 5 mm hole came
+    out M5 with a 4.2 mm drill."""
+    from . import thread_tables
+
+    best = None
+    for d in thread_tables.all_designations():
+        if d.standard != standard:
+            continue
+        gap = abs((d.drill or d.minor(True)) - diameter)
+        rank = (round(gap, 6), thread_tables.SERIES[standard].index(d.series), -d.pitch)
+        if best is None or rank < best[0]:
+            best = (rank, d)
+    return best[1] if best else None

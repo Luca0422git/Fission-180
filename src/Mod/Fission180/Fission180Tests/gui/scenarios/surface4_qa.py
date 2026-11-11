@@ -15,6 +15,7 @@ click another wall (two picked), Esc: still one face deleted. Delete the Fillet 
 timeline: the Press Pull and the Delete Face go on without it (the floor and the right wall
 found again where they were: before, the Press Pull lost its floor and the Delete Face took
 the left wall); Ctrl+Z. Suppress Features on the Press Pull: the body shows the filleted box
+without its right wall (the Delete Face stays on: its wall is still there)
 (before, a suppressed surface step came out empty and the body went blank); Unsuppress.
 MODIFY > Merge of the strip's
 two faces in one plane, OK. Click the strip's face, F: the surface Fillet opens on the strip
@@ -345,12 +346,20 @@ def suppressed():
     h.idle_step()()
     steps = [o for o in s["box"].Group if surfmod.is_step(o)]
     off = [surfmod.kind_of(o) for o in steps if bodies.is_suppressed(o)]
-    h.check("the Press Pull is off (and the Delete Face on it)", "surface_press_pull" in off, off)
+    h.check("the Press Pull is off", off == ["surface_press_pull"], off)
+    # The Delete Face stays on: its wall was there before the Press Pull, and a step whose
+    # picks live on the step before it finds them again on what is there now (wave 7,
+    # modify: timeline_ops.uses treats Picks like a fillet's edges, as Fusion keeps a step
+    # whose faces still exist). Until then the Delete Face went off with the Press Pull and
+    # the whole filleted box showed (1585.19). So: the filleted box without its right wall,
+    # (20 - 3) x 10 = 170 less.
     h.check(
-        "the body is not blank: the filleted box shows",
-        s4.near(st.area(s["box"]), fillet_area(3), 1e-5),
-        st.area(s["box"]),
+        "the body is not blank: the filleted box shows, its right wall still deleted",
+        s4.near(st.area(s["box"]), fillet_area(3) - 170.0, 1e-5),
+        (st.area(s["box"]), fillet_area(3) - 170.0),
     )
+    xs = [round(f.CenterOfMass.x, 6) for f in s["box"].Shape.Faces]
+    h.check("the right wall is the one deleted", 30.0 not in xs and 0.0 in xs, xs)
     h.check(
         "no step is red",
         all("Invalid" not in list(o.State) for o in steps),

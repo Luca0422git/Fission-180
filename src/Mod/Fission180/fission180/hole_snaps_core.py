@@ -346,3 +346,30 @@ def choose_hit(hits, owner=None):
         if here > rank and d2 <= NEAR_HIT:
             best, rank = hit, here
     return best
+
+
+# -- a free drag lands on a clean value -----------------------------------------------------------
+DRAG_STEPS_MM = (0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0)
+DRAG_STEPS_INCH = (0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0)
+DRAG_PIXELS = 2.0
+
+
+def drag_step(mm_per_px, inch=False):
+    """The step (mm) a dragged position is rounded to: the smallest clean step of the
+    design's unit that is at least DRAG_PIXELS on the screen. A hand cannot place the mouse
+    finer than that, so what a drag leaves beyond it is noise: the parity report's hole
+    dragged back onto an axis read "-55.00 um" in its position box (a real -0.055 mm).
+    Zoomed in, the step gets finer; typed values are never rounded."""
+    reach = max(float(mm_per_px), 0.0) * DRAG_PIXELS
+    steps = [s * 25.4 for s in DRAG_STEPS_INCH] if inch else list(DRAG_STEPS_MM)
+    for step in steps:
+        if step >= reach:
+            return step
+    return steps[-1]
+
+
+def drag_value(value, mm_per_px, inch=False):
+    """`value` (mm) as a drag leaves it: on the nearest multiple of drag_step."""
+    step = drag_step(mm_per_px, inch)
+    out = math.floor(float(value) / step + 0.5) * step
+    return round(out, 9) + 0.0

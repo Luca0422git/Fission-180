@@ -49,6 +49,10 @@ LINE_TYPES = ("Part::GeomLine", "Part::GeomLineSegment")
 MIN_DIAMETER = 0.1  # mm: the diameter arrow stops here
 TO_WAITING = "Click the face or plane the hole goes to (in the 3D view or the browser)."
 MISSES = "The hole misses the part. Drag it (or type X / Y) back onto a face of the part."
+# More modeled threads than this in one Hole step: the dialog's preview shows the drilled
+# holes, and the threads are cut once, by OK.
+LIGHT_THREADS = 1
+THREADS_LATER = "The %d threads are modeled when you press OK (the preview shows the holes)."
 
 
 class PointDragger(BoxCarrier):
@@ -1147,10 +1151,15 @@ class HolePanel(Panel):
                 "simple",
                 "taper",
             ):
-                # Start from the size nearest to the diameter the hole has now.
-                d = tables.closest(
-                    self.standard.currentData(), self.diameter.value(), internal=tap == "tapped"
-                )
+                # Start from the size nearest to the diameter the hole has now: a tapped
+                # hole keeps its diameter as the tap drill (5 mm: M6x1), a clearance hole
+                # takes the fastener of that diameter (hole_tables.size_for_drill).
+                if tap == "tapped":
+                    d = hole_tables.size_for_drill(
+                        self.standard.currentData(), self.diameter.value()
+                    )
+                else:
+                    d = tables.closest(self.standard.currentData(), self.diameter.value())
                 if d is not None:
                     self._fill_sizes(d.standard, d.size, d.label)
             elif tap == "clearance":
@@ -1414,7 +1423,16 @@ class HolePanel(Panel):
         except Exception:
             return False
 
-    def _apply(self):
+    def _many_modeled(self, options):
+        """True when the hole step would cut more than LIGHT_THREADS modeled threads."""
+        try:
+            if options.get("tap_type") != "tapped" or not options.get("modeled"):
+                return False
+            return len(hole.centres(self.target)) > LIGHT_THREADS
+        except Exception:
+            return False
+
+    def _apply(self, final=False):
         if self.target is None:
             return
         self._collect()
@@ -1423,6 +1441,13 @@ class HolePanel(Panel):
             # Fusion: the To box waits for its click, nothing is wrong yet; the hole keeps its
             # depth meanwhile (the dialog says what it waits for).
             options["extent"] = "distance"
+        # Several modeled threads: the preview drills the holes and the threads are cut once,
+        # by OK (book parity report, line 2192: five holes From Sketch took about 60 s. The
+        # dialog starts with the last hole's settings; with Tapped + Modeled every click on a
+        # circle and every key cut all the threads again, 1.3 s of kernel time for each).
+        self.threads_later = not final and self._many_modeled(options)
+        if self.threads_later:
+            options["modeled"] = False
         try:
             hole.apply(self.target, options)
             self.error = ""
@@ -1462,6 +1487,9 @@ class HolePanel(Panel):
 
     def show_status(self):
         text = self.problem()
+        if not text and getattr(self, "threads_later", False):
+            self.message.setText(THREADS_LATER % len(hole.centres(self.target)))
+            return
         self.message.setText("⚠ " + text if text else "")
 
     # -- handles --------------------------------------------------------------------------
@@ -1582,7 +1610,7 @@ class HolePanel(Panel):
             return
         try:
             if hole.on_flat_face(self.target):
-                hole.move_to(self.target, (round(xy[0], 3), round(xy[1], 3)))
+                hole.move_to(self.target, self._drag_xy(xy))
             else:
                 self._centre_on_curved_face()
         except Exception as exc:
@@ -1590,6 +1618,20 @@ class HolePanel(Panel):
             return
         self.dirty = True
         self.schedule()
+
+    def _drag_xy(self, xy):
+        """Where a drag of the blue dot leaves the hole: on clean values, as fine as the
+        screen shows (hole_snaps_core.drag_step). It was rounded to a micrometre: a hole
+        dragged back to an axis stood -0.055 mm beside it."""
+        from . import design_units, handle_look, hole_snaps_core
+
+        try:
+            dot = self.draggers.get("centre")
+            scale = handle_look.mm_per_px(Gui.ActiveDocument.ActiveView, dot.point())
+            inch = design_units.design_is_inch(self.doc)
+            return tuple(hole_snaps_core.drag_value(v, scale, inch) for v in xy[:2])
+        except Exception:
+            return (round(xy[0], 3), round(xy[1], 3))
 
     def _centre_released(self, xy):
         self._centre_dragged(xy)
@@ -1670,13 +1712,17 @@ class HolePanel(Panel):
             self.message.setText("⚠ " + TO_WAITING)
             return False
         self._timer.stop()
-        if self.dirty:
+        if self.dirty or getattr(self, "threads_later", False):
             self.dirty = False
-            self._apply()
+            self._apply(final=True)  # the threads the preview left out are cut now
         if self.error:
             self.message.setText("⚠ " + self.error)
             return False
-        preview.recompute(self.doc)
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        try:
+            preview.recompute(self.doc)
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
         text = self.problem()
         if text:
             self.message.setText("⚠ " + text)

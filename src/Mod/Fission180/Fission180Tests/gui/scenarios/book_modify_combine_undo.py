@@ -73,7 +73,7 @@ def setup():
 
     Gui.activateWorkbench("Fission180Workbench")
     App.newDocument("Drone")
-    parameters.add_user(doc(), "Thickness", "", "2.5 mm")
+    parameters.add_user(doc(), "Thickness", "mm", "2.5")
     doc().recompute()
     h.fit()
     h.ribbon("Create Sketch")

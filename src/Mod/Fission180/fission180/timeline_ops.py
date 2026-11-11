@@ -139,6 +139,8 @@ def settle(doc):
             repaired = repair_references(doc)
             if _resolve_patterns(doc) or repaired:
                 doc.recompute()
+            if _follow_counts(doc):
+                doc.recompute()
             if _keep_splits(doc):
                 doc.recompute()
             if _follow_faces(doc):
@@ -149,6 +151,17 @@ def settle(doc):
         follow_mesh_steps(doc)  # after an undo, a step added or deleted: mesh steps' sides
     finally:
         _settling.discard(doc.Name)
+
+
+def _follow_counts(doc):
+    """A pattern of bodies whose quantity follows a parameter gets as many copy bodies as
+    its count is now (pattern.follow_counts). True when bodies were added or removed."""
+    try:
+        from . import pattern
+
+        return pattern.follow_counts(doc)
+    except Exception:
+        return False
 
 
 def _keep_splits(doc):
@@ -308,6 +321,12 @@ def install_guard(defer=None):
         from . import split_face
 
         split_face.install()  # a split face stays split under the steps after it
+    except Exception:
+        pass
+    try:
+        from . import pattern
+
+        pattern.install_count_watch()  # a pattern of bodies follows its quantity parameter
     except Exception:
         pass
     picks.install()  # picked edges / faces kept when FreeCAD loses their names
@@ -1620,6 +1639,16 @@ def delete(doc, names):
             if obj is not None:
                 components.remove(doc, obj)
         return True
+    # A Hardware step is the part it inserted: Delete takes the part's component, its other
+    # occurrences, the holes made for it and its joints (Fusion: the component goes with the
+    # step that made it). Deleting only the step left an empty component and its
+    # occurrences behind (wave 7, the hardware builder's known gap).
+    made_parts = [n for n in names if _is_hardware(doc.getObject(n))]
+    if made_parts:
+        rest = [n for n in names if n not in made_parts]
+        if rest:
+            delete(doc, rest)
+        return _delete_hardware(doc, made_parts)
     title = ", ".join(_label(doc, n) for n in names[:3])
     # A multi-body extrude's hidden steps in the other bodies go with it.
     names = names + [n for n in followers(doc, names) if n not in names]
@@ -1682,6 +1711,36 @@ def delete(doc, names):
                 _show_only_tip(body, body.Tip)
         if rolling:
             _follow_root_steps(doc)
+        recompute(doc)
+    except Exception:
+        doc.abortTransaction()
+        recompute(doc)
+        raise
+    doc.commitTransaction()
+    return True
+
+
+def _is_hardware(obj):
+    try:
+        from . import hardware
+
+        return obj is not None and hardware.is_hardware(obj)
+    except Exception:
+        return False
+
+
+def _delete_hardware(doc, names):
+    """Delete Hardware steps with all they made, as one undo step."""
+    from . import hardware
+
+    title = ", ".join(_label(doc, n) for n in names[:3])
+    _transaction(doc, "Delete %s" % title)
+    try:
+        for n in names:
+            feature = doc.getObject(n)
+            if feature is not None:
+                hardware.remove(feature, own_step=False)
+        _follow_root_steps(doc)
         recompute(doc)
     except Exception:
         doc.abortTransaction()

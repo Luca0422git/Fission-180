@@ -445,6 +445,76 @@ class EnterFinishes:
         self.panel = None
 
 
+def _drop_redo(doc):
+    """(wave 7, modify-c; the book parity report's bug 18.) The toolbar's Undo with a dialog
+    open: FreeCAD closes the dialog's unfinished step as if it were done and undoes it, so
+    the half-made step sat on the Redo list and Ctrl+Y brought it back as a step of the
+    design: a preview that was incomplete then (no body picked yet, a value still being
+    typed) came back as an orphan, invalid step ("There is no solid in ..."). A cancelled
+    dialog leaves nothing to redo: the Redo list is emptied (it held nothing else: starting
+    the dialog's step had emptied it, as every new step does). FreeCAD has no call for
+    that: the first change of a new step empties the list (measured on 1.1.4: opening a
+    step alone does not), and a step that is aborted leaves no trace, so an object is
+    added in a step of its own and the step aborted."""
+    try:
+        if not doc.RedoCount:
+            return
+        doc.openTransaction("Cancelled")
+        doc.addObject("App::FeaturePython", "Fission180Cancelled")
+        doc.abortTransaction()
+        try:
+            App.closeActiveTransaction(True)
+        except Exception:
+            pass
+    except Exception as exc:
+        from . import warn
+
+        warn("undo in a dialog: the unfinished step could not be dropped: %s" % exc)
+
+
+def dialog_takes(name):
+    """(wave 7, modify-c; book parity report, bug 18.) Undo or Redo asked for from the
+    toolbar, a menu or a shortcut of Fission 180 (commands.make_way_for) while a dialog that
+    guards Ctrl+Z is open: True when the dialog dealt with it, so FreeCAD's Undo / Redo must
+    not run. Undo cancels the command being made, exactly as the Ctrl+Z key does; Redo does
+    nothing (there is nothing to redo inside a command).
+
+    Before, only the key was caught. The toolbar's Undo reached FreeCAD, which closed the
+    dialog's unfinished step as if it were done and undid it (the half-made step then sat
+    on the Redo list and came back as a step of the design with Ctrl+Y: the orphan "Combine
+    1"), or, when the dialog had changed nothing yet, undid the step BEFORE the command
+    under the open dialog."""
+    if name not in ("Std_Undo", "Std_Redo"):
+        return False
+    panel = None
+    for guard in list(UndoCancels.live):
+        if guard.panel is not None and not getattr(guard.panel, "_closed", True):
+            panel = guard.panel
+            break
+    if panel is None:
+        # a dialog without a Ctrl+Z guard of its own (Fillet, Draft, Shell, Scale...): the
+        # same rule (its Fillet came back as "Fillet 1" with Redo after the toolbar's Undo)
+        from . import taskui
+
+        panel = taskui.current()
+    if panel is None or getattr(panel, "_closed", False):
+        return False
+    if name == "Std_Undo":
+        from .compat import QtCore
+
+        def cancel():
+            try:
+                if not getattr(panel, "_closed", False):
+                    panel.reject()
+            except Exception as exc:
+                from . import warn
+
+                warn("Undo in a dialog: %s" % exc)
+
+        QtCore.QTimer.singleShot(0, cancel)
+    return True
+
+
 class UndoCancels:
     """Keys and document events that would pull the document from under an open dialog.
 
@@ -459,12 +529,18 @@ class UndoCancels:
     deleted document). remove() when the dialog closes."""
 
     FINISH_FIRST = {"S": "Std_Save", "N": "Std_New", "O": "Std_Open"}
+    live = []  # the guards of the dialogs open now (dialog_takes)
 
     def __init__(self, panel):
         from .compat import QtCore, QtWidgets
 
         self.panel = panel
         guard = self
+        UndoCancels.live.append(self)
+        try:
+            self.steps_before = int(panel.doc.UndoCount)
+        except Exception:
+            self.steps_before = None
 
         class KeyFilter(QtCore.QObject):
             def eventFilter(self, obj, event):
@@ -582,6 +658,16 @@ class UndoCancels:
             except Exception:
                 pass
             panel._close()
+            try:
+                # FreeCAD's own Undo reached the design (its Edit menu): when what it undid
+                # is the dialog's unfinished step (as many steps left as before the dialog),
+                # that step must not come back with Redo. A step from before the dialog
+                # that was undone under it stays on the Redo list.
+                own = self.steps_before is not None and panel.doc.UndoCount >= self.steps_before
+            except Exception:
+                own = False
+            if own:
+                _drop_redo(panel.doc)
             recompute(panel.doc)
             from . import log
 
@@ -626,6 +712,10 @@ class UndoCancels:
         try:
             App.removeDocumentObserver(self.watch)
         except Exception:
+            pass
+        try:
+            UndoCancels.live.remove(self)
+        except ValueError:
             pass
         self.panel = None
 
