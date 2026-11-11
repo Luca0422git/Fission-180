@@ -1231,6 +1231,24 @@ def _is_visible(view, gl, el, to_screen):
     return False
 
 
+def _shown_faces_first(view, gl, elements):
+    """The box's elements with the faces the view shows ahead of the hidden ones (the order
+    otherwise kept). With Select Through on (Fusion's default) a window inside a command
+    also takes faces hidden behind the one the person sees, and a dialog that builds on
+    one face (Extrude's profile) takes the first it is given: the window round a box's top
+    face in Extrude gave it the hidden back face (wave 7, fix-6; selection_dialogs B).
+    Only faces are tested: one pick per sample point, few faces in a window."""
+    hidden = []
+    shown = []
+    to_screen = _project(view)
+    for el in elements:
+        if el.kind == "faces" and not _is_visible(view, gl, el, to_screen):
+            hidden.append(el)
+        else:
+            shown.append(el)
+    return shown + hidden
+
+
 def _apply(elements, plan, doc_name=None):
     """Select the elements as the plan says; returns [(object name, element)] selected."""
     picked = []
@@ -1787,7 +1805,10 @@ class _ViewFilter(QtCore.QObject):
         plan = core.plan(
             bool(press.modifiers & SHIFT), bool(press.modifiers & CTRL), press.in_dialog
         )
-        elements = _elements_in(view, gl, polygon, crossing, filters())
+        filters_ = filters()
+        elements = _elements_in(view, gl, polygon, crossing, filters_)
+        if press.in_dialog and filters_.select_through:
+            elements = _shown_faces_first(view, gl, elements)
         picked = _apply(elements, plan, App.ActiveDocument.Name)
         _state["last"] = {
             "kind": "box",
@@ -2393,7 +2414,11 @@ class SelectCommand(_Command):
             from . import sketch_mode
 
             session = sketch_mode.current()
-            if session is not None and not session.closed and sketch_mode.editing_sketch() is not None:
+            if (
+                session is not None
+                and not session.closed
+                and sketch_mode.editing_sketch() is not None
+            ):
                 # In a sketch Fusion's Select ends the sketch tool that runs (what it drew
                 # stays) and the sketch stays open. (It closed the sketch and went back to
                 # the SOLID tab: Luca, 2026-11-05.)
