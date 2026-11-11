@@ -124,6 +124,16 @@ def firepiston(quantity=6):
     return steps, pattern
 
 
+def firepiston_x(quantity=6):
+    """The Fire Piston as the book lays it: along X, the pattern about the X axis."""
+    steps, pattern = firepiston(quantity)
+    for step in steps:
+        if step.get("plane") == "XY":
+            step["plane"] = "YZ"
+    pattern["axis"] = "X"
+    return steps, pattern
+
+
 def bolt(quantity=40):
     r = 4.25
     steps = [
@@ -179,6 +189,7 @@ CASES = {
     "geocache": geocache,
     "geocache_no_thread": lambda: geocache(thread=False),
     "firepiston": firepiston,
+    "firepiston_x": firepiston_x,
     "bolt": bolt,
     "holes": holes,
 }
