@@ -693,6 +693,17 @@ def _now():
     return time.time()
 
 
+def helpers_hidden(where):
+    """No helper of a step is drawn: a coil's section (the triangle it sweeps) is the
+    step's own, Fusion never shows it."""
+    shown = [
+        o.Label
+        for o in r.doc().Objects
+        if o.Label.endswith(" section") and o.ViewObject is not None and o.ViewObject.Visibility
+    ]
+    return h.check("%s: no coil section is drawn" % where, not shown, shown)
+
+
 def coil_made():
     shape = r.shape_of("Piston Body")
     h.check("one valid solid", shape.isValid() and len(shape.Solids) == 1)
@@ -710,6 +721,7 @@ def coil_made():
         )
     inch("Coil")
     r.timeline_ok("Coil")
+    helpers_hidden("Coil")
     App.Console.PrintMessage("[Fission 180] replay: Coil OK took %.1f s\n" % (_now() - S["coil_t0"]))
     r.cube_click("home")
     h.fit()
@@ -781,6 +793,7 @@ def mirror_made():
     h.check("Mirror 1 is in the timeline", t.titles()[-1] == "Mirror 1", t.titles())
     inch("Mirror")
     r.timeline_ok("Mirror")
+    helpers_hidden("Mirror")
     App.Console.PrintMessage("[Fission 180] replay: Mirror OK took %.1f s\n" % (_now() - S["mirror_t0"]))
     S["v_pair"] = shape.Volume
     S["pair"] = cut
@@ -866,6 +879,7 @@ def knurl_made():
     h.check("the timeline ends with the pattern", t.titles()[-1].startswith("Circular Pattern"), t.titles())
     inch("Circular Pattern")
     r.timeline_ok("Circular Pattern")
+    helpers_hidden("Circular Pattern")
     r.check_box("still 4 in long, d0.70 in", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
     App.Console.PrintMessage("[Fission 180] replay: Circular Pattern OK took %.1f s\n" % took)
     h.fit()
@@ -2406,7 +2420,8 @@ def limits_minimum_value():
     # report 1740: "ticking Minimum took the CURRENT slide (1.22 in) although the box first
     # showed 0.00 in": the box shows the joint's value now, as Fusion's does
     got = _rows()["min"][1].value()
-    h.check("Minimum shows the slide now", abs(got - S["out"]) < 1e-3, (got, S["out"]))
+    # (the box shows the slide to its two decimals: 0.9971 in reads 1.00 in)
+    h.check("Minimum shows the slide now", abs(got - S["out"]) <= 0.005 * IN, (got, S["out"]))
     r.type_field(_rows()["min"][1].widget, "0")
 
 
@@ -2516,8 +2531,12 @@ def opacity_set():
     texts = [x for x, _c in result.get("texts", [])]
     h.check("Opacity Control: 100 / 80 / 60 / 40 / 20 % and Custom Opacity", result.get("ok") and texts == ["100%", "80%", "60%", "40%", "20%", "Custom Opacity..."], texts)
     body = r.bodies_of("Piston Body")[0]
-    seen = [body.ViewObject.Transparency] + [f.ViewObject.Transparency for f in body.Group if hasattr(f.ViewObject, "Transparency") and f.ViewObject.Visibility]
-    h.check("the Piston Body is 60 % opaque", all(abs(v - 40) <= 1 for v in seen), seen)
+    seen = [(body.Label, body.ViewObject.Transparency)] + [
+        (f.Label, f.ViewObject.Transparency)
+        for f in body.Group
+        if hasattr(f.ViewObject, "Transparency") and f.ViewObject.Visibility
+    ]
+    h.check("the Piston Body is 60 % opaque", all(abs(v - 40) <= 1 for _n, v in seen), seen)
     # report 1744: "the Piston Body's anodized blue look turned back to grey in the view"
     look_is("Aluminium, anodized blue", "Piston Body", "Opacity Control")
     look_is("Brass", "End Cap", "Opacity Control")
