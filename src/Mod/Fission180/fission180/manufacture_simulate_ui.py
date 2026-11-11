@@ -18,6 +18,7 @@ import FreeCADGui as Gui
 from . import commands, log, warn
 from . import manufacture_core as core
 from .compat import QtCore, QtWidgets
+from .simulation_dialogs import FocusBack
 
 OPEN = {"player": None}
 PLAY_SECONDS = 20.0  # at speed 1 the whole program plays in about this long
@@ -44,7 +45,7 @@ def _alive(widget):
         return False
 
 
-class Player(QtWidgets.QDialog):
+class Player(FocusBack, QtWidgets.QDialog):
     def __init__(self, doc, setup, playback, labels):
         super().__init__(Gui.getMainWindow())
         self.setObjectName("Fission180CamSimulate")
@@ -308,6 +309,12 @@ def open_simulate(doc, setup=None, ops=None):
     player = Player(doc, setup, playback, [o.Label for o in chosen])
     OPEN["player"] = player
     player.show()
+    try:  # at the bottom left of the 3D view, off the part
+        main = Gui.getMainWindow()
+        corner = main.mapToGlobal(QtCore.QPoint(340, main.height() - player.height() - 70))
+        player.move(corner)
+    except Exception:
+        pass
     log(
         "simulate %s: %d operation(s), %s"
         % (setup.Label, len(chosen), core.time_text(playback.total))

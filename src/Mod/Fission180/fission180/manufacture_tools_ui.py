@@ -21,6 +21,7 @@ import FreeCADGui as Gui
 from . import commands, log, ui_icon, warn
 from . import manufacture_core as core
 from .compat import QtCore, QtWidgets
+from .simulation_dialogs import FocusBack
 
 OPEN = {"library": None, "editor": None}
 COLUMNS = (
@@ -54,7 +55,7 @@ def _alive(widget):
         return False
 
 
-class ToolEditor(QtWidgets.QDialog):
+class ToolEditor(FocusBack, QtWidgets.QDialog):
     """Fusion's tool editor for one tool. `on_save(tool)` gets the edited tool on OK."""
 
     LENGTHS = (
@@ -322,7 +323,7 @@ class ToolEditor(QtWidgets.QDialog):
         self.accept()
 
 
-class LibraryDialog(QtWidgets.QDialog):
+class LibraryDialog(FocusBack, QtWidgets.QDialog):
     def __init__(self, doc, on_select=None, kinds=None):
         super().__init__(Gui.getMainWindow())
         self.setObjectName("Fission180CamToolLibrary")

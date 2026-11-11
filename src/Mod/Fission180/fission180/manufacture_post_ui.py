@@ -22,6 +22,7 @@ import FreeCADGui as Gui
 from . import commands, log, warn
 from . import manufacture_core as core
 from .compat import QtCore, QtGui, QtWidgets
+from .simulation_dialogs import FocusBack
 
 OPEN = {"dialog": None}
 LAST = {"posted": None, "sheet": None, "opened": []}  # what was written last (tests read it)
@@ -59,7 +60,7 @@ def _open_file(path):
         warn("could not open %s: %s" % (path, exc))
 
 
-class PostDialog(QtWidgets.QDialog):
+class PostDialog(FocusBack, QtWidgets.QDialog):
     def __init__(self, doc, setup, ops=None, sheet=False):
         super().__init__(Gui.getMainWindow())
         self.setObjectName("Fission180CamPost")
