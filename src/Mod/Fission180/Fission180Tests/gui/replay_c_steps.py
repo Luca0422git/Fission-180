@@ -429,3 +429,8 @@ def reopen_steps(tag, name):
         "%s_opened" % tag,
     )
     return [close, open_, fit]
+
+
+def menu(group, label):
+    """The menu of a ribbon group, then its entry (MODIFY > Draft)."""
+    return si.menu_item(group, label)
