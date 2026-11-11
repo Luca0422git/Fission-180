@@ -23,6 +23,16 @@ import math
 EPS = 1e-9
 
 
+# -- keys into a value box ---------------------------------------------------------------
+def letter_starts_name(text):
+    """True when `text` (one key typed into an empty length or angle box of a sketch tool)
+    starts a parameter's name: a letter or "_", whatever key the letter is elsewhere
+    (Fusion: while a value box is shown the keys go to it; Autodesk's lesson "Create
+    parameter based sketches" types L1=20 into the rectangle's box, L being Line's key)."""
+    text = text or ""
+    return len(text) == 1 and (text.isalpha() or text == "_")
+
+
 # -- 2D vectors ------------------------------------------------------------------------
 def sub(a, b):
     return (a[0] - b[0], a[1] - b[1])
