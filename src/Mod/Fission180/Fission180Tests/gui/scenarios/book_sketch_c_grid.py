@@ -182,13 +182,15 @@ def b2_beside_the_middle():
 
 
 def b2_check():
+    import Part
+
     stop_tool()
     lines = new("Part::GeomLineSegment")
     h.check("B one more line", len(lines) == 1, len(lines))
     if lines:
         end = lines[0].EndPoint
         first = sk().Geometry[0]
-        gap = first.toShape().distToShape(__import__("Part").Vertex(end))[0]
+        gap = first.toShape().distToShape(Part.Vertex(end))[0]
         h.check("B a click on the line 7 px from its middle ends ON the line", gap < 1e-6, gap)
         h.check(
             "B ...where it was clicked, not on the middle",
