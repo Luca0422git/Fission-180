@@ -273,12 +273,44 @@ def solid_bodies(doc, visible_only=False):
 
 
 def is_shown(obj):
+    """True when `obj` is on the screen. A body counts by its solid, as its eye in the
+    browser does (body_visibility.body_shown): a hidden body is kept on, its solid off,
+    while one of its sketches shows (3.3.8), and was then taken for a shown body by every
+    tool asking here (wave 7, fix-9: Extrude proposed Cut, listed the hidden Body1 under
+    Bodies to Cut and drew it being cut, red)."""
     try:
+        if is_body(obj):
+            from . import body_visibility
+
+            return body_visibility.body_shown(obj)
         if App.GuiUp and obj.ViewObject is not None:
             return bool(obj.ViewObject.Visibility)
         return bool(obj.Visibility)
     except Exception:
         return True
+
+
+def solid_hidden(body):
+    """True for a body that holds a solid the person does not see (hidden with its eye, or
+    with its component's): Fusion leaves such a body alone. It is not proposed by a tool's
+    automatic operation (Cut, Join), not listed in a dialog's bodies to change, not drawn
+    by a preview, and new work made on an origin plane does not go into it."""
+    try:
+        if not is_body(body) or not has_solid(body):
+            return False
+        if not is_shown(body):
+            return True
+        if not App.GuiUp:
+            return False
+        parent = body.getParentGeoFeatureGroup()
+        while parent is not None:  # a hidden component hides what is in it
+            vobj = parent.ViewObject
+            if vobj is not None and not vobj.Visibility:
+                return True
+            parent = parent.getParentGeoFeatureGroup()
+    except Exception:
+        return False
+    return False
 
 
 def set_shown(obj, shown):
