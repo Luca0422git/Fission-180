@@ -1390,3 +1390,17 @@ def chain_tangent(start, curves, eps):
                     if t is not None:
                         return t, (geo, pos)
     return None
+
+
+def nearest_within(pointer, points, reach):
+    """Index of the point of `points` ((x, y), or None for one that is not on show)
+    nearest `pointer` and no further than `reach` from it, or None (a click at the centre
+    of a round model edge: sketch_reference.round_centre_under)."""
+    best = None
+    for i, p in enumerate(points):
+        if p is None:
+            continue
+        d = dist(p, pointer)
+        if d <= reach and (best is None or d < best[0]):
+            best = (d, i)
+    return best[1] if best is not None else None

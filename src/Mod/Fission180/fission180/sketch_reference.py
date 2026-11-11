@@ -30,6 +30,7 @@ Never lets an exception out (warn() and carry on).
 import FreeCAD as App
 
 from . import log, warn
+from . import sketch_infer_core as icore
 
 PARAM = ("User parameter:BaseApp/Preferences/Mod/Fission180/SketchInference", "ProjectOnReference")
 
@@ -86,7 +87,119 @@ def element_under(session, pos, corners_only=False):
             if (dx, dy) == (0, 0):
                 # (an edge right under the pointer: only a corner 2 pixels away beats it)
                 continue
+    if edge is None:
+        # the centre of a round edge (a pin's end, a hole's rim) is a point of the model
+        # like a corner: Fusion snaps to it (the book's Strandbeest: "start the slot on the
+        # pin's centre"; the report: "the slot's first click cannot snap to the Pin's
+        # centre"). Wave 7, replay-f.
+        return round_centre_under(session, point)
     return edge
+
+
+CENTRE_PIXELS = 6.0  # how near the pointer must be to a round edge's centre on the screen
+
+
+class Centre(tuple):
+    """(object, "EdgeN") of a round edge found by its CENTRE: the edge comes into the
+    sketch as a reference that bounds no profile (the point clicked is its centre; Fusion
+    projects the centre point alone, and a link started on a pin's centre gets no hole
+    there: the book parity report's Strandbeest, "it overlapped the Pin body")."""
+
+
+MANY_EDGES = 4000  # a solid with more edges is not searched for round ones (a knurl)
+
+
+def _place_of(obj):
+    """Where the shape of `obj` (a step of a body, a solid) stands in the design."""
+    from . import components
+
+    body = components.body_of(obj)
+    if body is not None and body is not obj:
+        return body.getGlobalPlacement()
+    return obj.getGlobalPlacement().multiply(obj.Placement.inverse())
+
+
+def _centre_of(session, point, obj, edges, facing=None):
+    """The edge of `edges` (round ones only count) whose centre shows at widget pixel
+    `point`, or None. `facing`: only circles lying parallel to the sketch (a direction)."""
+    place = _place_of(obj)
+    ratio = session.gl.devicePixelRatioF() or 1.0
+    height = session.gl.height()
+    round_ones, centres = [], []
+    for edge in edges:
+        curve = getattr(edge, "Curve", None)
+        if curve is None or curve.TypeId != "Part::GeomCircle":
+            continue
+        if facing is not None:
+            axis = place.Rotation.multVec(curve.Axis)
+            if abs(abs(axis.dot(facing)) - 1.0) > 1e-6:
+                continue
+        x, y = session.view.getPointOnViewport(place.multVec(curve.Center))
+        round_ones.append(edge)
+        centres.append((x / ratio, height - y / ratio))
+    i = icore.nearest_within((point.x(), point.y()), centres, CENTRE_PIXELS)
+    return round_ones[i] if i is not None else None
+
+
+def _name_of(shape, edge):
+    for n, other in enumerate(shape.Edges):
+        if other.isSame(edge):
+            return "Edge%d" % (n + 1)
+    return None
+
+
+def round_centre_under(session, point):
+    """(object, "EdgeN") of the round edge (a full circle or an arc of one) whose centre is
+    at widget pixel `point`: an edge of the flat face under the pointer (a pin's end), or,
+    with no such face there (the pointer is in a hole), a round edge of a solid on show
+    that lies parallel to the sketch (the hole's rim). None when there is none.
+    Projecting that edge brings its centre into the sketch as a point to snap to."""
+    from . import bodies, body_visibility, sketch_project_across
+
+    try:
+        found = sketch_project_across.element_at(session.view, session.gl, point)
+        if found is not None:
+            obj, sub = found
+            usable = obj is not None and obj is not session.sketch
+            if usable and getattr(obj, "TypeId", "") != "Sketcher::SketchObject":
+                if sub.startswith("Face"):
+                    shape = obj.Shape
+                    edge = _centre_of(session, point, obj, shape.getElement(sub).Edges)
+                    if edge is not None:
+                        name = _name_of(shape, edge)
+                        if name:
+                            return Centre((obj, name))
+        normal = session.sketch.getGlobalPlacement().Rotation.multVec(App.Vector(0, 0, 1))
+        ratio = session.gl.devicePixelRatioF() or 1.0
+        pixel = (int(point.x() * ratio), int((session.gl.height() - point.y()) * ratio))
+        eye = session.view.getPoint(pixel[0], pixel[1])
+        look = session.view.getViewDirection()
+        for body in bodies.list_bodies(session.doc):
+            if not body_visibility.drawn(body):
+                continue
+            obj = getattr(body, "Tip", None)
+            if obj is None or obj is session.sketch:
+                continue
+            shape = obj.Shape
+            if shape.isNull():
+                continue
+            # only a solid the pointer is over (its box): a design of 300 parts is not
+            # searched edge by edge at every click
+            back = _place_of(obj).inverse()
+            box = shape.BoundBox
+            box.enlarge(1e-3)
+            if not box.intersect(back.multVec(eye), back.Rotation.multVec(look)):
+                continue
+            if len(shape.Edges) > MANY_EDGES:
+                continue
+            edge = _centre_of(session, point, obj, shape.Edges, facing=normal)
+            if edge is not None:
+                name = _name_of(shape, edge)
+                if name:
+                    return Centre((obj, name))
+    except Exception as exc:
+        warn("the centre of a round edge under the pointer: %s" % exc)
+    return None
 
 
 def project_under(session, pos, title="Sketch", corners_only=False):
@@ -109,7 +222,13 @@ def project_under(session, pos, title="Sketch", corners_only=False):
     try:
         doc.openTransaction("Project")
         try:
-            if sketch_external.needs_reference(sketch, obj):
+            if isinstance(found, Centre):
+                # a round edge taken for its centre: a reference only (no profile)
+                if sketch_external.needs_reference(sketch, obj):
+                    sketch_external.project_across(sketch, obj, sub, defining=False)
+                else:
+                    sketch.addExternal(obj.Name, sub, False, False)
+            elif sketch_external.needs_reference(sketch, obj):
                 sketch_external.project_across(sketch, obj, sub)
             elif sub.startswith("Edge"):
                 missing, _have = sketch_auto_project.missing_edges(sketch, obj, sub)

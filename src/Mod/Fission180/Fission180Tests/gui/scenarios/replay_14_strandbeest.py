@@ -295,7 +295,9 @@ def a_slot_first():
 def a_slot_second():
     st.click(V(12, 9, 0), towards=V(0, 0, 0))
     st.hover(V(4, 8, 0))
-    h.check("4 the width box shows", any(x.startswith("W ") for x in st.box_texts()), st.box_texts())
+    h.check(
+        "4 the width box shows", any(x.startswith("W ") for x in st.box_texts()), st.box_texts()
+    )
 
 
 def a_slot_width():
@@ -323,7 +325,9 @@ def a_slot_made():
     rows = [x for x in parameters.user_rows(App.ActiveDocument) if x["name"] == "Width"]
     h.check("4 typing Width=5mm made the user parameter Width", len(rows) == 1, rows)
     if rows:
-        h.check("4 Width is 5 mm", abs(rows[0]["value"] - 5) < 1e-9 and rows[0]["unit"] == "mm", rows)
+        h.check(
+            "4 Width is 5 mm", abs(rows[0]["value"] - 5) < 1e-9 and rows[0]["unit"] == "mm", rows
+        )
     formulas = [e for _p, e in parameters.expressions_of(r.sk()).items()]
     h.check("4 the slot's width follows Width", any("Width" in e for e in formulas), formulas)
     ends = sorted(slot_centres(), key=lambda p: p.Length)
@@ -357,10 +361,167 @@ def a_length_check():
     h.shot("4-a-link-sketch")
 
 
+def hole_steps(tag, centre, check=None):
+    """Steps: C, a circle on the slot's end `centre()` (it snaps to the arc's centre), then
+    its diameter typed: the pin hole of a link."""
+
+    def tool():
+        st.esc()
+        Gui.Selection.clearSelection()
+        S["circles"] = len(r.circles())
+        h.press("c")
+
+    def draw():
+        c = centre()
+        st.click(c)
+        st.click(c + V(1, 0, 0), towards=V(0, 0, 0))
+
+    def drawn():
+        st.esc()
+        cs = r.circles()
+        h.check("%s: a circle drawn" % tag, len(cs) == S["circles"] + 1, len(cs))
+        h.check(
+            "%s: it sits on the slot's end" % tag,
+            (cs[-1][1].Center - centre()).Length < 1e-6,
+            (cs[-1][1].Center, centre()),
+        )
+        S["hole_r"] = cs[-1][1].Radius
+
+    def sized():
+        cs = r.circles()
+        h.check(
+            "%s: the hole is %g across" % (tag, PIN_D), abs(cs[-1][1].Radius * 2 - PIN_D) < 1e-6
+        )
+        h.check(
+            "%s: ...still on the slot's end" % tag,
+            (cs[-1][1].Center - centre()).Length < 1e-6,
+            (cs[-1][1].Center, centre()),
+        )
+        if check is not None:
+            check()
+
+    out = [r.named(x, "%s_hole_%s" % (tag, x.__name__)) for x in (tool, draw, drawn)]
+    out += r.dimension(
+        [lambda: centre() + V(-0.7071, 0.7071, 0) * S["hole_r"]],
+        lambda: centre() + V(-3, 3, 0),
+        "%g" % PIN_D,
+        tag + "_hole",
+        sized,
+    )
+    return out
+
+
+def front(p, y=0.0):
+    """A point of a Front-plane sketch in the design: sketch (x, y) is (X, Z)."""
+    return V(p.x, y, p.y)
+
+
+def link_extrude(tag, at, text, expect_op="New Body", start=None):
+    """Steps: E, the profile at the sketch point `at()` clicked, (Start: Offset, `start`
+    typed,) `text` typed for the distance; what the dialog proposes is checked; OK."""
+
+    def key():
+        h.click_empty()
+        h.fit()
+        h.press("e")
+
+    key.done = lambda: r.extrude_panel() is not None
+    key.done_what = "the Extrude dialog is open"
+
+    def profile():
+        p = r.extrude_panel()
+        if not p.profiles:
+            h.click(front(at()))
+            h.settle()
+        h.check("%s: one profile picked" % tag, len(r.extrude_panel().profiles) == 1, p.profiles)
+
+    def distance():
+        p = r.extrude_panel()
+        S["pins_volume"] = [k.volume(x) for x in r.bodies("Pins")]
+        if start is not None:
+            # the book's second layer: Start > Offset (the report: "no profile could be
+            # picked" with it; here the profile is picked first, as the book does)
+            h.check("%s: Start > Offset can be chosen" % tag, ui.choose(p.start, "Offset"))
+            h.caught_up(p)
+            h.check("%s: the Offset box shows" % tag, p.start_offset.widget.isVisible())
+            ui.type_into(p.start_offset.widget, start)
+            h.caught_up(p)
+            h.check("%s: the profile is still picked" % tag, len(p.profiles) == 1, p.profiles)
+        ui.type_into(p.distance.widget, text)
+        h.caught_up(p)
+        # bug 10: the profile lies on a pin of ANOTHER component. Fusion starts a new
+        # component's first extrude as a New Body; it cut the pin, without a word.
+        h.check(
+            "%s: the dialog proposes %s (bug 10: it proposed Cut and cut the pin)"
+            % (tag, expect_op),
+            p.operation.currentText() == expect_op,
+            (p.operation.currentText(), p.message.text()),
+        )
+        h.check("%s: no problem said" % tag, "⚠" not in p.message.text(), p.message.text())
+        h.shot("%s-extrude" % tag)
+        h.task_button("OK")
+
+    distance.done = lambda: r.extrude_panel() is None
+    distance.done_what = "the Extrude dialog closed"
+
+    return [r.named(x, "%s_extrude_%s" % (tag, x.__name__)) for x in (key, profile, distance)]
+
+
+def a_hole_done():
+    r.sketch_solved("4 A Link with its hole")
+
+
+def a_made():
+    import math
+
+    from fission180 import parameters
+
+    bodies = r.bodies("A Link")
+    h.check("5 A Link holds one body", len(bodies) == 1, [x.Label for x in bodies])
+    want = (15 * 5 + math.pi * 2.5**2 - math.pi * 1.5**2) * 2
+    if bodies:
+        h.check(
+            "5 the crank: a 15 x 5 slot, 2 thick, one hole",
+            r.near(k.volume(bodies[0]), want),
+            (k.volume(bodies[0]), want),
+        )
+        box = r.bbox(bodies[0])
+        h.check(
+            "5 it is 2 thick, towards the viewer (-Y)",
+            r.near(box[1], -2) and abs(box[4]) < 1e-6,
+            box,
+        )
+    h.check(
+        "5 the pins were not cut (bug 10)",
+        [round(k.volume(x), 6) for x in r.bodies("Pins")] == [round(v, 6) for v in S["pins_volume"]]
+        and len(r.bodies("Pins")) == 2,
+        [k.volume(x) for x in r.bodies("Pins")],
+    )
+    rows = {x["name"]: x for x in parameters.user_rows(App.ActiveDocument)}
+    h.check("5 Thickness=-2mm made the parameter Thickness", "Thickness" in rows, list(rows))
+    if "Thickness" in rows:
+        h.check(
+            "5 Thickness is -2 mm", abs(rows["Thickness"]["value"] + 2) < 1e-9, rows["Thickness"]
+        )
+    h.check(
+        "5 A Link is still the active component", k.active_label() == "A Link", k.active_label()
+    )
+    r.no_open_step("Extrude")
+    h.shot("5-a-link")
+
+
 steps += [r.activate("")]
 steps += r.new_component("A Link", parent_reads="root", activate_root=False)
 steps += r.create_sketch("XZ_Plane", "A Link", "a_link")
-steps += [key_options, key_shift_s, slot_key, a_slot_first, a_slot_second, a_slot_width, a_slot_made]
+steps += [
+    key_options,
+    key_shift_s,
+    slot_key,
+    a_slot_first,
+    a_slot_second,
+    a_slot_width,
+    a_slot_made,
+]
 steps += r.dimension(
     [lambda: S["a_end"] * 0.5],
     lambda: S["a_end"] * 0.5 + V(-S["a_end"].y, S["a_end"].x, 0) * 0.5,
@@ -368,5 +529,198 @@ steps += r.dimension(
     "a_length",
     a_length_check,
 )
+steps += hole_steps("a_link", lambda: S["a_end"], a_hole_done)
+steps += [r.named(r.finish_sketch, "a_finish")]
+steps += link_extrude("a_link", lambda: S["a_end"] * 0.5, "Thickness=-2mm")
+steps += [a_made]
+
+
+# == 6: DGF Plate (the rocker): a slot from the second pin, 30 between centres ====================
+def d_slot_first():
+    S["ext"] = len(r.sk().ExternalGeometry)
+    st.click(V(GROUND, 0, 0))
+
+
+def d_slot_second():
+    st.click(V(GROUND, 30, 0), towards=V(0, 0, 0))
+    st.hover(V(GROUND - 6, 16, 0))
+
+
+def d_slot_width():
+    st.keys("Width\n")
+
+
+def d_slot_made():
+    st.esc()
+    arcs = [g for _i, g in r.arcs()]
+    h.check("6 a slot: two end arcs", len(arcs) == 2, len(arcs))
+    if len(arcs) != 2:
+        return
+    h.check("6 the slot is Width (5) wide", all(abs(g.Radius - 2.5) < 1e-6 for g in arcs))
+    ends = sorted(slot_centres(), key=lambda p: p.y)
+    # The pin belongs to the component Pins. Fusion ("Auto project edges on reference"):
+    # a point clicked on another component's edge or centre projects it and holds on to
+    # it. The report: "the slot's first click cannot snap to the Pin's centre".
+    h.check(
+        "6 the slot starts on the second pin's centre (another component's)",
+        (ends[0] - V(GROUND, 0, 0)).Length < 1e-6,
+        ends[0],
+    )
+    h.check(
+        "6 ...held there by a projection of the pin (not by the grid)",
+        len(r.sk().ExternalGeometry) > S["ext"],
+        r.sk().ExternalGeometry,
+    )
+    h.check("6 the slot is upright", abs(ends[1].x - GROUND) < 1e-6, ends[1])
+    S["d_end"] = ends[1]
+
+
+def d_length_check():
+    ends = sorted(slot_centres(), key=lambda p: p.y)
+    h.check(
+        "6 the rocker is 30 between its centres",
+        (ends[1] - V(GROUND, 30, 0)).Length < 1e-6,
+        ends[1],
+    )
+    h.check("6 it still starts on the pin", (ends[0] - V(GROUND, 0, 0)).Length < 1e-6, ends[0])
+    S["d_end"] = ends[1]
+
+
+def d_hole_done():
+    r.sketch_solved("6 DGF Plate")
+    h.check("6 the rocker's sketch is fully defined", r.sk().solve() == 0, r.sk().solve())
+    h.shot("6-dgf-sketch")
+
+
+def d_made():
+    import math
+
+    bodies = r.bodies("DGF Plate")
+    h.check("6 DGF Plate holds one body", len(bodies) == 1, [x.Label for x in bodies])
+    # the pin's circle, projected when the slot was started on its centre, is a reference
+    # only (Fusion projects the centre point): it bounds no profile, the rocker lies on the
+    # pin like the crank does
+    want = (30 * 5 + math.pi * 2.5**2 - math.pi * 1.5**2) * 2
+    if bodies:
+        h.check(
+            "6 the rocker: a 30 x 5 slot, 2 thick, one hole (at its far end)",
+            r.near(k.volume(bodies[0]), want),
+            (k.volume(bodies[0]), want),
+        )
+        r.box_is("6 it stands on the second pin", bodies[0], [37.5, -2, -2.5, 42.5, 0, 32.5])
+    h.check(
+        "6 the pins were not cut",
+        len(r.bodies("Pins")) == 2
+        and [round(k.volume(x), 6) for x in r.bodies("Pins")]
+        == [round(v, 6) for v in S["pins_volume"]],
+    )
+    r.no_open_step("Extrude")
+
+
+steps += [r.activate("")]
+steps += r.new_component("DGF Plate", parent_reads="root", activate_root=False)
+steps += r.create_sketch("XZ_Plane", "DGF Plate", "dgf")
+steps += [r.named(slot_key, "d_slot_key"), d_slot_first, d_slot_second, d_slot_width, d_slot_made]
+steps += r.dimension(
+    [lambda: V(GROUND, 15, 0)],
+    lambda: V(GROUND + 8, 15, 0),
+    "30",
+    "d_length",
+    d_length_check,
+)
+steps += hole_steps("dgf", lambda: S["d_end"], d_hole_done)
+steps += [r.named(r.finish_sketch, "d_finish")]
+steps += link_extrude("dgf", lambda: V(GROUND, 15, 0), "Thickness")
+steps += [d_made]
+
+
+# == 7: B Link (the coupler), on a second layer: from the crank's hole to the rocker's ============
+def b_slot_first():
+    S["ext"] = len(r.sk().ExternalGeometry)
+    st.click(S["a_end"])
+
+
+def b_slot_second():
+    st.click(S["d_end"], towards=V(0, 0, 0))
+    mid = (S["a_end"] + S["d_end"]) * 0.5
+    st.hover(mid + V(-4, 6, 0))
+
+
+def b_slot_made():
+    st.esc()
+    arcs = [g for _i, g in r.arcs()]
+    h.check("7 a slot: two end arcs", len(arcs) == 2, len(arcs))
+    if len(arcs) != 2:
+        return
+    ends = sorted(slot_centres(), key=lambda p: p.x)
+    # both ends are in holes of OTHER components (no face under the pointer there): the
+    # hole's rim is projected and the end sits on its centre
+    h.check(
+        "7 the slot starts on the centre of the crank's hole",
+        (ends[0] - S["a_end"]).Length < 1e-6,
+        (ends[0], S["a_end"]),
+    )
+    h.check(
+        "7 ...and ends on the centre of the rocker's hole",
+        (ends[1] - S["d_end"]).Length < 1e-6,
+        (ends[1], S["d_end"]),
+    )
+    h.check(
+        "7 both holes' rims were projected",
+        len(r.sk().ExternalGeometry) >= S["ext"] + 2,
+        r.sk().ExternalGeometry,
+    )
+    S["b_len"] = (ends[1] - ends[0]).Length
+    r.sketch_solved("7 B Link")
+    h.check(
+        "7 the coupler's sketch is fully defined (it hangs on the two holes)",
+        r.sk().solve() == 0,
+        r.sk().solve(),
+    )
+    h.shot("7-b-link-sketch")
+
+
+def b_made():
+    import math
+
+    bodies = r.bodies("B Link")
+    h.check("7 B Link holds one body", len(bodies) == 1, [x.Label for x in bodies])
+    want = (S["b_len"] * 5 + math.pi * 2.5**2) * 2
+    if bodies:
+        h.check(
+            "7 the coupler: a slot from hole to hole, 5 wide, 2 thick",
+            r.near(k.volume(bodies[0]), want),
+            (k.volume(bodies[0]), want),
+        )
+        box = r.bbox(bodies[0])
+        h.check(
+            "7 Start > Offset: it lies on the second layer (y -4 .. -2)",
+            r.near(box[1], -4) and r.near(box[4], -2),
+            box,
+        )
+    h.check(
+        "7 the other links are untouched",
+        len(r.bodies("A Link")) == 1
+        and len(r.bodies("DGF Plate")) == 1
+        and len(r.bodies("Pins")) == 2,
+    )
+    r.no_open_step("Extrude")
+    h.shot("7-links")
+
+
+steps += [r.activate("")]
+steps += r.new_component("B Link", parent_reads="root", activate_root=False)
+steps += r.create_sketch("XZ_Plane", "B Link", "b_link")
+steps += [
+    r.named(slot_key, "b_slot_key"),
+    b_slot_first,
+    b_slot_second,
+    r.named(d_slot_width, "b_slot_width"),
+]
+steps += [b_slot_made, r.named(r.finish_sketch, "b_finish")]
+steps += link_extrude(
+    "b_link", lambda: (S["a_end"] + S["d_end"]) * 0.5, "Thickness", start="Thickness"
+)
+steps += [b_made]
 
 h.run("replay_14_strandbeest", steps, paced_by="state")
