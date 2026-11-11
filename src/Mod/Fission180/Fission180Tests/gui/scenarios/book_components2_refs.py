@@ -276,7 +276,7 @@ def h_body_menu():
     state["body_label"] = body.Label
     h.check(
         "the body's menu offers Properties",
-        "Properties" in t.row_menu_entries(body.Label),
+        ("Properties", True) in t.row_menu_entries(body.Label),
         t.row_menu_entries(body.Label),
     )
     t.row_menu(body.Label, "Properties")
@@ -307,7 +307,7 @@ h_body_props.done_what = "the Properties dialog closed"
 def h_component_menu():
     h.check(
         "the component's menu offers Properties",
-        "Properties" in t.row_menu_entries("Nozzle"),
+        ("Properties", True) in t.row_menu_entries("Nozzle"),
         t.row_menu_entries("Nozzle"),
     )
     t.row_menu("Nozzle", "Properties")

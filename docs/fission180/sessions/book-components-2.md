@@ -72,6 +72,33 @@ the menu entry.
 6. The "Where each command puts its result" rows: probed in `book_components2_cross`
    (Hole, Thread, Fillet, Chamfer, Shell, patterns / Mirror of bodies, Split, Combine).
 
+## Added by the orchestrator while this ran
+
+1. `insert_step` failed at "in the Plate's body" on develop: with the design active the
+   sketch on the inserted Plate's face now goes into the design's root (the wave 7 rule,
+   and Fusion's). The scenario follows Fusion's workflow now: it checks that result (the
+   root, lying on the face, the design still active), then activates the Plate by its ring
+   and checks that the next sketch goes into the Plate's body. Its check of the second
+   occurrence expects the rows of the parts inside ("two_parts:2" holds Plate and Peg).
+   Searched the scenario folder for other "in the clicked body" checks after a Create
+   Sketch on a face of an inserted or component-held body: `insert_step` was the only
+   scenario that inserts a part and sketches on it itself; `fixsketch_*` ("the sketch is in
+   the clicked body") sketch on bodies at the design's root, where the clicked body is in
+   the active component. Run after the change: `insert_step`, `insert_svg`,
+   `direct_base_feature`, `direct_commands`, `direct_history`, `direct_components`,
+   `rebuild_start`, `fixsketch_join`, `fixsketch_move`, `vex_qa_inch_sketch`,
+   `meshinspect2_inspect`, the `journey_rebuild*`: see the final report.
+2. Properties in the browser: `book_components2_refs` H right-clicks the Nozzle's body row
+   and the Nozzle's own row > Properties; the dialog opens for that body / that component
+   (its bodies counted, its title).
+3. Hardware's inserted standard part is not grounded: nothing in this work grounds an
+   inserted component (`components_ui.ground_first` is only called by New Component and
+   Create Components from Bodies). A second, separate insert of the same part being a new
+   component ("Name (2)"): Fusion does the same by a forum answer ("if you create just one
+   fastener ... and use Copy/Paste to duplicate the fastener in Fusion, you do get
+   instances, not separate components": separate inserts are separate components). Left as
+   it is.
+
 ## FreeCAD facts and traps (1.1.4)
 
 - `view.setActiveObject("pdbody", body)` does not touch the "part" slot; Fission 180's
