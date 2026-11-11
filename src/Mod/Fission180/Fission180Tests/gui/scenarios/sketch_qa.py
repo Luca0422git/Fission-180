@@ -435,7 +435,7 @@ def b_negative_check():
 
 
 def b_text_check():
-    _box_says("abc", "Not a value")
+    _box_says("abc", "no parameter named 'abc'")  # (wave 7: a name is read as a parameter)
     si.type_text("3 kg")
 
 

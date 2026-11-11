@@ -2646,12 +2646,12 @@ class UnitsPanel:
 
 
 def set_units(doc, schema, as_default=False):
-    """Units of a design (FreeCAD keeps them per document since 1.0)."""
-    names = doc.getEnumerationsOfProperty("UnitSystem")
-    doc.UnitSystem = names[schema]
-    App.Units.setSchema(schema)
-    if as_default:
-        App.ParamGet("User parameter:BaseApp/Preferences/Units").SetInt("UserSchema", schema)
+    """Units of a design (FreeCAD keeps them per document since 1.0). design_units holds the
+    design to them from here on (FreeCAD's window code carried other documents' units over:
+    bug 2 of the book parity report)."""
+    from . import design_units
+
+    design_units.set_units(doc, schema, as_default)
     try:
         Gui.updateGui()
     except Exception:
