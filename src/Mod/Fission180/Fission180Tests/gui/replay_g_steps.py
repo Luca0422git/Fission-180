@@ -300,18 +300,25 @@ def esc():
 
 def circle(tag, centre, diameter, towards=(0.7, 0.7)):
     """Steps: C, a click on the centre, the pointer moved out, the diameter typed, Enter;
-    Esc ends the tool. `centre` in sketch coordinates."""
+    Esc ends the tool. `centre`: sketch coordinates (x, y), or a point of the design."""
+
+    def local():
+        if isinstance(centre, (tuple, list)):
+            return (float(centre[0]), float(centre[1]))
+        at = sketch().getGlobalPlacement().inverse().multVec(centre)
+        return (at.x, at.y)
 
     def key():
         state["circles"] = len(si.circles(sketch(), construction=False))
         h.press("c")
 
     def click_centre():
-        sketch_click(centre)
+        sketch_click(local())
 
     def move_out():
         rad = diameter / 2.0
-        sketch_move((centre[0] + rad * towards[0], centre[1] + rad * towards[1]))
+        c = local()
+        sketch_move((c[0] + rad * towards[0], c[1] + rad * towards[1]))
         h.settle()
 
     def typed():
@@ -322,13 +329,14 @@ def circle(tag, centre, diameter, towards=(0.7, 0.7)):
         found = si.circles(sketch(), construction=False)
         if not h.check("%s: one more circle" % tag, len(found) == state["circles"] + 1, len(found)):
             return
-        c = found[-1][1]
+        got = found[-1][1]
+        c = local()
         h.check(
-            "%s: %g across at (%g, %g)" % (tag, diameter, centre[0], centre[1]),
-            abs(2 * c.Radius - diameter) < 1e-6
-            and abs(c.Center.x - centre[0]) < 1e-6
-            and abs(c.Center.y - centre[1]) < 1e-6,
-            (2 * c.Radius, c.Center),
+            "%s: %g across at (%g, %g)" % (tag, diameter, c[0], c[1]),
+            abs(2 * got.Radius - diameter) < 1e-6
+            and abs(got.Center.x - c[0]) < 1e-6
+            and abs(got.Center.y - c[1]) < 1e-6,
+            (2 * got.Radius, got.Center),
         )
 
     out = [key, click_centre, move_out, typed, drawn]

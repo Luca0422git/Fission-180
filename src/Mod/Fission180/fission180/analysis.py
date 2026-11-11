@@ -13,6 +13,7 @@ of the timeline). Both follow the model: every recompute measures the picked bod
 Saved documents store "fission180.analysis.CenterOfMassAnalysis" / "...InterferenceAnalysis":
 keep the names stable.
 """
+
 try:
     import FreeCAD as App
 
@@ -341,7 +342,7 @@ class InterferenceAnalysis:
         try:
             if len(picked) < 2:
                 raise AnalysisError(TOO_FEW)
-            named = [(o.Label, solid_of(o)) for o in picked]
+            named = [(_pair_name(o), solid_of(o)) for o in picked]
             found = interference(named, obj.IncludeCoincident)
         except Exception as exc:
             _set(obj, "Problem", str(exc) or TOO_FEW)
@@ -369,13 +370,27 @@ class InterferenceAnalysis:
     __setstate__ = loads
 
 
+def _pair_name(obj):
+    """The name an interference result shows for a body: with its component when another
+    body of the design has the same label ("Body1 (Phone)" and "Body1 (Case)": each
+    component's first body is called Body1, and the result read "Body1 / Body1")."""
+    try:
+        from . import bodies
+
+        if bodies.is_body(obj):
+            return bodies.shown_name(obj)
+    except Exception:
+        pass
+    return obj.Label
+
+
 def overlaps(obj):
     """[(label 1, label 2, volume, common solid shape)] of the pairs of an interference
     analysis that overlap (worked out again from its bodies, in the order of its results)."""
     picked = [o for o in obj.Bodies if o is not None]
     if len(picked) < 2:
         raise AnalysisError(TOO_FEW)
-    named = [(o.Label, solid_of(o)) for o in picked]
+    named = [(_pair_name(o), solid_of(o)) for o in picked]
     return [entry for entry in interference(named, False) if entry[2] > VOLUME_EPS]
 
 
