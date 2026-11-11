@@ -336,7 +336,12 @@ def dimension(picks, place, text):
     click(place)
     opened = editor() is not None
     if h.check("the value box opened for %s" % text, opened):
-        si.type_text(text)
+        box = editor().edit
+        # a person types once the box shows its value, selected, with the cursor in it
+        h.wait_for(lambda: QtWidgets.QApplication.focusWidget() is box, "the value box's focus")
+        si.type_text(text, enter=False)
+        h.check("the box holds %s" % text, box.text() == text, box.text())
+        si.key(QtCore.Qt.Key_Return)
         h.settle()
     esc_tool()
     return opened
@@ -571,7 +576,9 @@ def click_circle(at, radius, axis="x", first=135.0, tol=None, modifiers=QtCore.Q
                     pos = QtCore.QPoint(centre.x() + dx, centre.y() + dy)
                     if h.covered(pos):
                         continue
-                    info = h.view().getObjectInfo((pos.x() * ratio, (widget.height() - pos.y()) * ratio))
+                    info = h.view().getObjectInfo(
+                        (pos.x() * ratio, (widget.height() - pos.y()) * ratio)
+                    )
                     if not info or not str(info.get("Component", "")).startswith("Edge"):
                         continue
                     if not on_circle(V(info["x"], info["y"], info["z"])):

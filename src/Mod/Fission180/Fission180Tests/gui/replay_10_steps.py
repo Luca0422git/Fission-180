@@ -30,7 +30,14 @@ S = r.S
 # 3/8-16 thread (report 1671: "polyline + dims (4, 0.5, 0.70/2, 25/64/2, 0.35/2)").
 LENGTH, CAP_DEPTH = 4.0, 0.5
 R_OUT, R_TAP, R_BORE = 0.70 / 2, 25.0 / 64 / 2, 0.35 / 2
-BODY = [(0, R_TAP), (0, R_OUT), (LENGTH, R_OUT), (LENGTH, R_BORE), (CAP_DEPTH, R_BORE), (CAP_DEPTH, R_TAP)]
+BODY = [
+    (0, R_TAP),
+    (0, R_OUT),
+    (LENGTH, R_OUT),
+    (LENGTH, R_BORE),
+    (CAP_DEPTH, R_BORE),
+    (CAP_DEPTH, R_TAP),
+]
 
 
 def inch(where):
@@ -97,7 +104,9 @@ body_component_name.done_what = "the dialog closed"
 
 
 def body_component_made():
-    h.check("Piston Body is the active component", r.active_label() == "Piston Body", r.active_label())
+    h.check(
+        "Piston Body is the active component", r.active_label() == "Piston Body", r.active_label()
+    )
     # report 1689 / pattern 9: "had to be grounded by hand"; Fusion grounds the first component
     h.check("the first component is grounded by itself", r.grounded("Piston Body"))
     inch("New Component")
@@ -150,7 +159,11 @@ def body_drawn():
     # the left side lies on the Y axis: its two ends are held ON the axis (which makes it
     # upright); the five other sides are Horizontal / Vertical
     held = kinds.count("Horizontal") + kinds.count("Vertical") + kinds.count("PointOnObject") // 2
-    h.check("closed, level and upright by themselves", kinds.count("Coincident") >= 6 and held == 6, kinds)
+    h.check(
+        "closed, level and upright by themselves",
+        kinds.count("Coincident") >= 6 and held == 6,
+        kinds,
+    )
     h.check("no dimension added by itself", not [k for k in kinds if k.startswith("Dist")], kinds)
     h.shot("10-body-polyline")
 
@@ -269,8 +282,16 @@ def revolve_axis():
 def revolve_ok():
     p = _revolve()
     axis = p.axis
-    h.check("the X axis is the axis", axis is not None and "X_Axis" in str(getattr(axis[0], "Role", axis)), axis)
-    h.check("New Body (the component is empty)", p.options.get("operation") in ("new_body", "new"), p.options.get("operation"))
+    h.check(
+        "the X axis is the axis",
+        axis is not None and "X_Axis" in str(getattr(axis[0], "Role", axis)),
+        axis,
+    )
+    h.check(
+        "New Body (the component is empty)",
+        p.options.get("operation") in ("new_body", "new"),
+        p.options.get("operation"),
+    )
     r.ok()
 
 
@@ -282,7 +303,11 @@ def body_revolved():
     pts = [(a * IN, b * IN) for a, b in BODY]
     S["v_body"] = r.pappus(pts)
     r.check_volume("the tube, by Pappus", "Piston Body", S["v_body"], 1e-6)
-    r.check_box("4 in long, d0.70 in", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    r.check_box(
+        "4 in long, d0.70 in",
+        "Piston Body",
+        [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN],
+    )
     h.check("one body in Piston Body", len(r.bodies_of("Piston Body")) == 1)
     inch("Revolve")
     r.timeline_ok("Revolve")
@@ -307,7 +332,11 @@ thread_open.done_what = "the Thread dialog is open"
 def thread_face():
     p = _thread()
     # report 1673: "the Thread dialog defaults to ISO Metric in an inch design"
-    h.check("Thread starts with ANSI Unified in an inch design", p.standard.currentData() == "ansi", p.standard.currentText())
+    h.check(
+        "Thread starts with ANSI Unified in an inch design",
+        p.standard.currentData() == "ansi",
+        p.standard.currentText(),
+    )
     # the wall of the d25/64 hole is seen through its mouth at the left end: turn the view
     App.Console.PrintMessage(
         "[Fission 180] replay: cube parts %s, looking %s\n" % (r.cube_names(), r.looking())
@@ -324,11 +353,23 @@ def thread_face():
 
 def thread_set():
     p = _thread()
-    if not h.check("the hole's wall is picked", p is not None and len(p.faces) == 1, p and (p.faces, p.message.text())):
+    if not h.check(
+        "the hole's wall is picked",
+        p is not None and len(p.faces) == 1,
+        p and (p.faces, p.message.text()),
+    ):
         return
     # report 1672: "Fission auto-suggests the size from the hole, ANSI Unified 3/8-16 UNC"
-    h.check("3/8-16 UNC is offered for the d25/64 hole", p.designation.currentText() == "3/8-16 UNC", p.designation.currentText())
-    h.check("the read-out is in inches", " in" in p.info.text() and "mm" not in p.info.text(), p.info.text())
+    h.check(
+        "3/8-16 UNC is offered for the d25/64 hole",
+        p.designation.currentText() == "3/8-16 UNC",
+        p.designation.currentText(),
+    )
+    h.check(
+        "the read-out is in inches",
+        " in" in p.info.text() and "mm" not in p.info.text(),
+        p.info.text(),
+    )
     r.tick(p.modeled, True)
 
 
@@ -366,9 +407,15 @@ def body_threaded():
     # draws: the hole is lined, so the tube gains a little (Autodesk help, Thread: "the
     # diameter of the face is changed to match the thread").
     inner = min(_radii(shape, 0.05 * IN, 0.45 * IN))
-    h.check("the thread's crests are at the d0.307 in minor diameter", abs(inner - 0.307 * IN / 2) < 0.2, inner)
+    h.check(
+        "the thread's crests are at the d0.307 in minor diameter",
+        abs(inner - 0.307 * IN / 2) < 0.2,
+        inner,
+    )
     h.check("the modeled thread changed the solid", abs(v - _tube()) > 1.0, (v, _tube()))
-    helix = [f for f in shape.Faces if f.Surface.TypeId not in ("Part::GeomPlane", "Part::GeomCylinder")]
+    helix = [
+        f for f in shape.Faces if f.Surface.TypeId not in ("Part::GeomPlane", "Part::GeomCylinder")
+    ]
     h.check("thread flanks are modeled", len(helix) >= 2, len(shape.Faces))
     h.check("Thread 1 is in the timeline", "Thread 1" in t.titles(), t.titles())
     inch("Thread")
@@ -426,7 +473,11 @@ def chamfer_set_2():
     the largest size that does. Nobody waits for that: the picks and the typed size must
     be taken while it looks.)"""
     p = _blend()
-    h.check("set 2 is the current one", p.active == 1 and p.rows.count() == 2, (p.active, p.rows.count()))
+    h.check(
+        "set 2 is the current one",
+        p.active == 1 and p.rows.count() == 2,
+        (p.active, p.rows.count()),
+    )
     S["set2_t0"] = _now()
     h.click_edge(_rim(LENGTH, R_OUT))  # the outer rim at the open end
     h.wait_for(lambda: len(p.refs) == 1, "the outer rim to be picked")
@@ -464,7 +515,9 @@ def chamfer_outer_size():
     )
     faces = [ref for ref in p.refs if "Face" in str(ref)]
     h.check("set 2: the outer rim and the left FACE", len(p.refs) == 2 and len(faces) == 1, p.refs)
-    h.speed_check("the chamfer preview answered within 30 s of the typed size", took < 30.0 * h.SLOWDOWN, took)
+    h.speed_check(
+        "the chamfer preview answered within 30 s of the typed size", took < 30.0 * h.SLOWDOWN, took
+    )
 
 
 def chamfer_ok():
@@ -498,15 +551,35 @@ def body_chamfered():
     h.check("one valid solid", shape.isValid() and len(shape.Solids) == 1)
     # the bore's mouth is 3/32 in wider at the end; both outer rims are cut by 0.02 in
     mouth = min(_radii(shape, (LENGTH - 0.001) * IN, LENGTH * IN))
-    h.check("3/32 typed is 3/32 in at the bore's mouth", abs(mouth - (R_BORE + C_IN) * IN) < 1e-4, mouth / IN)
+    h.check(
+        "3/32 typed is 3/32 in at the bore's mouth",
+        abs(mouth - (R_BORE + C_IN) * IN) < 1e-4,
+        mouth / IN,
+    )
     right = max(_radii(shape, (LENGTH - 0.001) * IN, LENGTH * IN))
     left = max(_radii(shape, 0.0, 0.001 * IN))
-    h.check("0.02 typed is 0.02 in at the right rim", abs(right - (R_OUT - C_OUT) * IN) < 1e-4, right / IN)
-    h.check("the left FACE chamfers its outer rim too", abs(left - (R_OUT - C_OUT) * IN) < 1e-4, left / IN)
+    h.check(
+        "0.02 typed is 0.02 in at the right rim",
+        abs(right - (R_OUT - C_OUT) * IN) < 1e-4,
+        right / IN,
+    )
+    h.check(
+        "the left FACE chamfers its outer rim too",
+        abs(left - (R_OUT - C_OUT) * IN) < 1e-4,
+        left / IN,
+    )
     # ...and the face's inner rim, the mouth of the threaded hole
     inner = min(_radii(shape, 0.0, 0.001 * IN))
-    h.check("the left FACE chamfers the threaded hole's mouth", inner > 0.307 * IN / 2 + 0.3 * C_OUT * IN, inner / IN)
-    r.check_box("still 4 in long, d0.70 in", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    h.check(
+        "the left FACE chamfers the threaded hole's mouth",
+        inner > 0.307 * IN / 2 + 0.3 * C_OUT * IN,
+        inner / IN,
+    )
+    r.check_box(
+        "still 4 in long, d0.70 in",
+        "Piston Body",
+        [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN],
+    )
     inch("Chamfer")
     r.timeline_ok("Chamfer")
     S["v_chamfer"] = shape.Volume
@@ -575,7 +648,9 @@ def plane_made():
         return
     at = planes[0].getGlobalPlacement()
     # the face looks along -X; -0.5 goes into the body: the plane is at x = +0.5 in
-    h.check("-0.5 typed is 0.5 in INTO the body", abs(at.Base.x - PLANE_IN * IN) < 1e-6, at.Base.x / IN)
+    h.check(
+        "-0.5 typed is 0.5 in INTO the body", abs(at.Base.x - PLANE_IN * IN) < 1e-6, at.Base.x / IN
+    )
     normal = at.Rotation.multVec(V(0, 0, 1))
     h.check("parallel to the end face", abs(abs(normal.x) - 1.0) < 1e-9, normal)
     inch("Offset Plane")
@@ -648,7 +723,9 @@ coil_diameter_enter.done_what = "the coil is placed"
 
 def coil_revolutions():
     p = _coil()
-    h.check("Diameter 0.70 typed is 0.70 in", r.near(p.diameter.value(), 0.70 * IN), p.diameter.value())
+    h.check(
+        "Diameter 0.70 typed is 0.70 in", r.near(p.diameter.value(), 0.70 * IN), p.diameter.value()
+    )
     r.type_field(p.revolutions.widget, "1.5")
 
 
@@ -676,7 +753,9 @@ def coil_ok():
     want = (0.70 * IN, 1.5, -3 * IN, 0.02 * IN)
     h.check("the values are inches", all(r.near(a, b) for a, b in zip(got, want)), got)
     # report 1678: "Operation switched to Cut by itself"
-    h.check("Operation is Cut by itself", p.operation.currentText() == "Cut", p.operation.currentText())
+    h.check(
+        "Operation is Cut by itself", p.operation.currentText() == "Cut", p.operation.currentText()
+    )
     h.check("no message", not p.message.text(), p.message.text())
     S["coil_t0"] = _now()
     r.ok()
@@ -712,7 +791,12 @@ def coil_made():
     # a triangle 0.02 in on a side, 1.5 turns round d0.70: about 0.111 mm2 x 84 mm
     h.check("one groove is cut (about 9 mm3)", 3.0 < cut < 20.0, cut)
     h.check("Coil 1 is in the timeline", "Coil 1" in t.titles(), t.titles())
-    spans = [v.Point.x for v in shape.Vertexes if math.hypot(v.Point.y, v.Point.z) > (R_OUT - 0.021) * IN and 0.03 * IN < v.Point.x < 3.97 * IN]
+    spans = [
+        v.Point.x
+        for v in shape.Vertexes
+        if math.hypot(v.Point.y, v.Point.z) > (R_OUT - 0.021) * IN
+        and 0.03 * IN < v.Point.x < 3.97 * IN
+    ]
     if h.check("the groove's ends", bool(spans)):
         h.check(
             "it runs 3 in from the plane 0.5 in inside the body",
@@ -722,7 +806,9 @@ def coil_made():
     inch("Coil")
     r.timeline_ok("Coil")
     helpers_hidden("Coil")
-    App.Console.PrintMessage("[Fission 180] replay: Coil OK took %.1f s\n" % (_now() - S["coil_t0"]))
+    App.Console.PrintMessage(
+        "[Fission 180] replay: Coil OK took %.1f s\n" % (_now() - S["coil_t0"])
+    )
     r.cube_click("home")
     h.fit()
     h.shot("10-body-coil")
@@ -746,7 +832,8 @@ mirror_open.done_what = "the Mirror dialog is open"
 def mirror_type():
     p = _pattern()
     App.Console.PrintMessage(
-        "[Fission 180] replay: mirror fields %s type %s\n" % (sorted(p.fields), p.pattern_type.currentText())
+        "[Fission 180] replay: mirror fields %s type %s\n"
+        % (sorted(p.fields), p.pattern_type.currentText())
     )
     if p.pattern_type.currentText() != "Features":
         h.check("Pattern Type Features", r.choose(p.pattern_type, "Features"))
@@ -773,7 +860,11 @@ def mirror_plane():
 def mirror_ok():
     p = _pattern()
     plane = p.options.get("plane")
-    h.check("the XZ plane is the mirror plane", plane is not None and "XZ" in str(getattr(plane[0], "Role", plane)), plane)
+    h.check(
+        "the XZ plane is the mirror plane",
+        plane is not None and "XZ" in str(getattr(plane[0], "Role", plane)),
+        plane,
+    )
     S["mirror_t0"] = _now()
     r.ok()
 
@@ -794,7 +885,9 @@ def mirror_made():
     inch("Mirror")
     r.timeline_ok("Mirror")
     helpers_hidden("Mirror")
-    App.Console.PrintMessage("[Fission 180] replay: Mirror OK took %.1f s\n" % (_now() - S["mirror_t0"]))
+    App.Console.PrintMessage(
+        "[Fission 180] replay: Mirror OK took %.1f s\n" % (_now() - S["mirror_t0"])
+    )
     S["v_pair"] = shape.Volume
     S["pair"] = cut
 
@@ -876,11 +969,19 @@ def knurl_made():
     pair = S.get("pair", 17.0)
     # six pairs of long grooves cross each other often: far less than six times a pair
     h.check("the knurl: six pairs of grooves", 2.0 * pair < removed < 6.0 * pair, (removed, pair))
-    h.check("the timeline ends with the pattern", t.titles()[-1].startswith("Circular Pattern"), t.titles())
+    h.check(
+        "the timeline ends with the pattern",
+        t.titles()[-1].startswith("Circular Pattern"),
+        t.titles(),
+    )
     inch("Circular Pattern")
     r.timeline_ok("Circular Pattern")
     helpers_hidden("Circular Pattern")
-    r.check_box("still 4 in long, d0.70 in", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    r.check_box(
+        "still 4 in long, d0.70 in",
+        "Piston Body",
+        [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN],
+    )
     App.Console.PrintMessage("[Fission 180] replay: Circular Pattern OK took %.1f s\n" % took)
     h.fit()
     h.shot("10-body-knurl")
@@ -975,7 +1076,9 @@ root_activate.done_what = "the design's row is active"
 
 def group_first():
     S["titles"] = t.titles()
-    h.check("with the design active the timeline shows every step", len(S["titles"]) >= 9, S["titles"])
+    h.check(
+        "with the design active the timeline shows every step", len(S["titles"]) >= 9, S["titles"]
+    )
     t.click(S["titles"][0])
 
 
@@ -1041,7 +1144,11 @@ def group_name(new):
 def body_grouped():
     groups = _groups()
     h.check("the group is called Piston Body", "Piston Body" in groups, groups)
-    h.check("every step of the body is in it", len(groups.get("Piston Body", [])) == len(S["titles"]), groups)
+    h.check(
+        "every step of the body is in it",
+        len(groups.get("Piston Body", [])) == len(S["titles"]),
+        groups,
+    )
     r.timeline_ok("Create Group")
     inch("Create Group")
     look_is("Aluminium, anodized blue", "Piston Body", "the group")
@@ -1181,7 +1288,14 @@ def cap_dimensioned():
         for g in sketch.Geometry[S["first"] :]
         if g.TypeId == "Part::GeomLineSegment"
     )
-    want = [(CAP_X0, 0), (CAP_X0, R_OUT), (CAP_X1, R_OUT), (CAP_X1, CAP_R), (CAP_X2, CAP_R), (CAP_X2, 0)]
+    want = [
+        (CAP_X0, 0),
+        (CAP_X0, R_OUT),
+        (CAP_X1, R_OUT),
+        (CAP_X1, CAP_R),
+        (CAP_X2, CAP_R),
+        (CAP_X2, 0),
+    ]
     want = sorted((round(a, 5), round(b, 5)) for a, b in want)
     h.check("the End Cap's profile has its numbers", got == want, got)
     r.fully_constrained("End Cap before the fillet")
@@ -1341,14 +1455,20 @@ def _cap_volume():
 
 
 def cap_chamfered():
-    r.check_volume("0.05 and 0.02 (twice) are inches: the volume by Pappus", "End Cap", _cap_volume(), 2e-4)
+    r.check_volume(
+        "0.05 and 0.02 (twice) are inches: the volume by Pappus", "End Cap", _cap_volume(), 2e-4
+    )
     inch("the End Cap's chamfers")
     r.timeline_ok("the End Cap's chamfers")
 
 
 def cap_thread_face():
     p = _thread()
-    h.check("Thread remembers ANSI Unified", p.standard.currentData() == "ansi", p.standard.currentText())
+    h.check(
+        "Thread remembers ANSI Unified",
+        p.standard.currentData() == "ansi",
+        p.standard.currentText(),
+    )
     shape = r.shape_of("End Cap")
     shank = r.cylinders(shape, CAP_R * IN)
     spot = r.seen_spot(shank[0]) if shank else None
@@ -1358,9 +1478,15 @@ def cap_thread_face():
 
 def cap_thread_ok():
     p = _thread()
-    if not h.check("the shank is picked", p is not None and len(p.faces) == 1, p and p.message.text()):
+    if not h.check(
+        "the shank is picked", p is not None and len(p.faces) == 1, p and p.message.text()
+    ):
         return
-    h.check("3/8-16 UNC is offered for the d3/8 shank", p.designation.currentText() == "3/8-16 UNC", p.designation.currentText())
+    h.check(
+        "3/8-16 UNC is offered for the d3/8 shank",
+        p.designation.currentText() == "3/8-16 UNC",
+        p.designation.currentText(),
+    )
     # report 1698: "cosmetic thread (Modeled off)"; the last thread was modeled
     r.tick(p.modeled, False)
     h.caught_up(p)
@@ -1423,7 +1549,9 @@ def grouped(name):
     def step():
         groups = _groups()
         h.check("the group is called %s" % name, name in groups, sorted(groups))
-        h.check("the steps of %s are in it" % name, groups.get(name) == S["loose"], groups.get(name))
+        h.check(
+            "the steps of %s are in it" % name, groups.get(name) == S["loose"], groups.get(name)
+        )
         r.timeline_ok("the group " + name)
         inch("the group " + name)
 
@@ -1432,7 +1560,9 @@ def grouped(name):
 
 def _place(label):
     p = r.part(label).Placement
-    return [round(v, 4) for v in (p.Base.x, p.Base.y, p.Base.z)] + [round(a, 6) for a in p.Rotation.Q]
+    return [round(v, 4) for v in (p.Base.x, p.Base.y, p.Base.z)] + [
+        round(a, 6) for a in p.Rotation.Q
+    ]
 
 
 def cap_drag():
@@ -1464,7 +1594,11 @@ def cap_drag_undone():
     box = [CAP_X0 * IN, -R_OUT * IN, -R_OUT * IN, CAP_X2 * IN, R_OUT * IN, R_OUT * IN]
     r.check_box("...exactly where it was", "End Cap", box)
     inch("Ctrl+Z of the drag")  # report 1648 (bug 2): the units went back to mm here
-    h.check("the groups are still there", sorted(_groups()) == ["End Cap", "Piston Body"], sorted(_groups()))
+    h.check(
+        "the groups are still there",
+        sorted(_groups()) == ["End Cap", "Piston Body"],
+        sorted(_groups()),
+    )
     look_is("Brass", "End Cap", "Ctrl+Z of the drag")
     h.speed_check("the undo took less than 20 s", took < 20.0 * h.SLOWDOWN, took)
     App.Console.PrintMessage("[Fission 180] replay: undoing the drag took %.1f s\n" % took)
@@ -1515,7 +1649,11 @@ def oring_ok():
     bh = _bh()
     shown = bh.shown()
     h.check("an inch O-ring by its dash number", shown[:2] == ("Inch", "O-ring"), shown)
-    h.check("nothing clicked: OK puts it at the origin", "origin" in bh.panel().hint.text(), bh.panel().hint.text())
+    h.check(
+        "nothing clicked: OK puts it at the origin",
+        "origin" in bh.panel().hint.text(),
+        bh.panel().hint.text(),
+    )
     r.ok()
 
 
@@ -1556,15 +1694,25 @@ def _ring_box(label):
 
 def oring_placed(label, x_in, inside_in):
     def step():
-        h.check("%s is a component at the top level" % label, r.part(label) is not None and _owner(label) == "", [p.Label for p in _parts()])
+        h.check(
+            "%s is a component at the top level" % label,
+            r.part(label) is not None and _owner(label) == "",
+            [p.Label for p in _parts()],
+        )
         box = _ring_box(label)
         out = (inside_in + 2 * ORING_CS) * IN / 2.0
         # (the part's own origin is on the face it lies on, not in its middle)
         want = [x_in * IN, -out, -out, (x_in + ORING_CS) * IN, out, out]
         # typed -2 is -2 in; turned 90 degrees about Y the ring stands across the X axis
-        h.check("the O-ring stands across the X axis at x = %g in" % x_in, all(abs(a - b) < 1e-3 for a, b in zip(box, want)), (box, want))
+        h.check(
+            "the O-ring stands across the X axis at x = %g in" % x_in,
+            all(abs(a - b) < 1e-3 for a, b in zip(box, want)),
+            (box, want),
+        )
         h.check("an inserted part is not grounded", not r.grounded(label))
-        h.check("the active component is still the design", r.active_label() == "", r.active_label())
+        h.check(
+            "the active component is still the design", r.active_label() == "", r.active_label()
+        )
         inch("the O-ring's Move")
         r.timeline_ok("Hardware")
 
@@ -1582,7 +1730,10 @@ def hide_construction():
 
 
 def construction_hidden():
-    h.check("the offset plane was shown, and is hidden now", S["plane_shown"] and not t.shown(_planes()[0]))
+    h.check(
+        "the offset plane was shown, and is hidden now",
+        S["plane_shown"] and not t.shown(_planes()[0]),
+    )
 
 
 def joint_start():
@@ -1615,7 +1766,10 @@ def joint_pick_ring(label, centre_in):
         hot = bj.hot(p)
         # report 1716: "clicking a round surface snaps to the nearest snap point, usually an
         # EDGE MIDPOINT, so the O-ring landed off-axis"
-        App.Console.PrintMessage("[Fission 180] replay: ring snaps %s hot %s\n" % (bj.kinds(p), hot and (hot["kind"], hot["point"])))
+        App.Console.PrintMessage(
+            "[Fission 180] replay: ring snaps %s hot %s\n"
+            % (bj.kinds(p), hot and (hot["kind"], hot["point"]))
+        )
         h.check(
             "the O-ring's only snap is its centre, on its axis",
             hot is not None and (hot["point"] - V(centre_in * IN, 0, 0)).Length < 1e-4,
@@ -1631,15 +1785,26 @@ def joint_pick_cap_end():
 
     p = j.joint_panel()
     snap = p.snaps["comp1"]
-    h.check("the O-ring is component 1, by its centre", snap is not None and p.active == "comp2", (snap and snap["kind"], p.active))
+    h.check(
+        "the O-ring is component 1, by its centre",
+        snap is not None and p.active == "comp2",
+        (snap and snap["kind"], p.active),
+    )
     shape = r.shape_of("End Cap")
-    end = [f for f in shape.Faces if f.Surface.TypeId == "Part::GeomPlane" and abs(f.CenterOfMass.x - CAP_X2 * IN) < 1e-6]
+    end = [
+        f
+        for f in shape.Faces
+        if f.Surface.TypeId == "Part::GeomPlane" and abs(f.CenterOfMass.x - CAP_X2 * IN) < 1e-6
+    ]
     spot = r.seen_spot(end[0]) if end else None
     if not h.check("the flat end of the shank is in view", spot is not None, len(end)):
         return
     bj.hover_point(spot)
     hot = bj.hot(p)
-    App.Console.PrintMessage("[Fission 180] replay: shank end snaps %s hot %s\n" % (bj.kinds(p), hot and (hot["kind"], hot["point"])))
+    App.Console.PrintMessage(
+        "[Fission 180] replay: shank end snaps %s hot %s\n"
+        % (bj.kinds(p), hot and (hot["kind"], hot["point"]))
+    )
     h.check(
         "the lit snap of the round end face is its centre",
         hot is not None and (hot["point"] - V(CAP_X2 * IN, 0, 0)).Length < 1e-4,
@@ -1650,9 +1815,19 @@ def joint_pick_cap_end():
 
 def joint_ring_offset():
     p = j.joint_panel()
-    h.check("both sides are picked", p.snaps["comp1"] is not None and p.snaps["comp2"] is not None, p.active)
+    h.check(
+        "both sides are picked",
+        p.snaps["comp1"] is not None and p.snaps["comp2"] is not None,
+        p.active,
+    )
     box = _ring_box(ORING_CAP)
-    h.check("the O-ring jumped onto the shank's end, on the axis", abs((box[0] + box[3]) / 2 - CAP_X2 * IN) < 1e-3 and abs(box[1] + box[4]) < 1e-3 and abs(box[2] + box[5]) < 1e-3, box)
+    h.check(
+        "the O-ring jumped onto the shank's end, on the axis",
+        abs((box[0] + box[3]) / 2 - CAP_X2 * IN) < 1e-3
+        and abs(box[1] + box[4]) < 1e-3
+        and abs(box[2] + box[5]) < 1e-3,
+        box,
+    )
     # report 1719: "then Offset Z -0.465 in (end cap) to slide the O-ring into place"
     r.type_field(p.offset_fields["z"].widget, "-0.465")
 
@@ -1670,7 +1845,11 @@ joint_ring_ok.done_what = "the Joint dialog closed"
 def joint_ring_made():
     box = _ring_box(ORING_CAP)
     seat = (CAP_X1 + ORING_CS / 2) * IN  # against the head, in the rounded corner
-    h.check("-0.465 typed is 0.465 in along the shank: the O-ring sits under the head", abs((box[0] + box[3]) / 2 - seat) < 1e-3, ((box[0] + box[3]) / 2 / IN, seat / IN))
+    h.check(
+        "-0.465 typed is 0.465 in along the shank: the O-ring sits under the head",
+        abs((box[0] + box[3]) / 2 - seat) < 1e-3,
+        ((box[0] + box[3]) / 2 / IN, seat / IN),
+    )
     h.check("still on the axis", abs(box[1] + box[4]) < 1e-3 and abs(box[2] + box[5]) < 1e-3, box)
     made = j.joint_list()
     kinds = [x.Label for x in made]
@@ -1748,11 +1927,21 @@ CAP_HOME = [-CAP_HEAD * IN, -R_OUT * IN, -R_OUT * IN, CAP_SHANK * IN, R_OUT * IN
 
 def cap_joined():
     # report 1722: "it moved 1 in and the O-ring (rigidly joined) moved with it"
-    r.check_box("the End Cap moved 1 in: its head on the body's end, the shank inside", "End Cap", CAP_HOME)
+    r.check_box(
+        "the End Cap moved 1 in: its head on the body's end, the shank inside", "End Cap", CAP_HOME
+    )
     box = _ring_box(ORING_CAP)
     seat = ORING_CS / 2 * IN
-    h.check("the O-ring came with it", abs((box[0] + box[3]) / 2 - seat) < 1e-3 and abs(box[1] + box[4]) < 1e-3, box)
-    r.check_box("the grounded Piston Body stayed", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    h.check(
+        "the O-ring came with it",
+        abs((box[0] + box[3]) / 2 - seat) < 1e-3 and abs(box[1] + box[4]) < 1e-3,
+        box,
+    )
+    r.check_box(
+        "the grounded Piston Body stayed",
+        "Piston Body",
+        [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN],
+    )
     rigid = [x.Label for x in j.joint_list() if x.Label.startswith("Rigid")]
     h.check("two Rigid joints", len(rigid) == 2, [x.Label for x in j.joint_list()])
     inch("the End Cap's Joint")
@@ -1773,7 +1962,10 @@ def isolate_cap():
 
 def isolated_cap():
     h.check("the menu offers Isolate", "Isolate" in S["menu"], S["menu"])
-    h.check("only the End Cap is shown", _shown("End Cap") and not _shown("Piston Body") and not t.shown(r.part(ORING_CAP)))
+    h.check(
+        "only the End Cap is shown",
+        _shown("End Cap") and not _shown("Piston Body") and not t.shown(r.part(ORING_CAP)),
+    )
     S["menu"] = [e[0] for e in t.row_menu_entries("End Cap")]
     h.shot("10-isolated")
     # (the book: Unisolate; the same entry under Fission 180's own name)
@@ -1782,7 +1974,10 @@ def isolated_cap():
 
 def unisolated():
     h.check("the isolated row offers Exit Isolate", "Exit Isolate" in S["menu"], S["menu"])
-    h.check("everything is shown again", _shown("End Cap") and _shown("Piston Body") and t.shown(r.part(ORING_CAP)))
+    h.check(
+        "everything is shown again",
+        _shown("End Cap") and _shown("Piston Body") and t.shown(r.part(ORING_CAP)),
+    )
     look_is("Aluminium, anodized blue", "Piston Body", "Exit Isolate")  # report 1744
     look_is("Brass", "End Cap", "Exit Isolate")
     inch("Isolate")
@@ -1805,7 +2000,9 @@ def draw(grid, key):
         S["pitch"] = S["pitch_now"] = pitch
         S["first"] = r.polyline([V(x * pitch, y * pitch, 0) for x, y in grid])
         lines = [g for g in r.sk().Geometry[S["first"] :] if g.TypeId == "Part::GeomLineSegment"]
-        ends = sorted((round(g.StartPoint.x / pitch, 6), round(g.StartPoint.y / pitch, 6)) for g in lines)
+        ends = sorted(
+            (round(g.StartPoint.x / pitch, 6), round(g.StartPoint.y / pitch, 6)) for g in lines
+        )
         h.check("every corner on the grid crossing that was clicked", ends == sorted(grid), ends)
 
     return r.named(step, key + "_polyline")
@@ -1831,7 +2028,10 @@ def knob_scaled():
         )
     )
     h.check("0.70/2 typed is 0.35 in", r.near(sketch.Geometry[_line(0)].length(), R_OUT * IN))
-    h.check("the whole sketch was scaled with it", r.near(sketch.Geometry[_line(1)].length(), 2 * R_OUT * IN, 1e-6))
+    h.check(
+        "the whole sketch was scaled with it",
+        r.near(sketch.Geometry[_line(1)].length(), 2 * R_OUT * IN, 1e-6),
+    )
     S["pitch_now"] = R_OUT * IN
     h.fit(iso=False)
 
@@ -1885,7 +2085,9 @@ def revolve_new_body():
     # report 1727: "the next Revolve then JOINED the piston rod into it"; pattern 3: "a new
     # component's first extrude defaults to Cut"
     operation = p.options.get("operation")
-    h.check("New Body by itself: the component is empty", operation in ("new_body", "new"), operation)
+    h.check(
+        "New Body by itself: the component is empty", operation in ("new_body", "new"), operation
+    )
     r.ok()
 
 
@@ -1894,7 +2096,9 @@ revolve_new_body.done_what = "the Revolve dialog closed"
 
 
 def knob_revolved():
-    r.check_volume("the knob, by Pappus", "Piston End", r.pappus([(a * IN, b * IN) for a, b in KNOB]), 1e-6)
+    r.check_volume(
+        "the knob, by Pappus", "Piston End", r.pappus([(a * IN, b * IN) for a, b in KNOB]), 1e-6
+    )
     box = [KNOB_X0 * IN, -R_OUT * IN, -R_OUT * IN, (KNOB_X0 + KNOB_T) * IN, R_OUT * IN, R_OUT * IN]
     r.check_box("the knob at the body's open end", "Piston End", box)
     r.check_box("the End Cap is where the joint put it", "End Cap", CAP_HOME)
@@ -1908,13 +2112,19 @@ def rod_dim_land():
 
 def rod_scaled():
     sketch = r.sk()
-    h.check("5/32-0.09/2 typed is 0.11125 in", r.near(sketch.Geometry[_line(1)].length(), ROD_LAND * IN, 1e-9), sketch.Geometry[_line(1)].length() / IN)
+    h.check(
+        "5/32-0.09/2 typed is 0.11125 in",
+        r.near(sketch.Geometry[_line(1)].length(), ROD_LAND * IN, 1e-9),
+        sketch.Geometry[_line(1)].length() / IN,
+    )
     S["pitch_now"] = ROD_LAND * IN
     h.fit(iso=False)
 
 
 def rod_dim_groove():
-    App.Console.PrintMessage("[Fission 180] replay: rod tip after scale x=%.4f in\n" % (r.mid(_line(0)).x / IN))
+    App.Console.PrintMessage(
+        "[Fission 180] replay: rod tip after scale x=%.4f in\n" % (r.mid(_line(0)).x / IN)
+    )
     r.dimension([r.mid(_line(3))], _beside(3, 0, -1.5), "0.09")
 
 
@@ -1941,14 +2151,30 @@ def rod_dim_place():
 
 def _rod():
     x0, x1, x2, x3 = ROD_X0, ROD_X0 + ROD_LAND, ROD_X0 + ROD_LAND + GROOVE_W, ROD_X0 + ROD_LEN
-    return [(x0, 0), (x0, R_ROD), (x1, R_ROD), (x1, R_GROOVE), (x2, R_GROOVE), (x2, R_ROD), (x3, R_ROD), (x3, 0)]
+    return [
+        (x0, 0),
+        (x0, R_ROD),
+        (x1, R_ROD),
+        (x1, R_GROOVE),
+        (x2, R_GROOVE),
+        (x2, R_ROD),
+        (x3, R_ROD),
+        (x3, 0),
+    ]
 
 
 def rod_dimensioned():
     sketch = r.sk()
     App.Console.PrintMessage(
         "[Fission 180] replay: rod first %s constraints %s\n"
-        % (S["first"], [(c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, round(c.Value / IN, 4)) for c in sketch.Constraints if c.Type.startswith("Dist")])
+        % (
+            S["first"],
+            [
+                (c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, round(c.Value / IN, 4))
+                for c in sketch.Constraints
+                if c.Type.startswith("Dist")
+            ],
+        )
     )
     _profile_is(_rod(), "Piston")
     h.shot("10-rod-sketch")
@@ -1959,8 +2185,16 @@ def rod_revolved():
     S["v_rod"] = want
     r.check_volume("the rod with its groove, by Pappus", "Piston", want, 1e-6)
     # report 1725-1730 (bug 9): the Piston End's body was MOVED into Piston and the rod joined it
-    h.check("one body in Piston, one in Piston End", len(r.bodies_of("Piston")) == 1 and len(r.bodies_of("Piston End")) == 1)
-    r.check_volume("the knob is as it was (nothing joined it)", "Piston End", r.pappus([(a * IN, b * IN) for a, b in KNOB]), 1e-6)
+    h.check(
+        "one body in Piston, one in Piston End",
+        len(r.bodies_of("Piston")) == 1 and len(r.bodies_of("Piston End")) == 1,
+    )
+    r.check_volume(
+        "the knob is as it was (nothing joined it)",
+        "Piston End",
+        r.pappus([(a * IN, b * IN) for a, b in KNOB]),
+        1e-6,
+    )
     box = [ROD_X0 * IN, -R_ROD * IN, -R_ROD * IN, (ROD_X0 + ROD_LEN) * IN, R_ROD * IN, R_ROD * IN]
     r.check_box("the rod inside the Piston Body's bore", "Piston", box)
     look_is("Aluminium, anodized blue", "Piston Body", "the rod's Revolve")
@@ -2013,7 +2247,9 @@ def hole_click_tip():
 def hole_drag_to_centre():
     p = _hs().hole_panel()
     dot = p.draggers.get("centre") if p is not None else None
-    if not h.check("the hole is on the tip, with its blue dot", dot is not None, p and p.message.text()):
+    if not h.check(
+        "the hole is on the tip, with its blue dot", dot is not None, p and p.message.text()
+    ):
         return
     # report 1731: "drag the blue dot to the centre (snaps, X/Y = 0)"
     h.drag(h.screen_point(dot.point()), h.screen_point(V(ROD_X0 * IN, 0, 0)), steps=14)
@@ -2028,7 +2264,11 @@ def hole_countersink():
         centre is not None and (centre - V(ROD_X0 * IN, 0, 0)).Length < 1e-6,
         centre,
     )
-    h.check("X and Y read 0", abs(p.pos_x.value()) < 1e-9 and abs(p.pos_y.value()) < 1e-9, (p.pos_x.value(), p.pos_y.value()))
+    h.check(
+        "X and Y read 0",
+        abs(p.pos_x.value()) < 1e-9 and abs(p.pos_y.value()) < 1e-9,
+        (p.pos_x.value(), p.pos_y.value()),
+    )
     h.check("Countersink", r.choose(p.hole_type, "Countersink"))
 
 
@@ -2057,7 +2297,9 @@ def tip_hole_made():
     if S["drill_point"] == "Angle":
         removed += hs.tip_cone(IN / 8)
     S["v_rod"] = r.pappus([(a * IN, b * IN) for a, b in _rod()]) - removed
-    r.check_volume("0.25, 3/16 and 1/8 are inches: the countersunk hole's volume", "Piston", S["v_rod"], 1e-5)
+    r.check_volume(
+        "0.25, 3/16 and 1/8 are inches: the countersunk hole's volume", "Piston", S["v_rod"], 1e-5
+    )
     h.check("the Hole is a step of the Piston", "Hole 1" in t.titles(), t.titles())
     inch("Hole")
     r.timeline_ok("Hole")
@@ -2080,7 +2322,11 @@ def tip_chamfer_ok():
         "[Fission 180] replay: tip chamfer refs %s distance %s note %r\n"
         % (p.refs, p.distance.value(), p.limit_label.text())
     )
-    h.check("0.02 in is taken as typed (not held at a smaller size)", r.near(p.distance.value(), 0.02 * IN) and not p.limit_label.text(), (p.distance.value() / IN, p.limit_label.text()))
+    h.check(
+        "0.02 in is taken as typed (not held at a smaller size)",
+        r.near(p.distance.value(), 0.02 * IN) and not p.limit_label.text(),
+        (p.distance.value() / IN, p.limit_label.text()),
+    )
     h.check("no message", not _message(_blend()), _message(_blend()))
     r.ok()
 
@@ -2109,7 +2355,11 @@ def activate(label):
 def knob_hole_click():
     p = _hs().hole_panel()
     # report 1733: "the dialog remembers the last hole's settings (like Fusion)"
-    h.check("the dialog remembers Countersink", p.hole_type.currentText() == "Countersink", p.hole_type.currentText())
+    h.check(
+        "the dialog remembers Countersink",
+        p.hole_type.currentText() == "Countersink",
+        p.hole_type.currentText(),
+    )
     h.check("...and its 1/8 in", r.near(p.diameter.value(), IN / 8), p.diameter.value())
     face = _plane_face("Piston End", KNOB_X0)
     spot = r.seen_spot(face) if face is not None else None
@@ -2120,7 +2370,9 @@ def knob_hole_click():
 def knob_hole_drag():
     p = _hs().hole_panel()
     dot = p.draggers.get("centre") if p is not None else None
-    if h.check("the hole is on the knob, with its blue dot", dot is not None, p and p.message.text()):
+    if h.check(
+        "the hole is on the knob, with its blue dot", dot is not None, p and p.message.text()
+    ):
         h.drag(h.screen_point(dot.point()), h.screen_point(V(KNOB_X0 * IN, 0, 0)), steps=14)
 
 
@@ -2137,9 +2389,18 @@ def knob_hole_tapped():
 def knob_hole_thread():
     p = _hs().hole_panel()
     if p.standard.currentText() != "ANSI Unified Screw Threads":
-        App.Console.PrintMessage("[Fission 180] replay: hole thread types %s\n" % [p.standard.itemText(i) for i in range(p.standard.count())])
-        ansi = [p.standard.itemText(i) for i in range(p.standard.count()) if "ANSI Unified" in p.standard.itemText(i)]
-        h.check("ANSI Unified", bool(ansi) and r.choose(p.standard, ansi[0]), p.standard.currentText())
+        App.Console.PrintMessage(
+            "[Fission 180] replay: hole thread types %s\n"
+            % [p.standard.itemText(i) for i in range(p.standard.count())]
+        )
+        ansi = [
+            p.standard.itemText(i)
+            for i in range(p.standard.count())
+            if "ANSI Unified" in p.standard.itemText(i)
+        ]
+        h.check(
+            "ANSI Unified", bool(ansi) and r.choose(p.standard, ansi[0]), p.standard.currentText()
+        )
 
 
 def knob_hole_size():
@@ -2154,7 +2415,11 @@ def knob_hole_size():
 def knob_hole_designation():
     p = _hs().hole_panel()
     if p.designation.currentText() != "5/16-18 UNC":
-        h.check("5/16-18 UNC", r.choose(p.designation, "5/16-18 UNC"), [p.designation.itemText(i) for i in range(p.designation.count())])
+        h.check(
+            "5/16-18 UNC",
+            r.choose(p.designation, "5/16-18 UNC"),
+            [p.designation.itemText(i) for i in range(p.designation.count())],
+        )
 
 
 def knob_hole_depth():
@@ -2166,8 +2431,18 @@ def knob_hole_depth():
 def knob_hole_ok():
     p = _hs().hole_panel()
     centre = _hs().centre_of(p.target) if p.target is not None else None
-    h.check("the hole is on the knob's axis", centre is not None and (centre - V(KNOB_X0 * IN, 0, 0)).Length < 1e-6, centre)
-    h.check("5/16-18 UNC, 0.5 in deep, modeled", p.designation.currentText() == "5/16-18 UNC" and r.near(p.depth.value(), 0.5 * IN) and p.modeled.isChecked(), (p.designation.currentText(), p.depth.value()))
+    h.check(
+        "the hole is on the knob's axis",
+        centre is not None and (centre - V(KNOB_X0 * IN, 0, 0)).Length < 1e-6,
+        centre,
+    )
+    h.check(
+        "5/16-18 UNC, 0.5 in deep, modeled",
+        p.designation.currentText() == "5/16-18 UNC"
+        and r.near(p.depth.value(), 0.5 * IN)
+        and p.modeled.isChecked(),
+        (p.designation.currentText(), p.depth.value()),
+    )
     h.check("no message", not _hs().message(p), _hs().message(p))
     r.ok()
 
@@ -2185,11 +2460,28 @@ def knob_hole_made():
     # a 5/16-18 tap hole 0.5 in deep: between the tap drill (d0.257) and the full d5/16
     low = math.pi * (0.257 * IN / 2) ** 2 * 0.5 * IN
     high = math.pi * (0.3125 * IN / 2) ** 2 * 0.5 * IN * 1.25
-    h.check("a threaded hole 0.5 in deep is cut into the knob", low * 0.9 < removed < high, (removed, low, high))
-    deep = max(v.Point.x for v in shape.Vertexes if math.hypot(v.Point.y, v.Point.z) < 0.2 * IN and v.Point.x < (KNOB_X0 + KNOB_T - 0.01) * IN)
-    h.check("0.5 typed is 0.5 in deep (its drill point beyond)", (KNOB_X0 + 0.49) * IN < deep < (KNOB_X0 + 0.62) * IN, deep / IN)
+    h.check(
+        "a threaded hole 0.5 in deep is cut into the knob",
+        low * 0.9 < removed < high,
+        (removed, low, high),
+    )
+    deep = max(
+        v.Point.x
+        for v in shape.Vertexes
+        if math.hypot(v.Point.y, v.Point.z) < 0.2 * IN
+        and v.Point.x < (KNOB_X0 + KNOB_T - 0.01) * IN
+    )
+    h.check(
+        "0.5 typed is 0.5 in deep (its drill point beyond)",
+        (KNOB_X0 + 0.49) * IN < deep < (KNOB_X0 + 0.62) * IN,
+        deep / IN,
+    )
     r.check_volume("the Piston is not cut by the knob's hole", "Piston", S["v_rod"], 1e-5)
-    h.check("the hole is a step of Piston End", any(x.startswith("Hole") for x in t.titles()), t.titles())
+    h.check(
+        "the hole is a step of Piston End",
+        any(x.startswith("Hole") for x in t.titles()),
+        t.titles(),
+    )
     inch("the tapped Hole")
     r.timeline_ok("the tapped Hole")
     h.shot("10-knob-hole")
@@ -2213,7 +2505,11 @@ def joint_pick_tip():
     # the tip's flat is a ring a hair wide round the countersink: its round rim is clicked
     # (Fusion: a round edge gives its centre)
     rim = (R_ROD - 0.02) * IN
-    h.check("the rim of the piston's tip is clicked (the Piston Body is hidden)", r.click_circle(ROD_X0 * IN, rim, first=200.0), r.looking())
+    h.check(
+        "the rim of the piston's tip is clicked (the Piston Body is hidden)",
+        r.click_circle(ROD_X0 * IN, rim, first=200.0),
+        r.looking(),
+    )
 
 
 def joint_groove_offset():
@@ -2231,11 +2527,26 @@ def joint_groove_offset():
 def joint_groove_made():
     box = _ring_box(ORING_ROD)
     middle = (ROD_X0 + 5.0 / 32) * IN
-    h.check("-5/32 typed: the O-ring sits in the middle of the groove", abs((box[0] + box[3]) / 2 - middle) < 1e-3, ((box[0] + box[3]) / 2 / IN, middle / IN))
+    h.check(
+        "-5/32 typed: the O-ring sits in the middle of the groove",
+        abs((box[0] + box[3]) / 2 - middle) < 1e-3,
+        ((box[0] + box[3]) / 2 / IN, middle / IN),
+    )
     h.check("on the axis", abs(box[1] + box[4]) < 1e-3 and abs(box[2] + box[5]) < 1e-3, box)
     floor = (0.208 / 2) * IN
-    h.check("its inside on the groove's floor (d0.208)", abs((box[4] - box[1]) / 2 - (floor + ORING_CS * IN)) < 1e-3, box)
-    box_rod = [ROD_X0 * IN, -R_ROD * IN, -R_ROD * IN, (ROD_X0 + ROD_LEN) * IN, R_ROD * IN, R_ROD * IN]
+    h.check(
+        "its inside on the groove's floor (d0.208)",
+        abs((box[4] - box[1]) / 2 - (floor + ORING_CS * IN)) < 1e-3,
+        box,
+    )
+    box_rod = [
+        ROD_X0 * IN,
+        -R_ROD * IN,
+        -R_ROD * IN,
+        (ROD_X0 + ROD_LEN) * IN,
+        R_ROD * IN,
+        R_ROD * IN,
+    ]
     r.check_box("the Piston did not move (the O-ring came to it)", "Piston", box_rod)
     rigid = [x.Label for x in j.joint_list() if x.Label.startswith("Rigid")]
     h.check("three Rigid joints", len(rigid) == 3, [x.Label for x in j.joint_list()])
@@ -2280,7 +2591,11 @@ def row(label):
 
 def asbuilt_rigid_ok():
     p = _asbuilt()
-    h.check("Piston and Piston End are taken", [x.Label for x in p.parts] == ["Piston", "Piston End"], [x.Label for x in p.parts])
+    h.check(
+        "Piston and Piston End are taken",
+        [x.Label for x in p.parts] == ["Piston", "Piston End"],
+        [x.Label for x in p.parts],
+    )
     h.check("Type starts as Rigid", p.type_box.currentText() == "Rigid", p.type_box.currentText())
     r.ok()
 
@@ -2296,13 +2611,21 @@ def _joint_labels():
 def asbuilt_rigid_made():
     rigid = [k for k in _joint_labels() if k.startswith("Rigid")]
     h.check("a fourth Rigid joint", len(rigid) == 4, _joint_labels())
-    r.check_box("nothing moved", "Piston End", [KNOB_X0 * IN, -R_OUT * IN, -R_OUT * IN, (KNOB_X0 + KNOB_T) * IN, R_OUT * IN, R_OUT * IN])
+    r.check_box(
+        "nothing moved",
+        "Piston End",
+        [KNOB_X0 * IN, -R_OUT * IN, -R_OUT * IN, (KNOB_X0 + KNOB_T) * IN, R_OUT * IN, R_OUT * IN],
+    )
     inch("As-built Joint")
 
 
 def slider_type():
     p = _asbuilt()
-    h.check("Piston End and Piston Body are taken", [x.Label for x in p.parts] == ["Piston End", "Piston Body"], [x.Label for x in p.parts])
+    h.check(
+        "Piston End and Piston Body are taken",
+        [x.Label for x in p.parts] == ["Piston End", "Piston Body"],
+        [x.Label for x in p.parts],
+    )
     h.check("Slider", j.choose_type(p, "Slider"))
 
 
@@ -2328,7 +2651,9 @@ def slider_position():
 def slider_ok():
     p = _asbuilt()
     snap = p.position_snap
-    h.check("the position is the rim's centre", snap is not None and snap.get("kind") == "circle", snap)
+    h.check(
+        "the position is the rim's centre", snap is not None and snap.get("kind") == "circle", snap
+    )
     h.check("no problem shown", p.message.text() == "", p.message.text())
     r.ok()
 
@@ -2353,7 +2678,11 @@ def _knob_x():
 
 
 def slider_made():
-    h.check("Slider 1 is made (not a Rigid)", _slider() is not None and len([k for k in _joint_labels() if k.startswith("Rigid")]) == 4, _joint_labels())
+    h.check(
+        "Slider 1 is made (not a Rigid)",
+        _slider() is not None and len([k for k in _joint_labels() if k.startswith("Rigid")]) == 4,
+        _joint_labels(),
+    )
     h.check("it stands at 0", abs(_slide()) < 1e-6, _slide())
     inch("the Slider")
     r.timeline_ok("the Slider")
@@ -2384,14 +2713,23 @@ def slid_out():
     # report 1737: "dragging the Piston End slides the piston along X"
     h.check("the knob followed the pointer along X", 0.7 < x - KNOB_X0 < 1.3, x)
     box = r.box_of("Piston End")
-    h.check("only along X", abs(box[1] + R_OUT * IN) < 1e-3 and abs(box[2] + R_OUT * IN) < 1e-3, box)
+    h.check(
+        "only along X", abs(box[1] + R_OUT * IN) < 1e-3 and abs(box[2] + R_OUT * IN) < 1e-3, box
+    )
     moved = (r.box_of("Piston")[0] - S["rod_x"]) / IN
     h.check("the Piston came with it (rigid)", abs(moved - (x - KNOB_X0)) < 1e-4, moved)
     ring = (_ring_box(ORING_ROD)[0] + _ring_box(ORING_ROD)[3]) / 2 / IN
     h.check("...and its O-ring", abs(ring - (ROD_X0 + 5.0 / 32 + moved)) < 1e-4, ring)
-    r.check_box("the Piston Body stayed", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    r.check_box(
+        "the Piston Body stayed",
+        "Piston Body",
+        [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN],
+    )
     h.speed_check("the drag took less than 20 s", took < 20.0 * h.SLOWDOWN, took)
-    App.Console.PrintMessage("[Fission 180] replay: sliding the knob took %.1f s; the slide reads %.4f in\n" % (took, S["out"] / IN))
+    App.Console.PrintMessage(
+        "[Fission 180] replay: sliding the knob took %.1f s; the slide reads %.4f in\n"
+        % (took, S["out"] / IN)
+    )
 
 
 def limits_open():
@@ -2450,7 +2788,9 @@ def limits_rest():
     rows = _rows()
     got = (rows["min"][1].value() / IN, rows["max"][1].value() / IN)
     want = (-3.0, 0.0) if S["flipped"] else (0.0, 3.0)
-    h.check("the range is 3 in out of the body", all(abs(a - b) < 1e-6 for a, b in zip(got, want)), got)
+    h.check(
+        "the range is 3 in out of the body", all(abs(a - b) < 1e-6 for a, b in zip(got, want)), got
+    )
     _toggle(rows["rest"][0])
 
 
@@ -2473,8 +2813,16 @@ def limits_previewing():
     p = j.panel()
     h.check("Preview Motion is down", p.slide_limits.preview.isChecked())
     seen = []
-    h.wait_for(lambda: seen.append(_knob_x()) or max(seen) - min(seen) > 0.5 * IN, "the knob to move in the preview", 60)
-    h.check("the preview slides the knob between the limits", max(seen) - min(seen) > 0.5 * IN, (min(seen) / IN, max(seen) / IN))
+    h.wait_for(
+        lambda: seen.append(_knob_x()) or max(seen) - min(seen) > 0.5 * IN,
+        "the knob to move in the preview",
+        60,
+    )
+    h.check(
+        "the preview slides the knob between the limits",
+        max(seen) - min(seen) > 0.5 * IN,
+        (min(seen) / IN, max(seen) / IN),
+    )
     h.check("...never into the body", min(seen) > KNOB_X0 * IN - 1e-3, min(seen) / IN)
     w.click(p.slide_limits.preview)
 
@@ -2499,7 +2847,11 @@ def limits_set():
     h.check("the limits are kept: 3 in of travel", abs(high - low - 3 * IN) < 1e-6, lim)
     h.check("Rest 0 is kept", lim.get("rest") is not None and abs(lim["rest"]) < 1e-9, lim)
     # report 1741: "after typing 0 the piston jumped to 0 on OK": it goes to its rest
-    h.check("the piston stands at its rest: the knob against the body", abs(_knob_x() - KNOB_X0 * IN) < 1e-3, _knob_x() / IN)
+    h.check(
+        "the piston stands at its rest: the knob against the body",
+        abs(_knob_x() - KNOB_X0 * IN) < 1e-3,
+        _knob_x() / IN,
+    )
     inch("Edit Joint Limits")
     r.timeline_ok("Edit Joint Limits")
 
@@ -2507,13 +2859,21 @@ def limits_set():
 def sprung_back():
     # report 1742: "Rest does nothing after a drag: released at 0.78 in it stays there
     # (Fusion springs back to Rest)"
-    h.check("let go, the piston springs back to its rest", abs(_knob_x() - KNOB_X0 * IN) < 1e-3, _knob_x() / IN)
+    h.check(
+        "let go, the piston springs back to its rest",
+        abs(_knob_x() - KNOB_X0 * IN) < 1e-3,
+        _knob_x() / IN,
+    )
     h.check("the Piston with it", abs(r.box_of("Piston")[0] - S["rod_x"]) < 1e-3)
 
 
 def not_pushed_in():
     # report 1741: "Minimum works (cannot push it into the body)"
-    h.check("the knob cannot be pushed into the body", abs(_knob_x() - KNOB_X0 * IN) < 1e-3, _knob_x() / IN)
+    h.check(
+        "the knob cannot be pushed into the body",
+        abs(_knob_x() - KNOB_X0 * IN) < 1e-3,
+        _knob_x() / IN,
+    )
     inch("the drags")
 
 
@@ -2529,7 +2889,11 @@ def opacity_60():
 def opacity_set():
     result = S["opacity"]
     texts = [x for x, _c in result.get("texts", [])]
-    h.check("Opacity Control: 100 / 80 / 60 / 40 / 20 % and Custom Opacity", result.get("ok") and texts == ["100%", "80%", "60%", "40%", "20%", "Custom Opacity..."], texts)
+    h.check(
+        "Opacity Control: 100 / 80 / 60 / 40 / 20 % and Custom Opacity",
+        result.get("ok") and texts == ["100%", "80%", "60%", "40%", "20%", "Custom Opacity..."],
+        texts,
+    )
     body = r.bodies_of("Piston Body")[0]
     seen = [(body.Label, body.ViewObject.Transparency)] + [
         (f.Label, f.ViewObject.Transparency)
@@ -2592,14 +2956,29 @@ def finished():
     want = sorted(["Piston Body", "End Cap", "Piston End", "Piston", ORING_CAP, ORING_ROD])
     h.check("six components", names == want, names)
     for label in ("Piston Body", "End Cap", "Piston End", "Piston"):
-        h.check("%s has one body" % label, len(r.bodies_of(label)) == 1, [b.Label for b in r.bodies_of(label)])
+        h.check(
+            "%s has one body" % label,
+            len(r.bodies_of(label)) == 1,
+            [b.Label for b in r.bodies_of(label)],
+        )
     h.check("nothing at the design's root", not r.bodies_of(""), [b.Label for b in r.bodies_of("")])
     kinds = sorted(k.rstrip("0123456789 ") for k in _joint_labels())
     h.check("four Rigid joints and a Slider", kinds == ["Rigid"] * 4 + ["Slider"], _joint_labels())
-    h.check("Piston Body is the grounded one", [p.Label for p in _parts() if r.grounded(p.Label)] == ["Piston Body"])
-    r.check_box("the Piston Body, as the book dimensions it", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    h.check(
+        "Piston Body is the grounded one",
+        [p.Label for p in _parts() if r.grounded(p.Label)] == ["Piston Body"],
+    )
+    r.check_box(
+        "the Piston Body, as the book dimensions it",
+        "Piston Body",
+        [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN],
+    )
     r.check_box("the End Cap on it", "End Cap", CAP_HOME)
-    h.check("the timeline's groups", sorted(_groups()) == sorted(["Piston Body", "End Cap", "Piston End"]), sorted(_groups()))
+    h.check(
+        "the timeline's groups",
+        sorted(_groups()) == sorted(["Piston Body", "End Cap", "Piston End"]),
+        sorted(_groups()),
+    )
     inch("the end")
     r.timeline_ok("the end")
     h.check("no undo step is left open", h.open_undo_step() == "", h.open_undo_step())
