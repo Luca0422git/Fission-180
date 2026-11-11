@@ -6,6 +6,50 @@ Source: Fusion's documented behaviour and everyday use. Not yet checked against 
 screen captures (outline 2.4). Implemented in `src/Mod/Fission180/fission180/sketch_*.py` on top of
 FreeCAD 1.1.4's Sketcher. Status: **first pass + QA pass, not yet signed off**.
 
+## Wave 7, sketch-c: the merged sketch area and what was left open (branch `sf/book-sketch-c`, 2026-11-11)
+
+Sources: **Autodesk** (help, blog, API reference, a community manager on the forum),
+**Forum** (other forum answers), **Book** (the report quoting the book), **Guess**.
+
+| Fusion | Source | Fission 180 |
+|---|---|---|
+| A dimension from a point, line or circle centre to a centerline is the diameter, written with the diameter sign | Autodesk help "Sketches in Fusion"; Forum "Make a diameter-dimension in a sketch" | Inside the one Sketch Dimension tool (`sketch_dimension_tool._centerline_diameter`): a Distance to a hidden mirror point, drawn with the sign (`sketch_dimension_signs.py`). Revolve takes the centerline as its axis (sketch-a) |
+| Right-click before placing a dimension: Aligned, Horizontal or Vertical; the dimension keeps that orientation | Autodesk blog "Mastering Sketch Dimensions: 5 Essential Right-Click Tricks", "QUICK TIP: Aligned Dimensions" | The three entries lead the right-click list while a length follows the pointer (`Dimension.force`); a radius, an angle or a distance to a line has no such entries |
+| `Width = 12` typed in a dimension names that dimension; the name "does not show in the original sketch where it was created but will appear in the parameter table" | Autodesk support article (search excerpt); Autodesk tutorial ("L1=20") | The dimension that made the name keeps being it: a number or formula typed into it later sets the parameter (`sketch_named_dimensions.py`); the box says so. A dimension that only uses a parameter is unlinked by a number (Guess: as any formula) |
+| A parameter name typed into a value box while drawing | Book (Metric Bolt, Drone); Autodesk forum "Parameter on the fly feature not working with sketch tools" (it is meant to work) | Every drawing box: Fission 180's own (a bare name, no "="), and FreeCAD's Line / Rectangle / Circle / Arc / Ellipse / Slot / Polygon boxes through a text box over them (`sketch_field_names.py`). A letter that starts no parameter is still the tool's shortcut |
+| Snap to Grid is on by default; the pointer goes from one grid crossing to the next | Lynda / LinkedIn Learning, "Snap to grid and incremental move": "By default, Snap to Grid is enabled ... it snaps to the grid's intersection" | `sketch_infer` setting `GridSnapFull` (on): every free point lands on the nearest crossing of the lines drawn |
+| The snap follows the minor lines | Autodesk forum: "major lines at 5 mm with 20 subdivisions in order to snap your sketch geometry every .25 mm" | The lines FreeCAD draws are the minor lines (major / subdivisions; adaptive: the finest drawn) |
+| Sketch geometry comes before the grid | Autodesk forum "Points won't snap to grid if placed on a line": "the line is in the sketch and has snap priority over the grid" | An end, middle, centre, crossing, curve, guide or typed value is taken first; the grid only places what is left free |
+| "Auto project edges on reference": snapping, constraining or dimensioning to an edge or corner of the model projects it (purple); with it off nothing outside the sketch can be snapped to | Autodesk forum "Can no longer snap to geometry when drawing a sketch", "How do I turn object snap on?" | `sketch_reference.py`: the click of a drawing tool (FreeCAD's and Fission 180's own), the picks of the constraint tools and of Sketch Dimension; same body, another body or another component (`sketch_external.project_across`). Preference Design > "Auto project edges on reference" |
+| ...its default | **Not confirmed.** Forum, 2019: a moderator "suspected the last update changed that setting to default to off"; the book parity report (Opus's memory): "off by default". No Autodesk page states it | **On** (the book's steps dimension and snap to model edges, and Sketch Dimension projected already). One line in `prefs_core.py` / `sketch_reference.enabled` to flip |
+| "Scale entire sketch at first dimension": "the sketch geometry is automatically scaled when the first dimension is added" | Autodesk API reference (`isSketchScaledWithFirstDimension`); Forum "Tip: scaling SVG import to precise dimensions" | `sketch_first_dimension.py`: the value typed into the box of the dimension Sketch Dimension has just placed scales everything about the sketch origin when it is the sketch's first size and nothing is fixed, projected or a spline. Preference Design > "Scale entire sketch at first dimension" |
+| ...its default | **Not confirmed.** Forum threads of people surprised by it ("No auto-fit after first dimension", "Dimension entry zoom out": a community manager: "this option will disable the auto-scaling"); a 2019 course switches it on by hand | **On** |
+| The view fits when the scaled sketch leaves the canvas | Autodesk community manager, "No auto-fit after first dimension" | `SketchSession.show_all_if_outside` |
+
+### Decisions for Luca
+
+- **The grid snap** is now Fusion's (every free point on a crossing of the lines drawn). FreeCAD's
+  adaptive grid draws its lines 15 to 75 pixels apart, so a click can move by up to half of
+  that; Fusion's lines are closer on the screen. Untick Snap in the Sketch Palette for none.
+  The scenarios written before run with sketch-a's 8 pixel pull (`GridSnapFull` off, set in
+  the test harness); `book_sketch_c_grid` tests the default.
+- **The two preference defaults** above are on; Fusion's are not documented. Say the word
+  and they are flipped (the scenarios written before run with "Scale entire sketch" off).
+
+### Not built, or still different (sketch-c)
+
+| Fusion | Why not |
+|---|---|
+| A sketch pattern's glyph; double-click it to edit Quantity / Distance / Suppression (Autodesk help "Create a rectangular sketch pattern": "double-click the Rectangular Pattern glyph next to the original instance") | Not built (no room left in this session). A pattern is still ordinary curves and hidden ties after OK. What it needs: a hidden record on the sketch per pattern (originals, copies, ties by geometry id, the dialog's values), the glyph as a Coin node, the tool reopened from the record |
+| Splines / ellipses / conics in a pattern follow the original | Not built (they are placed, not tied) |
+| The midpoint snap as narrow as Fusion's triangle; a slot's end onto an arc's middle; the origin when a later point passes over it | Not reproduced or changed in this session |
+| World axis colours in a sketch on the Front / Right plane | Not looked at |
+| A sketch made before wave 7 keeps FreeCAD's helper circles and labels | Not built: only new shapes are tidied |
+| One edge of an Auto-projected face deleted | FreeCAD removes the face's whole reference: all its edges go (they stay deleted). What it needs: re-add the kept edges as edge references and carry their constraints over |
+| The control frame follows a control point during the drag | It is redrawn at the release: the sketch's own curves change only then; during the drag only FreeCAD's Coin points move |
+| A spline's points on the grid | FreeCAD's spline tool keeps its own grid rule (a fifth of the spacing): a point moved after its click breaks the finished spline (sketch-a's trap) |
+| A hover mark on a model edge before it is projected | The edge is projected at the click; nothing lights up on the hover |
+
 ## Wave 7: the book parity report, drawing / snapping / selecting / display / undo (branch `sf/book-sketch-a`, 2026-11-11)
 
 Source: `docs/fission180/dev/research/book-parity-report.txt` (Opus 5.5 working through
@@ -40,10 +84,10 @@ FreeCAD's rule alone), `DiagonalConstraint` (off).
 
 | Fusion | Why not |
 |---|---|
-| Grid snap puts every free point on a grid intersection | Fission 180 snaps by nearness (8 px). FreeCAD's adaptive grid is far coarser on the screen than Fusion's; a full snap would jump by centimetres. A decision for Luca |
-| "Scale entire sketch at first dimension" (preference, said to be on by default) | Not built: it changes what the first typed dimension does in every sketch, and every scenario that types one would have to be checked. The dimension box's `apply` is the place (`sketch_mode.DimensionEditor.apply`) |
-| "Auto project edges on reference": snapping to an edge of the part projects it | Not built: FreeCAD's tools only pick the sketch's own and projected curves while drawing |
-| A centerline dimension shows the diameter sign | FreeCAD's Distance has no sign; the value is the diameter |
+| Grid snap puts every free point on a grid intersection | Built by sketch-c (the section above) |
+| "Scale entire sketch at first dimension" (preference, said to be on by default) | Built by sketch-c (the section above) |
+| "Auto project edges on reference": snapping to an edge of the part projects it | Built by sketch-c (the section above) |
+| A centerline dimension shows the diameter sign | Built by sketch-c (the section above) |
 | A deleted single edge of an Auto-projected face | FreeCAD removes the face's whole reference (all its edges go); they stay deleted |
 | The control frame follows a control point while it is dragged | It is redrawn when the drag ends (the sketch's curves change only then) |
 | World axis colours in a sketch (the vertical axis blue on the Front plane) | Not built; both sketch axes are drawn in one grey in 3.3.10 |
@@ -568,7 +612,7 @@ Fission 180's Trim and P Fission 180's Project (`config.PREFERRED`).
 | Linetype Centerline | Built in wave 7 (`sketch_centerline.py`, see the wave 7 section at the top) |
 | Sketch double-click chain for curves touching across line types | The chain keeps to the clicked curve's line type (Guess) |
 | Shift to show hidden midpoints | Every midpoint is offered (no hidden ones) |
-| Snapping to an edge or corner of the part that is not projected projects it (Autodesk "Auto project edges on reference") | Not built: FreeCAD's tools only pick the sketch's own and projected curves while drawing |
+| Snapping to an edge or corner of the part that is not projected projects it (Autodesk "Auto project edges on reference") | Built in wave 7 (sketch-c, `sketch_reference.py`) |
 | A rectangle drawn over a projected rounded outline (FreeCAD 1.1.4 limit) | Fixed 2026-10-18: FreeCAD's sketch areas (WireJoiner, "tight bound") make no area where an arc ends tangent on the middle of a line (a sharp rectangle over a rounded outline lost the big area). Right after FreeCAD computes a sketch, `sketch_area_fill.py` adds the areas Fission 180's own region finder sees (`sketch_regions`) to its InternalShape; FreeCAD's own areas keep their numbers. Extrude's "could not make an area" message stays as a safety net |
 | Every closed area is a profile, also where a line crosses a circle inside another area (a line across a face to find its middle and a circle on it: each half of the circle is a profile) | FreeCAD 1.1.4 made no area at all for this layout (the whole sketch lost its areas; Extrude took the face; Luca 2026-10-18). `sketch_area_fill.py` adds them as above. Golden `sketch_face_line_through_circle`, `_half`, `sketch_line_through_circle_overhang`; scenario `sketch_line_through_circle` (real clicks: line, circle on its middle, E, a click in each half) |
 | Auto project from a face changed by a later step (a fillet on its edges, a hole in it) | The outline is the face of the step the sketch hangs on (stable when the later step is suppressed): a fillet's rounded corners or a later hole are not in it; P adds them |
