@@ -126,7 +126,8 @@ def step_ribbon():
     solid_titles = [g.group["title"] for g in groups if g.isVisible()]
     check(
         "SOLID groups in Fusion's order",
-        solid_titles[:3] == ["CREATE", "MODIFY", "CONSTRUCT"],
+        # (wave 7) ASSEMBLE stands right after MODIFY, as in Fusion
+        solid_titles[:4] == ["CREATE", "MODIFY", "ASSEMBLE", "CONSTRUCT"],
         solid_titles,
     )
     check("Dark theme applied", "Fission180Ribbon" in QtWidgets.QApplication.instance().styleSheet())

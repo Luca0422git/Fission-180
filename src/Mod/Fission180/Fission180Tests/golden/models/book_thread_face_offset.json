@@ -1,0 +1,55 @@
+{
+  "id": "book_thread_face_offset",
+  "title": "Offset Face -0.25 mm on the Geocache's modeled M33x3.5 thread",
+  "tags": [
+    "thread",
+    "book",
+    "offset-face"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            0,
+            16.5
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 16
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 16.5,
+        "count": 1
+      },
+      "modeled": true
+    },
+    {
+      "op": "edit",
+      "target": "t1",
+      "set": {
+        "face_offset": -0.25
+      }
+    }
+  ],
+  "expect": {
+    "volume": 11251.106194,
+    "solids": 1,
+    "rel_tol": 1e-06,
+    "source": "baseline-freecad-1.1.4",
+    "note": "book parity report, Project 7. Every face of the thread (flanks, roots, the crest) moved 0.25 mm into the material, the Thread step's FaceOffset. Hand check: the thread's faces are 2488.5 mm2, so the layer is about 2488.5 * 0.25 = 622 mm3 to first order; the model loses 614.9 (the layer thins where it turns the outside corners at the crest). The number is FreeCAD's"
+  }
+}

@@ -267,6 +267,7 @@ def parts(
     thread_class="",
     from_end=False,
     grooves=True,
+    face_offset=0.0,
 ):
     """(add, cut): what a modeled thread adds to the part and what it removes from it
     (shape coordinates; `add` is None when nothing is added). The thread has its standard
@@ -278,7 +279,10 @@ def parts(
     threads follow the class). A taper thread (NPT) starts at the end the thread starts
     from (`from_end`: the face's far end) and follows its cone of 1 in 16. `grooves` off:
     only the cylinder brought to the thread's diameter (`cut` is then None when nothing is
-    turned or bored): the part under the thread (blank())."""
+    turned or bored): the part under the thread (blank()). `face_offset`: every face of the
+    thread moved that far, square to itself, as Offset Face moves faces (negative: into the
+    material, the book's -0.25 mm for a printed thread that turns freely): the crest and
+    the root by it along the radius, the flanks apart."""
     import Part
 
     if z1 - z0 <= TOL:
@@ -309,10 +313,32 @@ def parts(
         zone = tables.class_zone(designation, thread_class, internal)
         major, limit = core.class_radii(designation.diameter, internal, zone)
         grow = 0.0
+    face_offset = float(face_offset or 0.0)
+    if face_offset:
+        # the crest's cylinder moves with the thread's other faces: a shaft's in for a
+        # negative offset, a hole's out
+        limit += -face_offset if internal else face_offset
+        if limit <= TOL:
+            raise ThreadError("Nothing is left of the thread at this offset. Use a smaller one.")
     end_limit = limit + grow * length
     tool = None
     if grooves:
         corners = core.groove(major, pitch, internal, form)
+        if face_offset:
+            try:
+                corners = core.moved_groove(corners, -face_offset)
+            except ValueError:
+                raise ThreadError(
+                    "The thread's faces cannot be moved out this far: its grooves would close "
+                    "up. Use a smaller offset."
+                )
+            try:
+                corners = core.fitted_groove(corners, pitch, limit)
+            except ValueError:
+                raise ThreadError(
+                    "The thread's faces cannot be moved in this far: nothing would be left "
+                    "between its grooves. Use a smaller offset."
+                )
         # Start one pitch early and end one late, so inside the span every turn is complete.
         height = length + 2.0 * pitch
         start_major = major - grow * pitch
@@ -385,6 +411,7 @@ def build(
     thread_class="",
     from_end=False,
     grooves=True,
+    face_offset=0.0,
 ):
     """base_shape with modeled threads cut (one cylinder and span per face); `thread_class`
     is the class asked for (the right one for a hole or a shaft is used, see
@@ -392,7 +419,7 @@ def build(
     adds, tools = [], []
     for c, (z0, z1) in zip(cylinders, z_spans):
         wanted = thread_class_for(designation.standard, thread_class, c.internal)
-        add, tool = parts(c, designation, z0, z1, left_hand, wanted, from_end, grooves)
+        add, tool = parts(c, designation, z0, z1, left_hand, wanted, from_end, grooves, face_offset)
         if add is not None:
             adds.append(add)
         if tool is not None:
@@ -443,6 +470,12 @@ class ThreadFeature:
             obj.FullLength = True
         add("App::PropertyDistance", "Length", "Thread length when not full length")
         add("App::PropertyDistance", "Offset", "Distance from the face's end to the thread")
+        add(
+            "App::PropertyDistance",
+            "FaceOffset",
+            "How far every face of the modeled thread is moved, square to itself (Offset Face "
+            "or Press Pull on the thread; negative: into the material, a looser thread)",
+        )
         if add("App::PropertyBool", "FromEnd", "Measure from the face's other end"):
             obj.FromEnd = False
         if add("App::PropertyBool", "Refine", "Merge faces that end up coplanar, like Fusion"):
@@ -554,6 +587,7 @@ class ThreadFeature:
                 refine=obj.Refine,
                 thread_class=obj.ThreadClass,
                 from_end=obj.FromEnd,
+                face_offset=face_offset(obj),
             )
         else:
             obj.Shape = base.Shape.copy()
@@ -602,6 +636,7 @@ def blank(obj, base_shape=None):
         thread_class=obj.ThreadClass,
         from_end=obj.FromEnd,
         grooves=False,
+        face_offset=face_offset(obj),
     )
 
 
@@ -622,8 +657,47 @@ def slack(obj):
         wanted = thread_class_for(designation.standard, obj.ThreadClass, internal)
         zone = tables.class_zone(designation, wanted, internal)
         _major, limit = core.class_radii(designation.diameter, internal, zone)
-        most = max(most, abs(float(one["radius"]) - limit))
+        most = max(most, abs(float(one["radius"]) - limit) + abs(face_offset(obj)))
     return most
+
+
+def face_offset(obj):
+    """How far the faces of this modeled thread are moved (Offset Face / Press Pull on the
+    thread), mm; 0 for a thread saved before there was such a thing."""
+    try:
+        return float(obj.FaceOffset.Value)
+    except Exception:
+        return 0.0
+
+
+def own_face(obj, face, tol=1e-6):
+    """True when `face` (a face of the solid of the modeled Thread step `obj`, or of a later
+    step that left it alone) is one of the thread's own: a flank or a root of its grooves, or
+    the crest between them (the threaded cylinder at the thread's diameter). False for every
+    other face of the part."""
+    try:
+        if not is_thread(obj) or not obj.Modeled:
+            return False
+        if face.Surface.__class__.__name__ == "Plane":
+            return False  # an end face (also where a groove runs out of it)
+        record = computed(obj)
+        # a point of the face: the middle of its parameters (a turn of a flank goes all the
+        # way round, so its centre of mass lies on the axis)
+        u0, u1, v0, v1 = face.ParameterRange
+        point = face.valueAt((u0 + u1) / 2.0, (v0 + v1) / 2.0)
+        pitch = float(record.get("pitch", 0.0))
+        for one in record.get("threads", []):
+            base = App.Vector(*one["base"])
+            axis = App.Vector(*one["axis"])
+            along = (point - base).dot(axis)
+            if along < one["z0"] - tol or along > one["z1"] + tol:
+                continue
+            radial = ((point - base) - axis * along).Length
+            if abs(radial - float(one["radius"])) <= pitch + slack(obj) + tol:
+                return True
+    except Exception:
+        return False
+    return False
 
 
 def computed(obj):

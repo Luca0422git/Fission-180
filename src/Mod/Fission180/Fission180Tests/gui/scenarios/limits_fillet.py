@@ -183,14 +183,29 @@ def ok_at_once():
     h.task_button("OK")
 
 
+def fillet_steps():
+    """The fillet steps of the body: FreeCAD's own, or Fission 180's (wave 7: the largest
+    radius here is the 10 mm that uses up the front face exactly, which only Fission 180's
+    step builds: fillet_section.py; it was FreeCAD's step at 9.99)."""
+    from fission180 import fillet_sets
+
+    return [o for o in h.body().Group if o.TypeId == "PartDesign::Fillet" or fillet_sets.is_sets(o)]
+
+
+def radius_of(step):
+    from fission180 import fillet_sets
+
+    if fillet_sets.is_sets(step):
+        return float(fillet_sets.read_spec(step)["sets"][0]["radius"])
+    return step.Radius.Value
+
+
 def fillet_made():
     h.check("OK worked at once", b.blend_panel() is None and not Gui.Control.activeDialog())
-    fl = b.blends()
+    fl = fillet_steps()
     h.check("one fillet", len(fl) == 1, fl)
     if fl:
-        h.check(
-            "its radius is the limit", abs(fl[0].Radius.Value - s["limit"]) < 1e-9, fl[0].Radius
-        )
+        h.check("its radius is the limit", abs(radius_of(fl[0]) - s["limit"]) < 1e-9, fl[0].Label)
     v = h.solid_volume()
     h.check("the part has that round", b.close(v, one_edge(s["limit"])), v)
     h.check("valid solid", h.body().Shape.isValid())
@@ -242,8 +257,8 @@ def formula_ok_waits():
 
 def cancelled():
     h.check("Cancel closed it", not Gui.Control.activeDialog())
-    fl = b.blends()
-    h.check("the fillet kept its radius", fl and abs(fl[0].Radius.Value - s["limit"]) < 1e-9)
+    fl = fillet_steps()
+    h.check("the fillet kept its radius", fl and abs(radius_of(fl[0]) - s["limit"]) < 1e-9)
     s["v"] = h.solid_volume()
 
 

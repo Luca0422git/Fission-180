@@ -313,3 +313,18 @@ export. Fusion has no such command (its nearest is File > Export, one format at 
 | An inserted mesh in the timeline rolls back with the marker | mesh bodies sit outside the PartDesign bodies, so the history marker never hides them |
 | Canvas: "Render as" options | not built (rendering is out of scope) |
 | FreeCAD's SVG importer skips text and gradients; a `<circle>` with stroke attributes came in at twice its position in one FreeCAD build | FreeCAD's importer; the fixture avoids stroke attributes, real files may need a path-based circle |
+
+
+## Wave 7 (2026-11-11): USDZ, Save As Mesh, file dialogs (`sf/book-shell`)
+
+| Fusion | Source | Fission 180 |
+|---|---|---|
+| File > Export, Type **USDZ**: the design for AR viewers (iOS AR Quick Look). Component names must be plain ASCII. | Autodesk blog "How to View Your Fusion 360 Designs in AR with USDz File Format" (May 2021 release) | **Export > Type USDZ** (`export_usd.py`, no USD library): a zip that is not compressed, files aligned to 64 bytes, its first file a USD text layer (`design.usda`) with one Mesh per body (per colour for a body with painted faces) and a `UsdPreviewSurface` material per colour (colour, opacity). Written in **metres, Y up** whatever the Unit Type, so the part stands on the table at its real size. Any name is taken (the prim gets a safe name, the body's own name is kept beside it). Checked with Pixar's own library (usd-core 26.11: the stage opens, the meshes and their materials are found, its 30 validators report nothing) and read back by `export_usd.read_usdz`. Not written: textures (decals), the component tree (bodies are flat), physical materials. Refinement applies (Low / Medium / High / Custom). |
+| Right-click a body or component > **Save As Mesh**: Format (3MF, STL Binary, STL ASCII, OBJ), Unit Type, Structure (One File / One File Per Body), Refinement and its options, Number of Triangles, **Send to 3D Print Utility** + Print Utility. | Autodesk help "Save bodies in a component as 3MF, OBJ, or STL files"; All3DP; Forum ("reselect Send to 3D Print Utility") | `export_ui.SaveAsMeshDialog` (it was the general Export dialog with 3MF chosen): the same rows; **Send to 3D Print Utility** ticked hands the mesh to the slicer chosen under Print Utility (the code of 3D Print), unticked it asks where to save ("Pink Box.3mf" in the design's folder). A component's file is in the component's own coordinates. It does not change what 3D Print remembers. |
+| File dialogs open in the project. | Book | Export, Save As DXF, Insert and 3D Print's save dialog start in the design's folder, then the last folder used, then the folder open in the Data Panel, then the project folder (`versions_ui.start_folder`); never just the home folder. |
+| Insert SVG asks nothing about pixels per inch. | Guess | FreeCAD's importer asked "not produced by Inkscape... 96 dpi?" in a white-on-white box: answered 96 (the SVG standard's) without showing it (`insert._svg_question_off`). |
+| Lengths read the design's units. | | The Insert dialogs' notes, the flat pattern's browser row and Refinement's Surface Deviation read inches in an inch design. Throw-away documents of imports and exports take the design's units as they are made. |
+
+Tests: `book_shell_ribbon` (H: USDZ through the Export dialog, read back; I: Save As Mesh),
+`book_shell_dialogs` (F: Insert SVG), `exchange2_export` P7, unit tests `test_book_shell.py`
+(`UsdzTest`).

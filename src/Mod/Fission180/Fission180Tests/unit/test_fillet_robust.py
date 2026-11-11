@@ -147,5 +147,46 @@ class GearNameTests(unittest.TestCase):
         self.assertFalse(gear_core.is_component_name(""))
 
 
+class RefusalWordsTests(unittest.TestCase):
+    """What a refusal says about the edges in the way (wave 7, second builder)."""
+
+    def test_nowhere_to_land(self):
+        text = fillet_robust.in_the_way(part(), ["Edge1", "Edge2"], 5, "chamfer", "lands")
+        self.assertIn("On 2 of the 5 edges the bevel would run past the end of a face", text)
+        self.assertIn("the other 3 have room", text)
+        every = fillet_robust.in_the_way(part(), ["Edge1"], 1, "fillet", "lands")
+        self.assertIn("It would run past the end of a face", every)
+        self.assertIn("smaller size", every)
+
+    def test_tangent_end_is_not_too_big(self):
+        refused = fillet_robust.Refused("command not done", ["Edge5"], "tangent")
+        text = fillet_robust.refusal_text(
+            part(), refused, 1, "fillet", "Radius 6.35 mm is too big here"
+        )
+        # no size would do: it must not read as a limit (a search for one would start)
+        self.assertNotIn("too big", text)
+        self.assertIn("This edge cannot be rounded at any size", text)
+        self.assertIn("run into each other smoothly", text)
+        some = fillet_robust.Refused("command not done", ["Edge5"], "tangent")
+        text = fillet_robust.refusal_text(part(), some, 3, "chamfer", "x")
+        self.assertIn("1 of the 3 edges cannot be bevelled at any size", text)
+        self.assertIn("the other 2 can", text)
+
+    def test_other_refusals_keep_the_reason(self):
+        refused = fillet_robust.Refused("command not done", ["Edge4"])
+        text = fillet_robust.refusal_text(
+            part(), refused, 5, "chamfer", "Distance 1 mm is too big here."
+        )
+        self.assertTrue(text.startswith("Distance 1 mm is too big here."))
+        self.assertIn("1 of the 5 edges cannot be bevelled at this size", text)
+
+    def test_covered_groups_order(self):
+        # (pure helper of the group builder) one item per edge, the first one kept
+        self.assertEqual(
+            fillet_robust._merge([(1, 1.0, 1.0), (2, 1.0, 1.0), (1, 2.0, 2.0)]),
+            [(1, 1.0, 1.0), (2, 1.0, 1.0)],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

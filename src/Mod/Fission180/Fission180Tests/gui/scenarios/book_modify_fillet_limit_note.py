@@ -3,12 +3,20 @@
 top edges at 4 mm: Fission silently capped it to 3.99 mm". Only real input.
 
 A bar 60 x 8 x 8 (the carabiner's 8 x 8 section). Fillet, the two long top edges, 4 typed:
-two 4 mm rounds use up the 8 mm face between them exactly, which OpenCASCADE cannot build
-(4.0 fails on the kernel, 3.99 builds). The size is held at the largest that fits (Luca's
-decision of 2026-10-21), and that is SAID: the blue note under the message reads
-"4 mm does not fit: limited to 3.99 mm" and is visible; no error; OK keeps 3.99.
-The same on the edges of the top FACE picked as a face (the book's pick).
+two 4 mm rounds use up the 8 mm face between them exactly. OpenCASCADE's own fillet cannot
+build that (4.0 fails, 3.99 builds), so the size used to be held at 3.99. Since the second
+builder's fillet_section.py it builds as typed: the two rounds meet in a line, no flat face
+is left between them (Fusion builds it; the book's step uses 4 mm).
+
+A size that truly does not fit is still held at the largest that does, and that is SAID
+(Luca's decision of 2026-10-21): 5 typed reads "5 mm does not fit: limited to 4.00 mm" in
+the visible blue note. And the edges of the top FACE picked as a face (its two short end
+edges with it, where three rounds would meet in a ball corner): 4 mm is held just under 4,
+and said. The book's own part, a closed ring without such ends, is the scenario
+book_modifyb_carabiner.
 """
+
+import math
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -55,18 +63,43 @@ def type_4():
 type_4.timeout_s = 120
 
 
+def four_builds():
+    p = panel()
+    if p is None:
+        h.check("Fillet dialog", False)
+        return
+    # (the box keeps what is being typed until it is left; the size built is the one held)
+    r = p._value(p._row_key(), "radius")
+    h.check("4 mm is taken as typed (the report: capped to 3.99)", abs(r - 4.0) < 1e-9, r)
+    h.check("nothing says it does not fit", note(p) == "" and not p.error, (note(p), p.error))
+    shape = h.body().Shape
+    flat = [
+        f
+        for f in shape.Faces
+        if f.Surface.__class__.__name__ == "Plane" and abs(f.CenterOfMass.z - 8.0) < 1e-6
+    ]
+    h.check("the two rounds meet: no flat top face is left", shape.isValid() and not flat, flat)
+    # the bar less two corners of 4 x 4 less a quarter disc each, 60 long
+    removed = 2 * (16.0 - math.pi * 4.0) * 60.0
+    h.check("the preview is the full round", abs(3840.0 - h.solid_volume() - removed) < 1e-3)
+    h.shot("full_round")
+    b.type_into(p.radius.widget, "5")
+
+
+four_builds.timeout_s = 120
+
+
 def held_and_said():
     p = panel()
     if p is None:
         h.check("Fillet dialog", False)
         return
-    # (the box keeps what is being typed until it is left; the size built is the held one)
     r = p._value(p._row_key(), "radius")
-    h.check("held just under 4 mm", 3.9 <= r < 4.0, r)
+    h.check("5 mm does not fit: held at the 4 mm that does", abs(r - 4.0) < 1e-6, r)
     text = note(p)
     h.check(
         "and it is said, in the visible blue note",
-        text.startswith("4 mm does not fit: limited to 3.9") and text.endswith("mm"),
+        text.startswith("5 mm does not fit: limited to 4") and text.endswith("mm"),
         (text, p.limit_label.isVisible()),
     )
     h.check("no error", not p.error and "⚠" not in p.message.text(), (p.error, p.message.text()))
@@ -79,13 +112,13 @@ held_and_said.timeout_s = 120
 
 def kept():
     h.check("dialog closed", panel() is None)
-    fillets = b.blends()
-    if h.check("one fillet", len(fillets) == 1, fillets):
-        shape = h.body().Shape
-        h.check(
-            "a valid solid with the two rounds",
-            shape.isValid() and h.solid_volume() < 60 * 8 * 8 - 300.0,
-        )
+    shape = h.body().Shape
+    removed = 2 * (16.0 - math.pi * 4.0) * 60.0
+    h.check(
+        "a valid solid with the full round",
+        shape.isValid() and abs(3840.0 - h.solid_volume() - removed) < 1e-3,
+        h.solid_volume(),
+    )
     s["v"] = h.solid_volume()
     h.press("z", __import__("PySide").QtCore.Qt.ControlModifier)
 
@@ -136,6 +169,7 @@ h.run(
         edge_front,
         edge_back,
         type_4,
+        four_builds,
         held_and_said,
         kept,
         undone,

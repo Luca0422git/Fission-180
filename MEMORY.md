@@ -51,7 +51,19 @@ switch of the active component; the suite with `FirstComponentGrounded` on; patt
 subassemblies), workspaces-2 (AI tools for Manufacture and Animation, cam's ignored fields,
 workspace switching). Checked 2026-11-11 against Autodesk forum answers: Extrude Join only
 reaches bodies of the ACTIVE component (not children of it), so `components.may_change`
-stays as it is. **Open follow-ups for the orchestrator** (do before release):
+stays as it is. Later the same day: **hardware** (cb560dc0), **looks** (3d7b241a),
+**drawings** (a275a2b4) and **extrude** (049c500b) merged; only **shell** is still out. The
+helpers were cut off once (usage credits ran out, machine restarted): worktrees and
+transcripts survive, each was resumed with SendMessage. GitHub's full run on 049c500b (run
+#49): base green; 20 of about 700 scenarios fail twice, each handed to its owner:
+`journey_plastic`, `journey_plastic_rule`, `journey_plastic_timeline`, `insert_step`
+(components-2); `book_sketch_a_dimension`, `book_sketch_a_centerline`,
+`book_sketch_b_dimension_edge`, `sketch_qa_keys`, `navbar_grid` (sketch-c); `hole_tapped`,
+`hole_qa_more`, `book_modify_combine_undo`, `patterns_qa_paths`, `surface4_qa` (modify-c);
+`fillet_qa_more` + 2 Windows golden models off by 0.0002 % (modify-b); `bodies_look`
+(library-2); `export_report` (shell); `surface2_loft`, `surface3_untrim_revolve`,
+`extrude_presspull_qa4` (extrude-2, brief `book-extrude-2.md`). Windows simulation: one
+CalculiX crash (exit 3221225477), seen once, not followed up. **Open follow-ups for the orchestrator** (do before release):
 (1) AI tools for Manufacture, and the cam dialog fields the engine ignores (tolerance,
 lead-in / ramp feedrates); (2) run the components / joints / journey scenarios with
 `FirstComponentGrounded` ON (users' default) and fix what breaks, then drop the harness

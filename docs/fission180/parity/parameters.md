@@ -89,14 +89,17 @@ reserved.
 
 ## Still different from Fusion
 
-- `Name = value` makes a user parameter, not a named model parameter (see above).
+- `Name = value` makes a user parameter, not a named model parameter (see above). Since
+  sketch-c (wave 7) the sketch dimension that made the name keeps being it: a number or
+  formula typed into it later sets the parameter (`sketch_named_dimensions.py`).
 - The `fx` mark is "(ƒx)" after the value, not "fx:" before it (FreeCAD's C++ draws it).
 - Model parameters have no names of their own (d1, d2...) that a formula could use; a sketch
   dimension can be named in FreeCAD's way (`Sketch.Constraints.name`), a feature's value as
   `Pad.Length`. Fusion's `d12` style is not built.
-- While FreeCAD's own Line / Circle / Rectangle tools draw, their value boxes take numbers
-  only (FreeCAD's on-view parameters, C++). Fission 180's own sketch tools take `=name`. A
-  letter typed first is the letter's shortcut, as in Fusion while a tool runs.
+- (Closed by sketch-c, wave 7.) Every drawing box takes a bare parameter name or a
+  formula: Fission 180's own boxes, and FreeCAD's Line / Circle / Rectangle boxes through
+  a text box over them (`sketch_field_names.py`). A letter that starts no parameter's
+  name is still the letter's shortcut.
 - Units Fusion also offers for a parameter (mass, time, area...) are not offered: mm, cm, m,
   in, ft, deg, rad and No Units are.
 - A starred sketch dimension is remembered by its place in the sketch's list: delete a

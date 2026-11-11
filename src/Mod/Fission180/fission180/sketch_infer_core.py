@@ -308,9 +308,14 @@ def grid_line(value, grid):
     return (math.ceil(q - 0.5) if q < 0 else math.floor(q + 0.5)) * grid
 
 
+FULL = float("inf")  # a grid reach: every free coordinate goes to its nearest grid line
+
+
 def grid_snap(value, grid, reach=None):
     """The grid snap of one coordinate: to the nearest grid line when closer than a fifth
-    of the spacing (FreeCAD's rule) and, with `reach` (mm), closer than that too.
+    of the spacing (FreeCAD's rule) and, with `reach` (mm), closer than that too. With
+    `reach` FULL: always to the nearest grid line (Fusion's Snap: the pointer goes from one
+    grid crossing to the next; wave 7, sketch-c).
 
     FreeCAD's rule alone is a distance in the model that grows with the grid: on a grid
     of 50 mm lines a click 8 mm (40 pixels) off the X axis landed on it (the book parity
@@ -319,6 +324,8 @@ def grid_snap(value, grid, reach=None):
     if not grid or grid <= 0:
         return value
     nearest = grid_line(value, grid)
+    if reach == FULL:
+        return nearest
     tol = grid / 5.0
     if reach is not None:
         tol = min(tol, reach)
@@ -330,7 +337,9 @@ def grid_capped(raw, grid, reach):
     (mm) before FreeCAD's fifth of the spacing, as a Result (its `grid`: the coordinates
     that snapped); None when both rules agree on this point (FreeCAD's own snap then
     places it, exactly)."""
-    if not grid or grid <= 0 or reach is None or reach >= grid / 5.0:
+    if not grid or grid <= 0 or reach is None:
+        return None
+    if reach != FULL and reach >= grid / 5.0:
         return None
     mine = (grid_snap(raw[0], grid, reach), grid_snap(raw[1], grid, reach))
     theirs = (grid_snap(raw[0], grid), grid_snap(raw[1], grid))
@@ -500,14 +509,25 @@ def snap_points(items):
     return out
 
 
+# A line's or arc's middle is the one snap point nothing marks until the pointer is on it,
+# and a point that lands on it by accident is held there by a constraint that fights the
+# next dimension (the book parity report, Drone: "the construction line's end snapped to the
+# MIDPOINT of the arm line ... which later fights the arm length"; Tensegrity: a Coincident
+# click on a line made the centre the line's midpoint). Its reach is the triangle drawn for
+# it, not the whole snap reach: 0.6 of it (8 screen pixels: about 5). (Guess: Autodesk gives
+# no pixel number; in Fusion the triangle appears only with the pointer on the midpoint.)
+MIDDLE_REACH = 0.6
+
+
 def nearest_snap(raw, points, tol):
-    """The snap point nearest to raw within tol, or None. Where points lie on top of
-    each other (a corner of the sketch on a projected corner, an end on a middle) a
-    sketch point (Coincident) wins, then the sketch's own curves over projected ones."""
+    """The snap point nearest to raw within tol (a middle: within MIDDLE_REACH of it), or
+    None. Where points lie on top of each other (a corner of the sketch on a projected
+    corner, an end on a middle) a sketch point (Coincident) wins, then the sketch's own
+    curves over projected ones."""
     best = None
     for s in points:
         d = dist(raw, s.point)
-        if d > tol:
+        if d > (tol * MIDDLE_REACH if s.kind == MIDDLE else tol):
             continue
         rank = (0 if s.kind in VERTEX_KINDS else 1, 0 if _own(s) else 1)
         if best is None or d < best[0] - 1e-9 or (abs(d - best[0]) <= 1e-9 and rank < best[1]):

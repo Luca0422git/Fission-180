@@ -359,8 +359,20 @@ class PrefsCore(unittest.TestCase):
         groups = [g for g, _opts in prefs_core.groups("general")]
         self.assertEqual(
             groups,
-            ["Language", "Startup", "Appearance", "Navigation", "Saving and Recovery", "Updates"],
+            [
+                "Language",
+                "Startup",
+                "Appearance",
+                "Navigation",
+                "Saving and Recovery",
+                "Updates",
+                "Modeling",  # (wave 7: Default modeling orientation, on General as in Fusion)
+            ],
         )
+        self.assertEqual(prefs_core.option("orientation")["page"], "general")
+        self.assertEqual(prefs_core.languages(), ["English"])
+        self.assertEqual(prefs_core.languages("Deutsch"), ["English", "Deutsch"])
+        self.assertEqual(prefs_core.languages("English"), ["English"])
         # the update check (brief beta-release.md R3): on, and the channel follows the version
         self.assertIs(plan["check_updates"], True)
         self.assertEqual(

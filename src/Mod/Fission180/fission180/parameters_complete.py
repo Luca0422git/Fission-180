@@ -365,6 +365,46 @@ def _already_typed(p):
     return word == item.text()
 
 
+# -- (wave 7, sketch-c) the list for a box that never has the keyboard --------------------------
+# The value boxes of Fission 180's own sketch tools are read-only labels: the keys arrive at
+# the 3D view and sketch_draw.Boxes keeps the text. It asks for the list itself.
+def starts_a_name(letter):
+    """True when a user parameter of the active design starts with `letter` (whatever its
+    case): that letter typed into an empty value box starts a name, not a tool's shortcut."""
+    letter = (letter or "")[:1].lower()
+    if not (letter.isalpha() or letter == "_"):
+        return False
+    return any(name[:1].lower() == letter for name in _names())
+
+
+def offer(widget, text, cursor):
+    """Show the list under `widget` for `text` typed up to `cursor` (or hide it). Returns
+    the names shown."""
+    _start, word = fragment(text, cursor)
+    found = suggestions(word, _names()) if word else []
+    if not found:
+        hide()
+        return []
+    _show(widget, found)
+    return found
+
+
+def step(delta):
+    """Move the list's lit row; False when the list is closed."""
+    p = popup()
+    if p is None or not p.count():
+        return False
+    p.setCurrentRow((p.currentRow() + delta) % p.count())
+    return True
+
+
+def lit():
+    """The list's lit name, or None when it is closed."""
+    p = popup()
+    item = p.currentItem() if p is not None else None
+    return item.text() if item is not None else None
+
+
 def mark(widget):
     """Mark a line edit (or the spin box that holds one) as a value box."""
     try:

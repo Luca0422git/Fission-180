@@ -135,7 +135,9 @@ def _rename_mesh_body(doc, obj, text):
         mesh.rename_body(obj, text)
     except Exception as exc:
         warn("browser rename: %s" % exc)
-    doc.commitTransaction()
+    from . import transactions
+
+    transactions.close(doc)
     try:
         App.closeActiveTransaction()
     except Exception:
@@ -386,9 +388,12 @@ def _objects(doc):
             _joint_row(row, obj)
             if row["fission180_type"] == "FlatPattern":  # sheet metal: the flat's size
                 try:
-                    row["describe"] = "Flat %.2f x %.2f mm, %d bend(s)" % (
-                        obj.FlatLength.Value,
-                        obj.FlatWidth.Value,
+                    from . import design_units
+
+                    # (wave 7) in the design's units: an inch design read millimetres
+                    row["describe"] = "Flat %s x %s, %d bend(s)" % (
+                        design_units.length_text(obj.FlatLength.Value, doc),
+                        design_units.length_text(obj.FlatWidth.Value, doc),
                         obj.BendCount,
                     )
                 except Exception:
@@ -782,7 +787,9 @@ def _delete_drawings(doc, names):
                 drawing.delete_drawing(page)
     except Exception as exc:
         warn("browser delete: %s" % exc)
-    doc.commitTransaction()
+    from . import transactions
+
+    transactions.close(doc)
     try:
         App.closeActiveTransaction()
     except Exception:
@@ -854,6 +861,22 @@ def _command_running():
         return False
 
 
+def _dialog_open():
+    """A command's dialog is open (not just a sketch being edited: its menus stay whole)."""
+    try:
+        if not Gui.Control.activeDialog():
+            return False
+        from . import taskui
+
+        if taskui.current() is not None:
+            return True
+        gdoc = Gui.ActiveDocument
+        edit = gdoc.getInEdit() if gdoc is not None else None
+        return not (edit is not None and edit.Object.TypeId == "Sketcher::SketchObject")
+    except Exception:
+        return False
+
+
 def _later(fn, *args):
     def run():
         try:
@@ -921,6 +944,47 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             ring.left() - MARK - 4, rect.top() + (rect.height() - MARK) // 2, MARK, MARK
         )
 
+    def units_rect(self, rect):
+        """Fusion's Change Active Units button, at the end of the Units row while the mouse
+        is over the row (wave 7: the row showed nothing to click)."""
+        return QtCore.QRect(rect.right() - 26, rect.top() + (rect.height() - 18) // 2, 22, 18)
+
+    def _units_button(self, painter, option):
+        painter.save()
+        try:
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            box = self.units_rect(option.rect)
+            painter.setPen(QtGui.QPen(QtGui.QColor(theme.ACCENT or "#3fa9f5")))
+            painter.setBrush(QtGui.QBrush(QtGui.QColor(theme.ACCENT or "#3fa9f5")))
+            painter.drawRoundedRect(QtCore.QRectF(box), 3, 3)
+            # a pencil: a slanted bar with a point
+            pen = QtGui.QPen(QtGui.QColor("#ffffff"))
+            pen.setWidthF(2.2)
+            pen.setCapStyle(QtCore.Qt.RoundCap)
+            painter.setPen(pen)
+            c = box.center()
+            painter.drawLine(QtCore.QPointF(c.x() - 3, c.y() + 3), QtCore.QPointF(c.x() + 4, c.y() - 4))
+            pen.setWidthF(1.0)
+            painter.setPen(pen)
+            painter.drawLine(QtCore.QPointF(c.x() - 6, c.y() + 6), QtCore.QPointF(c.x() - 3, c.y() + 3))
+        finally:
+            painter.restore()
+
+    def helpEvent(self, event, view, option, index):
+        try:
+            node = self._node(index)
+            if (
+                node is not None
+                and node["kind"] == "units"
+                and event.type() == QtCore.QEvent.ToolTip
+                and self.units_rect(option.rect).contains(event.pos())
+            ):
+                QtWidgets.QToolTip.showText(event.globalPos(), "Change Active Units", view)
+                return True
+        except Exception:
+            pass
+        return super().helpEvent(event, view, option, index)
+
     def paint(self, painter, option, index):
         node = self._node(index)
         if node is None:
@@ -954,6 +1018,8 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             font.setStrikeOut(True)
             shifted.font = font
         super().paint(painter, shifted, index)
+        if node["kind"] == "units" and option.state & QtWidgets.QStyle.State_MouseOver:
+            self._units_button(painter, option)
         if node.get("locked"):
             self._padlock(painter, shifted, index)
         if node.get("unselectable"):
@@ -1063,6 +1129,10 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             if event.type() == QtCore.QEvent.MouseButtonRelease:
                 key = node["key"]
                 QtCore.QTimer.singleShot(0, lambda: self.tree.activate_key(key))
+            return True
+        if node["kind"] == "units" and self.units_rect(option.rect).contains(pos):
+            if event.type() == QtCore.QEvent.MouseButtonRelease:
+                QtCore.QTimer.singleShot(0, open_units_panel)
             return True
         return False
 
@@ -1338,6 +1408,11 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def label_point(self, item):
         rect = self.visualRect(self.indexFromItem(item, 1))
         return QtCore.QPoint(rect.left() + EYE + 30, rect.center().y())
+
+    def icon_point(self, item):
+        """Viewport point of a row's icon (a double-click there activates a body)."""
+        rect = self.visualRect(self.indexFromItem(item, 1))
+        return QtCore.QPoint(rect.left() + EYE + 10, rect.center().y())
 
     def radio_point(self, item):
         """Viewport point of a component row's activate ring (for a click)."""
@@ -1840,11 +1915,22 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 return
             obj = self._object(node)
             if node["kind"] == "body" and obj is not None:
-                self._activate(obj)
+                # (wave 7) a double-click on a body's NAME renames it in place: the book
+                # says "double-click Body1", and Fusion has nothing else a double-click on
+                # a body could do (Fusion itself wants the second click slow: that works
+                # too). On its icon it makes the body the active one, as before (also in
+                # its right-click menu); a command waiting for picks takes neither.
+                pos = self.viewport().mapFromGlobal(QtGui.QCursor.pos())
+                if self._on_name(item, node, pos) and not _command_running():
+                    _later(self._rename_key, node["key"])
+                else:
+                    self._activate(obj)
             elif node["kind"] == "component" and obj is not None:
                 self.activate_component(obj)
             elif node["kind"] == "document" and self._doc is not None:
                 self.activate_component(None)
+            elif node["kind"] == "units":
+                _later(open_units_panel)  # (wave 7) as Fusion's double-click on Units
             elif node["kind"] == "drawing" and obj is not None:
                 _later(_open_drawing, obj)  # Fusion: open the drawing (its own tab)
             elif (
@@ -2089,7 +2175,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                     doc.removeObject(name)
         except Exception as exc:
             warn("browser delete: %s" % exc)
-        doc.commitTransaction()
+        from . import transactions
+
+        transactions.close(doc)
         try:
             App.closeActiveTransaction()
         except Exception:
@@ -2279,6 +2367,11 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         if node["kind"] in ("body", "component") and isolated:
             handlers["Isolate"] = lambda: self._unisolate()
         entries = core.menu_for(node)
+        if _dialog_open():
+            # (wave 7) a look elsewhere does not end the command (book parity report: a
+            # right-click > Find in Window closed the Decal dialog): while a dialog is open
+            # the menu holds what changes only what is seen, and none of it ends the dialog
+            entries = core.while_command(entries)
         if node["visible"] is None and "Show/Hide" in entries:
             entries.remove("Show/Hide")
         if node["kind"] in self.OBJECT_KINDS and obj is None:
@@ -2378,15 +2471,17 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             return False
         sub = menu.addMenu("Move to Component")
         sub.setObjectName("Fission180MoveToMenu")
+        from .shown_names import shown_name
+
         for label, target in targets:
-            action = sub.addAction(label)
+            action = sub.addAction(shown_name(label))  # ("Nut & Bolt" keeps its &)
             self._handlers[action] = lambda t=target, m=list(moving): self._move_objects(m, t)
         return True
 
     def _toggle_selectable(self, obj, selected_nodes):
         """Fusion's Selectable/Unselectable: the row's object, or every selected body / mesh
         body / component when the row is one of them, turned the other way."""
-        if obj is None or not commands.finish_open_dialog():
+        if obj is None:
             return
         kinds = ("body", "mesh_body", "component")
         targets = [self._object(n) for n in selected_nodes if n["kind"] in kinds]
@@ -2523,8 +2618,6 @@ class BrowserWidget(QtWidgets.QTreeWidget):
     def _find_in_window(self, obj, nodes=()):
         """The view fits the row's object, or every selected row's object when it is one of
         several selected."""
-        if not commands.finish_open_dialog():  # the selection it makes is not a pick
-            return
         objs = [obj] if obj is not None else []
         for n in nodes or ():
             other = self._object(n)
@@ -2532,10 +2625,12 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 objs.append(other)
         if not objs:
             return
-        Gui.Selection.clearSelection()
-        for each in objs:
-            Gui.Selection.addSelection(each.Document.Name, each.Name)
-        Gui.SendMsgToActiveView("ViewSelection")
+        # (wave 7) the view is framed on the objects themselves: no selection is made, so a
+        # command waiting for picks keeps running and keeps its picks
+        from . import view_fit
+
+        if not view_fit.fit_objects(objs):
+            commands.tell("There is nothing of %s to show yet." % objs[0].Label)
 
     def _find_in_timeline(self, node, nodes=()):
         from . import timeline_ui
@@ -2764,9 +2859,42 @@ def show():
     _out_of_overlay(dock)
     _watch_overlay(dock)
     dock.setWindowTitle("BROWSER")
+    _title_buttons(dock, True)
     dock.show()
     _state["widget"].show()
     _state["widget"].start()
+
+
+def _title_buttons(dock, own):
+    """The three small buttons FreeCAD puts in the browser's header were faint grey marks
+    nobody could read (the book parity report's "tiny, faint square"). While Fission 180 is on:
+    the close button is drawn with Fission 180's own icon; "overlay" (FreeCAD's see-through
+    mode, which the browser is kept out of) and "float" are not shown. own=False gives
+    FreeCAD its own back."""
+    kept = _state.setdefault("title_buttons", {})
+    try:
+        bar = dock.titleBarWidget()
+        if bar is None:
+            return
+        for button in bar.findChildren(QtWidgets.QToolButton):
+            what = "%s %s" % (button.objectName(), button.toolTip())
+            if own:
+                if id(button) not in kept:
+                    kept[id(button)] = (button, button.icon(), button.isVisibleTo(bar))
+                if "Close" in what:
+                    button.setIcon(ui_icon("panel_close"))
+                    button.setToolTip("Close the browser")
+                    button.setVisible(True)
+                else:
+                    button.setVisible(False)
+            elif id(button) in kept:
+                _b, icon, shown = kept.pop(id(button))
+                button.setIcon(icon)
+                button.setVisible(shown)
+    except RuntimeError:
+        pass
+    except Exception as exc:
+        warn("browser: header buttons: %s" % exc)
 
 
 OVERLAYS = ("OverlayLeft", "OverlayRight", "OverlayTop", "OverlayBottom")
@@ -2871,6 +2999,7 @@ def hide():
             _state["original"].show()
         if _state["title"]:
             dock.setWindowTitle(_state["title"])
+    _title_buttons(dock, False)
     _state["dock"] = None
     guard, guarded = _state.get("overlay_guard"), _state.pop("guarded", None)
     if guard is not None and guarded is not None:

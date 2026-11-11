@@ -1171,6 +1171,9 @@ SKETCH_MODIFY = group(
         item("Break", ("Fission180_SketchBreak", "Sketcher_Split"), "sk_break"),
         item("Sketch Scale", "Fission180_SketchScale", "sk_scale"),
         item("Move/Copy", "Fission180_SketchMove", "sk_move", "M"),
+        SEP,
+        # Fusion's sketch MODIFY menu ends with Change Parameters too (wave 7, shell)
+        _same(SOLID_MODIFY, "Change Parameters"),
     ],
 )
 SKETCH_CONSTRAINTS = group(
@@ -1247,7 +1250,12 @@ DRAWING_CREATE = group(
             "dw_section_view",
             note="Click a view, then a closed boundary around what should show inside.",
         ),
-        item("Exploded View", None, "dw_base_view"),
+        item(
+            "Exploded View",
+            "Fission180_DrawingExplodedView",
+            "dw_base_view",
+            note="A view of an animation storyboard's end: the design taken apart.",
+        ),
     ],
 )
 DRAWING_MODIFY = group(
@@ -1265,8 +1273,18 @@ DRAWING_MODIFY = group(
             note="Or double-click the title block",
         ),
         SEP,
-        item("Move", None, "move", note="Drag a view by its frame on the sheet"),
-        item("Rotate", None, "move"),
+        item(
+            "Move",
+            "Fission180_DrawingMove",
+            "move",
+            note="Pick views, tables, text or balloons, then two points (or drag a view).",
+        ),
+        item(
+            "Rotate",
+            "Fission180_DrawingRotate",
+            "move",
+            note="Pick views, then type the angle.",
+        ),
         item("Delete", "Fission180_DrawingDelete", "delete", "Del"),
     ],
 )
@@ -1277,7 +1295,12 @@ DRAWING_GEOMETRY = group(
     [
         item("Centerline", "Fission180_DrawingCenterline", "dw_centerline"),
         item("Center Mark", "Fission180_DrawingCenterMark", "dw_center_mark"),
-        item("Center Mark Pattern", None, "dw_center_mark"),
+        item(
+            "Center Mark Pattern",
+            "Fission180_DrawingCenterMarkPattern",
+            "dw_center_mark",
+            note="Click the holes of a pattern, Enter: marks and the line or circle through them.",
+        ),
         item(
             "Edge Extension",
             "Fission180_DrawingEdgeExtension",
@@ -1345,7 +1368,6 @@ DRAWING_TEXT = group(
             "dw_text",
             note="Click an edge, then where the text goes; type the text.",
         ),
-        item("Note", None, "dw_text"),
         item(
             "Bend Note",
             "Fission180_DrawingBendNote",
@@ -1381,6 +1403,12 @@ DRAWING_TABLES = group(
             note="A parts list of the components a view shows, with balloons.",
         ),
         item(
+            "Parts List",
+            "Fission180_DrawingPartsList",
+            "dw_table",
+            note="The components a view shows, numbered, with a balloon on each.",
+        ),
+        item(
             "Bend Table",
             "Fission180_DrawingBendTable",
             "dw_table",
@@ -1392,8 +1420,18 @@ DRAWING_TABLES = group(
             "dw_balloon",
             note="Click a component on a view, then where the balloon goes.",
         ),
-        item("Renumber", None, "dw_balloon"),
-        item("Align Balloons", None, "dw_balloon"),
+        item(
+            "Renumber",
+            "Fission180_DrawingRenumber",
+            "dw_balloon",
+            note="Type the number, click the balloon that gets it; the parts list sorts.",
+        ),
+        item(
+            "Align Balloons",
+            "Fission180_DrawingAlignBalloons",
+            "dw_balloon",
+            note="Click balloons, Enter, click where their line goes.",
+        ),
     ],
 )
 DRAWING_EXPORT = group(
@@ -1403,8 +1441,18 @@ DRAWING_EXPORT = group(
     [
         item("Export PDF", "Fission180_DrawingExportPDF", "dw_export_pdf"),
         item("Export DXF", "Fission180_DrawingExportDXF", "dw_export_dxf"),
-        item("Export DWG", None, "export"),
-        item("Export CSV", None, "export"),
+        item(
+            "Export DWG",
+            "Fission180_DrawingExportDWG",
+            "export",
+            note="Needs a DWG converter program on this computer; a DXF otherwise.",
+        ),
+        item(
+            "Export CSV",
+            "Fission180_DrawingExportCSV",
+            "export",
+            note="The parts list (or a bend table) as a file for a spreadsheet.",
+        ),
     ],
 )
 
@@ -1590,7 +1638,7 @@ SIM_MARKING_LIST = [
     SEP,
     item("Hide", "Std_HideSelection", "nav_display"),
     item("Show All", "Std_ShowObjects", "nav_display"),
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
@@ -1626,7 +1674,7 @@ SIMR_MARKING_LIST = [
         "Show Mesh", "Fission180_SimResultsMesh", "simr_mesh", toggle="simulation_results_ui:mesh_on"
     ),
     SEP,
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
@@ -1780,7 +1828,9 @@ TABS = [
     {
         "id": "solid",
         "title": "SOLID",
-        "groups": [SOLID_CREATE, SOLID_MODIFY, CONSTRUCT, INSPECT, INSERT, ASSEMBLE, SELECT],
+        # Fusion's order: CREATE, (AUTOMATE), MODIFY, ASSEMBLE, (CONFIGURE), CONSTRUCT,
+        # INSPECT, INSERT, SELECT (wave 7: ASSEMBLE stood after INSERT)
+        "groups": [SOLID_CREATE, SOLID_MODIFY, ASSEMBLE, CONSTRUCT, INSPECT, INSERT, SELECT],
     },
     {
         "id": "surface",
@@ -2016,7 +2066,7 @@ CAM_MARKING_LIST = [
     item("Drill", "Fission180_CamDrill", "cam_drill"),
     item("Tool Library", "Fission180_CamToolLibrary", "cam_tools"),
     SEP,
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
@@ -2135,6 +2185,12 @@ FILE_MENU = [
         "dw_new",
         note="From Design: views of this design on a sheet",
     ),
+    item(
+        "New Drawing From Animation",
+        "Fission180_NewDrawingFromAnimation",
+        "dw_new",
+        note="An exploded drawing of one of the design's animation storyboards",
+    ),
     item("Open", ("Fission180_Open", "Std_Open"), "qa_open", "Ctrl+O"),
     item("Recover Documents", "Fission180_RecoverDocuments", "document"),
     SEP,
@@ -2186,7 +2242,7 @@ QUICK_ACCESS = [
         note="The project folder's designs with thumbnails (Fusion's Data Panel)",
     ),
     item("Menu", "__menu__", "qa_menu", note="All FreeCAD menus"),
-    item("New", "Std_New", "qa_new", "Ctrl+N"),
+    item("New", ("Fission180_NewDesign", "Std_New"), "qa_new", "Ctrl+N"),
     item("Open", ("Fission180_Open", "Std_Open"), "qa_open", "Ctrl+O"),
     item(
         "Save",
@@ -2233,7 +2289,7 @@ NAV_BAR = [
         ],
         "nav_zoom",
     ),
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     sub(
         "Display Settings",
         [
@@ -2521,7 +2577,7 @@ MARKING_LIST = [
     SEP,
     item("Hide", "Std_HideSelection", "nav_display"),
     item("Show All", "Std_ShowObjects", "nav_display"),
-    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Fit", ("Fission180_Fit", "Std_ViewFitAll"), "nav_fit", "F6"),
     item("Look At", "Std_AlignToSelection", "nav_lookat"),
     SEP,
     item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),

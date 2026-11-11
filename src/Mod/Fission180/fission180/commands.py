@@ -228,7 +228,15 @@ def _active(cmd):
 
 # Sketch commands that work with the running tool (FreeCAD's construction mode switches the
 # tool being drawn to construction lines)
-KEEPS_SKETCH_TOOL = ("Sketcher_ToggleConstruction", "Fission180_SketchToggleConstruction")
+KEEPS_SKETCH_TOOL = (
+    "Sketcher_ToggleConstruction",
+    "Fission180_SketchToggleConstruction",
+    # (wave 7, sketch-c) the right-click menu while a dimension is being placed: the
+    # running Sketch Dimension keeps its picks and turns the dimension
+    "Fission180_SketchDimensionAligned",
+    "Fission180_SketchDimensionHorizontal",
+    "Fission180_SketchDimensionVertical",
+)
 
 
 NOTHING_TO = {"Std_Undo": "Nothing to undo.", "Std_Redo": "Nothing to redo."}
@@ -239,7 +247,11 @@ def _own_tool_running(session, name):
     press does (O again ends Offset, M again keeps Move/Copy with its picks), so it is not
     stopped first."""
     tool = getattr(session, "tool", None)
-    return tool is not None and bool(getattr(tool, "active", False)) and getattr(tool, "command", "") == name
+    return (
+        tool is not None
+        and bool(getattr(tool, "active", False))
+        and getattr(tool, "command", "") == name
+    )
 
 
 def _would_ask(name):
@@ -356,11 +368,12 @@ def ensure_body():
     try:
         # FreeCAD's Body command uses its own "part" slot, which can lag behind the active
         # component (a body-less component was just activated): put the body where it goes.
-        # Inside a component the body is numbered per component, like Fusion (Body1); at
-        # the root FreeCAD's own label stays, as before components.
+        # Bodies are numbered per component from the first one on, like Fusion (Body1,
+        # Body2 ...), at the root too (wave 7: the first body was FreeCAD's "Body" while
+        # Box made "Body1": the book report's "inconsistent").
         if component is not None:
             components.place(body, component, keep_position=False)  # a new, empty body
-            body.Label = components.body_label_in(doc, component, exclude=body)
+        body.Label = components.body_label_in(doc, component, exclude=body)
     except Exception as exc:
         warn("could not place the new body: %s" % exc)
     components.activate_body(body)

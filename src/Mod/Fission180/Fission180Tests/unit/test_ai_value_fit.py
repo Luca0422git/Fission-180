@@ -146,5 +146,44 @@ class Largest(unittest.TestCase):
         self.assertFalse(value_fit.is_limit("selector picked 2 faces, expected 1"))
 
 
+class SlowComputer(unittest.TestCase):
+    """The AI tools' answer does not depend on how fast the computer is (wave 7: the docs'
+    example, a 30 mm fillet where 19.99 fits, answered 'Largest radius found that fits here:
+    19.98 mm' under load)."""
+
+    def answer(self, seconds_per_try):
+        now = [0.0]
+
+        def trial(args):
+            now[0] += seconds_per_try
+            return args["radius"] <= 19.9951
+
+        return value_fit.largest(
+            "fillet", {"radius": 30}, trial, per_try=seconds_per_try, clock=lambda: now[0]
+        )
+
+    def test_the_same_sentence_whatever_a_try_takes(self):
+        fast = self.answer(0.01)
+        self.assertIn("Largest radius that fits here: 19.99 mm (30 mm does not;", fast)
+        self.assertIn("give radius 19.99 or less", fast)
+        for seconds in (0.3, 1.0, 2.5):  # (2.5 s a try: nothing was searched at all before)
+            self.assertEqual(self.answer(seconds), fast)
+
+    def test_the_guard_says_about(self):
+        text = self.answer(8.0)  # the minute's guard stops it after a few tries
+        self.assertIn("Largest radius found that fits here: about ", text)
+        self.assertIn("(30 mm does not; the search stopped at its time limit", text)
+        self.assertNotIn("give radius", text)
+
+    def test_the_whole_refusal_sentence(self):
+        # (the log cut it at "(30 mm do": the sentence itself is whole)
+        text = value_fit.sentence("radius", "mm", 30.0, 19.99, True, "radius")
+        self.assertEqual(
+            text,
+            " Largest radius that fits here: 19.99 mm (30 mm does not; Fission 180 did not "
+            "build a smaller value in its place: give radius 19.99 or less).",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

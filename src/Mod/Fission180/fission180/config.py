@@ -203,4 +203,9 @@ PREFERRED = {
     "Std_Save": "Fission180_Save",
     # Fusion's Open also takes STEP / IGES files and opens them as designs with components.
     "Std_Open": "Fission180_Open",
+    # Fusion's Fit frames the design or the sketch being edited, never a grid; an empty
+    # design shows the origin in the middle (view_fit.py)
+    "Std_ViewFitAll": "Fission180_Fit",
+    # Fusion's new design: its Origin in the browser, the Home view (home_ui.new_design)
+    "Std_New": "Fission180_NewDesign",
 }

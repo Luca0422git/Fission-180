@@ -58,7 +58,7 @@ def click_part():
 def body_picked():
     p = sd.scale_panel()
     h.check("the body is picked", p is not None and p.base is not None, p and p.message.text())
-    h.check("Entities shows the body", p and p.entities.button.text() == "Body")
+    h.check("Entities shows the body", p and p.entities.button.text() == App.ActiveDocument.getObject("Body").Label)
     h.check("the Point box takes the clicks now", p is not None and p.active == "point")
     h.check("a Scale step previewed", len(sd.scales()) == 1, sd.scales())
     h.check("factor 1: the part is unchanged", sd.close(h.solid_volume(), sd.BOX))
@@ -298,7 +298,7 @@ def after_esc():
 
 def pick_body_in_browser():
     Gui.Selection.clearSelection()
-    sd.click_browser_row("Body")
+    sd.click_browser_row(App.ActiveDocument.getObject("Body").Label)
 
 
 def second_scale():

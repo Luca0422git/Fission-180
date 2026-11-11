@@ -17,6 +17,9 @@ NOT_REPEATABLE = {
     "Fission180_CommandSearch",
     "__menu__",
     "Std_ViewFitAll",
+    "Fission180_Fit",  # (wave 7: Fission 180's own Fit and New Design)
+    "Fission180_NewDesign",
+    "Fission180_Preferences",
     "Std_Save",
     "Std_Open",
     "Std_New",

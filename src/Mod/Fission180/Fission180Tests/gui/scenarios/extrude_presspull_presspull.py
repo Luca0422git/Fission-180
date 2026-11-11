@@ -420,15 +420,17 @@ def sketch_on_top():
 
 def pick_top_face():
     h.fit()
-    h.click(V(14, -18, 25))
+    # (the prism lies at y 0..20: a Front plane sketch is extruded away from the
+    # front viewer, like Fusion; it was y -20..0)
+    h.click(V(14, 18, 25))
 
 
 def draw_square():
     sk = h.in_sketch()
     h.check("sketch on the pulled top face", sk is not None)
     if sk:
-        ax, ay = h.to_sketch(sk, V(15, -15, 25))
-        bx, by = h.to_sketch(sk, V(25, -5, 25))
+        ax, ay = h.to_sketch(sk, V(15, 15, 25))
+        bx, by = h.to_sketch(sk, V(25, 5, 25))
         h.draw_rectangle(sk, min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))
 
 
@@ -447,7 +449,7 @@ def click_profile():
     regions = len(p.picker.regions) if p is not None and p.picker is not None else 0
     h.check("Press Pull shades the visible sketch area", regions == 1, regions)
     h.fit()
-    h.click(V(17, -12, 25))
+    h.click(V(17, 12, 25))
 
 
 def became_extrude():

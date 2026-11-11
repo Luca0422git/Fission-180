@@ -1,0 +1,237 @@
+{
+  "id": "book_tensegrity_corner_chamfer_20",
+  "title": "The Tensegrity Tower's 20 mm chamfer in the arm's inner corner (it was limited to 1.79 mm)",
+  "tags": [
+    "chamfer",
+    "book",
+    "robust"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "polygon": {
+            "center": [
+              0,
+              0
+            ],
+            "radius": 50.0,
+            "sides": 6,
+            "rotation": 0
+          }
+        },
+        {
+          "polyline": [
+            [
+              0.0,
+              6.0
+            ],
+            [
+              18.07179677,
+              37.301270189
+            ],
+            [
+              -18.07179677,
+              37.301270189
+            ]
+          ]
+        },
+        {
+          "polyline": [
+            [
+              -5.196152423,
+              3.0
+            ],
+            [
+              -23.267949192,
+              34.301270189
+            ],
+            [
+              -41.339745962,
+              3.0
+            ]
+          ]
+        },
+        {
+          "polyline": [
+            [
+              -5.196152423,
+              -3.0
+            ],
+            [
+              -41.339745962,
+              -3.0
+            ],
+            [
+              -23.267949192,
+              -34.301270189
+            ]
+          ]
+        },
+        {
+          "polyline": [
+            [
+              -0.0,
+              -6.0
+            ],
+            [
+              -18.07179677,
+              -37.301270189
+            ],
+            [
+              18.07179677,
+              -37.301270189
+            ]
+          ]
+        },
+        {
+          "polyline": [
+            [
+              5.196152423,
+              -3.0
+            ],
+            [
+              23.267949192,
+              -34.301270189
+            ],
+            [
+              41.339745962,
+              -3.0
+            ]
+          ]
+        },
+        {
+          "polyline": [
+            [
+              5.196152423,
+              3.0
+            ],
+            [
+              41.339745962,
+              3.0
+            ],
+            [
+              23.267949192,
+              34.301270189
+            ]
+          ]
+        },
+        {
+          "circle": [
+            21.535898385,
+            37.301270189,
+            1.75
+          ]
+        },
+        {
+          "circle": [
+            21.535898385,
+            -37.301270189,
+            1.75
+          ]
+        },
+        {
+          "circle": [
+            -21.535898385,
+            37.301270189,
+            1.75
+          ]
+        },
+        {
+          "circle": [
+            -21.535898385,
+            -37.301270189,
+            1.75
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 6
+    },
+    {
+      "op": "sketch",
+      "id": "s2",
+      "plane": "XZ",
+      "geometry": [
+        {
+          "polyline": [
+            [
+              3.4,
+              6.0
+            ],
+            [
+              -3.4,
+              6.0
+            ],
+            [
+              30.2,
+              69.0
+            ],
+            [
+              30.2,
+              75.0
+            ],
+            [
+              40.2,
+              75.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e2",
+      "profile": "s2",
+      "distance": 6,
+      "direction": "symmetric",
+      "operation": "join"
+    },
+    {
+      "op": "blend_chamfer",
+      "id": "c1",
+      "distance": 20,
+      "edges": {
+        "type": "line",
+        "parallel": [
+          0,
+          1,
+          0
+        ],
+        "at": [
+          {
+            "axis": "x",
+            "value": 3.4
+          },
+          {
+            "axis": "z",
+            "value": 6
+          }
+        ],
+        "count": 1
+      }
+    }
+  ],
+  "expect": {
+    "volume": 22307.732674,
+    "solids": 1,
+    "faces": 35,
+    "bbox": [
+      -50,
+      -43.30127,
+      0,
+      50,
+      43.30127,
+      75
+    ],
+    "source": "analytic",
+    "note": "book parity report, Project 4. Frame: hexagon 100 across corners less six pockets (6 mm rim, 6 mm spokes) and four 3.5 mm holes, 6 thick = 18376.109. Arm: 6 wide between its leaning lines, 10 flat top, 6 drop, 75 high, 6 thick: an 8-15-17 lean, section 478.8 mm2 = 2872.8. The chamfer: a triangle 20 along the frame's top and 20 up the arm's underside, 61.93 degrees between them: 20 * 20 * (15/17) / 2 = 176.47 mm2, times the 6 mm edge = 1058.824. OpenCASCADE's own chamfer stops at 1.79 mm (where the top face narrows to the spoke); Fission 180 sweeps the bevel's section along the edge (fillet_section.py)"
+  }
+}

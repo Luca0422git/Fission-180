@@ -72,7 +72,13 @@ def _home(doc):
             return folder
     except Exception:
         pass
-    return os.path.expanduser("~")
+    try:  # (wave 7) then the folder open in the Data Panel or the project folder: it was
+        # the home folder (book parity report: Save As DXF "opens in the home folder")
+        from . import versions_ui
+
+        return versions_ui.start_folder(doc)
+    except Exception:
+        return os.path.expanduser("~")
 
 
 def _remember_folder(path):
@@ -144,10 +150,20 @@ class _RefinementRows:
         self.level.setCurrentText(export.DEFAULT_REFINEMENT)
         self.level.currentIndexChanged.connect(lambda *_: self._level_changed())
         form.addRow("Refinement", self.level)
+        # (wave 7) shown in the design's units (an inch design read " mm"); the values
+        # this row gives out stay millimetres
+        self.unit, self.per_unit = "mm", 1.0
+        try:
+            from . import browser_core, design_units
+
+            self.unit = design_units.length_unit()
+            self.per_unit = float(browser_core.MM_PER_UNIT.get(self.unit, 1.0))
+        except Exception:
+            self.unit, self.per_unit = "mm", 1.0
         self.surface = QtWidgets.QDoubleSpinBox()
-        self.surface.setDecimals(4)
-        self.surface.setRange(0.0001, 100.0)
-        self.surface.setSuffix(" mm")
+        self.surface.setDecimals(4 if self.per_unit == 1.0 else 6)
+        self.surface.setRange(0.0001 / self.per_unit, 100.0 / self.per_unit)
+        self.surface.setSuffix(" " + self.unit)
         self.surface.setKeyboardTracking(False)
         self.normal = QtWidgets.QDoubleSpinBox()
         self.normal.setDecimals(1)
@@ -169,7 +185,7 @@ class _RefinementRows:
             surface, normal = export.REFINEMENT[level]
             self.surface.blockSignals(True)
             self.normal.blockSignals(True)
-            self.surface.setValue(surface)
+            self.surface.setValue(surface / self.per_unit)
             self.normal.setValue(normal)
             self.surface.blockSignals(False)
             self.normal.blockSignals(False)
@@ -182,7 +198,11 @@ class _RefinementRows:
             self.on_change()
 
     def values(self):
-        return (self.level.currentText(), self.surface.value(), self.normal.value())
+        return (
+            self.level.currentText(),
+            self.surface.value() * self.per_unit,
+            self.normal.value(),
+        )
 
     def set_triangles(self, count):
         self.triangles.setText("" if count is None else "{:,}".format(count).replace(",", " "))
@@ -244,7 +264,7 @@ class _MeshDialog(QtWidgets.QDialog):
 WHOLE = "Whole design"
 SELECTED = "Selected bodies"
 COMPONENT = "A component"
-MESH_KINDS = ("stl", "stl_ascii", "3mf", "obj")
+MESH_KINDS = ("stl", "stl_ascii", "3mf", "obj", "usdz")
 
 
 class ExportDialog(_MeshDialog):
@@ -434,6 +454,11 @@ class ExportDialog(_MeshDialog):
 
             if exchange.dwg_converter() is None:
                 note = self.exchange_core.DWG_NONE
+        elif kind == "usdz":
+            note = (
+                "USDZ is for AR viewers (a phone's AR view): the bodies as meshes with their "
+                "colours, in metres with Y up whatever the Unit Type."
+            )
         elif flat:
             note = "DXF writes the picked sketch's curves (or a flat face's edges) in 2D."
         self.note.setText(note)
@@ -511,9 +536,7 @@ class ExportDialog(_MeshDialog):
                     "surface": surface,
                     "normal": normal,
                 }
-            export_report_ui.report_losses(
-                self.doc, objects, fmt, files_label(written), **options
-            )
+            export_report_ui.report_losses(self.doc, objects, fmt, files_label(written), **options)
         except Exception as exc:
             warn("export report: %s" % exc)
 
@@ -686,9 +709,7 @@ class PrintDialog(_MeshDialog):
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
-        start = slicer_core.default_target(
-            self.found, export.print_send_to(), self.other_program
-        )
+        start = slicer_core.default_target(self.found, export.print_send_to(), self.other_program)
         self.send_to.setCurrentIndex(max(0, self.send_to.findData(start)))
         self.send_to.currentIndexChanged.connect(lambda *_: self._send_to_changed(True))
         self._send_to_changed(False)
@@ -770,6 +791,16 @@ class PrintDialog(_MeshDialog):
             self._picking = False
 
     # -- OK -------------------------------------------------------------------------------
+    save_title = "Save for 3D printing"
+
+    def per_body(self):
+        """One file per body (Save As Mesh's Structure); 3D Print always writes one file."""
+        return False
+
+    def frame(self):
+        """The placement whose coordinates the file is in (Save As Mesh of a component)."""
+        return None
+
     def default_path(self):
         chosen = self.bodies.chosen()
         name = slicer_core.print_name(_design_name(self.doc), [b.Label for b in chosen])
@@ -816,7 +847,7 @@ class PrintDialog(_MeshDialog):
                     path = self._temp_path(fmt)
                 else:
                     path = _save_dialog(
-                        "Save for 3D printing",
+                        self.save_title,
                         self.default_path(),
                         "%s (*%s)" % (fmt, export.extension_of(fmt)),
                     )
@@ -826,7 +857,16 @@ class PrintDialog(_MeshDialog):
             level, surface, normal = self.refinement.values()
             unit = slicer_core.send_unit(self.unit.currentText(), sending)
             written = export.export_mesh_files(
-                self.doc, chosen, fmt, path, level, surface, normal, unit=unit
+                self.doc,
+                chosen,
+                fmt,
+                path,
+                level,
+                surface,
+                normal,
+                unit=unit,
+                per_body=self.per_body() and not sending,
+                frame=self.frame(),
             )
             file_path, count = written[0]
             self.last_file = file_path
@@ -876,6 +916,100 @@ class PrintDialog(_MeshDialog):
             warn("3D Print failed: %s" % exc)
             self.say("The export failed: %s" % exc)
         return False
+
+
+# ============================================================================ Save As Mesh
+class SaveAsMeshDialog(PrintDialog):
+    """Fusion's Save As Mesh (right-click a body or a component in the browser): Format,
+    Unit Type, Structure, Refinement with the Number of Triangles, and Send to 3D Print
+    Utility: ticked, the mesh goes straight to the slicer chosen under Print Utility (what
+    3D Print does) instead of a file. (It was the general Export dialog with 3MF chosen and
+    no way to send: book parity report, Finger Surfboard.)"""
+
+    save_title = "Save As Mesh"
+
+    def __init__(self, doc, obj):
+        super().__init__(doc)
+        from . import components, exchange
+
+        self.setWindowTitle("Save As Mesh")
+        self.setObjectName("Fission180SaveAsMesh")
+        self.obj = obj
+        self.component = obj if components.is_component(obj) else None
+        wanted = (
+            {b.Name for b in exchange.mesh_bodies_of(doc, obj)}
+            if self.component is not None
+            else {obj.Name}
+        )
+        for i in range(self.bodies.count()):
+            item = self.bodies.item(i)
+            tick = item.data(QtCore.Qt.UserRole) in wanted
+            item.setCheckState(QtCore.Qt.Checked if tick else QtCore.Qt.Unchecked)
+        form = self.form
+        self.format.setCurrentText("3MF")  # Fusion's default; 3D Print's own choice is its own
+        row = form.getWidgetPosition(self.send_to)[0]
+        self.send_box = QtWidgets.QCheckBox("Send to 3D Print Utility")
+        self.send_box.setObjectName("Fission180SaveAsMeshSend")
+        self.send_box.setToolTip(
+            "Hand the mesh to your slicer instead of saving a file (what 3D Print does)"
+        )
+        form.insertRow(row, self.send_box)
+        label = form.labelForField(self.send_to)
+        if label is not None:
+            label.setText("Print Utility")
+        self.structure = QtWidgets.QComboBox()
+        self.structure.setObjectName("Fission180SaveAsMeshStructure")
+        self.structure.addItems(export.STRUCTURES)
+        form.insertRow(form.getWidgetPosition(self.unit)[0] + 1, "Structure", self.structure)
+        # only slicers under Print Utility: "a file only" is the box left unticked
+        index = self.send_to.findData(slicer_core.FILE_ONLY)
+        self._slicer = self.target() if self.sending() else None
+        if index >= 0:
+            self.send_to.blockSignals(True)
+            self.send_to.removeItem(index)
+            self.send_to.blockSignals(False)
+        if self._slicer is not None:
+            self.set_target(self._slicer)
+        self.send_box.toggled.connect(lambda *_: self._send_toggled())
+        self._send_toggled()
+        if self.bodies.count() and not self.bodies.chosen():
+            self.say("%s has no solid to save as a mesh yet." % obj.Label)
+        self.schedule_count()
+
+    def target(self):
+        box = getattr(self, "send_box", None)
+        if box is not None and not box.isChecked():
+            return slicer_core.FILE_ONLY
+        return self.send_to.currentData() or slicer_core.FILE_ONLY
+
+    def per_body(self):
+        return self.structure.currentText() == "One File Per Body"
+
+    def frame(self):
+        if self.component is None:
+            return None
+        from . import exchange
+
+        return exchange.component_frame(self.component)
+
+    def default_path(self):
+        name = export.safe_name(self.obj.Label, "mesh")
+        return os.path.join(_home(self.doc), name + export.extension_of(self.format.currentText()))
+
+    def _remember(self, target):
+        """Save As Mesh keeps 3D Print's remembered choices as they are (only a program
+        picked for "Other" is kept: it is the same slicer)."""
+        if target == slicer_core.OTHER:
+            export.set_slicer_program(self.program.text().strip())
+
+    def _send_toggled(self):
+        try:
+            self.send_to.setEnabled(self.send_box.isChecked())
+            self.structure.setEnabled(not self.send_box.isChecked())
+            self._send_to_changed(False)
+            self.send_to.setEnabled(self.send_box.isChecked())
+        except Exception as exc:
+            warn("Save As Mesh: %s" % exc)
 
 
 # ============================================================================ everything

@@ -57,7 +57,7 @@ FILE MENU [in=file,quick]
   New Electronics Design [out=electronics is out of scope]
   New Drawing
     From Design
-    From Animation [out=animation is out of scope]
+    From Animation
   New Drawing Template?
   Open
   Recover Documents
@@ -90,6 +90,7 @@ WORKSPACES [in=workspace]
   Manufacture
   Drawing
     From Design
+    From Animation
 
 SOLID [in=tab:solid]
   CREATE
@@ -488,7 +489,6 @@ DRAWING [in=tab:drawing]
   TEXT
     Text
     Leader
-    Note?
     Hole and Thread Note?
   SYMBOLS
     Surface Texture
@@ -497,6 +497,7 @@ DRAWING [in=tab:drawing]
     Welding Symbol?
   TABLES
     Table
+    Parts List
     Balloon
     Renumber
     Align Balloons

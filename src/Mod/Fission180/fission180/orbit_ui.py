@@ -354,7 +354,9 @@ def drag_camera(view, dx, dy, deg_per_pixel=viewcube.ORBIT_DEG_PER_PIXEL):
 
 def fit_view():
     try:
-        Gui.runCommand("Std_ViewFitAll")
+        from . import view_fit
+
+        view_fit.fit()  # (wave 7: the design or the open sketch, never a grid)
     except Exception as exc:
         warn("fit: %s" % exc)
 

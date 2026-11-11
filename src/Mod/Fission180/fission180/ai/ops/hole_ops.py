@@ -31,7 +31,8 @@ core.Builder when the package is imported.
       ISO 68-1 groove (fission180/thread_core.py has the formulas), cosmetic changes nothing.
 
 `edit` steps can change a hole's "diameter" / "depth" and a thread's "length" / "offset" /
-"modeled".
+"modeled" / "face_offset" (every face of a modeled thread moved that far, as Offset Face on
+the thread does: negative makes it looser).
 """
 
 import FreeCAD as App
@@ -78,7 +79,13 @@ THREAD_OPTIONS = (
     "from_end",
 )
 
-_EDIT_PROPS["thread"] = {"length": "Length", "offset": "Offset", "modeled": "Modeled"}
+_EDIT_PROPS["thread"] = {
+    "length": "Length",
+    "offset": "Offset",
+    "modeled": "Modeled",
+    # every face of the modeled thread moved (Offset Face on a thread; modify-b)
+    "face_offset": "FaceOffset",
+}
 
 
 def _size_and_designation(options, step):
