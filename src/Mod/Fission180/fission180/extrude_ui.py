@@ -1404,6 +1404,9 @@ class ExtrudePanel(
             if taskui.box_click_taken():
                 return  # the click that left an arrow's value box: not a pick
             recent = self.picker is not None and self.picker.clicked_region_recently()
+            # (a window selection brings a face together with its edges: only a single
+            # click on an edge can stand for the face next to it)
+            self._one_pick = len(picks) == 1
             for obj, short, point in picks:
                 self._picked(obj, short, recent, point)
         except Exception as exc:
@@ -1448,6 +1451,8 @@ class ExtrudePanel(
                 # A small face in a fitted view (the rocket's top, 10 pixels wide) is mostly
                 # edge under the mouse: an edge with one flat face toward the viewer is a
                 # click on that face.
+                if not getattr(self, "_one_pick", True):
+                    return  # one of the edges a selection window took along with a face
                 face = self._face_at_edge(obj, short)
                 if face is None:
                     if not self.profiles:
