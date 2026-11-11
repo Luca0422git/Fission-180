@@ -175,3 +175,97 @@ builders "hardware" and "looks" (`docs/fission180/sessions/book-hardware.md`,
   default mesh PASS; fine mesh FAIL on this branch; fine mesh FAIL on develop 049c500b+.
   The scenario's part is therefore made fine by its many faces (28 balls on the donut), not
   by the mesh settings.
+
+## Item 10 (in part): New Appearance picks its colour on a wheel
+
+- Manage Materials > New Appearance had a text box "Colour (#RRGGBB)". It now has the look
+  editor's colour wheel (`appearance_edit_ui.ColourWheel`), a brightness slider and a
+  swatch; the code is filled in from the pick and can still be typed. Nothing has to be
+  typed for the colour.
+- Not built: editing a user material in place (name, density, look) and copies that change
+  every listed property. `material.create_user_material` only takes a density; a material's
+  other values come from the card it was inherited from (`MaterialManager.inheritMaterial`,
+  see book-looks.md's trap about `addPhysicalModel`).
+
+## A Hardware step's place follows its own hole
+
+- Found while testing item 2: a screw put on a flat face makes its own Hole step; when that
+  hole was moved afterwards, editing the Hardware step put hole and screw back where the
+  face had been clicked (the step kept the clicked point). `hardware.pick_of` / `more_of`
+  now give the place where the step's own hole is now (`hole.centres`).
+
+## Not done (with the reason)
+
+- **Item 4** (hover preview of the part, a sketch point as a place, a nut or washer clicked
+  onto a screw, a hole with a modeled thread read as a hole): not started. Each is a piece
+  of `hardware_place.spot` plus dialog work; the room went to items 1, 2, 7, 11, 13, the
+  CI failure and items 3, 6, 9, 12.
+- **Item 5** (retaining rings with lugs, a real Phillips recess, head and nut chamfers):
+  not started; every changed shape needs its volume formula, golden models and the 1,706
+  combinations test again.
+- **Item 8** (drag handles for Texture Map Controls): not started.
+- **Item 10**: only New Appearance's colour wheel (above).
+- Item 1: the families marked "not confirmed" in `parity/hardware.md`.
+
+## Tests (FreeCAD 1.1.4, this sandbox, one scenario at a time, from a snapshot of the tree)
+
+See the builder's report for the counts of the last round.
+
+## Changelog lines
+
+- Hardware sizes were checked against a second source: eight large O-rings (AS568 -438 to
+  -445) had inside diameters up to an inch too small, two shoulder screws (12 and 16 mm)
+  had heads 1 mm too low, and the 37 mm internal retaining ring was 0.1 mm too narrow. They
+  are right now.
+- A screw, nut, bearing or other hardware part now follows its hole: move the hole (change
+  its sketch's dimension, or move its Hole step) and the part goes with it.
+- Editing a hardware part whose own hole you moved no longer puts the hole back.
+- A hardware part with cosmetic threads now shows its thread as a dashed spiral, like a
+  cosmetic thread made with the Thread tool; with Modeled threads on, the real thread is
+  cut as before.
+- The AI's `insert_hardware` can put a part into a hole from any part of the hole (rim,
+  wall, countersink), sizes it from the hole, can fill every hole like it, and joins it.
+- Component Color Swatch (the timeline's gear menu) now marks each component's colour on
+  its row in the browser and on its steps in the timeline, instead of a list in the 3D
+  view. A joint's step shows both components' colours.
+- New: right-click a component > Cycle Component Color gives it another colour (while
+  component colours or the swatches are shown).
+- A new body is now drawn in the default look, "Steel, satin", exactly as In This Design
+  lists it (it used to be a lighter grey). Older designs' plain grey bodies take it too
+  when they are opened; bodies you gave a look are not touched.
+- The question "Keep or Remove the faces' own looks?" is now a row inside the Appearance
+  dialog with the buttons Keep, Remove and Cancel, instead of a box that stopped
+  everything until it was answered.
+- Properties of a component now has Part Number, Part Name and Description: type them
+  there; the drawing's parts list shows the part number and the description.
+- Manage Materials > New Appearance: pick the colour on a colour wheel (no code to type).
+- Fixed: once in a while a dialog (seen with Move/Copy started from several selected
+  browser rows) was on screen but Fission 180 did not know it was open, so Esc, typing a
+  value over the 3D view or starting the next command did not treat it as open.
+- Fixed: pressing Enter in the Properties window no longer copies the list to the
+  clipboard.
+
+## Known issues
+
+- A hardware part on a flat face with no hole under it (Make the hole too off) moves with
+  the part it sits on, but has no hole to follow: tick Make the hole too, or click a hole.
+- When a hole moves, the screw goes to it, unless the screw itself is what an older joint
+  holds everything else to: then the holed part comes to the screw. Ground the part that
+  should stay (right-click it > Ground to Parent).
+- Each hardware joint shows its mark at its hole. Click the eye of the Joints folder in
+  the browser to hide them.
+- A nut or washer cannot be clicked onto a screw, and a sketch point is not a place for a
+  hardware part: click the face or the round edge it sits on. There is no preview of the
+  part under the pointer before the click.
+- Retaining rings are drawn without their lugs, a Phillips recess as two crossed slots,
+  and screw heads and nuts without their chamfers.
+- A few hardware families could not be checked against a second source (ISO 7040 lock nuts,
+  ISO 2338 pins, set screws' point sizes, inch low head and flat head socket screws, jam
+  nuts): check such a size against the supplier's sheet before ordering.
+- Component Color Swatch is off until you tick it (the timeline's gear menu). The design's
+  own row always keeps the first colour (Cycle Component Color is for components).
+- Part Number, Part Name and Description can be typed when ONE component is selected (click
+  its row in the browser); for a body or several things the fields are grey.
+- Texture Map Controls still has no handles in the 3D view: type the offset, rotation and
+  scale.
+- A material of your own cannot be edited in place yet: make another copy (double-click).

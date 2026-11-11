@@ -207,7 +207,8 @@ below each face (**Guess**); a nylon lock nut is a higher hex nut.
 ### Known gaps (with the reason)
 
 - (Solved 2026-11-11, library-2: the joint follows the hole; the cosmetic thread is drawn;
-  the AI tool takes any part of a hole.)
+  the AI tool takes any part of a hole; a Hardware step's place follows its own Hole step
+  when that hole was moved, so an edit of the part no longer puts the hole back.)
 - **Which part moves** when a hole moves is the joints' rule: the grounded part stays, else
   component 2 of the group's oldest joint. A screw that is itself the anchor of an older
   joint stays, and the holed part comes to it.

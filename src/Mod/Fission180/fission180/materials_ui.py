@@ -157,7 +157,12 @@ class _Tab(QtWidgets.QWidget):
         form.addRow("Name", self.new_name)
         self.new_value = QtWidgets.QLineEdit()
         self.new_value.setObjectName("Fission180MaterialNewValue_" + kind)
-        form.addRow("Density (g/cm³)" if kind == "physical" else "Colour (#RRGGBB)", self.new_value)
+        form.addRow("Density (g/cm³)" if kind == "physical" else "Colour", self.new_value)
+        self.wheel = None
+        if kind != "physical":
+            # (library-2) the colour is picked on the look editor's colour wheel; a code
+            # (#3a7bd5) can still be typed by who has one
+            self._build_colour(form)
         self.based_on = QtWidgets.QLabel("")
         if kind == "physical":
             form.addRow("Based on", self.based_on)
@@ -168,6 +173,76 @@ class _Tab(QtWidgets.QWidget):
         self.new_box.setVisible(False)
         right.addWidget(self.new_box)
         outer.addLayout(right, 1)
+
+    # -- New Appearance: the colour ---------------------------------------------------------
+    START_COLOUR = "#3a7bd5"
+
+    def _build_colour(self, form):
+        from . import appearance_edit_ui
+
+        self._colour_busy = False
+        self.new_colour = QtGui.QColor(self.START_COLOUR)
+        self.new_value.setPlaceholderText("pick it on the wheel, or type a code: #3a7bd5")
+        self.wheel = appearance_edit_ui.ColourWheel()
+        self.wheel.picked.connect(
+            lambda hue, sat: self.browser.guarded(lambda: self._wheel_picked(hue, sat))
+        )
+        self.brightness = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.brightness.setObjectName("Fission180MaterialNewBrightness")
+        self.brightness.setRange(0, 100)
+        self.brightness.setToolTip("Brightness")
+        self.brightness.valueChanged.connect(
+            lambda *_: self.browser.guarded(self._brightness_changed)
+        )
+        self.new_swatch = QtWidgets.QLabel()
+        self.new_swatch.setObjectName("Fission180MaterialNewSwatch")
+        self.new_swatch.setFixedSize(44, 44)
+        side = QtWidgets.QVBoxLayout()
+        side.addWidget(self.new_swatch)
+        side.addWidget(self.brightness)
+        side.addStretch(1)
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(self.wheel)
+        row.addLayout(side, 1)
+        form.addRow(row)
+        self.new_value.textChanged.connect(lambda *_: self.browser.guarded(self._code_typed))
+        self._show_colour(self.new_colour, write=False)
+
+    def _show_colour(self, color, write=True):
+        """The colour of the appearance being made: on the wheel, the slider, the swatch,
+        and (write) as its code in the Colour box."""
+        self._colour_busy = True
+        try:
+            self.new_colour = QtGui.QColor(color)
+            hue = color.hueF()
+            self.wheel.set_hsv(hue if hue >= 0 else self.wheel.hue, color.saturationF(), 1.0)
+            self.brightness.setValue(int(round(color.valueF() * 100)))
+            self.new_swatch.setStyleSheet(
+                "background: %s; border: 1px solid #55657a;" % color.name()
+            )
+            self.new_swatch.setToolTip(color.name())
+            if write:
+                self.new_value.setText(color.name())
+        finally:
+            self._colour_busy = False
+
+    def _wheel_picked(self, hue, saturation):
+        value = max(0.0, min(1.0, self.brightness.value() / 100.0))
+        self._show_colour(QtGui.QColor.fromHsvF(hue, saturation, value))
+
+    def _brightness_changed(self):
+        if self._colour_busy:
+            return
+        value = max(0.0, min(1.0, self.brightness.value() / 100.0))
+        self._show_colour(QtGui.QColor.fromHsvF(self.wheel.hue, self.wheel.saturation, value))
+
+    def _code_typed(self):
+        if self._colour_busy:
+            return
+        text = self.new_value.text().strip()
+        color = QtGui.QColor(text) if text.startswith("#") and len(text) in (4, 7) else None
+        if color is not None and color.isValid():
+            self._show_colour(color, write=False)
 
     # -- filling ----------------------------------------------------------------------------
     def _entries(self):
@@ -376,7 +451,9 @@ class _Tab(QtWidgets.QWidget):
             key = material.create_user_material(self.new_name.text(), base, self.new_value.text())
             label = material.entry(key)["label"]
         else:
-            look = add_look(self.new_name.text(), self.new_value.text())
+            # the code typed, else the colour picked on the wheel
+            code = self.new_value.text().strip() or self.new_colour.name()
+            look = add_look(self.new_name.text(), code)
             key, label = look["key"], look["label"]
         self.new_name.clear()
         self.new_value.clear()

@@ -493,25 +493,38 @@ def _pick_json(pick):
     }
 
 
-def _pick_from(doc, data):
+def _pick_from(doc, data, own_hole=None):
+    """(object, sub, point) of a stored place. `own_hole`: the name of the Hole step made
+    with the part there: when that hole was moved since (its dialog, its sketch), the place
+    is where the hole is now, so an edit of the part does not put the hole back."""
     data = data or {}
     obj = doc.getObject(data.get("object") or "")
     if obj is None:
         return None
     point = data.get("point")
-    return obj, data.get("sub", ""), App.Vector(*point) if point else None
+    point = App.Vector(*point) if point else None
+    made = _named(doc, own_hole, hole.is_hole) if own_hole else None
+    if made is not None and point is not None:
+        try:
+            now = hole.centres(made)
+            if len(now) == 1 and (now[0][0] - point).Length > 1e-6:
+                point = App.Vector(now[0][0])
+        except Exception as exc:
+            log("hardware: where its hole is now could not be read (%s)" % exc)
+    return obj, data.get("sub", ""), point
 
 
 def pick_of(feature):
     """(object, sub, point) where the part was placed, or None (at the origin, or the object
     is gone)."""
-    return _pick_from(feature.Document, load_meta(feature).get("pick"))
+    meta = load_meta(feature)
+    return _pick_from(feature.Document, meta.get("pick"), meta.get("hole"))
 
 
 def more_of(feature):
     """[(object, sub, point)] of the further places of the part (its occurrences)."""
     doc = feature.Document
-    found = [_pick_from(doc, m) for m in load_meta(feature).get("more", [])]
+    found = [_pick_from(doc, m, m.get("hole")) for m in load_meta(feature).get("more", [])]
     return [p for p in found if p is not None]
 
 

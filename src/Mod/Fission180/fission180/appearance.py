@@ -828,7 +828,8 @@ def adopt_default(doc):
                 if vobj is None or "ShapeAppearance" not in vobj.PropertiesList:
                     continue
                 if _is_old_grey(vobj):
-                    _write(vobj, [base])
+                    # (as see-through as it was: Opacity Control's value is in the view)
+                    _write(vobj, [_cleared(base, list(vobj.ShapeAppearance)[0].Transparency)])
                     changed += 1
         except Exception:
             continue

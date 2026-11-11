@@ -111,7 +111,9 @@ computer where one is missing gets it made again.
 - Relief (bump), roughness maps, cut-outs, image files as textures, reflections: rendering.
 - The look editor cannot load a picture as a pattern (the patterns are the built-in ones).
 - Editing a material of your own in place (make another copy), and values other than the
-  density on a copy.
+  density on a copy. (Manage Materials > New Appearance picks its colour on the look
+  editor's colour wheel with a brightness slider since 2026-11-11; a code can still be
+  typed.)
 - (Built 2026-11-11, library-2: the swatch marks in the browser and the timeline, Cycle
   Component Color, Part Number / Part Name / Description, the default look on new bodies.)
 - Cycle Component Color for the design's own row (the top component keeps the first colour).

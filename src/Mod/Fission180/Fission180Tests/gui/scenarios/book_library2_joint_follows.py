@@ -21,6 +21,8 @@ E  Save, close, reopen. The dimension back to 30 (by script: the reopened design
 F  A screw whose own hole is made with it (a click on the flat face, Make the hole too): its
    joint is on that hole's edge; the Hole step moved (by script, as its dialog would):
    the screw goes with it.
+G  That screw's Hardware step edited (Length 16 mm, OK): the hole stays where it was moved
+   to, and the screw with it (the step's place follows its own hole).
 """
 
 import os
@@ -385,6 +387,42 @@ def f_followed():
     h.check("satisfied", not joints.broken_joints(bh.doc()))
     h.check("nothing lost", not joints.lost_joints(bh.doc()))
     h.shot("F-own-hole-moved")
+    S["own_now"] = now
+    s.timeline_double_click(S["own"])
+
+
+f_followed.done = bh.is_open
+f_followed.done_what = "the Hardware dialog opens on the screw with its own hole"
+
+
+# -- G --------------------------------------------------------------------------------------------
+def g_edit():
+    p = bh.panel()
+    h.check("editing the screw whose hole was moved", p is not None and p.editing)
+    at = bh.axis_of(bh.hw().component_of(S["own"]))[:2]
+    h.check("opening the dialog does not put it back", bh.near(at, S["own_now"], 1e-3), at)
+    h.check("Length 16 mm", ui.choose(p.length, "16 mm"))
+
+
+def g_ok():
+    h.settle("the part to follow")
+    h.task_button("OK")
+
+
+def g_kept():
+    from fission180 import hole, joints
+
+    bh.no_dialog("OK")
+    at = bh.axis_of(bh.hw().component_of(S["own"]))[:2]
+    h.check(
+        "after the edit the screw is where the hole was moved to",
+        bh.near(at, S["own_now"], 1e-3),
+        at,
+    )
+    own = bh.hw().holes_of(S["own"])[0]
+    centre = hole.centres(own)[0][0]
+    h.check("and so is its hole", bh.near((centre.x, centre.y), S["own_now"], 1e-3), centre)
+    h.check("satisfied", not joints.broken_joints(bh.doc()))
 
 
 h.run(
@@ -419,6 +457,9 @@ h.run(
         f_made,
         f_joint,
         f_followed,
+        g_edit,
+        g_ok,
+        g_kept,
     ],
     paced_by="state",
 )
