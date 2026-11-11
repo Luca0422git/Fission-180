@@ -34,8 +34,8 @@ The second direction, tried and taken back: advancing to the second Direction bo
 first pick (as Fusion's single Axes field does) made `patterns_qa_paths` fail (P4: OK pressed
 by Enter while the second box, with its origin axes drawn, was still the active one; Ctrl+Z
 then took back more than the pattern and Ctrl+Y did not bring it back: reproduced twice,
-gone with the change undone). The cause is in the pattern dialog's handling of the axis
-overlay at finish; left to the modify builder with this evidence.
+gone with the change undone). The cause was not found (the arrow click before OK left the
+directions as they were); left to the modify builder with this evidence.
 
 Not hitches, but facts a replay has to know:
 
