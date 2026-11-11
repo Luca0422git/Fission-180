@@ -87,7 +87,7 @@ WORKSPACES [in=workspace]
   Render [out=rendering is out of scope]
   Animation [out=animation is out of scope]
   Simulation
-  Manufacture [out=CAM is out of scope]
+  Manufacture
   Drawing
     From Design
 
@@ -868,3 +868,40 @@ NAVIGATION BAR [in=nav]
   Viewports
     Single View
     Multiple Views
+
+# MANUFACTURE workspace, MILLING tab (wave 7, builder cam; docs/fission180/parity/manufacture.md).
+# INSPECT and SELECT are as in DESIGN (listed once, under SOLID). The TURNING, ADDITIVE,
+# INSPECTION and FABRICATION tabs and MULTI-AXIS are out: FreeCAD has no engine for them.
+MANUFACTURE MILLING [in=tab:cam_milling]
+  SETUP
+    New Setup
+  2D
+    2D Adaptive Clearing
+    2D Pocket
+    Face
+    2D Contour
+    Slot
+    Trace
+    Thread
+    Bore
+    Circular
+    Engrave
+    2D Chamfer
+  3D
+    Adaptive Clearing
+    Pocket Clearing
+    Parallel
+    Contour
+    Scallop [out=FreeCAD's CAM engine has no such strategy]
+    Pencil [out=FreeCAD's CAM engine has no such strategy]
+    Spiral [out=FreeCAD's CAM engine has no such strategy]
+    Radial [out=FreeCAD's CAM engine has no such strategy]
+  DRILLING
+    Drill
+  ACTIONS
+    Generate
+    Simulate
+    Post Process
+    Setup Sheet
+  MANAGE
+    Tool Library

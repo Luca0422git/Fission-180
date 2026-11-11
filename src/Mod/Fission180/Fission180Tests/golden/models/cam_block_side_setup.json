@@ -1,0 +1,105 @@
+{
+  "id": "cam_block_side_setup",
+  "title": "Manufacture: a block machined from its side (Z axis picked on a side face, X on an edge), Face and 2D Contour, then the stock changed: needs regenerating",
+  "tags": [
+    "manufacture",
+    "cam"
+  ],
+  "steps": [
+    {
+      "op": "sf_primitive",
+      "id": "b1",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 60,
+      "width": 40,
+      "height": 20,
+      "operation": "new_body"
+    },
+    {
+      "op": "cam_setup",
+      "id": "s1",
+      "stock": {"mode": "relative", "offset_mode": "sides_top_bottom", "side": 1, "top": 1, "bottom": 0},
+      "wcs": {
+        "orientation": "z_x",
+        "z": {"face": {"normal": [0, 1, 0]}},
+        "x": {"edge": {"type": "line", "parallel": [1, 0, 0], "at": [{"axis": "y", "value": "max"}, {"axis": "z", "value": "max"}]}},
+        "origin": "stock_point",
+        "box_point": [-1, -1, 1]
+      }
+    },
+    {
+      "op": "cam_expect",
+      "target": "s1",
+      "stock": [0, 0, -41, 62, 22, 0],
+      "model": [1, 1, -41, 61, 21, -1],
+      "origin": [-1, 41, 21],
+      "comment": "Z of the setup is the design's +Y, X the design's +X, so its Y is the design's -Z: the block is 60 x 20 x 40 as the machine sees it; the origin on the stock's top (design y = 41) at its -X -Y corner (design x = -1, z = 21)"
+    },
+    {
+      "op": "cam_operation",
+      "id": "face",
+      "setup": "s1",
+      "kind": "face",
+      "tool": {"type": "flat", "diameter": 10, "number": 1}
+    },
+    {
+      "op": "cam_expect",
+      "target": "face",
+      "state": "valid",
+      "bounds": [5, 5, -1, 57, 17, 15],
+      "min_z": -1,
+      "comment": "the 10 mm tool's centre 5 mm inside the 62 x 22 stock, one pass at the block's side face (Z -1)"
+    },
+    {
+      "op": "cam_operation",
+      "id": "contour",
+      "setup": "s1",
+      "kind": "contour2d",
+      "faces": {"normal": [0, -1, 0], "count": 1},
+      "tool": {"type": "flat", "diameter": 6, "number": 2},
+      "options": {"linking": {"lead_in": false, "lead_out": false}}
+    },
+    {
+      "op": "cam_expect",
+      "target": "contour",
+      "state": "valid",
+      "bounds": [-2, -2, -41, 64, 24, 15],
+      "min_z": -41,
+      "cut_length": 224.85,
+      "comment": "around the 60 x 20 outline 3 mm out with rounded corners: 2 x (60 + 20) + 2 pi x 3 = 178.85 mm at the far face (Z -41), plus the 46 mm plunge from the feed height (Z 5)"
+    },
+    {
+      "op": "cam_edit",
+      "target": "s1",
+      "stock": {"side": 3}
+    },
+    {
+      "op": "cam_expect",
+      "target": "s1",
+      "stock": [0, 0, -41, 66, 26, 0],
+      "stale_after": true,
+      "comment": "more stock on the sides: both toolpaths were made for the old stock and need regenerating"
+    },
+    {
+      "op": "cam_generate",
+      "setup": "s1"
+    },
+    {
+      "op": "cam_expect",
+      "target": "face",
+      "state": "valid",
+      "bounds": [5, 5, -1, 61, 21, 15]
+    }
+  ],
+  "expect": {
+    "volume": 48000,
+    "bbox": [0, 0, 0, 60, 40, 20],
+    "abs_tol": 0.001,
+    "solids": 1,
+    "source": "analytic",
+    "note": "The design is not changed by the setup or its operations: 60 x 40 x 20. The toolpaths' numbers are in the cam_expect steps, in the setup's own coordinates (turned 90 degrees from the design's)."
+  }
+}

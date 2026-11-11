@@ -1768,6 +1768,17 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
         # Each scenario starts in a fresh FreeCAD profile (run_tests.sh), so the choices
         # Fission 180 remembers between sessions (selection mode, display style, preferences,
         # keys, pins) are the defaults already: no reset needed for them.
+        try:
+            # (wave 7) Fusion grounds the first component of each level by itself
+            # ("First component Ground to Parent", on by default; components_ui.ground_first).
+            # The scenarios written before it move, drag and joint their first component
+            # as a free one: they run with the preference off, as a person who unticked it.
+            # book_components_new turns it on and tests it.
+            from fission180 import prefs_core
+
+            App.ParamGet(prefs_core.PREFS).SetBool("FirstComponentGrounded", False)
+        except Exception as exc:
+            print("[Fission 180] first-component ground reset failed: %s" % exc, flush=True)
         try:  # the first-start welcome line on Home shows once per profile: a fresh profile
             # would show it in every scenario (the welcome_line scenario asks for it)
             from fission180 import home_notices_ui

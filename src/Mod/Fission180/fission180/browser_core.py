@@ -463,7 +463,11 @@ def build(
     children = [settings, _node("views", "Named Views", "folder", "views", children=named)]
     children += folders
     children += components  # Fusion lists the components after the root's own folders
-    root = _node("document", doc_label, "document", "document", children=children)
+    # (wave 7) a design that holds components is an assembly: Fusion's stacked icon
+    root = _node(
+        "document", doc_label, "assembly" if components else "document", "document",
+        children=children,
+    )
     root["active"] = active_component is None  # the root component's activate mark
     if root["active"] and components:
         root["tip"] = "Active component (root): new sketches and bodies go here"
@@ -601,9 +605,13 @@ MENUS = {
         "-",
         "Ground",
         "-",
+        "Move/Copy",  # (wave 7: Fusion's component menu has it; Move opens on the component)
         "Copy",
         "Paste",
         "Paste New",
+        "-",
+        "Create Drawing",  # (wave 7: the DRAWING workspace's Create Drawing)
+        "Properties",  # (wave 7: shown when the Properties command exists)
         "-",
         "Show/Hide",
         "Selectable/Unselectable",
