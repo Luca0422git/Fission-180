@@ -1931,6 +1931,12 @@ class ExtrudePanel(
             self.picker.show_faces(faces)
 
     def _profiles_changed(self):
+        if not self.editing:
+            # A sketch on the Front plane used for the first time: plus is away from the
+            # front from now on, like Fusion's (extrude.adopt_fusion_side).
+            for obj in {id(o): o for o, _sub in self.profiles}.values():
+                if extrude.adopt_fusion_side(obj, lead=self.target):
+                    log("extrude: %s goes Fusion's way on the Front plane" % obj.Label)
         self._refresh_profiles()
         if not self.profiles:
             if not self.editing:
