@@ -137,6 +137,17 @@ models: 644 pass, 2 expected failures (as on develop).
    them. (`direct_components` first failed there for another reason: it aligned its first,
    grounded component; it ungrounds it in the browser now, like `modify_align`.)
 
+5. After the merge the unit suite failed `test_vex_qa_freecad` (parts_list_assembly_twice:
+   an assembly inserted twice listed its parts once each plus "Case001" ...): the holder
+   components of Part 3 item 1 were counted as parts of their own. (The plain `python3 -m
+   unittest` run skips the FreeCAD-backed tests: `run_tests.sh --only unit` must be used.)
+   Fix: one predicate, `components.is_holder`, and `components.stands_for` (the part a
+   component is the same part as); the parts list and balloons count a body in a holder as
+   the component it stands for; a holder is no part for joints (the copy moves as one), no
+   parent for a new component, no source for a pattern. The table of who sees what is in
+   the parity doc, Part 4. `joints2_nested` dragged its first, grounded component: it
+   ungrounds it in the browser first.
+
 ## FreeCAD facts and traps (1.1.4)
 
 - `view.setActiveObject("pdbody", body)` does not touch the "part" slot; Fission 180's
