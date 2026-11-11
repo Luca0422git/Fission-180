@@ -168,3 +168,11 @@ that run out on the pipe; the classes of a pipe thread (G A / B) are not modeled
 modeled thread still has one B-spline face per turn and flank (Fusion: 4 faces), so Offset
 Face / Press Pull on a modeled thread stays refused ("Work in progress on complex shapes" is
 FreeCAD's own Thickness limit): use the Class to loosen a thread.
+
+## Wave 7, second builder (branch `sf/book-modify-b`, 2026-11-11)
+
+| What | Fusion (source) | Fission 180 now |
+|---|---|---|
+| Offset Face / Press Pull on a modeled thread (the Geocache: -0.25 mm so the printed thread turns freely) | The thread's faces are picked and offset (**Book**: the report quoting the book's step) | A click on any face of the thread takes the Thread step: its faces all move together by the distance (`FaceOffset`: the crest and the root along the radius, the flanks apart), and it stays one step. The kernel cannot offset the swept faces one by one. Too far either way is refused with the reason in the dialog. `book_modifyb_thread_offset` (22 checks), golden `book_thread_face_offset` |
+| The modeled thread's faces | 4 (two flanks, crest, root) (**Book**: the report) | Still one flank / root face per turn (19 on the Geocache's M33 x 16, 41 on 40 mm). Measured: a groove swept along ONE helix edge for the whole length, or its one-turn faces joined into one B-spline face per flank, gives Fusion's count (6 faces with the two ends), but OpenCASCADE's booleans then misjudge what is inside: of 12 cuts with such a tool 5 were wrong (nothing cut, or everything), and the single-edge sweep's volume is 2 % off on 32 turns. Not built: robustness comes first. Next step if wanted: merge the per-turn faces after the cut by face surgery (no boolean) |
+
