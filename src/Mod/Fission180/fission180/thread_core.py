@@ -95,6 +95,69 @@ def groove(major_radius, pitch, internal, form="iso"):
     ]
 
 
+def moved_groove(corners, distance):
+    """The groove (groove(): a closed, counter-clockwise polygon in r-z) with every side
+    moved `distance` out of the groove, square to itself (negative: into it). Offset Face on a
+    modeled thread moves the thread's faces: the faces of the groove are the flanks and the
+    root, so the groove grows by what the thread's faces move into the material. Raises
+    ValueError when the groove closes up (its root's width is used up)."""
+    count = len(corners)
+    lines = []  # (point on the moved side, its direction)
+    for i in range(count):
+        (r0, z0), (r1, z1) = corners[i], corners[(i + 1) % count]
+        dr, dz = r1 - r0, z1 - z0
+        length = math.hypot(dr, dz)
+        if length < 1e-12:
+            raise ValueError("a side of the groove has no length")
+        # counter-clockwise: the outside is to the right of the direction of travel
+        nr, nz = dz / length, -dr / length
+        lines.append(((r0 + nr * distance, z0 + nz * distance), (dr, dz)))
+    moved = []
+    for i in range(count):
+        (p, d), (q, e) = lines[i - 1], lines[i]
+        cross = d[0] * e[1] - d[1] * e[0]
+        if abs(cross) < 1e-12:
+            raise ValueError("two sides of the groove are parallel")
+        t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / cross
+        moved.append((p[0] + d[0] * t, p[1] + d[1] * t))
+    for i in range(count):  # every side still runs the way it did
+        (r0, z0), (r1, z1) = corners[i], corners[(i + 1) % count]
+        (m0, w0), (m1, w1) = moved[i], moved[(i + 1) % count]
+        if (r1 - r0) * (m1 - m0) + (z1 - z0) * (w1 - w0) <= 1e-12:
+            raise ValueError("the groove closes up")
+    return moved
+
+
+def fitted_groove(corners, pitch, crest):
+    """The groove (after moved_groove()) with its open side put where it has to be: a little
+    past the thread's crest (the cylinder of radius `crest` the grooves are cut into), along
+    its flanks, so that the groove breaks through the crest; but never where it is a pitch
+    wide: wider, neighbouring turns of the swept groove would run into each other. Raises
+    ValueError when the grooves would meet on the crest or before it: nothing is left
+    between them."""
+    (r_in, z_in), (r_out, z_out) = corners[0], corners[1]
+    half_in, half_out = abs(z_in), abs(z_out)
+    if abs(half_out - half_in) < 1e-12 or abs(r_out - r_in) < 1e-12:
+        raise ValueError("the groove's flanks do not open")
+    slope = (half_out - half_in) / (r_out - r_in)  # half width gained per radius
+    limit = 0.499 * pitch
+    over = fundamental_height(pitch) / 16.0
+
+    def half(r):
+        return half_in + (r - r_in) * slope
+
+    r_cap = r_in + (limit - half_in) / slope  # where it is `limit` wide to each side
+    if slope > 0:  # opens outwards (a shaft's thread)
+        r_open = min(crest + over, r_cap)
+        if r_open <= crest + 1e-6 or r_open <= r_in:
+            raise ValueError("the grooves meet")
+        return [corners[0], (r_open, -half(r_open)), (r_open, half(r_open)), corners[3]]
+    r_open = max(crest - over, r_cap)  # opens towards the axis (a hole's thread)
+    if r_open >= crest - 1e-6 or r_open >= r_out:
+        raise ValueError("the grooves meet")
+    return [(r_open, -half(r_open)), corners[1], corners[2], (r_open, half(r_open))]
+
+
 def groove_width(major_radius, pitch, internal, radius, form="iso"):
     """w(r): the groove's width along the axis at `radius` (0 outside the groove)."""
     corners = groove(major_radius, pitch, internal, form)

@@ -145,6 +145,18 @@ def _option(
     }
 
 
+LANGUAGES = ["English"]  # the languages Fission 180's own words exist in
+
+
+def languages(current=None):
+    """What User Language lists: Fission 180's languages, and the one FreeCAD runs in now
+    when that is another (chosen in FreeCAD itself), so a person can go back to English."""
+    names = list(LANGUAGES)
+    if current and current not in names:
+        names.append(current)
+    return names
+
+
 OPTIONS = [
     # -- General ----------------------------------------------------------------------------
     _option(
@@ -155,7 +167,8 @@ OPTIONS = [
         None,
         (GENERAL, "String", "Language"),
         group="Language",
-        tip="The language of FreeCAD's own windows; Fission 180's own words stay English.",
+        tip="Fission 180 is in English. (FreeCAD's own windows, under UTILITIES > FreeCAD "
+        "Tools, have more languages in FreeCAD's own Preferences.)",
         restart=True,
     ),
     _option(
@@ -362,12 +375,13 @@ OPTIONS = [
     ),
     _option(
         "orientation",
-        "design",
+        # (wave 7) on General, where Fusion has it (it was on General > Design)
+        "general",
         "Default modeling orientation",
         "choice",
         "z",
         (PREFS, "String", "ModelingOrientation"),
-        group="General",
+        group="Modeling",
         choices=[
             ("z", "Z up", True, ""),
             ("y", "Y up", False, "Fission 180's views, ViewCube and sketches are made for Z up."),
@@ -426,6 +440,31 @@ OPTIONS = [
         tip="A new sketch on a flat face of the part gets the face's edges as projected "
         "(purple) curves, so the shapes you draw against them make profiles. Delete them "
         "in the sketch if you do not want them: they stay deleted.",
+    ),
+    _option(
+        "sketch_project_on_reference",
+        "design",
+        "Auto project edges on reference",
+        "bool",
+        True,
+        (INFERENCE, "Bool", "ProjectOnReference"),
+        group="Sketch",
+        tip="While you draw, constrain or dimension in a sketch, a click on an edge or "
+        "corner of the model (also of another body or component) projects it into the "
+        "sketch as a purple curve and snaps to it. Off: only what you project with "
+        "Project (P) can be snapped to.",
+    ),
+    _option(
+        "sketch_scale_first_dimension",
+        "design",
+        "Scale entire sketch at first dimension",
+        "bool",
+        True,
+        (INFERENCE, "Bool", "ScaleAtFirstDimension"),
+        group="Sketch",
+        tip="The value typed into the first dimension you place in a sketch scales "
+        "everything drawn in it by the same factor, so a shape drawn by eye keeps its "
+        "proportions. Not when something in the sketch is fixed or projected.",
     ),
     # -- General > API ----------------------------------------------------------------------
     _option(

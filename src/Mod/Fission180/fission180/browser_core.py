@@ -573,6 +573,34 @@ def path_to(tree, key, _path=None):
 
 # What the right-click menu offers per kind of node, in Fusion's order. The UI
 # leaves out entries that do not apply (e.g. no Delete for an origin plane).
+# What a row's menu keeps while a command's dialog is open: only what changes what is seen
+# or what can be picked, never the design, the selection or the command (wave 7).
+WHILE_COMMAND = (
+    "Show/Hide",
+    "Selectable/Unselectable",
+    "Opacity Control",
+    "Find in Window",
+    "Show All Bodies",
+    "Show All Sketches",
+    "Hide All Sketches",
+)
+
+
+def while_command(entries):
+    """The entries of a row's menu that stay while a command's dialog is open, in their
+    order, without separators left at an end or doubled."""
+    kept = []
+    for entry in entries:
+        if entry == "-":
+            if kept and kept[-1] != "-":
+                kept.append(entry)
+        elif entry in WHILE_COMMAND:
+            kept.append(entry)
+    while kept and kept[-1] == "-":
+        kept.pop()
+    return kept
+
+
 MENUS = {
     "document": [
         "Activate",

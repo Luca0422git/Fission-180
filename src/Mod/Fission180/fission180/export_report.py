@@ -376,6 +376,10 @@ def _parameter_count(doc, steps=None):
         own = parameters.own_names(doc)
         if steps is None or not own:
             return len(own)
+        # (wave 7) formulas name a parameter by the property FreeCAD keeps it in, which is
+        # not always its name (W, H, T... read as units are kept as F180_W: parameters_core):
+        # counted by display name, a design with such a parameter came out one short
+        own = [parameters.core.prop_name(name) for name in own]
         container = parameters.container(doc)
         holder = parameters.core.CONTAINER
         reference = re.compile(

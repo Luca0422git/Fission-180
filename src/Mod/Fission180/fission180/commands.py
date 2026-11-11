@@ -235,7 +235,15 @@ def _active(cmd):
 
 # Sketch commands that work with the running tool (FreeCAD's construction mode switches the
 # tool being drawn to construction lines)
-KEEPS_SKETCH_TOOL = ("Sketcher_ToggleConstruction", "Fission180_SketchToggleConstruction")
+KEEPS_SKETCH_TOOL = (
+    "Sketcher_ToggleConstruction",
+    "Fission180_SketchToggleConstruction",
+    # (wave 7, sketch-c) the right-click menu while a dimension is being placed: the
+    # running Sketch Dimension keeps its picks and turns the dimension
+    "Fission180_SketchDimensionAligned",
+    "Fission180_SketchDimensionHorizontal",
+    "Fission180_SketchDimensionVertical",
+)
 
 
 NOTHING_TO = {"Std_Undo": "Nothing to undo.", "Std_Redo": "Nothing to redo."}

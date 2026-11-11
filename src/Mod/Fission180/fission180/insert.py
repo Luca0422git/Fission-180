@@ -83,10 +83,14 @@ def unit_scale(unit):
 
 def design_unit(doc):
     """The Unit Type that matches the design's units ("Millimeter" for a mm design)."""
+    # (wave 7) read through browser_core.doc_length_unit: this called int() on the unit
+    # system's NAME ("Imperial decimal (in, lb)"), which always failed, so every design
+    # counted as millimetres and Insert Mesh started on Millimeter in an inch design too
+    # (found by the hardware builder)
     try:
         from . import browser_core
 
-        short = browser_core.unit_label(int(doc.UnitSystem))
+        short = browser_core.doc_length_unit(doc)
     except Exception:
         short = None
     return UNIT_BY_SHORT.get(short or "mm", "Millimeter")
@@ -513,8 +517,54 @@ def _temp_document():
     closing it leaves FreeCAD's active document pointing at the closed one in the GUI."""
     import FreeCAD as App
 
-    active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
-    return App.newDocument("Fission180Import", "import", True, True), active
+    design = App.ActiveDocument
+    active = design.Name if design is not None else None
+    scratch = App.newDocument("Fission180Import", "import", True, True)
+    same_units(scratch, design)
+    return scratch, active
+
+
+def same_units(scratch, design):
+    """A throw-away document takes the design's units as it is made. FreeCAD shows every
+    length in the units of the document it last touched: a hidden document left in
+    millimetres set an inch design's dialogs back to mm (book parity report, bug 2; the
+    design's own units are held by design_units either way)."""
+    try:
+        if design is not None and scratch is not None:
+            scratch.UnitSystem = design.UnitSystem
+    except Exception:
+        pass
+    try:  # (what restore_active_document compares with, see there)
+        import FreeCAD as App
+
+        _STEPS_BEFORE.append(App.getActiveTransaction())
+    except Exception:
+        pass
+
+
+_STEPS_BEFORE = []  # the open undo step when each throw-away document was made (a stack)
+
+
+def _close_scratch_step():
+    """FreeCAD's importers and exporters open undo steps of their own in the throw-away
+    document (importDXF: "DXF Post-processing") and leave them the application's open step
+    when that document is closed: the person's next change, in their design, was then filed
+    under that name and joined whatever came after (found by the test harness's undo check
+    on every DXF export, wave 7). A step that was not open before the throw-away document
+    was made, and still is after it is closed, is closed here; a dialog's own step, open
+    before, is left alone."""
+    if not _STEPS_BEFORE:
+        return
+    before = _STEPS_BEFORE.pop()
+    try:
+        import FreeCAD as App
+
+        now = App.getActiveTransaction()
+        if now and not before:
+            App.closeActiveTransaction(True)
+            log("closed the undo step a throw-away document left open (%s)" % now[0])
+    except Exception as exc:
+        warn("the throw-away document's undo step: %s" % exc)
 
 
 def _close_temp(doc, active):
@@ -531,6 +581,7 @@ def restore_active_document(name):
     """Make the design `name` the active document again (after a throw-away document)."""
     import FreeCAD as App
 
+    _close_scratch_step()
     if not name or name not in App.listDocuments():
         return
     try:
@@ -546,6 +597,52 @@ def restore_active_document(name):
                 Gui.getMainWindow().setActiveWindow(gdoc.ActiveView)
         except Exception:
             pass
+
+
+class _svg_question_off:
+    """FreeCAD's SVG importer asks, in a box of its own, whether a file "not produced by
+    Inkscape" counts 96 or 90 pixels per inch (book parity report: white text on white).
+    Fusion asks nothing: 96 per inch, the SVG standard's (and what this module's docs
+    promise). While the importer runs, the box it would show answers Yes without showing."""
+
+    class _Box:
+        Yes, No = 1, 0
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def __getattr__(self, _name):  # setText, setInformativeText, setStandardButtons...
+            return lambda *_args, **_kwargs: None
+
+        def exec_(self):
+            return self.Yes
+
+        exec = exec_
+
+    def __init__(self, module):
+        self.module = module
+        self.was = None
+
+    def __enter__(self):
+        real = getattr(self.module, "QtWidgets", None)
+        if real is None:
+            return self
+        self.was = real
+        box = self._Box
+
+        class _Widgets:
+            QMessageBox = box
+
+            def __getattr__(self, name):
+                return getattr(real, name)
+
+        self.module.QtWidgets = _Widgets()
+        return self
+
+    def __exit__(self, *exc):
+        if self.was is not None:
+            self.module.QtWidgets = self.was
+        return False
 
 
 class _dxf_dialog_off:
@@ -600,7 +697,8 @@ def read_curves(path, notes=None):
         if ext == ".svg":
             import importSVG
 
-            importSVG.insert(path, doc.Name)
+            with _svg_question_off(importSVG):
+                importSVG.insert(path, doc.Name)
             if notes is not None:
                 _svg_notes(path, notes)
         else:

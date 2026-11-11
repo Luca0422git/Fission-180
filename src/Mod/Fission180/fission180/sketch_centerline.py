@@ -12,13 +12,15 @@ FreeCAD's sketch knows normal and construction curves only. Here a centerline is
 line (so profiles close as before) whose geometry id is listed in a hidden property of the
 sketch (kept in the file), drawn dashed on FreeCAD's "discontinuous" visual layer.
 
-The diameter: FreeCAD's solver has no "twice the distance". A dimension placed between a
-point (or a line) and a centerline is replaced by a mirror image of that point across the
-centerline (a hidden construction point held by a Symmetric constraint) and a Distance
-between the point and its image: its value is the diameter, it is drawn across the
-centerline, and typing a value into it sets the diameter.
+The diameter: FreeCAD's solver has no "twice the distance". The Dimension tool
+(sketch_dimension_tool.py, the one dimension tool since wave 7's merge) puts a dimension
+between a point (or a line, a circle's centre) and a centerline as a Distance between that
+point and its mirror image across the centerline (a hidden construction point held by a
+Symmetric constraint: mirror_point): its value is the diameter, it is drawn across the
+centerline with the diameter sign (sketch_dimension_signs.py), and typing a value into it
+sets the diameter.
 
-No Qt here (the palette and the dimension hook are in sketch_palette.py / sketch_mode.py).
+No Qt here (the palette is sketch_palette.py).
 Every function works inside the caller's undo step.
 """
 
@@ -42,29 +44,24 @@ def mirror(point, a, b):
     return (2.0 * foot[0] - point[0], 2.0 * foot[1] - point[1])
 
 
-def diameter_plan(kind, first, first_pos, second, second_pos, centerlines):
-    """What a fresh dimension between something and a centerline becomes.
-
-    Returns ((geo, pos) of the point to mirror, centerline geo), or None when the
-    dimension is not a distance from a point or a line to a centerline. `centerlines`:
-    the geometry indices of the sketch's centerlines. A point-to-line Distance has the
-    point first and the line second (no point position); a line-to-line one names two
-    lines: the start of the one that is no centerline is mirrored."""
-    if kind != "Distance":
-        return None
+def diameter_dimensions(constraints, centerlines):
+    """The indices of the dimensions that are a DIAMETER about a centerline: a Distance
+    between a point and its mirror image across a centerline (the image is held by a
+    Symmetric constraint about that line). `constraints`: (Type, First, FirstPos, Second,
+    SecondPos, Third) of every constraint; `centerlines`: the centerlines' geometry
+    indices."""
     centerlines = set(centerlines)
-    if second in (NO_GEO, None) or first == second:
-        return None  # a line's length, a point-to-point distance on one curve
-    if first_pos != 0 and second_pos == 0 and second in centerlines:
-        return (first, first_pos), second
-    if first_pos == 0 and second_pos != 0 and first in centerlines:
-        return (second, second_pos), first
-    if first_pos == 0 and second_pos == 0:
-        if second in centerlines and first not in centerlines:
-            return (first, 1), second
-        if first in centerlines and second not in centerlines:
-            return (second, 1), first
-    return None
+    if not centerlines:
+        return []
+    mirrored = set()
+    for kind, first, first_pos, second, second_pos, third in constraints:
+        if kind == "Symmetric" and third in centerlines:
+            mirrored.add(frozenset(((first, first_pos), (second, second_pos))))
+    found = []
+    for i, (kind, first, first_pos, second, second_pos, _third) in enumerate(constraints):
+        if kind == "Distance" and frozenset(((first, first_pos), (second, second_pos))) in mirrored:
+            found.append(i)
+    return found
 
 
 # -- the sketch's centerlines -----------------------------------------------------------------
@@ -157,27 +154,17 @@ def set_centerline(sketch, geos, on):
 
 
 # -- the diameter dimension -------------------------------------------------------------------
-def diameter(sketch, index):
-    """The dimension constraint `index`, just placed, is the distance from a point or a
-    line to a centerline: replace it by the diameter (see the module's text). Returns the
-    new dimension's index, or None when it is no such dimension (nothing changed)."""
+def mirror_point(sketch, geo, pos, line):
+    """The hidden mirror image of sketch point (geo, pos) across centerline `line`: a
+    construction point held by a Symmetric constraint, neither drawn. The Dimension tool
+    (sketch_dimension_tool.py) puts the diameter between the point and this image.
+    Returns the image's geometry index, or None when the point is on the centerline."""
     import FreeCAD as App
     import Part
     import Sketcher
 
     from . import sketch_draw_helpers
 
-    centerlines = lines(sketch)
-    if not centerlines:
-        return None
-    constraints = sketch.Constraints
-    if index < 0 or index >= len(constraints):
-        return None
-    c = constraints[index]
-    plan = diameter_plan(c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, centerlines)
-    if plan is None:
-        return None
-    (geo, pos), line = plan
     point = sketch.getPoint(geo, pos)
     axis_line = sketch.Geometry[line]
     a = (axis_line.StartPoint.x, axis_line.StartPoint.y)
@@ -185,15 +172,27 @@ def diameter(sketch, index):
     image = mirror((point.x, point.y), a, b)
     distance = ((image[0] - point.x) ** 2 + (image[1] - point.y) ** 2) ** 0.5
     if distance < 1e-9:
-        return None  # the point is on the centerline: no diameter to speak of
-    sketch.delConstraint(index)
+        return None
     helper = sketch.addGeometry(Part.Point(App.Vector(image[0], image[1], 0)), True)
     symmetric = sketch.addConstraint(Sketcher.Constraint("Symmetric", geo, pos, helper, 1, line))
-    new = sketch.addConstraint(Sketcher.Constraint("Distance", geo, pos, helper, 1, distance))
     sketch_draw_helpers.hide_constraints(sketch, [symmetric])
     sketch_draw_helpers.hide_curves(sketch, [helper])
     log("sketch: a dimension to the centerline is the diameter (%.6g mm)" % distance)
-    return new
+    return helper
+
+
+def diameters(sketch):
+    """The indices of the sketch's dimensions that are a diameter about a centerline (the
+    value box and the drawing show them with the diameter sign)."""
+    found = lines(sketch)
+    if not found:
+        return []
+    triples = []
+    for c in sketch.Constraints:
+        triples.append(
+            (c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, getattr(c, "Third", NO_GEO))
+        )
+    return diameter_dimensions(triples, found)
 
 
 def revolve_axis(profiles):

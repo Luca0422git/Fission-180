@@ -91,9 +91,11 @@ Scenarios (real input): `book_sketch_b_constraints`, `book_sketch_b_constraints2
 
 ## Known gaps
 
-- A dimension to a centerline as a diameter (needs sketch-a's linetype).
+- A dimension to a centerline as a diameter: built by sketch-c after the merge (inside
+  Sketch Dimension, with the diameter sign; `parity/sketch.md`, "Wave 7, sketch-c").
 - Editing a made sketch pattern (Fusion: double-click its glyph).
-- Right-click Aligned / Horizontal / Vertical while placing a dimension.
+- Right-click Aligned / Horizontal / Vertical while placing a dimension: built by
+  sketch-c (`Dimension.force`).
 - Copies of splines, ellipses and conic curves in a pattern are not tied.
 - Deleting the ORIGINAL of a circular pattern leaves its copies loose as a group (their
   hidden spokes stay).

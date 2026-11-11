@@ -337,7 +337,9 @@ def p17_reopened():
         origin,
     )
     h.check("both bodies listed", len(t.children("Bodies") or []) == 2, t.children("Bodies"))
-    t.double_click_row(s["l1"])
+    # (wave 7) a double-click on a body's name renames it; on its icon it activates it
+    tree = t.tree()
+    w.double_click(tree.viewport(), tree.icon_point(tree.row(s["l1"])))
 
 
 def p17_active():

@@ -171,6 +171,7 @@ EXPORT_TYPES = [
     ("STL (ASCII)", ".stl", "stl_ascii"),
     ("3MF", ".3mf", "3mf"),
     ("OBJ", ".obj", "obj"),
+    ("USDZ", ".usdz", "usdz"),  # (wave 7) Fusion's File > Export > USDZ, for AR
     ("DXF", ".dxf", "dxf"),
     ("DWG", ".dwg", "dwg"),
 ]

@@ -51,15 +51,16 @@ FORMAT_NAMES = {
     "stl_ascii": "STL",
     "3mf": "3MF",
     "obj": "OBJ",
+    "usdz": "USDZ",
     "brep": "BREP",
     "dxf": "DXF",
     "dwg": "DWG",
     "drawing_pdf": "PDF",
     "drawing_dxf": "DXF",
 }
-SOLID_FORMATS = ("step", "iges", "stl", "stl_ascii", "3mf", "obj", "brep")
+SOLID_FORMATS = ("step", "iges", "stl", "stl_ascii", "3mf", "obj", "usdz", "brep")
 EXACT_FORMATS = ("step", "iges", "brep")  # exact solids only (no mesh bodies)
-MESH_FORMATS = ("stl", "stl_ascii", "3mf", "obj")
+MESH_FORMATS = ("stl", "stl_ascii", "3mf", "obj", "usdz")
 FLAT_FORMATS = ("dxf", "dwg")
 DRAWING_FORMATS = ("drawing_pdf", "drawing_dxf")
 _ALIASES = {
@@ -355,6 +356,8 @@ def items(fmt, facts, purpose="file"):
             )
         looks = _n(facts, "looks")
         colours_kept = fmt == "step" and bool(facts.get("colours_written"))
+        if fmt == "usdz":
+            looks = 0  # USDZ keeps each body's colour and how see-through it is
         if looks and not colours_kept:
             reason = (
                 "FreeCAD writes STEP colours only with the window open"

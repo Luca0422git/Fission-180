@@ -77,6 +77,13 @@ def main(argv):
                 step = c.get("step") or "?"
                 print("  FAIL %s [%s]: %s %s" % (result["name"], step, c["name"], c["detail"][:600]))
                 failures.append((step, c["name"], c["detail"]))
+        for note in result.get("notes") or []:
+            # what the harness saw and did not count as a failure (an undo step left open
+            # after a step, a dialog that is not Fission 180's: harness.STRICT)
+            print(
+                "  NOTE %s [%s]: %s: %s"
+                % (result["name"], note.get("step") or "?", note.get("kind"), note.get("text"))
+            )
         if result.get("stopped"):
             not_run = result.get("not_run") or []
             print(

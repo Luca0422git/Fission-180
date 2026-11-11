@@ -215,7 +215,9 @@ def go_home(view, doc):
 
     def finish():
         if home["fit"]:
-            view.fitAll()
+            from . import view_fit
+
+            view_fit.fit(view)  # (wave 7: an empty design shows the origin in the middle)
         else:
             view.setCamera(_camera_like(view, home["camera"]))
 

@@ -181,6 +181,191 @@ def expect_no_errors(where):
     return check("No errors after %s" % where, not fresh, fresh)
 
 
+# -- undo steps left open, dialogs of FreeCAD's own ------------------------------------
+# Two things a person meets as lost work or as "FreeCAD showing through", looked for after
+# every step of every scenario, like the Report view's errors (book parity report, bug 11
+# and friction pattern 6):
+#  - an undo step (a transaction) still open or pending although no dialog is open: the next
+#    command's changes join it, and one Ctrl+Z or a later Cancel takes both away;
+#  - a dialog that is not Fission 180's: one of FreeCAD's own classes (Document Recovery,
+#    FreeCAD's Preferences), or a plain Qt question shown by code that is not Fission 180's
+#    (the SVG importer's "not produced by Inkscape", the sketcher's "Constraint Substitution").
+# A step that means either says so:  step.open_undo_step = True  /  step.native_dialogs = True
+# (FreeCAD Tools opening FreeCAD's own windows on purpose). STRICT says what a finding does:
+# True fails the scenario, False prints a line "[Fission 180] <scenario>: note: ..." and lists
+# it in the result file under "notes" (run_tests.sh prints them as "NOTE ..." lines).
+#
+# Dialogs: strict for every scenario. Undo steps: a note by default, for now. The check found
+# real leftovers in areas whose scenarios are not this builder's to change (Create Sketch on
+# an empty design, cancelled: "Add a Body" stays the open step; see the shell's session log),
+# so the older scenarios report them and the scenarios written with the check
+# (book_shell_*) set STRICT["undo"] = True. FISSION180_STRICT_UNDO=1 makes it a failure
+# everywhere: the goal once the list is empty.
+STRICT = {
+    "undo": os.environ.get("FISSION180_STRICT_UNDO", "0") == "1",
+    "dialogs": os.environ.get("FISSION180_STRICT_DIALOGS", "1") != "0",
+}
+notes = []
+_dialogs_seen = []
+# words in the source of a function that shows a dialog of its own
+_SHOWS_A_DIALOG = re.compile(
+    r"QMessageBox|QInputDialog|QFileDialog|QColorDialog|QProgressDialog|QDialog|QFontDialog"
+    r"|\.exec_?\(|\.open\(|\.show\(|\.setVisible\("
+)
+_shows_cache = {}
+
+
+def note(kind, text):
+    """A finding that does not fail the scenario (STRICT off for its kind): printed, and
+    kept in the result file."""
+    notes.append({"kind": kind, "step": state.get("step"), "text": str(text)[:1000]})
+    print("[Fission 180] %s: note: %s: %s" % (state["name"], kind, str(text)[:600]), flush=True)
+
+
+def _frame_shows_dialogs(code):
+    key = (code.co_filename, code.co_firstlineno)
+    if key not in _shows_cache:
+        try:
+            import inspect
+
+            source = inspect.getsource(code)
+        except Exception:
+            source = ""
+        _shows_cache[key] = bool(_SHOWS_A_DIALOG.search(source))
+    return _shows_cache[key]
+
+
+def dialog_origin(widget):
+    """Whose dialog this is: "" for Fission 180's own (a class of its package, or a plain Qt
+    box shown by a Fission 180 function that shows dialogs), else words for the failure:
+    FreeCAD's class, or the file whose code put it up."""
+    import sys
+
+    try:
+        cls = widget.metaObject().className()
+    except Exception:
+        return ""
+    if "::" in cls:
+        return "FreeCAD's %s" % cls
+    module = type(widget).__module__ or ""
+    if module.startswith(("fission180", "Fission180Tests")):
+        return ""
+    here = os.path.normcase(os.path.abspath(__file__))
+    frame = sys._getframe(1)
+    while frame is not None:
+        path = os.path.normcase(os.path.abspath(frame.f_code.co_filename))
+        if path != here:
+            break
+        frame = frame.f_back
+    if frame is None:
+        return "FreeCAD's own code (no Python code showed it)"
+    path = frame.f_code.co_filename.replace("\\", "/")
+    where = "%s: %s" % (os.path.basename(path), frame.f_code.co_name)
+    if "/Fission180Tests/" in path:
+        # the scenario's input ran FreeCAD's C++ straight away (a native command's box),
+        # unless the scenario itself puts a box up
+        own = _frame_shows_dialogs(frame.f_code)
+        return "" if own else "FreeCAD's own code (after %s)" % where
+    if "/fission180/" in path:
+        own = _frame_shows_dialogs(frame.f_code)
+        return "" if own else "FreeCAD's own code (run by %s)" % where
+    return "%s (not Fission 180's code)" % where
+
+
+def _dialog_shown(widget):
+    try:
+        if not widget.isWindow() or state.get("finished") or "t0" not in state:
+            return
+        if isinstance(widget, QtWidgets.QProgressDialog):
+            return  # a progress bar of a long import or rebuild asks nothing
+        origin = dialog_origin(widget)
+        text = ""
+        if isinstance(widget, QtWidgets.QMessageBox):
+            text = " ".join(widget.text().split())[:200]
+        _dialogs_seen.append(
+            {
+                "step": state.get("step"),
+                "title": widget.windowTitle() or widget.metaObject().className(),
+                "text": text,
+                "origin": origin,
+                "counted": False,
+            }
+        )
+    except Exception:
+        pass
+
+
+def native_dialogs():
+    """The dialogs that are not Fission 180's own, shown since the scenario began (each a
+    dict: step, title, text, origin)."""
+    return [d for d in _dialogs_seen if d["origin"]]
+
+
+def _native_after(step):
+    fresh = [d for d in native_dialogs() if not d["counted"]]
+    for d in fresh:
+        d["counted"] = True
+    if not fresh or getattr(step, "native_dialogs", False):
+        return
+    said = [
+        "%s%s, shown by %s" % (d["title"], (" (%s)" % d["text"]) if d["text"] else "", d["origin"])
+        for d in fresh
+    ]
+    if STRICT["dialogs"] and not state.get("allow_native_dialogs"):
+        check("No dialog of FreeCAD's own in %s" % step.__name__, False, said)
+    else:
+        note("a dialog that is not Fission 180's in %s" % step.__name__, "; ".join(said))
+
+
+def open_undo_step():
+    """What is left open of an undo step although no dialog is open ("" when nothing is):
+    the application's active step and the designs with a pending one. A dialog, a sketch
+    being edited, a mesh or sheet being edited and a visible window of its own may hold a
+    step open: then "" too."""
+    try:
+        if Gui.Control.activeDialog():
+            return ""
+        from fission180 import taskui
+
+        if taskui.current() is not None:
+            return ""
+        for doc in App.listDocuments().values():
+            gdoc = Gui.getDocument(doc.Name)
+            if gdoc is not None and gdoc.getInEdit() is not None:
+                return ""
+        app = QtWidgets.QApplication
+        if app.activeModalWidget() is not None or app.activePopupWidget() is not None:
+            return ""
+        if popups():
+            return ""
+        found = []
+        active = App.getActiveTransaction()
+        if active:
+            found.append("the active undo step is %r" % (active,))
+        for doc in App.listDocuments().values():
+            if getattr(doc, "HasPendingTransaction", False):
+                found.append("%s has a pending undo step" % doc.Name)
+        return "; ".join(found)
+    except Exception as exc:
+        return "could not look: %s" % exc
+
+
+def _undo_after(step):
+    if getattr(step, "open_undo_step", False) or state.get("allow_open_undo_step"):
+        return
+    left = open_undo_step()
+    if not left:
+        state.pop("undo_left", None)
+        return
+    if state.get("undo_left") == left:
+        return  # said once: the steps after it would only repeat it
+    state["undo_left"] = left
+    if STRICT["undo"]:
+        check("No undo step left open after %s" % step.__name__, False, left)
+    else:
+        note("an undo step left open after %s" % step.__name__, left)
+
+
 # -- work the app has posted for a moment later -----------------------------------
 # Fission 180's dialogs debounce their previews and post follow-ups (QTimer.singleShot(0, ...),
 # a single-shot QTimer restarted on every change). Until they have run, what the screen
@@ -332,6 +517,8 @@ class _PointerTap(QtCore.QObject):
                 self.last = event.globalPosition().toPoint()
             elif kind == QtCore.QEvent.Show and isinstance(obj, QtWidgets.QMenu):
                 self.menus_shown += 1
+            elif kind == QtCore.QEvent.Show and isinstance(obj, QtWidgets.QDialog):
+                _dialog_shown(obj)
             elif kind == QtCore.QEvent.MouseButtonPress and isinstance(obj, QtWidgets.QWidget):
                 self.last_press = time.monotonic()
                 if _in_3d_view(obj):
@@ -1502,6 +1689,75 @@ def close_popups():
             w.reject()
 
 
+def painted(widget, need=6, contrast=48):
+    """Whether a button (or any small widget) shows something a person can read: at least
+    `need` of its pixels differ from its most common colour by `contrast` (of 255) in some
+    channel. A light text on the system's light button, or no text at all, is a blank square
+    (book parity report: Parameters' "+" and "-", Save's "...")."""
+    # what is on the screen (a widget's own picture leaves out what shows through it: a
+    # flat button's ground is its panel's)
+    top = widget.mapToGlobal(QtCore.QPoint(0, 0))
+    image = (
+        QtWidgets.QApplication.primaryScreen()
+        .grabWindow(0, top.x(), top.y(), widget.width(), widget.height())
+        .toImage()
+    )
+    counts = {}
+    for x in range(image.width()):
+        for y in range(image.height()):
+            pixel = image.pixel(x, y) & 0xFFFFFF
+            counts[pixel] = counts.get(pixel, 0) + 1
+    if not counts:
+        return False
+    ground = max(counts, key=counts.get)
+    base = ((ground >> 16) & 255, (ground >> 8) & 255, ground & 255)
+    seen = 0
+    for pixel, count in counts.items():
+        rgb = ((pixel >> 16) & 255, (pixel >> 8) & 255, pixel & 255)
+        if max(abs(a - b) for a, b in zip(rgb, base)) >= contrast:
+            seen += count
+    return seen >= need
+
+
+def on_screen(widget):
+    """Whether a person sees the whole widget: shown, not cut off by a scroll area and
+    nothing lying over its middle (a page behind another tab is "visible" to Qt too)."""
+    try:
+        if not widget.isVisible() or widget.visibleRegion().boundingRect() != widget.rect():
+            return False
+        top = QtWidgets.QApplication.widgetAt(widget.mapToGlobal(widget.rect().center()))
+        while top is not None:
+            if top is widget:
+                return True
+            top = top.parentWidget()
+        return False
+    except RuntimeError:
+        return False
+
+
+def blank_buttons(root):
+    """The buttons under `root` that a person sees (on_screen), can use (a greyed one is
+    dim on purpose) and that have a text or an icon to show, yet paint nothing readable:
+    [description]."""
+    blank = []
+    for button in root.findChildren(QtWidgets.QAbstractButton):
+        try:
+            if button.width() < 6 or button.height() < 6 or not button.isEnabled():
+                continue
+            if not on_screen(button):
+                continue
+            if not button.text().strip() and button.icon().isNull():
+                continue
+            if not painted(button):
+                blank.append(
+                    "%s %r %s"
+                    % (type(button).__name__, button.text(), button.objectName() or button.toolTip())
+                )
+        except RuntimeError:
+            continue
+    return blank
+
+
 def in_sketch():
     edit = Gui.ActiveDocument.getInEdit() if Gui.ActiveDocument else None
     obj = edit.Object if edit is not None else None
@@ -1578,6 +1834,8 @@ def _write(partial):
         "paced_by": state.get("paced_by"),
         "step": state.get("step"),
         "checks": checks,
+        "notes": notes,
+        "dialogs": [{k: v for k, v in d.items() if k != "counted"} for d in _dialogs_seen],
     }
     if state.get("stop"):
         result["stopped"] = state["stop"]
@@ -1768,6 +2026,33 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
         # Each scenario starts in a fresh FreeCAD profile (run_tests.sh), so the choices
         # Fission 180 remembers between sessions (selection mode, display style, preferences,
         # keys, pins) are the defaults already: no reset needed for them.
+        try:
+            # (wave 7, sketch-c) Fusion's Snap puts every free sketch point on a grid
+            # crossing (on by default: sketch_infer "GridSnapFull"). The scenarios written
+            # before it click free points at exact coordinates and read them back: they run
+            # with the screen-reach pull of wave 7's sketch-a (the setting off, as before).
+            # book_sketch_c_grid turns it on and tests it.
+            from fission180 import sketch_infer
+
+            App.ParamGet(sketch_infer.PARAMS).SetBool("GridSnapFull", False)
+            # ...and Fusion's "Scale entire sketch at first dimension" (on by default)
+            # scales everything drawn so far when the first dimension gets its value: the
+            # scenarios written before it type a first dimension and then click the other
+            # curves where they were. book_sketch_c_scale turns it on and tests it.
+            App.ParamGet(sketch_infer.PARAMS).SetBool("ScaleAtFirstDimension", False)
+        except Exception as exc:
+            print("[Fission 180] grid snap reset failed: %s" % exc, flush=True)
+        try:
+            # (wave 7) Fusion shows the layout grid in every new design (Grid and Snaps >
+            # Layout Grid, on by default since the book parity report). The scenarios
+            # written before it read the colours of the empty view: they run with the grid
+            # off, as a person who unticked it. book_shell_new_design tests the default.
+            from fission180 import grid_ui
+
+            grid_ui.put("LayoutGrid", False)
+            grid_ui.redraw_all()
+        except Exception as exc:
+            print("[Fission 180] layout grid reset failed: %s" % exc, flush=True)
         try:  # the first-start welcome line on Home shows once per profile: a fresh profile
             # would show it in every scenario (the welcome_line scenario asks for it)
             from fission180 import home_notices_ui
@@ -1908,6 +2193,12 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
         )
 
     def errors_then_next(step):
+        if not state.get("stop"):
+            try:
+                _native_after(step)
+                _undo_after(step)
+            except Exception as exc:
+                print("[Fission 180] the harness's own look failed: %s" % exc, flush=True)
         if check_errors_each_step:
             fresh = new_errors()
             if fresh and getattr(step, "known", False):

@@ -8,8 +8,8 @@ A sketch on the XY plane: a slanted line A, a line B, a line C between them. Rea
 through the X server (x_input); D starts the Dimension tool.
 
   A  D, a click on line A (its length follows the pointer), then a click ON the sketch's Y
-     axis: the length dimension is placed there (one Distance on A, no Angle to the axis),
-     the value box opens
+     axis: the dimension is placed there (one dimension between A's ends, no Angle to the
+     axis), the value box opens
   B  D, a click on an end of A, a click on an end of B (the distance between them follows
      the pointer), then a click ON line C: the distance is placed (C is not picked as a
      third thing), the value box opens
@@ -93,14 +93,19 @@ def a_place_on_axis():
 def a_check():
     cons = new_cons()
     h.check("A one dimension was placed", len(cons) == 1, cons)
+    # (wave 7's merge: D is Fission 180's own Sketch Dimension. A slanted line's dimension is
+    # its length while the pointer is beside it and, like Fusion's, the vertical or
+    # horizontal distance between its ends once the pointer is past them: the click on the
+    # axis is up and to the right of the line's end, nearer its side: vertical)
     h.check(
-        "A it is the line's length (no Angle to the axis)",
+        "A it is a dimension of the line (between its two ends, no Angle to the axis)",
         len(cons) == 1
-        and cons[0][0] == "Distance"
+        and cons[0][0] in ("Distance", "DistanceX", "DistanceY")
         and cons[0][1] == s["a"]
         and cons[0][3] in (s["a"], -2000),  # (between its two ends, or the line itself)
         cons,
     )
+    h.check("A ...the vertical one (the pointer is past the line's end)", cons[0][0] == "DistanceY")
     h.check("A the value box is open", editor() is not None)
     h.shot("A-placed-on-the-axis")
     end_tool()

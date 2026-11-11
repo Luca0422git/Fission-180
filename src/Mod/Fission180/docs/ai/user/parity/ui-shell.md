@@ -335,3 +335,37 @@ Known: FreeCAD's right-hand overlay (where the Tasks panel with the command dial
 over the 3D view) draws a thin frame. It shows while a command dialog is open, and all the
 time while a panel of Fission 180's own is docked on the right (the AI panel): FreeCAD gives
 the overlay a style sheet of its own (`overlay:...qss`), which Fission 180's does not override.
+
+
+## Wave 7 (2026-11-11): the book parity report, shell (`sf/book-shell`)
+
+Sources of the Fusion column: **Autodesk** = Autodesk help / blog / support pages (read
+through search excerpts: the sandbox cannot open autodesk.com), **Forum** = Autodesk
+Community answers, **Book** = *Mastering Autodesk Fusion, 2nd ed.* as the parity report quotes
+it, **Guess** = what a Fusion user would expect, not confirmed.
+
+| Fusion | Source | Fission 180 |
+|---|---|---|
+| A new design opens on the Home (isometric) view, a grid on the ground with the origin in its middle. | Book ("white grid with the Origin dot in the middle, home (isometric) view"); Forum (Layout Grid is a setting of its own, separate from the Sketch Grid) | **Home > New design, the "+" beside the design tabs, the New button and Ctrl+N** all make the same design (`home_ui.new_design`, command `Fission180_NewDesign`): its first body and Origin folder, the Home view, the origin in the middle of a view about 150 mm high (`view_fit.show_new_design`), nothing to undo, not marked changed. **Layout Grid is on by default** (`grid_ui.DEFAULTS`): major and minor lines, a red line along X, a green one along Y, a dot at the origin; while a sketch is edited the sketch's own grid stands in for it (Guess: one grid at a time). The canvas stays Luca's dark look (light with Preferences > Look: Light). FreeCAD opened a scripted document looking straight down at nothing. |
+| Grid Settings: Adaptive / Fixed, Major Grid Spacing, Minor Subdivisions, **Reference Numbers**. | Book (the option's name); Guess (numbers along the axes; off by default) | **Reference Numbers** box in Grid Settings: the distance from the origin written at the major lines along the grid's X and Y lines (every 2nd, 5th... when there would be more than 40). |
+| Fit (F6) frames the model. | Autodesk (Fit in the navigation bar); Book | `Fission180_Fit` (F6, the navigation bar, the marking menu, a double middle click, the ViewCube's Home with Fit to View): the design; in an open sketch the sketch's own curves; a design with nothing in it: the origin in the middle. The layout grid sits in FreeCAD's `SoSkipBoundingGroup`, so no fit frames it (each Fit had doubled the view: 24 m after a few). |
+| Toolbar, Solid tab: CREATE, AUTOMATE, MODIFY, ASSEMBLE, CONFIGURE, CONSTRUCT, INSPECT, INSERT, SELECT. | Book (ASSEMBLE after MODIFY); Autodesk blog (Create, Modify, Assemble named in that order) | CREATE, MODIFY, **ASSEMBLE**, CONSTRUCT, INSPECT, INSERT, SELECT (AUTOMATE and CONFIGURE are left out on purpose, see Decisions). |
+| The sketch's MODIFY menu ends with Change Parameters. | Book | Added (the same entry as SOLID > MODIFY). |
+| Workspaces: Design, Generative Design, Render, Animation, Simulation, Manufacture, Drawing. | Autodesk help "Workspaces"; engineering.com | Design, (Animation: its builder's line), Simulation, Manufacture, Drawing, in that order. Render and Generative Design are out of scope. |
+| A "+" at the end of the design tabs opens a new design. | Book | The `+` right after the last tab (`ribbon_ui.new_tab`). |
+| The profile button at the top right holds Preferences. | Book; Guess (no account in Fission 180) | A profile button at the far right; its menu has **Preferences** only. The application menu's Edit > Preferences opens Fission 180's Preferences too; FreeCAD's own Preferences stay under UTILITIES > FreeCAD Tools (in FreeCAD's interface). |
+| Preferences > General: Default modeling orientation; User Language. | Book | "Default modeling orientation" moved from General > Design to **General**. **User Language** lists English (what Fission 180 has), plus the language FreeCAD itself runs in when that is another one. |
+| Browser: a slow second click on a name renames it; a double-click on a sketch edits it; a component is activated with its radio button. | Forum ("click-wait-click (not a double-click mind you) renames bodies, sketches, etc."; "a double-click on the component's name turns the name blue but doesn't activate rename"); Autodesk help "Activate a component" (the radio button); Book ("double-click Body1" to rename) | The slow second click renames (since 2026-11-02). **A double-click on a body's name renames it too** (the book's step; Fusion has nothing else a double-click on a body does); on a body's icon it makes the body the active one, as it always did (also right-click > Activate Body). Sketches and components as before (edit, activate). |
+| Document Settings > Units: a Change Active Units button appears on hover; a double-click opens it. | Book | A blue button at the end of the Units row while the mouse is on it (tool tip "Change Active Units"); a click on the row or the button, a double-click or right-click > Change Active Units open the dialog. |
+| A right-click in the browser while a command is running does not end the command. | Guess (the report: "a right-click in the browser while the Decal dialog is open cancels the dialog") | While a command's dialog is open a row's menu holds only what changes what is seen or picked: **Show / Hide, Selectable/Unselectable, Opacity Control, Find in Window** (and Show / Hide All on the design's row); none of them ends the dialog. Find in Window frames the object without selecting it (`view_fit.fit_objects`). A sketch being edited keeps the whole menu. |
+| Dialog buttons show the names picked. | (Fusion shows "n selected") | A selection button keeps "&" ("Housing & Inlet Tube") and shortens a long list to the room it has ("Housing & In… + 6 more", the whole list as its tool tip): `taskui.NamesButton`. Any other button of a dialog keeps a name's "&" too, and so do the menus that list names (Move to Component, Select Other, the Out-of-Date menu). A command dialog never asks for more width than the panel (`taskui._WidthGuard`); a dialog window is never larger than the screen or partly off it (`dialog_fit.py`). |
+| One recovery dialog after a crash. | Autodesk (Fusion's recovery) | FreeCAD's own "Document Recovery" is off while Fission 180 is on (`RecoveryEnabled`, with `AutoSaveEnabled`; both given back when Fission 180 is off): Fission 180's "Recover unsaved work?" is the only one. |
+| Buttons are readable. | | A plain tool button in a dialog had no rule in the style sheet: the system's light button under the theme's light text, a blank square (Parameters' + and -, Save's ...). Rule `QDialog QToolButton` in `theme.py` (dark and light). The browser header's faint FreeCAD buttons are gone (its close button is Fission 180's icon). |
+
+Tests: scenarios `book_shell_new_design`, `book_shell_dialogs`, `book_shell_ribbon`,
+`book_shell_data_panel`; unit tests `test_book_shell.py`.
+
+Still open: Fusion's "n selected" wording on selection buttons (Fission 180 shows names: an
+earlier decision); the layout grid is drawn where the view looks, six view heights wide (not
+endless, as Fusion's looks); "Scale entire sketch at first dimension" (a sketch preference,
+not shell's).

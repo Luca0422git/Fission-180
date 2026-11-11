@@ -1057,3 +1057,5 @@ TOOLS = {
         ConicCurve,
     )
 }
+for _tool in TOOLS.values():
+    _tool.references_model = True  # (a point clicked on a model edge projects that edge)

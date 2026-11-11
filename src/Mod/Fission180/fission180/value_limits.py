@@ -26,8 +26,14 @@ import math
 import time
 from collections import OrderedDict
 
-BUDGET = 1.5  # seconds the bisection may take (it runs once per set of inputs)
-MIN_TRIALS = 3  # ... but at least this many builds, even on a slow part
+# The search ends by itself: it halves the gap between a value that works and one that does
+# not until the gap is under the box's step (0.01 mm: about 12 builds from 30 mm), so a slow
+# computer finds the same number as a fast one. Seconds are only a last-resort guard, far
+# above what those builds need (it was 1.5 s, and the AI's 3 s: under load a search stopped
+# early and answered "19.98 mm" and another sentence where it answers "19.99 mm"; wave 7).
+# When the guard does stop a search, the value is said to be "about" that.
+BUDGET = 30.0  # seconds: the guard of a dialog's search (counted over its builds)
+MIN_TRIALS = 3  # ... and at least this many builds, even then
 VERIFY_TRIES = 6  # tidy candidates tried toward the safe side before giving up on tidiness
 SEARCHING_VALUE = "Finding the largest value that fits…"
 SEARCHING_ANGLE = "Finding the largest angle that fits…"
@@ -153,20 +159,27 @@ def fmt_typed(value, unit="mm", design=None):
     return "%g" % value + ("°" if unit == "deg" else " mm" if unit == "mm" else "")
 
 
-def note_reached(limit, side, unit="mm", step=None):
-    """The note shown while a dragged value sits at its limit."""
+def note_reached(limit, side, unit="mm", step=None, rough=False):
+    """The note shown while a dragged value sits at its limit. `rough`: the search for it
+    was stopped by its time guard (a little more may fit): "about"."""
     if side == "hi":
         word = "Largest"
     elif limit > 0:
         word = "Smallest"  # a value that must not get smaller (a pipe's section size)
     else:
         word = "Furthest"  # a push into the part, -30 deg...
+    if rough:
+        return "%s found that fits here: about %s" % (word, fmt(limit, unit, step))
     return "%s that fits here: %s" % (word, fmt(limit, unit, step))
 
 
-def note_typed(typed, limit, unit="mm", step=None):
-    """The note shown when a typed value was set to the limit."""
-    return "%s does not fit: limited to %s" % (fmt_typed(typed, unit), fmt(limit, unit, step))
+def note_typed(typed, limit, unit="mm", step=None, rough=False):
+    """The note shown when a typed value was set to the limit (`rough`: see note_reached)."""
+    return "%s does not fit: limited to %s%s" % (
+        fmt_typed(typed, unit),
+        "about " if rough else "",
+        fmt(limit, unit, step),
+    )
 
 
 def hint(limit, side, unit="mm", step=None):
@@ -514,6 +527,7 @@ class Limiter:
         self.key_now = None  # the dialog's inputs now, for the value edited (a function)
         self.searches = 0  # bisections run (tests: never on every drag step)
         self.search_clock = time.perf_counter  # tests give a fake clock
+        self.rough = set()  # the keys whose limit a search's time guard cut short: "about"
 
     def step(self, unit=None):
         return step_for(self.unit if unit is None else unit)
@@ -546,17 +560,18 @@ class Limiter:
         unchanged (and the note is cleared). Never builds anything."""
         unit = self.unit if unit is None else unit
         held, limit, side = self.cache.clamp(key, value)
+        rough = key in self.rough
         if limit is None:
             self.note = ""
             on = self.cache.on_limit(key, value)  # sitting right on it (the arrow let go there)
             if on is not None:
-                self._say(note_reached(on[0], on[1], unit, self.step(unit)), key)
+                self._say(note_reached(on[0], on[1], unit, self.step(unit), rough), key)
             return value
         self._say(
             (
-                note_typed(value, limit, unit, self.step(unit))
+                note_typed(value, limit, unit, self.step(unit), rough)
                 if typed
-                else note_reached(limit, side, unit, self.step(unit))
+                else note_reached(limit, side, unit, self.step(unit), rough)
             ),
             key,
         )
@@ -632,6 +647,10 @@ class Limiter:
             if wall is not None and (wall - new_wall) * sign < 0:
                 new_wall = wall
         self.cache.store(key, slot, limit, value, keep, wall=new_wall)
+        if limit is not None and not exact and found is None:
+            self.rough.add(key)  # stopped by the time guard: the notes say "about"
+        elif exact:
+            self.rough.discard(key)
         return limit
 
     def cached(self, key, value, good):
@@ -651,11 +670,12 @@ class Limiter:
         """Set the note for `value` held at `limit` (found just now)."""
         unit = self.unit if unit is None else unit
         side = side_of(value, limit) if value != limit else "hi"
+        rough = key in self.rough
         self._say(
             (
-                note_typed(value, limit, unit, self.step(unit))
+                note_typed(value, limit, unit, self.step(unit), rough)
                 if typed
-                else note_reached(limit, side, unit, self.step(unit))
+                else note_reached(limit, side, unit, self.step(unit), rough)
             ),
             key,
         )

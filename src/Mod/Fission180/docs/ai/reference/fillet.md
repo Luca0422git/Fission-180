@@ -68,5 +68,5 @@ Done: AI: Fillet 5 mm. Its id is 'Fillet1'. Bodies now: Body1: 23785.4 mm3, 60 x
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
 - Recipe: [stepped shaft with a keyway](fission180://docs/recipes/shaft-with-keyway.md)
 - Recipe: [cantilever snap-fit hook](fission180://docs/recipes/snap-fit.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain`, `blend_fillet_top_face`, `blend_insert_chamfer_before_fillet`, `export_report_design`, `live_blend_fillet_boss_feature`, `live_blend_fillet_slot_chain`, `live_spline_top_fillet`, `mirror_fillet_feature` and 2 more
+- Golden models built with its steps (read one with docs_read golden/<id>): `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain`, `blend_fillet_top_face`, `blend_insert_chamfer_before_fillet`, `book_carabiner_full_round_4`, `export_report_design`, `live_blend_fillet_boss_feature`, `live_blend_fillet_slot_chain`, `live_spline_top_fillet` and 3 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

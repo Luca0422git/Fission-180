@@ -255,6 +255,110 @@ def upload_target(folder, path, exists=os.path.exists):
     return target
 
 
+# -- folders and projects (wave 7) ----------------------------------------------------------------
+NEW_PROJECT = "New Project"
+
+
+def is_project(root, folder):
+    """A project: a folder directly in the place's root (Fusion: projects, then folders)."""
+    try:
+        return store.same_path(os.path.dirname(os.path.abspath(folder)), root)
+    except Exception:
+        return False
+
+
+def name_refusal(parent, name, old=None, exists=os.path.exists):
+    """Why `name` cannot be the name of a folder in `parent` ("" when it can): empty, a
+    character a file name cannot hold, or taken (the folder's own old name is not)."""
+    typed = (name or "").strip()
+    if not typed:
+        return "Type a name."
+    typed = " ".join(typed.split())
+    clean = store.clean_name(typed)
+    if clean != typed:
+        return 'A name cannot hold < > : " / \\ | ? * or end with a dot.'
+    if old is not None and clean == old:
+        return ""
+    taken = exists(os.path.join(parent, clean))
+    if taken and not (old is not None and clean.lower() == old.lower()):
+        return "%s is there already. Choose another name." % clean
+    return ""
+
+
+def folder_refusal(folder, target_parent, kind="move", exists=os.path.exists):
+    """Why the folder cannot be moved (or copied) into `target_parent` ("" when it can)."""
+    folder = os.path.abspath(folder)
+    target_parent = os.path.abspath(target_parent)
+    name = os.path.basename(folder)
+    if store.same_path(folder, target_parent) or store.inside(folder, target_parent):
+        return "%s cannot go into itself." % name
+    if kind == "move" and store.same_path(os.path.dirname(folder), target_parent):
+        return "%s is in that folder already." % name
+    if kind == "move" and exists(os.path.join(target_parent, name)):
+        return "A folder called %s is already in %s." % (name, os.path.basename(target_parent))
+    return ""
+
+
+def tree_plan(folder, target_parent, name=None):
+    """What moving or copying the folder into `target_parent` does, in order: the folders to
+    make (the new root first), the designs with the folder each goes to, and the other
+    files with their new paths. Version folders, git's and the trash are left out: a
+    design's versions travel with the design."""
+    folder = os.path.abspath(folder)
+    root = os.path.join(os.path.abspath(target_parent), name or os.path.basename(folder))
+    plan = {"root": root, "folders": [root], "designs": [], "files": []}
+    for here, dirs, files in os.walk(folder):
+        dirs[:] = sorted(
+            (
+                d
+                for d in dirs
+                if d not in store.HIDDEN_FOLDERS and not d.endswith(store.VERSIONS_SUFFIX)
+            ),
+            key=str.lower,
+        )
+        rel = os.path.relpath(here, folder)
+        there = root if rel == "." else os.path.join(root, rel)
+        for d in dirs:
+            plan["folders"].append(os.path.join(there, d))
+        for f in sorted(files, key=str.lower):
+            full = os.path.join(here, f)
+            if store.is_design(f):
+                plan["designs"].append((full, there))
+            else:
+                plan["files"].append((full, os.path.join(there, f)))
+    return plan
+
+
+def designs_under(folder):
+    """Every design in the folder and the folders in it."""
+    return [path for path, _there in tree_plan(folder, os.path.dirname(folder))["designs"]]
+
+
+def fit_crumbs(labels, width, measure, separator=" / "):
+    """Which parts of a path the panel shows when all of them do not fit `width` pixels:
+    their indexes in order, None standing for the "…" that takes the place of the parts left
+    out. The first part (the project folder) and the last (the folder shown) stay longest:
+    "Project / … / 1 - Fundamentals", then "… / 1 - Fundamentals"."""
+    count = len(labels)
+    everything = list(range(count))
+    if count <= 1 or measure(separator.join(labels)) <= width:
+        return everything
+    for keep in range(count - 2, 0, -1):  # the first, "…", the last `keep` parts
+        shown = [0, None] + everything[count - keep :]
+        text = separator.join("\u2026" if i is None else labels[i] for i in shown)
+        if measure(text) <= width:
+            return shown
+    return [None, count - 1]
+
+
+def remembered_folder(root, kept):
+    """The folder the panel opens on: the one it showed last (`kept`) while that is still a
+    folder of the place, else the place's root."""
+    if kept and os.path.isdir(kept) and store.inside(root, kept):
+        return os.path.abspath(kept)
+    return os.path.abspath(root)
+
+
 # -- details: Uses and Used In -------------------------------------------------------------------
 def uses(path, xml):
     """The designs `path` (its Document.xml given) inserts or derives from: [(name, path,

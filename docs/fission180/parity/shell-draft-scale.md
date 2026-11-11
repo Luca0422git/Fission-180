@@ -189,3 +189,12 @@ decimal point typed with the mouse over the 3D view goes into the box of the han
 or hovered (else the main one), with its text selected (`taskui.TypeOverView`; FreeCAD's view
 keys 0-6 no longer turn the view while the dialog is open). Which handle a digit goes to is
 Fission 180's guess at Fusion's rule.
+
+## Wave 7, the book parity report: Draft's two boxes (branch `sf/book-modify-b`, 2026-11-11)
+
+| What | Fusion (source) | Fission 180 now |
+|---|---|---|
+| A click on the pull direction's face while faces are being picked | Pull Direction and Faces are two selections of the dialog (**Autodesk**, Draft help: "Pull Direction ... Faces"); that a click for one never empties the other: **Guess** (it is how every Fusion dialog with two selection boxes behaves) | The pull direction stays and the reason is said next to the pointer. Before, the click dropped it and made Pull Direction the active box, so the next face clicked became the pull direction instead of a face to draft: the report's "a face sometimes did nothing" and "cleared the pull direction" (reproduced: `book_modifyb_draft` fails 7 checks without the fix) |
+| A picked face clicked again | Deselected (**Autodesk**: clicking a selected entity deselects it) | Dropped: unchanged (the report's "some of my clicks toggled faces off" is this) |
+| OK with no face picked | - | Refused with "Pick the faces to draft."; the pull direction stays (it did on 3.3.10 already; checked) |
+

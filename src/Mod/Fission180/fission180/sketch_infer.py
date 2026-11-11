@@ -95,6 +95,11 @@ DEFAULTS = {
     # land on it, whatever the spacing (FreeCAD alone: a fifth of the spacing, which on a
     # coarse grid is dozens of pixels); 0: FreeCAD's rule alone
     "GridSnapPixels": ("Float", 8.0),
+    # Fusion's Snap (wave 7, sketch-c): with Snap on, every free point lands on the nearest
+    # crossing of the grid lines drawn (the minor grid), whatever the distance; what the
+    # pointer infers (an end, a middle, a guide) and typed values come first. Off: the
+    # screen reach above (sketch-a's rule; the scenarios written before run with it)
+    "GridSnapFull": ("Bool", True),
 }
 SNAP_OFF_MARK = "SnapSwitchedOff"  # set while FreeCAD's Snap is off for a Ctrl event
 
@@ -327,6 +332,27 @@ class Inference:
         if not view.ok:
             return None
         result, grid = self._infer(view, start)
+        if (
+            result is None
+            and kind == QtCore.QEvent.MouseButtonPress
+            and tool != "spline"
+            and self._freecad_snap(view) is None
+        ):
+            # Fusion's "Auto project edges on reference": the click is on an edge or corner
+            # of the model that is not in the sketch: it is projected (purple) and the
+            # point lands on it like on any sketch curve (sketch_reference.py)
+            from . import sketch_reference
+
+            if sketch_reference.project_under(session, event.position(), "Sketch"):
+                result, grid = self._infer(view, start)
+                if result is None:
+                    result = self._on_projected(view)
+        beside = False
+        if result is None and tool != "spline":
+            # on a line or arc, near its middle but not on it: FreeCAD's own snap would
+            # take the middle all the same (_beside_middle)
+            result = self._beside_middle(view)
+            beside = result is not None
         if result is None and tool != "spline":
             # a free point: the grid alone places it, within a reach on the screen. (Not
             # a spline's points: FreeCAD's spline tool keeps each clicked point loose until
@@ -349,7 +375,80 @@ class Inference:
             return None
         self.overlay.show(result, view.px)
         nogrid = core.grid_off(result, grid, view.px)
-        return (pos, False, nogrid, result, view.px)
+        # (beside a middle: FreeCAD's snapping is off for this event, the point is kept on
+        # the curve by the constraint added after the click)
+        return (pos, beside, nogrid, result, view.px)
+
+    # FreeCAD's own snap (SnapManager::snapToLineMiddle) takes a line's middle whenever the
+    # point is within a twentieth of the line's LENGTH of it: a model distance that grows
+    # with the line, as its grid rule did (on a 54 mm line: 2.7 mm, 18 pixels), and its
+    # automatic constraint then holds the point on the middle (Symmetric). The book parity
+    # report, Drone: "the construction line's end snapped to the MIDPOINT of the arm line
+    # (midpoint constraint) which later fights the arm length". A little more than its zone:
+    FREECAD_MIDDLE = 0.06
+
+    def _beside_middle(self, view):
+        """The Result for a point on a line or arc that FreeCAD's own snap would pull onto
+        the curve's middle although the pointer is outside the middle's reach on the screen
+        (nearest_snap: about 5 pixels): the point stays on the curve where it was aimed.
+        None anywhere else (FreeCAD places the point itself)."""
+        _verts, curves, _lines, _keyed = self._geometry()
+        geos = self._curve_geos
+        pick = _pick_pixels(view.ratio) * view.px
+        best = None
+        for i, curve in enumerate(curves):
+            if i >= len(geos) or geos[i] is None or geos[i] in (-1, -2):
+                continue
+            if not core.near_curve(view.raw, curve, pick):
+                continue
+            q = core.nearest_on_curve(view.raw, curve)
+            if q is not None and (best is None or core.dist(q, view.raw) < best[0]):
+                best = (core.dist(q, view.raw), q, i)
+        if best is None:
+            return None
+        _gap, q, i = best
+        geo = geos[i]
+        sketch = self.session.sketch
+        try:
+            g = sketch.Geometry[geo] if geo >= 0 else sketch.ExternalGeo[-geo - 1]
+            if g.TypeId == "Part::GeomLineSegment":
+                mid = (g.StartPoint + g.EndPoint) * 0.5
+            elif g.TypeId == "Part::GeomArcOfCircle":
+                mid = g.value((g.FirstParameter + g.LastParameter) / 2.0)
+            else:
+                return None
+            length = float(g.length())
+        except Exception:
+            return None
+        if core.dist(q, (mid.x, mid.y)) >= self.FREECAD_MIDDLE * length:
+            return None
+        result = core.Result(q)
+        result.on_curve = i
+        result.on_curve_geo = geo
+        return result
+
+    def _on_projected(self, view):
+        """The Result for a point on the projected curve under the pointer (just
+        projected: FreeCAD has not lit it yet, so its own tool would leave the point free):
+        the point goes onto the curve and is kept on it after the click."""
+        _verts, curves, _lines, _keyed = self._geometry()
+        geos = self._curve_geos
+        pick = max(_pick_pixels(view.ratio), 6.0) * view.px
+        best = None
+        for i, curve in enumerate(curves):
+            if i >= len(geos) or geos[i] is None or geos[i] > -3:
+                continue
+            if not core.near_curve(view.raw, curve, pick):
+                continue
+            q = core.nearest_on_curve(view.raw, curve)
+            if q is not None and (best is None or core.dist(q, view.raw) < best[0]):
+                best = (core.dist(q, view.raw), q, i)
+        if best is None:
+            return None
+        result = core.Result(best[1])
+        result.on_curve = best[2]
+        result.on_curve_geo = geos[best[2]]
+        return result
 
     def _grid_only(self, view, grid):
         """The Result for a free point where FreeCAD's grid rule (a fifth of the spacing)
@@ -564,18 +663,11 @@ class Inference:
             for i in helpers
             if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
         }
-        try:
-            from . import sketch_helpers
+        from . import sketch_helpers
 
-            # (Fission 180's hidden helper lines, a circular pattern's spokes: never snapped to)
-            helper_circles |= sketch_helpers.hidden(sketch)
-        except Exception:
-            pass
-        from . import sketch_draw_helpers
-
-        # ...nor are a shape's helper curves that are not drawn (a polygon's corner circle
-        # and spoke, a fit point spline's control circles: sketch_draw_helpers.py)
-        helper_circles |= sketch_draw_helpers.hidden(sketch)
+        # helper curves that are not drawn are never snapped to (a circular pattern's
+        # spokes, a polygon's corner circle and spoke, a fit point spline's control circles)
+        helper_circles |= sketch_helpers.hidden(sketch)
         for i, geo in enumerate(sketch.Geometry):
             if i in helper_circles:
                 continue
@@ -1542,6 +1634,11 @@ def grid_reach(px):
     """How far (mm) a grid line pulls a coordinate onto it at `px` mm per screen pixel:
     GridSnapPixels on the screen; None for FreeCAD's rule alone (a fifth of the
     spacing)."""
+    try:
+        if setting("GridSnapFull"):
+            return core.FULL
+    except Exception:
+        pass
     try:
         pixels = float(setting("GridSnapPixels"))
     except Exception:
