@@ -13,7 +13,7 @@ grid, first component grounded; an undo step left open fails the run) and real i
 |---|---|---|
 | 3 Finger Surfboard | `replay_03_surfboard` | PASS, 163 checks (one hitch not fixed: the fillet's 1 mm, see below) |
 | 4 Tensegrity Tower | `replay_04_tensegrity` | PASS, 120 checks |
-| 5 Carabiner | `replay_05_carabiner` | not started |
+| 5 Carabiner | `replay_05_carabiner` | PASS, 17 checks: the path only (steps 1-3); the rest written, not replayed (see below) |
 
 ## Project 3, Finger Surfboard: hitches
 
@@ -48,6 +48,17 @@ the sketch pattern's double-click chain and its copies tied to the original (ske
 sketch-b), Coincident tool-first on a line (sketch-b), the H/V point-to-origin (sketch-b),
 the 20 mm chamfer (modify-b), the look editor (looks), Save As Mesh's own dialog (shell).
 
+## Project 5, Carabiner: hitches (replayed as far as the path)
+
+| Report line | What happened in the replay | Fusion (source) | Root cause | Fix (function) |
+|---|---|---|---|---|
+| 1144-1148 | Press and drag at the line's end: the tangent arc came (sketch-a's fix) | Book | - | none needed; the replay presses on the line's end where it is drawn (Snap moves a click onto a grid crossing) |
+| 1149-1153 | Tangent on the bottom arc and the first line (they share the origin): no FreeCAD message box (sketch-b's fix); a second Tangent where the line down the far side leaves the top arc (Snap put the line's end a little off the tangent) | Book: "fully constrained" after R20, R12, 50 | - | none |
+| 1155-1157 | NOT REPLAYED in the committed scenario. The last full run: the slot's far centre clicked on the bottom arc's middle is put ON the arc only (1 DoF left) | Fusion snaps to an arc's midpoint (Book) | FreeCAD has no "midpoint of an arc" constraint (PointOnObject + Symmetric would put the point on the chord) | NOT FIXED: it needs a hidden helper line from the arc's centre with the arc's ends symmetric about it, made by the snap (sketch_infer) |
+| 1158-1171 | NOT REPLAYED. The pattern of the slot (8, five left out) ran; the copies left 6 DoF (from the slot's freedom) | - | as above | - |
+| 1175-1176 | NOT REPLAYED. Center Rectangle on the Front plane, 8 Tab 8 Enter: made nothing in the last run (not investigated) | Book | ? | - |
+| 1177-1192 | NOT REPLAYED. Sweep 13,017 (12,996 wanted: the slot's leftover freedom moved nothing of the path... not investigated); 2 mm chamfer of the underside 824 removed; the 4 mm fillet with the chamfer's top edges: "1 of the 9 edges cannot be rounded" (the window of picks took one edge too many) | - | - | - |
+
 Book steps that are not what the report did, with the reason:
 
 - The ellipses' centres are put BELOW the origin. The book's later tail hole is sketched on
@@ -79,6 +90,13 @@ Book steps that are not what the report did, with the reason:
   a shown origin or construction plane now picks the face or edge.
 - Select Through is on by default, as in Fusion: a window drawn round a part takes its
   hidden edges too.
+- Extrude: a sketch above a part, extruded through All into it after Flip, now comes up as
+  Cut by itself (it came up as Join because the part was a small share of the very long
+  "All" extrusion).
+- Sketch Dimension: clicking a part's edge that lies behind a construction plane seen edge-on
+  now projects that edge and dimensions to it.
+- Extrude got quicker on lofted parts (no slow surface comparisons for faces that only
+  touch along a line).
 
 - Loft: clicking the origin (its dot) as the last section works also when the Origin folder
   is hidden or a construction plane is drawn over it.
@@ -99,4 +117,9 @@ Book steps that are not what the report did, with the reason:
   tail. Put the hole 2.5 mm from the tail for a full 1 mm round.
 - Tensegrity: D from a line to the sketch's X axis, clicked where an Origin plane lies
   edge-on over it, did not pick the axis (seen once; dimension to the origin point instead).
-- (more to be filled at the end)
+- Carabiner: a point clicked on the middle of an arc is put on the arc, not held at its
+  middle: dimension it (an angle, or the distance to another point) to fix it.
+- Extrude on a lofted part can still take several seconds per change on a slow computer
+  (two booleans of a thin slice remain in the "does it start inside the part" test).
+- Extrude's message for an All extrusion that meets nothing reads "SketchBased: No faces
+  found in this direction" (FreeCAD's words).
