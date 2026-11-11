@@ -699,9 +699,10 @@ def record_visibility(storyboard, target, show, playhead):
 def record_view(storyboard, camera, playhead, before=None):
     """The view changed while View is on. In the scratch zone the storyboard starts with
     that view; later it is a View action ending at the playhead (a View action that already
-    ends there just takes the new view). `before`: the view before the change, kept as the
-    storyboard's first view when it had none (so the first View action has something to
-    start from). Returns the action or None."""
+    ends there just takes the new view; one the playhead stands inside is cut in two there:
+    the new one takes its first part, so the camera never jumps). `before`: the view before
+    the change, kept as the storyboard's first view when it had none (so the first View
+    action has something to start from). Returns the action or None."""
     camera = _camera(camera)
     if camera is None:
         return None
@@ -714,12 +715,14 @@ def record_view(storyboard, camera, playhead, before=None):
         if act["kind"] == "view" and abs(_end(act) - float(playhead)) < 1e-6:
             act["camera"] = camera
             return act
-    values = {
-        "kind": "view",
-        "camera": camera,
-        "start": default_start(storyboard, VIEW_ROW, playhead, "view"),
-        "end": float(playhead),
-    }
+    start = default_start(storyboard, VIEW_ROW, playhead, "view")
+    for act in storyboard["actions"]:
+        if act["kind"] != "view":
+            continue
+        if float(act["start"]) < float(playhead) - 1e-6 < _end(act) - 2e-6:
+            start = max(start, float(act["start"]))
+            act["start"] = float(playhead)
+    values = {"kind": "view", "camera": camera, "start": start, "end": float(playhead)}
     return add_action(storyboard, values)
 
 

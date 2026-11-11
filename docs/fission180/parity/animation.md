@@ -192,7 +192,7 @@ workspace ever having been entered. An unknown storyboard name raises
 
 ## 4. Tests
 
-Unit: `Fission180Tests/unit/test_animation_core.py` (60 tests: quaternions and slerp, poses,
+Unit: `Fission180Tests/unit/test_animation_core.py` (61 tests: quaternions and slerp, poses,
 the state at a time, cameras, timeline edits, storyboards, reverse, the explode maths, frame
 times, the AVI writer, the golden steps' format).
 Golden: `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` (hand numbers).

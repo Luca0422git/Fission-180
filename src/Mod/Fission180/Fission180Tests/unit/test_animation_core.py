@@ -244,6 +244,19 @@ class Cameras(unittest.TestCase):
         self.assertAlmostEqual(core.camera_at(board, 3.0)["position"][0], 40.0)
         self.assertAlmostEqual(core.camera_at(board, 3.0)["height"], 15.0)
 
+    def test_a_view_inside_another_cuts_it_in_two(self):
+        board = core.new_storyboard("S")
+        core.record_view(board, self.cam(40), 4.0, before=self.cam(0))
+        mid = core.record_view(board, self.cam(100), 1.0)
+        spans = sorted((a["start"], a["end"]) for a in board["actions"])
+        self.assertEqual(spans, [(0.0, 1.0), (1.0, 4.0)])
+        self.assertEqual((mid["start"], mid["end"]), (0.0, 1.0))
+        # no jump at the cut: just before and just after 1 s the camera is the new view
+        self.assertAlmostEqual(core.camera_at(board, 1.0)["position"][0], 100.0)
+        self.assertAlmostEqual(core.camera_at(board, 1.0 + 1e-9)["position"][0], 100.0, places=5)
+        self.assertAlmostEqual(core.camera_at(board, 2.5)["position"][0], 70.0)
+        self.assertAlmostEqual(core.camera_at(board, 4.0)["position"][0], 40.0)
+
     def test_the_scratch_zone_sets_the_first_view(self):
         board = core.new_storyboard("S")
         self.assertIsNone(core.record_view(board, self.cam(7), 0.0))

@@ -29,7 +29,7 @@ Drawing workspace: `docs/fission180/parity/animation.md`.
 
 ## What I built
 
-- `animation_core.py` (no FreeCAD, no Qt; 60 unit tests with the AVI writer's): the
+- `animation_core.py` (no FreeCAD, no Qt; 61 unit tests with the AVI writer's): the
   storyboard data and its clean-up on load, quaternions, slerp, poses, a transform action's
   pose at a fraction, the state at a time (offsets, opacity, camera, callouts), recording
   (transform, home, visibility, view, callout) with the scratch-zone rule, timeline edits,
