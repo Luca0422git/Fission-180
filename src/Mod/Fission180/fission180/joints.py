@@ -496,6 +496,10 @@ def _face_frame(face):
         return centre, axis, None
     if kind == "Part::GeomTorus":
         return App.Vector(surface.Center), App.Vector(surface.Axis), None
+    if kind == RING and all(_closed(edge) for edge in face.Edges):
+        # (FreeCAD's name for a torus is GeomToroid: the line above never matched.) A whole
+        # ring, an O-ring: its centre, the joint origin's Z along the ring's axis
+        return App.Vector(surface.Center), App.Vector(surface.Axis), None
     if kind == "Part::GeomSphere":
         return App.Vector(surface.Center), App.Vector(0, 0, 1), None
     centre = face.CenterOfMass
@@ -608,15 +612,53 @@ def _keypoints(shape, element, snaps):
     return snaps
 
 
+RING = "Part::GeomToroid"  # FreeCAD's name for a torus
+
+
+def _off_axis(surface, point):
+    """How far `point` is from the axis of a torus (or any surface with Center and Axis)."""
+    axis = App.Vector(surface.Axis)
+    rel = App.Vector(point) - App.Vector(surface.Center)
+    return (rel - axis * (rel.dot(axis) / max(axis.Length**2, 1e-12))).Length
+
+
+def _ring_of(shape, edge):
+    """The torus an edge is the cross-section circle of (the seam an O-ring's round face
+    starts and ends at), or None. That circle's own centre lies in the ring's material,
+    off the ring's axis."""
+    try:
+        if not _is_circle(edge):
+            return None
+        import Part
+
+        for face in shape.ancestorsOfType(edge, Part.Face):
+            surface = face.Surface
+            if surface.TypeId != RING:
+                continue
+            if _off_axis(surface, edge.Curve.Center) > 1e-6:
+                return surface
+    except Exception:
+        pass
+    return None
+
+
 def _edge_keypoints(shape, edge, snaps):
     out = []
     round_edge = _is_circle(edge)
     closed = _closed(edge)
+    # (wave 7, the book replay) the Fire Piston's O-rings: the pointer on the line where an
+    # O-ring's round face starts and ends lit the centre of the ring's cross-section, a
+    # point inside the rubber: the O-ring was joined off the axis (the book parity report,
+    # line 1716). Such a circle offers the centre of the ring, on the ring's axis.
+    ring = _ring_of(shape, edge) if round_edge else None
     for snap in snaps:
         kind = snap["kind"]
         if closed and kind in ("midpoint", "vertex"):
             continue  # the circle's seam and the point opposite it: not corners one sees
-        if kind == "circle" and round_edge:
+        if kind == "circle" and ring is not None:
+            reach = float(ring.MajorRadius) + float(ring.MinorRadius)
+            snap = dict(snap, point=App.Vector(ring.Center), z=App.Vector(ring.Axis), reach=reach)
+        elif kind == "circle" and round_edge:
             snap = dict(snap, reach=float(edge.Curve.Radius))  # lit from all along the edge
         elif kind == "loop":
             snap = _true_loop(shape, snap)
@@ -645,10 +687,16 @@ def _face_keypoints(shape, face, snaps):
     except Exception:
         ghosts = set()
     ghosts -= real
+    # (wave 7, the book replay) a ring's round face (an O-ring): its only keypoints are on
+    # the ring's axis. The centre of its cross-section circle (the seam of the face) is a
+    # point inside the material: with the pointer near it the O-ring was joined off the axis.
+    ring = face.Surface if face.Surface.TypeId == RING else None
     out = []
     for snap in snaps:
         kind = snap["kind"]
         if ghosts and kind in ("vertex", "midpoint") and _point_key(snap["point"]) in ghosts:
+            continue
+        if ring is not None and kind == "circle" and _off_axis(ring, snap["point"]) > 1e-6:
             continue
         if kind == "loop":
             snap = _true_loop(shape, snap)

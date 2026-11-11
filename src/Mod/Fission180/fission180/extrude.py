@@ -2092,7 +2092,7 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
             options = dict(options, operation="new_body")
             participants = None
         else:
-            raise ExtrudeError(nothing_touched(options))
+            raise ExtrudeError(nothing_touched(options, doc=profiles[0][0].Document))
     elif (
         participants is None
         and options["operation"] == "join"

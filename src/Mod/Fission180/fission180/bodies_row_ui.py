@@ -93,7 +93,9 @@ class BodiesRow:
         if touched is None:
             return None
         if not touched and operation in ("cut", "intersect"):
-            self.problem = extrude_bodies.nothing_touched({"operation": operation}, self.what)
+            self.problem = extrude_bodies.nothing_touched(
+                {"operation": operation}, self.what, getattr(self.panel, "doc", None)
+            )
             return None
         names = core.participants(touched, self.excluded)
         if touched and not names:

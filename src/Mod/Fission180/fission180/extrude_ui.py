@@ -2711,7 +2711,9 @@ class ExtrudePanel(
             # Nothing in the way: the preview stays a cut of the profile's own body (it
             # removes nothing), the operation stays as picked (the next change, a Flip,
             # may reach a body), and the dialog says why OK is refused.
-            self._bodies_problem = extrude_bodies.nothing_touched({"operation": operation})
+            self._bodies_problem = extrude_bodies.nothing_touched(
+                {"operation": operation}, doc=self.doc
+            )
             return None
         names = bodies_core.participants(touched, self.excluded)
         if touched and not names:

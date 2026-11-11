@@ -733,9 +733,17 @@ class Background:
 
     `paused()` (optional): True while no build may run now (a handle is being dragged: a
     trial build would freeze it for its whole length, review finding DRAFT-2-F1); the job
-    looks again every PAUSE_POLL_MS. finish() does not wait for it."""
+    looks again every PAUSE_POLL_MS. finish() does not wait for it.
+
+    (wave 7, the book replay) No build either for INPUT_REST_S after a key or a mouse press:
+    on a part with a modeled thread one trial build takes a second or two, and with a build
+    between every two keys a size typed right after a pick (the Fire Piston's 0.02 in for
+    the chamfer of its end face) took nine seconds to arrive. The first key waits for the
+    build that is running; then the search rests while the person types, and the typed
+    size ends it."""
 
     PAUSE_POLL_MS = 25
+    INPUT_REST_S = 0.4
 
     def __init__(self, make_steps, on_done, key=None, paused=None):
         self.spent = 0.0
@@ -747,6 +755,8 @@ class Background:
         self.paused = paused
         self.steps = make_steps(self.clock)
         self.timer = None
+        self.last_input = None  # () -> when the person last pressed a key or a button
+        self._watch = None
 
     def clock(self):
         if self._in is None:
@@ -761,7 +771,59 @@ class Background:
         self.timer.setInterval(0)
         self.timer.timeout.connect(self._tick)
         busy(self)
+        self._watch_input()
         self.timer.start()
+
+    def _watch_input(self):
+        """Note when the person presses a key or a mouse button while the search runs."""
+        try:
+            from .compat import QtCore, QtWidgets
+
+            app = QtWidgets.QApplication.instance()
+            if app is None:
+                return
+            kinds = (QtCore.QEvent.KeyPress, QtCore.QEvent.MouseButtonPress)
+            move, none = QtCore.QEvent.MouseMove, QtCore.Qt.NoButton
+
+            class Watch(QtCore.QObject):
+                at = None
+
+                def eventFilter(self, obj, event):
+                    try:
+                        kind = event.type()
+                        if kind in kinds or (kind == move and event.buttons() != none):
+                            self.at = time.perf_counter()
+                    except Exception:
+                        pass
+                    return False
+
+            watch = self._watch = Watch()
+            app.installEventFilter(watch)
+            self.last_input = lambda: watch.at
+        except Exception:
+            self._watch = None
+
+    def _unwatch_input(self):
+        watch, self._watch = self._watch, None
+        if watch is None:
+            return
+        try:
+            from .compat import QtWidgets
+
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.removeEventFilter(watch)
+        except Exception:
+            pass
+
+    def _typing(self):
+        """True for INPUT_REST_S after the person's last key, mouse press or move with a
+        button held (typing, the view being turned, something being dragged)."""
+        try:
+            at = self.last_input() if self.last_input is not None else None
+            return at is not None and time.perf_counter() - at < self.INPUT_REST_S
+        except Exception:
+            return False
 
     def step(self):
         """One build (or the end). True when the search has ended."""
@@ -799,9 +861,14 @@ class Background:
         except Exception:
             self.done = True
             busy(self, False)
+            self._unwatch_input()
 
     def _waits(self):
-        if self.paused is None or self.timer is None:
+        if self.timer is None:
+            return False
+        if self._typing():
+            return True
+        if self.paused is None:
             return False
         try:
             return bool(self.paused())
@@ -810,6 +877,7 @@ class Background:
 
     def _end(self):
         callback, self.on_done = self.on_done, None
+        self._unwatch_input()
         try:
             if callback is not None:
                 callback(self.result)
@@ -830,6 +898,7 @@ class Background:
         self.on_done = None
         self.done = True
         busy(self, False)
+        self._unwatch_input()
         if self.timer is not None:
             self.timer.stop()
         try:

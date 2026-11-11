@@ -3133,6 +3133,11 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                     from . import sketch_named_dimensions
 
                     sketch_named_dimensions.remember(self.sketch, made.created)
+                if kind == "length":
+                    # (wave 7, the book replay) the first dimension scales the whole sketch
+                    # also when its value is typed as a sum (the Fire Piston's "0.70/2"),
+                    # a parameter or `Name = value`: only a plain number did
+                    scaled = self._scale_at_first(App.Units.Quantity("%r mm" % float(made.value)))
                 # (bound the way FreeCAD renumbers it when a constraint before it is
                 # deleted: parameters.set_expression, bug 3 of the book parity report)
                 parameters.set_expression(self.sketch, ".Constraints[%d]" % self.index, formula)

@@ -999,6 +999,9 @@ class SectionPanel(bodypick.Tones, pickpanel.PickPanel):
                 self._show_status("")
                 return False
             label = self.analysis.Label
+            # the body start() asked for (only for the origin squares) goes in this step;
+            # else the close took the merged step for a cancelled one and undid the section
+            commands.drop_unused_made_body(self.doc)
             done = self.finish_ok()
             schedule(self.doc)
             log("Section Analysis: %s kept" % label)

@@ -188,5 +188,48 @@ class RefusalWordsTests(unittest.TestCase):
         )
 
 
+class Checked:
+    """A part that counts how often OpenCASCADE's (slow) check runs on it."""
+
+    def __init__(self, code, clean=True):
+        self.code, self.clean, self.checks, self.Edges = code, clean, 0, []
+
+    def hashCode(self):
+        return self.code
+
+    def isSame(self, other):
+        return other is self
+
+    def check(self, _bop=False):
+        self.checks += 1
+        if not self.clean:
+            raise ValueError("an edge does not lie on its face")
+
+
+class CleanIsKept(unittest.TestCase):
+    def setUp(self):
+        fillet_robust._STATE["tables"] = []
+        fillet_robust._STATE["clean"] = []
+
+    def test_the_check_runs_once_for_a_part(self):
+        # the book replay (Fire Piston): the check takes seconds on a part with a modeled
+        # thread, and it ran again whenever the tables of other solids had pushed the
+        # part's table out (every second trial of a chamfer size)
+        piston, dirty = Checked(1), Checked(2, clean=False)
+        self.assertTrue(fillet_robust._clean(piston))
+        self.assertFalse(fillet_robust._clean(dirty))
+        for code in range(10, 10 + fillet_robust._KEEP_TABLES + 2):
+            fillet_robust._table(Checked(code))  # the part-way solids of other routes
+        self.assertTrue(fillet_robust._clean(piston))
+        self.assertFalse(fillet_robust._clean(dirty))
+        self.assertEqual((piston.checks, dirty.checks), (1, 1))
+
+    def test_another_part_with_the_same_hash_is_checked_itself(self):
+        one, other = Checked(7), Checked(7, clean=False)
+        self.assertTrue(fillet_robust._clean(one))
+        self.assertFalse(fillet_robust._clean(other))
+        self.assertEqual(other.checks, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

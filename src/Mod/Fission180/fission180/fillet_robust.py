@@ -74,6 +74,7 @@ _STATE = {
     "memo": [],
     "suspects": [],
     "tables": [],
+    "clean": [],
     "why": "",
 }
 _KEEP_TWINS = 3
@@ -81,6 +82,7 @@ _KEEP_FAILS = 400
 _KEEP_MEMO = 6
 _KEEP_SUSPECTS = 12
 _KEEP_TABLES = 4
+_KEEP_CLEAN = 6
 
 
 class Refused(blend.BlendError):
@@ -703,11 +705,31 @@ def _clean(shape):
     Turbine's housing)."""
     table = _table(shape)
     if "clean" not in table:
-        try:
-            shape.check(True)
-            table["clean"] = True
-        except Exception:
-            table["clean"] = False
+        # (wave 7, the book replay) The verdict is kept apart from the table: the tables of
+        # the last few parts are kept, the routes tried after this one ask for the tables
+        # of their part-way solids, and the part's own table was gone at the next preview.
+        # The check takes seconds on a part with a modeled thread (the Fire Piston's
+        # chamfer on its threaded end face ran it at every second trial of a size).
+        key = _shape_key(shape)
+        verdict = None
+        for i, (known_key, source_shape, clean) in enumerate(_STATE["clean"]):
+            try:
+                if key is not None and known_key == key and source_shape.isSame(shape):
+                    verdict = clean
+                    _STATE["clean"].insert(0, _STATE["clean"].pop(i))
+                    break
+            except Exception:
+                continue
+        if verdict is None:
+            try:
+                shape.check(True)
+                verdict = True
+            except Exception:
+                verdict = False
+            if key is not None:
+                _STATE["clean"].insert(0, (key, shape, verdict))
+                del _STATE["clean"][_KEEP_CLEAN:]
+        table["clean"] = verdict
     return table["clean"]
 
 
