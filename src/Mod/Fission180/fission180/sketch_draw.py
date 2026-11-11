@@ -132,17 +132,11 @@ class Geometry:
         # (geo, curve) for "which curve is under the pointer" (axes -1, -2 first)
         self.hits = [(-1, curves[0]), (-2, curves[1])]
         items = [("point", -1, (0.0, 0.0))]  # snap point descriptions (sketch_infer_core)
-        from . import sketch_draw_helpers
+        from . import sketch_helpers
 
-        # a shape's helper curves that are not drawn (a polygon's corner circle, a fit
-        # point spline's control circles) are nothing to snap to or to pick
-        hidden = set(sketch_draw_helpers.hidden(sketch))
-        try:
-            from . import sketch_helpers
-
-            hidden |= set(sketch_helpers.hidden(sketch))  # (hidden helper lines: pattern ties)
-        except Exception:
-            pass
+        # helper curves that are not drawn (a polygon's corner circle, a fit point spline's
+        # control circles, a pattern's spokes) are nothing to snap to or to pick
+        hidden = sketch_helpers.hidden(sketch)
         for i, geo in enumerate(sketch.Geometry):
             if i in hidden:
                 continue

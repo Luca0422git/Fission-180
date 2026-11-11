@@ -1783,8 +1783,6 @@ class SketchSession:
         FreeCAD directly. Then it is checked: when no spline came of it, Fission 180 makes
         it from the points (sketch_spline.make_from_points) and FreeCAD's tool is stopped
         (its points are gone). Returns "freecad", "own" or None (nothing to make)."""
-        from . import sketch_spline
-
         gl = self.gl
         if gl is None or not _is_valid(gl):
             return None

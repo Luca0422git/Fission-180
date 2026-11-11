@@ -564,18 +564,11 @@ class Inference:
             for i in helpers
             if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
         }
-        try:
-            from . import sketch_helpers
+        from . import sketch_helpers
 
-            # (Fission 180's hidden helper lines, a circular pattern's spokes: never snapped to)
-            helper_circles |= sketch_helpers.hidden(sketch)
-        except Exception:
-            pass
-        from . import sketch_draw_helpers
-
-        # ...nor are a shape's helper curves that are not drawn (a polygon's corner circle
-        # and spoke, a fit point spline's control circles: sketch_draw_helpers.py)
-        helper_circles |= sketch_draw_helpers.hidden(sketch)
+        # helper curves that are not drawn are never snapped to (a circular pattern's
+        # spokes, a polygon's corner circle and spoke, a fit point spline's control circles)
+        helper_circles |= sketch_helpers.hidden(sketch)
         for i, geo in enumerate(sketch.Geometry):
             if i in helper_circles:
                 continue

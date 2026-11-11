@@ -28,12 +28,32 @@ NODE = "Fission180HiddenHelpers"
 SUB_LAYERS = 5  # FreeCAD's kinds of curve per layer (normal, construction, internal, ...)
 
 
+def _visual_layer(facade):
+    """The Coin layer FreeCAD draws a curve on (its view extension's VisualLayerId; 0 when
+    it has none)."""
+    try:
+        for ext in facade.getExtensions():
+            layer = getattr(ext, "VisualLayerId", None)
+            if layer is not None:
+                return int(layer)
+    except Exception:
+        pass
+    return 0
+
+
 def hidden(sketch):
-    """Indices of the sketch's hidden helper curves."""
+    """Indices of the sketch's curves and points that work unseen. THE one answer for every
+    tool (wave 7's merge): this module's helper lines (a circular pattern's spokes, an
+    offset's square lines: GeometryLayerId 2) and the helper curves of sketch_draw_helpers
+    (a polygon's corner circle and spoke, a fit point spline's control circles, a centerline
+    diameter's mirror point: only the view's VisualLayerId 2). Snapping, picking, chain
+    selection, box selection, Trim / Extend, Offset, Mirror, Move / Copy and the patterns
+    all ask here (sketch_build.internal_geometry, sketch_draw.Geometry, sketch_infer,
+    sketch_select.curves_of, _NeverSelected)."""
     out = set()
     try:
         for i, facade in enumerate(sketch.GeometryFacadeList):
-            if facade.GeometryLayerId == HIDDEN_LAYER:
+            if facade.GeometryLayerId == HIDDEN_LAYER or _visual_layer(facade) == HIDDEN_LAYER:
                 out.add(i)
     except Exception:
         pass
@@ -125,39 +145,86 @@ def install(view):
     return len(found)
 
 
-class _NeverSelected:
-    """A selection observer: a hidden helper line that gets selected all the same (FreeCAD's
-    box selection takes every curve inside the box, drawn or not) is let go again at once,
-    so Delete, Cut or a drag never act on a line nobody can see. Only the selection is
-    changed, and only from a timer (never inside the observer's call)."""
+def unseen_element(sketch, name, unseen):
+    """Is the sketch's selection name `name` ("Edge3", "Vertex7") a curve, a point, or the
+    end of a line that works unseen? `unseen`: hidden(sketch). The ends of a hidden line
+    count: a box selection takes them too, and Delete on one would take the constraints
+    that tie a pattern's copies off it."""
+    try:
+        if name.startswith("Edge"):
+            return int(name[4:]) - 1 in unseen
+        if name.startswith("Vertex"):
+            geo, _pos = sketch.getGeoVertexIndex(int(name[6:]) - 1)
+            return geo in unseen
+    except Exception:
+        pass
+    return False
 
-    def addSelection(self, doc, obj, sub, _pos=None):
+
+class _NeverSelected:
+    """A selection observer: a hidden helper that gets selected all the same (FreeCAD's box
+    selection takes every curve and point inside the box, drawn or not) is let go again at
+    once, so Delete, Cut or a drag never act on something nobody can see. Only the
+    selection is changed, and only from a timer (never inside the observer's call): one
+    timer for a whole box, which takes the hidden ones out together."""
+
+    def __init__(self):
+        self._pending = False
+
+    def addSelection(self, _doc, _obj, sub, _pos=None):
         try:
             short = str(sub).rsplit(".", 1)[-1]
-            if not short.startswith("Edge"):
-                return
-            import FreeCAD as App
-
-            document = App.getDocument(doc)
-            sketch = document.getObject(obj) if document is not None else None
-            if sketch is None or sketch.TypeId != "Sketcher::SketchObject":
-                return
-            if int(short[4:]) - 1 not in hidden(sketch):
+            if not short.startswith(("Edge", "Vertex")) or self._pending:
                 return
             from .compat import QtCore
 
-            QtCore.QTimer.singleShot(0, lambda: _unselect(doc, obj, sub))
+            self._pending = True
+            QtCore.QTimer.singleShot(0, self._let_go)
         except Exception:
             pass
 
+    def _let_go(self):
+        self._pending = False
+        try:
+            from . import sketch_mode
 
-def _unselect(doc, obj, sub):
-    try:
-        import FreeCADGui as Gui
+            # (the open sketch: FreeCAD names the object it is edited through, the body)
+            session = sketch_mode.current()
+            if session is not None:
+                unselect_unseen(session.sketch)
+        except Exception as exc:
+            warn("sketch helper lines: %s" % exc)
 
-        Gui.Selection.removeSelection(doc, obj, sub)
-    except Exception:
-        pass
+
+def unselect_unseen(sketch):
+    """Take the sketch's unseen helpers out of the selection. Returns how many were let
+    go. FreeCAD keeps an open sketch's elements under the object it is edited through (the
+    body: "Sketch.Edge5"), where removeSelection by the sketch's own name removes nothing:
+    the selection is cleared and the others are selected again (as sketch_select does)."""
+    import FreeCADGui as Gui
+
+    unseen = hidden(sketch)
+    if not unseen:
+        return 0
+    keep, drop = [], 0
+    for sel in Gui.Selection.getSelectionEx():
+        if sel.Object is not sketch:
+            continue
+        for name in sel.SubElementNames:
+            short = name.rsplit(".", 1)[-1]
+            if not short:
+                continue
+            if unseen_element(sketch, short, unseen):
+                drop += 1
+            elif short not in keep:
+                keep.append(short)
+    if not drop:
+        return 0
+    doc = sketch.Document.Name
+    Gui.Selection.clearSelection()
+    for name in keep:
+        Gui.Selection.addSelection(doc, sketch.Name, name)
+    return drop
 
 
 _observer = {"it": None}
@@ -179,9 +246,10 @@ def _watch_selection():
 def opened(session):
     """A sketch was opened for editing (sketch_mode): its hidden helpers stay unseen."""
     try:
-        if not any_hidden(session.sketch):
+        if not hidden(session.sketch):
             return
-        install(session.view)
+        if any_hidden(session.sketch):
+            install(session.view)
         _watch_selection()
     except Exception as exc:
         warn("sketch helper lines: %s" % exc)
