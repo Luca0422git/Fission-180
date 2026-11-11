@@ -34,6 +34,8 @@ origin.
      pointer "left" it (FreeCAD's value box under the pointer): the line is still exactly
      upright (sketch-a's "no guide stays behind when the pointer leaves" dropped the guide
      the typed line was to follow)
+  K  Line: 20 typed for the first line and the pointer moved up at once, before the tool has
+     started the next line from the end; 12 typed: the second line is exactly upright
 """
 
 import FreeCAD as App
@@ -424,6 +426,52 @@ def j_check():
             abs(g.StartPoint.x - g.EndPoint.x) < 1e-7,
             (g.StartPoint, g.EndPoint),
         )
+    st.sketch_ok("after J")
+
+
+# == K ======================================================================================
+def k_line():
+    s["n"] = len(sk().Geometry)
+    h.press("l")
+
+
+def k_first():
+    st.click(V(-60, -44, 0))
+
+
+def k_right():
+    si.move_towards(st.g(V(-52, -43.7, 0)), V(1, 0, 0))
+
+
+def k_type_and_move_at_once():
+    # 20 and Enter draw the first line; the hand is already on its way up before the Line
+    # tool has started the next line from the end (GitHub's run, sketch_qa_keys R2: the
+    # pointer moved first, the restart came after it and put the pointer "back" where the
+    # screen's own pointer was, which a tablet or a test does not move)
+    si.type_text("20")
+    si.move_towards(st.g(V(-39.7, -36, 0)), V(0, 1, 0))
+
+
+def k_type_12():
+    si.type_text("12")
+
+
+def k_check():
+    end_tool()
+    lines = [
+        g
+        for i, g in enumerate(sk().Geometry)
+        if i >= s["n"] and g.TypeId == "Part::GeomLineSegment"
+    ]
+    h.check("K two lines were drawn", len(lines) == 2, len(lines))
+    if len(lines) == 2:
+        g = lines[1]
+        h.check("K the second is 12 long", abs(g.length() - 12) < 1e-6, g.length())
+        h.check(
+            "K ...and exactly upright (the pointer moved before the next line started)",
+            abs(g.StartPoint.x - g.EndPoint.x) < 1e-7,
+            (g.StartPoint, g.EndPoint),
+        )
     st.sketch_ok("at the end")
 
 
@@ -478,6 +526,12 @@ h.run(
         j_up,
         j_leave_and_type,
         j_check,
+        k_line,
+        k_first,
+        k_right,
+        k_type_and_move_at_once,
+        k_type_12,
+        k_check,
     ],
     paced_by="state",
 )
