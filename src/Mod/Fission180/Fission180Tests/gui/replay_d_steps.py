@@ -523,3 +523,62 @@ def rim_points(x, radius, axis="x", first=135.0):
         a = math.radians(first + turn)
         out.append(V(x, radius * math.cos(a), radius * math.sin(a)))
     return out
+
+
+def click_radio(label):
+    """Click the activate ring of a component's row (or the design's), the browser scrolled
+    to the row first (the list is long by the end of an assembly)."""
+    from Fission180Tests.gui import widget_input as w
+
+    tree = t.tree()
+    item = tree.row(label)
+    if not h.check("browser row %r" % label, item is not None, tree.labels()):
+        return False
+    tree.scrollToItem(item)
+    QtWidgets.QApplication.processEvents()
+    w.click(tree.viewport(), tree.radio_point(item))
+    return True
+
+
+def click_circle(at, radius, axis="x", first=135.0, tol=None, modifiers=QtCore.Qt.NoModifier):
+    """Click the round edge of `radius` about the `axis` line at `at` along it (mm), as a
+    person does: the pointer goes where THAT edge is under it (the view's own pick says
+    which edge a pixel has: a rim 1 mm beside another is told apart), clear of anything
+    floating over the view. True when the edge was clicked."""
+    tol = tol if tol is not None else max(0.02, min(0.15, 0.05 * radius))
+    widget = h.gl_widget()
+    ratio = widget.devicePixelRatioF()
+
+    def on_circle(hit):
+        if axis == "x":
+            along, off = hit.x, math.hypot(hit.y, hit.z)
+        elif axis == "y":
+            along, off = hit.y, math.hypot(hit.x, hit.z)
+        else:
+            along, off = hit.z, math.hypot(hit.x, hit.y)
+        return abs(along - at) <= tol and abs(off - radius) <= tol
+
+    for turn in (0, -25, 25, -50, 50, -75, 75, -100, 100, 180, 140, -140, 160, -160):
+        a = math.radians(first + turn)
+        c, s_ = radius * math.cos(a), radius * math.sin(a)
+        point = {"x": V(at, c, s_), "y": V(c, at, s_)}.get(axis, V(c, s_, at))
+        centre = h.screen_point(point)
+        for reach in range(0, h.AIM + 1):
+            for dx in range(-reach, reach + 1):
+                for dy in range(-reach, reach + 1):
+                    if max(abs(dx), abs(dy)) != reach:
+                        continue
+                    pos = QtCore.QPoint(centre.x() + dx, centre.y() + dy)
+                    if h.covered(pos):
+                        continue
+                    info = h.view().getObjectInfo((pos.x() * ratio, (widget.height() - pos.y()) * ratio))
+                    if not info or not str(info.get("Component", "")).startswith("Edge"):
+                        continue
+                    if not on_circle(V(info["x"], info["y"], info["z"])):
+                        continue
+                    h.press_pace()
+                    h.move(pos)
+                    QtTest.QTest.mouseClick(widget, QtCore.Qt.LeftButton, modifiers, pos)
+                    QtWidgets.QApplication.processEvents()
+                    return True
+    return False

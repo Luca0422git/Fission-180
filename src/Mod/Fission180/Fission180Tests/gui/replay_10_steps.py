@@ -952,7 +952,7 @@ def body_look():
 
 def root_activate():
     # report 1686: "Root dot activates the root"
-    cs.click_radio(r.doc().Label)
+    r.click_radio(r.doc().Label)
 
 
 root_activate.done = lambda: r.active_label() == ""
@@ -1955,6 +1955,288 @@ def rod_revolved():
     h.shot("10-rod-revolved")
 
 
+# == 12: the holes, the tip's chamfer (report 1731-1733) ===========================================
+def _hs():
+    from Fission180Tests.gui import hole_steps as hs
+
+    return hs
+
+
+def isolate(label):
+    def step():
+        t.row_menu(label, "Isolate")
+
+    return r.named(step, "isolate_" + label.replace(" ", "_"))
+
+
+def exit_isolate(label):
+    def step():
+        t.row_menu(label, "Exit Isolate")
+
+    return r.named(step, "exit_isolate_" + label.replace(" ", "_"))
+
+
+def look_from_left():
+    r.cube_click("home")
+    r.orbit(-260, 0)
+
+
+def hole_open():
+    Gui.Selection.clearSelection()
+    h.ribbon("Hole")
+
+
+hole_open.done = lambda: _hs().hole_panel() is not None
+hole_open.done_what = "the Hole dialog is open"
+
+
+def hole_click_tip():
+    h.check("only the Piston is shown", _shown("Piston") and not _shown("Piston Body"))
+    # beside the middle of the tip (the dot is dragged to the middle next, as the book does)
+    h.click(V(ROD_X0 * IN, 0.45 * R_ROD * IN, -0.3 * R_ROD * IN))
+
+
+def hole_drag_to_centre():
+    p = _hs().hole_panel()
+    dot = p.draggers.get("centre") if p is not None else None
+    if not h.check("the hole is on the tip, with its blue dot", dot is not None, p and p.message.text()):
+        return
+    # report 1731: "drag the blue dot to the centre (snaps, X/Y = 0)"
+    h.drag(h.screen_point(dot.point()), h.screen_point(V(ROD_X0 * IN, 0, 0)), steps=14)
+
+
+def hole_countersink():
+    hs = _hs()
+    p = hs.hole_panel()
+    centre = hs.centre_of(p.target) if p.target is not None else None
+    h.check(
+        "the dragged dot snapped onto the tip's centre",
+        centre is not None and (centre - V(ROD_X0 * IN, 0, 0)).Length < 1e-6,
+        centre,
+    )
+    h.check("X and Y read 0", abs(p.pos_x.value()) < 1e-9 and abs(p.pos_y.value()) < 1e-9, (p.pos_x.value(), p.pos_y.value()))
+    h.check("Countersink", r.choose(p.hole_type, "Countersink"))
+
+
+def hole_countersink_sizes():
+    p = _hs().hole_panel()
+    r.type_field(p.csink_diameter.widget, "0.25")
+    r.type_field(p.depth.widget, "3/16")
+    r.type_field(p.diameter.widget, "1/8")
+
+
+def hole_ok():
+    p = _hs().hole_panel()
+    S["drill_point"] = p.drill_point.currentText()
+    S["csink_angle"] = p.csink_angle.value()
+    h.check("no message", not _hs().message(p), _hs().message(p))
+    r.ok()
+
+
+hole_ok.done = lambda: _hs().hole_panel() is None
+hole_ok.done_what = "the Hole dialog closed"
+
+
+def tip_hole_made():
+    hs = _hs()
+    removed = hs.countersink(IN / 8, 0.25 * IN, 3 * IN / 16, S["csink_angle"])
+    if S["drill_point"] == "Angle":
+        removed += hs.tip_cone(IN / 8)
+    S["v_rod"] = r.pappus([(a * IN, b * IN) for a, b in _rod()]) - removed
+    r.check_volume("0.25, 3/16 and 1/8 are inches: the countersunk hole's volume", "Piston", S["v_rod"], 1e-5)
+    h.check("the Hole is a step of the Piston", "Hole 1" in t.titles(), t.titles())
+    inch("Hole")
+    r.timeline_ok("Hole")
+
+
+def tip_chamfer_rim():
+    # the tip's outer rim (the countersink's rim is 0.03 in inside it)
+    h.check("the tip's outer rim is clicked", r.click_circle(ROD_X0 * IN, R_ROD * IN, first=200.0))
+
+
+def tip_chamfer_size():
+    p = _blend()
+    h.check("the tip's rim is picked", p is not None and len(p.refs) == 1, p and p.refs)
+    r.type_field(p.distance.widget, "0.02")
+
+
+def tip_chamfer_ok():
+    p = _blend()
+    App.Console.PrintMessage(
+        "[Fission 180] replay: tip chamfer refs %s distance %s note %r\n"
+        % (p.refs, p.distance.value(), p.limit_label.text())
+    )
+    h.check("0.02 in is taken as typed (not held at a smaller size)", r.near(p.distance.value(), 0.02 * IN) and not p.limit_label.text(), (p.distance.value() / IN, p.limit_label.text()))
+    h.check("no message", not _message(_blend()), _message(_blend()))
+    r.ok()
+
+
+tip_chamfer_ok.done = lambda: _blend() is None
+tip_chamfer_ok.done_what = "the Chamfer dialog closed"
+
+
+def tip_chamfered():
+    S["v_rod"] = S.get("v_rod", 0) - _ring(0.02, R_ROD, True)
+    r.check_volume("0.02 on the tip", "Piston", S["v_rod"], 1e-5)
+    inch("the tip's chamfer")
+    r.timeline_ok("the tip's chamfer")
+    h.shot("10-piston-tip")
+
+
+def activate(label):
+    def step():
+        r.click_radio(label)
+
+    step.done = lambda: r.active_label() == label
+    step.done_what = "%s is active" % label
+    return r.named(step, "activate_" + label.replace(" ", "_"))
+
+
+def knob_hole_click():
+    p = _hs().hole_panel()
+    # report 1733: "the dialog remembers the last hole's settings (like Fusion)"
+    h.check("the dialog remembers Countersink", p.hole_type.currentText() == "Countersink", p.hole_type.currentText())
+    h.check("...and its 1/8 in", r.near(p.diameter.value(), IN / 8), p.diameter.value())
+    face = _plane_face("Piston End", KNOB_X0)
+    spot = r.seen_spot(face) if face is not None else None
+    if h.check("the knob's inner face is in view", spot is not None, r.looking()):
+        h.click(spot)
+
+
+def knob_hole_drag():
+    p = _hs().hole_panel()
+    dot = p.draggers.get("centre") if p is not None else None
+    if h.check("the hole is on the knob, with its blue dot", dot is not None, p and p.message.text()):
+        h.drag(h.screen_point(dot.point()), h.screen_point(V(KNOB_X0 * IN, 0, 0)), steps=14)
+
+
+def knob_hole_type():
+    p = _hs().hole_panel()
+    h.check("Simple", r.choose(p.hole_type, "Simple"))
+
+
+def knob_hole_tapped():
+    p = _hs().hole_panel()
+    h.check("Tapped", r.choose(p.tap_type, "Tapped"))
+
+
+def knob_hole_thread():
+    p = _hs().hole_panel()
+    if p.standard.currentText() != "ANSI Unified Screw Threads":
+        App.Console.PrintMessage("[Fission 180] replay: hole thread types %s\n" % [p.standard.itemText(i) for i in range(p.standard.count())])
+        ansi = [p.standard.itemText(i) for i in range(p.standard.count()) if "ANSI Unified" in p.standard.itemText(i)]
+        h.check("ANSI Unified", bool(ansi) and r.choose(p.standard, ansi[0]), p.standard.currentText())
+
+
+def knob_hole_size():
+    p = _hs().hole_panel()
+    sizes = [p.size.itemText(i) for i in range(p.size.count())]
+    want = [s for s in sizes if s.startswith("5/16")]
+    if h.check("a 5/16 size is listed", bool(want), sizes[:12]):
+        if p.size.currentText() != want[0]:
+            h.check("5/16", r.choose(p.size, want[0]))
+
+
+def knob_hole_designation():
+    p = _hs().hole_panel()
+    if p.designation.currentText() != "5/16-18 UNC":
+        h.check("5/16-18 UNC", r.choose(p.designation, "5/16-18 UNC"), [p.designation.itemText(i) for i in range(p.designation.count())])
+
+
+def knob_hole_depth():
+    p = _hs().hole_panel()
+    r.type_field(p.depth.widget, "0.5")
+    r.tick(p.modeled, True)
+
+
+def knob_hole_ok():
+    p = _hs().hole_panel()
+    centre = _hs().centre_of(p.target) if p.target is not None else None
+    h.check("the hole is on the knob's axis", centre is not None and (centre - V(KNOB_X0 * IN, 0, 0)).Length < 1e-6, centre)
+    h.check("5/16-18 UNC, 0.5 in deep, modeled", p.designation.currentText() == "5/16-18 UNC" and r.near(p.depth.value(), 0.5 * IN) and p.modeled.isChecked(), (p.designation.currentText(), p.depth.value()))
+    h.check("no message", not _hs().message(p), _hs().message(p))
+    r.ok()
+
+
+knob_hole_ok.done = lambda: _hs().hole_panel() is None
+knob_hole_ok.done_what = "the Hole dialog closed"
+knob_hole_ok.timeout_s = 180
+
+
+def knob_hole_made():
+    shape = r.shape_of("Piston End")
+    h.check("one valid solid", shape.isValid() and len(shape.Solids) == 1)
+    full = r.pappus([(a * IN, b * IN) for a, b in KNOB])
+    removed = full - shape.Volume
+    # a 5/16-18 tap hole 0.5 in deep: between the tap drill (d0.257) and the full d5/16
+    low = math.pi * (0.257 * IN / 2) ** 2 * 0.5 * IN
+    high = math.pi * (0.3125 * IN / 2) ** 2 * 0.5 * IN * 1.25
+    h.check("a threaded hole 0.5 in deep is cut into the knob", low * 0.9 < removed < high, (removed, low, high))
+    deep = max(v.Point.x for v in shape.Vertexes if math.hypot(v.Point.y, v.Point.z) < 0.2 * IN and v.Point.x < (KNOB_X0 + KNOB_T - 0.01) * IN)
+    h.check("0.5 typed is 0.5 in deep (its drill point beyond)", (KNOB_X0 + 0.49) * IN < deep < (KNOB_X0 + 0.62) * IN, deep / IN)
+    r.check_volume("the Piston is not cut by the knob's hole", "Piston", S["v_rod"], 1e-5)
+    h.check("the hole is a step of Piston End", any(x.startswith("Hole") for x in t.titles()), t.titles())
+    inch("the tapped Hole")
+    r.timeline_ok("the tapped Hole")
+    h.shot("10-knob-hole")
+
+
+# == 13: the piston's O-ring (report 1719: "Offset ... -0.15625 in (piston groove)") ===============
+ORING_ROD = "O-Ring AS568-009"  # 0.208 x 0.070: the groove's floor
+
+
+def eye(label):
+    def step():
+        t.click_eye(label)
+
+    return r.named(step, "eye_" + label.replace(" ", "_"))
+
+
+def joint_pick_tip():
+    p = j.joint_panel()
+    h.check("the O-ring is component 1", p.snaps["comp1"] is not None and p.active == "comp2")
+    look_from_left()
+    # the tip's flat is a ring a hair wide round the countersink: its round rim is clicked
+    # (Fusion: a round edge gives its centre)
+    rim = (R_ROD - 0.02) * IN
+    h.check("the rim of the piston's tip is clicked (the Piston Body is hidden)", r.click_circle(ROD_X0 * IN, rim, first=200.0), r.looking())
+
+
+def joint_groove_offset():
+    p = j.joint_panel()
+    snap = p.snaps["comp2"]
+    h.check(
+        "the rim's snap is its centre, on the axis",
+        snap is not None and (snap["point"] - V(ROD_X0 * IN, 0, 0)).Length < 1e-4,
+        snap and (snap["kind"], snap["point"]),
+    )
+    # negative: into the part, along the rod, to the middle of the groove
+    r.type_field(p.offset_fields["z"].widget, "-5/32")
+
+
+def joint_groove_made():
+    box = _ring_box(ORING_ROD)
+    middle = (ROD_X0 + 5.0 / 32) * IN
+    h.check("-5/32 typed: the O-ring sits in the middle of the groove", abs((box[0] + box[3]) / 2 - middle) < 1e-3, ((box[0] + box[3]) / 2 / IN, middle / IN))
+    h.check("on the axis", abs(box[1] + box[4]) < 1e-3 and abs(box[2] + box[5]) < 1e-3, box)
+    floor = (0.208 / 2) * IN
+    h.check("its inside on the groove's floor (d0.208)", abs((box[4] - box[1]) / 2 - (floor + ORING_CS * IN)) < 1e-3, box)
+    box_rod = [ROD_X0 * IN, -R_ROD * IN, -R_ROD * IN, (ROD_X0 + ROD_LEN) * IN, R_ROD * IN, R_ROD * IN]
+    r.check_box("the Piston did not move (the O-ring came to it)", "Piston", box_rod)
+    rigid = [x.Label for x in j.joint_list() if x.Label.startswith("Rigid")]
+    h.check("three Rigid joints", len(rigid) == 3, [x.Label for x in j.joint_list()])
+    inch("the piston O-ring's Joint")
+    r.timeline_ok("the piston O-ring's Joint")
+    h.shot("10-oring-piston")
+
+
+def body_shown_again():
+    h.check("the Piston Body is shown again", _shown("Piston Body"))
+    look_is("Aluminium, anodized blue", "Piston Body", "hide and show")  # report 1744
+    r.cube_click("home")
+    h.fit()
+
+
 def steps():
     return r.stages(
         "replay_10",
@@ -2199,6 +2481,62 @@ def steps():
                     revolve_axis_at(5.3),
                     revolve_new_body,
                     rod_revolved,
+                ],
+            ),
+            (
+                "holes",
+                [
+                    isolate("Piston"),
+                    look_from_left,
+                    hole_open,
+                    hole_click_tip,
+                    hole_drag_to_centre,
+                    hole_countersink,
+                    hole_countersink_sizes,
+                    hole_ok,
+                    tip_hole_made,
+                    chamfer_open,
+                    tip_chamfer_rim,
+                    tip_chamfer_size,
+                    tip_chamfer_ok,
+                    tip_chamfered,
+                    exit_isolate("Piston"),
+                    activate("Piston End"),
+                    isolate("Piston End"),
+                    look_from_left,
+                    hole_open,
+                    knob_hole_click,
+                    knob_hole_drag,
+                    knob_hole_type,
+                    knob_hole_tapped,
+                    knob_hole_thread,
+                    knob_hole_size,
+                    knob_hole_designation,
+                    knob_hole_depth,
+                    knob_hole_ok,
+                    knob_hole_made,
+                    exit_isolate("Piston End"),
+                    root_activate,
+                ],
+            ),
+            (
+                "rod_oring",
+                [hardware_open]
+                + hardware_search("o-ring 009", ORING_ROD)
+                + [
+                    oring_ok,
+                    oring_move("6"),
+                    move_ok,
+                    oring_placed(ORING_ROD, 6.0, 0.208),
+                    eye("Piston Body"),
+                    joint_start,
+                    joint_pick_ring(ORING_ROD, 6.0 + ORING_CS / 2),
+                    joint_pick_tip,
+                    joint_groove_offset,
+                    joint_ring_ok,
+                    joint_groove_made,
+                    eye("Piston Body"),
+                    body_shown_again,
                 ],
             ),
         ],
