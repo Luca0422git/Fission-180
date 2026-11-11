@@ -313,9 +313,13 @@ def _after_generate(ctx, op, setup, lead):
     errors = _generate([op])
     row = _op_row(op, setup)
     if errors:
+        why = errors.get(op.Name, "")
+        if why.startswith("The toolpath could not be made: "):
+            why = why[len("The toolpath could not be made: ") :]
         return bridge_core.error_result(
-            "%s, but its toolpath could not be made: %s Change it with cam_edit (target %r) "
-            "or take it away with cam_delete." % (lead, errors.get(op.Name, ""), op.Name)
+            "%s, but FreeCAD's engine could not make its toolpath: %s Change it with "
+            "cam_edit (target %r) or take it away with cam_delete."
+            % (lead[len("Done: ") :] if lead.startswith("Done: ") else lead, why, op.Name)
         )
     stats = cam.result(op).get("stats") or {}
     core = _core()

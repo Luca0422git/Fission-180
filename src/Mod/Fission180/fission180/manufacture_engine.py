@@ -255,6 +255,9 @@ class Engine:
                 _set(obj, name, value)
             tabs = spec.get("tabs") or {}
             self.doc.recompute()
+            if tabs.get("positioning") == "points":
+                self._tabs_at(obj, tabs)
+                return obj
             count = int(tabs.get("count") or 4)
             if tabs.get("positioning") == "distance":
                 try:
@@ -286,6 +289,39 @@ class Engine:
         for name, value in (spec.get("props") or {}).items():
             _set(obj, name, value)
         return obj
+
+    def _tabs_at(self, obj, tabs):
+        """Tabs at clicked points: each point (x, y in the job's coordinates, clicked on the
+        model's edge) is moved onto the nearest place of the toolpath's contour, where
+        FreeCAD's tabs must sit."""
+        import Part
+
+        data = obj.Proxy.pathData
+        positions = []
+        reach = float(tabs.get("reach") or 4.0)
+        for number, (x, y) in enumerate(tabs.get("points") or [], 1):
+            vertex = Part.Vertex(App.Vector(float(x), float(y), data.minZ))
+            best = None
+            for edge in data.bottomEdges:
+                distance, pairs, _info = edge.distToShape(vertex)
+                if best is None or distance < best[0]:
+                    best = (distance, pairs[0][0])
+            if best is None or best[0] > reach:
+                raise ValueError(
+                    "tab position %d is not on this contour (it is %.1f mm from the toolpath): "
+                    "click on the contour's edge" % (number, best[0] if best else 0.0)
+                )
+            positions.append(App.Vector(best[1].x, best[1].y, data.minZ))
+        if not positions:
+            raise ValueError("no tab position was given")
+        obj.Positions = positions
+        obj.Disabled = []
+        self.doc.recompute()
+        if len(obj.Disabled):
+            raise ValueError(
+                "%d of the tabs overlap another tab or the start of the cut: put them "
+                "further apart" % len(obj.Disabled)
+            )
 
     def _part(self, part, controller, label):
         import importlib

@@ -88,7 +88,7 @@ STOCK_MODES = (
     ("solid", "From solid", True, ""),
     ("rel_cylinder", "Relative size cylinder", False, "Round stock is for turning."),
     ("fix_cylinder", "Fixed size cylinder", False, "Round stock is for turning."),
-    ("preceding", "From preceding setup", False, "Rest stock from another setup is not built."),
+    ("preceding", "From preceding setup", True, ""),
 )
 OFFSET_MODES = (
     ("none", "No additional stock"),
@@ -977,7 +977,11 @@ DRILL_CYCLES = (
 DIRECTIONS = (("climb", "Left (climb milling)"), ("conventional", "Right (conventional milling)"))
 RAMPS = (("plunge", "Plunge"), ("helix", "Helix"), ("profile", "Profile"), ("zigzag", "Zig-zag"))
 TAB_SHAPES = (("rectangular", "Rectangular"), ("triangular", "Triangular"))
-TAB_POSITIONING = (("distance", "By distance"), ("count", "Number of tabs"))
+TAB_POSITIONING = (
+    ("distance", "By distance"),
+    ("count", "Number of tabs"),
+    ("points", "At points"),
+)
 COMPENSATIONS = (
     ("computer", "In computer", True),
     ("control", "In control", False),
@@ -1000,6 +1004,7 @@ OP_DEFAULTS = {
             "positioning": "distance",
             "distance": 100.0,
             "count": 4,
+            "points": [],  # "points": [x, y, z] in design coordinates, clicked on the contour
         },
     },
     "heights": HEIGHT_DEFAULTS,
@@ -1173,10 +1178,30 @@ def op_title(kind):
     return op_info(kind)["title"]
 
 
+def tab_points(value):
+    """Tab positions as a list of [x, y, z] (design coordinates), or CamError."""
+    out = []
+    for point in value or []:
+        try:
+            xyz = [float(c) for c in point]
+        except (TypeError, ValueError):
+            raise CamError("A tab position is a point [x, y, z].")
+        if len(xyz) == 2:
+            xyz.append(0.0)
+        if len(xyz) != 3 or any(math.isnan(c) or math.isinf(c) for c in xyz):
+            raise CamError("A tab position is a point [x, y, z].")
+        out.append(xyz)
+    return out
+
+
 def op_options(kind, given=None):
     """An operation's options, complete: OP_DEFAULTS, the kind's own defaults, `given`."""
     op_info(kind)
     out = merge(merge(OP_DEFAULTS, KIND_DEFAULTS.get(kind)), given)
+    tabs = out["geometry"]["tabs"]
+    tabs["points"] = tab_points(tabs.get("points"))
+    if tabs.get("positioning") not in [k for k, _t in TAB_POSITIONING]:
+        raise CamError("Unknown tab positioning %r." % (tabs.get("positioning"),))
     if out.get("tool"):
         out["tool"] = tool(out["tool"])
     for key in HEIGHT_KEYS:
@@ -1291,6 +1316,11 @@ def op_problems(kind, options, picks=None):
                 out.append("The distance between tabs must be more than a tab's width.")
             if tabs["positioning"] == "count" and int(tabs["count"]) < 1:
                 out.append("At least one tab.")
+            if tabs["positioning"] == "points" and not tabs.get("points"):
+                out.append(
+                    "No tab position yet: click on the contour where each tab goes (Geometry "
+                    "tab > Tab Positions)."
+                )
         if kind == "drill":
             cycle = [c for c in DRILL_CYCLES if c[0] == passes["cycle"]][0]
             if not cycle[2]:
@@ -1476,6 +1506,10 @@ def engine_plan(kind, options, env):
                             "positioning": tabs["positioning"],
                             "distance": float(tabs["distance"]),
                             "count": int(tabs["count"]),
+                            # the clicked points in the setup's coordinates, and how far
+                            # from the toolpath a click on the model's edge may be
+                            "points": [list(xy) for xy in env.get("tab_points") or []],
+                            "reach": d / 2.0 + abs(radial) + 1.0,
                         },
                     }
                 )

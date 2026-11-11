@@ -21,12 +21,16 @@ is then drawn on the model. What cannot be made says why in the dialog: no tool,
 picked, a tool of the wrong kind, heights out of order.
 """
 
+import FreeCAD as App
+import FreeCADGui as Gui
+
 from . import bodies, commands, log, warn
 from . import manufacture_core as core
 from . import manufacture_panels as panels
 from .compat import QtCore, QtWidgets
 
 GEOMETRY = 0
+TABS = 1  # the selection box that takes the clicks for tabs "At points"
 LAST_TOOL = {}  # tool type group -> the tool picked last (new operations start with it)
 
 # field key -> (label, how it is edited, tool tip). "mm": a length; "deg"; "int"; "s";
@@ -360,6 +364,16 @@ class OpPanel(panels.CamPanel):
                 "Tabs per Contour",
                 self.plain_number("tabs_count", int(tabs["count"]), 1, 100),
             )
+            # Fusion's Tab Positioning "At points": each click on the contour is a tab
+            self.tab_points = [list(point) for point in tabs.get("points") or []]
+            points = self.selection_box(
+                TABS, "tabs_points", "Click on the contour", kinds=("edges", "faces")
+            )
+            points.widget.setToolTip(
+                "Click on the picked contour where each tab goes; the X takes them all away"
+            )
+            self._row(form, "tabs_points", "Tab Positions", points.widget)
+            self._tabs_text()
 
     def _heights_tab(self):
         form = self._page("Heights")
@@ -528,6 +542,8 @@ class OpPanel(panels.CamPanel):
         if self.kind == "contour2d":
             on = bool(self.value("tabs_on"))
             by_distance = self.value("tabs_positioning") == "distance"
+            by_count = self.value("tabs_positioning") == "count"
+            at_points = self.value("tabs_positioning") == "points"
             for key in (
                 "tabs_shape",
                 "tabs_width",
@@ -535,15 +551,19 @@ class OpPanel(panels.CamPanel):
                 "tabs_positioning",
                 "tabs_distance",
                 "tabs_count",
+                "tabs_points",
             ):
                 show = (
                     on
                     and (key != "tabs_distance" or by_distance)
-                    and (key != "tabs_count" or not by_distance)
+                    and (key != "tabs_count" or by_count)
+                    and (key != "tabs_points" or at_points)
                 )
                 label, widget = self.rows[key]
                 label.setVisible(show)
                 widget.setVisible(show)
+            if not (on and at_points) and self.active_box == TABS:
+                self.activate(GEOMETRY)  # (its box went: the contour's takes the clicks)
         if self.kind == "drill":
             cycle = self.value("cycle")
             for key, show in (
@@ -611,7 +631,7 @@ class OpPanel(panels.CamPanel):
 
     def _tab_changed(self, index):
         try:  # the Geometry tab's box takes the clicks while that tab shows
-            if GEOMETRY in self.boxes:
+            if GEOMETRY in self.boxes and self.active_box != TABS:
                 self.activate(GEOMETRY if index == 1 else self.active_box)
         except Exception as exc:
             warn("%s: %s" % (self.title, exc))
@@ -626,6 +646,80 @@ class OpPanel(panels.CamPanel):
             return element.Curve.TypeId == "Part::GeomCircle"
         except Exception:
             return False
+
+    # -- tabs at points ----------------------------------------------------------------------
+    def _tabs_text(self):
+        box = self.boxes.get(TABS)
+        if box is not None:
+            count = len(self.tab_points)
+            box.set_text("%d point%s" % (count, "" if count == 1 else "s") if count else None)
+
+    def box_text(self, index):
+        if index == TABS:
+            self._tabs_text()
+            return
+        super().box_text(index)
+
+    def clear_field(self, index):
+        if index == TABS:
+            try:
+                self.tab_points = []
+                self._tabs_text()
+                self._sync()
+                self.schedule()
+            except Exception as exc:
+                warn("%s: %s" % (self.title, exc))
+            return
+        super().clear_field(index)
+
+    def picks_changed(self, added, dropped):
+        """While Tab Positions takes the clicks, a click on the model is a tab's place (the
+        point clicked, in design coordinates), not a face or edge of the contour."""
+        if self.active_box != TABS:
+            return super().picks_changed(added, dropped)
+        changed = False
+        for obj, short, point in added:
+            if point is None or not short or not self.allow(obj, short):
+                continue
+            xyz = [round(float(c), 4) for c in point]
+            near = [
+                p
+                for p in self.tab_points
+                if sum((a - b) ** 2 for a, b in zip(p, xyz)) < float(self.value("tabs_width")) ** 2
+            ]
+            if near:  # (a click on a tab takes it away again)
+                for p in near:
+                    self.tab_points.remove(p)
+            else:
+                self.tab_points.append(xyz)
+            changed = True
+        if changed or added:
+            try:  # (the same edge is clicked again for the next tab)
+                Gui.Selection.clearSelection()
+            except Exception:
+                pass
+        if changed:
+            self._tabs_text()
+        return changed
+
+    def _tab_marks(self, frame):
+        """A cross on each tab position (in the setup's coordinates), while the dialog shows."""
+        from . import manufacture_view
+
+        marks = []
+        if (
+            self.kind == "contour2d"
+            and self.value("tabs_on")
+            and (self.value("tabs_positioning") == "points")
+        ):
+            inverse = frame.placement.inverse()
+            size = max(1.0, float(self.value("tabs_width")) / 2.0)
+            for point in self.tab_points:
+                c = inverse.multVec(App.Vector(*point))
+                marks.append([(c.x - size, c.y, c.z), (c.x + size, c.y, c.z)])
+                marks.append([(c.x, c.y - size, c.z), (c.x, c.y + size, c.z)])
+                marks.append([(c.x, c.y, c.z - size), (c.x, c.y, c.z + size)])
+        manufacture_view.show_marks(self.doc, frame, marks)
 
     def expand_pick(self, index, pick):
         """Chain selection: a picked edge stands for the whole loop at its height."""
@@ -676,6 +770,7 @@ class OpPanel(panels.CamPanel):
                 "positioning": self.value("tabs_positioning"),
                 "distance": self.value("tabs_distance"),
                 "count": int(self.value("tabs_count")),
+                "points": [list(point) for point in self.tab_points],
             }
         return options
 
@@ -714,6 +809,8 @@ class OpPanel(panels.CamPanel):
             manufacture_view.show_heights(self.doc, frame, heights)
         else:
             manufacture_view.drop("heights")
+        if frame is not None and self.kind == "contour2d":
+            self._tab_marks(frame)
         tool = self.tool
         if tool:
             speed = float(self.value("feed_spindle_speed"))
