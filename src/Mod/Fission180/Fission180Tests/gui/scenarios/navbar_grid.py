@@ -140,7 +140,16 @@ def sketch_grid():
     vp = sk.ViewObject
     h.check("its grid is fixed", not vp.GridAuto)
     size = float(getattr(vp.GridSize, "Value", vp.GridSize))
-    h.check("its spacing is 5 mm", abs(size - 5) < 1e-9, size)
+    # (wave 7: FreeCAD's GridSize is the distance between two grid LINES, and every
+    # GridNumberSubdivision-th line is the stronger major one. Fusion's Major Grid Spacing
+    # 5 mm with 4 Minor Subdivisions draws a line every 1.25 mm and a major one every 5 mm
+    # (Autodesk forum: "major lines at 5 mm with 20 subdivisions ... snap every .25 mm");
+    # until sketch-a the major spacing was handed over as the line spacing, so the lines
+    # were 5 mm apart and the major ones 20)
+    h.check("its lines are 1.25 mm apart (5 mm / 4)", abs(size - 1.25) < 1e-9, size)
+    sub = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher/General")
+    major = size * sub.GetInt("GridNumberSubdivision")
+    h.check("...and every 4th is a major line: 5 mm", abs(major - 5) < 1e-9, major)
     n.choose(GS, "Grid Settings")
 
 

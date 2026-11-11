@@ -79,7 +79,7 @@ def a_ghost():
 
 
 def b_plate():
-    hover_row("Body")
+    hover_row(j.plate().Label)
 
 
 def b_no_ghost():

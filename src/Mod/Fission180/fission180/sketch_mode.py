@@ -999,6 +999,14 @@ class SketchSession:
         ensure_areas(sketch)  # an older sketch: its areas can be clicked after Finish Sketch
         self.display = DisplayOptions(self)
         self.fixed = FixedColour(self)
+        from . import sketch_dimension_signs
+
+        # the diameter sign on dimensions to a centerline
+        self.signs = sketch_dimension_signs.DiameterSigns(self)
+        from . import sketch_field_names
+
+        # parameter names typed into the value boxes of FreeCAD's own drawing tools
+        self.names = sketch_field_names.FieldNames(self)
         self.right_angles = None  # the 90 degree marks at corners (sketch_right_angles.py)
         try:
             from .sketch_right_angles import RightAngleMarks
@@ -1077,6 +1085,7 @@ class SketchSession:
         if self.tool is not None:
             self.tool.changed()
         self.fixed.invalidate()
+        self.signs.invalidate()
         self._refresh.start()
 
     def _refreshed(self):
@@ -1087,6 +1096,7 @@ class SketchSession:
             self.areas.refresh(self.shading.shaded)
             self.display.apply()
             self.fixed.apply()
+            self.signs.apply()
             self.frames.update()
         except Exception as exc:
             warn("sketch display: %s" % exc)
@@ -1107,6 +1117,7 @@ class SketchSession:
                 self.infer.commit_signal(kind)
             except Exception as exc:
                 warn("sketch inference: %s" % exc)
+        self.names.settled(kind)
         if kind in ("undo", "redo", "abort"):
             try:
                 self._tidy_seen = len(self.sketch.Geometry)
@@ -1309,53 +1320,11 @@ class SketchSession:
                 return
             c = constraints[index]
             if c.Type in DIMENSIONAL and c.Driving:
-                # Fusion: a dimension to a centerline is the diameter (sketch_centerline.py)
-                index = self._diameter_dimension(index)
                 if self._make_driven_if_redundant(index):
                     return
                 self.edit_dimension(index)
         except Exception as exc:
             warn("dimension box: %s" % exc)
-
-    def _diameter_dimension(self, index):
-        """The dimension just placed, when it runs from a point or line to a centerline,
-        becomes the diameter, in a step glued to the dimension's own. Returns the index
-        of the dimension to go on with (the new one, or `index`)."""
-        from . import sketch_centerline
-
-        sketch = self.sketch
-        try:
-            if not sketch_centerline.lines(sketch):
-                return index
-            c = sketch.Constraints[index]
-            plan = sketch_centerline.diameter_plan(
-                c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, sketch_centerline.lines(sketch)
-            )
-            if plan is None:
-                return index
-            doc = self.doc
-            infer = self.infer
-            if infer is not None:
-                infer._applying = True
-            doc.openTransaction(INFER_STEP)
-            try:
-                new = sketch_centerline.diameter(sketch, index)
-                sketch.solve()
-            except Exception:
-                doc.abortTransaction()
-                raise
-            finally:
-                if infer is not None:
-                    infer._applying = False
-            doc.commitTransaction()
-            self._tidy_seen = len(sketch.Geometry)
-            if infer is not None:
-                infer.seen = sketch.GeometryCount
-                infer.invalidate()
-            return new if new is not None else index
-        except Exception as exc:
-            warn("diameter dimension: %s" % exc)
-            return index
 
     def _make_driven_if_redundant(self, index):
         """A dimension on a size the other dimensions/constraints already set would
@@ -1505,6 +1474,28 @@ class SketchSession:
             if pos is None:
                 pos = self.last_press or self.gl.mapFromGlobal(QtGui.QCursor.pos())
         self.editor = DimensionEditor(self, index, pos, centred)
+
+    def show_all_if_outside(self):
+        """After the whole sketch was scaled: when part of it is outside the view now, the
+        view shows all of it (Fusion fits the view then; Autodesk community manager:
+        "auto-fit will get invoked when ... the sketch goes outside the canvas")."""
+        if self.closed or self.gl is None:
+            return
+        try:
+            box = self.sketch.Shape.BoundBox
+            if not box.isValid():
+                return
+            ratio = self.gl.devicePixelRatioF() or 1.0
+            w, h = self.gl.width() * ratio, self.gl.height() * ratio
+            place = self.sketch.getGlobalPlacement()
+            for corner in range(8):
+                p = place.multVec(box.getPoint(corner))
+                x, y = self.view.getPointOnViewport(p)
+                if x < 0 or y < 0 or x > w or y > h:
+                    self.view.fitAll()
+                    return
+        except Exception as exc:
+            warn("sketch view: %s" % exc)
 
     def label_pixel(self, index):
         """Where a dimension's text is on screen (view pixels), or None."""
@@ -1819,8 +1810,6 @@ class SketchSession:
         FreeCAD directly. Then it is checked: when no spline came of it, Fission 180 makes
         it from the points (sketch_spline.make_from_points) and FreeCAD's tool is stopped
         (its points are gone). Returns "freecad", "own" or None (nothing to make)."""
-        from . import sketch_spline
-
         gl = self.gl
         if gl is None or not _is_valid(gl):
             return None
@@ -1980,6 +1969,7 @@ class SketchSession:
         if self.closed or editing_sketch() is not self.sketch:
             return
         self._typed_since_commit = False
+        self.names.close()
         self.stop_tool()  # Fission 180's own tool: the half-drawn shape goes with it
         self.line.stop()
         if self.infer is not None:
@@ -2057,6 +2047,13 @@ class SketchSession:
             if not self._finishes_on_enter():
                 return False
             self._accept_fields(field)
+            return True
+        if self.names.feeding:
+            return False  # (our own keys: the number a typed name stands for, with its unit)
+        if self.names.wants(field, event):
+            # Fusion: a parameter's name (or a formula) typed into the box of the shape
+            # being drawn; FreeCAD's box takes numbers only (sketch_field_names.py)
+            self.names.start(field, event.text()[:1])
             return True
         if _is_value_key(event) or key in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Delete):
             self._typed = field  # the user is typing a value here
@@ -2235,10 +2232,6 @@ class SketchSession:
             QtWidgets.QApplication.instance().focusChanged.disconnect(self._focus_changed)
         except Exception:
             pass
-        try:
-            self.filter._placed()  # (the view's pick radius, if a dimension was being placed)
-        except Exception as exc:
-            warn("sketch mode: %s" % exc)
         hooked = [(self.gl, self.filter), (self.viewer, self.keys)]
         hooked += [(field, self.keys) for field in self._fields]
         for widget, event_filter in hooked:
@@ -2337,7 +2330,6 @@ class _ViewFilter(QtCore.QObject):
         self.right_pressed = None
         self.refused_release = False  # the release of a refused Project click
         self.chain_double = False  # a double-click's press on the line chain's end
-        self.placing = None  # the view's pick radius, shrunk while a dimension is placed
 
     def eventFilter(self, obj, event):
         try:
@@ -2427,15 +2419,13 @@ class _ViewFilter(QtCore.QObject):
                 return True
             if kind == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
                 session.open_spline_step()  # (FreeCAD's spline tool: the points' undo step)
-                self._placing_dimension(obj, event)
-            elif kind == QtCore.QEvent.MouseButtonRelease and self.placing is not None:
-                QtCore.QTimer.singleShot(0, self._placed)
             # Fusion's inference (sketch_infer.py) may hand FreeCAD a copy of the event
             # with the point moved onto a guide; the copy comes back through here.
             if session.infer is not None and session.infer.mouse(obj, event):
                 return True
             if kind in _REDRAWS:
                 session.fixed.poke()  # FreeCAD recolours curves after these
+                session.signs.poke()  # ...and may write the dimensions' texts again
             if kind == QtCore.QEvent.MouseMove:
                 if event.buttons() == QtCore.Qt.NoButton:
                     session.areas.moved(event.position().toPoint())
@@ -2486,61 +2476,6 @@ class _ViewFilter(QtCore.QObject):
         except Exception as exc:
             warn("sketch view: %s" % exc)
         return False
-
-    def _placing_dimension(self, obj, event):
-        """A left press while FreeCAD's Dimension tool runs: when it places the dimension
-        (sketch_select_core.places_dimension) FreeCAD must find nothing under the pointer,
-        or it takes the click for one more pick. The view's pick radius is shrunk to
-        nothing until the release is handled, and FreeCAD is shown the pointer once more
-        (a move), so that what it had lit goes dark."""
-        if self.placing is not None:
-            self._placed()  # (the release of the click before never came: put back first)
-        session = self.session
-        try:
-            from . import recent
-            from . import sketch_select_core
-
-            if recent.running_tool() not in DIMENSION_COMMANDS or not session.drawing_cursor():
-                return
-            sketch = session.sketch
-            preview = len(sketch.Constraints) > session.constraint_count
-            picked = sum(
-                len(sel.SubElementNames)
-                for sel in Gui.Selection.getSelectionEx()
-                if sel.Object is sketch
-            )
-            pre = Gui.Selection.getPreselection()
-            under = []
-            if getattr(pre, "ObjectName", "") == session.name:
-                under = [n.rsplit(".", 1)[-1] for n in (pre.SubElementNames or ()) if n]
-            if not under or not sketch_select_core.places_dimension(preview, picked, under):
-                return
-            viewer = session.view.getViewer()
-            self.placing = (viewer, viewer.getPickRadius())
-            viewer.setPickRadius(0.01)
-            move = QtGui.QMouseEvent(
-                QtCore.QEvent.MouseMove,
-                event.position(),
-                event.globalPosition(),
-                QtCore.Qt.NoButton,
-                QtCore.Qt.NoButton,
-                event.modifiers(),
-            )
-            QtWidgets.QApplication.sendEvent(obj, move)
-            log("dimension: the click places it (not a pick of %s)" % ", ".join(under))
-        except Exception as exc:
-            self._placed()
-            warn("dimension placement: %s" % exc)
-
-    def _placed(self):
-        placing, self.placing = self.placing, None
-        if placing is None:
-            return
-        try:
-            viewer, radius = placing
-            viewer.setPickRadius(radius)
-        except Exception as exc:
-            warn("dimension placement: %s" % exc)
 
 
 _PRESSES = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)
@@ -2831,6 +2766,7 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         self.sketch = session.sketch
         self.index = index
         self._done = False
+        self.just_placed = False  # Sketch Dimension placed it a moment ago (its first value)
         try:  # which dimension this is, to find it again if the sketch changes meanwhile
             self.identity = _constraint_key(self.sketch.Constraints[index])
         except Exception:
@@ -2852,9 +2788,18 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         self.message = QtWidgets.QLabel("", self)
         self.message.setWordWrap(True)
         self.message.hide()
+        # a dimension that was given a name (`Width = 12`) IS that parameter: the hint says
+        # what a number typed here will do (sketch_named_dimensions.py)
+        self.hint = QtWidgets.QLabel("", self)
+        self.hint.setObjectName("Fission180DimensionHint")
+        self.hint.setStyleSheet("color: #444444;")
+        self.hint.setWordWrap(True)
+        self.hint.hide()
         layout.addWidget(self.edit)
+        layout.addWidget(self.hint)
         layout.addWidget(self.message)
         self.edit.setText(self._current_text())
+        self._show_owner()
         self.edit.selectAll()
         self.edit.returnPressed.connect(lambda: self.finish(True))
         self.adjustSize()
@@ -2871,6 +2816,62 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         self._fresh = True
         self.edit.textEdited.connect(self._edited)
         log("dimension: type a value and press Enter")
+
+    def owner(self):
+        """The user parameter this dimension IS (it was named here: `Width = 12`), or
+        None."""
+        try:
+            from . import sketch_named_dimensions
+
+            return sketch_named_dimensions.owned(self.sketch, self.index)
+        except Exception:
+            return None
+
+    def _scale_at_first(self, q):
+        """Fusion's "Scale entire sketch at first dimension": the value typed into the
+        dimension Sketch Dimension has just placed, when it is the sketch's first size,
+        scales the whole sketch (sketch_first_dimension.py). Inside apply()'s undo step.
+        True when it scaled."""
+        if not self.just_placed:
+            return False
+        from . import sketch_first_dimension as first
+
+        if not first.applies(self.sketch, self.index):
+            return False
+        old = self.sketch.getDatum(self.index).getValueAs("mm").Value
+        k = first.factor(old, q.getValueAs("mm").Value)
+        if k is None:
+            return False
+        first.scale(self.sketch, k)
+        from . import commands
+
+        commands.tell(
+            "The whole sketch was scaled to this first dimension (Preferences > Design > "
+            "Scale entire sketch at first dimension)."
+        )
+        return True
+
+    def _show_owner(self):
+        name = self.owner()
+        if name is None:
+            return
+        try:
+            q = self.sketch.getDatum(self.index)
+            if self.is_angle():
+                now = "%g deg" % round(abs(q.getValueAs("deg").Value), 6)
+            else:
+                from . import browser_core
+
+                unit = browser_core.doc_length_unit(self.sketch.Document)
+                per = browser_core.MM_PER_UNIT.get(unit, 1.0)
+                now = "%g %s" % (round(abs(q.getValueAs("mm").Value) / per, 6), unit)
+            self.hint.setText(
+                "%s = %s. This dimension is %s: type a number to change %s."
+                % (name, now, name, name)
+            )
+            self.hint.show()
+        except Exception as exc:
+            warn("dimension box: %s" % exc)
 
     def _edited(self, _text):
         self._fresh = False
@@ -3083,10 +3084,42 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         from . import sketch_explain_core as explain_core
 
         culprits = []
+        scaled = False
         broken_before = _broken_state(self.sketch)
+        owner = self.owner()
+        if owner is not None and expression is not None:
+            from . import parameters_core
+
+            if parameters_core.split_assignment(expression)[0] is not None:
+                owner = None  # `Other = value`: the dimension gets a new name, as typed
         doc.openTransaction("Edit Dimension")
         try:
-            if expression is not None:
+            if owner is not None:
+                # Fusion: the dimension IS the parameter it was named (`Width = 12`): what
+                # is typed into it later is Width's new value, and everything that uses
+                # Width follows (it used to unlink the dimension: params' known issue)
+                from . import parameters
+
+                kind = "angle" if self.is_angle() else "length"
+                if expression is not None:
+                    parameters.read(doc, expression, kind, skip=owner)  # (not itself)
+                    new = expression
+                else:
+                    new = "%r %s" % (abs(q.Value), "deg" if kind == "angle" else "mm")
+                parameters.set_user(doc, owner, new)
+                holder = parameters.container(doc)
+                if holder is not None:
+                    holder.recompute()
+                self.sketch.recompute()
+                kind = self._constraint().Type
+                got = self.sketch.getDatum(self.index).getValueAs("mm").Value
+                if kind != "Angle" and explain_core.bad_size(kind, got):
+                    raise ValueError(
+                        "The value must be more than 0 (%s would be %s mm)."
+                        % (owner, explain_core._number(got))
+                    )
+                log("dimension: %s is now %s" % (owner, text.strip()))
+            elif expression is not None:
                 from . import parameters
 
                 # Fusion's formula (width*2, Arm_Length + 5, Name = value) in FreeCAD's
@@ -3094,7 +3127,12 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                 # parameter here, inside this undo step. A formula that cannot be computed
                 # (an unknown name) is said, not kept (parameters.read raises).
                 kind = "angle" if self.is_angle() else "length"
-                formula = parameters.read(doc, expression, kind, create=True).freecad
+                made = parameters.read(doc, expression, kind, create=True)
+                formula = made.freecad
+                if made.created:
+                    from . import sketch_named_dimensions
+
+                    sketch_named_dimensions.remember(self.sketch, made.created)
                 # (bound the way FreeCAD renumbers it when a constraint before it is
                 # deleted: parameters.set_expression, bug 3 of the book parity report)
                 parameters.set_expression(self.sketch, ".Constraints[%d]" % self.index, formula)
@@ -3108,6 +3146,15 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
                         % explain_core._number(got)
                     )
             else:
+                from . import parameters
+
+                path = ".Constraints[%d]" % self.index
+                if path in parameters.expressions_of(self.sketch):
+                    # a number typed over a formula takes its place (found by
+                    # book_sketch_c_dimension: the formula stayed bound under the number,
+                    # and the next recompute put the parameter's value back)
+                    parameters.set_expression(self.sketch, path, None)
+                scaled = self._scale_at_first(q)
                 self.sketch.setDatum(self.index, q)
             if self.sketch.solve() != 0:
                 raise ValueError(CONFLICT)
@@ -3136,6 +3183,8 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
             return False
         doc.commitTransaction()
         log("dimension set to %s" % text.strip())
+        if scaled:
+            QtCore.QTimer.singleShot(0, self.session.show_all_if_outside)
         return True
 
     def _error(self, text):

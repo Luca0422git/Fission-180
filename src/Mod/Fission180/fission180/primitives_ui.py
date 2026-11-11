@@ -24,9 +24,10 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, drag_guard, handle_look, handles3d, log, preview, primitives
+from . import commands, drag_guard, extrude_finish, handle_look, handles3d, log, preview
+from . import primitives
 from . import profile_pick, taskui, ui_icon_path, value_limits, warn
-from .compat import QtCore, QtWidgets
+from .compat import QtCore, QtGui, QtWidgets
 from .primitives import PrimitiveError
 from .primitives_core import nearest_snap, nice_floor, round_to
 from .taskui import BoxCarrier, DistanceField, Panel, ValueBoxes
@@ -174,6 +175,31 @@ class EnterTakesNumber(QtCore.QObject):
         except Exception as exc:
             warn("value box Enter: %s" % exc)
         return False
+
+
+class PlacingBox(taskui.ArrowValueBox):
+    """Fusion's size boxes on the canvas while a shape is placed: after the first click a
+    box sits on each side the next click would size (a Box: Length and Width; a Cylinder:
+    Diameter). They follow the outline and show its size; a number typed with the mouse over
+    the view goes into the first one, Tab takes it and moves to the next, Enter takes it
+    and places the shape (the book: "click the origin corner, type 31.8, Tab, 15.8,
+    Enter, 9.6": there was no box on the canvas, the numbers went into the dialog at the
+    side, where nobody looks while placing). on_tab(forward) names the next box."""
+
+    def __init__(self, text, commit, on_tab=None, cancel=None):
+        super().__init__(text, commit, cancel=cancel)
+        self._on_tab = on_tab
+
+    def focusNextPrevChild(self, forward):
+        # Tab: take what was typed and go on to the next size box on the canvas (Qt would
+        # hand the keyboard to some field of the dialog).
+        try:
+            self._take()
+            if self._on_tab is not None:
+                self._on_tab(bool(forward))
+        except Exception as exc:
+            warn("size box: %s" % exc)
+        return True
 
 
 _GRAB = {"time": 0.0}  # when a handle last took a press (one press moves one handle)
@@ -719,7 +745,7 @@ def on_circle(center, mouse, radius):
 
 
 # -- the dialog base ----------------------------------------------------------------------------------------
-class PlacedPanel(Panel, value_limits.LimitedValues):
+class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
     """A primitive placed on a plane with the mouse (Box, Cylinder, Sphere, Torus, Coil).
 
     A size dragged or typed past what the shape can take (a torus ring too thick for its
@@ -1159,6 +1185,7 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
             warn("%s placing unavailable: %s" % (self.title, exc))
 
     def _stop_placing(self):
+        self._drop_placing_boxes()
         if self.placer is not None:
             self.placer.remove()
             self.placer = None
@@ -1167,6 +1194,119 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
     def _mouse_moved(self, points, mouse):
         if self.state == "place":
             self._live(points, mouse)
+            self._show_placing_boxes(points, mouse)
+
+    # -- the size boxes on the canvas while placing (PlacingBox) ---------------------------------
+    PLACING = "placing:"  # their keys in self.value_boxes: "placing:length" ...
+
+    def _placing_spots(self, points, mouse):
+        """[(field key, (x, y) the box belongs to, (x, y) one end of that side, (x, y) its
+        other end)] in plane coordinates: the sizes the next click gives, and where each
+        one's box sits. A circle (CIRCLE_KEY): its diameter, where the circle passes the
+        mouse. Override (Box: Length and Width on their sides)."""
+        key = self.CIRCLE_KEY
+        if not key or len(points) != 1:
+            return []
+        spot = on_circle(points[0], mouse, self._circle_radius(points, mouse))
+        return [(key, spot, spot, spot)]
+
+    def _show_placing_boxes(self, points, mouse):
+        """Put a size box on each side being sized (made on the first call), where the
+        outline is now."""
+        if self.placer is None or self._closed:
+            return
+        try:
+            spots = self._placing_spots(list(points), mouse) if mouse is not None else []
+        except Exception:
+            spots = []
+        keys = [self.PLACING + key for key, _a, _t, _p in spots]
+        for name in [k for k in self.value_boxes.boxes if k.startswith(self.PLACING)]:
+            if name not in keys:
+                self._drop_placing_box(name)
+        view, frame = self.placer.view, self.placer.frame
+        fresh = False
+        for key, anchor, tail, tip in spots:
+            field = self._visible_field(key)
+            if field is None:
+                continue
+            name = self.PLACING + key
+            box = self.value_boxes.boxes.get(name)
+            if box is None:
+                box = self._make_placing_box(key, field)
+                if box is None:
+                    continue
+                self.value_boxes.boxes[name] = box
+                fresh = True
+            try:
+                box.refresh()
+                others = [
+                    (b.x(), b.y(), b.width(), b.height())
+                    for n, b in self.value_boxes.boxes.items()
+                    if n != name and n.startswith(self.PLACING) and b.isVisible()
+                ]
+                box.place_segment(
+                    view,
+                    frame.multVec(App.Vector(anchor[0], anchor[1], 0)),
+                    frame.multVec(App.Vector(tail[0], tail[1], 0)),
+                    frame.multVec(App.Vector(tip[0], tip[1], 0)),
+                    0.0,
+                    avoid_rects=others,
+                )
+            except RuntimeError:
+                pass  # the box went with the dialog
+        if fresh and keys:
+            # a number typed over the view goes into the first size not typed yet
+            waiting = [k for k in keys if k[len(self.PLACING) :] not in self.locked]
+            self.value_boxes.used((waiting or keys)[0])
+
+    def _make_placing_box(self, key, field):
+        try:
+            return PlacingBox(
+                lambda: field.widget.text(),
+                lambda text: self._box_typed(key, text),
+                on_tab=lambda forward: self._next_placing_box(key, forward),
+                cancel=self.value_boxes._cancel,
+            )
+        except Exception as exc:
+            warn("%s size box unavailable: %s" % (self.title, exc))
+            return None
+
+    def _next_placing_box(self, key, forward=True):
+        """Tab in a size box: the keyboard goes to the next one (round and round), with its
+        value selected so the next digits replace it."""
+        names = [k for k in self.value_boxes.boxes if k.startswith(self.PLACING)]
+        current = self.PLACING + key
+        if current not in names or len(names) < 2:
+            box = self.value_boxes.boxes.get(current)
+        else:
+            step = 1 if forward else -1
+            box = self.value_boxes.boxes[names[(names.index(current) + step) % len(names)]]
+        if box is None:
+            return
+        for name, other in self.value_boxes.boxes.items():
+            if other is box:
+                self.value_boxes.used(name)
+        try:
+            box.edited = False
+            box.refresh()
+            box.setFocus(QtCore.Qt.TabFocusReason)
+            box.selectAll()
+        except RuntimeError:
+            pass
+
+    def _drop_placing_box(self, name):
+        box = self.value_boxes.boxes.pop(name, None)
+        if box is not None:
+            try:
+                box.discard()
+            except Exception:
+                pass
+        if self.value_boxes.last == name:
+            self.value_boxes.last = None
+
+    def _drop_placing_boxes(self):
+        for name in [k for k in self.value_boxes.boxes if k.startswith(self.PLACING)]:
+            self._drop_placing_box(name)
 
     @safe
     def _clicked(self, point):
@@ -1186,6 +1326,7 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
             self.placer.points = list(self.points)
         if len(self.points) < self.clicks:
             self._show_hint()
+            self._show_placing_boxes(self.points, point)
             return
         self._placed(list(self.points))
         for key, value in self.locked.items():  # a size typed while placing stays
@@ -1194,9 +1335,33 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
         self.locked = {}
         self._stop_placing()
         self.state = "ready"
+        # Fusion: once the shape is placed the next number is its height (READY_KEY),
+        # wherever the mouse was left: see typing_box().
+        self._placed_at = QtGui.QCursor.pos()
         self.info.setText("")
         self._show_fields()
         self._changed(new_geometry=True)
+
+    def typing_box(self):
+        """The value box a number typed over the 3D view goes to. Right after the shape was
+        placed, and until the mouse moves, that is the READY_KEY's box (a Box's Height):
+        the mouse may have been left on another arrow (the Width's, where the rectangle
+        ended), and "31.8, Tab, 15.8, Enter, 9.6" then put the 9.6 into the Width."""
+        box = super().typing_box()
+        at = getattr(self, "_placed_at", None)
+        if at is None:
+            return box
+        try:
+            if QtGui.QCursor.pos() != at:
+                self._placed_at = None
+                return box
+            ready = self.value_boxes.boxes.get(self.READY_KEY)
+            if ready is not None and ready.isVisible():
+                self.value_boxes.used(self.READY_KEY)
+                return ready
+        except Exception:
+            pass
+        return box
 
     def _show_hint(self):
         self.info.setText(self.HINTS[min(len(self.points), len(self.HINTS) - 1)])
@@ -1267,6 +1432,8 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
             self.locked[key] = value
             if self.placer is not None:
                 self.placer.redraw()
+                if self.placer.mouse is not None:
+                    self._show_placing_boxes(self.points, self.placer.mouse)
             return
         handle = self.handles.get(key)
         if handle is not None:
@@ -1399,7 +1566,9 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
             self.error = str(exc)
         except Exception as exc:
             self.error = "This %s cannot be built: %s" % (self.title.lower(), exc)
-        if self.error and self.target is not None:
+        # (never over the person's own choice: that stays as picked, with the reason
+        # it cannot be built beside it; extrude_ui does the same)
+        if self.error and self.target is not None and not self.user_picked_operation:
             actual = self._feature_operation()
             if actual != self.options["operation"]:
                 self.options["operation"] = actual
@@ -1653,6 +1822,7 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
             self._quiet = False
 
     # -- OK / Cancel ------------------------------------------------------------------------------------------
+    @extrude_finish.speaking
     def accept(self):
         try:
             return self._accept()
@@ -1702,12 +1872,8 @@ class PlacedPanel(Panel, value_limits.LimitedValues):
         self._close()
         body = primitives.owner_body(feature)
         if body is not None and body is not commands.active_body():
-            try:
-                from . import components
-
-                components.activate_body(body)  # and its (new) component
-            except Exception as exc:
-                warn("could not activate %s: %s" % (body.Label, exc))
+            # its (new) body and component; never another component's body a Cut changed
+            extrude_finish.activate_result(body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
 
@@ -1831,6 +1997,17 @@ class BoxPanel(PlacedPanel):
         if len(points) == 1 and "length" in self.locked and "width" in self.locked:
             return self._corner(points[0], mouse)
         return None
+
+    def _placing_spots(self, points, mouse):
+        """Length in the middle of the side along the plane's first axis, Width in the
+        middle of the side next to it (as Fusion shows them on the rectangle)."""
+        if len(points) != 1:
+            return []
+        (x0, y0), (x1, y1) = points[0], self._corner(points[0], mouse)
+        return [
+            ("length", ((x0 + x1) / 2.0, y0), (x0, y0), (x1, y0)),
+            ("width", (x1, (y0 + y1) / 2.0), (x1, y0), (x1, y1)),
+        ]
 
     def _placed(self, points):
         (x0, y0), (x1, y1) = points[0], self._corner(points[0], points[1])

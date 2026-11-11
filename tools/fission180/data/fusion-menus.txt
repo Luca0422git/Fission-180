@@ -57,7 +57,7 @@ FILE MENU [in=file,quick]
   New Electronics Design [out=electronics is out of scope]
   New Drawing
     From Design
-    From Animation [out=animation is out of scope]
+    From Animation
   New Drawing Template?
   Open
   Recover Documents
@@ -85,11 +85,12 @@ WORKSPACES [in=workspace]
   Design
   Generative Design [out=generative design is out of scope]
   Render [out=rendering is out of scope]
-  Animation [out=animation is out of scope]
+  Animation
   Simulation
   Manufacture
   Drawing
     From Design
+    From Animation
 
 SOLID [in=tab:solid]
   CREATE
@@ -488,7 +489,6 @@ DRAWING [in=tab:drawing]
   TEXT
     Text
     Leader
-    Note?
     Hole and Thread Note?
   SYMBOLS
     Surface Texture
@@ -497,6 +497,7 @@ DRAWING [in=tab:drawing]
     Welding Symbol?
   TABLES
     Table
+    Parts List
     Balloon
     Renumber
     Align Balloons
@@ -905,3 +906,22 @@ MANUFACTURE MILLING [in=tab:cam_milling]
     Setup Sheet
   MANAGE
     Tool Library
+
+# ANIMATION workspace (wave 7, builder animation; docs/fission180/parity/animation.md). SELECT
+# is as in DESIGN (listed once, under SOLID).
+ANIMATION [in=tab:anim_animation]
+  STORYBOARD
+    New Storyboard
+  TRANSFORM
+    Transform Components
+    Restore Home
+    Auto Explode: One Level
+    Auto Explode: All Levels
+    Manual Explode
+    Show/Hide
+  ANNOTATION
+    Create Callout
+  VIEW
+    View
+  PUBLISH
+    Publish Video

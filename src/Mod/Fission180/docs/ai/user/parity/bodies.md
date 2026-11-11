@@ -115,6 +115,11 @@ Fusion):
 
 ### Appearance and Physical Material (MODIFY menu)
 
+**Wave 7 (2026-11-11): the newer and fuller spec is `parity/appearance.md`** (200 looks in
+categories with a search box, textured looks, the look editor, face looks under a body look,
+Texture Map Controls, more physical materials, Properties, the selection read-out). Where
+the rows below differ from it, that page holds.
+
 | Fusion | Fission 180 |
 |---|---|
 | Appearance: Apply To Bodies/Components / Faces, In This Design, Library, drag a look onto a body or face | Apply To Bodies / Faces, In This Design, a library (steel, stainless, aluminium incl. anodized, titanium, iron, brass, copper, chrome, glossy plastics in 9 colours, matte plastics, clear plastic, rubber black/grey, glass, wood), a custom colour (#RRGGBB or R/G/B sliders). Pick a swatch and click bodies/faces, or drag the swatch onto them. A face keeps its look through later steps while it survives, also when the body is moved (Move/Copy); the faces without a look of their own keep the grey every part has |

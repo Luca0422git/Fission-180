@@ -64,6 +64,7 @@ def p_command():
 
 def p_place():
     x, y = w.at(0.0, 0.0)
+    d.click_at(x, y)  # the parent view is clicked first (Fusion; wave 7)
     d.move_to(x + 2, y - 50)
     d.move_to(x, y - 55)
 
@@ -89,7 +90,9 @@ def a_marks():
     marks = auto(w.base()).get("marks", [])
     centres = sorted((round(m[0], 3), round(m[1], 3)) for m in marks)
     h.check("a mark on each hole", centres == [w.HOLE1, w.HOLE2], marks)
-    h.check("as cosmetic lines (4)", len(w.base().Fission180AutoTags) == 4, w.base().Fission180AutoTags)
+    h.check(
+        "as cosmetic lines (4)", len(w.base().Fission180AutoTags) == 4, w.base().Fission180AutoTags
+    )
     d.ok()
 
 

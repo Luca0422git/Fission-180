@@ -1,0 +1,541 @@
+{
+  "id": "anim_sequential_transform_reverse",
+  "title": "Animation: a Sequential explosion, Transform Components with a turn, Manual Explode, Show/Hide, Restore Home, a storyboard from the end of the previous one, Reverse",
+  "tags": [
+    "animation",
+    "explode",
+    "components"
+  ],
+  "steps": [
+    {
+      "op": "sf_primitive",
+      "id": "b_base",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 60,
+      "width": 40,
+      "height": 10,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "b_lid",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 60,
+      "width": 40,
+      "height": 4,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "b_right",
+      "kind": "box",
+      "plane": "XY",
+      "x": 60,
+      "y": 15,
+      "length": 20,
+      "width": 10,
+      "height": 6,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "b_left",
+      "kind": "box",
+      "plane": "XY",
+      "x": -20,
+      "y": 15,
+      "length": 20,
+      "width": 10,
+      "height": 6,
+      "operation": "new_body"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "base",
+      "bodies": [
+        "b_base"
+      ],
+      "label": "Base"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "lid",
+      "bodies": [
+        "b_lid"
+      ],
+      "label": "Lid"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "right",
+      "bodies": [
+        "b_right"
+      ],
+      "label": "Right"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "left",
+      "bodies": [
+        "b_left"
+      ],
+      "label": "Left"
+    },
+    {
+      "op": "component_move",
+      "id": "m_lid",
+      "components": [
+        "lid"
+      ],
+      "move_type": "translate",
+      "dz": 10,
+      "comment": "the Lid sits on the Base: its own placement is 10 up (a storyboard's offset comes on top of it)"
+    },
+    {
+      "op": "measure_components",
+      "steps": [
+        "left"
+      ]
+    },
+    {
+      "op": "anim_storyboard",
+      "id": "sb1",
+      "name": "Explode"
+    },
+    {
+      "op": "anim_explode",
+      "storyboard": "sb1",
+      "at": 3,
+      "scale": 2,
+      "sequential": true,
+      "comment": "scale 2: the gap is 50. All three go as far, so they go in the order they were made, a second each"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          50
+        ],
+        "right": [
+          50,
+          0,
+          0
+        ],
+        "left": [
+          -50,
+          0,
+          0
+        ]
+      },
+      "spans": {
+        "lid": [
+          [
+            0,
+            1
+          ]
+        ],
+        "right": [
+          [
+            1,
+            2
+          ]
+        ],
+        "left": [
+          [
+            2,
+            3
+          ]
+        ]
+      },
+      "duration": 3
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 1.5,
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          50
+        ],
+        "right": [
+          25,
+          0,
+          0
+        ],
+        "left": [
+          0,
+          0,
+          0
+        ]
+      },
+      "comment": "at 1.5 s the Lid is out, the Right pin half way, the Left pin has not started"
+    },
+    {
+      "op": "anim_transform",
+      "storyboard": "sb1",
+      "at": 5,
+      "of": [
+        "lid"
+      ],
+      "move": [
+        0,
+        0,
+        10
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "angle": 90,
+      "pivot": [
+        30,
+        20,
+        0
+      ]
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "lid": [
+          50,
+          -10,
+          60
+        ]
+      },
+      "positions": {
+        "lid": [
+          50,
+          -10,
+          70
+        ]
+      },
+      "angles": {
+        "lid": 90
+      },
+      "spans": {
+        "lid": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            5
+          ]
+        ]
+      },
+      "comment": "a quarter turn about the vertical line through (30, 20): the Lid's origin (0, 0) goes to (30 + 20, 20 - 30) = (50, -10); 50 + 10 up from its home at z 10"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 3,
+      "angles": {
+        "lid": 45
+      },
+      "offsets": {
+        "lid": [
+          22.928932188134524,
+          -15.355339059327378,
+          55
+        ]
+      },
+      "comment": "half of that action (it runs from 1 to 5 s): 45 degrees (the slerp of the turn) and 5 of the 10 up. The origin, (-30, -20) from the pivot, turned 45 degrees is (-10, -50) / sqrt 2 from it: (30 - 7.0711, 20 - 35.3553)"
+    },
+    {
+      "op": "anim_manual_explode",
+      "storyboard": "sb1",
+      "at": 6,
+      "picks": [
+        {
+          "of": "right",
+          "axis": "X+"
+        }
+      ],
+      "distance": 10,
+      "scale": 1.5
+    },
+    {
+      "op": "anim_show_hide",
+      "storyboard": "sb1",
+      "at": 6,
+      "of": [
+        "left"
+      ],
+      "show": false
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "right": [
+          65,
+          0,
+          0
+        ]
+      },
+      "spans": {
+        "right": [
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            6
+          ]
+        ]
+      },
+      "hidden": [
+        "left"
+      ],
+      "duration": 6,
+      "comment": "10 x 1.5 = 15 more to the right; the Left pin is hidden from 6 s on"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 5.5,
+      "hidden": [],
+      "offsets": {
+        "right": [
+          63.125,
+          0,
+          0
+        ]
+      },
+      "comment": "before 6 s the Left pin still shows; the Right pin's second move (2 to 6 s) is 3.5 / 4 done"
+    },
+    {
+      "op": "anim_restore_home",
+      "storyboard": "sb1",
+      "at": 8,
+      "of": [
+        "lid"
+      ]
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          0
+        ],
+        "right": [
+          65,
+          0,
+          0
+        ],
+        "left": [
+          -50,
+          0,
+          0
+        ]
+      },
+      "angles": {
+        "lid": 0
+      },
+      "spans": {
+        "lid": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            5,
+            8
+          ]
+        ]
+      },
+      "duration": 8,
+      "design_unchanged": true,
+      "comment": "Restore Home: the Lid back where the design has it, turn and all"
+    },
+    {
+      "op": "anim_storyboard",
+      "id": "sb2",
+      "clean": false
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb2",
+      "at": 0,
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          0
+        ],
+        "right": [
+          65,
+          0,
+          0
+        ],
+        "left": [
+          -50,
+          0,
+          0
+        ]
+      },
+      "hidden": [
+        "left"
+      ],
+      "duration": 0,
+      "actions": 0,
+      "storyboards": [
+        "Explode",
+        "Storyboard2"
+      ],
+      "comment": "Start from end of previous: no actions, every component (and what is hidden) as the first storyboard leaves it"
+    },
+    {
+      "op": "anim_reverse",
+      "storyboard": "sb1"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 0,
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          0
+        ],
+        "right": [
+          65,
+          0,
+          0
+        ],
+        "left": [
+          -50,
+          0,
+          0
+        ]
+      },
+      "hidden": [
+        "left"
+      ],
+      "comment": "reversed, it starts as it ended"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 6.5,
+      "offsets": {
+        "right": [
+          25,
+          0,
+          0
+        ],
+        "left": [
+          0,
+          0,
+          0
+        ]
+      },
+      "hidden": [],
+      "comment": "8 - 6.5 = 1.5 s of the original: the Right pin half way through its first move, the Left pin (shown again since 2 s) at home"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 7.5,
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          25
+        ],
+        "right": [
+          0,
+          0,
+          0
+        ],
+        "left": [
+          0,
+          0,
+          0
+        ]
+      },
+      "angles": {
+        "lid": 0
+      },
+      "comment": "0.5 s of the original: the Lid half way up, straight again"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          0
+        ],
+        "left": [
+          0,
+          0,
+          0
+        ]
+      },
+      "angles": {
+        "lid": 0
+      },
+      "hidden": [],
+      "duration": 8,
+      "design_unchanged": true,
+      "comment": "and ends assembled: the book's assemble animation"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb2",
+      "offsets": {
+        "right": [
+          65,
+          0,
+          0
+        ]
+      },
+      "comment": "the second storyboard is its own: reversing the first did not touch it"
+    }
+  ],
+  "expect": {
+    "volume": 1200,
+    "solids": 1,
+    "bbox": [
+      -20,
+      15,
+      0,
+      0,
+      25,
+      6
+    ],
+    "abs_tol": 0.001,
+    "source": "analytic",
+    "note": "The Left pin as the design has it (20 x 10 x 6): an animation moves nothing in the design. The storyboards' numbers are in the anim_expect steps."
+  }
+}

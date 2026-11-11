@@ -190,6 +190,14 @@ def b_box():
         len(sym) == 1 and sym[0].InVirtualSpace,
         len(sym),
     )
+    signs = st.session().signs
+    signs.apply()
+    labels = signs.labels()
+    h.check(
+        "B it is drawn with the diameter sign",
+        list(labels) == [ed.index] and labels[ed.index].startswith("\u2300"),
+        labels,
+    )
     si.type_text("24")
 
 
@@ -202,6 +210,13 @@ def b_typed():
         top.StartPoint,
     )
     st.sketch_ok("B")
+    h.settle()
+    labels = st.session().signs.labels()
+    h.check(
+        "B the new value is drawn with the diameter sign too",
+        len(labels) == 1 and list(labels.values())[0].startswith("\u2300 24"),
+        labels,
+    )
     stop_tool()
     h.shot("B-diameter")
 
@@ -217,12 +232,15 @@ def c_value_back():
 
 
 def c_dimension_back():
-    for _ in range(3):  # (FreeCAD's dimension tool records a step of its own first)
-        if len(sk().Constraints) <= s["cons"]:
-            break
-        st.undo()
-        h.settle()
-    h.check("C the dimension is gone", len(sk().Constraints) == s["cons"], len(sk().Constraints))
+    # (wave 7's merge: the dimension, its hidden mirror point and the constraint that
+    # holds the point are ONE step of Fission 180's own Sketch Dimension)
+    st.undo()
+    h.settle()
+    h.check(
+        "C one more Ctrl+Z: the dimension is gone",
+        len(sk().Constraints) == s["cons"],
+        len(sk().Constraints),
+    )
     h.check("C ...with its hidden helper", len(sk().Geometry) == s["geos"], len(sk().Geometry))
     h.check(
         "C the bottom line is still the centerline",

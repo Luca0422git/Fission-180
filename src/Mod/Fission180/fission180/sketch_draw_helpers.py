@@ -78,14 +78,10 @@ def layer_of(facade):
 def hidden(sketch):
     """The geometry indices of the curves on the hidden layer (not drawn, not clickable):
     Fission 180's snapping and picking leave them out as well."""
-    found = set()
-    try:
-        for i, facade in enumerate(sketch.GeometryFacadeList):
-            if layer_of(facade) == HIDDEN_LAYER:
-                found.add(i)
-    except Exception:
-        pass
-    return found
+    # (one answer for both kinds of unseen helpers since wave 7's merge: sketch_helpers)
+    from . import sketch_helpers
+
+    return sketch_helpers.hidden(sketch)
 
 
 def aligned_to(sketch, main):

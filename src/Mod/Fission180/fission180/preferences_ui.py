@@ -296,6 +296,8 @@ def reset_for_tests():
         "active_component_visibility",
         "version_on_close",
         "sketch_auto_project",
+        "sketch_project_on_reference",
+        "sketch_scale_first_dimension",
         "print_send_to",
         "slicer_program",
         "print_format",

@@ -1550,8 +1550,11 @@ class TimelineWidget(QtWidgets.QWidget):
         # Fusion's timeline settings switch the design to direct modeling too (it asks).
         no_history = menu.addAction("Do Not Capture Design History")
         no_history.setEnabled(_doc() is not None and not _base_feature_open())
+        swatch = _swatch_entry(menu)  # (wave 7, looks: Fusion's Component Color Swatch)
 
         def chose(chosen):
+            if swatch is not None and chosen is swatch:
+                _later(Gui.runCommand, "Fission180_ComponentColorSwatch")
             if chosen is no_history:
                 _later(Gui.runCommand, "Fission180_DoNotCaptureDesignHistory")
             if chosen is to_end:
@@ -1779,3 +1782,20 @@ def toggle():
         hide()
     else:
         show()
+
+
+def _swatch_entry(menu):
+    """Fusion's "Component Color Swatch" in the timeline's Settings menu (a tick while on):
+    the entry, or None when the command is not there (component_colors_ui, wave 7 looks)."""
+    try:
+        if "Fission180_ComponentColorSwatch" not in Gui.listCommands():
+            return None
+        from . import component_colors_ui
+
+        menu.addSeparator()
+        action = menu.addAction("Component Color Swatch")
+        action.setCheckable(True)
+        action.setChecked(bool(component_colors_ui.swatch_on()))
+        return action
+    except Exception:
+        return None

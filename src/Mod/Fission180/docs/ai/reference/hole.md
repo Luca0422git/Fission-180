@@ -125,5 +125,5 @@ Done: AI: Hole 5.5 mm. Its id is 'Hole1'. Bodies now: Body1: 23461.1 mm3, 60 x 4
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Recipe: [sheet-like U bracket (thin extrude with bends)](fission180://docs/recipes/sheet-like-part.md)
 - Recipe: [is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `hole_blind`, `hole_counterbore`, `hole_countersink`, `hole_points_flipped`, `hardware_countersunk_m4_on_rim`, `hole_clearance_countersunk`, `hole_clearance_m6`, `hole_clearance_socket_cbore`, `hole_curved_follows`, `hole_references_follow_edge`, `hole_second_survives_first`, `hole_single_angled` and 11 more
+- Golden models built with its steps (read one with docs_read golden/<id>): `hole_blind`, `hole_counterbore`, `hole_countersink`, `hole_points_flipped`, `hardware_bearing_608_bore`, `hardware_countersunk_m4_on_rim`, `hardware_dowel_3x10`, `hardware_hex_m6`, `hardware_inch_shcs_quarter`, `hardware_pan_phillips_m3`, `hardware_set_screw_inch_dog`, `hardware_set_screw_m4_cup` and 19 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

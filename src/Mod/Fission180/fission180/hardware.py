@@ -1,37 +1,45 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"""INSERT > Hardware...: a real-size screw, nut, washer, heat-set insert or magnet as its own
-component, placed in the hole it goes into, and (when asked) that hole made in the part as a
-normal Hole step. No Qt: the dialog (hardware_ui.py) and the golden-model builder run this.
-The sizes come from hardware_core.py (pure Python, unit tested).
+"""INSERT > Hardware...: a standard part (a screw, a set screw, a nut, a washer, an O-ring, a
+ball bearing, a retaining ring, a pin, a key, a standoff, a heat-set insert, a magnet) as its
+own component, placed in the hole it goes into, and (when asked) that hole made in the part
+as a normal Hole step. No Qt: the dialog (hardware_ui.py) and the golden-model builder run
+this. The sizes come from hardware_core.py (pure Python, unit tested), the solids from
+hardware_shapes.py, where a click puts a part from hardware_place.py.
 
 What one insert makes (one undo step, the dialog's transaction):
 
-  a component     named after the part ("M3x10 ISO 4762"), with one body holding one step
-                  "Hardware" (a PartDesign::FeaturePython, Fission180Type "Hardware") whose
-                  solid is built from the tables. Fusion inserts a library part as its own
-                  component too. The component's Placement puts the part's own frame on the
-                  hole: origin on the hole's axis at the clicked face, +z out of the part.
-  a Hole step     in the clicked body (Fission 180's Hole: hole.py), at the same spot: a
-                  clearance hole with the counterbore or countersink of the head, an insert's
-                  hole or a magnet's pocket. Its options are Fission 180's Hole options, so the
-                  Hole dialog can edit it like any other hole.
-
-Placing: click a round edge of the part (a hole's rim, a boss's edge: the part goes on its
-axis, the head on the face the rim lies in) or a flat face (the part goes where you clicked,
-square to the face). A rim that is already a hole does not get another one by default, and
-the size is read off it (Fusion's Insert Fastener sizes itself from the hole: Automatic).
+  a component     named like the part is asked for ("M3 x 10 Socket Head Cap Screw",
+                  "O-Ring AS568-012"), its standard as the description (the parts list shows
+                  both), with one body holding one step "Hardware" (a
+                  PartDesign::FeaturePython, Fission180Type "Hardware") whose solid is built
+                  from the tables, of a physical material (steel, brass, rubber...) so it has
+                  a mass. Fusion inserts a library part as its own component too. The
+                  component's Placement puts the part's own frame on the hole: origin on the
+                  hole's axis at the face, +z out of the part. With no place given it stands
+                  at the origin (Fusion's Insert McMaster-Carr Component drops the part
+                  there and opens Move).
+  more of it      one occurrence of that component ("...:2", ":3": instances.py, as Copy /
+                  Paste makes them) for every further hole filled in the same go: one part,
+                  several places, one row with its count in the parts list.
+  a Hole step     per place, in the clicked body (Fission 180's Hole: hole.py): a clearance
+                  hole with the counterbore or countersink of the head, a set screw's tapped
+                  hole, an insert's hole or a magnet's pocket. Its options are Fission 180's
+                  Hole options, so the Hole dialog can edit it like any other hole.
+  a rigid joint   per place (join(), an as-built joint: joints.py) between the part and the
+                  component it was put on, so it moves with it. Fusion's Insert Fastener
+                  places fasteners with joints.
 
 The step remembers its options and where it was clicked as JSON (property
 "Fission180Hardware"); double-clicking it in the timeline opens the dialog again.
 """
 
 import json
-import math
 
 import FreeCAD as App
 
 from . import bodies, components, hole, log, warn
 from . import hardware_core as core
+from . import hardware_place, hardware_shapes
 from .hardware_core import HardwareError
 
 TYPE = "PartDesign::FeaturePython"
@@ -39,99 +47,19 @@ KIND = "Hardware"  # Fission180Type of the step
 META = "Fission180Hardware"
 Z = App.Vector(0, 0, 1)
 TOL = 1e-6
-RIM_PROBE = 0.05  # mm beside a rim where the material is looked for
-LOOKS = {  # appearance.LIBRARY keys
-    "screw": "cast_iron",
-    "nut": "steel_satin",
-    "washer": "steel_satin",
-    "insert": "brass",
-    "magnet": "steel_polished",
-}
+LOOKS = core.LOOKS  # (kept: the old name)
+RUBBER = ("Rubber (NBR)", "nylon", 1.2)  # name, the library material it is made from, g/cm3
+
+spot = hardware_place.spot
+raw_solid = hardware_shapes.raw_solid
 
 
 # -- the solids ------------------------------------------------------------------------------------
-def _cylinder(radius, z0, z1):
-    import Part
-
-    return Part.makeCylinder(radius, z1 - z0, App.Vector(0, 0, z0), Z)
-
-
-def _hex_prism(s, z0, z1):
-    """A hexagon s across the flats (flats parallel to x) from z0 to z1."""
-    import Part
-
-    r = s / math.sqrt(3.0)  # the corner radius
-    points = [
-        App.Vector(r * math.cos(math.radians(60 * i)), r * math.sin(math.radians(60 * i)), z0)
-        for i in range(6)
-    ]
-    wire = Part.makePolygon(points + [points[0]])
-    return Part.Face(wire).extrude(App.Vector(0, 0, z1 - z0))
-
-
-def _cap(base_radius, height, z0):
-    """A spherical cap (a button head): base radius, height, its flat side at z0."""
-    import Part
-
-    big = core.cap_radius(base_radius, height)
-    sphere = Part.makeSphere(big, App.Vector(0, 0, z0 + height - big))
-    box = Part.makeBox(4 * big, 4 * big, height, App.Vector(-2 * big, -2 * big, z0))
-    return sphere.common(box)
-
-
-def _cone(r_top, r_bottom, z_bottom, z_top):
-    import Part
-
-    return Part.makeCone(r_bottom, r_top, z_top - z_bottom, App.Vector(0, 0, z_bottom), Z)
-
-
-def _one(shape):
-    shape = shape.removeSplitter()
-    return shape.Solids[0] if len(shape.Solids) == 1 else shape
-
-
-def raw_solid(options):
-    """The part in its own frame before the seat and flip (hardware_core.extent): screws
-    with the head's bearing face at z = 0 (a countersunk head: its top), nuts and washers
-    from z = 0 up, inserts and magnets from z = 0 down."""
-    o = core.check(options)
-    dm = core.dims(o["standard"], o["size"])
-    kind = o["kind"]
-    if kind == "nut":
-        return _one(
-            _hex_prism(dm["s"], 0.0, dm["m"]).cut(_cylinder(dm["d"] / 2.0, -1, dm["m"] + 1))
-        )
-    if kind == "washer":
-        ring = _cylinder(dm["d2"] / 2.0, 0.0, dm["h"]).cut(
-            _cylinder(dm["d1"] / 2.0, -1, dm["h"] + 1)
-        )
-        return _one(ring)
-    if kind == "insert":
-        tube = _cylinder(dm["outside"] / 2.0, -dm["length"], 0.0)
-        return _one(tube.cut(_cylinder(dm["d"] / 2.0, -dm["length"] - 1, 1)))
-    if kind == "magnet":
-        return _one(_cylinder(dm["diameter"] / 2.0, -dm["thickness"], 0.0))
-    d, dk, k, s, t = dm["d"], dm["dk"], dm["k"], dm["s"], dm["t"]
-    length = o["length"]
-    if o["standard"] == "iso10642":
-        head = _cone(dk / 2.0, d / 2.0, -k, 0.0)
-        shank = _cylinder(d / 2.0, -length, -k)
-        top = 0.0
-    else:
-        if o["standard"] == "iso7380":
-            head = _cap(dk / 2.0, k, 0.0)
-        else:
-            head = _cylinder(dk / 2.0, 0.0, k)
-        shank = _cylinder(d / 2.0, -length, 0.0)
-        top = k
-    socket = _hex_prism(s, top - t, top + 1.0)
-    return _one(head.fuse(shank).cut(socket))
-
-
 def local_placement(options):
-    """The part's placement in its component: lifted to its seat, turned round by Flip."""
+    """The part's placement in its component: lifted to its seat and by Offset, turned round
+    by Flip."""
     o = core.with_defaults(options)
-    place = App.Placement(App.Vector(0, 0, core.seat(o)), App.Rotation())
+    place = App.Placement(App.Vector(0, 0, core.seat(o) + o["offset"]), App.Rotation())
     if o["flip"]:
         place = App.Placement(App.Vector(), App.Rotation(App.Vector(1, 0, 0), 180)).multiply(place)
     return place
@@ -139,7 +67,7 @@ def local_placement(options):
 
 def solid(options):
     """The part in its component's coordinates (the frame on the hole)."""
-    shape = raw_solid(options).copy()
+    shape = hardware_shapes.solid(options).copy()
     place = local_placement(options)
     if not place.isIdentity():
         # baked into the geometry: a PartDesign feature puts its own Placement on its Shape
@@ -218,11 +146,44 @@ def component_of(feature):
     return components.container_of(body_of(feature))
 
 
+def _named(doc, name, test=None):
+    obj = doc.getObject(name) if name else None
+    if obj is None or (test is not None and not test(obj)):
+        return None
+    return obj
+
+
 def hole_of(feature):
-    """The Hole step this part made, or None (deleted, or none asked for)."""
-    name = load_meta(feature).get("hole")
-    obj = feature.Document.getObject(name) if name else None
-    return obj if hole.is_hole(obj) else None
+    """The Hole step this part made at its first place, or None (deleted, or none asked
+    for)."""
+    return _named(feature.Document, load_meta(feature).get("hole"), hole.is_hole)
+
+
+def holes_of(feature):
+    """Every Hole step this part made (its first place and the further ones)."""
+    doc = feature.Document
+    meta = load_meta(feature)
+    names = [meta.get("hole")] + [m.get("hole") for m in meta.get("more", [])]
+    return [h for h in (_named(doc, n, hole.is_hole) for n in names) if h is not None]
+
+
+def occurrences(feature):
+    """The components this part stands in: its own, then one occurrence per further place."""
+    doc = feature.Document
+    found = [component_of(feature)]
+    for more in load_meta(feature).get("more", []):
+        found.append(_named(doc, more.get("part"), components.is_component))
+    return [c for c in found if c is not None]
+
+
+def joints_of(feature):
+    doc = feature.Document
+    found = []
+    for record in load_meta(feature).get("joints", []):
+        joint = _named(doc, record.get("joint"))
+        if joint is not None:
+            found.append(joint)
+    return found
 
 
 def _attach_view(obj):
@@ -236,11 +197,11 @@ def _attach_view(obj):
         pass
 
 
-def _look(body, kind):
+def _look(body, options):
     try:
         from . import appearance
 
-        look = appearance.find(LOOKS.get(kind, "steel_satin"))
+        look = appearance.find(core.look_key(options))
         if look is not None:
             appearance.set_body(body, look)
             appearance.apply(body)
@@ -248,136 +209,53 @@ def _look(body, kind):
         warn("hardware look: %s" % exc)
 
 
+def _rubber_key(material):
+    """The user's own "Rubber (NBR)" material (made the first time an O-ring is inserted:
+    FreeCAD's library has no rubber), or None."""
+    name, base, density = RUBBER
+    for found in material.user_entries():
+        if found["label"] == name:
+            return found["key"]
+    try:
+        return material.create_user_material(name, base, density)
+    except Exception as exc:
+        log("hardware: no rubber material (%s)" % exc)
+        return None
+
+
+def _material(body, options):
+    """Give the part its physical material (so it has a mass and the parts list a material):
+    steel for the fasteners, bearings and pins, brass for inserts, rubber for O-rings."""
+    try:
+        from . import material
+
+        keys = list(core.material_keys(options))
+        if core.with_defaults(options)["kind"] == "oring" and material.entry("rubber") is None:
+            rubber = _rubber_key(material)
+            if rubber:
+                keys.insert(0, rubber)
+        for key in keys:
+            if material.entry(key) is None:
+                continue
+            if material.key_of(body) != key:
+                material.assign(body, key)
+            return key
+    except Exception as exc:
+        log("hardware material: %s" % exc)
+    return None
+
+
+def mass(feature):
+    """The part's mass in kg (its solid's volume times its material's density), or None."""
+    try:
+        from . import material
+
+        return material.mass(body_of(feature))
+    except Exception:
+        return None
+
+
 # -- where it goes ---------------------------------------------------------------------------------
-def _global_element(obj, sub):
-    element = obj.Shape.getElement(sub).copy()
-    parent = obj.getParentGeoFeatureGroup()
-    if parent is not None:
-        place = parent.getGlobalPlacement()
-        if not place.isIdentity():
-            element.transformShape(place.toMatrix())
-    return element
-
-
-def _global_shape(obj):
-    shape = obj.Shape.copy()
-    parent = obj.getParentGeoFeatureGroup()
-    if parent is not None:
-        place = parent.getGlobalPlacement()
-        if not place.isIdentity():
-            shape.transformShape(place.toMatrix())
-    return shape
-
-
-def _perpendicular(axis):
-    other = App.Vector(1, 0, 0) if abs(axis.x) < 0.9 else App.Vector(0, 1, 0)
-    side = axis.cross(other)
-    side.normalize()
-    return side
-
-
-def _inside(shape, point):
-    try:
-        return shape.isInside(point, 1e-7, False)
-    except Exception:
-        return False
-
-
-def _on_face(shape, point, normal, tol=1e-6):
-    """True when `point` lies on a flat face of `shape` square to `normal`."""
-    import Part
-
-    vertex = Part.Vertex(point)
-    for face in shape.Faces:
-        try:
-            if face.Surface.TypeId != "Part::GeomPlane":
-                continue
-            if abs(hole.face_normal_at(face, point).dot(normal)) < 1.0 - 1e-9:
-                continue
-            box = face.BoundBox
-            box.enlarge(1e-3)
-            if box.isInside(point) and face.distToShape(vertex)[0] <= tol:
-                return True
-        except Exception:
-            continue
-    return False
-
-
-def spot(obj, sub, point=None):
-    """Where a click puts the part: {"center", "normal" (out of the part), "body", "rim"
-    (the click was a round edge), "diameter" (the rim's), "is_hole" (the rim is a hole's),
-    "face_point" (a point on the face the hole is drilled from)}, all global. Raises
-    HardwareError when the click is no round edge or flat face of a solid."""
-    if obj is None or not sub:
-        raise HardwareError("Click a round edge (a hole's rim) or a flat face of the part.")
-    body = bodies.body_of(obj)
-    if body is None or obj.Shape.isNull() or not obj.Shape.Solids:
-        raise HardwareError("Click a round edge or a flat face of a solid body.")
-    try:
-        element = _global_element(obj, sub)
-    except Exception:
-        raise HardwareError("That edge or face is gone. Click the part again.")
-    shape = _global_shape(obj)
-    if sub.startswith("Edge"):
-        curve = getattr(element, "Curve", None)
-        if curve is None or curve.TypeId != "Part::GeomCircle":
-            raise HardwareError("That edge is not round. Click a hole's rim or a flat face.")
-        center = App.Vector(curve.Center)
-        axis = App.Vector(curve.Axis)
-        axis.normalize()
-        r = curve.Radius
-        side = _perpendicular(axis)
-        rim = center + side * r
-        outside = rim + side * RIM_PROBE
-        inside = rim - side * RIM_PROBE
-        # Out of the part is the side of the rim's face with no material.
-        if _inside(shape, outside - axis * RIM_PROBE) or _inside(shape, inside - axis * RIM_PROBE):
-            normal = axis
-        else:
-            normal = -axis
-        # A hole's rim has material outside the circle (under the face); a boss's inside.
-        is_hole = _inside(shape, outside - normal * RIM_PROBE)
-        # The face the rim lies in: beside the rim on one side (the top face around a hole,
-        # a boss's top, the floor of a counterbore).
-        if _on_face(shape, outside, normal):
-            face_point = outside
-        elif _on_face(shape, inside, normal):
-            face_point = inside
-        else:
-            raise HardwareError(
-                "That round edge has no flat face beside it. Click the rim on a flat face."
-            )
-        return {
-            "center": center,
-            "normal": normal,
-            "body": body,
-            "rim": True,
-            "diameter": 2.0 * r,
-            "is_hole": is_hole,
-            "face_point": face_point,
-        }
-    if not sub.startswith("Face"):
-        raise HardwareError("Click a round edge (a hole's rim) or a flat face of the part.")
-    surface = getattr(element, "Surface", None)
-    if surface is None or surface.TypeId != "Part::GeomPlane":
-        raise HardwareError(
-            "That face is curved. Click a flat face, or the round edge at a hole's opening."
-        )
-    if point is None:
-        point = element.CenterOfMass
-    point = hole.snap_to_face(element, point)
-    normal = hole.face_normal_at(element, point)
-    return {
-        "center": App.Vector(point),
-        "normal": normal,
-        "body": body,
-        "rim": False,
-        "diameter": None,
-        "is_hole": False,
-        "face_point": App.Vector(point),
-    }
-
-
 def frame(place, flip=False):
     """The part's frame (global): origin on the hole's axis at the face, +z out of the part."""
     return App.Placement(App.Vector(place["center"]), App.Rotation(Z, App.Vector(place["normal"])))
@@ -391,7 +269,7 @@ def _parent_for_new(doc, body):
             parent = components.active_component(doc)
         except Exception:
             parent = None
-    else:
+    elif body is not None:
         parent = components.container_of(body)
     while parent is not None and any(is_hardware(o) for o in _features_in(parent)):
         parent = components.container_of(parent)
@@ -427,21 +305,34 @@ def _hole_base(body, own_hole):
     if own_hole is not None and hole.owner_body(own_hole) is body:
         return own_hole.BaseFeature
     tip = body.Tip
+    if tip is not None and tip.Shape.isNull() and hole.is_hole(tip):
+        # the hole made a moment ago for another place of this part: worked out now, so the
+        # next hole goes into what it left
+        try:
+            first = [o for o in (hole.helper_sketch(tip), tip) if o is not None]
+            body.Document.recompute(first)
+        except Exception as exc:
+            warn("hardware: %s" % exc)
     if tip is None or tip.Shape.isNull() or not tip.Shape.Solids:
         return None
     return tip
 
 
-def _place_hole(feature, place, wanted, old):
-    """Make, move, change or remove the part's Hole step. Returns the hole or None."""
-    body = place["body"]
-    if old is not None and hole.owner_body(old) is not body:
+def _place_hole(place, wanted, old):
+    """Make, move, change or remove a place's Hole step. Returns the hole or None."""
+    body = place["body"] if place is not None else None
+    if old is not None and (body is None or hole.owner_body(old) is not body):
         hole.remove(old)  # placed on another body: its hole goes there
         old = None
-    if wanted is None:
+    if wanted is None or place is None:
         if old is not None:
             hole.remove(old)
         return None
+    if place.get("face_point") is None:
+        raise HardwareError(
+            "There is no flat face here to make the hole in. Untick Make the hole too, or "
+            "click a flat face."
+        )
     base = _hole_base(body, old)
     if base is None:
         raise HardwareError("%s has no solid to make the hole in." % body.Label)
@@ -467,7 +358,10 @@ def _place_hole(feature, place, wanted, old):
 
 
 # -- making and changing ---------------------------------------------------------------------------
-def _pick_json(obj, sub, point):
+def _pick_json(pick):
+    if pick is None:
+        return None
+    obj, sub, point = pick
     return {
         "object": obj.Name,
         "sub": sub,
@@ -475,14 +369,31 @@ def _pick_json(obj, sub, point):
     }
 
 
-def pick_of(feature):
-    """(object, sub, point) where the part was placed, or None (the object is gone)."""
-    data = load_meta(feature).get("pick") or {}
-    obj = feature.Document.getObject(data.get("object") or "")
+def _pick_from(doc, data):
+    data = data or {}
+    obj = doc.getObject(data.get("object") or "")
     if obj is None:
         return None
     point = data.get("point")
     return obj, data.get("sub", ""), App.Vector(*point) if point else None
+
+
+def pick_of(feature):
+    """(object, sub, point) where the part was placed, or None (at the origin, or the object
+    is gone)."""
+    return _pick_from(feature.Document, load_meta(feature).get("pick"))
+
+
+def more_of(feature):
+    """[(object, sub, point)] of the further places of the part (its occurrences)."""
+    doc = feature.Document
+    found = [_pick_from(doc, m) for m in load_meta(feature).get("more", [])]
+    return [p for p in found if p is not None]
+
+
+def at_origin(feature):
+    """True for a part put in without a place (it stands where Move left it)."""
+    return load_meta(feature).get("pick") is None
 
 
 def read(feature):
@@ -494,87 +405,281 @@ def read(feature):
     return pick_of(feature), options
 
 
-def make(doc, pick, options):
-    """Insert a part at `pick` = (object, sub, global point): a new component with the
-    Hardware step, and its hole. Returns the step."""
+def _new_occurrence(component, place):
+    from . import instances
+
+    part = instances.make_instance(
+        component, parent=components.container_of(component), placement=frame(place)
+    )
+    try:
+        part.Label2 = component.Label2
+    except Exception:
+        pass
+    return part
+
+
+def _drop_occurrence(doc, record):
+    made = _named(doc, record.get("hole"), hole.is_hole)
+    if made is not None:
+        hole.remove(made)
+    part = _named(doc, record.get("part"), components.is_component)
+    if part is not None:
+        components.remove(doc, part, _top=False)
+
+
+def _set_more(feature, meta, picks, options):
+    """Make the part's further places match `picks`: an occurrence (and its hole) per
+    place. Changes meta["more"]."""
+    doc = feature.Document
+    component = component_of(feature)
+    have = list(meta.get("more", []))
+    wanted = core.hole_options(options)
+    kept = []
+    try:
+        for i, pick in enumerate(picks):
+            place = spot(*pick)
+            record = have[i] if i < len(have) else {}
+            part = _named(doc, record.get("part"), components.is_component)
+            if part is None:
+                part = _new_occurrence(component, place)
+            else:
+                _place_component(part, place)
+            old = _named(doc, record.get("hole"), hole.is_hole)
+            now = dict(_pick_json(pick), part=part.Name, hole=old.Name if old is not None else None)
+            kept.append(now)
+            made = _place_hole(place, wanted, old)
+            now["hole"] = made.Name if made is not None else None
+    except Exception:
+        # what was made so far stays known to the step (the next change or Cancel finds it)
+        meta["more"] = kept + have[len(kept) :]
+        _save_meta(feature, meta)
+        raise
+    for record in have[len(picks) :]:
+        _drop_occurrence(doc, record)
+    meta["more"] = kept
+
+
+def make(doc, pick, options, more=None):
+    """Insert a part at `pick` = (object, sub, global point), or at the origin of the active
+    component when pick is None: a new component with the Hardware step, and its hole.
+    `more`: further picks, each filled with an occurrence of the part. Returns the step."""
     options = core.check(options)
-    obj, sub, point = pick
-    place = spot(obj, sub, point)
-    body_target = place["body"]
+    if pick is None:
+        # no hole, no counterbore to sit in: the part's own frame stands at the origin
+        options = core.check(dict(options, make_hole=False, sink_head=False, seat=None))
+    place = spot(*pick) if pick is not None else None
+    body_target = place["body"] if place is not None else None
     parent = _parent_for_new(doc, body_target)
     label = _unique_label(doc, core.name(options))
     component = components.new_component(doc, label=label, parent=parent)
+    try:
+        component.Label2 = core.description(options)
+    except Exception:
+        pass
     body = components.new_body_in(doc, component)
     feature = bodies.insert_after_tip(body, TYPE, "Hardware")
     HardwareFeature(feature)
     _attach_view(feature)
-    _save_meta(
-        feature,
-        {
-            "v": 1,
-            "options": options,
-            "pick": _pick_json(obj, sub, point),
-            "hole": None,
-            "label": label,
-        },
-    )
-    _place_component(component, place)
-    made = _place_hole(feature, place, core.hole_options(options), None)
-    meta = load_meta(feature)
-    meta["hole"] = made.Name if made is not None else None
+    meta = {
+        "v": 2,
+        "options": options,
+        "pick": _pick_json(pick),
+        "hole": None,
+        "label": label,
+        "more": [],
+        "joints": [],
+    }
     _save_meta(feature, meta)
-    _look(body, options["kind"])
-    hole.show_tip(body_target)
+    made = None
+    if place is not None:
+        _place_component(component, place)
+        made = _place_hole(place, core.hole_options(options), None)
+        meta["hole"] = made.Name if made is not None else None
+        if more:
+            _set_more(feature, meta, more, options)
+        _save_meta(feature, meta)
+    _material(body, options)
+    _look(body, options)
+    if body_target is not None:
+        hole.show_tip(body_target)
     log(
-        "hardware %s inserted on %s%s"
-        % (label, body_target.Label, " with %s" % made.Label if made is not None else "")
+        "hardware %s inserted%s%s"
+        % (
+            label,
+            " on %s" % body_target.Label if body_target is not None else " at the origin",
+            " with %s" % made.Label if made is not None else "",
+        )
     )
     return feature
 
 
-def update(feature, pick=None, options=None):
-    """Change a part: new options and/or a new place (pick). Its hole follows. Returns the
-    step."""
+def update(feature, pick=None, options=None, more=None):
+    """Change a part: new options and/or a new place (pick); `more` (a list) replaces its
+    further places. Its holes follow. Returns the step."""
     meta = load_meta(feature)
+    before = core.with_defaults(meta.get("options", {}))
     merged = dict(meta.get("options", {}))
     merged.update(options or {})
     merged = core.check(merged)
+    doc = feature.Document
     if pick is None:
         pick = pick_of(feature)
-        if pick is None:
+        if pick is None and not at_origin(feature):
             raise HardwareError("The face it was placed on is gone. Click a new place.")
-    obj, sub, point = pick
-    place = spot(obj, sub, point)
+    place = spot(*pick) if pick is not None else None
     component = component_of(feature)
     old_hole = hole_of(feature)
-    made = _place_hole(feature, place, core.hole_options(merged), old_hole)
+    made = _place_hole(place, core.hole_options(merged), old_hole)
+    meta.update({"v": 2, "options": merged, "pick": _pick_json(pick)})
+    meta["hole"] = made.Name if made is not None else None
     if component is not None:
-        _place_component(component, place)
+        if place is not None:
+            _place_component(component, place)
         wanted = core.name(merged)
-        if component.Label == meta.get("label") and core.name(meta.get("options", {})) != wanted:
-            component.Label = _unique_label(feature.Document, wanted, mine=component)
+        if component.Label == meta.get("label") and core.name(before) != wanted:
+            component.Label = _unique_label(doc, wanted, mine=component)
             meta["label"] = component.Label
-    kind_before = core.with_defaults(meta.get("options", {}))["kind"]
-    meta.update(
-        {
-            "v": 1,
-            "options": merged,
-            "pick": _pick_json(obj, sub, point),
-            "hole": made.Name if made is not None else None,
-        }
-    )
+        try:
+            if component.Label2 == core.description(before):
+                component.Label2 = core.description(merged)
+        except Exception:
+            pass
+    if more is None:
+        more = more_of(feature)
+    if place is None:
+        more = []
+    _set_more(feature, meta, more, merged)
     _save_meta(feature, meta)
-    if kind_before != merged["kind"]:
-        _look(body_of(feature), merged["kind"])
-    hole.show_tip(place["body"])
+    if component is not None:
+        _rename_occurrences(feature, component)
+    if before["kind"] != merged["kind"]:
+        _material(body_of(feature), merged)
+        _look(body_of(feature), merged)
+    if place is not None:
+        hole.show_tip(place["body"])
     return feature
 
 
+def _rename_occurrences(feature, component):
+    """The occurrences are named after the part ("...:2", ":3"): they follow its name at
+    once (instances.sync does it too, at the next recompute with the window up)."""
+    try:
+        from . import components_core
+
+        for part in occurrences(feature)[1:]:
+            base, number = components_core.split_instance_label(part.Label)
+            if number is not None and base != component.Label:
+                part.Label = components_core.instance_label(component.Label, number)
+    except Exception as exc:
+        log("hardware: occurrence names (%s)" % exc)
+
+
 def remove(feature):
-    """Delete a part's component (with its body) and its hole."""
+    """Delete a part's component (with its body), its occurrences, holes and joints."""
+    doc = feature.Document
+    meta = load_meta(feature)
+    _drop_joints(feature, meta, keep=())
+    for record in meta.get("more", []):
+        _drop_occurrence(doc, record)
     made = hole_of(feature)
     component = component_of(feature)
     if made is not None:
         hole.remove(made)
     if component is not None:
-        components.remove(feature.Document, component)
+        components.remove(doc, component)
+
+
+# -- joints ----------------------------------------------------------------------------------------
+def _relative(part, target):
+    """Where `part` stands seen from `target`, as numbers (to see whether it moved)."""
+    from . import joints
+
+    plc = joints.global_placement(target).inverse().multiply(joints.global_placement(part))
+    q = plc.Rotation.Q
+    return [round(v, 6) for v in (plc.Base.x, plc.Base.y, plc.Base.z) + tuple(q)]
+
+
+def _drop_joints(feature, meta, keep):
+    doc = feature.Document
+    try:
+        from . import joints
+    except Exception:
+        return
+    left = []
+    for record in meta.get("joints", []):
+        joint = _named(doc, record.get("joint"))
+        if joint is None:
+            continue
+        if record in keep:
+            left.append(record)
+            continue
+        try:
+            joints.delete_joint(joint)
+        except Exception as exc:
+            warn("hardware: %s" % exc)
+    meta["joints"] = left
+
+
+def join(feature):
+    """Hold every occurrence of the part to the component it was placed on with a rigid
+    as-built joint (Fusion's Insert Fastener places fasteners with joints), when the part's
+    "joint" option is on; joints of places that are gone or changed are removed. Nothing
+    moves. A part put on a body of its own parent component moves with that component
+    already and gets no joint. Returns the joints made now."""
+    from . import joints
+
+    doc = feature.Document
+    meta = load_meta(feature)
+    options = core.with_defaults(meta.get("options", {}))
+    wanted = []
+    if options["joint"]:
+        picks = [pick_of(feature)] + more_of(feature)
+        for part, pick in zip(occurrences(feature), picks):
+            if pick is None:
+                continue
+            target = joints.part_of(pick[0])
+            if target is None or target is part or components.is_inside(part, target):
+                continue
+            wanted.append((part, target))
+    keep, todo = [], []
+    for part, target in wanted:
+        match = None
+        for record in meta.get("joints", []):
+            if (
+                record.get("part") == part.Name
+                and record.get("target") == target.Name
+                and record.get("at") == _relative(part, target)
+                and _named(doc, record.get("joint")) is not None
+            ):
+                match = record
+                break
+        if match is not None:
+            keep.append(match)
+        else:
+            todo.append((part, target))
+    _drop_joints(feature, meta, keep)
+    made = []
+    for part, target in todo:
+        try:
+            joint = joints.create_as_built_joint(doc, "rigid", part, target)
+        except Exception as exc:
+            log("hardware: no joint between %s and %s (%s)" % (part.Label, target.Label, exc))
+            continue
+        meta["joints"].append(
+            {
+                "joint": joint.Name,
+                "part": part.Name,
+                "target": target.Name,
+                "at": _relative(part, target),
+            }
+        )
+        made.append(joint)
+    _save_meta(feature, meta)
+    if made and App.GuiUp:
+        try:
+            from . import joints_ui
+
+            joints_ui.attach_views(doc)
+        except Exception as exc:
+            warn("hardware: %s" % exc)
+    return made

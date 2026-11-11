@@ -130,28 +130,6 @@ class ClickRule(unittest.TestCase):
         self.assertEqual(got, ["Constraint2", "Constraint3"])
 
 
-class DimensionPlacement(unittest.TestCase):
-    def test_nothing_to_place_yet(self):
-        self.assertFalse(select.places_dimension(False, 0, ["Edge1"]))
-        self.assertFalse(select.places_dimension(False, 1, ["H_Axis"]))
-
-    def test_one_pick_then_a_curve_is_a_second_pick(self):
-        self.assertFalse(select.places_dimension(True, 1, ["Edge2"]))
-        self.assertFalse(select.places_dimension(True, 1, ["Vertex3"]))
-        self.assertFalse(select.places_dimension(True, 1, ["RootPoint"]))
-
-    def test_one_pick_then_an_axis_places(self):
-        self.assertTrue(select.places_dimension(True, 1, ["V_Axis"]))
-        self.assertTrue(select.places_dimension(True, 1, ["H_Axis"]))
-
-    def test_two_picks_then_anything_places(self):
-        self.assertTrue(select.places_dimension(True, 2, ["Edge2"]))
-        self.assertTrue(select.places_dimension(True, 2, ["Constraint4"]))
-
-    def test_empty_space_places(self):
-        self.assertTrue(select.places_dimension(True, 1, []))
-
-
 class Centerline(unittest.TestCase):
     def test_mirror_across_a_level_line(self):
         self.assertEqual(centerline.mirror((30.0, 10.0), (0.0, 0.0), (30.0, 0.0)), (30.0, -10.0))
@@ -161,31 +139,32 @@ class Centerline(unittest.TestCase):
         self.assertAlmostEqual(x, 2.0)
         self.assertAlmostEqual(y, 0.0)
 
-    def test_point_to_centerline_is_a_diameter(self):
-        # FreeCAD's point-to-line distance: the point first, the line second
-        self.assertEqual(centerline.diameter_plan("Distance", 2, 1, 0, 0, [0]), ((2, 1), 0))
-        # ...also with the two picked the other way round
-        self.assertEqual(centerline.diameter_plan("Distance", 0, 0, 2, 2, [0]), ((2, 2), 0))
-
-    def test_line_to_centerline_is_a_diameter(self):
-        self.assertEqual(centerline.diameter_plan("Distance", 3, 0, 0, 0, [0]), ((3, 1), 0))
-        self.assertEqual(centerline.diameter_plan("Distance", 0, 0, 3, 0, [0]), ((3, 1), 0))
+    # (wave 7's merge, sketch-c: the diameter is made by the one Dimension tool,
+    # sketch_dimension_tool.py; what counts as one is read back from the constraints)
+    def test_a_distance_to_the_mirror_image_is_a_diameter(self):
+        no = centerline.NO_GEO
+        cons = [
+            ("Coincident", 0, 2, 1, 1, no),
+            ("Symmetric", 2, 1, 5, 1, 0),  # point 5 mirrors corner (2, 1) across line 0
+            ("Distance", 2, 1, 5, 1, no),  # the diameter
+            ("Distance", 2, 1, 3, 1, no),  # another distance
+        ]
+        self.assertEqual(centerline.diameter_dimensions(cons, [0]), [2])
+        # ...whichever way round the dimension names its two points
+        cons[2] = ("Distance", 5, 1, 2, 1, no)
+        self.assertEqual(centerline.diameter_dimensions(cons, [0]), [2])
 
     def test_what_is_no_diameter(self):
-        no_geo = centerline.NO_GEO
-        # a line's own length, also the centerline's
-        self.assertIsNone(centerline.diameter_plan("Distance", 0, 0, no_geo, 0, [0]))
-        # a distance to a line that is no centerline
-        self.assertIsNone(centerline.diameter_plan("Distance", 2, 1, 1, 0, [0]))
-        # a distance between two points
-        self.assertIsNone(centerline.diameter_plan("Distance", 2, 1, 0, 1, [0]))
-        # other dimensions
-        self.assertIsNone(centerline.diameter_plan("DistanceX", 2, 1, 0, 0, [0]))
-        self.assertIsNone(centerline.diameter_plan("Radius", 2, 0, no_geo, 0, [0]))
-        # no centerline in the sketch
-        self.assertIsNone(centerline.diameter_plan("Distance", 2, 1, 0, 0, []))
-        # two centerlines: the distance between them stays a distance
-        self.assertIsNone(centerline.diameter_plan("Distance", 0, 0, 1, 0, [0, 1]))
+        no = centerline.NO_GEO
+        cons = [
+            ("Symmetric", 2, 1, 5, 1, 4),  # mirrored across a line that is no centerline
+            ("Distance", 2, 1, 5, 1, no),
+            ("DistanceX", 2, 1, 5, 1, no),
+        ]
+        self.assertEqual(centerline.diameter_dimensions(cons, [0]), [])
+        self.assertEqual(centerline.diameter_dimensions(cons, []), [])
+        # the same sketch with line 4 a centerline: the Distance is one, the DistanceX not
+        self.assertEqual(centerline.diameter_dimensions(cons, [4]), [1])
 
 
 class PolygonParts(unittest.TestCase):

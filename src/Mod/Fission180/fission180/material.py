@@ -9,6 +9,14 @@ was given to the body, as in Fusion.
 
 Fusion starts every design in Steel; FreeCAD starts with a "Default" material of almost no
 weight. A body still on FreeCAD's Default counts as Steel for its mass (effective()).
+
+Two kinds of library rows. LIBRARY: materials FreeCAD's own library has a card for (with a
+density). OWN: materials it has none for, or only a colour card (Brass, Gold, Carbon fibre,
+anodized aluminium, woods...): Fission 180 states their values here (typical handbook values
+from public engineering data) and makes each one in FreeCAD's User library, in a folder of
+its own, the first time a body is made of it (FreeCAD stores only a material's id in a
+design, so it has to be in a library). A design opened where one is missing gets it made
+again (restore_user_materials).
 """
 
 from . import appearance, bodies
@@ -37,7 +45,140 @@ LIBRARY = [
     ("peek", "PEEK", "PEEK-Generic", "plastic_matte_black", "Plastic"),
     ("wood", "Wood", "Wood-Generic", "wood_light", "Other"),
     ("glass", "Glass", "Glass-Generic", "glass_clear", "Other"),
+    # (wave 7: more of FreeCAD's own cards)
+    ("aluminium_7075", "Aluminium 7075", "Aluminum-7075-T6", "aluminium_satin", "Metal"),
+    ("cast_iron", "Cast Iron", "Steel-EN-GJL-200", "cast_iron", "Metal"),
+    ("pvc", "PVC", "PVC-Generic", "plastic_matte_grey", "Plastic"),
+    ("concrete", "Concrete", "Concrete-Generic", "concrete", "Other"),
 ]
+
+# Materials FreeCAD's library has no card with a density for. Typical values from public
+# engineering handbooks (density g/cm^3, Young's modulus GPa, Poisson's ratio, yield strength
+# MPa, ultimate tensile strength MPa; None where a value means nothing for the material).
+# (key, label, the LIBRARY key it is built on, look key, group, values)
+OWN = [
+    ("brass", "Brass", "copper", "brass", "Metal", (8.5, 100.0, 0.34, 135.0, 330.0)),
+    ("bronze", "Bronze", "copper", "bronze", "Metal", (8.8, 110.0, 0.34, 125.0, 240.0)),
+    ("gold", "Gold", "copper", "gold", "Metal", (19.32, 79.0, 0.42, 30.0, 120.0)),
+    ("silver", "Silver", "copper", "silver", "Metal", (10.49, 83.0, 0.37, 54.0, 140.0)),
+    ("zinc", "Zinc", "copper", "zinc", "Metal", (7.14, 108.0, 0.25, 110.0, 150.0)),
+    ("lead", "Lead", "copper", "lead", "Metal", (11.34, 16.0, 0.44, 12.0, 18.0)),
+    ("magnesium", "Magnesium", "aluminium", "magnesium", "Metal", (1.74, 45.0, 0.35, 160.0, 260.0)),
+    ("nickel", "Nickel", "copper", "nickel", "Metal", (8.9, 200.0, 0.31, 150.0, 460.0)),
+    ("tungsten", "Tungsten", "steel", "tungsten", "Metal", (19.25, 400.0, 0.28, 750.0, 980.0)),
+    (
+        "aluminium_anodized_clear",
+        "Aluminium, anodized clear",
+        "aluminium_6061",
+        "aluminium_clear",
+        "Metal",
+        (2.7, 68.9, 0.33, 276.0, 310.0),
+    ),
+    (
+        "aluminium_anodized_black",
+        "Aluminium, anodized black",
+        "aluminium_6061",
+        "aluminium_black",
+        "Metal",
+        (2.7, 68.9, 0.33, 276.0, 310.0),
+    ),
+    (
+        "aluminium_anodized_red",
+        "Aluminium, anodized red",
+        "aluminium_6061",
+        "aluminium_red",
+        "Metal",
+        (2.7, 68.9, 0.33, 276.0, 310.0),
+    ),
+    (
+        "aluminium_anodized_blue",
+        "Aluminium, anodized blue",
+        "aluminium_6061",
+        "aluminium_blue",
+        "Metal",
+        (2.7, 68.9, 0.33, 276.0, 310.0),
+    ),
+    (
+        "aluminium_anodized_gold",
+        "Aluminium, anodized gold",
+        "aluminium_6061",
+        "aluminium_gold",
+        "Metal",
+        (2.7, 68.9, 0.33, 276.0, 310.0),
+    ),
+    (
+        "aluminium_anodized_green",
+        "Aluminium, anodized green",
+        "aluminium_6061",
+        "aluminium_green",
+        "Metal",
+        (2.7, 68.9, 0.33, 276.0, 310.0),
+    ),
+    (
+        "carbon_fibre",
+        "Carbon Fibre",
+        "abs",
+        "carbon_twill",
+        "Composite",
+        (1.6, 70.0, 0.3, 300.0, 600.0),
+    ),
+    ("fibreglass", "Fibreglass", "abs", "fibreglass", "Composite", (1.9, 20.0, 0.25, 150.0, 300.0)),
+    ("rubber", "Rubber", "abs", "rubber_black", "Plastic", (1.1, 0.05, 0.49, None, 20.0)),
+    (
+        "rubber_soft",
+        "Rubber, soft",
+        "abs",
+        "rubber_soft",
+        "Plastic",
+        (0.93, 0.01, 0.49, None, 15.0),
+    ),
+    (
+        "silicone",
+        "Silicone Rubber",
+        "abs",
+        "silicone_red",
+        "Plastic",
+        (1.15, 0.01, 0.48, None, 8.0),
+    ),
+    (
+        "polystyrene",
+        "Polystyrene",
+        "abs",
+        "plastic_white",
+        "Plastic",
+        (1.05, 3.2, 0.34, 40.0, 45.0),
+    ),
+    (
+        "polystyrene_foam",
+        "Polystyrene Foam",
+        "abs",
+        "polystyrene",
+        "Plastic",
+        (0.03, 0.005, 0.1, None, 0.2),
+    ),
+    (
+        "hdpe",
+        "Polyethylene (HDPE)",
+        "abs",
+        "plastic_matte_white",
+        "Plastic",
+        (0.95, 1.0, 0.42, 26.0, 30.0),
+    ),
+    ("oak", "Oak", "wood", "wood_oak", "Wood", (0.75, 11.0, 0.35, None, 95.0)),
+    ("pine", "Pine", "wood", "wood_pine", "Wood", (0.5, 9.0, 0.35, None, 80.0)),
+    ("mahogany", "Mahogany", "wood", "wood_mahogany", "Wood", (0.6, 10.0, 0.35, None, 85.0)),
+    ("walnut", "Walnut", "wood", "wood_walnut", "Wood", (0.65, 11.6, 0.35, None, 100.0)),
+    ("leather", "Leather", "abs", "leather_brown", "Other", (0.86, 0.1, 0.4, None, 20.0)),
+]
+OWN_FOLDER = "Fission180Library"  # in FreeCAD's User material library (saved: keep it)
+OWN_MARK = "Fission 180 library material"
+OWN_VALUES = (
+    ("Density", "g/cm^3"),
+    ("YoungsModulus", "GPa"),
+    ("PoissonRatio", ""),
+    ("YieldStrength", "MPa"),
+    ("UltimateTensileStrength", "MPa"),
+)
 DEFAULT_KEY = "steel"
 DEFAULT_PREF = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
 FREECAD_DEFAULT_UUID = "7f9fd73b-50c9-41d8-b7b2-575a030c1eeb"
@@ -69,11 +210,85 @@ def entry(key):
                 "look": row[3],
                 "group": row[4],
             }
+    for row in OWN:
+        if row[0] == key:
+            return {
+                "key": row[0],
+                "label": row[1],
+                "freecad": row[1],
+                "look": row[3],
+                "group": row[4],
+                "base": row[2],
+                "own": dict(zip([name for name, _unit in OWN_VALUES], row[5])),
+            }
     return None
 
 
 def entries():
-    return [entry(row[0]) for row in LIBRARY]
+    return [entry(row[0]) for row in LIBRARY] + [entry(row[0]) for row in OWN]
+
+
+def own_value(row, prop):
+    """A stated value of one of Fission 180's own library materials (None when it has none)."""
+    values = (row or {}).get("own") or {}
+    return values.get(prop)
+
+
+_OWN_MADE = {}  # key -> FreeCAD material (made or found this session)
+
+
+def _own_material(row):
+    """FreeCAD's material for one of Fission 180's own rows: found in the User library
+    (folder OWN_FOLDER) by its name, made there the first time."""
+    key = row["key"]
+    if key in _OWN_MADE:
+        return _OWN_MADE[key]
+    manager = _manager()
+    found = _find_own(manager, row["label"])
+    if found is None:
+        base = material_of(entry(row["base"]))
+        if base is None:
+            raise MaterialError("FreeCAD's material library has no %s." % row["base"])
+        mat = manager.inheritMaterial(base.UUID)
+        mat.Name = row["label"]
+        mat.Description = OWN_MARK
+        for model in list(base.PhysicalModels) + [DENSITY_MODEL]:
+            try:
+                if not mat.hasPhysicalModel(model):
+                    mat.addPhysicalModel(model)  # (a parent's models are not carried over)
+            except Exception:
+                pass
+        for prop, unit in OWN_VALUES:
+            value = own_value(row, prop)
+            if value is None:
+                continue
+            try:
+                mat.setPhysicalValue(prop, ("%r %s" % (value, unit)).strip())
+            except Exception:
+                pass  # (the parent card has no such value: mass needs only the density)
+        manager.save(USER_LIBRARY, mat, "%s/%s.FCMat" % (OWN_FOLDER, row["label"]), saveAsCopy=True)
+        try:
+            manager.refresh()
+        except Exception:
+            pass
+        found = _find_own(_manager(), row["label"])
+        if found is None:
+            raise MaterialError("%s was saved but FreeCAD does not list it." % row["label"])
+    _OWN_MADE[key] = found
+    return found
+
+
+def _find_own(manager, label):
+    try:
+        for uuid, mat in manager.Materials.items():
+            if mat.LibraryName != USER_LIBRARY or mat.Name != label:
+                continue
+            full = manager.getMaterial(uuid)
+            if str(getattr(full, "Directory", "")).replace("\\", "/").strip("/") == OWN_FOLDER:
+                return full
+    except Exception:
+        pass
+    return None
 
 
 def _manager():
@@ -93,6 +308,8 @@ def user_entries():
             if mat.LibraryName != USER_LIBRARY or uuid in _DELETED:
                 continue
             full = manager.getMaterial(uuid)
+            if str(getattr(full, "Directory", "")).replace("\\", "/").strip("/") == OWN_FOLDER:
+                continue  # one of Fission 180's own library rows: listed with the library
             rows.append(
                 {
                     "key": USER_PREFIX + uuid,
@@ -122,6 +339,9 @@ def _base_of_parent(uuid):
         mat = library_material(row[2])
         if mat is not None and uuid and mat.UUID == uuid:
             return row[0], row[3]
+    for key, made in _OWN_MADE.items():  # a copy of one of Fission 180's own rows
+        if uuid and made.UUID == uuid:
+            return key, entry(key)["look"]
     return DEFAULT_KEY, "plastic_grey"
 
 
@@ -134,18 +354,24 @@ def material_of(row):
             return _manager().getMaterial(row["uuid"])
         except Exception:
             return None
+    if row.get("own"):
+        try:
+            return _own_material(row)
+        except MaterialError:
+            raise
+        except Exception:
+            return None
     return library_material(row["freecad"])
 
 
 def taken_names():
-    names = set()
-    try:
-        for uuid, mat in _manager().Materials.items():
-            if uuid not in _DELETED:  # a deleted one's name can be used again
-                names.add(mat.Name.lower())
-    except Exception:
-        pass
+    """The names a new material cannot have: the ones the lists show (the library's and the
+    user's own). FreeCAD's library also has colour-only cards called Brass, Gold, Steel...
+    that no list shows: counting them said "There is already a material called Brass" with
+    no Brass anywhere to be seen (book parity report)."""
+    names = {row["label"].lower() for row in user_entries()}
     names.update(row[1].lower() for row in LIBRARY)
+    names.update(row[1].lower() for row in OWN)
     return names
 
 
@@ -259,13 +485,46 @@ def library_material(name):
 
 
 def available():
-    """The library rows whose FreeCAD material exists here, then the user's own."""
-    return [e for e in entries() if library_material(e["freecad"]) is not None] + user_entries()
+    """The library rows whose FreeCAD material exists here (Fission 180's own rows always
+    do: they are made when first used), then the user's own."""
+    found = [e for e in entries() if e.get("own") or library_material(e["freecad"]) is not None]
+    return found + user_entries()
+
+
+def search(text, rows=None):
+    """The rows whose name or group has every word typed ("alu anod", "brass")."""
+    rows = available() if rows is None else rows
+    words = [w for w in str(text or "").lower().replace(",", " ").split() if w]
+    return [r for r in rows if all(w in (r["label"] + " " + r["group"]).lower() for w in words)]
+
+
+def value_of(key, prop, unit):
+    """A physical value of an entry in `unit` ("GPa", "MPa", "g/cm^3", "" for a plain
+    number), or None. Fission 180's own rows answer from what is stated here; the others
+    from FreeCAD's library card."""
+    row = entry(key)
+    if row is None:
+        return None
+    if row.get("own"):
+        return own_value(row, prop)
+    mat = material_of(row)
+    if mat is None:
+        return None
+    try:
+        if not mat.hasPhysicalProperty(prop):
+            return None
+        value = mat.getPhysicalValue(prop)
+        number = float(value.getValueAs(unit)) if unit else float(value)
+    except Exception:
+        return None
+    return None if number != number else number  # (nan: the card leaves it open)
 
 
 def density_of(key):
     """kg/mm^3 of a library entry, or None."""
     row = entry(key)
+    if row is not None and row.get("own"):
+        return own_value(row, "Density") * 1e-6
     mat = material_of(row) if row else None
     if mat is None:
         return None
@@ -287,10 +546,26 @@ def key_of(body):
     for row in LIBRARY:
         if row[2] == name:
             return row[0]
+    for row in OWN:  # one of Fission 180's own rows (made in the User library, by its name)
+        if row[1] == name:
+            if row[0] in _OWN_MADE and _OWN_MADE[row[0]].UUID != uuid:
+                continue  # (a material of the user's own that has the same name)
+            if _is_own(body):
+                return row[0]
     for row in user_entries():
         if row["uuid"] == uuid:
             return row["key"]
     return ""
+
+
+def _is_own(body):
+    try:
+        text = getattr(body, USER_PROP, "") if USER_PROP in body.PropertiesList else ""
+        if text and '"own"' in text:
+            return True
+        return str(body.ShapeMaterial.Description) == OWN_MARK
+    except Exception:
+        return False
 
 
 def default_key():
@@ -355,6 +630,20 @@ def assign(body, key):
     _remember_user_material(body, row)
 
 
+def body_name(body):
+    """A body's name with its component's ("Body1 (Bracket)"): in an assembly every
+    component's first body is called Body1."""
+    try:
+        from . import components
+
+        part = components.container_of(body)
+        if part is not None:
+            return "%s (%s)" % (body.Label, part.Label)
+    except Exception:
+        pass
+    return body.Label
+
+
 USER_PROP = "Fission180UserMaterial"
 
 
@@ -363,7 +652,12 @@ def _remember_user_material(body, row):
     its name, density and base in the design, so it can be made again where it is missing."""
     import json
 
-    if row.get("uuid"):
+    if row.get("own"):
+        text = json.dumps({"name": row["label"], "own": row["key"]})
+        bodies.add_prop(body, "App::PropertyString", USER_PROP, "Base", "", True)
+        if getattr(body, USER_PROP) != text:
+            setattr(body, USER_PROP, text)
+    elif row.get("uuid"):
         rho = density_of(row["key"])
         text = json.dumps(
             {"name": row["label"], "density": rho * 1e6 if rho else None, "base": row.get("base")}
@@ -392,6 +686,14 @@ def restore_user_materials(doc):
             continue
         name = data.get("name")
         if not name or bodies.material_name(body) == name:
+            continue
+        if data.get("own"):  # one of Fission 180's own library rows: made here on demand
+            try:
+                if entry(data["own"]) is not None:
+                    assign(body, data["own"])
+                    fixed.append(body)
+            except Exception:
+                pass
             continue
         key = None
         for row in user_entries():

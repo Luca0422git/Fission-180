@@ -137,6 +137,17 @@ TEST_ONLY_OPS = (
 # (Empty since the SHEET METAL, PLASTIC and SURFACE > MODIFY tools landed; wave 7's MANUFACTURE
 # workspace has its design steps, golden-tested, and no AI tools yet: builder cam.)
 AI_TOOLS_TO_COME = ("cam_setup", "cam_operation", "cam_edit", "cam_generate", "cam_post")
+# (wave 7's ANIMATION workspace too: its design steps are golden-tested, no AI tools yet:
+# builder animation.)
+AI_TOOLS_TO_COME += (
+    "anim_storyboard",
+    "anim_explode",
+    "anim_manual_explode",
+    "anim_transform",
+    "anim_restore_home",
+    "anim_show_hide",
+    "anim_reverse",
+)
 
 
 def tool(name):

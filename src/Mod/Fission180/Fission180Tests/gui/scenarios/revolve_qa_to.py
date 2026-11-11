@@ -441,7 +441,7 @@ def p25_picked():
     h.check("P25 a corner was under the mouse", s["hit25"], h.state.get("last_click"))
     target = p.options.get("to")
     h.check("P25 the corner is the object", bool(target and target[1].startswith("Vertex")), target)
-    h.check("P25 the box names it", to_text(p) == "Corner of Body", to_text(p))
+    h.check("P25 the box names it", to_text(p) == "Corner of Body1", to_text(p))
     want = s["v25"] + turned(math.degrees(math.atan2(30, 40)))
     h.check("P25 turned 36.87 degrees, to the corner", near(vol(), want), (vol(), want))
     h.check("P25 no warning", "⚠" not in msg(), msg())
@@ -509,7 +509,7 @@ def p26_box():
     if p is None:
         return
     h.check("P26 Type To is shown", p.type.currentText() == "To")
-    h.check("P26 the corner is shown", to_text(p) == "Corner of Body", to_text(p))
+    h.check("P26 the corner is shown", to_text(p) == "Corner of Body1", to_text(p))
     object_box()
 
 
@@ -529,7 +529,7 @@ def p26_curved_refused():
     h.check(
         "P26 a curved face is refused", "flat face" in msg(), (msg(), h.state.get("last_click"))
     )
-    h.check("P26 the corner is kept", to_text(p) == "Corner of Body", to_text(p))
+    h.check("P26 the corner is kept", to_text(p) == "Corner of Body1", to_text(p))
     h.check("P26 unchanged", near(vol(), s["v26"]), vol())
     h.click(V(30, 36, 10))  # the top face of the block
 
