@@ -36,7 +36,7 @@ import tempfile
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore
+from PySide import QtCore, QtWidgets
 from PySide6 import QtTest
 
 from Fission180Tests.gui import blend_steps as bl
@@ -157,8 +157,11 @@ def palm_circle():
 def palm_circle_drawn():
     st.esc()
     cs_ = r.circles()
-    h.check("1 a circle in the middle of the palm", len(cs_) == 1
-            and (cs_[0][1].Center - V(30, 10, 0)).Length < 1e-6, [(g.Center, g.Radius) for _i, g in cs_])
+    h.check(
+        "1 a circle in the middle of the palm",
+        len(cs_) == 1 and (cs_[0][1].Center - V(30, 10, 0)).Length < 1e-6,
+        [(g.Center, g.Radius) for _i, g in cs_],
+    )
     S["r"] = cs_[0][1].Radius if cs_ else 5.0
 
 
@@ -176,8 +179,11 @@ def palm_made():
     import math
 
     want = (70 * 20 - math.pi * 9) * THICK
-    h.check("1 70 x 20 x 10 with a 6 mm hole through it", r.near(k.volume(bodies[0]), want),
-            (k.volume(bodies[0]), want))
+    h.check(
+        "1 70 x 20 x 10 with a 6 mm hole through it",
+        r.near(k.volume(bodies[0]), want),
+        (k.volume(bodies[0]), want),
+    )
     k.box_is("1 it stands on the XY plane", r.part("Palm"), [0, 0, 0, 70, 20, 10])
     h.check("1 Palm, the first component, is grounded", jm().is_grounded(r.part("Palm")))
     r.no_open_step("Extrude")
@@ -207,7 +213,9 @@ def proximal_made():
     part = r.part("Proximal")
     # friction pattern 9: "a new component goes inside whatever component is active":
     # that is Fusion's behaviour, and what the book's subassemblies count on
-    h.check("2 Proximal is inside Finger", k.container_label(part) == "Finger", k.container_label(part))
+    h.check(
+        "2 Proximal is inside Finger", k.container_label(part) == "Finger", k.container_label(part)
+    )
     k.box_is("2 Proximal: 10 x 30 x 10, on the palm's edge", part, [0, 20, 0, 10, 50, 10])
     h.check("2 the palm was not changed", r.near(k.volume(r.bodies("Palm")[0]), S["palm"]))
     r.no_open_step("Extrude")
@@ -219,7 +227,9 @@ def remember_palm():
 
 def distal_made():
     part = r.part("Distal")
-    h.check("2 Distal is inside Finger", k.container_label(part) == "Finger", k.container_label(part))
+    h.check(
+        "2 Distal is inside Finger", k.container_label(part) == "Finger", k.container_label(part)
+    )
     k.box_is("2 Distal: 10 x 30 x 10, on the end of Proximal", part, [0, 50, 0, 10, 80, 10])
     k.box_is("2 the Finger: both phalanges", r.part("Finger"), [0, 20, 0, 10, 80, 10])
     rows = cs.children_of(["Finger"]) or []
@@ -275,15 +285,25 @@ def knuckle(tag, rows, labels, corner, name, low, high, side):
 
     def kind():
         p = j.panel()
-        h.check("%s: %s are taken" % (tag, " and ".join(labels)),
-                [x.Label for x in p.parts] == list(labels), [x.Label for x in p.parts])
+        h.check(
+            "%s: %s are taken" % (tag, " and ".join(labels)),
+            [x.Label for x in p.parts] == list(labels),
+            [x.Label for x in p.parts],
+        )
         h.check("%s: Type Revolute chosen" % tag, j.choose_type(p, "Revolute"))
 
     def aim():
         # A person moves the pointer over the phalanx's side face (its normal is the
         # hinge's axis) near the hinge's corner until that corner's dot is lit there.
         S["aimed"] = None
-        for dy, dz in ((2.0, -1.4), (1.6, -0.6), (3.0, -2.0), (1.2, -1.2), (4.0, -1.0), (2.5, -3.0)):
+        for dy, dz in (
+            (2.0, -1.4),
+            (1.6, -0.6),
+            (3.0, -2.0),
+            (1.2, -1.2),
+            (4.0, -1.0),
+            (2.5, -3.0),
+        ):
             at = corner + V(0, dy, dz)
             bj.hover_point(at)
             hov = bj.hover_of(j.panel())
@@ -301,9 +321,11 @@ def knuckle(tag, rows, labels, corner, name, low, high, side):
     def position():
         hov = bj.hover_of(j.panel())
         spot = bj.hot(j.panel())
-        h.check("%s: on %s's side face its hinge corner can be lit" % (tag, side),
-                S["aimed"] is not None,
-                (spot and (spot["kind"], spot["point"]), hov and hov.pick))
+        h.check(
+            "%s: on %s's side face its hinge corner can be lit" % (tag, side),
+            S["aimed"] is not None,
+            (spot and (spot["kind"], spot["point"]), hov and hov.pick),
+        )
         if S["aimed"] is not None:
             h.click(S["aimed"])
 
@@ -329,15 +351,25 @@ def knuckle(tag, rows, labels, corner, name, low, high, side):
 
     def made():
         joint = bj.joint(name)
-        h.check("%s: %s made, a Revolute joint" % (tag, name),
-                joint is not None and joint.JointType == "Revolute", bj.labels())
+        h.check(
+            "%s: %s made, a Revolute joint" % (tag, name),
+            joint is not None and joint.JointType == "Revolute",
+            bj.labels(),
+        )
         got = limits(name)
-        h.check("%s: its limits are %g .. %g" % (tag, low, high),
-                got["min"] == low and got["max"] == high, got)
+        h.check(
+            "%s: its limits are %g .. %g" % (tag, low, high),
+            got["min"] == low and got["max"] == high,
+            got,
+        )
         now = [bj.place(r.part(x)) for x in ("Finger", "Proximal", "Distal")]
-        h.check("%s: nothing moved (as-built)" % tag,
-                not any(bj.moved(a, c) for a, c in zip(now, S["before"])))
-        h.check("%s: the solver is happy" % tag, jm().solve(r.doc()) == 0, jm().broken_joints(r.doc()))
+        h.check(
+            "%s: nothing moved (as-built)" % tag,
+            not any(bj.moved(a, c) for a, c in zip(now, S["before"])),
+        )
+        h.check(
+            "%s: the solver is happy" % tag, jm().solve(r.doc()) == 0, jm().broken_joints(r.doc())
+        )
         r.no_open_step("As-built Joint")
 
     names = (command, pick_rows, kind, aim, position, minimum, maximum, ok, made)
@@ -350,7 +382,13 @@ steps += knuckle(
     "k1", ("Finger", "Palm"), ("Finger", "Palm"), V(10, 20, 10), "Revolute 1", -90, 90, "Proximal"
 )
 steps += knuckle(
-    "k2", ("Distal", "Proximal"), ("Distal", "Proximal"), V(10, 50, 10), "Revolute 2", -90, 90,
+    "k2",
+    ("Distal", "Proximal"),
+    ("Distal", "Proximal"),
+    V(10, 50, 10),
+    "Revolute 2",
+    -90,
+    90,
     "Distal",
 )
 
@@ -379,8 +417,11 @@ def edit_limits_type():
     shown = {key: (c.isChecked(), round(f.value(), 6)) for key, (c, f) in limit_rows(p).items()}
     # the report: "Edit Joint Limits on as-built joints is broken": the dialog showed
     # nothing of the joint's limits and its changes were lost
-    h.check("4 the dialog shows the joint's limits, -90 .. 90",
-            shown["min"] == (True, -90.0) and shown["max"] == (True, 90.0), shown)
+    h.check(
+        "4 the dialog shows the joint's limits, -90 .. 90",
+        shown["min"] == (True, -90.0) and shown["max"] == (True, 90.0),
+        shown,
+    )
     bodies_steps.type_value(limit_rows(p)["max"][1].widget, "60")
     bodies_steps.type_value(limit_rows(p)["min"][1].widget, "-60")
 
@@ -431,22 +472,33 @@ def driven_up():
     S["a45"] = angle("Revolute 1")
     S["up"] = 1.0 if tip_z() > S["tip"] + 1 else -1.0  # which way lifts the fingertip
     # the fingertip is 60 from the hinge: 60 sin 45 = 42.4 higher (or the finger hangs down)
-    h.check("4 Drive Joints 45: the whole finger turns about the palm's edge",
-            abs(S["a45"] - 45) < 1e-4 and abs(tip_z() - S["tip"]) > 20, (S["a45"], tip_z()))
-    h.check("4 the palm stands still", jm().is_grounded(r.part("Palm"))
-            and k.box(r.part("Palm")) == [0, 0, 0, 70, 20, 10], k.box(r.part("Palm")))
+    h.check(
+        "4 Drive Joints 45: the whole finger turns about the palm's edge",
+        abs(S["a45"] - 45) < 1e-4 and abs(tip_z() - S["tip"]) > 20,
+        (S["a45"], tip_z()),
+    )
+    h.check(
+        "4 the palm stands still",
+        jm().is_grounded(r.part("Palm")) and k.box(r.part("Palm")) == [0, 0, 0, 70, 20, 10],
+        k.box(r.part("Palm")),
+    )
     h.shot("4-finger-driven")
 
 
 def driven_past():
     h.caught_up(j.panel())
-    h.check("4 Drive Joints 80 stops at the limit, 60", abs(angle("Revolute 1") - 60) < 1e-4,
-            (angle("Revolute 1"), j.panel().message.text()))
+    h.check(
+        "4 Drive Joints 80 stops at the limit, 60",
+        abs(angle("Revolute 1") - 60) < 1e-4,
+        (angle("Revolute 1"), j.panel().message.text()),
+    )
 
 
 def back_home():
     now = [bj.place(r.part(x)) for x in ("Finger", "Distal")]
-    h.check("4 Cancel puts the finger back", not any(bj.moved(a, c) for a, c in zip(now, S["home"])))
+    h.check(
+        "4 Cancel puts the finger back", not any(bj.moved(a, c) for a, c in zip(now, S["home"]))
+    )
     r.no_open_step("Drive Joints")
 
 
@@ -461,7 +513,8 @@ def pattern_steps_of(kind):
     from fission180 import component_pattern, pattern
 
     return [
-        o for o in r.doc().Objects
+        o
+        for o in r.doc().Objects
         if component_pattern.is_component_pattern(o) and pattern.kind_of(o) == kind
     ]
 
@@ -484,8 +537,11 @@ pattern_open.done_what = "the Rectangular Pattern dialog is open"
 
 
 def components_type(p, what):
-    h.check("%s: Pattern Type reads Components" % what, p.options["pattern_type"] == "components",
-            p.options["pattern_type"])
+    h.check(
+        "%s: Pattern Type reads Components" % what,
+        p.options["pattern_type"] == "components",
+        p.options["pattern_type"],
+    )
     if p.options["pattern_type"] != "components":
         bl.choose(p.pattern_type, "Components")
 
@@ -503,8 +559,11 @@ def pattern_pick():
 def pattern_direction():
     p = ps.panel()
     # the report: "component pattern picks the top-level and makes nothing"
-    h.check("5 the Finger subassembly is picked", p.options["objects"] == [(r.part("Finger"), "")],
-            [(o.Label, x) for o, x in p.options["objects"]])
+    h.check(
+        "5 the Finger subassembly is picked",
+        p.options["objects"] == [(r.part("Finger"), "")],
+        [(o.Label, x) for o, x in p.options["objects"]],
+    )
     ps.click_box("direction")
 
 
@@ -543,15 +602,26 @@ def pattern_made():
     if not h.check("5 one Rectangular Pattern step", len(found) == 1, found):
         return
     made = copies(found[0])
-    h.check("5 three copies: Finger:2, Finger:3, Finger:4",
-            [x.Label for x in made] == ["Finger:2", "Finger:3", "Finger:4"], [x.Label for x in made])
+    h.check(
+        "5 three copies: Finger:2, Finger:3, Finger:4",
+        [x.Label for x in made] == ["Finger:2", "Finger:3", "Finger:4"],
+        [x.Label for x in made],
+    )
     for i, part in enumerate(fingers()):
-        k.box_is("5 finger %d stands %d mm along X" % (i + 1, 20 * i), part,
-                 [20 * i, 20, 0, 20 * i + 10, 80, 10])
+        k.box_is(
+            "5 finger %d stands %d mm along X" % (i + 1, 20 * i),
+            part,
+            [20 * i, 20, 0, 20 * i + 10, 80, 10],
+        )
     rows = cs.children_of(["Finger:2"]) or []
-    h.check("5 a copy shows its two phalanges in the browser",
-            any(x.startswith("Proximal") for x in rows) and any(x.startswith("Distal") for x in rows), rows)
-    h.check("5 the timeline shows the pattern", any("Pattern" in x for x in r.timeline()), r.timeline())
+    h.check(
+        "5 a copy shows its two phalanges in the browser",
+        any(x.startswith("Proximal") for x in rows) and any(x.startswith("Distal") for x in rows),
+        rows,
+    )
+    h.check(
+        "5 the timeline shows the pattern", any("Pattern" in x for x in r.timeline()), r.timeline()
+    )
     r.no_open_step("Rectangular Pattern")
     h.fit()
     h.shot("5-four-fingers")
@@ -565,19 +635,28 @@ def tips():
 def knuckle2_driven():
     h.caught_up(j.panel())
     got = tips()
-    h.check("5 the second knuckle at 60 degrees: the first finger's tip is up or down by 25",
-            abs(abs(got[0] - 10) - 30 * 0.8660254) < 0.1 or abs(got[0] - 10) > 14, got)
+    h.check(
+        "5 the second knuckle at 60 degrees: the first finger's tip is up or down by 25",
+        abs(abs(got[0] - 10) - 30 * 0.8660254) < 0.1 or abs(got[0] - 10) > 14,
+        got,
+    )
     # the copies are the same component (Fusion: every occurrence of a component shows its
     # joints at the same value): the knuckle and its limits are theirs too
-    h.check("5 every finger bends the same (the knuckle is inherited by the copies)",
-            max(got) - min(got) < 1e-3 and abs(got[0] - 10) > 14, got)
+    h.check(
+        "5 every finger bends the same (the knuckle is inherited by the copies)",
+        max(got) - min(got) < 1e-3 and abs(got[0] - 10) > 14,
+        got,
+    )
     h.shot("5-fingers-bent")
 
 
 def knuckle2_past():
     h.caught_up(j.panel())
-    h.check("5 Drive Joints 120 stops at the knuckle's limit, 90", abs(angle("Revolute 2") - 90) < 1e-4,
-            angle("Revolute 2"))
+    h.check(
+        "5 Drive Joints 120 stops at the knuckle's limit, 90",
+        abs(angle("Revolute 2") - 90) < 1e-4,
+        angle("Revolute 2"),
+    )
     got = tips()
     h.check("5 ...on every finger", max(got) - min(got) < 1e-3, got)
 
@@ -593,5 +672,308 @@ steps += [pattern_ok, pattern_made]
 steps += drive("Revolute 2", "60", "k2") + [knuckle2_driven]
 steps += [r.named(lambda: bodies_steps.type_value(j.panel().angle.widget, "120"), "k2_past_type")]
 steps += [knuckle2_past, r.named(cancel_drive, "k2_cancel"), fingers_straight]
+
+
+# == 6: Copy, Paste New: the thumb; Mirror of it; Circular Pattern of it ===========================
+def copy_finger():
+    h.click_empty()
+    t.click_row("Finger")
+    t.ctrl("c")
+    S["labels"] = list(k.labels())
+
+
+def paste_new():
+    top = t.tree().topLevelItem(0).text(1)
+    entries = [e[0] for e in t.row_menu_entries(top)]
+    h.check("6 the design's menu offers Paste New", "Paste New" in entries, entries)
+    t.row_menu(top, "Paste New")
+
+
+paste_new.done = lambda: c2.component_panel() is not None
+paste_new.done_what = "Move/Copy opened on the pasted thumb"
+
+
+def thumb_label():
+    new = [x for x in k.labels() if x not in S["labels"] and k.container_label(r.part(x)) == ""]
+    return new[0] if len(new) == 1 else None
+
+
+def thumb_move():
+    from fission180 import instances
+
+    S["thumb"] = thumb_label()
+    h.check(
+        "6 Paste New made one new component at the top level",
+        S["thumb"] is not None,
+        [x for x in k.labels() if x not in S["labels"]],
+    )
+    thumb = r.part(S["thumb"])
+    h.check("6 ...an independent one (not linked to the Finger)", not instances.is_instance(thumb))
+    h.check("6 ...named after the Finger", S["thumb"].startswith("Finger"), S["thumb"])
+    p = c2.component_panel()
+    c2.type_value(p, "rz", "90")
+    c2.type_value(p, "dx", "20")
+
+
+def thumb_ok():
+    h.caught_up(c2.component_panel())
+    h.task_button("OK")
+
+
+thumb_ok.done = lambda: c2.component_panel() is None
+thumb_ok.done_what = "Move/Copy closed"
+
+
+def thumb_made():
+    thumb = r.part(S["thumb"])
+    k.box_is(
+        "6 the thumb lies along the palm's left end: x -60..0, y 0..10",
+        thumb,
+        [-60, 0, 0, 0, 10, 10],
+    )
+    rows = cs.children_of([S["thumb"]]) or []
+    h.check(
+        "6 the thumb has its own phalanges",
+        any(x.startswith("Proximal") for x in rows) and any(x.startswith("Distal") for x in rows),
+        rows,
+    )
+    k.box_is("6 the Finger did not move", r.part("Finger"), [0, 20, 0, 10, 80, 10])
+    r.no_open_step("Paste New")
+    S["thumb_volume"] = r.volume(thumb)
+
+
+def mirror_open():
+    Gui.Selection.clearSelection()
+    h.click_empty()
+    h.fit()
+    ps.menu("Mirror")
+
+
+mirror_open.done = lambda: ps.panel() is not None and ps.panel().kind == "mirror"
+mirror_open.done_what = "the Mirror dialog is open"
+
+
+def mirror_pick():
+    components_type(ps.panel(), "6 Mirror")
+    t.click_row(S["thumb"])  # the thumb subassembly, by its browser row
+
+
+def mirror_plane_box():
+    p = ps.panel()
+    h.check(
+        "6 the thumb is picked",
+        p.options["objects"] == [(r.part(S["thumb"]), "")],
+        [(o.Label, x) for o, x in p.options["objects"]],
+    )
+    ps.click_box("plane")
+
+
+def mirror_face():
+    h.fit()
+    h.click(V(70, 8, 5))  # the palm's right end face (x 70)
+
+
+def mirror_ok():
+    p = ps.panel()
+    plane = p.options["plane"]
+    h.check(
+        "6 the palm's end face is the mirror plane",
+        plane is not None and str(plane[1]).startswith("Face"),
+        plane,
+    )
+    h.caught_up(p)
+    h.check("6 nothing wrong said", "⚠" not in p.message.text(), p.message.text())
+    h.task_button("OK")
+
+
+mirror_ok.done = lambda: ps.panel() is None
+mirror_ok.done_what = "the Mirror dialog closed"
+
+
+def mirror_made():
+    found = pattern_steps_of("mirror")
+    if not h.check("6 one Mirror step", len(found) == 1, found):
+        return
+    made = copies(found[0])
+    if not h.check("6 one mirrored thumb", len(made) == 1, [x.Label for x in made]):
+        return
+    S["mirror"] = made[0].Label
+    k.box_is(
+        "6 mirrored across the palm's end: x 140..200, y 0..10", made[0], [140, 0, 0, 200, 10, 10]
+    )
+    h.check(
+        "6 the same volume",
+        r.near(r.volume(made[0]), S["thumb_volume"]),
+        (r.volume(made[0]), S["thumb_volume"]),
+    )
+    rows = cs.children_of([S["mirror"]]) or []
+    h.check("6 the mirrored subassembly shows its phalanges", len(rows) >= 2, rows)
+    r.no_open_step("Mirror")
+    h.fit()
+    h.shot("6-thumbs")
+
+
+def circular_open():
+    Gui.Selection.clearSelection()
+    h.click_empty()
+    h.fit()
+    ps.menu("Circular Pattern")
+
+
+circular_open.done = lambda: ps.panel() is not None and ps.panel().kind == "circular"
+circular_open.done_what = "the Circular Pattern dialog is open"
+
+
+def circular_pick():
+    components_type(ps.panel(), "6 Circular Pattern")
+    t.click_row(S["thumb"])
+
+
+def circular_axis_box():
+    p = ps.panel()
+    h.check(
+        "6 the thumb is picked for the circular pattern",
+        p.options["objects"] == [(r.part(S["thumb"]), "")],
+        [(o.Label, x) for o, x in p.options["objects"]],
+    )
+    ps.click_box("axis")
+
+
+def circular_z():
+    h.fit()
+    pl.click_on_plane(V(0, 0, 30))  # the Z axis, above the palm's corner
+
+
+def circular_values():
+    p = ps.panel()
+    axis = p.options["axis"]
+    h.check("6 the Z axis is the axis", axis is not None and axis[0].Role == "Z_Axis", axis)
+    ps.type_quantity(p.quantity, 2)
+
+
+def circular_ok():
+    p = ps.panel()
+    h.caught_up(p)
+    h.check("6 nothing wrong said", "⚠" not in p.message.text(), p.message.text())
+    h.task_button("OK")
+
+
+circular_ok.done = lambda: ps.panel() is None
+circular_ok.done_what = "the Circular Pattern dialog closed"
+
+
+def circular_made():
+    found = pattern_steps_of("circular")
+    if not h.check("6 one Circular Pattern step", len(found) == 1, found):
+        return
+    made = copies(found[0])
+    if not h.check(
+        "6 one copy (2 in all, over 360 degrees)", len(made) == 1, [x.Label for x in made]
+    ):
+        return
+    k.box_is("6 turned half a turn about Z: x 0..60, y -10..0", made[0], [0, -10, 0, 60, 0, 10])
+    r.no_open_step("Circular Pattern")
+    h.shot("6-circular")
+
+
+def circular_undone():
+    # the hand has one thumb on each side: the circular copy is taken back
+    h.check("6 Ctrl+Z: no circular pattern", not pattern_steps_of("circular"))
+    h.check("6 ...the mirrored thumb stays", r.part(S["mirror"]) is not None, k.labels())
+
+
+steps += [copy_finger, paste_new, thumb_move, thumb_ok, thumb_made]
+steps += [mirror_open, mirror_pick, mirror_plane_box, mirror_face, mirror_ok, mirror_made]
+steps += [circular_open, circular_pick, circular_axis_box, circular_z, circular_values]
+steps += [circular_ok, circular_made, r.named(r.undo, "circular_undo"), circular_undone]
+
+
+# == 7: Contact Sets: the finger stops on the palm =================================================
+def contact_menu():
+    h.click_empty()
+    h.fit()
+    j.menu("New Contact Set")
+
+
+contact_menu.done = lambda: j.panel() is not None and j.panel().title == "New Contact Set"
+contact_menu.done_what = "the New Contact Set dialog is open"
+
+
+def contact_pick():
+    t.click_row("Finger")
+    h.settle()
+    t.click_row("Palm")
+
+
+def contact_ok():
+    p = j.panel()
+    names = [m.Label for m in getattr(p, "members", [])]
+    h.check("7 the Finger and the Palm are the set's members", names == ["Finger", "Palm"], names)
+    j.ok()
+
+
+contact_ok.done = lambda: j.panel() is None
+contact_ok.done_what = "the New Contact Set dialog closed"
+
+
+def contact_made():
+    sets = jm().contact_sets(r.doc())
+    h.check("7 Contact Set 1 made", len(sets) == 1 and sets[0].Label == "Contact Set 1", sets)
+    h.check(
+        "7 the browser's Contacts folder lists it",
+        "Contact Set 1" in (t.children("Contacts") or []),
+    )
+    r.no_open_step("New Contact Set")
+    j.menu("Enable Contact Sets")
+
+
+contact_made.done = lambda: jm().contact_mode(r.doc()) == "sets"
+contact_made.done_what = "contact sets are on"
+
+
+def into_palm_type():
+    bodies_steps.type_value(j.panel().angle.widget, "%g" % (-30 * S["up"]))
+
+
+def into_palm():
+    h.caught_up(j.panel())
+    got = angle("Revolute 1")
+    # turning the finger down swings its underside into the palm's back face at once
+    h.check(
+        "7 driven 30 degrees into the palm, the finger stops where it touches (0)",
+        abs(got) < 0.5,
+        (got, j.panel().message.text()),
+    )
+    note = j.panel().note.text()
+    h.check("7 ...and says the Finger and the Palm touch", "touch" in note and "Palm" in note, note)
+    bodies_steps.type_value(j.panel().angle.widget, "%g" % (30 * S["up"]))
+
+
+def away_from_palm():
+    h.caught_up(j.panel())
+    got = angle("Revolute 1")
+    h.check(
+        "7 driven 30 degrees the other way, nothing is in the way", abs(abs(got) - 30) < 1e-3, got
+    )
+    j.cancel()
+
+
+away_from_palm.done = lambda: j.panel() is None
+away_from_palm.done_what = "the Drive Joints dialog closed"
+
+
+def contact_off():
+    r.no_open_step("Drive Joints")
+    h.check("7 Cancel: the finger is straight", tips()[0] == 10.0, tips())
+    j.menu("Disable Contact")
+
+
+contact_off.done = lambda: jm().contact_mode(r.doc()) == "off"
+contact_off.done_what = "contact is off"
+
+
+steps += [contact_menu, contact_pick, contact_ok, contact_made]
+steps += drive("Revolute 1", "0", "contact")[:1] + [into_palm_type, into_palm, away_from_palm]
+steps += [contact_off]
 
 h.run("replay_16_robotic_hand", steps, paced_by="state")

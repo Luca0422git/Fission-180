@@ -232,6 +232,10 @@ def build_menu(parent, entries, available, context=None):
             if entry.get("icon"):
                 submenu.setIcon(ui_icon(entry["icon"]))
             menu.addMenu(submenu)
+            # (wave 7, replay-f) kept with its menu: when nothing on the Python side held the
+            # submenu, a garbage collection deleted it and CREATE > Pattern vanished from the
+            # menu (the Robotic Hand: Rectangular Pattern, Mirror, then no Circular Pattern)
+            menu._sf_submenus = getattr(menu, "_sf_submenus", []) + [submenu]
             continue
         action = menu.addAction(ui_icon(entry["icon"]), _menu_text(entry))
         action.setProperty("fission180Icon", entry["icon"] or "")  # (redrawn for a new look)

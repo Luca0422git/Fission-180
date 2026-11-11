@@ -3539,6 +3539,8 @@ def part_shape(part):
                 # replay-f)
                 if not _inside(obj, part):
                     continue
+                if _is_copy_feature(obj):
+                    continue  # the solid a copy body starts from: the body counts it
                 if obj.TypeId == "PartDesign::Body" or (
                     obj.isDerivedFrom("Part::Feature")
                     and obj.getParentGeoFeatureGroup() is not None
@@ -3552,6 +3554,18 @@ def part_shape(part):
                 continue
         return Part.makeCompound(shapes) if shapes else Part.Shape()
     return bodies.global_shape(part)
+
+
+def _is_copy_feature(obj):
+    """An instance's copy feature (instances.InstanceCopy): it stands in the component beside
+    the copy body that starts from it, so its solid is the body's (a mirrored or pasted
+    copy's shape held each solid twice; wave 7, replay-f)."""
+    try:
+        from . import instances
+
+        return instances.is_copy_feature(obj)
+    except Exception:
+        return False
 
 
 def _inside(obj, part):
@@ -4238,6 +4252,7 @@ def _rerooted(ref):
             return None
         doc = part.Document
         owner = part
+        through = set()  # the components the path names on its way down
         for name in subs[0].split(".")[:-1]:
             obj = doc.getObject(name)
             if obj is None:
@@ -4245,8 +4260,17 @@ def _rerooted(ref):
             if obj.isDerivedFrom("PartDesign::Feature"):
                 continue
             owner = obj
+            if obj.TypeId == "App::Part":
+                through.add(obj.Name)
         new_part = part_of(owner)
         if new_part is None:
+            return None
+        if new_part is not part and new_part.Name in through and _inside(new_part, part):
+            # the path itself goes down into a component inside the part: a joint of a
+            # subassembly placed on one of its parts (the Robotic Hand's knuckle on the
+            # Finger, on its Proximal's face). It is right as it is; a pattern of the
+            # Finger moved it onto Proximal, which is grounded to the Finger, and the
+            # finger could no longer be driven (wave 7, replay-f)
             return None
         prefix = _path(new_part, owner) if owner is not new_part else ""
         new_subs = [prefix + s.split(".")[-1] for s in subs]
