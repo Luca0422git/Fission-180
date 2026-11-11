@@ -450,6 +450,9 @@ def make(doc, pick, options, more=None):
     component when pick is None: a new component with the Hardware step, and its hole.
     `more`: further picks, each filled with an occurrence of the part. Returns the step."""
     options = core.check(options)
+    if pick is None:
+        # no hole, no counterbore to sit in: the part's own frame stands at the origin
+        options = core.check(dict(options, make_hole=False, sink_head=False, seat=None))
     place = spot(*pick) if pick is not None else None
     body_target = place["body"] if place is not None else None
     parent = _parent_for_new(doc, body_target)

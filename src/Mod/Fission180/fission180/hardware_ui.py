@@ -556,17 +556,31 @@ class HardwarePanel(Panel):
         hardware itself."""
         if not name.startswith(("Face", "Edge")):
             return False
-        body = hole.owner_body(obj) if obj.TypeId != "PartDesign::Body" else obj
+        body = components.body_of(obj)
         if body is None:
             return False
         try:
-            if any(hardware.is_hardware(o) for o in body.Group):
-                return False
             if components.container_of(body) in self._own_parts():
+                # this part's own screws: one of several can be clicked away again
+                return len(self.picks) > 1
+            if any(hardware.is_hardware(o) for o in body.Group):
                 return False
         except Exception:
             return False
         return True
+
+    def _own_index(self, obj):
+        """Which of this part's places a clicked object stands on (it is one of the
+        preview's own screws), or None."""
+        try:
+            body = components.body_of(obj)
+            part = components.container_of(body) if body is not None else None
+            parts = self._own_parts()
+            if part is not None and part in parts:
+                return parts.index(part)
+        except Exception:
+            pass
+        return None
 
     def _watch(self):
         panel = self
@@ -624,6 +638,18 @@ class HardwarePanel(Panel):
     def _clicked(self, obj, short, point):
         if not self.allow(obj, short):
             return
+        index = self._own_index(obj)
+        if index is not None:
+            # a click on one of the screws of this insert takes that one away again
+            if len(self.picks) > 1 and index < len(self.picks):
+                first = index == 0
+                del self.picks[index]
+                if first:
+                    self.place0 = hardware.spot(*self.picks[0])
+                self.note = ""
+                self._update_visibility()
+                self._rebuild()
+            return
         own = [h for h in self._own_holes() if h is obj]
         try:
             place = hardware.spot(obj, short, point)
@@ -669,6 +695,14 @@ class HardwarePanel(Panel):
                 self._fit_existing(place)
                 if self.similar.isChecked():
                     self._add_similar(obj, place)
+        elif len(self.picks) > 1:
+            # several holes are filled: a stray click on a face must not throw them away
+            self.note = (
+                "%d holes are filled. Click a hole to fill it too, one of the parts to take "
+                "it away, or the x beside Place on to start over." % len(self.picks)
+            )
+            self._show_status_text()
+            return
         else:
             self.picks = [(obj, short, App.Vector(point) if point is not None else None)]
             self.place0 = place
