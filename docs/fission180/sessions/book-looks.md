@@ -105,8 +105,6 @@ Spec with sources: `docs/fission180/parity/appearance.md`.
 
 ## Gaps (also in `parity/appearance.md`, "Missing / not built")
 
-- No drop of a physical material onto a browser row (a look can be dropped on a body's or a
-  component's row).
 - Texture Map Controls has no drag handles; no 3D Texture projection; no image file as a
   pattern; no relief / roughness / cut-outs (rendering).
 - Automatic maps flat faces, cylinders, cones, balls, lathe shapes and rings (the donut)
@@ -117,6 +115,37 @@ Spec with sources: `docs/fission180/parity/appearance.md`.
 - "Properties" on a **body's** right-click menu needs one line in `browser_core.MENUS["body"]`
   (shell's file) once the components work's handler is merged; INSPECT > Properties works now.
 - A copy of a material can only change the density.
+
+## Tests (FreeCAD 1.1.4, this sandbox, one scenario at a time)
+
+New scenarios, all real input, paced by state:
+
+| Scenario | Checks | What it proves |
+|---|---|---|
+| `book_looks_kept` | 89 | bug 16: a look on screen after Isolate / Exit Isolate, a component Move, hide / show, two materials, a new step, Undo / Redo, the body's material read and written, the same look dropped again, a look dropped on a component's browser row, save / reopen |
+| `book_looks_faces` | 91 | bug 17: a drop and a click on an edge take one face; Keep / Remove / Cancel; the Remove button; Undo / Redo; Esc; save / reopen |
+| `book_looks_library` | 118 | the default look and its edit (pink donut), search, categories, a textured look on the donut (screen roughness), favourites, the look editor, a look's menu, Cancel, Undo / Redo, save / reopen |
+| `book_looks_materials` | 104 | Brass and the other new materials, search, component names, Edit a Copy, a material dropped on a browser row, Undo / Redo, Properties of a component and of the design, the read-out, save / reopen |
+| `book_looks_map` | 91 | Texture Map Controls (every field, Reset, OK, Undo / Redo, Esc), Opacity Control with a pattern, two patterns on one body, Display Component Colors, Component Color Swatch, save / reopen |
+| `book_looks_empty` | 38 | every command of the area in an empty design: what it waits for, the refusals, Esc / Cancel |
+
+Older scenarios run again (all pass): `bodies_look` 58 (paths F and G now answer the new
+question with Remove), `misc_materials` 51 (the library's new groups), `bodies_qa` 317,
+`bodies_qa_2` 240, `body_pick_hover` 53, `browser_multi_select` 86, `browser_opacity_hover` 46,
+`surface4_misc` 28, `modify_align` 232, `inspect_analysis_components` 29, `ribbon_sweep` 227
+(the Properties window is the command itself), `timeline_browser_2` 134, `inspect_qa4` 330,
+`look_light` 25, `export_report` 61, `misc_decal` 54, `exchange2_step_insert` 76,
+`insert_step` 31, `journey_sim_bracket` 115, `ribbon_customize` 57.
+
+`body_pick_many` (52): failed while the views were observed (the trap above), passes since;
+7 runs after the fix, 6 passed and one was FLAKY (first try: Move/Copy opened from three
+browser rows held no body at the next step; passed on the retry and in 3 runs alone
+afterwards). Not pinned down; nothing of this work is on that path (no look, no dialog of
+mine), other builders were loading the machine.
+
+Unit tests: 3223 run, all pass once the generated docs are regenerated (49 new in
+`test_appearance_library.py` and `test_properties_core.py`). Golden models: 621 pass, 2 known
+xfail (`plate_hole_grid`, `sf_loft_merge_slot_volume`), as before.
 
 ## Changelog lines
 
@@ -133,8 +162,8 @@ Spec with sources: `docs/fission180/parity/appearance.md`.
   search box, a category list and favourites.
 - Textured looks: wood grain, leather, brushed metal, carbon weave, mesh and more are drawn
   on the part in the 3D view.
-- A look can be dragged onto a body's row in the browser, or onto a component's row to give
-  it to every body of the component.
+- A look or a physical material can be dragged onto a body's row in the browser, or onto a
+  component's row to give it to every body of the component.
 - Double-click a look under In This Design to edit it: name, a colour wheel, pattern, scale,
   rotation, shine, see-through and glow. Right-click a look: Edit, Duplicate, Rename, Delete,
   Select Objects Applied To, Add to Favorites.

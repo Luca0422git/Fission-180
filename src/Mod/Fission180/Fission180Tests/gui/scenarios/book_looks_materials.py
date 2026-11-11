@@ -298,7 +298,45 @@ def c_chrome_made():
     k.click_item(p.library, p.item_for("Brass C360"))
 
 
-# -- D ---------------------------------------------------------------------------------------------
+def c_drop_on_row():
+    """A material dragged onto a row of the browser (Fusion): the plate becomes gold, then
+    steel again (so the masses below stay the ones of the scenario's text)."""
+    p = panel()
+    tree, pos = t.row_point(plate().Label)
+    item = p.item_for("Gold")
+    p.library.scrollToItem(item)
+    h.check(
+        "the browser takes the material",
+        k.drop_events(p.library.mimeData([item]), pos, tree.viewport()),
+    )
+    h.settle("the material to land")
+
+
+def c_row_gold():
+    from fission180 import material
+
+    p = panel()
+    h.check("the plate is gold", material.key_of(plate()) == "gold", material.key_of(plate()))
+    # 12000 mm3 x 19.32 g/cm3
+    h.check("231.84 g", close(mass_g(plate()), 231.84, 1e-6), mass_g(plate()))
+    h.check("the dialog says so", "Gold" in p.note.text(), p.note.text())
+    k.click_item(p.library, p.item_for("Steel"))
+
+
+def c_plate_steel():
+    h.click(ON_PLATE)
+
+
+def c_steel_again():
+    from fission180 import material
+
+    h.check(
+        "the plate is steel again", material.key_of(plate()) == "steel", material.key_of(plate())
+    )
+    h.check("94.80 g", close(mass_g(plate()), 94.8, 1e-6), mass_g(plate()))
+    k.click_item(panel().library, panel().item_for("Brass C360"))
+
+
 def d_ok():
     h.task_button("OK")
 
@@ -516,6 +554,10 @@ h.run(
         c_chrome_copy,
         c_chrome_name,
         c_chrome_made,
+        c_drop_on_row,
+        c_row_gold,
+        c_plate_steel,
+        c_steel_again,
         d_ok,
         d_undo,
         d_undone,

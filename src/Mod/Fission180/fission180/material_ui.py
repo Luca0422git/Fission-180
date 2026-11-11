@@ -82,6 +82,42 @@ class _DropTaker(QtCore.QObject):
             return False
 
 
+class _RowDropTaker(QtCore.QObject):
+    """Event filter on the browser's rows: a material dropped on a body's or a component's
+    row goes to that body, or to every body of the component (Fusion drops materials onto
+    browser rows too). Anything else dragged there is the browser's own business."""
+
+    def __init__(self, panel, tree):
+        super().__init__()
+        self.panel = panel
+        self.tree = tree
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            if kind not in (QtCore.QEvent.DragEnter, QtCore.QEvent.DragMove, QtCore.QEvent.Drop):
+                return False
+            panel = self.panel
+            if panel is None or panel._closed:
+                return False
+            key = key_of(event.mimeData())
+            if key is None:
+                return False
+            if kind == QtCore.QEvent.Drop:
+                item = self.tree.itemAt(event.position().toPoint())
+                node = item.data(1, QtCore.Qt.UserRole) if item is not None else None
+                name = (node or {}).get("object")
+                QtCore.QTimer.singleShot(
+                    0, lambda: panel._guarded(lambda: panel.dropped_on_row(key, name))
+                )
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+            return True
+        except Exception as exc:
+            warn("material drop: %s" % exc)
+            return False
+
+
 class _EnterStays(QtCore.QObject):
     """Event filter: Enter / Return in a field goes no further (the task panel would take it
     as OK and close the dialog)."""
@@ -378,6 +414,19 @@ class MaterialPanel(BodyPanel):
             widget.installEventFilter(self._drop_filter)
         except Exception as exc:
             warn("material drag and drop unavailable: %s" % exc)
+        self._row_filter = None
+        try:  # the browser's rows take a material too
+            from . import browser_ui
+
+            tree = browser_ui.widget()
+            if tree is not None:
+                self._row_tree = tree
+                self._row_accepted = tree.viewport().acceptDrops()
+                tree.viewport().setAcceptDrops(True)
+                self._row_filter = _RowDropTaker(self, tree)
+                tree.viewport().installEventFilter(self._row_filter)
+        except Exception as exc:
+            warn("material: no drop on the browser's rows (%s)" % exc)
 
     def remove_handles(self):
         widget = getattr(self, "_drop_widget", None)
@@ -388,6 +437,46 @@ class MaterialPanel(BodyPanel):
             except Exception:
                 pass
             self._drop_widget = None
+        if getattr(self, "_row_filter", None) is not None:
+            try:
+                self._row_tree.viewport().removeEventFilter(self._row_filter)
+                self._row_tree.viewport().setAcceptDrops(self._row_accepted)
+            except Exception:
+                pass
+            self._row_filter = None
+
+    def dropped_on_row(self, key, name):
+        """A material dropped on a browser row: its body is made of it, or every body of
+        its component."""
+        from . import components
+
+        row = material.entry(key)
+        if row is None:
+            return False
+        obj = self.doc.getObject(name) if name else None
+        if components.is_component(obj):
+            targets = components.bodies_in(self.doc, obj, recursive=True)
+        else:
+            body = bodies.body_of(obj)
+            targets = [body] if body is not None else []
+        if not targets:
+            self.message.setText(
+                "⚠ Drop the material on a body's or a component's row (or on the part in the "
+                "3D view): that row has no body."
+            )
+            return False
+        self.key = key
+        self.chosen.setText(row["label"])
+        self.message.setText("")
+        for body in targets:
+            self._give(body)
+        if components.is_component(obj):
+            count = len(targets)
+            self.note.setText(
+                "%s: %s on %d bod%s"
+                % (obj.Label, row["label"], count, "y" if count == 1 else "ies")
+            )
+        return True
 
     def dropped(self, key, position):
         """A material dropped at widget pixel `position`: the body there is made of it."""
@@ -402,7 +491,7 @@ class MaterialPanel(BodyPanel):
         obj = self.doc.getObject(info["Object"]) if info and info.get("Object") else None
         body = bodies.body_of(obj)
         if body is None:
-            self.message.setText("Drop the material on a body.")
+            self.message.setText("⚠ Drop the material on a body: nothing was there.")
             return False
         self.key = key
         self.chosen.setText(row["label"])
