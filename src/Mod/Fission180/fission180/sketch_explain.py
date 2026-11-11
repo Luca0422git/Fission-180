@@ -61,8 +61,22 @@ def words(sketch, indices, limit=3):
         return "", 0
     cons = sketch.Constraints
     curve_names, kinds = names(sketch)
-    items = [constraint_info(sketch, i, cons[i]) for i in indices if 0 <= i < len(cons)]
-    return core.culprit_list(items, curve_names, kinds, limit), len(items)
+    shown = [i for i in indices if 0 <= i < len(cons) and not _unseen(cons[i])]
+    unseen = [i for i in indices if 0 <= i < len(cons) and _unseen(cons[i])]
+    items = [constraint_info(sketch, i, cons[i]) for i in shown]
+    text = core.culprit_list(items, curve_names, kinds, limit)
+    if unseen:
+        # the ties of a sketch pattern, offset or text frame work unseen (FreeCAD's virtual
+        # space): a "12 mm dimension" nobody can see would only puzzle
+        text = core.with_unseen(text)
+    return text, len(items) + (1 if unseen else 0)
+
+
+def _unseen(constraint):
+    try:
+        return bool(constraint.InVirtualSpace)
+    except Exception:
+        return False
 
 
 def bad_sets(sketch):
@@ -215,9 +229,7 @@ def redundant_culprits(sketch, index, exclude=(), solved=False):
     found = Culprits()
     cons = sketch.Constraints
     exclude = set(exclude) | {index}
-    candidates = [
-        j for j in component(sketch, [index]) if j not in exclude and _nameable(cons[j])
-    ]
+    candidates = [j for j in component(sketch, [index]) if j not in exclude and _nameable(cons[j])]
     if not candidates:
         return found
     candidates = _nearness(sketch, index, candidates)[:PROBE_LIMIT]
@@ -317,9 +329,7 @@ def check_new(sketch, new, probe=True):
         return Finding("conflict", bad, conflict_culprits(sketch, new))
     bad = [i for i in new if i in redundant]
     if bad:
-        culprits = (
-            redundant_culprits(sketch, bad[0], exclude=new, solved=True) if probe else []
-        )
+        culprits = redundant_culprits(sketch, bad[0], exclude=new, solved=True) if probe else []
         return Finding("redundant", bad, culprits)
     if code == 0 or not new:
         return Finding()
@@ -337,9 +347,7 @@ def check_new(sketch, new, probe=True):
     cons = sketch.Constraints
 
     def named(indices):
-        return sorted(
-            i for i in indices if i not in new and i in near and _nameable(cons[i])
-        )
+        return sorted(i for i in indices if i not in new and i in near and _nameable(cons[i]))
 
     if code == REDUNDANT:
         # FreeCAD pinned the redundancy on older ones: with the new ones they say it twice

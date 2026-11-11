@@ -269,6 +269,39 @@ class Vectors(unittest.TestCase):
         self.assertAlmostEqual(math.hypot(*core.rotate((3, 4), (0, 0), 37.0)), 5.0)
 
 
+class UniqueMoves(unittest.TestCase):
+    def test_a_whole_turn_lands_on_the_original(self):
+        moves = [("turn", (0, 0), 120.0), ("turn", (0, 0), 240.0), ("turn", (0, 0), 360.0)]
+        self.assertEqual(core.unique_moves(moves), moves[:2])
+
+    def test_turns_a_whole_turn_apart_are_one(self):
+        moves = [("turn", (0, 0), 90.0), ("turn", (0, 0), -270.0), ("turn", (0, 0), 180.0)]
+        self.assertEqual(core.unique_moves(moves), [moves[0], moves[2]])
+
+    def test_symmetric_half_turns_meet(self):
+        # Symmetric, 3 instances over 360: +120 and -120 are different; +180 and -180 are one
+        self.assertEqual(
+            len(core.unique_moves(core.circular_moves((0, 0), 3, 360.0, "symmetric"))), 2
+        )
+        moves = [("turn", (0, 0), 180.0), ("turn", (0, 0), -180.0)]
+        self.assertEqual(core.unique_moves(moves), moves[:1])
+
+    def test_moves(self):
+        moves = [
+            ("move", (5.0, 0.0)),
+            ("move", (0.0, 0.0)),
+            ("move", (5.0, 0.0)),
+            ("move", (0.0, 5.0)),
+        ]
+        self.assertEqual(core.unique_moves(moves), [moves[0], moves[3]])
+
+    def test_ordinary_patterns_keep_every_copy(self):
+        moves = core.rect_moves((1, 0), 3, 20.0, (0, 1), 3, 30.0, "extent")
+        self.assertEqual(core.unique_moves(moves), moves)
+        moves = core.circular_moves((1.0, 2.0), 8)
+        self.assertEqual(core.unique_moves(moves), moves)
+
+
 class Ties(unittest.TestCase):
     L, C, A, P = core.LINE, core.CIRCLE, core.ARC, core.POINT
 

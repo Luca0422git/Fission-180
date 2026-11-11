@@ -21,7 +21,6 @@ C  MODIFY > Fillet, a corner, 4 typed over the sketch, Enter: the arc has radius
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtWidgets
 
 from Fission180Tests.gui import book_sketch_b_steps as b
 from Fission180Tests.gui import harness as h
@@ -101,7 +100,9 @@ def a_mirror():
 
 
 def a_line_field():
-    h.check("Mirror runs with the three lines", st.tool() is not None and len(st.tool().objects) == 3)
+    h.check(
+        "Mirror runs with the three lines", st.tool() is not None and len(st.tool().objects) == 3
+    )
     b.panel_click(MIRROR, "Fission180MirrorLine")
 
 
@@ -132,7 +133,9 @@ def a_made():
     joins = [
         c
         for c in sk.Constraints
-        if c.Type == "Coincident" and {c.First, c.Second} & set(s["half"]) and max(c.First, c.Second) > max(s["half"])
+        if c.Type == "Coincident"
+        and {c.First, c.Second} & set(s["half"])
+        and max(c.First, c.Second) > max(s["half"])
     ]
     h.check("...by a Coincident at each of the two ends", len(joins) == 2, len(joins))
     if len(wires) == 1 and wires[0].isClosed():
@@ -173,7 +176,11 @@ def b_made():
         (len(new), len(seen_lines()), s["lines"]),
     )
     hidden = sketch_helpers.hidden(sk)
-    h.check("...its square helper lines work unseen", len(hidden) >= 1 and sketch_helpers.nodes(st.session().view) > 0, len(hidden))
+    h.check(
+        "...its square helper lines work unseen",
+        len(hidden) >= 1 and sketch_helpers.nodes(st.session().view) > 0,
+        len(hidden),
+    )
     ends = sorted((round(g.StartPoint.x, 6), round(g.StartPoint.y, 6)) for _i, g in new) + sorted(
         (round(g.EndPoint.x, 6), round(g.EndPoint.y, 6)) for _i, g in new
     )
@@ -201,9 +208,15 @@ def c_type():
 def c_made():
     sk = b.sk()
     arcs = [g for g in sk.Geometry if g.TypeId == "Part::GeomArcOfCircle"]
-    h.check("report Fire Piston: the typed radius is the fillet's radius", len(arcs) == 1 and abs(arcs[0].Radius - 4.0) < 1e-9, [a.Radius for a in arcs])
+    h.check(
+        "report Fire Piston: the typed radius is the fillet's radius",
+        len(arcs) == 1 and abs(arcs[0].Radius - 4.0) < 1e-9,
+        [a.Radius for a in arcs],
+    )
     radii = [c for c in sk.Constraints if c.Type == "Radius"]
-    h.check("...with its radius dimension of 4", len(radii) == 1 and abs(radii[0].Value - 4.0) < 1e-9)
+    h.check(
+        "...with its radius dimension of 4", len(radii) == 1 and abs(radii[0].Value - 4.0) < 1e-9
+    )
     h.check("Enter made it and ended the tool", st.tool() is None, st.tool_title())
     b.clean("after Fillet")
 
@@ -249,6 +262,24 @@ def extruded():
     Gui.Selection.clearSelection()
 
 
+def missing_font():
+    """The book's fonts are Autodesk's (not shipped): a text set in a font that is not on
+    this computer uses another one and says so (brief item 12; fission180/text.py)."""
+    from fission180 import text
+
+    info, _bold, _italic, used, note = text.resolve_font("Artifakt Element")
+    h.check(
+        "a font that is not installed falls back to one that is",
+        bool(used) and used != "Artifakt Element",
+        used,
+    )
+    h.check(
+        "...and the note for the Text dialog says so, naming both",
+        "Artifakt Element" in note and "not installed" in note and used in note,
+        note,
+    )
+
+
 h.run(
     "book_sketch_b_modify",
     [st.new_design("BookSketchBModify"), one_mm_grid, st.create_sketch, st.pick_xy, st.sketch_open]
@@ -275,7 +306,7 @@ h.run(
         distance,
         ok,
         extruded,
+        missing_font,
     ],
     paced_by="state",
 )
-assert QtWidgets  # (kept for the helpers' Qt types)

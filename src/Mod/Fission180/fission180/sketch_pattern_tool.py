@@ -444,7 +444,17 @@ class _PatternTool(draw.DrawTool):
         if not self.objects:
             return
         try:
-            self.moves_now = self.moves()
+            moves = self.moves()
+            self.moves_now = core.unique_moves(moves)
+            if len(self.moves_now) != len(moves):
+                log(
+                    "%s: %d cop%s would lie exactly on another instance: left out"
+                    % (
+                        self.title,
+                        len(moves) - len(self.moves_now),
+                        "y" if len(moves) - len(self.moves_now) == 1 else "ies",
+                    )
+                )
         except PatternError as exc:
             self.error = str(exc)
         except Exception as exc:

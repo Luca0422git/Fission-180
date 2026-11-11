@@ -134,6 +134,44 @@ def circular_moves(centre, quantity, angle=360.0, kind="full"):
     return [("turn", (float(centre[0]), float(centre[1])), a) for a in angles[1:]]
 
 
+def unique_moves(moves, tolerance=1e-7):
+    """`moves` without the ones that put a copy exactly on the original or on an earlier
+    copy (a turn of 360 degrees, two turns a whole turn apart, a move of nothing): two
+    curves on one spot cannot be told apart or clicked (the book parity report: overlapping
+    arcs left behind), and split the sketch's areas into slivers."""
+    seen = [("move", 0.0, 0.0)]
+    out = []
+    for move in moves:
+        if move[0] == "move":
+            key = ("move", float(move[1][0]), float(move[1][1]))
+            same = [
+                k
+                for k in seen
+                if k[0] == "move" and math.hypot(k[1] - key[1], k[2] - key[2]) <= tolerance
+            ]
+            if not same and abs(key[1]) <= tolerance and abs(key[2]) <= tolerance:
+                same = [key]
+        else:
+            turn = float(move[2]) % 360.0
+            key = ("turn", turn, 0.0)
+            same = [
+                k
+                for k in seen
+                if (k[0] == "turn" and min(abs(k[1] - turn), 360.0 - abs(k[1] - turn)) <= tolerance)
+                or (
+                    k[0] == "move"
+                    and k[1] == 0.0
+                    and k[2] == 0.0
+                    and min(turn, 360.0 - turn) <= tolerance
+                )
+            ]
+        if same:
+            continue
+        seen.append(key)
+        out.append(move)
+    return out
+
+
 def circular_count(quantity, kind="full"):
     return max(1, int(quantity))
 

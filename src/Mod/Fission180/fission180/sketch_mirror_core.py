@@ -129,7 +129,12 @@ def boxed(polylines, start, end):
     """The keys of the polylines {key: [screen points]} the box from `start` to `end` (screen
     pixels) takes: dragged left to right (window) the ones fully inside, right to left
     (crossing) the ones it touches. A point off the view (None) is outside."""
-    box = (min(start[0], end[0]), min(start[1], end[1]), max(start[0], end[0]), max(start[1], end[1]))
+    box = (
+        min(start[0], end[0]),
+        min(start[1], end[1]),
+        max(start[0], end[0]),
+        max(start[1], end[1]),
+    )
     window = end[0] >= start[0]
     x0, y0, x1, y1 = box
     edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]

@@ -49,7 +49,10 @@ class Ties(unittest.TestCase):
         )
 
     def test_a_circle_by_its_centre(self):
-        self.assertEqual(mc.ties(mc.CIRCLE, 2, 7, False), [("Equal", 2, 0, 7, 0), ("Symmetric", 2, mc.MID, 7, mc.MID)])
+        self.assertEqual(
+            mc.ties(mc.CIRCLE, 2, 7, False),
+            [("Equal", 2, 0, 7, 0), ("Symmetric", 2, mc.MID, 7, mc.MID)],
+        )
 
     def test_helpers_of_a_curve_are_not_tied_twice(self):
         self.assertEqual(mc.ties(mc.LINE, 3, 8, False, aligned=True), [])

@@ -271,6 +271,16 @@ def culprit_list(items, names, kinds=None, limit=3):
     return join_list([describe(c, names, kinds) for c in ordered], limit)
 
 
+UNSEEN = "what holds a pattern's, an offset's or a text frame's curves in place"
+
+
+def with_unseen(culprits_text):
+    """The culprits' text with the unseen ties of a pattern, offset or text frame added."""
+    if not culprits_text:
+        return UNSEEN
+    return "%s and %s" % (culprits_text, UNSEEN)
+
+
 # -- the messages ------------------------------------------------------------------------------
 SHOWN = " (highlighted in the sketch)"
 

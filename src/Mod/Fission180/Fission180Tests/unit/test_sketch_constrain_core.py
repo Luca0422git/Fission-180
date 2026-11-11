@@ -189,6 +189,12 @@ class Words(unittest.TestCase):
         self.assertIn("Delete that first", text)
         self.assertTrue(text.startswith("Symmetry: not added"))
 
+    def test_unseen_ties_are_named_as_what_they_are(self):
+        self.assertEqual(ec.with_unseen(""), ec.UNSEEN)
+        text = ec.with_unseen("the 30 mm dimension")
+        self.assertTrue(text.startswith("the 30 mm dimension and "))
+        self.assertIn("pattern", text)
+
     def test_partial_refusal_without_a_name(self):
         self.assertIn("cannot take both", ec.refused_partial("Tangent", ""))
 

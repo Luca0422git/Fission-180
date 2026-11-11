@@ -26,7 +26,6 @@ import math
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore
 
 from Fission180Tests.gui import book_sketch_b_steps as b
 from Fission180Tests.gui import harness as h
