@@ -11,8 +11,8 @@ grid, first component grounded; an undo step left open fails the run) and real i
 
 | Project | Scenario | State |
 |---|---|---|
-| 3 Finger Surfboard | `replay_03_surfboard` | steps 1-8 replay clean (121 checks); fin extrude, tail hole, fillet, export being written |
-| 4 Tensegrity Tower | `replay_04_tensegrity` | not started |
+| 3 Finger Surfboard | `replay_03_surfboard` | PASS, 163 checks (one hitch not fixed: the fillet's 1 mm, see below) |
+| 4 Tensegrity Tower | `replay_04_tensegrity` | PASS, 120 checks |
 | 5 Carabiner | `replay_05_carabiner` | not started |
 
 ## Project 3, Finger Surfboard: hitches
@@ -31,12 +31,36 @@ grid, first component grounded; an undo step left open fails the run) and real i
 | (speed) | Each change in the fin's Extrude dialog took about 2 minutes under the test machine's load | - | `extrude_bodies._same_surface` took any two faces that meet along a curve for "one surface" (their distance is 0) and then made a boolean of them (10 s each, 8 per preview) | `extrude_bodies._same_surface` / `_lies_on`: points inside one face must lie on the other's surface (about half the time now; the two booleans of `start_state`'s 0.01 mm slices remain) |
 | (test env) | E after the look editor (a window of its own) did nothing | - | The test screen has no window manager: the main window stays inactive after the editor closes; not a product bug | `replay_b_steps.key` activates the main window first, as a desktop does |
 
+## Project 4, Tensegrity Tower: hitches
+
+| Report line | What happened in the replay | Fusion (source) | Root cause | Fix (function) |
+|---|---|---|---|---|
+| 1059-1063 | L, X, corner, ORIGIN, corner: one guide only; then the triangle (after X off again) came out as two loose lines | The chain goes on (Book: "from the top-left corner through the origin to the top-right corner"; Autodesk: X toggles construction inside the Line tool) | X (Sketcher_ToggleConstruction) was recorded as the last command, and the line chain took that as "another tool started": it stopped after each line drawn after X. A line ending on the origin where the hexagon's centre also sits ended the chain | `sketch_line.LineChain._tool_running` (commands.KEEPS_SKETCH_TOOL pass), `sketch_line._ends_on_geometry` (a line ending on the origin goes on) |
+| 1102 | P, click the frame's front face: the YZ plane took the click (the Origin is shown for the holes' Mirror, the book's step) | Project takes edges, faces, points (Autodesk help) | FreeCAD's Sketcher_Projection takes the first thing under the pointer | `sketch_tools_ui._through_glyphs`, `_GlyphClicks` (also for Include 3D Geometry) |
+| 1125 | Chamfer on the arm's inner corner, with the Origin shown: the click took the XZ plane | as above | as above | `fillet_ui.BlendPanel._behind_glyph` prefers an edge within 4 px |
+| 1134-1137 | Window over the whole part: only the edges the view shows | Select Through on by default (Autodesk support: "Fusion by default has the select through selection filter enabled") | `selection_core.DEFAULT_SELECT_THROUGH` was False | `selection_core.DEFAULT_SELECT_THROUGH = True`; `selection_box`, `selection_filters`, `test_selection_core` follow |
+| 1051-1054 | H/V on the hexagon's top edge: refused, with the reason (the edge's middle was clicked on the Y axis, which holds the turn already) | Fusion would refuse it too ("over-constrain") (Guess) | - | none (said, not silent) |
+| 1069 | The second Parallel: refused with the reason | Fusion shows an error (Book) | - | none (said) |
+| (replay) | A 3.5 mm circle drawn at the whole hexagon's zoom: both clicks landed on one 10 mm grid crossing (a dot) | Fusion's Snap does the same; a person zooms in | - | the replay zooms in (not a workaround: the book's figures are zoomed in there) |
+
+Not reproduced any more (fixed by the builders of wave 7): the D on two polygon corners (sketch-b),
+the sketch pattern's double-click chain and its copies tied to the original (sketch-a /
+sketch-b), Coincident tool-first on a line (sketch-b), the H/V point-to-origin (sketch-b),
+the 20 mm chamfer (modify-b), the look editor (looks), Save As Mesh's own dialog (shell).
+
 Book steps that are not what the report did, with the reason:
 
 - The ellipses' centres are put BELOW the origin. The book's later tail hole is sketched on
   the Top plane and needs Flip to go into the board (report line 1042), which only happens
   with the board under that plane.
 - The book's canvas picture is a download of its publisher: a stand-in PNG (`canvas.png`).
+- Tensegrity: the triangle's bottom corner is clicked off the Y axis (on it, Snap holds the
+  triangle symmetric and the book's second 3 mm is a driven dimension); the arm's height (75)
+  is dimensioned from the top line to the origin point (a click on the X axis left of the
+  frame did not pick it while the Origin's planes were shown: not investigated further, see
+  Known issues); the hole is clicked in the middle of the arm's top (off the middle, its
+  rim came within 0.45 mm of the spoke's side and the 0.5 mm chamfer of every edge was held
+  at 0.25).
 
 ## Facts found on the way
 
@@ -48,6 +72,13 @@ Book steps that are not what the report did, with the reason:
   must use points, not booleans.
 
 ## Changelog lines
+
+- Line: pressing X while drawing no longer stops the line chain, and a chain through the
+  origin goes on even when another point sits on the origin.
+- Project, Include 3D Geometry, Fillet and Chamfer: a click on a part's face or edge behind
+  a shown origin or construction plane now picks the face or edge.
+- Select Through is on by default, as in Fusion: a window drawn round a part takes its
+  hidden edges too.
 
 - Loft: clicking the origin (its dot) as the last section works also when the Origin folder
   is hidden or a construction plane is drawn over it.
@@ -66,4 +97,6 @@ Book steps that are not what the report did, with the reason:
   goes 0.1 mm into the board (draw its top edge a hair above the outline) fuses normally.
 - Surfboard: the tail hole's 1 mm rim round is held at 0.49 mm: the hole is 1 mm from the
   tail. Put the hole 2.5 mm from the tail for a full 1 mm round.
+- Tensegrity: D from a line to the sketch's X axis, clicked where an Origin plane lies
+  edge-on over it, did not pick the axis (seen once; dimension to the origin point instead).
 - (more to be filled at the end)
