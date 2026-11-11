@@ -231,12 +231,19 @@ def _active(cmd):
 KEEPS_SKETCH_TOOL = ("Sketcher_ToggleConstruction", "Fission180_SketchToggleConstruction")
 
 
+NOTHING_TO = {"Std_Undo": "Nothing to undo.", "Std_Redo": "Nothing to redo."}
+
+
 def _own_tool_running(session, name):
     """The command's own Fission 180 tool runs already: the command decides what a second
     press does (O again ends Offset, M again keeps Move/Copy with its picks), so it is not
     stopped first."""
     tool = getattr(session, "tool", None)
-    return tool is not None and bool(getattr(tool, "active", False)) and getattr(tool, "command", "") == name
+    return (
+        tool is not None
+        and bool(getattr(tool, "active", False))
+        and getattr(tool, "command", "") == name
+    )
 
 
 def _would_ask(name):
@@ -268,6 +275,12 @@ def make_way_for(name):
         cmd = None
     if cmd is None:
         return True
+    if name in NOTHING_TO and not _active(cmd):
+        # (wave 7, sketch-a) Undo or Redo with nothing to take back or bring back: it never
+        # ends what is open to "make way". Ctrl+Y pressed once too often inside a sketch
+        # finished the sketch (the book parity report: "Redo doesn't reopen it")
+        tell(NOTHING_TO[name])
+        return False
     if _in_sketch() and _is_sketch_command(name) and name not in KEEPS_SKETCH_TOOL:
         # a sketch tool replaces the running one, Fission 180's own (Line, Fillet...) too:
         # FreeCAD's Rectangle started from the ribbon left Fission 180's Line chain or Fillet

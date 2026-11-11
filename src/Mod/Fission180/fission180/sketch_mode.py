@@ -545,11 +545,12 @@ RECOMPUTE_STEP = "Sketch recompute"
 # (sketch_infer.py: Fusion adds them with the line itself).
 INFER_STEP = "Inferred Constraints"
 GLUED_STEPS = (RECOMPUTE_STEP, INFER_STEP)
-# FreeCAD's spline tool records the constraints of the spline's ends (on the points it was
-# clicked on) as a step of its own after the spline ("Add Auto-Constraints"): one Ctrl+Z
-# took only those back and left the spline (Fusion: one Ctrl+Z, the spline is gone). That
-# step goes with the spline step before it. (After FreeCAD's line the same step is still
-# its own: the Line tool's two steps are a known difference, parity/sketch.md.)
+# FreeCAD's drawing tools record the constraints of the points they were clicked on as a
+# step of its own after the shape ("Add Auto-Constraints"): one Ctrl+Z took only those back
+# and left the shape (Fusion: one Ctrl+Z, the spline is gone). That step goes with the
+# shape's step before it: the spline's since 3.2.1, every tool's since wave 7 (the book
+# parity report: "Ctrl+Z after drawing a polyline only removed its auto-constraints, not
+# the lines", with Fission 180's own inferred constraints glued in front of them).
 AUTO_STEP = "Add Auto-Constraints"
 _merging = {"busy": False}
 
@@ -569,7 +570,7 @@ def _glued_next(doc):
     following = doc.RedoNames[0]
     if following in GLUED_STEPS:
         return True
-    return following == AUTO_STEP and bool(doc.UndoNames) and doc.UndoNames[0] == SPLINE_STEP
+    return following == AUTO_STEP and bool(doc.UndoNames)
 
 
 def _merge_recompute_step(doc, undo):
@@ -604,6 +605,48 @@ def _one_more_step(doc_name, undo):
                 break
         if doc.isTouched() or any("Touched" in o.State for o in doc.Objects):
             doc.recompute()
+    except Exception as exc:
+        warn("undo: %s" % exc)
+    finally:
+        _merging["busy"] = False
+
+
+NO_MORE_UNDO = (
+    "Nothing more to undo in this sketch. Finish Sketch first to undo what came before it."
+)
+
+
+def _back_into_sketch(doc_name, name):
+    """Ctrl+Z went one step past what was done in the open sketch (SketchSession.
+    _count_undo): the step that made the sketch, which deletes it and ends the editing, or
+    the last step of the design before a sketch opened for editing. That step is put back
+    and the sketch stays open (or opens again), with a note beside the pointer. Before,
+    the sketch closed, the camera turned away, and Redo brought back the curves but not
+    the open sketch (the book parity report, 2026-11-10). From a timer."""
+    from . import commands
+
+    _merging["busy"] = True  # (the redo is ours: no step glued to it follows)
+    try:
+        doc = App.getDocument(doc_name)
+        if doc is None or not doc.RedoNames:
+            return
+        doc.redo()
+        if doc.isTouched() or any("Touched" in o.State for o in doc.Objects):
+            doc.recompute()
+        sketch = doc.getObject(name)
+        if sketch is not None and editing_sketch() is not sketch:
+            from . import sketch_ui
+
+            # the sketch came back as it was when the Undo deleted it: hidden, as FreeCAD
+            # hides every sketch while it is open. Opened again like that, Finish Sketch
+            # would "restore" it hidden for good
+            try:
+                if sketch.ViewObject is not None and not sketch.ViewObject.Visibility:
+                    sketch.ViewObject.Visibility = True
+            except Exception as exc:
+                warn("undo: %s" % exc)
+            sketch_ui.edit_sketch(sketch)
+        commands.tell(NO_MORE_UNDO)
     except Exception as exc:
         warn("undo: %s" % exc)
     finally:
@@ -684,6 +727,35 @@ def _end():
             session.close()
         except Exception as exc:
             warn("sketch mode: closing: %s" % exc)
+        doc_name, name = session.doc_name, session.name
+        QtCore.QTimer.singleShot(0, lambda: _show_finished(doc_name, name))
+
+
+def _show_finished(doc_name, name):
+    """Fusion: a finished sketch stays shown until a feature uses it (Extrude hides its
+    profile sketch). FreeCAD hides a sketch while it is open and puts back how it was
+    shown before; a sketch that was hidden then for a reason that is over (opened hidden
+    after an Undo and Redo of its making; its only feature deleted since) stayed hidden
+    after Finish Sketch, with an empty view (the book parity report: "the sketch had
+    become hidden; right-click > Show"). From a timer, after FreeCAD closed the sketch."""
+    try:
+        doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+        sketch = doc.getObject(name) if doc is not None else None
+        from . import sketch_ui
+
+        if sketch is None or sketch.ViewObject is None or editing_sketch() is sketch:
+            return
+        if sketch.ViewObject.Visibility:
+            sketch_ui.shown_before_edit(doc_name, name)  # (asked once)
+            return
+
+        shown = sketch_ui.shown_before_edit(doc_name, name)
+        if not shown or sketch_ui.used_by_feature(sketch):
+            return  # hidden before it was opened (by hand, or by its feature): stays so
+        sketch.ViewObject.Visibility = True
+        log("sketch %s shown again: nothing uses it yet" % sketch.Label)
+    except Exception as exc:
+        warn("sketch mode: %s" % exc)
 
 
 # -- helpers for the 3D view ----------------------------------------------------------
@@ -824,6 +896,11 @@ class SketchSession:
         self.palette = None
         self.last_press = None
         self._drawing_cursor = False  # what the view's cursor said last (drawing_cursor)
+        self.undo_steps = 0  # steps of the undo list made in this sketch (_count_undo)
+        try:
+            self._undo_names = tuple(self.doc.UndoNames)
+        except Exception:
+            self._undo_names = ()
         self._enter_follow = False
         self.shading = ProfileShading(self)
         from .sketch_areas import AreaPicker, ensure_areas
@@ -933,6 +1010,7 @@ class SketchSession:
         before = self.constraint_count
         grew = count > before
         self.constraint_count = count
+        self._count_undo(kind)
         if self.infer is not None:
             try:
                 self.infer.commit_signal(kind)
@@ -953,6 +1031,29 @@ class SketchSession:
         if kind in ("undo", "redo") and self.tool is not None:
             tool = self.tool
             QtCore.QTimer.singleShot(0, lambda: _tool_undone(tool))
+
+    def _count_undo(self, kind):
+        """How many steps of the design's undo list were made in this sketch since it
+        opened. An Undo that takes one more is put back (_back_into_sketch): Ctrl+Z never
+        leaves the sketch. Only counts and a timer (called from FreeCAD's signal)."""
+        try:
+            names = tuple(self.doc.UndoNames)
+        except Exception:
+            return
+        before, self._undo_names = self._undo_names, names
+        if kind == "commit":
+            if len(names) > len(before):
+                self.undo_steps += len(names) - len(before)
+            elif names != before:
+                # (the list is full: the oldest step fell out as this one came in)
+                self.undo_steps = min(self.undo_steps + 1, len(names))
+        elif kind == "redo":
+            self.undo_steps += 1
+        elif kind == "undo":
+            self.undo_steps -= 1
+            if self.undo_steps < 0:
+                doc_name, name = self.doc_name, self.name
+                QtCore.QTimer.singleShot(0, lambda: _back_into_sketch(doc_name, name))
 
     def _close_editor_after_undo(self):
         """Undo and Redo put the sketch's curves and dimensions back as whole lists, so the

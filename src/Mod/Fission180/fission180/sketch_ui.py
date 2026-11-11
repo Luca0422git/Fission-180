@@ -780,6 +780,11 @@ def _point_on(face):
 
 def open_sketch(sketch):
     Gui.Selection.clearSelection()
+    try:  # (FreeCAD hides the sketch while it is open: sketch_mode._show_finished)
+        key = (sketch.Document.Name, sketch.Name)
+        _SHOWN_BEFORE[key] = bool(sketch.ViewObject is not None and sketch.ViewObject.Visibility)
+    except Exception as exc:
+        warn("sketch: %s" % exc)
     _no_support_shown(sketch)
     Gui.ActiveDocument.setEdit(sketch.Name)
     show_design_at(sketch)  # (again from sketch_mode for sketches opened elsewhere)
@@ -856,6 +861,35 @@ def show_design_at(sketch):
             tv.hide(others)
     except Exception as exc:
         warn("sketch: could not show the design at the sketch: %s" % exc)
+
+
+def used_by_feature(sketch):
+    """A feature is built on the sketch (Extrude, Revolve, a hole's points...): Fusion hides
+    a sketch once one is. The sketch's own curve objects (sketch_companions), its body and
+    component, and other sketches that only project from it do not count."""
+    try:
+        from . import sketch_companions
+
+        for obj in sketch.InList:
+            if sketch_companions.is_companion(obj):
+                continue
+            if obj.TypeId in CONTAINERS or obj.TypeId == "Sketcher::SketchObject":
+                continue
+            return True
+    except Exception as exc:
+        warn("sketch: %s" % exc)
+        return True  # (unknown: leave the sketch as it is shown)
+    return False
+
+
+CONTAINERS = ("PartDesign::Body", "App::Part", "App::DocumentObjectGroup", "App::Origin")
+_SHOWN_BEFORE = {}  # (design, sketch name): the sketch was shown when it was opened
+
+
+def shown_before_edit(doc_name, name):
+    """The sketch was shown when Fission 180 opened it (open_sketch); None when it was
+    opened some other way. Asked once."""
+    return _SHOWN_BEFORE.pop((doc_name, name), None)
 
 
 def edit_sketch(sketch):
