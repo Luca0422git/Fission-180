@@ -51,7 +51,9 @@ class NameTests(unittest.TestCase):
             core.check_name("width", existing={"width"})
 
     def test_units(self):
-        self.assertEqual(core.property_type("mm"), "App::PropertyLength")
+        # (wave 7: a length parameter may be negative; FreeCAD holds a PropertyLength at 0)
+        self.assertEqual(core.property_type("mm"), "App::PropertyDistance")
+        self.assertEqual(core.unit_of("App::PropertyLength"), "mm")  # designs made before
         self.assertEqual(core.unit_of("App::PropertyAngle"), "deg")
         with self.assertRaises(core.ParameterError):
             core.property_type("furlong")

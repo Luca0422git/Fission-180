@@ -645,6 +645,8 @@ def model_parameters(doc):
                 if not expr and constraint.Name:
                     expr = expressions.get(".Constraints.%s" % constraint.Name, "")
                 found.append(_row(obj, path, label, quantity, expr))
+        elif _is_construction(obj):
+            found.extend(_construction_rows(obj))
         else:
             for prop, label in _props_of(obj):
                 found.append(_row(obj, prop, label, getattr(obj, prop), expressions.get(prop, "")))
@@ -734,6 +736,56 @@ def _is_construction(obj):
         return False
 
 
+OFFSET_PATH = ".AttachmentOffset.Base.z"  # where an offset plane on a face keeps its distance
+
+
+def _construction_rows(datum):
+    """The size of a construction plane, axis or point (CONSTRUCT): an Offset Plane's
+    Distance, a Plane at Angle's Angle, the distance along a path. It is kept on the datum
+    itself (an offset from a flat face) or on its hidden helper frame."""
+    from . import construct
+
+    spec = construct.SPECS.get(getattr(datum, construct.PROP_KEY, "") or "")
+    which = spec.get("value") if spec else None
+    if not which:
+        return []
+    helper = construct.helper_of(datum)
+    if helper is None:
+        if which != "distance":
+            return []
+        expr = dict(datum.ExpressionEngine).get(OFFSET_PATH, "")
+        value = App.Units.Quantity("%r mm" % float(datum.AttachmentOffset.Base.z))
+        return [_row(datum, OFFSET_PATH, "Distance", value, expr)]
+    if which == "angle":
+        prop, label = "Angle", "Angle"
+    elif which == "path" and getattr(helper, "DistanceType", "") != "physical":
+        prop, label = "Fraction", "Distance (0 to 1)"
+    else:
+        prop, label = "Distance", "Distance"
+    expr = dict(helper.ExpressionEngine).get(prop, "")
+    return [_row(helper, prop, label, getattr(helper, prop), expr)]
+
+
+def _value_at(obj, path):
+    """What `path` of `obj` holds (a property, a sketch dimension, an offset plane's distance)."""
+    if path.startswith(".Constraints["):
+        return obj.getDatum(int(path[len(".Constraints[") : -1]))
+    if path == OFFSET_PATH:
+        return App.Units.Quantity("%r mm" % float(obj.AttachmentOffset.Base.z))
+    return getattr(obj, path)
+
+
+def _put_value(obj, path, value):
+    if path == OFFSET_PATH:
+        offset = obj.AttachmentOffset
+        number = float(getattr(value, "Value", value))
+        obj.AttachmentOffset = App.Placement(
+            App.Vector(offset.Base.x, offset.Base.y, number), offset.Rotation
+        )
+    else:
+        setattr(obj, path, value)
+
+
 def _row(obj, path, label, value, expr):
     number = value.Value if hasattr(value, "Value") else value
     unit = str(value.Unit) if hasattr(value, "Unit") else ""
@@ -765,6 +817,8 @@ def kind_of_path(obj, path):
     if path.startswith(".Constraints["):
         kind = obj.Constraints[int(path[len(".Constraints[") : -1])].Type
         return "angle" if kind == "Angle" else "length"
+    if path == OFFSET_PATH:
+        return "length"
     type_id = obj.getTypeIdOfProperty(path)
     if "Integer" in type_id or type_id in ("App::PropertyFloat", "App::PropertyFloatConstraint"):
         return "number"
@@ -799,6 +853,9 @@ def _set(obj, path, text, names=None, unit=None):
                 else App.Units.Quantity("%r deg" % got.value)
             ),
         )
+        return
+    if path == OFFSET_PATH:
+        _put_value(obj, path, got.value)
         return
     type_id = obj.getTypeIdOfProperty(path)
     if "Integer" in type_id:
@@ -991,12 +1048,7 @@ def _step_names(doc):
 
 def _snapshot(obj, path):
     """What `path` of `obj` holds now (its expressions and its value), to put it back."""
-    expressions = dict(obj.ExpressionEngine)
-    if path.startswith(".Constraints["):
-        value = obj.getDatum(int(path[len(".Constraints[") : -1]))
-    else:
-        value = getattr(obj, path)
-    return expressions, value
+    return dict(obj.ExpressionEngine), _value_at(obj, path)
 
 
 def _sketch_shots(doc):
@@ -1058,7 +1110,7 @@ def _put_back(obj, path, snapshot):
             obj.recompute()
             obj.setExpression(path, None)
     else:
-        setattr(obj, path, value)
+        _put_value(obj, path, value)
 
 
 # a sketch whose solver finds no solution with the new value (no conflict list to name)
