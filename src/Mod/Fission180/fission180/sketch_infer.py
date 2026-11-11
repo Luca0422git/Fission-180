@@ -95,6 +95,11 @@ DEFAULTS = {
     # land on it, whatever the spacing (FreeCAD alone: a fifth of the spacing, which on a
     # coarse grid is dozens of pixels); 0: FreeCAD's rule alone
     "GridSnapPixels": ("Float", 8.0),
+    # Fusion's Snap (wave 7, sketch-c): with Snap on, every free point lands on the nearest
+    # crossing of the grid lines drawn (the minor grid), whatever the distance; what the
+    # pointer infers (an end, a middle, a guide) and typed values come first. Off: the
+    # screen reach above (sketch-a's rule; the scenarios written before run with it)
+    "GridSnapFull": ("Bool", True),
 }
 SNAP_OFF_MARK = "SnapSwitchedOff"  # set while FreeCAD's Snap is off for a Ctrl event
 
@@ -1548,6 +1553,11 @@ def grid_reach(px):
     """How far (mm) a grid line pulls a coordinate onto it at `px` mm per screen pixel:
     GridSnapPixels on the screen; None for FreeCAD's rule alone (a fifth of the
     spacing)."""
+    try:
+        if setting("GridSnapFull"):
+            return core.FULL
+    except Exception:
+        pass
     try:
         pixels = float(setting("GridSnapPixels"))
     except Exception:

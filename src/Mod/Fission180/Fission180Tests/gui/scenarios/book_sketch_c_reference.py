@@ -8,8 +8,8 @@ along X, "Pins" with a cylinder (radius 5, height 20, axis through x 0, y 40), t
 component "Heat Break", which is active and gets a sketch on its XY plane. Nothing of the
 other components is in that sketch.
 
-  A  Line (FreeCAD's tool): a click on empty space, a click ON the Nozzle's front edge: the
-     edge is projected (one purple line from (30, 0) to (50, 0)) and the line ends on it,
+  A  Line (FreeCAD's tool): a click on empty space, a click ON the Nozzle's back edge: the
+     edge is projected (one purple line from (30, 20) to (50, 20)) and the line ends on it,
      held there by a constraint. Ctrl+Z, Ctrl+Z: the line, then the projection, are gone;
      Ctrl+Y twice brings both back
   B  Sketch Dimension: the centre of a sketch circle, then the Pins' top edge (another
@@ -20,7 +20,7 @@ other components is in that sketch.
   D  Fission 180's own 2-Point Circle: its first click on a corner of the Nozzle: the corner
      is projected as a point and the circle starts on it
   E  Preferences > Design > "Auto project edges on reference" off: a line ended on the
-     Nozzle's back edge projects nothing (the end stays where it was clicked, free)
+     Nozzle's left edge projects nothing (the end stays where it was clicked, free)
 """
 
 import FreeCAD as App
@@ -136,14 +136,14 @@ def a_first():
 
 
 def a_on_edge():
-    st.click(V(40, 0, 10))  # the Nozzle's top front edge, seen from above
+    st.click(V(42, 20, 10))  # the Nozzle's top back edge, seen from above
 
 
 def a_check():
     h.check("A the Nozzle's edge was projected on the click", len(externals()) == 1, describe())
     found = describe()
     h.check(
-        "A ...where the edge is: (30, 0) to (50, 0)",
+        "A ...where the edge is: (30, 20) to (50, 20)",
         found and found[0][0] == "line" and sorted(found[0][1][0:4:3]) == [30.0, 50.0],
         found,
     )
@@ -156,7 +156,9 @@ def a_check():
     if lines:
         end = sk().Geometry[lines[0]].EndPoint
         h.check(
-            "A ...ending on the edge", abs(end.y) < 1e-6 and 30 - 1e-6 <= end.x <= 50 + 1e-6, end
+            "A ...ending on the edge",
+            abs(end.y - 20) < 1e-6 and 30 - 1e-6 <= end.x <= 50 + 1e-6,
+            end,
         )
         h.check(
             "A ...held on it by a constraint", bool(on_external(lines[0])), on_external(lines[0])
@@ -202,7 +204,7 @@ def b_centre():
 
 def b_pin():
     h.check("B the circle's centre is picked", st.tool() is not None and len(st.tool().picks) == 1)
-    st.click(V(0, 35, 20))  # the Pins' top edge
+    st.click(V(3.5355, 43.5355, 20))  # the Pins' top edge (clear of the sketch's Y axis)
 
 
 def b_picked():
@@ -309,7 +311,7 @@ def e_first():
 
 
 def e_on_edge():
-    st.click(V(42, 20, 10))  # the Nozzle's back edge
+    st.click(V(30, 8, 10))  # the Nozzle's left edge
 
 
 def e_check():

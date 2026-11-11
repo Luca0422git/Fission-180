@@ -308,9 +308,14 @@ def grid_line(value, grid):
     return (math.ceil(q - 0.5) if q < 0 else math.floor(q + 0.5)) * grid
 
 
+FULL = float("inf")  # a grid reach: every free coordinate goes to its nearest grid line
+
+
 def grid_snap(value, grid, reach=None):
     """The grid snap of one coordinate: to the nearest grid line when closer than a fifth
-    of the spacing (FreeCAD's rule) and, with `reach` (mm), closer than that too.
+    of the spacing (FreeCAD's rule) and, with `reach` (mm), closer than that too. With
+    `reach` FULL: always to the nearest grid line (Fusion's Snap: the pointer goes from one
+    grid crossing to the next; wave 7, sketch-c).
 
     FreeCAD's rule alone is a distance in the model that grows with the grid: on a grid
     of 50 mm lines a click 8 mm (40 pixels) off the X axis landed on it (the book parity
@@ -319,6 +324,8 @@ def grid_snap(value, grid, reach=None):
     if not grid or grid <= 0:
         return value
     nearest = grid_line(value, grid)
+    if reach == FULL:
+        return nearest
     tol = grid / 5.0
     if reach is not None:
         tol = min(tol, reach)
@@ -330,7 +337,9 @@ def grid_capped(raw, grid, reach):
     (mm) before FreeCAD's fifth of the spacing, as a Result (its `grid`: the coordinates
     that snapped); None when both rules agree on this point (FreeCAD's own snap then
     places it, exactly)."""
-    if not grid or grid <= 0 or reach is None or reach >= grid / 5.0:
+    if not grid or grid <= 0 or reach is None:
+        return None
+    if reach != FULL and reach >= grid / 5.0:
         return None
     mine = (grid_snap(raw[0], grid, reach), grid_snap(raw[1], grid, reach))
     theirs = (grid_snap(raw[0], grid), grid_snap(raw[1], grid))
