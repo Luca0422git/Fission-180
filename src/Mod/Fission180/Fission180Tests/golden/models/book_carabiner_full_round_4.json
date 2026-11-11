@@ -1,0 +1,106 @@
+{
+  "id": "book_carabiner_full_round_4",
+  "title": "The Carabiner's 4 mm fillet on its 8 mm top face and the chamfer's top edges (it was held at 3.99)",
+  "tags": [
+    "fillet",
+    "book",
+    "robust",
+    "full-round"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "slot": [
+            -30,
+            0,
+            30,
+            0,
+            48
+          ]
+        },
+        {
+          "slot": [
+            -30,
+            0,
+            30,
+            0,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 8
+    },
+    {
+      "op": "blend_chamfer",
+      "id": "c1",
+      "distance": 2,
+      "faces": {
+        "type": "plane",
+        "normal": [
+          0,
+          0,
+          -1
+        ],
+        "count": 1
+      }
+    },
+    {
+      "op": "blend_fillet",
+      "id": "f1",
+      "radius": 4,
+      "edges": {
+        "any_of": [
+          {
+            "on_faces": {
+              "type": "plane",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "count": 1
+            }
+          },
+          {
+            "type": "line",
+            "at": {
+              "axis": "z",
+              "value": 2
+            }
+          },
+          {
+            "type": "circle",
+            "at": {
+              "axis": "z",
+              "value": 2
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "volume": 12883.655729,
+    "solids": 1,
+    "bbox": [
+      -54,
+      -24,
+      0,
+      54,
+      24,
+      8
+    ],
+    "rel_tol": 1e-06,
+    "source": "baseline-freecad-1.1.4",
+    "note": "book parity report, Project 5. An 8 x 8 section swept round a closed outline of two lines and two half circles (15722.48), the bottom chamfered 2 mm, then fillet 4 on the top face's two edge loops and the chamfer's two top edge loops. The two 4 mm rounds use up the 8 mm top face exactly: OpenCASCADE's fillet fails at 4.0 (3.99 builds), Fission 180 sweeps the second round's section (fillet_section.py). On the straight runs the two top rounds remove 2 * (16 - 4 pi) per mm exactly; round the bends a round's section sweeps a little more outside and less inside, so the whole is FreeCAD's number, checked against the 3.99 build (8.4 mm3 less removed)"
+  }
+}

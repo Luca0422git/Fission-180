@@ -862,6 +862,18 @@ def trial(kind, info, refs, options):
     from . import fillet_robust
 
     fillet_robust.reset()
+    # what another route made of this very blend a moment ago (the kernel can take ten
+    # seconds to give up on one run, and a dialog asks several times)
+    items = plain_items(kind, info, names, options)
+    if items:
+        from . import fillet_sets
+
+        try:
+            early = fillet_robust.first(kind, info.shape, items, None, fillet_sets.kernel_once)
+        except fillet_robust.Refused as refused:
+            raise BlendError(_refused_text(kind, info, items, refused, too_big(kind, label, size)))
+        if early is not None:
+            return early
     try:
         result = _build(kind, info.shape, edges, options)
     except Exception as exc:
@@ -919,9 +931,13 @@ def _another_route(kind, info, names, options, reason):
     try:
         return fillet_robust.retry(kind, info.shape, items, None, fillet_sets.kernel_once, reason)
     except fillet_robust.Refused as refused:
-        raise BlendError(
-            reason + fillet_robust.in_the_way(info.shape, refused.blockers, len(items), kind)
-        )
+        raise BlendError(_refused_text(kind, info, items, refused, reason))
+
+
+def _refused_text(kind, info, items, refused, reason):
+    from . import fillet_robust
+
+    return fillet_robust.refusal_text(info.shape, refused, len(items), kind, reason)
 
 
 def check_build(kind, info, refs, options):
@@ -967,9 +983,10 @@ def too_big(kind, label, size, exc=None):
     )
 
 
-def max_size(kind, info, refs, options, upper, budget=0.6):
-    """Largest size that still works (bisection with trial()), or None. Stops after
-    `budget` seconds: it is a hint for the message, not an exact limit."""
+def max_size(kind, info, refs, options, upper, budget=20.0):
+    """Largest size that still works (bisection with trial(): 14 halvings, the same on every
+    computer), or None. `budget` seconds are only a guard against a part on which a single
+    trial takes seconds (it was 0.6 s: a slow computer got another number)."""
     key = "radius" if kind == "fillet" else "distance"
     if kind == "chamfer" and options.get("chamfer_type") == "angle":
         return None

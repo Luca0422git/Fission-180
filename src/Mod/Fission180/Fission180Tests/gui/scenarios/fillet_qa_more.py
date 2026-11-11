@@ -369,9 +369,14 @@ def p18_done():
         fl.TypeId == "PartDesign::Fillet" and abs(fl.Radius.Value - 0.5) < 1e-9,
         fl.Label,
     )
+    # (wave 7) A typed sum is kept as typed, like Fusion keeps "9 * 1.02" in its box (the
+    # book parity report, line 2158; Autodesk's API: Parameter.expression), with the unit
+    # the box gave its bare number. It was evaluated once and dropped before builder
+    # params' change; this check then read "leaves no formula behind".
+    formula = dict(fl.ExpressionEngine).get("Radius", "")
     h.check(
-        "P18 a plain sum leaves no formula behind",
-        "Radius" not in dict(fl.ExpressionEngine),
+        "P18 the sum is kept as typed, and the radius follows it",
+        formula.replace(" ", "") in ("2mm*0.25", "2*0.25mm", "2*0.25"),
         fl.ExpressionEngine,
     )
 

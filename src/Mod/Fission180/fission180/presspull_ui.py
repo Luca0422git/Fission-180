@@ -453,6 +453,8 @@ class PressPullPanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             blend = core.owning_fillet(self.body, face, fission180=True)
             if blend is not None and self._start_blend_edit(blend, face):
                 return
+        if self.mode is None and self._start_thread_edit(face):
+            return
         distance = self.field.value() if self.mode == "faces" else 0.0
         name = core.match_pick(base.Shape, face, _local(obj, point), self.names, distance)
         if name is None:
@@ -568,6 +570,38 @@ class PressPullPanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             warn("press pull: could not remove the preview: %s" % exc)
         self.field_label.setText("Distance")
         self.schedule()
+
+    def _start_thread_edit(self, face):
+        """A face of a modeled thread was clicked (the book's Offset Face -0.25 mm on the
+        Geocache's thread, so the printed parts turn freely): the Thread step itself moves
+        its faces by the distance, all of them together, as Fusion's four thread faces move
+        (the kernel cannot offset the swept faces of a thread one by one). True when it
+        was one. Wave 7, builder modify-b; the rest of this dialog is not the thread's."""
+        from . import thread
+
+        step = None
+        try:
+            steps = [self.tip] + list(reversed(self.body.Group if self.body else []))
+            for one in steps:
+                if one is not None and thread.is_thread(one) and thread.own_face(one, face):
+                    step = one
+                    break
+        except Exception:
+            step = None
+        if step is None:
+            return False
+        self.target = step
+        self.mode = "edit_blend"
+        self.prop = "FaceOffset"
+        self.field_label.setText("Distance")
+        self.field.set_value(thread.face_offset(step))
+        self._show_formula(preview.formula_of(step, "FaceOffset"))
+        self.what.setText(
+            "Moving the faces of %s: all of the thread's faces move together, and it stays "
+            "one step in the timeline. A negative distance makes the thread looser." % step.Label
+        )
+        self.selection_field.set_text(step.Label)
+        return True
 
     def _start_blend_edit(self, blend, face=None):
         """Edit the size of the fillet / chamfer that made the clicked face; False when it
@@ -725,6 +759,8 @@ class PressPullPanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
                 self.dragger.set_distance(value)
         elif self.mode == "fillet":
             self.target.Radius = max(value, 0.01)
+        elif self.prop == "FaceOffset":  # a thread's faces: either way (modify-b)
+            self.target.FaceOffset = value
         else:
             setattr(self.target, self.prop, max(value, 0.01))
         self.schedule()
@@ -823,7 +859,9 @@ class PressPullPanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             info = blends.ShapeInfo(self.base.Shape)
             return info, list(self.names), {"radius": 1.0}, "fillet", "radius"
         target = self.target
-        if self.mode != "edit_blend" or target is None or not target.Base:
+        if self.mode != "edit_blend" or target is None or self.prop == "FaceOffset":
+            return None  # (FaceOffset: a thread's faces, its own refusal stays)
+        if not target.Base:
             return None
         if target.TypeId not in (blends.FILLET, blends.CHAMFER) or self.prop not in (
             "Radius",

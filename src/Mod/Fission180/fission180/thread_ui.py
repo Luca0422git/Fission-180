@@ -106,9 +106,9 @@ def design_standard(doc):
     """The thread standard a new thread starts with: Unified in a design in inches or feet,
     ISO metric otherwise (Fusion follows the design's units; the book's Fire Piston and
     Pizza Cutter are inch designs)."""
-    from . import browser_core
+    from . import design_units
 
-    return "ansi" if browser_core.doc_length_unit(doc) in ("in", "ft") else "iso"
+    return "ansi" if design_units.design_is_inch(doc) else "iso"
 
 
 class ThreadPanel(Panel):
@@ -527,7 +527,7 @@ class ThreadPanel(Panel):
         if c is None:
             self.info.setText("")
         else:
-            from . import browser_core
+            from . import design_units
 
             # in the design's units, like every value Fusion shows (it read "25.4 mm" in
             # the book's inch designs)
@@ -536,8 +536,8 @@ class ThreadPanel(Panel):
                 % (
                     "Inside" if c.internal else "Outside",
                     "⌀",
-                    browser_core.length_text(c.diameter, self.doc),
-                    browser_core.length_text(c.length, self.doc),
+                    design_units.length_text(c.diameter, self.doc),
+                    design_units.length_text(c.length, self.doc),
                 )
             )
         if self.base is None and self.target is None and not common.has_solid(self.doc):
@@ -1151,8 +1151,10 @@ class _AppWatch:
     def slotRedoDocument(self, doc):
         CosmeticThreads.schedule()
 
-    def slotFinishRestoreDocument(self, doc):
-        CosmeticThreads.schedule()  # a file opened with cosmetic threads in it
+    # (FreeCAD 1.1.4 never calls slotFinishRestoreDocument on a Python observer: the method
+    # that stood here was dead. A file opened with cosmetic threads in it is drawn by
+    # slotActivateDocument below (a design is activated when it has been loaded) and by the
+    # first recompute.)
 
     def slotDeletedDocument(self, doc):
         try:
@@ -1167,6 +1169,8 @@ class _AppWatch:
             CosmeticThreads.schedule()
 
     def slotActivateDocument(self, doc):
+        # also: a file that has just been opened (it is not Restoring any more when FreeCAD
+        # activates it; while it still is, the recompute that ends the loading draws them)
         CosmeticThreads.schedule()
 
 

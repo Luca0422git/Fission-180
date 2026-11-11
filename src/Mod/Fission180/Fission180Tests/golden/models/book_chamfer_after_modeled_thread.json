@@ -55,7 +55,7 @@
     }
   ],
   "expect": {
-    "volume": 29457.4696101,
+    "volume": 29457.43351,
     "solids": 1,
     "bbox": [
       -16.369936,
@@ -65,8 +65,8 @@
       16.369936,
       40
     ],
-    "rel_tol": 1e-06,
-    "source": "baseline-freecad-1.1.4",
-    "note": "the book's Geocache trick: the thread runs the whole shaft and the chamfer cuts through it. OpenCASCADE cannot chamfer the end of a threaded shaft; Fission 180 builds the bevel on the shaft under the thread and cuts the grooves again (fillet_robust.py). No hand formula for grooves cut by a cone: the number is what FreeCAD 1.1.4 gives, and the two models that reach it by different routes (the thread made first; the thread dragged before the chamfer) must agree. It is less than book_thread_stops_at_chamfer (29567.909): the grooves go on under the bevel"
+    "rel_tol": 2e-05,
+    "source": "analytic",
+    "note": "the book's Geocache trick: the thread runs the whole shaft and the chamfer cuts through it. OpenCASCADE cannot chamfer the end of a threaded shaft; Fission 180 builds the bevel on the shaft under the thread and cuts the grooves again (fillet_robust.py). V = the threaded shaft (book_thread_survives_deleted_chamfer: pi 16.5^2 40 - thread_core.class_removed_volume(M33x3.5, 6g) = 29665.152) - what the bevel takes of it: the bevel is 3 mm down the crest's cylinder (r = 16.36994, the 6g major radius) and 3 mm in on the end face, so at depth t under the end it reaches in to r - (3 - t); the threaded shaft's material between a radius c and the crest is, per unit length, the ring pi (r^2 - c^2) less the grooves' share (2 pi / P) * integral of rho w(rho) from c to r (w: the groove's width at that radius, thread_core._integral_rw; the same at every height because the groove goes round); integrated over the 3 mm: 207.719. V = 29457.434. FreeCAD 1.1.4 on Linux gives 29457.470 (1.2e-6 off: its swept faces), on Windows 29457.4; the tolerance is the one of the other swept-thread models (2e-5). The two models that reach it by different routes (the thread made first; the thread dragged before the chamfer) must agree"
   }
 }

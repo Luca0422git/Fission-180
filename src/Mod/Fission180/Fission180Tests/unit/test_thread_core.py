@@ -221,5 +221,75 @@ class HelixTests(unittest.TestCase):
         self.assertEqual(core.helix_points(3.0, 1.0, 5.0, 5.0), [])
 
 
+class MovedGrooveTests(unittest.TestCase):
+    """Offset Face on a modeled thread: every face of the groove moved (moved_groove) and its
+    open side put back past the crest (fitted_groove)."""
+
+    def area(self, corners):
+        total = 0.0
+        for i, (r0, z0) in enumerate(corners):
+            r1, z1 = corners[(i + 1) % len(corners)]
+            total += r0 * z1 - r1 * z0
+        return total / 2.0
+
+    def test_a_square_grows_by_the_distance_on_every_side(self):
+        square = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)]  # counter-clockwise
+        self.assertAlmostEqual(self.area(square), 4.0)
+        grown = core.moved_groove(square, 0.5)
+        self.assertAlmostEqual(self.area(grown), 9.0)
+        self.assertAlmostEqual(grown[0][0], -0.5)
+        self.assertAlmostEqual(grown[0][1], -0.5)
+        shrunk = core.moved_groove(square, -0.5)
+        self.assertAlmostEqual(self.area(shrunk), 1.0)
+
+    def test_the_iso_groove_of_m33(self):
+        pitch, major = 3.5, 16.5
+        groove = core.groove(major, pitch, False)
+        moved = core.moved_groove(groove, 0.25)
+        # the root (the groove's narrow side, nearest the axis) is 0.25 deeper
+        self.assertAlmostEqual(groove[0][0] - moved[0][0], 0.25)
+        # the 60 degree flanks move 0.25 square to themselves: at the root's level that is
+        # 0.25 / cos 30 along the axis, less what the deeper root takes back (0.25 tan 30)
+        wider = abs(moved[0][1]) - abs(groove[0][1])
+        self.assertAlmostEqual(
+            wider, 0.25 / math.cos(math.radians(30)) - 0.25 * math.tan(math.radians(30))
+        )
+        # and the flank still makes 30 degrees with the plane across the axis
+        dr, dz = moved[1][0] - moved[0][0], abs(moved[1][1]) - abs(moved[0][1])
+        self.assertAlmostEqual(math.degrees(math.atan2(dz, dr)), 30.0, 9)
+
+    def test_it_closes_up(self):
+        groove = core.groove(16.5, 3.5, False)
+        with self.assertRaises(ValueError):
+            core.moved_groove(groove, -1.0)  # the root is 0.875 wide: used up
+
+    def test_fitted_past_the_crest(self):
+        pitch, major = 3.5, 16.5
+        groove = core.moved_groove(core.groove(major, pitch, False), 0.25)
+        crest = major - 0.25
+        fitted = core.fitted_groove(groove, pitch, crest)
+        self.assertGreater(fitted[1][0], crest)  # it breaks through the crest
+        self.assertLessEqual(abs(fitted[1][1]), 0.499 * pitch + 1e-12)  # turns do not meet
+        self.assertEqual(fitted[0], groove[0])  # the root is left alone
+        # moved out (a tighter thread): the open side still reaches past the higher crest
+        tight = core.moved_groove(core.groove(major, pitch, False), -0.3)
+        fitted = core.fitted_groove(tight, pitch, major + 0.3)
+        self.assertGreater(fitted[1][0], major + 0.3)
+
+    def test_nothing_left_between_the_grooves(self):
+        pitch, major = 3.5, 16.5
+        groove = core.moved_groove(core.groove(major, pitch, False), 0.5)
+        with self.assertRaises(ValueError):
+            core.fitted_groove(groove, pitch, major - 0.5)
+
+    def test_a_holes_thread_opens_towards_the_axis(self):
+        pitch, major = 1.0, 3.0
+        groove = core.moved_groove(core.groove(major, pitch, True), 0.05)
+        minor = major - 2 * 0.625 * core.fundamental_height(pitch) / 2.0 - 0.3
+        fitted = core.fitted_groove(groove, pitch, minor + 0.35)
+        self.assertLess(fitted[0][0], minor + 0.35)
+        self.assertEqual(fitted[1], groove[1])
+
+
 if __name__ == "__main__":
     unittest.main()

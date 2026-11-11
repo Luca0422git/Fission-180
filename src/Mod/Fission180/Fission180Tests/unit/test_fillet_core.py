@@ -198,5 +198,65 @@ class SpecTests(unittest.TestCase):
             core.check_spec(bad)
 
 
+class SectionTests(unittest.TestCase):
+    """The cross-section fillet_section.py sweeps along an edge the kernel cannot blend."""
+
+    def test_chamfer_on_a_box_edge(self):
+        found = core.section("chamfer", math.pi / 2, 3.0, 4.0)
+        self.assertAlmostEqual(found["p1"][0], 3.0)
+        self.assertAlmostEqual(found["p1"][1], 0.0)
+        self.assertAlmostEqual(found["p2"][0], 0.0)
+        self.assertAlmostEqual(found["p2"][1], 4.0)
+        self.assertAlmostEqual(found["area"], 6.0)  # the 3-4 right triangle
+
+    def test_the_tensegrity_corner(self):
+        # the book's 20 mm chamfer in the arm's inner corner: the arm leans in an 8-15-17
+        # triangle (61.93 degrees); the bevel's triangle is 20 * 20 * sin / 2, and over
+        # the 6 mm edge that is 1058.82 mm3
+        gamma = math.atan2(15.0, 8.0)
+        found = core.section("chamfer", gamma, 20.0)
+        self.assertAlmostEqual(found["area"] * 6.0, 0.5 * 400.0 * (15.0 / 17.0) * 6.0)
+        self.assertAlmostEqual(math.hypot(*found["p2"]), 20.0)
+
+    def test_fillet_on_a_box_edge(self):
+        found = core.section("fillet", math.pi / 2, 2.0)
+        self.assertAlmostEqual(found["p1"][0], 2.0)  # touches each face R from the corner
+        self.assertAlmostEqual(found["p2"][1], 2.0)
+        self.assertAlmostEqual(found["center"][0], 2.0)
+        self.assertAlmostEqual(found["center"][1], 2.0)
+        self.assertAlmostEqual(found["area"], 4.0 - math.pi)  # the square less the quarter disc
+        # the arc's point nearest the corner is R from the centre, on the diagonal
+        middle, center = found["middle"], found["center"]
+        self.assertAlmostEqual(math.hypot(middle[0] - center[0], middle[1] - center[1]), 2.0)
+        self.assertAlmostEqual(middle[0], middle[1])
+
+    def test_fillet_in_a_sharp_and_a_wide_corner(self):
+        for degrees in (30.0, 61.93, 118.07, 150.0):
+            gamma = math.radians(degrees)
+            found = core.section("fillet", gamma, 5.0)
+            reach = 5.0 / math.tan(gamma / 2)
+            self.assertAlmostEqual(found["p1"][0], reach)
+            self.assertAlmostEqual(math.hypot(*found["p2"]), reach)
+            # tangent to both faces: the centre is R from each
+            cx, cy = found["center"]
+            self.assertAlmostEqual(cy, 5.0)
+            across = (-math.sin(gamma), math.cos(gamma))
+            self.assertAlmostEqual(abs(cx * across[0] + cy * across[1]), 5.0)
+            self.assertGreater(found["area"], 0.0)
+        # a sharper corner needs more room along the faces for the same radius
+        sharp = core.section("fillet", math.radians(30), 5.0)["p1"][0]
+        wide = core.section("fillet", math.radians(150), 5.0)["p1"][0]
+        self.assertGreater(sharp, wide)
+
+    def test_refusals(self):
+        for bad in (0.0, math.pi, -1.0):
+            with self.assertRaises(core.SetError):
+                core.section("chamfer", bad, 1.0)
+        with self.assertRaises(core.SetError):
+            core.section("fillet", 1.0, 0.0)
+        with self.assertRaises(core.SetError):
+            core.section("chamfer", 1.0, 1.0, -2.0)
+
+
 if __name__ == "__main__":
     unittest.main()
