@@ -378,11 +378,19 @@ def ensure_body():
         _MADE_BODY.pop(doc.Name, None)  # an existing body: nothing to take back on Cancel
         return body
     component = components.active_component(doc)  # the new body goes in here
+    # (wave 7, replay-d) FreeCAD's Body command takes a selected feature as the new body's
+    # base, and a PartDesign feature selected there stopped everything with its modal "Bad
+    # base feature: A body cannot be based on a Part Design feature" (the Hot End's Offset
+    # Plane, a new component active): it runs with nothing selected, the selection is put
+    # back for the command that asked (Create Sketch reads it afterwards)
+    held = _hold_selection()
     try:
         Gui.runCommand("PartDesign_Body")
         body = active_body()
     except Exception:
         body = None
+    finally:
+        _give_back_selection(held)
     if body is None:
         body = doc.addObject("PartDesign::Body", "Body")
         doc.recompute()
@@ -404,6 +412,29 @@ def ensure_body():
     except Exception:
         pass
     return body
+
+
+def _hold_selection():
+    """The selection as FreeCAD keeps it (whole paths from the top), then cleared."""
+    held = []
+    try:
+        for sel in Gui.Selection.getSelectionEx("", 0):
+            subs = list(sel.SubElementNames) or [""]
+            held.append((sel.DocumentName, sel.ObjectName, subs))
+        if held:
+            Gui.Selection.clearSelection()
+    except Exception as exc:
+        warn("could not set the selection aside: %s" % exc)
+    return held
+
+
+def _give_back_selection(held):
+    for doc_name, obj_name, subs in held:
+        for sub in subs:
+            try:
+                Gui.Selection.addSelection(doc_name, obj_name, sub)
+            except Exception:
+                pass
 
 
 _MADE_BODY = {}  # design name -> (name of the body ensure_body() made, its undo step's name)
