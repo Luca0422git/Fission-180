@@ -17,6 +17,7 @@ from . import commands, components, log, taskui, ui_icon_path, warn
 from .compat import QtCore, QtWidgets
 
 ISOLATED = {}  # document name -> names of the bodies / components Isolate hid
+ISOLATE_TARGETS = {}  # document name -> names of the bodies / components it was asked for
 
 
 def _browser_refresh():
@@ -72,12 +73,33 @@ def isolate(obj):
         if shown.ViewObject is not None and not shown.ViewObject.Visibility:
             shown.ViewObject.Visibility = True
     ISOLATED[doc.Name] = hidden
+    ISOLATE_TARGETS[doc.Name] = [obj.Name]
     log("%s isolated (%d hidden)" % (obj.Label, len(hidden)))
+
+
+def is_isolate_target(doc, obj):
+    """True when Isolate is on for `obj`: it, something around it or something inside it
+    was isolated (its menu then offers Exit Isolate). False for everything else, also for
+    something made after the Isolate. With no record (an Isolate from before this was
+    kept): True, as before."""
+    names = ISOLATE_TARGETS.get(doc.Name if doc is not None else None)
+    if not ISOLATED.get(doc.Name if doc is not None else None):
+        return False
+    if not names:
+        return True
+    for name in names:
+        target = doc.getObject(name)
+        if target is None:
+            continue
+        if obj is target or components.is_inside(obj, target) or components.is_inside(target, obj):
+            return True
+    return False
 
 
 def unisolate(doc):
     if doc is None:
         return
+    ISOLATE_TARGETS.pop(doc.Name, None)
     for name in ISOLATED.pop(doc.Name, []):
         obj = doc.getObject(name)
         if obj is not None and obj.ViewObject is not None:

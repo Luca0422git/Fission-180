@@ -822,7 +822,7 @@ def starts_in_material(profiles, options, lead=None):
         if not profiles or options["direction"] == "symmetric":
             return False
         candidates = candidate_bodies(profiles[0][0].Document, lead)
-        # FISSION180 wave 7 (bug 10): only material of the active component proposes a Cut
+        # (wave 7, bug 10) only material of the active component proposes a Cut
         keep = _joinable([body for body, _shape in candidates], lead)
         candidates = [c for c in candidates if c[0] in keep]
         if not candidates:

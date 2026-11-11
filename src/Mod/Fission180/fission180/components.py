@@ -558,6 +558,10 @@ def place(obj, component, keep_position=True):
     except Exception as exc:
         warn("%s: could not keep its position: %s" % (obj.Label, exc))
     _carry_decals(obj)
+    if is_body(obj) and component is not None and not is_unused(obj):
+        # the body with the part arrived: an empty body Fission 180 made there for a sketch
+        # that went elsewhere is not left behind (it would take the next sketch)
+        drop_unused_bodies(component, keep=obj)
     log("%s moved to %s" % (obj.Label, component.Label if component is not None else "the root"))
     return True
 
@@ -784,7 +788,46 @@ def preferred_body(doc, component):
         if is_body(body) and container_of(body) is component:
             return body
     found = bodies_in(doc, component)
+    if len(found) > 1:
+        # (wave 7) a body with something in it before an older body that is still empty
+        # (one made for a sketch that was never drawn): new work joined the empty one,
+        # beside the part it was meant for
+        used = [b for b in found if not is_unused(b)]
+        if used:
+            return used[0]
     return found[0] if found else None
+
+
+def is_unused(body):
+    """True for a body nothing was ever put in: no sketch, no step, no construction (only
+    its origin). Fission 180 makes one when a command needs a body in the active component;
+    it has no row in the browser."""
+    try:
+        if not is_body(body) or body.BaseFeature is not None:
+            return False
+        return not any(o.TypeId != "App::Origin" for o in body.Group)
+    except Exception:
+        return False
+
+
+def drop_unused_bodies(component, keep=None):
+    """Remove the bodies of a component that nothing was ever put in (is_unused), except
+    ``keep``: after a body with the real part was moved in beside one (book parity report:
+    Move to Component "leaves an empty, invalid Body behind"). Returns how many went."""
+    if component is None:
+        return 0
+    gone = 0
+    for body in list(bodies_in(component.Document, component)):
+        if body is keep or not is_unused(body):
+            continue
+        try:
+            name = body.Name
+            body.removeObjectsFromDocument()
+            component.Document.removeObject(name)
+            gone += 1
+        except Exception as exc:
+            warn("could not remove the empty body %s: %s" % (body.Label, exc))
+    return gone
 
 
 def editable(component):
