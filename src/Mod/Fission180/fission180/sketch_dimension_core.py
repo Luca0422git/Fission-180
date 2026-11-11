@@ -6,13 +6,12 @@ Fusion's Sketch Dimension (D): pick one or two things, move the pointer, click t
 dimension, type its value. What dimension it is follows from what was picked and from where
 the pointer is:
 
-- one line: its length. A slanted line: the ALIGNED length while the pointer is beside the
-  line, the horizontal distance when it is past the line's ends above or below, the vertical
-  one when it is past them to the left or right (Autodesk blog "Quick tip: aligned
-  dimensions"; the exact zones are Fission 180's);
+- one line: its length. A slanted line: the ALIGNED length while the pointer is inside the
+  box its two ends span, the horizontal distance once the pointer leaves that box above or
+  below, the vertical one once it leaves it to the left or right (linear_kind, its sources);
 - a circle: its diameter; an arc: its radius;
 - two points (or a point and a circle's centre): aligned / horizontal / vertical the same way;
-- a point and a line, two parallel lines: the distance between them;
+- a point and a line, two parallel lines: the distance between them, square to the line;
 - two lines that are not parallel: the angle of the sector the pointer is in;
 - a line (or point) and a CENTERLINE: the diameter (twice the distance), as Fusion does for
   revolve profiles (Autodesk blog "Mastering Sketch Dimensions").
@@ -45,12 +44,34 @@ def _cross(a, b):
 
 
 def linear_kind(a, b, cursor):
-    """ALIGNED, HORIZONTAL or VERTICAL for the distance between points a and b with the
-    pointer at `cursor`. Points level with or upright above each other: always ALIGNED (it
-    is the same number). Straight above or below the box of the two points: HORIZONTAL;
-    straight left or right of it: VERTICAL. Else ALIGNED while the pointer is beside the
-    stretch between the two points (inside their box, or in a corner between the two
-    perpendiculars through them), and past them HORIZONTAL or VERTICAL by the farther side."""
+    """ALIGNED, HORIZONTAL or VERTICAL for the distance between points a and b (a line's two
+    ends, or two points picked) with the pointer at `cursor`, the way Fusion picks it:
+
+    - inside the box the two points span: ALIGNED (the true length);
+    - out of that box above or below it: HORIZONTAL; out of it to the left or right:
+      VERTICAL; out past a corner: the side the pointer is farther out of;
+    - two points level with or upright above each other: always ALIGNED (the same number).
+
+    Sources (wave 7, fix-5: sketch-b's "aligned beside the line, between the perpendiculars
+    through its ends" and replay-c's "straight beside two points is vertical" were two
+    guesses that the book's steps pulled apart): Autodesk forum "aligned dimensions"
+    (Inventor forum, the same Autodesk sketch dimension): "the dimension orients as aligned
+    when the cursor is within the bounding box of the end points, then changes to horizontal
+    or vertical when outside the box", easy on a 45 degree line, "really difficult" close to
+    level or upright; Autodesk support "How to create an aligned dimension in a part sketch
+    in Inventor": the middle of the line aligned, up or down horizontal, left or right
+    outside the line's space vertical; Autodesk forum "Dimension diagonal line" (Fusion): the
+    type follows zones while the text is dragged, "the aligned zone can be quite small" for a
+    nearly level or upright line, a short move to one side of the line gives the aligned one
+    before the horizontal or vertical one shows; Fusion blog "Quick tip: aligned dimensions"
+    (aligned while the pointer is near the line) and "Mastering Sketch Dimensions: 5
+    Essential Right-Click Tricks" (the pointer decides, hard with little horizontal or
+    vertical offset: right-click > Aligned / Horizontal / Vertical forces one, which the tool
+    does before asking this). Guess: a corner by the farther side.
+
+    A point and a line never come here: Fusion's dimension between them is the distance
+    square to the line whatever the pointer does (Fusion API: SketchOffsetDimension, "measured
+    perpendicular to the line")."""
     d = _sub(b, a)
     length = _len(d)
     if length < EPS:
@@ -59,23 +80,6 @@ def linear_kind(a, b, cursor):
         return ALIGNED
     out_x = max(min(a[0], b[0]) - cursor[0], cursor[0] - max(a[0], b[0]), 0.0)
     out_y = max(min(a[1], b[1]) - cursor[1], cursor[1] - max(a[1], b[1]), 0.0)
-    # (wave 7, the book replay: the Play Brick's stud, "3.9 from the origin" twice) Straight
-    # to the left or right of the two points, at a height between them, is the VERTICAL
-    # distance, and straight above or below is the HORIZONTAL one, however near: that is
-    # where a person puts those two dimensions. (It was the aligned length until the pointer
-    # was past the perpendiculars through the points, so the brick's second 3.9 became a
-    # slanted 3.9. Autodesk forum "Dimension diagonal line": the aligned zone of a nearly
-    # upright line "can be quite small", as this one is: the box of the two points and the
-    # corners square to the line.)
-    if out_x > 0.0 and out_y == 0.0:
-        return VERTICAL
-    if out_y > 0.0 and out_x == 0.0:
-        return HORIZONTAL
-    u = (d[0] / length, d[1] / length)
-    mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
-    along = _dot(_sub(cursor, mid), u)
-    if abs(along) <= length / 2.0:
-        return ALIGNED
     if out_x == 0.0 and out_y == 0.0:
         return ALIGNED
     return HORIZONTAL if out_y >= out_x else VERTICAL
