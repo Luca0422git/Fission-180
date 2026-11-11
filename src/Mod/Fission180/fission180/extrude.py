@@ -1824,7 +1824,7 @@ def _apply(feature, body, profiles, options, refs):
                 options["object_offset2"],
             )
         _fp_thin(feature, options)
-        feature.Refine = True
+        _refine(feature)
         return
     cut = feature.TypeId == "PartDesign::Pocket"
     feature.SideType = side_type
@@ -1844,9 +1844,24 @@ def _apply(feature, body, profiles, options, refs):
     native = _native_normal(feature)
     feature.Reversed = (want * sign).dot(native) < 0
     if hasattr(feature, "Refine"):
-        feature.Refine = True
+        _refine(feature)
     if hasattr(feature, "AllowMultiFace"):
         feature.AllowMultiFace = True
+
+
+def _refine(feature):
+    """Refine on, as every step has it (Fusion shows no seam where two faces lie in one
+    plane), unless it was switched off to keep a Split Face before this step split
+    (split_face.keep_splits): writing the step again from the dialog must not merge the
+    split, to have it found and switched once more at every change."""
+    try:
+        from . import split_face
+
+        if split_face.kept_unrefined(feature):
+            return
+    except Exception:
+        pass
+    feature.Refine = True
 
 
 def _fp_side(feature, suffix, extent, length, taper, ref, extend="", offset=0.0):
