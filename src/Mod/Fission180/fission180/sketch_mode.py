@@ -2303,6 +2303,7 @@ class _ViewFilter(QtCore.QObject):
         self.right_pressed = None
         self.refused_release = False  # the release of a refused Project click
         self.chain_double = False  # a double-click's press on the line chain's end
+        self.placing = None  # the view's pick radius, shrunk while a dimension is placed
 
     def eventFilter(self, obj, event):
         try:
@@ -2392,6 +2393,9 @@ class _ViewFilter(QtCore.QObject):
                 return True
             if kind == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
                 session.open_spline_step()  # (FreeCAD's spline tool: the points' undo step)
+                self._placing_dimension(obj, event)
+            elif kind == QtCore.QEvent.MouseButtonRelease and self.placing is not None:
+                QtCore.QTimer.singleShot(0, self._placed)
             # Fusion's inference (sketch_infer.py) may hand FreeCAD a copy of the event
             # with the point moved onto a guide; the copy comes back through here.
             if session.infer is not None and session.infer.mouse(obj, event):
@@ -2448,6 +2452,61 @@ class _ViewFilter(QtCore.QObject):
         except Exception as exc:
             warn("sketch view: %s" % exc)
         return False
+
+    def _placing_dimension(self, obj, event):
+        """A left press while FreeCAD's Dimension tool runs: when it places the dimension
+        (sketch_select_core.places_dimension) FreeCAD must find nothing under the pointer,
+        or it takes the click for one more pick. The view's pick radius is shrunk to
+        nothing until the release is handled, and FreeCAD is shown the pointer once more
+        (a move), so that what it had lit goes dark."""
+        if self.placing is not None:
+            return
+        session = self.session
+        try:
+            from . import recent
+            from . import sketch_select_core
+
+            if recent.running_tool() not in DIMENSION_COMMANDS or not session.drawing_cursor():
+                return
+            sketch = session.sketch
+            preview = len(sketch.Constraints) > session.constraint_count
+            picked = sum(
+                len(sel.SubElementNames)
+                for sel in Gui.Selection.getSelectionEx()
+                if sel.Object is sketch
+            )
+            pre = Gui.Selection.getPreselection()
+            under = []
+            if getattr(pre, "ObjectName", "") == session.name:
+                under = [n.rsplit(".", 1)[-1] for n in (pre.SubElementNames or ()) if n]
+            if not under or not sketch_select_core.places_dimension(preview, picked, under):
+                return
+            viewer = session.view.getViewer()
+            self.placing = (viewer, viewer.getPickRadius())
+            viewer.setPickRadius(0.01)
+            move = QtGui.QMouseEvent(
+                QtCore.QEvent.MouseMove,
+                event.position(),
+                event.globalPosition(),
+                QtCore.Qt.NoButton,
+                QtCore.Qt.NoButton,
+                event.modifiers(),
+            )
+            QtWidgets.QApplication.sendEvent(obj, move)
+            log("dimension: the click places it (not a pick of %s)" % ", ".join(under))
+        except Exception as exc:
+            self._placed()
+            warn("dimension placement: %s" % exc)
+
+    def _placed(self):
+        placing, self.placing = self.placing, None
+        if placing is None:
+            return
+        try:
+            viewer, radius = placing
+            viewer.setPickRadius(radius)
+        except Exception as exc:
+            warn("dimension placement: %s" % exc)
 
 
 _PRESSES = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)

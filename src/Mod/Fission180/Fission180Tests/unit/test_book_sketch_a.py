@@ -130,6 +130,28 @@ class ClickRule(unittest.TestCase):
         self.assertEqual(got, ["Constraint2", "Constraint3"])
 
 
+class DimensionPlacement(unittest.TestCase):
+    def test_nothing_to_place_yet(self):
+        self.assertFalse(select.places_dimension(False, 0, ["Edge1"]))
+        self.assertFalse(select.places_dimension(False, 1, ["H_Axis"]))
+
+    def test_one_pick_then_a_curve_is_a_second_pick(self):
+        self.assertFalse(select.places_dimension(True, 1, ["Edge2"]))
+        self.assertFalse(select.places_dimension(True, 1, ["Vertex3"]))
+        self.assertFalse(select.places_dimension(True, 1, ["RootPoint"]))
+
+    def test_one_pick_then_an_axis_places(self):
+        self.assertTrue(select.places_dimension(True, 1, ["V_Axis"]))
+        self.assertTrue(select.places_dimension(True, 1, ["H_Axis"]))
+
+    def test_two_picks_then_anything_places(self):
+        self.assertTrue(select.places_dimension(True, 2, ["Edge2"]))
+        self.assertTrue(select.places_dimension(True, 2, ["Constraint4"]))
+
+    def test_empty_space_places(self):
+        self.assertTrue(select.places_dimension(True, 1, []))
+
+
 class Centerline(unittest.TestCase):
     def test_mirror_across_a_level_line(self):
         self.assertEqual(centerline.mirror((30.0, 10.0), (0.0, 0.0), (30.0, 0.0)), (30.0, -10.0))
