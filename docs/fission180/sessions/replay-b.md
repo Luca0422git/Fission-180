@@ -73,6 +73,36 @@ Book steps that are not what the report did, with the reason:
   rim came within 0.45 mm of the spoke's side and the 0.5 mm chamfer of every edge was held
   at 0.25).
 
+## Tests
+
+- Replays: `replay_03_surfboard` 163 checks PASS, `replay_04_tensegrity` 120 PASS,
+  `replay_05_carabiner` 17 PASS (the path only).
+- Older scenarios of the files changed, each run once, all PASS: `selection_box` 47,
+  `selection_filters` 76, `book_modifyb_tensegrity` 25 (now with all 98 edges),
+  `book_extrude_operation` 74, `book_extrude_loft` 27, `book_sketch_a_line` 36,
+  `book_sketch_b_dimension_edge` 21, `sketch_modify_panels` 101, `book_sketch_a_project` 17,
+  `fillet2_chamfer` 37, `book_extrude2_across` 37; after the last extrude change again: `book_extrude_operation` 74, `replay_03_surfboard` 163, `replay_04_tensegrity` 120.
+- Unit: 3681 run, the one known failure only (`test_vex_qa_freecad`
+  "parts_list_assembly_twice", not this builder's). New: `test_extrude_beside_freecad`
+  (headless `extrude_beside_check`, 17 checks).
+- Golden: 649 pass, 2 xfail (as on develop). The first run found three regressions of the
+  side-by-side Join (an edge-touching neighbour merged; two thin extrudes split in two):
+  fixed in `f034d34e`.
+
+## Functions changed (shared files)
+
+`loft_ui`: `LoftPanel._origin_dot`, `_pressed`, `_origin_clicked`, `_watch`, `_unwatch`,
+`_selection_changed`, `shown_label`, `profile_text`, `_picked` (message);
+`profile_pick.origin_dot_point`; `timeline_ops.shown_label`; `sketch_tools_ui`:
+`SketchIntersect.run`, `SketchProject.run`, `SketchInclude3D.run`, `WatchedTool.stop`,
+`_PlaneClicks`, `_through_glyphs`, `_GlyphClicks`; `extrude_bodies`: `bodies_in_way`,
+`in_the_way`, `_same_surface`, `_lies_on`, `_curve_contact`, `_edge_points`, `beside`,
+`join_shape`, `joins_beside`, `_within_reach`; `extrude`: `ExtrudeFeature.execute`,
+`_structure`; `sketch_project_across.element_at`, `_element_of`, `_is_glyph_info`;
+`fillet_ui`: `BlendPanel._mouse_event`, `_behind_glyph`, `_released`, `cleanup`,
+`_GlyphRelease`; `selection_core.DEFAULT_SELECT_THROUGH`; `sketch_line`:
+`LineChain._tool_running`, `_ends_on_geometry`.
+
 ## Facts found on the way
 
 - `addExternal(datum_plane, "", True, True)` fails ("Not able to add external shape element
