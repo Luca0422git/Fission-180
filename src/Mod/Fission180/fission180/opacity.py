@@ -155,12 +155,22 @@ def _views(obj):
 
 
 def _show(obj, transparency):
+    changed = False
     for vobj in _views(obj):
         try:
             if int(vobj.Transparency) != transparency:
                 vobj.Transparency = transparency
+                changed = True
         except Exception:
             continue
+    if changed and bodies.is_body(obj):
+        # the pattern of a textured look is drawn as see-through as the body
+        try:
+            from . import appearance
+
+            appearance.apply(obj)
+        except Exception as exc:
+            warn("opacity: %s" % exc)
 
 
 def preview(objects, value):

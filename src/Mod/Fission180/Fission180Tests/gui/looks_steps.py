@@ -334,3 +334,17 @@ def click_group_tick(group):
         QtWidgets.QStyle.CC_GroupBox, option, QtWidgets.QStyle.SC_GroupBoxCheckBox, group
     )
     w.click(group, rect.center())
+
+
+def pattern_uvs(step):
+    """The texture coordinates drawn on a step: [(u, v)] in repeats of the pattern."""
+    from fission180 import appearance_draw
+
+    return appearance_draw.uvs(step)
+
+
+def pattern_transparency(step):
+    from fission180 import appearance_draw
+
+    value = appearance_draw.transparency(step)
+    return -1.0 if value is None else value

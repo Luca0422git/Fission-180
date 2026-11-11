@@ -323,3 +323,38 @@ def drawn(step):
 def forget(doc_name):
     for key in [k for k in _STAMPS if k[0] == doc_name]:
         _STAMPS.pop(key, None)
+
+
+def _groups(step):
+    """The Coin separators of the patterns drawn on a step."""
+    try:
+        flat = _flat_root(step.ViewObject)
+        index = _existing(flat) if flat is not None else -1
+        if index < 0:
+            return []
+        holder = flat.getChild(index)
+        found = [holder.getChild(i) for i in range(holder.getNumChildren())]
+        return [node for node in found if _type(node) == "Separator"]
+    except Exception:
+        return []
+
+
+def uvs(step):
+    """Every texture coordinate (u, v) drawn on a step, all patterns (tests)."""
+    out = []
+    for group in _groups(step):
+        for i in range(group.getNumChildren()):
+            node = group.getChild(i)
+            if _type(node) == "TextureCoordinate2":
+                out += [tuple(p.getValue()) for p in node.point.getValues()]
+    return out
+
+
+def transparency(step):
+    """How see-through the first pattern on a step is drawn (0..1), or None (tests)."""
+    for group in _groups(step):
+        for i in range(group.getNumChildren()):
+            node = group.getChild(i)
+            if _type(node) == "Material":
+                return float(node.transparency[0])
+    return None
