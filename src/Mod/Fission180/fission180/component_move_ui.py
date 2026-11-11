@@ -354,8 +354,36 @@ class ComponentMovePanel(MovePanel):
         except Exception as exc:
             warn("Move: %s" % exc)
 
+    def _cancel_paste(self):
+        """(wave 7, components-2) Cancel or Esc in the Move that opened after a Paste takes
+        the pasted copy away again: in Fusion, cancelling cancels the Paste, not only the
+        Move (Autodesk community manager, forum "Comportement of the C/P Cancel button").
+        Before, the copy stayed, standing exactly on the one it was copied from, where
+        nobody sees it. ``self.pasted``: (the paste's undo step, the pasted names), set by
+        clipboard_ui."""
+        pasted = getattr(self, "pasted", None)
+        if not pasted:
+            return
+        self.pasted = None
+        step, names = pasted
+        try:
+            doc = self.doc
+            if not any(doc.getObject(n) is not None for n in names):
+                return
+            if list(doc.UndoNames or [])[:1] != [step]:
+                return  # something else was done since: the paste stays (Undo takes it)
+            doc.undo()
+            doc.recompute()
+            from . import commands
+
+            commands.tell("%s cancelled: the copy was removed." % step)
+        except Exception as exc:
+            warn("could not take the pasted copy away: %s" % exc)
+
     def after_close(self, ok):
         super().after_close(ok)
+        if not ok:
+            self._cancel_paste()
         if ok:
             log(
                 "%s moved%s"

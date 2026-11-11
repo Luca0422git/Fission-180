@@ -46,6 +46,7 @@ COMPONENT_TYPE = "Component"
 
 # component name -> name of the body that was last active in it (per document)
 _last_body = {}
+_chosen = {}  # design name -> Name of the component the person made active (None: the root)
 
 
 # -- reading the tree ------------------------------------------------------------------------
@@ -374,6 +375,47 @@ def may_change(body, doc=None, lead=None):
     except Exception:
         return True
     return False
+
+
+def home_text(body, doc=None):
+    """How a dialog names a body: "Body1", or "Body1 (Base)" when the body is in another
+    component than the active one (every component has a Body1), "Body1 (the design)" for a
+    body at the root while a component is active."""
+    try:
+        if in_active(body, doc):
+            return body.Label
+        home = container_of(body)
+        return "%s (%s)" % (body.Label, home.Label if home is not None else "the design")
+    except Exception:
+        return getattr(body, "Label", "")
+
+
+def outside_note(body, what="step", doc=None):
+    """What a dialog says when the body it is about to change is outside the active
+    component (not in it, nor in a component inside it), or "" (wave 7, components-2).
+    Fusion changes the body picked, whichever component is active (Hole, Cut, Fillet,
+    Shell, Combine, the PLASTIC tools); the step then belongs to that body's component
+    here (FreeCAD keeps a step inside its body), so it does not show in the active
+    component's timeline: said, never silent. With the design itself active every step
+    shows, so there is nothing to say."""
+    try:
+        if body is None or not App.GuiUp:
+            return ""
+        doc = doc or body.Document
+        active = active_component(doc)
+        if active is None:
+            return ""
+        home = container_of(body)
+        if home is active or (home is not None and is_inside(home, active)):
+            return ""
+        return "%s is in %s, not in the active component %s: the %s changes it there." % (
+            body.Label,
+            home.Label if home is not None else "the design",
+            active.Label,
+            what,
+        )
+    except Exception:
+        return ""
 
 
 def whole_pick(root, sub):
@@ -802,13 +844,43 @@ def active_body(doc=None):
 
 
 def active_component(doc=None):
-    """The active component (None: the root). The active body's container decides when
-    a body is active (FreeCAD only sets the "part" slot from its own tree), else the "part"
-    slot."""
+    """The active component (None: the root): the one the PERSON made active (the ring on
+    its browser row, Activate, New Component, a body activated in the browser, an edited
+    step's), remembered per design (wave 7, components-2). Until one was chosen: the active
+    body's container when a body is active (FreeCAD only sets the "part" slot from its own
+    tree), else the "part" slot; what is found is then the choice.
+
+    Before, the active body alone decided, and many commands make the body they were aimed
+    at the active body (Shell, Hole, Thread, Fillet, a Cut): a hole drilled into a part of
+    another component silently made that component the active one. Fusion never changes
+    the active component because of what a command was aimed at."""
     if doc is None:
         doc = App.ActiveDocument
     if doc is None:
         return None
+    try:
+        name = doc.Name
+    except Exception:
+        return None
+    if App.GuiUp and name in _chosen:
+        wanted = _chosen[name]
+        if wanted is None:
+            return None
+        try:
+            part = doc.getObject(wanted)
+        except Exception:
+            part = None
+        if part is not None and alive(part) and is_component(part):
+            return part
+        _chosen.pop(name, None)  # it is gone (deleted, undone): found again below
+    found = _derived_component(doc)
+    if App.GuiUp and _view(doc) is not None:
+        _chosen[name] = found.Name if found is not None else None
+    return found
+
+
+def _derived_component(doc):
+    """The active component as FreeCAD's slots give it (see active_component)."""
     body = active_body(doc)
     if body is not None:
         return container_of(body)
@@ -830,6 +902,121 @@ def _set_slot(doc, slot, obj):
         view.setActiveObject(slot, obj)
     except Exception as exc:
         warn("could not set the active %s: %s" % (slot, exc))
+
+
+def _choose(doc, component):
+    """The person's choice of active component (None: the root); see active_component."""
+    try:
+        _chosen[doc.Name] = component.Name if component is not None else None
+    except Exception:
+        pass
+
+
+def working_elsewhere(doc=None):
+    """The active body when it is NOT in the active component: a command made the body it
+    was aimed at the active one (Shell, Hole, Thread, a Cut of another component's part).
+    None otherwise."""
+    doc = doc or App.ActiveDocument
+    if doc is None or not App.GuiUp:
+        return None
+    try:
+        body = active_body(doc)
+        if body is not None and container_of(body) is not active_component(doc):
+            return body
+    except Exception:
+        pass
+    return None
+
+
+def outside_tips(doc=None):
+    """{body name: name of its last step} of the bodies that are NOT in the active
+    component: taken when a dialog opens, so that its close can tell which of them the
+    command changed (settle_active). {} without components (nothing is outside)."""
+    doc = doc or App.ActiveDocument
+    found = {}
+    if doc is None or not App.GuiUp:
+        return found
+    try:
+        if not list_components(doc):
+            return found
+        active = active_component(doc)
+        if active is None:
+            return found  # the design is active: every step shows in its timeline
+        for body in of_type(doc, BODY):
+            home = container_of(body)
+            if home is not active and not (home is not None and is_inside(home, active)):
+                tip = body.Tip
+                found[body.Name] = tip.Name if tip is not None else None
+    except Exception:
+        pass
+    return found
+
+
+def _changed_outside(doc, before):
+    """The first body outside the active component whose last step is not the one in
+    ``before`` (outside_tips at the dialog's start); (body, True) for a body that is new."""
+    try:
+        now = outside_tips(doc)
+        for name, tip in now.items():
+            if name in before and before[name] != tip:
+                return doc.getObject(name), False
+        for name in now:
+            if name not in before:
+                return doc.getObject(name), True
+    except Exception:
+        pass
+    return None, False
+
+
+def settle_active(doc=None, say=False, before=None):
+    """After a command (called when a dialog closes, and before the next command starts):
+    give the active component its own body back as the active body when the command made a
+    body of another component its work body, and, with ``say`` (the step was kept), tell
+    next to the mouse that a body which is not in the active component was changed
+    (``before``: outside_tips() from the dialog's start, so commands that never touch the
+    active body are told too: Combine, Split Body, Mirror, Press Pull). The step of such a
+    change is in that body's component here, so it does not show in the active
+    component's timeline: never silent. Returns the body named, or None."""
+    doc = doc or App.ActiveDocument
+    body = working_elsewhere(doc)
+    component = active_component(doc) if body is not None else None
+    if body is not None:
+        try:
+            _set_slot(doc, "part", component)
+            _set_slot(doc, "pdbody", preferred_body(doc, component))
+        except Exception as exc:
+            warn("could not give the active component its body back: %s" % exc)
+    if not say:
+        return body
+    try:
+        from . import commands
+
+        fresh = False
+        if before is not None:
+            changed, fresh = _changed_outside(doc, before)
+            if changed is not None or body is None:
+                body = changed
+        if body is None:
+            return None
+        if fresh:
+            home = container_of(body)
+            active = active_component(doc)
+            text = ""
+            if active is not None:
+                text = (
+                    "The new body %s is in %s, beside the body it was made from (not in "
+                    "the active component %s)."
+                    % (body.Label, home.Label if home is not None else "the design", active.Label)
+                )
+        else:
+            text = outside_note(body, "step", doc)
+            if text:
+                text += " Activate it there to see the step in its timeline."
+        if text:
+            commands.tell(text)
+    except Exception:
+        pass
+    return body
 
 
 def remember(body):
@@ -905,6 +1092,11 @@ def editable(component):
             source = instances.source_of(component)
             if source is not None:
                 return source
+        # (wave 7, components-2) a component inside a copy of a subassembly: the nested
+        # component of the original it stands for
+        original = instances.nested_source(component)
+        if original is not None:
+            return editable(original)
     except Exception:
         pass
     return component
@@ -927,7 +1119,39 @@ def activate_body(body):
     doc = body.Document
     _set_slot(doc, "pdbody", body)
     _set_slot(doc, "part", container_of(body))
+    _choose(doc, container_of(body))
     remember(body)
+
+
+def activate_result(body, feature=None):
+    """After a feature was made (Extrude, Revolve, Sweep, Loft, Pipe, a primitive): the body
+    it is in becomes the active body when that body is in the active component (New Body)
+    or was made by this feature (New Component: the new component becomes active with it).
+    A feature that went into an existing body of ANOTHER component (a Cut through that
+    component's part) leaves the active component alone, as in Fusion, and says where the
+    step is (wave 7, components-2: such a Cut silently made the other component active).
+    Returns True when the body was activated."""
+    if not is_body(body):
+        return False
+    try:
+        fresh = feature is not None and not any(
+            o is not feature
+            and getattr(o, "Shape", None) is not None
+            and not o.Shape.isNull()
+            and bool(o.Shape.Solids)
+            for o in body.Group
+        )
+        if not App.GuiUp or in_active(body) or fresh:
+            activate_body(body)
+            return True
+        from . import commands
+
+        text = outside_note(body, "step")
+        if text:
+            commands.tell(text + " Activate it there to see the step in its timeline.")
+    except Exception as exc:
+        warn("could not activate %s: %s" % (getattr(body, "Label", "the body"), exc))
+    return False
 
 
 def sync_part_slot(body):
@@ -961,6 +1185,7 @@ def set_active(component, doc=None):
     body = preferred_body(doc, component)
     _set_slot(doc, "part", component)
     _set_slot(doc, "pdbody", body)
+    _choose(doc, component)
     if body is not None:
         remember(body)
     log("component %s activated" % (component.Label if component is not None else "root"))
@@ -969,6 +1194,7 @@ def set_active(component, doc=None):
 def forget(doc_name):
     for key in [k for k in _last_body if k[0] == doc_name]:
         _last_body.pop(key, None)
+    _chosen.pop(doc_name, None)
 
 
 # -- isolate -----------------------------------------------------------------------------------

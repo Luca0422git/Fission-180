@@ -263,6 +263,14 @@ def g_component():
         t.row_menu(right[0].Label, "Create Components from Bodies")
 
 
+def g_unground():
+    # (wave 7, components-2) the component made from the body is the first of the design:
+    # grounded to its parent, as in Fusion; a person ungrounds it before moving it
+    from Fission180Tests.gui import component_steps as cs
+
+    cs.unground(state["half_label"])
+
+
 def g_move_open():
     h.click_empty()
     t.click_row(state["half_label"])  # the component is named after the body
@@ -374,6 +382,7 @@ h.run(
             f_preview,
             f_ok,
             g_component,
+            g_unground,
             g_move_open,
             g_press_m,
             g_move_component,

@@ -216,6 +216,35 @@ def e_made():
     state["place"] = App.Placement(part.Placement) if part is not None else None
 
 
+# (wave 7, components-2) The component made from the body is the first of the design:
+# grounded to its parent, as in Fusion, where a grounded component cannot be moved ("you
+# have to first unground it from the parent"). Align moved it without a word; now it is
+# refused with the reason, and a person ungrounds it first.
+def e_grounded_click():
+    h.click(V(65, 21, 6))
+
+
+def e_grounded_refused():
+    p = d.panel()
+    if h.check("Align open on Components", p is not None):
+        text = p.message.text()
+        h.check(
+            "a grounded component is refused, with what to do",
+            "is grounded" in text and "Unground From Parent" in text,
+            text,
+        )
+        h.check("nothing is picked to move", p.moving is None, p.moving)
+    h.task_button("Cancel")
+
+
+def e_unground():
+    from fission180 import components
+    from Fission180Tests.gui import component_steps as cs
+
+    part = components.component_of(block())
+    cs.unground(part.Label)
+
+
 def e_align():
     h.click_empty()
     h.fit()
@@ -325,6 +354,11 @@ h.run(
             d_done,
             e_component,
             e_made,
+            e_align,
+            e_components,
+            e_grounded_click,
+            e_grounded_refused,
+            e_unground,
             e_align,
             e_components,
             e_click_block,

@@ -42,6 +42,8 @@ from . import components_core as core
 INSTANCE_OF = "Fission180InstanceOf"  # on an instance part: the component it repeats
 PATTERN = "Fission180Pattern"  # on a pattern's instance part: the pattern step
 INDEX = "Fission180Index"  # which copy of the pattern (0 = the first copy)
+NESTED = "Fission180Nested"  # on an instance part: it keeps the source's nested components
+NESTED_OF = "Fission180NestedOf"  # on a component inside an instance: the one it stands for
 COPY_TYPE = "InstanceCopy"
 COPY_OBJECT = "Part::FeaturePython"
 
@@ -93,8 +95,29 @@ def instances_of(source):
     return sorted(found, key=lambda o: o.ID)
 
 
+def is_mirrored(part):
+    """True for the copy a Mirror of components made: a component of its own in name (the
+    other hand of the part, "Bracket (Mirror)"), not a numbered occurrence of the original
+    (wave 7, components-2; it was "Bracket:2" and made the original "Bracket:1")."""
+    pattern = pattern_of(part)
+    if pattern is None:
+        return False
+    try:
+        from . import pattern as patterns
+
+        return patterns.kind_of(pattern) == "mirror"
+    except Exception:
+        return False
+
+
+def occurrences_of(source):
+    """The numbered occurrences of a component ("Bracket:2" ...): its instances without
+    the mirrored copies."""
+    return [p for p in instances_of(source) if not is_mirrored(p)]
+
+
 def has_instances(part):
-    return bool(instances_of(part)) if components.is_component(part) else False
+    return bool(occurrences_of(part)) if components.is_component(part) else False
 
 
 def pattern_of(part):
@@ -113,12 +136,84 @@ def is_copy_feature(obj):
 
 
 def copy_features(part):
-    """The copy features of an instance part, with their bodies: [(feature, body)]."""
+    """The copy features of an instance part, with their bodies: [(feature, body)]; those
+    in the components nested inside it (nested_holders) too."""
     found = []
     for obj in list(getattr(part, "Group", [])):
         if is_copy_feature(obj):
             found.append((obj, copy_body(obj)))
+        elif is_nested_holder(obj):
+            found += copy_features(obj)
     return found
+
+
+def is_nested_holder(part):
+    """True for a component inside an instance that stands for a nested component of the
+    instance's source (wave 7, components-2): the copy of a subassembly keeps its
+    structure, as Fusion's occurrences do (before, its bodies came in flat)."""
+    return components.is_component(part) and NESTED_OF in getattr(part, "PropertiesList", [])
+
+
+def nested_source(part):
+    """The nested component of the source a holder stands for (None when it is gone)."""
+    return _link(part, NESTED_OF) if is_nested_holder(part) else None
+
+
+def nested_holders(part):
+    """Every holder inside an instance part (or inside a holder), deepest first."""
+    found = []
+    for obj in list(getattr(part, "Group", [])):
+        if is_nested_holder(obj):
+            found += nested_holders(obj)
+            found.append(obj)
+    return found
+
+
+def instance_around(part):
+    """The instance a nested holder belongs to (None for anything else)."""
+    current = part
+    seen = 0
+    while is_nested_holder(current) and seen < 50:
+        seen += 1
+        current = components.container_of(current)
+    return current if current is not part and is_instance(current) else None
+
+
+def keeps_structure(part):
+    return bool(getattr(part, NESTED, False)) if is_instance(part) else False
+
+
+def _holder_for(part, body, source):
+    """The component inside the instance ``part`` that the copy of ``body`` goes into: the
+    instance itself for a body directly in ``source``, else a holder per nested component
+    on the way down to the body, named like it, nested like it, made when missing. A
+    holder's Placement stays none: the copy features place the solids (so a part moved
+    inside the original moves in every copy)."""
+    if not keeps_structure(part):
+        return part
+    chain = []
+    current = components.container_of(body)
+    while current is not None and current is not source and len(chain) < 50:
+        chain.append(current)
+        current = components.container_of(current)
+    if current is not source:
+        return part
+    holder = part
+    for comp in reversed(chain):
+        found = None
+        for obj in holder.Group:
+            if is_nested_holder(obj) and _link(obj, NESTED_OF) is comp:
+                found = obj
+                break
+        if found is None:
+            found = components.new_component(part.Document, comp.Label, holder)
+            bodies.add_prop(found, "App::PropertyLinkGlobal", NESTED_OF, "Fission180")
+            setattr(found, NESTED_OF, comp)
+            bodies.hide_from_timeline(found)
+        elif found.Label != comp.Label:
+            found.Label = comp.Label
+        holder = found
+    return holder
 
 
 def copy_body(feature):
@@ -249,7 +344,7 @@ def _labels_in_use(source, but=None):
     and those of any other component still named "<source>:<n>" (the occurrences of an
     original that was deleted keep their names: a new one with the same number clashed, and
     FreeCAD made its name unique by itself, "Screw:001", read as the first occurrence)."""
-    used = [number(p) for p in instances_of(source) if p is not but]
+    used = [number(p) for p in occurrences_of(source) if p is not but]
     try:
         for comp in components.list_components(source.Document):
             if comp is source or comp is but:
@@ -260,6 +355,10 @@ def _labels_in_use(source, but=None):
     except Exception:
         pass
     return used
+
+
+def _labels_but(part):
+    return [c.Label for c in components.list_components(part.Document) if c is not part]
 
 
 def global_placement(obj):
@@ -284,6 +383,11 @@ def make_instance(source, parent=components.KEEP, placement=None, pattern=None, 
     n = core.next_instance_number(_labels_in_use(source))
     part = components.new_component(doc, core.instance_label(source.Label, n), where)
     _mark_instance(part, source, pattern, index)
+    if is_mirrored(part):
+        part.Label = core.mirror_label(source.Label, _labels_but(part))
+    # (wave 7, components-2) the copy of a subassembly keeps its nested components
+    bodies.add_prop(part, "App::PropertyBool", NESTED, "Fission180")
+    setattr(part, NESTED, True)
     if pattern is None:
         wanted = placement if placement is not None else global_placement(source)
         outer = components._container_placement(where)
@@ -303,8 +407,9 @@ def _add_copy(part, body, source, pattern=None, index=0):
     if pattern is not None:
         feature.Pattern = pattern
         feature.Index = int(index)
-    part.addObject(feature)  # in the copy body's own component (FreeCAD's link scope)
-    copy = components.new_body_in(doc, part, label=body.Label)
+    holder = _holder_for(part, body, source)
+    holder.addObject(feature)  # in the copy body's own component (FreeCAD's link scope)
+    copy = components.new_body_in(doc, holder, label=body.Label)
     copy.BaseFeature = feature
     for obj in copy.Group:
         if obj.TypeId == "PartDesign::FeatureBase":
@@ -359,7 +464,11 @@ def _sync_one(part):
         return False  # the original is gone: the instance keeps its last shapes
     changed = False
     base, n = core.split_instance_label(part.Label)
-    if n is None or n < 2 or base != source.Label:  # (1 is the original's number)
+    if is_mirrored(part):
+        if core.mirror_base(part.Label) != source.Label:  # the original was renamed
+            part.Label = core.mirror_label(source.Label, _labels_but(part))
+            changed = True
+    elif n is None or n < 2 or base != source.Label:  # (1 is the original's number)
         used = _labels_in_use(source, but=part)
         keep = n is not None and n >= 2 and n not in used
         n = n if keep else core.next_instance_number(used)
@@ -382,6 +491,17 @@ def _sync_one(part):
     for body in wanted:
         if body.Name not in have:
             _add_copy(part, body, source, pattern, index)
+            changed = True
+    for holder in nested_holders(part):  # deepest first
+        comp = _link(holder, NESTED_OF)
+        if comp is None or not list(holder.Group):
+            try:
+                part.Document.removeObject(holder.Name)
+                changed = True
+            except Exception as exc:
+                warn("instance %s: %s" % (part.Label, exc))
+        elif holder.Label != comp.Label:
+            holder.Label = comp.Label
             changed = True
     return changed
 
@@ -426,7 +546,20 @@ def hand_over(source, leaving=None):
             if src is not None and src.Name in kept:
                 feature.Source = kept[src.Name]
             feature.Root = heir
-    for prop in (INSTANCE_OF, PATTERN, INDEX):
+    stand_ins = {}  # a nested component of the original (its name) -> the heir's holder
+    for holder in nested_holders(heir):
+        comp = _link(holder, NESTED_OF)
+        if comp is not None:
+            stand_ins[comp.Name] = holder
+        holder.removeProperty(NESTED_OF)  # an ordinary component of the new original
+        if getattr(holder, "Fission180Timeline", True) is False:
+            holder.Fission180Timeline = True
+    for part in rest:
+        for holder in nested_holders(part):
+            comp = _link(holder, NESTED_OF)
+            if comp is not None and comp.Name in stand_ins:
+                setattr(holder, NESTED_OF, stand_ins[comp.Name])
+    for prop in (INSTANCE_OF, PATTERN, INDEX, NESTED):
         if prop in heir.PropertiesList:
             heir.removeProperty(prop)
     if getattr(heir, "Fission180Timeline", True) is False:

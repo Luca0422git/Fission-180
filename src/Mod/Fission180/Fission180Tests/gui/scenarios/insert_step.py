@@ -14,8 +14,15 @@ B  Ctrl+Z: no bodies. Ctrl+Y: both again, still coloured.
 C  The same file again: another occurrence of the first, "two_parts:2" (linked to it, its
    Plate and Peg bodies copies of the first's; Fusion: a second insert of a design is
    another instance of the same component; beta 3, VEX).
-D  The imported bodies work like any body: Create Sketch on the Plate's top face puts a
-   sketch into the Plate's body.
+   (Wave 7, components-2: the occurrence keeps the rows of the parts inside it, "Plate"
+   and "Peg", as Fusion's occurrence of a design does; they came in flat.)
+D  The imported bodies work like any body, by Fusion's rule for components (wave 7): new
+   things go into the ACTIVE component. With the design active, Create Sketch on the
+   Plate's top face puts the sketch into the design's root, lying on that face, and the
+   design stays active (the scenario expected it in the Plate's body, which the click got
+   by silently making the Plate the active component). To change the inserted part a
+   person activates it: the ring on the Plate's browser row, then Create Sketch on its top
+   face puts the sketch into the Plate's body.
 """
 
 import FreeCAD as App
@@ -138,13 +145,16 @@ def c_check():
     h.press(QtCore.Qt.Key_Escape)
     labels = x.labels()
     h.check(
-        "the same file again: another occurrence, two_parts:2",
-        labels == ["Peg", "Plate", "two_parts", "two_parts:2"],
+        "the same file again: another occurrence, two_parts:2, with its parts' rows",
+        labels == ["Peg", "Peg", "Plate", "Plate", "two_parts", "two_parts:2"],
         labels,
     )
-    from fission180 import instances
+    from fission180 import components, instances
 
     second = x.comp("two_parts:2")
+    if second is not None:
+        inside = sorted(c.Label for c in second.Group if components.is_component(c))
+        h.check("two_parts:2 holds the rows Peg and Plate", inside == ["Peg", "Plate"], inside)
     h.check(
         "linked to the first two_parts",
         second is not None and instances.source_of(second) is x.comp("two_parts"),
@@ -170,26 +180,52 @@ def d_click_plate():
 
 
 def d_check():
+    from Fission180Tests.gui import component_steps as cs
+
     sketch = h.in_sketch()
     h.check("a sketch opened on the plate", sketch is not None)
     plate = x.body_of("Plate")
     if sketch is not None and plate is not None:
-        # (wave 7, components) new work goes into the ACTIVE component, as in Fusion: with
-        # the design's own row active a sketch on the inserted plate's face is the design's,
-        # not the Plate's (it went into the clicked body before; activate Plate to add to it)
-        from fission180 import components
-
+        h.check("the design is still the active component", cs.active_label() is None)
         h.check(
-            "in the active component (the design), not the Plate's body",
-            sketch not in plate.Group and components.component_of(sketch) is None,
-            (components.component_of(sketch), [o.Label for o in plate.Group]),
+            "with the design active the sketch is in the design's root, not in the Plate",
+            cs.container_label(sketch) is None and sketch not in plate.Group,
+            cs.container_label(sketch),
         )
-        top = sketch.getGlobalPlacement().Base.z
-        h.check("on the plate's top face (z 5)", abs(top - 5.0) < 1e-6, top)
+        z = sketch.getGlobalPlacement().Base.z
+        h.check("it lies on the Plate's top face (z 5)", abs(z - 5) < 1e-6, z)
     i.no_file()
 
 
 def d_finish():
+    if h.in_sketch() is not None:
+        h.ribbon("Finish Sketch")
+
+
+def d_activate_plate():
+    from Fission180Tests.gui import component_steps as cs
+
+    cs.click_radio("Plate")
+
+
+def d_sketch_again():
+    from Fission180Tests.gui import component_steps as cs
+
+    h.check("the Plate is the active component", cs.active_label() == "Plate", cs.active_label())
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+def d_check_plate():
+    sketch = h.in_sketch()
+    h.check("a sketch opened on the plate (the Plate active)", sketch is not None)
+    plate = x.body_of("Plate")
+    if sketch is not None and plate is not None:
+        h.check("in the Plate's body", sketch in plate.Group, [o.Label for o in plate.Group])
+    i.no_file()
+
+
+def d_finish_plate():
     if h.in_sketch() is not None:
         h.ribbon("Finish Sketch")
     h.shot("end")
@@ -211,6 +247,11 @@ h.run(
         d_click_plate,
         d_check,
         d_finish,
+        d_activate_plate,
+        d_sketch_again,
+        d_click_plate,
+        d_check_plate,
+        d_finish_plate,
     ],
     paced_by="state",
 )

@@ -80,6 +80,15 @@ def to_component():
     t.row_menu(box().Label, "Create Components from Bodies")
 
 
+def unground():
+    # (wave 7, components-2) the component made from the box is the first of the design:
+    # grounded to its parent, as in Fusion, where a grounded component cannot be moved.
+    # Align moved it all the same until now; a person ungrounds it first.
+    from Fission180Tests.gui import component_steps as cs
+
+    cs.unground(part().Label)
+
+
 def align_start():
     h.check("the box is in a component", part() is not None)
     h.click_empty()
@@ -293,6 +302,7 @@ h.run(
         + [
             names,
             to_component,
+            unground,
             align_start,
             align_components,
             align_from,

@@ -12,7 +12,7 @@ come from the plastic rule until you type over them; the blue arrow drags the th
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, curve_pick, curves, extrude, log, plastic, plastic_rest as pr
+from . import commands, components, curve_pick, curves, extrude, log, plastic, plastic_rest as pr
 from . import preview, profile_pick, ui_icon_path, warn
 from .compat import QtCore, QtWidgets
 from .hole_common import SelectionField
@@ -344,7 +344,8 @@ class RestPanel(Panel):
                 body = self.picked_body or pr.body_under(self.doc, self.refs) or self.body
             if body is None:
                 raise pr.RestError("The profile does not lie over a body.")
-            self.body_label.setText(body.Label)
+            self.body_label.setText(components.home_text(body, self.doc))
+            self.elsewhere = components.outside_note(body, "rest", self.doc)
             self._follow_body_rule(body)
             self.target = pr.make(body, self.refs, self.options, feature=self.target)
             self.error = ""
@@ -361,7 +362,8 @@ class RestPanel(Panel):
             self.message.setText("⚠ " + self.error)
             return
         text = preview.failure(self.target)
-        self.message.setText("⚠ " + text if text else "")
+        # (wave 7) a rest built in a body of another component than the active one says so
+        self.message.setText("⚠ " + text if text else getattr(self, "elsewhere", ""))
 
     # -- the thickness arrow -----------------------------------------------------------------------
     def _remove_arrow(self):

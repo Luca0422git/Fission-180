@@ -327,7 +327,10 @@ class _Gate:
             if obj.Name == panel.base.Name:
                 return panel._pickable(name) if name else True
             if name:
-                return False
+                # (wave 7, components-2) an edge or face of ANOTHER body: while nothing is
+                # picked yet the dialog moves to that body (Fusion rounds the edge you
+                # click, whichever body or component it is on); with picks, it says why not
+                return panel._other_body_pick(obj, name)
             return panel._is_body_feature(obj)  # a timeline click: round the edges it made
         except Exception:
             return False
@@ -1059,14 +1062,19 @@ class BlendPanel(Panel):
             cleared, self._cleared = self._cleared, False
             self.help.setText(self._help_text())  # (a timeline click below says what it added)
             names, features = [], []
-            for sel in Gui.Selection.getSelectionEx(self._doc_name):
-                for obj, name in _resolve(sel):
-                    if obj is None:
-                        continue
-                    if not name:
-                        features.append(obj)
-                    elif obj.Name == self.base.Name:
-                        names.append(name)
+            picked = [
+                (obj, name)
+                for sel in Gui.Selection.getSelectionEx(self._doc_name)
+                for obj, name in _resolve(sel)
+            ]
+            self._follow_other_body(picked)  # (wave 7, components-2) may change self.base
+            for obj, name in picked:
+                if obj is None:
+                    continue
+                if not name:
+                    features.append(obj)
+                elif obj.Name == self.base.Name:
+                    names.append(name)
             changed = False
             if not cleared:  # a pick that is no longer selected was clicked again: drop it
                 for name in self._shown:
@@ -1086,6 +1094,86 @@ class BlendPanel(Panel):
                 self._refs_changed()
         except Exception as exc:
             warn("%s pick: %s" % (self.title, exc))
+
+    # -- an edge of another body (wave 7, components-2) ------------------------------------
+    def _other_solid_body(self, obj):
+        """The body whose current solid ``obj`` is, when that is another body than the
+        dialog's; else None."""
+        try:
+            body = obj.getParentGeoFeatureGroup()
+            if body is None or body is self.body or body.TypeId != "PartDesign::Body":
+                return None
+            return body if solid_base(body) is obj else None
+        except Exception:
+            return None
+
+    def _other_body_pick(self, obj, name):
+        """The selection gate's answer for an edge or face of another body: it can be
+        clicked while this (new) fillet has no pick yet; the dialog then moves to that
+        body. With picks it cannot, and the dialog says why (a click that did nothing, with
+        no word, looked broken)."""
+        body = self._other_solid_body(obj)
+        if body is None or not (name.startswith("Edge") or name.startswith("Face")):
+            return False
+        if self.target is None and not self._has_picks() and not self.refs2:
+            return True
+        try:
+            from . import components
+
+            word = self.title.lower()
+            self.help.setText(
+                "One %s step works on one body: this one on %s. Press OK, then start %s "
+                "again for %s."
+                % (
+                    word,
+                    components.home_text(self.body, self.doc),
+                    self.title,
+                    components.home_text(body, self.doc),
+                )
+            )
+        except Exception:
+            pass
+        return False
+
+    def _follow_other_body(self, picked):
+        """A first click on an edge or face of another body: the dialog works on that body
+        from now on (its part before the blend, its later steps), whichever component it is
+        in; the active component stays as it is and the dialog says where the step goes."""
+        if self.target is not None or self._has_picks() or self.refs2:
+            return False
+        for obj, name in picked:
+            if obj is None or not name or obj.Name == self.base.Name:
+                continue
+            body = self._other_solid_body(obj)
+            if body is None:
+                continue
+            base = solid_base(body)
+            try:
+                self._restore_display()
+                self.body, self.base = body, base
+                self.info = blend.ShapeInfo(base.Shape)
+                self._shown = []
+                try:
+                    self.keep = blend.References(body, base)
+                except Exception as exc:
+                    warn("%s: later steps not tracked: %s" % (self.title, exc))
+                self._prepare_display()
+                try:  # the body the step goes into (the hook in taskui gives the active
+                    # component its own body back when the dialog closes)
+                    Gui.ActiveDocument.ActiveView.setActiveObject("pdbody", body)
+                except Exception:
+                    pass
+                from . import components
+
+                note = components.outside_note(body, self.title.lower(), self.doc)
+                if note:
+                    self._say(note)
+                log("%s moved to %s" % (self.title.lower(), body.Label))
+                return True
+            except Exception as exc:
+                warn("%s: could not move to %s: %s" % (self.title, body.Label, exc))
+                return False
+        return False
 
     def _help_text(self):
         if self.mode == "rule":

@@ -13,10 +13,11 @@ the empty component "Tube"; two blocks at the root: Body1 (x 0..20, y 50..70) an
   B  Housing's menu > Isolate: the Wall and the root blocks hide. Wall's menu now offers
      Isolate (it only offered Exit Isolate): Isolate there shows the Wall and hides the
      Housing. Wall's menu > Exit Isolate: everything is back.
-  C  Tube's ring, Create Sketch, Cancel: Tube holds an empty body nothing was put in (no
-     row). The design's ring. Body1's row dragged onto Tube: it lands in Tube, and the
-     empty body is gone (it would have taken the next sketch). Body2's row dragged onto
-     Housing right after (the tree was rebuilt in between): it lands in Housing, the row
+  C  Tube's ring, Create Sketch, Cancel: no body and no open undo step are left (wave 7,
+     components-2: the body made to show the planes stayed). A body nothing was put in is
+     then set up in Tube. The design's ring. Body1's row dragged onto Tube: it lands in
+     Tube, and the empty body is gone (it would have taken the next sketch). Body2's row
+     dragged onto Housing right after (the tree was rebuilt in between): it lands in Housing, the row
      under the pointer.
   D  Undo twice: both blocks are back at the root. Redo twice.
 """
@@ -166,12 +167,23 @@ def c_cancel():
 def c_empty_body():
     from fission180 import components
 
+    # (wave 7, components-2) Create Sketch made a body in Tube to show its planes; Cancel
+    # takes it away again and no undo step stays open (FreeCAD's "Add a Body" stayed
+    # pending with the empty body: the harness's undo check found it here)
     found = k.all_bodies_of("Tube")
+    h.check("the cancelled Create Sketch left no body in Tube", not found, [b.Label for b in found])
+    doc = k.doc()
     h.check(
-        "Tube holds one body nothing was put in",
-        len(found) == 1 and components.is_unused(found[0]),
-        [b.Label for b in found],
+        "no undo step is left open",
+        App.getActiveTransaction() is None and not doc.HasPendingTransaction,
+        App.getActiveTransaction(),
     )
+    # a body nothing was put in can still come about (its only sketch deleted again): one
+    # is set up here through the module, for the drag below
+    doc.openTransaction("New Body")
+    empty = components.new_body_in(doc, k.part("Tube"))
+    doc.commitTransaction()
+    h.check("Tube holds one body nothing was put in", components.is_unused(empty))
     cs.click_radio("BookComponentsMenus")
 
 

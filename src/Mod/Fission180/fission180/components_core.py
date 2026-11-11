@@ -164,6 +164,31 @@ def paste_new_label(label, labels):
     return "%s (%d)" % (base, n)
 
 
+MIRROR_TAG = " (Mirror)"
+
+
+def mirror_base(label):
+    """ "Bracket" for "Bracket (Mirror)" and "Bracket (Mirror) (2)"; None for another
+    label."""
+    found = re.match(r"^(?P<base>.*) \(Mirror\)(?: \(\d+\))?$", label or "")
+    return found.group("base") if found else None
+
+
+def mirror_label(label, labels):
+    """A mirrored component is a new component named after the one it mirrors: "Bracket
+    (Mirror)", then "Bracket (Mirror) (1)" ... (a mirrored part is the other hand of the
+    part: "always new part numbers", Fusion community manager; the wording of the name is
+    a guess). ``labels``: the names taken."""
+    base = split_instance_label(label)[0] or "Component"
+    taken = set(labels)
+    name = base + MIRROR_TAG
+    n = 0
+    while name in taken:
+        n += 1
+        name = "%s%s (%d)" % (base, MIRROR_TAG, n)
+    return name
+
+
 # -- picking a component in the 3D view -------------------------------------------------------
 def component_to_pick(chain, active):
     """The component a click in the window picks when components are asked for (Move's

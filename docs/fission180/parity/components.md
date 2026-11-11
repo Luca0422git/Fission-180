@@ -292,7 +292,8 @@ components), `book_components_menus` (menus, Isolate, drag, the empty body),
 | Hole, Thread, Fillet, Chamfer, Shell, Draft (change a body) | change the body picked | the same | the same |
 | Patterns and Mirror of features / faces / bodies | in the body of what is repeated | the same | the same |
 | Pattern / Mirror of components | a step of the design; the copies beside the original | patterns: the same; Mirror: not built | the same; Mirror built |
-| Canvas, Decal | the active component | the active component's body | the same |
+| Canvas | the active component | the active component's body | the same (checked again by components-2: `insert_ui` takes `commands.ensure_body()`) |
+| Decal | the active component (Guess: a new object) | the component of the body whose face it is put on (`decal.make`: it is drawn in that component and moves with it) | the same: not the active component when the face is another component's (components-2 corrected this row, which said "the active component's body"); the decal is always on the face clicked |
 | Joints, Rigid Groups, Motion Links | the active component's Joints folder | the design's hidden assembly | the same (one Joints folder: FreeCAD's assembly holds them) |
 | New Component | under the active component (Parent box) | the same | the same; Parent can be clicked in the browser |
 | Paste | the active component | the same | the same, standing on the occurrence copied |
@@ -347,6 +348,120 @@ components), `book_components_menus` (menus, Isolate, drag, the empty body),
   change does nothing, and the next change anywhere becomes a step under that name:
   `App.closeActiveTransaction(True)` closes it.
 
+## Part 4: commands aimed at another component, grounded first components, copies with structure (wave 7, components-2, 2026-11-11)
+
+Built in `components.py` (`active_component` as the person's choice, `settle_active`,
+`outside_tips`, `outside_note`, `home_text`, `activate_result`), `taskui.Panel._close` and
+`commands.finish_open_dialog` (the hooks), `fillet_ui.py` (a first click on another body),
+`plastic_rest.body_under`, `instances.py` (nested structure, mirrored names),
+`component_move.refusal`, `component_move_ui._cancel_paste`, `clipboard_ui.py`,
+`construct.py` (`_freeze`, `_frozen_world`), `components_ui.py` (Internal / External),
+`align_ui.py` (a grounded component). Tests: scenarios `book_components2_cross`,
+`book_components2_structure`, `book_components2_refs`; the three `journey_plastic*`; unit
+tests in `test_components_core.py`.
+
+### Sources (search excerpts; Autodesk's sites cannot be opened from the sandbox)
+
+31. **Forum**, *Cannot Join Bodies with Extrude*, *Recurring problem with Join vs New
+    Body*, *Extrude join to specific body*: a Join reaches the bodies of the active
+    component only; "activate the component you want to join to". (Checked again for this
+    work: the wave 7 rule stays.)
+32. **Autodesk** help, *Snap Fit* (SLD-SNAP-FIT): "Assign a plastic rule to the components
+    that contain the bodies"; *Boss* (SLD-BOSS): "fasten two solid bodies together";
+    *Lip* (SLD-LIP): "a lip and groove on a pair of solid bodies". The PLASTIC tools work on
+    bodies of several components at once, so they change bodies outside the active one.
+33. **Autodesk** help, *Bodies* / *QUICK TIP: Body v Component*: bodies are modified "with
+    commands like Fillet, Chamfer, Shell, Draft, Combine, and Split Body"; **AU 2016
+    handout** (Doering): Fusion works out which component a new fillet or chamfer belongs
+    to without activation; **Forum** (source 24): "even making the component active, using
+    the cut/hole feature will still affect other component". No source says that a command
+    aimed at a body of another component switches the active component: **Guess**, from
+    all of these and from source 22 ("Fusion does not switch the active component for a new
+    sketch"), that it never does.
+34. **Forum**, *To move a grounded object, must always first unground?* (accepted answer):
+    "to move a component, whether by dragging or using the move feature, you have to first
+    unground it from the parent"; a user in the same thread: Move Object Components "would
+    not select a grounded component". **Autodesk** blog *Ground to Parent*: when a moved
+    component is grounded again, Fusion offers "Update Initial Position".
+35. **Forum**, *Copy/move dialog appears when paste new is used* (Autodesk staff): "It
+    pastes the new body/component/whatever in place, then immediately invokes Move so you
+    can reposition the copy"; *Comportement of the C/P Cancel button* (Fusion community
+    manager): cancelling should cancel the Paste, not just the Move. (Source 27's guess
+    "the paste stands on what was copied" is confirmed: in place.)
+36. **Forum**, *How to properly create a mirrored component?*: Fusion treats a mirror of
+    components "as if everything was copied, PASTE NEW, and reversed"; with source 28 ("a
+    left and right handed version ... always new part numbers"): a mirrored component is a
+    component of its own. Its name in the browser was not found in a source: **Guess**
+    "Name (Mirror)".
+37. **Autodesk** help, *Create a rectangular pattern*: "Components duplicates components in
+    an assembly"; **Book** (the report, Robotic Hand 2406-2409): the copies of a patterned
+    subassembly are subassemblies with their parts and joints.
+38. **Autodesk** help, *New Component* (excerpts): Internal "creates the component within
+    the current design", External creates it "as a separate design" that the design
+    references (X-ref), edited in place.
+39. Construction on another component: no source found. **Guess** from the timeline model
+    (sources 13, 21: a projection and a captured position are worked out at their place in
+    the timeline): a plane built on another component's face does not move when that
+    component is moved later.
+
+### A command aimed at a body of ANOTHER component (component A active, the pick on B)
+
+Probed by real input on 3.3.10 + wave 7 before any change (the probe became the scenario
+`book_components2_cross`). "Switched" = B silently became the active component.
+
+| Command | Fusion (source or Guess) | Fission 180 before | Fission 180 now |
+|---|---|---|---|
+| Fillet, Chamfer (edge clicked after the command started) | rounds the edge clicked (33, Guess) | the click was not taken, no word (only the dialog's own body could be picked); OK then said "Select the edges ... first" | the dialog moves to the body of the first edge or face clicked; A stays active; with picks already, a click on another body says "One fillet step works on one body ..." |
+| Fillet, Chamfer (edge selected before the command) | the same | worked on B's body, switched | works on B's body, A stays active |
+| Shell | hollows the body picked (33) | worked, switched | works, A stays active |
+| Hole | drills the face picked (24: "will still affect other component") | worked, switched | works, A stays active |
+| Thread | threads the face picked (Guess) | worked, switched | works, A stays active |
+| Press Pull (a face) | moves the face picked (Guess) | worked, A stayed | the same |
+| Extrude, Operation Cut chosen by hand | cuts every body in its way (24) | worked (the first builder's "does not go through any body" did not reproduce: the cut went through B), switched after OK | works, A stays active |
+| Extrude, Join / the proposed operation | bodies of the active component only (31) | wave 7: the same | the same |
+| Split Body | splits the body picked (33) | worked, A stayed; the new piece is in B | the same |
+| Combine | changes the target picked (33) | worked, A stayed | the same |
+| Mirror / patterns of bodies | the copy beside its original (Guess) | worked, A stayed; the copy is in B | the same |
+| PLASTIC Boss, Snap Fit, Lip | work on the bodies they are aimed at, in several components (32) | worked | the same |
+| PLASTIC Rest | the body under the profile (32, Guess) | built in the body the profile's SKETCH was in (the active component's), nowhere near, no word | the body nearest to the profile; the dialog names it with its component and says it is not in the active component |
+| SHEET METAL Flange (an edge) | the sheet metal body of the edge (Guess) | worked, A stayed | the same |
+| Create Sketch, CONSTRUCT, primitives, New Body results | the active component (21, 23) | wave 7: the active component | the same |
+
+Every row: the step itself is in B's body (FreeCAD keeps a step inside its body), so with A
+active it does not show in A's timeline. Fusion lists such a step under the component that
+was active. So that this is never silent, when a dialog closes on OK and a body outside the
+active component was changed, a note next to the mouse says "Body1 is in B, not in the
+active component A: the step changes it there. Activate it there to see the step in its
+timeline." (a new body: "The new body Body5 is in B, beside the body it was made from").
+With the design itself active nothing is said: its timeline shows every step.
+
+How: `components.active_component` is now what the person chose (the ring, Activate, New
+Component, a body activated in the browser, an edited step); before, it was read from the
+active body, and Shell, Hole, Thread, Fillet and the pick panels make the body they work on
+the active body. `components.settle_active` gives the active component its own body back
+when a dialog closes (and before the next command).
+
+### The first component is grounded (the test harness no longer switches it off)
+
+| Command, on a grounded component | Fusion | Fission 180 |
+|---|---|---|
+| Move/Copy, Move Object Components | cannot be picked; unground first (34) | refused in the dialog: "Bracket is grounded, so it cannot move. Unground it first (right-click it in the browser > Unground From Parent)" |
+| Drag in the window | does not move (34) | says why, names Unground From Parent (joints, wave 7) |
+| Joint, first component picked | ungrounded by itself (25) | the same (joints, wave 7) |
+| Align, Objects Components | cannot move (34; Guess for Align) | refused with the same sentence (it moved the component without a word) |
+| Create Components from Bodies, New Component | the first of a level is grounded (25) | the same |
+| Paste, patterns, Mirror, Duplicate With Joints | copies are new occurrences, not grounded (Guess) | the same |
+
+### Copies with structure, mirrored names, Paste, construction, Internal / External
+
+| Fusion | Fission 180 |
+|---|---|
+| A pattern's copies, a pasted copy and a Create Copy of a subassembly are occurrences with the components inside (37) | An instance keeps a component per nested component of its source ("holders": `instances.NESTED_OF`), named and nested like it, with the copy bodies inside; the browser shows them as rows. The copy features place the solids, so a part moved inside the original moves in every copy. A holder cannot be moved on its own (refused: "... is part of the copy Stator:2: move Bolt in the original"); its ring activates the original's part. Instances saved before this stay flat (joints made on them keep their references) |
+| A mirrored component is a component of its own (28, 36) | Named "Name (Mirror)" (then "Name (Mirror) (1)"); it is not counted as an occurrence, so the original is not shown as "Name:1" because of it. It still follows the original and is edited through it (a gap, below) |
+| Paste: pasted in place, Move/Copy opens on it; Cancel cancels the Paste (35) | Same: Esc or Cancel in that Move takes the paste away again ("Paste cancelled: the copy was removed"); OK or the next command keeps it |
+| A construction built on another component does not move with that component's later moves (39, Guess) | Same as a sketch's reference: the frame is worked out with the picked bodies where they stood, for the construction's own body, when it was made (`ConstructionFrame.Home / Frames`); it follows the other part's CHANGES, not later MOVES of either component. Constructions saved before this freeze at their first recompute |
+| New Component: Internal / External (38) | "Saved: Internal / External"; External is greyed, with the reason and what to do instead in its tooltip (one design per file; linked designs are locked until Break Link, so an empty one could not be modelled in) |
+
 ## Known gaps (honest list)
 
 - Wave 7: snapping and inference to another component's geometry while drawing, and a
@@ -355,21 +470,23 @@ components), `book_components_menus` (menus, Isolate, drag, the empty body),
   components), then snap or dimension to the projected curve. The function to call is
   `sketch_external.project_across(sketch, object, "EdgeN")` (the drawing and dimension tools
   are the sketch builders').
-- Wave 7: New Component has no Internal / External choice (an External component is a design
-  of its own on disk, edited in place; Insert into Current Design links a saved design, but
-  cannot start an empty one or edit it in place). Create Selection Set is not built (Fission
-  180 has no selection sets). The first component picked for a Joint is not ungrounded by
-  itself (Fusion does; here the dialog says it is grounded).
-- Wave 7: a construction plane, axis or point built on another component follows that part's
-  changes; when the other component MOVES later it moves too at the next change of the part
-  (its frame is worked out from the picks in design coordinates when it recomputes), unlike a
-  sketch's reference, which keeps its place.
-- Wave 7, open: with a sub-component active, a Cut chosen by hand in Extrude did not reach
-  another component's body in the scenario's probe ("The cut does not go through any body",
-  for both signs of the distance; the same profile as New Body lies inside that body).
-  Fusion cuts it (Objects To Cut). The bodies a Cut passes through are not filtered by the
-  wave 7 rule (`extrude_bodies.in_the_way` returns them all); not resolved (the Extrude
-  dialog is the extrude work's). With that body's component active the cut works.
+- Wave 7 (components-2): New Component shows Internal / External with External greyed (an
+  External component is a design of its own on disk, edited in place; Insert into Current
+  Design links a saved design, but cannot start an empty one or edit it in place). Create
+  Selection Set is not built (Fission 180 has no selection sets).
+- Wave 7 (components-2): a step made on a body outside the active component (a Hole, a Cut,
+  a Fillet, a Rest on another component's part) is a step of that body's component here
+  (FreeCAD keeps a step inside its body); Fusion lists it under the component that was
+  active. It is said next to the mouse when the dialog closes; the step shows in that
+  component's (and the design's) timeline.
+- Wave 7 (components-2): one Fillet / Chamfer step rounds edges of one body (Fusion's takes
+  edges of several bodies); a click on a second body says so.
+- Wave 7 (components-2): "First component Ground to Parent" grounds the first component
+  CREATED at a level (New Component, Create Components from Bodies:
+  `components_ui.ground_first`). The first one made by Extrude > New Component is not
+  grounded here (Fusion's blog says "the first component created at each layer": a gap). An
+  INSERTED part is not grounded (the hardware builder's finding for Fusion; kept). Editing
+  a step of another component from the timeline still makes that component the active one.
 - Wave 7: with the design's row active, a sketch on a face of a component's body goes into the
   root (Fusion does the same) and its extrude makes a New Body at the root unless Cut is
   chosen; activate the component first to add to its body, as in Fusion.
@@ -383,19 +500,22 @@ components), `book_components_menus` (menus, Isolate, drag, the empty body),
   the root while the body goes to a component" (Fusion's Create Components from Bodies) is
   approximated: the body's sketches move with the body.
 - The New Component dialog's Parent is a drop-down, not Fusion's click-in-the-browser box.
-- Instances: nested components of the copied component are flattened into the instance (its
-  bodies are there, the nested component rows are not); editing happens through the
-  original (activating an instance activates the original; a sketch put directly on an
-  instance's face goes into the instance's copy body only, Fusion would edit the component);
+- Instances: editing happens through the original (activating an instance, or a part
+  inside it, activates the original; a sketch put directly on an instance's face goes into
+  the instance's copy body only, Fusion would edit the component); a part inside a copy of
+  a subassembly cannot be moved or jointed on its own (it stands where the original's part
+  stands; refused with the reason), and the copies have no joints of their own (they show
+  the pose the original's joints give it); instances saved before wave 7 stay flat (no
+  rows for the parts inside);
   deleting the original hands over to an occurrence, but the original's features (its
   timeline steps) and decals go with the original: the occurrence that takes over keeps
   the solids as frozen bases (Fusion keeps the features in the component; Undo brings
   them back), and a pattern's copies of the original stay frozen; a body deleted from an
   instance comes back at the next sync.
 - A pattern's copies cannot be moved on their own (refused with the reason). A mirrored
-  component (wave 7) is an occurrence-like copy ("Name:2") whose solids are mirrored, not a
-  new component with features of its own as in Fusion; nested components of a mirrored or
-  patterned subassembly come in flat (its bodies, not its component rows or joints).
+  component (wave 7) is named "Name (Mirror)" but is still a copy whose solids are
+  mirrored and that is edited through its original, not a new component with features of
+  its own as in Fusion; joints are not mirrored (Fusion neither).
 - A component move that is not captured, in a design without joints, cannot be reverted
   (joints' Capture Position / Revert need the joints' assembly); Fusion asks to capture or
   revert before the next feature (not built: the pending position simply stays). Rolling the

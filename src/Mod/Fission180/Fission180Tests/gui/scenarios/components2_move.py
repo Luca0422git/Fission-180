@@ -69,6 +69,11 @@ def setup_done():
     h.check("Bracket exists", bracket() is not None, c.labels())
     c.box_is("Bracket where the box was", bracket(), [0, 0, 0, 40, 30, 10])
     state["moves0"] = len(c.moves())
+    # (wave 7, components-2) Bracket is the first component of the design: grounded to its
+    # parent, as in Fusion ("First component Ground to Parent"), where a grounded
+    # component cannot be picked for Move either. A person ungrounds it first (F grounds
+    # it again and checks the refusal).
+    cs.unground("Bracket")
 
 
 # -- A --------------------------------------------------------------------------------------------

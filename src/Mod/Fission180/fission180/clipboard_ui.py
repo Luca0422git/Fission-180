@@ -131,15 +131,19 @@ def paste(into=None, new=False):
         doc.commitTransaction()
         log("pasted %s" % ", ".join(p.Label for p in made))
         _refresh_browser()
-        QtCore.QTimer.singleShot(0, lambda: _move_after(doc.Name, [p.Name for p in made]))
+        step = "Paste New" if new else "Paste"
+        QtCore.QTimer.singleShot(0, lambda: _move_after(doc.Name, [p.Name for p in made], step))
     elif others:
         bodies = [o for o in others if o.TypeId == "PartDesign::Body"]
         QtCore.QTimer.singleShot(0, lambda: _copy_bodies(doc.Name, [b.Name for b in bodies]))
     return made
 
 
-def _move_after(doc_name, names):
-    """Fusion opens the move manipulator on what was pasted."""
+def _move_after(doc_name, names, step=None):
+    """Fusion opens the move manipulator on what was pasted ("it pastes the new component
+    in place, then immediately invokes Move so you can reposition the copy": forum).
+    ``step``: the paste's undo step; Cancel or Esc in that Move takes the paste away again
+    (ComponentMovePanel._cancel_paste)."""
     try:
         if doc_name not in App.listDocuments():
             return
@@ -150,7 +154,9 @@ def _move_after(doc_name, names):
             return
         from . import component_move_ui
 
-        component_move_ui.start(picks=parts)
+        panel = component_move_ui.start(picks=parts)
+        if panel is not None and step:
+            panel.pasted = (step, list(names))
     except Exception as exc:
         warn("paste: the move could not start: %s" % exc)
 
