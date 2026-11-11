@@ -129,6 +129,14 @@ models: 644 pass, 2 expected failures (as on develop).
    module for its drag. New scenario `book_components2_cancel` (29 checks, the undo check
    strict).
 
+   Run with `FISSION180_STRICT_UNDO=1` on the fully merged code (develop e35d1ef2), one
+   at a time: the five `book_components2_*`, the eight `book_components_*`, `components2_*`
+   (5), `components_basic / _extrude / _move`, the three `journey_plastic*`, `insert_step`,
+   `modify_align`, `origin_squares_small`, `direct_components`, `book_joints_ground`,
+   `joints_basic`, `vex_duplicate`, `journey_vex`: all PASS, no undo NOTE left in any of
+   them. (`direct_components` first failed there for another reason: it aligned its first,
+   grounded component; it ungrounds it in the browser now, like `modify_align`.)
+
 ## FreeCAD facts and traps (1.1.4)
 
 - `view.setActiveObject("pdbody", body)` does not touch the "part" slot; Fission 180's
