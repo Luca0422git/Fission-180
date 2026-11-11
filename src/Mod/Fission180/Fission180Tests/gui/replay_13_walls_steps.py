@@ -760,7 +760,19 @@ def steam_rename():
 
 
 def steam_named():
-    h.check("the copy is the Steam Side Wall", r.component("Steam Side Wall") is not None)
+    steam = r.component("Steam Side Wall")
+    # (hitch found by the replay: renaming the mirrored copy renamed the original, and the
+    # copy took the original's name + " (Mirror)" again)
+    h.check(
+        "the copy is the Steam Side Wall, on the front",
+        steam is not None and r.box_in("Steam Side Wall")[4] < 0,
+        steam and r.box_in("Steam Side Wall"),
+    )
+    h.check(
+        "the original is still the Power Side Wall",
+        r.component(POWER) is not None and r.box_in(POWER)[1] > 0,
+        [x.Label for x in r.doc().Objects if r.comps().is_component(x)],
+    )
     h.fit()
     h.shot("stator")
 

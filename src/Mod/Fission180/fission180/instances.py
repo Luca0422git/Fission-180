@@ -465,7 +465,11 @@ def _sync_one(part):
     changed = False
     base, n = core.split_instance_label(part.Label)
     if is_mirrored(part):
-        if core.mirror_base(part.Label) != source.Label:  # the original was renamed
+        # the original was renamed: a copy still named after it follows; a copy the person
+        # gave a name of its own keeps it (the book's Steam Side Wall, a mirrored Power Side
+        # Wall renamed: it was named "... (Mirror)" again at once)
+        base = core.mirror_base(part.Label)
+        if base is not None and base != source.Label:
             part.Label = core.mirror_label(source.Label, _labels_but(part))
             changed = True
     elif n is None or n < 2 or base != source.Label:  # (1 is the original's number)

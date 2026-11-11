@@ -567,7 +567,9 @@ def _component_rename(obj, text):
 
         if number is not None and (instances.is_instance(obj) or instances.has_instances(obj)):
             text = base
-        if instances.is_instance(obj):
+        # (a mirrored copy is a component of its own, the other hand of the part: renamed
+        # alone, as the book's Steam Side Wall, made by mirroring the Power Side Wall)
+        if instances.is_instance(obj) and not instances.is_mirrored(obj):
             source = instances.source_of(obj)
             if source is not None:
                 return source, text

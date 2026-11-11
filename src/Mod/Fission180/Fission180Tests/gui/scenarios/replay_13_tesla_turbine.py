@@ -7,6 +7,7 @@ stand-ins named in each part's steps file (replay_13_*_steps.py).
 """
 
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import replay_13_assembly_steps as assembly
 from Fission180Tests.gui import replay_13_housing_steps as housing
 from Fission180Tests.gui import replay_13_walls_steps as walls
 from Fission180Tests.gui import replay_e_steps as r
@@ -28,5 +29,9 @@ walls_b, walls_c = walls_all[:second], walls_all[second:]
 walls_c, walls_d = split(walls_c, "wall_extrude_key")
 walls_d, walls_e = split(walls_d, "steam_mirror_open")
 SECTIONS += [("gaskets", walls_b), ("wall", walls_c), ("wall2", walls_d), ("steam", walls_e)]
+assembly_all = assembly.steps()
+assembly_a, assembly_b = split(assembly_all, "power_back")
+assembly_b, assembly_c = split(assembly_b, "circular_open")
+SECTIONS += [("sliders", assembly_a), ("screw", assembly_b), ("patterns", assembly_c)]
 
 h.run("replay_13_tesla_turbine", r.assemble(SECTIONS), paced_by="state")
