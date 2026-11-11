@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Book chapter 10 (Animation), step 7: the timeline's transport, with real input.
 
-The tool exploded over 6 s. The buttons under the view: go to start, next / previous action,
+The tool exploded over 12 s. The buttons under the view: go to start, next / previous action,
 go to end; the playhead dragged along the ruler; Play, paused part way by a second click (the
 view stands at that moment), resumed with Space on the timeline to the end; Loop: played from
 near the end, it starts again from the beginning; Home / End on the keyboard. A component
@@ -16,7 +16,7 @@ from Fission180Tests.gui import simsetup_steps as st
 from Fission180Tests.gui import widget_input as w
 
 s = {}
-LENGTH = 6.0
+LENGTH = 12.0  # (long, so a pause part way never comes too late on a slow machine)
 
 
 def lid_now():
@@ -36,7 +36,13 @@ def view_off():
     h.ribbon("View")
 
 
-def to_six():
+def to_ten():
+    a.click_time(10.0)
+
+
+def to_twelve():
+    # (the ruler grew past 10 s once the playhead stood at its end)
+    h.check("the ruler makes room past the playhead", a.canvas().span > 12.0, a.canvas().span)
     a.click_time(LENGTH)
 
 
@@ -58,7 +64,7 @@ explode_ok.done_what = "the dialog closed"
 
 def go_start():
     h.check(
-        "five actions over 6 s", a.spans("transform") == [(0.0, LENGTH)] * 5, a.spans("transform")
+        "five actions over 12 s", a.spans("transform") == [(0.0, LENGTH)] * 5, a.spans("transform")
     )
     a.transport("start")
 
@@ -72,7 +78,7 @@ def at_start():
 
 
 def at_next():
-    h.check("Next action: the actions' end, 6 s", abs(a.playhead() - LENGTH) < 1e-6, a.playhead())
+    h.check("Next action: the actions' end, 12 s", abs(a.playhead() - LENGTH) < 1e-6, a.playhead())
     a.transport("previous")
 
 
@@ -82,7 +88,7 @@ def at_previous():
 
 
 def at_end():
-    h.check("Go to end: 6 s", abs(a.playhead() - LENGTH) < 1e-6, a.playhead())
+    h.check("Go to end: 12 s", abs(a.playhead() - LENGTH) < 1e-6, a.playhead())
     h.check("the parts are exploded", a.close(lid_now(), (0, 0, 25)), lid_now())
     a.drag_playhead(1.0, 3.0)
 
@@ -94,11 +100,13 @@ def dragged():
         a.playhead(),
     )
     h.check(
-        "the view shows that moment (the Lid half way)", a.close(lid_now(), (0, 0, 12.5)), lid_now()
+        "the view shows that moment (the Lid a quarter up)",
+        a.close(lid_now(), lid_at(3.0)),
+        lid_now(),
     )
     h.check(
-        "the time says 3.0 s of 6.0 s",
-        a.time_label().replace(" ", "") == "3.0s/6.0s",
+        "the time says 3.0 s of 12.0 s",
+        a.time_label().replace(" ", "") == "3.0s/12.0s",
         a.time_label(),
     )
     a.transport("start")
@@ -156,7 +164,7 @@ def played_on():
 
 def loop_on():
     h.check("Loop is on", a.ui_module().STATE["loop"] is True)
-    a.click_time(5.0)
+    a.click_time(11.0)
 
 
 def play_loop():
@@ -258,7 +266,8 @@ h.run(
         a.new_assembly("AnimPlay"),
         enter,
         view_off,
-        to_six,
+        to_ten,
+        to_twelve,
         explode,
         explode_ok,
         go_start,
