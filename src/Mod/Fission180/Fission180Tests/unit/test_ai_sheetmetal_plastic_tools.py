@@ -65,7 +65,8 @@ class Catalogue(unittest.TestCase):
         self.assertEqual(catalog.tool("surface_modify")["category"], "surface")
 
     def test_no_op_waits_for_its_tool(self):
-        self.assertEqual(catalog.AI_TOOLS_TO_COME, ())
+        # (wave 7: the MANUFACTURE steps wait for their tools; none of these tabs' does)
+        self.assertEqual([op for op in catalog.AI_TOOLS_TO_COME if not op.startswith("cam_")], [])
         built = set()
         for t in catalog.TOOLS:
             built |= set(t["ops"])

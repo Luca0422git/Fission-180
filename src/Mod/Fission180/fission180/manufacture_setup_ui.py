@@ -109,9 +109,7 @@ class SetupPanel(panels.CamPanel):
         )
         form.addRow(
             "Model",
-            self.selection_box(
-                MODEL, "model", "All bodies", whole=True
-            ).widget,
+            self.selection_box(MODEL, "model", "All bodies", whole=True).widget,
         )
         form.addRow(QtWidgets.QLabel("Work Coordinate System (WCS)"))
         form.addRow(
@@ -215,9 +213,7 @@ class SetupPanel(panels.CamPanel):
                 "Offset %s" % name,
                 self.number(axis + "_offset", stock[axis + "_offset"]).widget,
             )
-        solid = self.selection_box(
-            SOLID, "stock_solid", "Select a body", single=True, whole=True
-        )
+        solid = self.selection_box(SOLID, "stock_solid", "Select a body", single=True, whole=True)
         row("solid", "Stock Solid", solid.widget)
 
     def _post_tab(self, opts):

@@ -41,7 +41,11 @@ def empty_setup_told():
 
 
 def empty_face_told():
-    h.check("an operation says why too", cam.panel() is None and "no solid body" in cam.told(), cam.told())
+    h.check(
+        "an operation says why too",
+        cam.panel() is None and "no solid body" in cam.told(),
+        cam.told(),
+    )
     h.ribbon("Generate")
 
 
@@ -56,8 +60,16 @@ def empty_simulate_told():
 
 
 def empty_post_told():
-    h.check("Post Process: no setup yet", "no setup yet" in cam.told() and cam.post_dialog() is None, cam.told())
-    h.check("the empty design got nothing", len(cam.doc().Objects) == 0, [o.Name for o in cam.doc().Objects])
+    h.check(
+        "Post Process: no setup yet",
+        "no setup yet" in cam.told() and cam.post_dialog() is None,
+        cam.told(),
+    )
+    h.check(
+        "the empty design got nothing",
+        len(cam.doc().Objects) == 0,
+        [o.Name for o in cam.doc().Objects],
+    )
 
 
 def plate_setup():
@@ -70,12 +82,20 @@ def no_operations():
 
 
 def no_operations_told():
-    h.check("a setup without operations cannot be posted", "has no operation to post" in cam.told(), cam.told())
+    h.check(
+        "a setup without operations cannot be posted",
+        "has no operation to post" in cam.told(),
+        cam.told(),
+    )
     h.ribbon("Simulate")
 
 
 def no_operations_simulate():
-    h.check("nor simulated", "has no operation to simulate" in cam.told() and cam.player() is None, cam.told())
+    h.check(
+        "nor simulated",
+        "has no operation to simulate" in cam.told() and cam.player() is None,
+        cam.told(),
+    )
     h.ribbon("Generate")
 
 
@@ -101,12 +121,20 @@ def pocket_wrong_face():
 
 def pocket_wrong_told():
     text = cam.message()
-    h.check("a wall is no pocket: it says what to pick", "not a flat face at right angles to the tool" in text, text)
+    h.check(
+        "a wall is no pocket: it says what to pick",
+        "not a flat face at right angles to the tool" in text,
+        text,
+    )
     cam.ok()
 
 
 def pocket_refused():
-    h.check("OK is refused, the dialog stays open", cam.panel() is not None and "not a flat face" in cam.message(), cam.message())
+    h.check(
+        "OK is refused, the dialog stays open",
+        cam.panel() is not None and "not a flat face" in cam.message(),
+        cam.message(),
+    )
     cam.tab("Geometry")
     clear = cam.field("geometry_clear", QtWidgets.QToolButton)
     from Fission180Tests.gui import widget_input as w
@@ -115,7 +143,11 @@ def pocket_refused():
 
 
 def pocket_heights():
-    h.check("the x cleared the selection", cam.box_text("geometry") == "Select faces", cam.box_text("geometry"))
+    h.check(
+        "the x cleared the selection",
+        cam.box_text("geometry") == "Select faces",
+        cam.box_text("geometry"),
+    )
     h.check("the pocket's floor", cam.click_face(cam.body(), cam.pocket_floor()))
 
 
@@ -126,12 +158,20 @@ def heights_wrong():
 
 def heights_told():
     text = cam.message()
-    h.check("heights out of order say which and what to do", "Retract Height" in text and "raise it" in text, text)
+    h.check(
+        "heights out of order say which and what to do",
+        "Retract Height" in text and "raise it" in text,
+        text,
+    )
     cam.ok()
 
 
 def heights_refused():
-    h.check("OK is refused with the same reason", cam.panel() is not None and "Retract Height" in cam.message(), cam.message())
+    h.check(
+        "OK is refused with the same reason",
+        cam.panel() is not None and "Retract Height" in cam.message(),
+        cam.message(),
+    )
     cam.cancel()
 
 
@@ -140,7 +180,9 @@ heights_refused.done_what = "Cancel closed the dialog"
 
 
 def cancelled():
-    h.check("Cancel leaves no operation", cam.operations() == [], [o.Label for o in cam.operations()])
+    h.check(
+        "Cancel leaves no operation", cam.operations() == [], [o.Label for o in cam.operations()]
+    )
     h.check("and one setup", len(cam.setups()) == 1)
     h.check("2D > Bore", cam.menu_item("2D", "Bore"))
 
@@ -179,7 +221,11 @@ def stock_negative():
 
 def stock_told():
     text = cam.message()
-    h.check("a stock smaller than the model says where it sticks out", "sticks out of the stock by 3 mm" in text, text)
+    h.check(
+        "a stock smaller than the model says where it sticks out",
+        "sticks out of the stock by 3 mm" in text,
+        text,
+    )
     cam.type_number("side", "-60")
 
 
@@ -190,7 +236,11 @@ def stock_refused():
 
 
 def stock_ok_refused():
-    h.check("OK is refused", cam.panel() is not None and "leave no stock" in cam.message(), cam.message())
+    h.check(
+        "OK is refused",
+        cam.panel() is not None and "leave no stock" in cam.message(),
+        cam.message(),
+    )
     cam.cancel()
 
 
@@ -207,8 +257,14 @@ def simulation_workspace():
 def in_simulation():
     from fission180 import simulation_ui
 
-    h.check("Simulation shows, Manufacture is left", simulation_ui.in_workspace() and not cam.ui_module().in_workspace())
-    h.check("the MILLING tab is gone", not cam.tab_visible("cam_milling") and cam.tab_visible("sim_setup"))
+    h.check(
+        "Simulation shows, Manufacture is left",
+        simulation_ui.in_workspace() and not cam.ui_module().in_workspace(),
+    )
+    h.check(
+        "the MILLING tab is gone",
+        not cam.tab_visible("cam_milling") and cam.tab_visible("sim_setup"),
+    )
     h.check("nothing of the setup is drawn", cam.view_counts() == {}, cam.view_counts())
     dialog = st.new_study_dialog()
     if dialog is not None:
@@ -222,20 +278,34 @@ def back_to_manufacture():
 def in_manufacture():
     from fission180 import simulation_ui
 
-    h.check("Manufacture shows, Simulation is left", cam.ui_module().in_workspace() and not simulation_ui.in_workspace())
-    h.check("only the MILLING tab", cam.tab_visible("cam_milling") and not cam.tab_visible("sim_setup") and not cam.tab_visible("solid"))
+    h.check(
+        "Manufacture shows, Simulation is left",
+        cam.ui_module().in_workspace() and not simulation_ui.in_workspace(),
+    )
+    h.check(
+        "only the MILLING tab",
+        cam.tab_visible("cam_milling")
+        and not cam.tab_visible("sim_setup")
+        and not cam.tab_visible("solid"),
+    )
     h.check("the timeline stays hidden", not cam.timeline_visible())
     st.click_doc_tab("CamEmpty")
 
 
 def other_design():
-    h.check("the other design is still in Manufacture, with no setup", cam.ui_module().in_workspace() and cam.setups() == [])
+    h.check(
+        "the other design is still in Manufacture, with no setup",
+        cam.ui_module().in_workspace() and cam.setups() == [],
+    )
     h.check("Design there", cam.leave())
     st.click_doc_tab("CamRefuse")
 
 
 def each_its_own():
-    h.check("the plate's design is still in Manufacture", cam.ui_module().in_workspace() and cam.tab_visible("cam_milling"))
+    h.check(
+        "the plate's design is still in Manufacture",
+        cam.ui_module().in_workspace() and cam.tab_visible("cam_milling"),
+    )
     h.check("its setup is drawn", cam.view_counts().get("stock") == 1, cam.view_counts())
     h.check("Design", cam.leave())
 

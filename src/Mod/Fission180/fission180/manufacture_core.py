@@ -1942,8 +1942,8 @@ def check_gcode(text, expect=None):
             z_here = min(heights) if heights else None
             if z_here is not None and z_here < safe_z - tol:
                 text_ = (
-                    "Line %d moves sideways at rapid speed at Z %s, below the top of the stock (%s)."
-                    % (line, fmt(z_here), fmt(safe_z))
+                    "Line %d moves sideways at rapid speed at Z %s, below the top of the stock "
+                    "(%s)." % (line, fmt(z_here), fmt(safe_z))
                 )
                 if expect.get("stay_down"):
                     if "rapid" not in flagged:
@@ -2107,7 +2107,8 @@ th { background: #eee; }
 # -- the browser's tree ------------------------------------------------------------------------
 STATE_TEXT = {
     "valid": "The toolpath is up to date",
-    "stale": "Needs regenerating: the design, the setup or the operation changed (right-click: Generate)",
+    "stale": "Needs regenerating: the design, the setup or the operation changed (right-click: "
+    "Generate)",
     "empty": "No toolpath yet (right-click: Generate)",
     "error": "The toolpath could not be made",
     "suppressed": "Suppressed: left out of Generate, Simulate and Post Process",

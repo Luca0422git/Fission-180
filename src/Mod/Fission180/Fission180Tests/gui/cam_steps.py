@@ -321,7 +321,9 @@ def editor():
 
 def library_button(key):
     dialog = library()
-    button = dialog.findChild(QtWidgets.QPushButton, "Fission180CamLibrary_" + key) if dialog else None
+    button = (
+        dialog.findChild(QtWidgets.QPushButton, "Fission180CamLibrary_" + key) if dialog else None
+    )
     if button is None:
         h.check("Tool Library button %s" % key, False)
         return False
@@ -397,7 +399,9 @@ def editor_tab(title):
 
 def editor_ok():
     dialog = editor()
-    box = dialog.findChild(QtWidgets.QDialogButtonBox, "Fission180CamToolButtons") if dialog else None
+    box = (
+        dialog.findChild(QtWidgets.QDialogButtonBox, "Fission180CamToolButtons") if dialog else None
+    )
     if box is None:
         h.check("the tool editor is open", False)
         return False

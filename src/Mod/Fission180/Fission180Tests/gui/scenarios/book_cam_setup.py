@@ -25,9 +25,15 @@ def enter():
 
 
 def entered():
-    h.check("the MILLING tab is the one shown", cam.current_tab() == "cam_milling", cam.current_tab())
+    h.check(
+        "the MILLING tab is the one shown", cam.current_tab() == "cam_milling", cam.current_tab()
+    )
     h.check("the design's tabs are hidden", not cam.tab_visible("solid"))
-    h.check("the workspace button says MANUFACTURE", "MANUFACTURE" in cam.workspace_text(), cam.workspace_text())
+    h.check(
+        "the workspace button says MANUFACTURE",
+        "MANUFACTURE" in cam.workspace_text(),
+        cam.workspace_text(),
+    )
     h.check("the timeline is hidden", not cam.timeline_visible())
     labels = cam.browser_labels()
     h.check("the browser shows Setups", "Setups" in labels, labels)
@@ -47,10 +53,20 @@ def opened():
     h.check("the dialog is Setup", panel.title == "Setup", panel.title)
     h.check("a setup is there while the dialog is open", len(cam.setups()) == 1)
     info = panel.info.text()
-    h.check("the default stock: 1 mm on the sides and the top", "Stock 102 x 62 x 11 mm" in info, info)
+    h.check(
+        "the default stock: 1 mm on the sides and the top", "Stock 102 x 62 x 11 mm" in info, info
+    )
     counts = cam.view_counts()
-    h.check("the stock and the axes are drawn", counts.get("stock") == 1 and counts.get("triad") == 1, counts)
-    h.check("the origin starts on the stock's top centre", counts.get("origin") == [50.0, 30.0, 11.0], counts)
+    h.check(
+        "the stock and the axes are drawn",
+        counts.get("stock") == 1 and counts.get("triad") == 1,
+        counts,
+    )
+    h.check(
+        "the origin starts on the stock's top centre",
+        counts.get("origin") == [50.0, 30.0, 11.0],
+        counts,
+    )
 
 
 def stock_tab():
@@ -77,8 +93,15 @@ def corner_picked():
     got = [int(panel.value("box_point_" + a)) for a in "xyz"]
     h.check("the clicked dot is the box point", got == [-1, -1, 1], got)
     counts = cam.view_counts()
-    h.check("the origin is on the stock's top corner", counts.get("origin") == [-2.0, -2.0, 11.0], counts)
-    h.check("the click on the dot picked no body for Model", cam.box_text("model").startswith("All bodies"))
+    h.check(
+        "the origin is on the stock's top corner",
+        counts.get("origin") == [-2.0, -2.0, 11.0],
+        counts,
+    )
+    h.check(
+        "the click on the dot picked no body for Model",
+        cam.box_text("model").startswith("All bodies"),
+    )
 
 
 def post_tab():
@@ -99,15 +122,29 @@ def made():
     setup = cam.setup()
     h.check("one setup, named Setup1", setup is not None and setup.Label == "Setup1")
     opts = cam.cam().setup_options(setup)
-    h.check("the program is 2001", opts["post"]["program"] == "2001" and opts["post"]["comment"] == "plate", opts["post"])
+    h.check(
+        "the program is 2001",
+        opts["post"]["program"] == "2001" and opts["post"]["comment"] == "plate",
+        opts["post"],
+    )
     frame = cam.cam().frame(setup)
-    h.check("the stock box in setup coordinates", frame.stock_box == [0.0, 0.0, -11.0, 104.0, 64.0, 0.0], frame.stock_box)
-    h.check("the model box", frame.model_box == [2.0, 2.0, -11.0, 102.0, 62.0, -1.0], frame.model_box)
+    h.check(
+        "the stock box in setup coordinates",
+        frame.stock_box == [0.0, 0.0, -11.0, 104.0, 64.0, 0.0],
+        frame.stock_box,
+    )
+    h.check(
+        "the model box", frame.model_box == [2.0, 2.0, -11.0, 102.0, 62.0, -1.0], frame.model_box
+    )
     labels = cam.browser_labels()
     h.check("Setup1 is in the browser", "Setup1" in labels, labels)
     h.check("the design's body is unchanged", volume() == s["volume"])
     counts = cam.view_counts()
-    h.check("the stock stays drawn", counts.get("stock") == 1 and counts.get("origin") == [-2.0, -2.0, 11.0], counts)
+    h.check(
+        "the stock stays drawn",
+        counts.get("stock") == 1 and counts.get("origin") == [-2.0, -2.0, 11.0],
+        counts,
+    )
     h.shot("setup")
 
 
@@ -127,7 +164,9 @@ def redo():
 def redone():
     h.check("Redo brings it back", len(cam.setups()) == 1 and cam.setup().Label == "Setup1")
     frame = cam.cam().frame(cam.setup())
-    h.check("with its stock", frame.stock_box == [0.0, 0.0, -11.0, 104.0, 64.0, 0.0], frame.stock_box)
+    h.check(
+        "with its stock", frame.stock_box == [0.0, 0.0, -11.0, 104.0, 64.0, 0.0], frame.stock_box
+    )
 
 
 def edit():
@@ -140,7 +179,10 @@ edit.done_what = "the Setup dialog is open for Setup1"
 
 def fixed_box():
     panel = cam.panel()
-    h.check("the dialog shows what the setup has", panel.value("side") == 2.0 and panel.value("program") == "2001")
+    h.check(
+        "the dialog shows what the setup has",
+        panel.value("side") == 2.0 and panel.value("program") == "2001",
+    )
     h.check("the Stock tab", cam.tab("Stock"))
     h.check("Fixed size box", cam.choose("mode", "Fixed size box"))
     cam.type_number("width", "120")
@@ -154,14 +196,24 @@ def fixed_typed():
     box = cam.field("mode", QtWidgets.QComboBox)
     row = box.findText("Relative size cylinder")
     h.check("round stock is listed greyed", row >= 0 and not box.model().item(row).isEnabled())
-    h.check("its reason is its tool tip", "turning" in (box.itemData(row, QtCore.Qt.ToolTipRole) or ""))
+    h.check(
+        "its reason is its tool tip", "turning" in (box.itemData(row, QtCore.Qt.ToolTipRole) or "")
+    )
 
 
 def edited():
     frame = cam.cam().frame(cam.setup())
     # centred on the model in X and Y, its top 1 mm above the model's (z_offset 1)
-    h.check("the fixed stock's box", frame.stock_box == [0.0, 0.0, -15.0, 120.0, 80.0, 0.0], frame.stock_box)
-    h.check("the model inside it", frame.model_box == [10.0, 10.0, -11.0, 110.0, 70.0, -1.0], frame.model_box)
+    h.check(
+        "the fixed stock's box",
+        frame.stock_box == [0.0, 0.0, -15.0, 120.0, 80.0, 0.0],
+        frame.stock_box,
+    )
+    h.check(
+        "the model inside it",
+        frame.model_box == [10.0, 10.0, -11.0, 110.0, 70.0, -1.0],
+        frame.model_box,
+    )
     h.check("still one setup", len(cam.setups()) == 1)
 
 
@@ -182,17 +234,29 @@ def leave():
 
 
 def left():
-    h.check("the SOLID tab is back", cam.tab_visible("solid") and not cam.tab_visible("cam_milling"))
-    h.check("the workspace button says DESIGN", "DESIGN" in cam.workspace_text(), cam.workspace_text())
+    h.check(
+        "the SOLID tab is back", cam.tab_visible("solid") and not cam.tab_visible("cam_milling")
+    )
+    h.check(
+        "the workspace button says DESIGN", "DESIGN" in cam.workspace_text(), cam.workspace_text()
+    )
     h.check("the timeline is back", cam.timeline_visible())
     h.check("nothing is drawn of the setup", cam.view_counts() == {}, cam.view_counts())
     labels = cam.browser_labels()
-    h.check("the design's browser is back, without the setup", "Bodies" in labels and "Setup1" not in labels, labels)
+    h.check(
+        "the design's browser is back, without the setup",
+        "Bodies" in labels and "Setup1" not in labels,
+        labels,
+    )
     h.check("the design's body is unchanged", volume() == s["volume"])
     from Fission180Tests.gui import dialog_input as ui
 
     titles = ui.timeline_titles()
-    h.check("the setup is no step of the timeline", not any("Setup" in t or "Cam" in t for t in titles), titles)
+    h.check(
+        "the setup is no step of the timeline",
+        not any("Setup" in t or "Cam" in t for t in titles),
+        titles,
+    )
 
 
 def again():

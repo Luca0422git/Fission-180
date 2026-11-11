@@ -732,7 +732,10 @@ class _Command:
 
 class NewSetupCommand(_Command):
     label = "New Setup"
-    tip = "Say how the part sits on the machine: the origin, the directions and the stock it is cut from"
+    tip = (
+        "Say how the part sits on the machine: the origin, the directions and the stock it is "
+        "cut from"
+    )
     icon = "cam_setup"
 
     def run(self):
@@ -773,7 +776,10 @@ def _op_command(kind):
 
 class GenerateCommand(_Command):
     label = "Generate"
-    tip = "Make the toolpaths that are missing or out of date (of the picked operations, or the active setup)"
+    tip = (
+        "Make the toolpaths that are missing or out of date (of the picked operations, or the "
+        "active setup)"
+    )
     icon = "cam_generate"
 
     def run(self):

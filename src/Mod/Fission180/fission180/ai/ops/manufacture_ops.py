@@ -201,7 +201,7 @@ def op_cam_edit(self, step):
         if target is not None and cam.is_setup(target):
             cam.update_setup(target, {k: step[k] for k in ("stock", "wcs", "post") if k in step})
         elif target is not None and cam.is_op(target):
-            data = cam.op_data(target)
+            data = cam.operation_data(target)
             options = core.merge(data["options"], step.get("options"))
             tool = _tool(step)
             if tool is not None:

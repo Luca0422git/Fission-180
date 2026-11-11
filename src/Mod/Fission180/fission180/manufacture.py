@@ -502,6 +502,11 @@ def op_data(op):
     return data
 
 
+def operation_data(op):
+    """op_data under a name the AI step files can use (their own steps are named op_...)."""
+    return op_data(op)
+
+
 def op_picks(op):
     return picks(op.References)
 
@@ -817,7 +822,8 @@ def resolve(op, fr=None):
                 z = _horizontal(element)
                 if z is None and kind != "pocket3d":
                     raise CamError(
-                        "%s is not a flat face at right angles to the tool: pick the pocket's floor "
+                        "%s is not a flat face at right angles to the tool: pick the pocket's "
+                        "floor "
                         "or its top edge." % sub
                     )
                 bottom = round(z if z is not None else element.BoundBox.ZMin, 6)
@@ -1055,8 +1061,8 @@ def plan(op, fr=None):
         )
     if heights["bottom"] < fr.stock_box[2] - 1e-6 and kind != "drill":
         warnings.append(
-            "The Bottom Height is %s mm below the stock: the tool would cut into what the stock lies on."
-            % core.fmt(fr.stock_box[2] - heights["bottom"])
+            "The Bottom Height is %s mm below the stock: the tool would cut into what the stock "
+            "lies on." % core.fmt(fr.stock_box[2] - heights["bottom"])
         )
     linking = options["linking"]
     if (
@@ -1380,7 +1386,8 @@ class Run:
                 pass
             log("manufacture engine ended without a result (code %s): %s" % (code, tail))
             self._fail(
-                "FreeCAD's toolpath engine stopped without a result (it may have crashed on this shape)."
+                "FreeCAD's toolpath engine stopped without a result (it may have crashed on this "
+                "shape)."
             )
             return self.state
         try:

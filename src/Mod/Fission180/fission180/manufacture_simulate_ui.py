@@ -216,7 +216,8 @@ class Player(FocusBack, QtWidgets.QDialog):
             first = play.collisions[0]
             self.collisions.setStyleSheet("color: #ff8a80;")
             self.collisions.setText(
-                "%d rapid move%s went into the stock (a crash on a machine). First: %s, toolpath line %s, "
+                "%d rapid move%s went into the stock (a crash on a machine). First: %s, toolpath "
+                "line %s, "
                 "%s mm deep at (%s)."
                 % (
                     len(play.collisions),

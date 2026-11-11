@@ -216,7 +216,8 @@ def delete_tool(key, tool_id, doc=None):
         raise CamError("The sample library cannot be changed.")
     if key == "document":
         raise CamError(
-            "A design's own tools are the ones its operations use: give the operation another tool instead."
+            "A design's own tools are the ones its operations use: give the operation another "
+            "tool instead."
         )
     name = key[6:]
     bit, _lib = _dirs()

@@ -134,8 +134,9 @@ TEST_ONLY_OPS = (
 )
 # Ops a person can do that no tool builds YET, named in docs/fission180/known-issues.md. Remove
 # an op here when its tool lands (a unit test fails while a tool lists an op that is still here).
-# (Empty since the SHEET METAL, PLASTIC and SURFACE > MODIFY tools landed.)
-AI_TOOLS_TO_COME = ()
+# (Empty since the SHEET METAL, PLASTIC and SURFACE > MODIFY tools landed; wave 7's MANUFACTURE
+# workspace has its design steps, golden-tested, and no AI tools yet: builder cam.)
+AI_TOOLS_TO_COME = ("cam_setup", "cam_operation", "cam_edit", "cam_generate", "cam_post")
 
 
 def tool(name):

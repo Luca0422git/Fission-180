@@ -27,7 +27,11 @@ def build():
     body = cam.body()
     s["volume"] = round(body.Shape.Volume, 3)
     setup = m.create_setup(
-        doc, {"stock": {"side": 2.0, "top": 1.0}, "wcs": {"origin": "stock_point", "box_point": [-1, -1, 1]}}
+        doc,
+        {
+            "stock": {"side": 2.0, "top": 1.0},
+            "wcs": {"origin": "stock_point", "box_point": [-1, -1, 1]},
+        },
     )
     m.add_operation(setup, "face", [], {"tool": core.make_tool("flat", 10.0, number=1)})
     m.add_operation(
@@ -55,10 +59,21 @@ def enter():
 
 def not_generated():
     labels = cam.browser_labels()
-    h.check("the operations are listed in order", labels[-3:] == ["[T1] Face1", "[T2] 2D Contour1", "[T3] Drill1"], labels)
-    h.check("none has a toolpath yet", [cam.state(n) for n in ("Face1", "2D Contour1", "Drill1")] == ["empty"] * 3)
+    h.check(
+        "the operations are listed in order",
+        labels[-3:] == ["[T1] Face1", "[T2] 2D Contour1", "[T3] Drill1"],
+        labels,
+    )
+    h.check(
+        "none has a toolpath yet",
+        [cam.state(n) for n in ("Face1", "2D Contour1", "Drill1")] == ["empty"] * 3,
+    )
     node = cam.row_node("[T1] Face1")
-    h.check("the browser marks them", node["status"] == "warning" and "No toolpath yet" in node["tip"], node)
+    h.check(
+        "the browser marks them",
+        node["status"] == "warning" and "No toolpath yet" in node["tip"],
+        node,
+    )
 
 
 def generate():
@@ -74,7 +89,11 @@ def all_valid():
     states = {n: cam.state(n) for n in ("Face1", "2D Contour1", "Drill1")}
     h.check("every toolpath is up to date", set(states.values()) == {"valid"}, states)
     node = cam.row_node("[T2] 2D Contour1")
-    h.check("the row is plain again, with the times in its tip", node["status"] == "ok" and "Machining time" in node["tip"], node)
+    h.check(
+        "the row is plain again, with the times in its tip",
+        node["status"] == "ok" and "Machining time" in node["tip"],
+        node,
+    )
     s["contour"] = cam.stats("2D Contour1")["bounds"]
 
 
@@ -96,11 +115,25 @@ def stale():
     states = {n: cam.state(n) for n in ("Face1", "2D Contour1", "Drill1")}
     h.check("every toolpath needs regenerating", set(states.values()) == {"stale"}, states)
     node = cam.row_node("[T2] 2D Contour1")
-    h.check("the browser shows it in yellow, with what to do", node["status"] == "warning" and "Needs regenerating" in node["tip"], node)
+    h.check(
+        "the browser shows it in yellow, with what to do",
+        node["status"] == "warning" and "Needs regenerating" in node["tip"],
+        node,
+    )
     setup = cam.row_node("Setup1")
     h.check("the setup's row too", setup["status"] == "warning", setup)
     entries = cam.menu_entries("Setup1")
-    want = ["Edit", "Generate", "Simulate", "Post Process", "Setup Sheet", "Suppress", "Duplicate", "Rename", "Delete"]
+    want = [
+        "Edit",
+        "Generate",
+        "Simulate",
+        "Post Process",
+        "Setup Sheet",
+        "Suppress",
+        "Duplicate",
+        "Rename",
+        "Delete",
+    ]
     h.check("the setup's right-click menu", entries == want, entries)
 
 
@@ -120,7 +153,18 @@ def regenerated():
 
 def suppress():
     entries = cam.menu_entries("[T3] Drill1")
-    want = ["Edit", "Generate", "Simulate", "Post Process", "Suppress", "Duplicate", "Move Up", "Move Down", "Rename", "Delete"]
+    want = [
+        "Edit",
+        "Generate",
+        "Simulate",
+        "Post Process",
+        "Suppress",
+        "Duplicate",
+        "Move Up",
+        "Move Down",
+        "Rename",
+        "Delete",
+    ]
     h.check("an operation's right-click menu", entries == want, entries)
     cam.right_click_row("[T3] Drill1", "Suppress")
 
@@ -142,7 +186,9 @@ def duplicate():
 
 def duplicated():
     labels = [o.Label for o in cam.operations()]
-    h.check("a copy at the end", labels == ["Face1", "2D Contour1", "Drill1", "2D Contour2"], labels)
+    h.check(
+        "a copy at the end", labels == ["Face1", "2D Contour1", "Drill1", "2D Contour2"], labels
+    )
     h.check("without a toolpath yet", cam.state("2D Contour2") == "empty")
     cam.undo()
 
@@ -155,7 +201,9 @@ def undone():
 
 def redone():
     labels = [o.Label for o in cam.operations()]
-    h.check("Redo brings it back", labels == ["Face1", "2D Contour1", "Drill1", "2D Contour2"], labels)
+    h.check(
+        "Redo brings it back", labels == ["Face1", "2D Contour1", "Drill1", "2D Contour2"], labels
+    )
     cam.right_click_row("[T2] 2D Contour2", "Delete")
 
 
@@ -167,7 +215,11 @@ def deleted():
 
 def moved():
     labels = [o.Label for o in cam.operations()]
-    h.check("Move Up: the drill before the contour", labels == ["Face1", "Drill1", "2D Contour1"], labels)
+    h.check(
+        "Move Up: the drill before the contour",
+        labels == ["Face1", "Drill1", "2D Contour1"],
+        labels,
+    )
     h.check("moving keeps the toolpaths", {cam.state(n) for n in labels} == {"valid"})
     cam.click_row("Setup1")
 
@@ -176,7 +228,11 @@ def paths_shown():
     counts = cam.view_counts()
     h.check("picking the setup's row draws its toolpaths", counts.get("paths", 0) > 30, counts)
     kinds = counts.get("kinds") or {}
-    h.check("cutting, rapid and plunging moves", all(kinds.get(k, 0) > 0 for k in ("cut", "rapid", "plunge")), kinds)
+    h.check(
+        "cutting, rapid and plunging moves",
+        all(kinds.get(k, 0) > 0 for k in ("cut", "rapid", "plunge")),
+        kinds,
+    )
     h.shot("toolpaths")
 
 
@@ -193,9 +249,17 @@ def simulate_opened():
     play = cam.player().playback
     stats = play.statistics()
     s["start"] = stats["start_volume"]
-    h.check("the whole stock at the start", stats["removed"] == 0.0 and abs(stats["start_volume"] - 114 * 64 * 11) < 300, stats)
+    h.check(
+        "the whole stock at the start",
+        stats["removed"] == 0.0 and abs(stats["start_volume"] - 114 * 64 * 11) < 300,
+        stats,
+    )
     h.check("three operations to play", len(play.operations) == 3 and stats["time_s"] > 30, stats)
-    h.check("the stock is drawn as a surface, with the tool", cam.view_counts().get("simulation", 0) > 1000, cam.view_counts())
+    h.check(
+        "the stock is drawn as a surface, with the tool",
+        cam.view_counts().get("simulation", 0) > 1000,
+        cam.view_counts(),
+    )
     cam.player_button("step")
 
 
@@ -221,19 +285,29 @@ def at_end():
 
 def restarted():
     stats = cam.player().playback.statistics()
-    h.check("Restart: the whole stock again", stats["removed"] == 0.0 and stats["played_s"] == 0.0, stats)
+    h.check(
+        "Restart: the whole stock again",
+        stats["removed"] == 0.0 and stats["played_s"] == 0.0,
+        stats,
+    )
     cam.player().speed.setValue(100)  # (the speed slider far right: a hand drags it there)
     cam.player_button("play")
 
 
 def played():
     stats = cam.player().playback.statistics()
-    h.check("Play ran to the end by itself", abs(stats["removed"] - s["removed"]) < 1.0, (stats, s["removed"]))
+    h.check(
+        "Play ran to the end by itself",
+        abs(stats["removed"] - s["removed"]) < 1.0,
+        (stats, s["removed"]),
+    )
     h.check("the Play button is back", cam.player().buttons["play"].text() == "Play")
     cam.player_button("close")
 
 
-played.ready = lambda: cam.player() is not None and cam.player().playback.done() and not cam.player().playing
+played.ready = (
+    lambda: cam.player() is not None and cam.player().playback.done() and not cam.player().playing
+)
 played.ready_what = "the simulation played to its end"
 played.while_busy = True
 played.timeout_s = 120
@@ -242,7 +316,11 @@ played.timeout_s = 120
 def simulate_closed():
     h.check("the player closed", cam.player() is None)
     counts = cam.view_counts()
-    h.check("the see-through stock is back", counts.get("stock") == 1 and "simulation" not in counts, counts)
+    h.check(
+        "the see-through stock is back",
+        counts.get("stock") == 1 and "simulation" not in counts,
+        counts,
+    )
 
 
 # -- Post Process ---------------------------------------------------------------------------------
@@ -261,7 +339,11 @@ def post_opened():
     manufacture_post_ui.OPEN_FILES = False
     dialog = cam.post_dialog()
     posts = [dialog.post.itemText(i) for i in range(dialog.post.count())]
-    h.check("the posts by their machines' names", posts[:5] == ["Grbl", "LinuxCNC (EMC2)", "Mach3 / Mach4 Mill", "Fanuc", "Marlin"], posts)
+    h.check(
+        "the posts by their machines' names",
+        posts[:5] == ["Grbl", "LinuxCNC (EMC2)", "Mach3 / Mach4 Mill", "Fanuc", "Marlin"],
+        posts,
+    )
     safety = cam.post_widget("safety").text()
     h.check("the safety note is in the dialog", safety == core.SAFETY_NOTE, safety)
     cam.post_type("folder", cam.out_dir())
@@ -270,7 +352,11 @@ def post_opened():
 
 
 def post_go():
-    h.check("the file's name follows the program and the post", cam.post_widget("file").text() == "2042.nc", cam.post_widget("file").text())
+    h.check(
+        "the file's name follows the program and the post",
+        cam.post_widget("file").text() == "2042.nc",
+        cam.post_widget("file").text(),
+    )
     cam.post_click("go")
 
 
@@ -281,27 +367,61 @@ def posted():
     path = os.path.join(cam.out_dir(), "2042.nc")
     h.check("the program was written", os.path.isfile(path), path)
     result = cam.post_widget("result").text()
-    h.check("the dialog says what the checker found", "Checked: nothing found" in result and "2042.nc" in result, result)
+    h.check(
+        "the dialog says what the checker found",
+        "Checked: nothing found" in result and "2042.nc" in result,
+        result,
+    )
     text = open(path).read() if os.path.isfile(path) else ""
     lines = text.splitlines()
-    h.check("the program's name and comment at its top", lines[:2] == ["(Program 2042)", "(longboard)"], lines[:3])
-    check = core.check_gcode(text, {"units": "mm", "min_z": -11.0, "safe_z": 0.0, "bounds": [-1, -1, 115, 65]})
-    h.check("millimetres, spindle on before cutting, safe rapids, inside the box", check["problems"] == [], check)
-    h.check("down to the plate's bottom and no further", check["min_z"] == -11.0 and check["max_z"] == 15.0, check)
+    h.check(
+        "the program's name and comment at its top",
+        lines[:2] == ["(Program 2042)", "(longboard)"],
+        lines[:3],
+    )
+    check = core.check_gcode(
+        text, {"units": "mm", "min_z": -11.0, "safe_z": 0.0, "bounds": [-1, -1, 115, 65]}
+    )
+    h.check(
+        "millimetres, spindle on before cutting, safe rapids, inside the box",
+        check["problems"] == [],
+        check,
+    )
+    h.check(
+        "down to the plate's bottom and no further",
+        check["min_z"] == -11.0 and check["max_z"] == 15.0,
+        check,
+    )
     first_cut = next(i for i, ln in enumerate(lines) if ln.startswith("G1 "))
     spindle = next(i for i, ln in enumerate(lines) if ln.startswith("M3"))
     units = next(i for i, ln in enumerate(lines) if ln.strip() == "G21")
-    h.check("G21, then M3 with a speed, then the first cut", units < spindle < first_cut and " S" in lines[spindle], lines[spindle])
+    h.check(
+        "G21, then M3 with a speed, then the first cut",
+        units < spindle < first_cut and " S" in lines[spindle],
+        lines[spindle],
+    )
     h.check("three tools are called", text.count("M6 T") == 3, text.count("M6 T"))
-    h.check("it would be opened in the editor", manufacture_post_ui.LAST["opened"][-1:] == [path], manufacture_post_ui.LAST["opened"])
+    h.check(
+        "it would be opened in the editor",
+        manufacture_post_ui.LAST["opened"][-1:] == [path],
+        manufacture_post_ui.LAST["opened"],
+    )
     opts = cam.cam().setup_options(cam.setup())["post"]
-    h.check("the program's name is the setup's now", opts["program"] == "2042" and opts["comment"] == "longboard", opts)
+    h.check(
+        "the program's name is the setup's now",
+        opts["program"] == "2042" and opts["comment"] == "longboard",
+        opts,
+    )
     h.check("LinuxCNC", cam.post_choose("post", "LinuxCNC (EMC2)"))
     h.check("inches", cam.post_choose("units", "Inches (G20)"))
 
 
 def post_inch():
-    h.check("the file's name follows the post", cam.post_widget("file").text() == "2042.ngc", cam.post_widget("file").text())
+    h.check(
+        "the file's name follows the post",
+        cam.post_widget("file").text() == "2042.ngc",
+        cam.post_widget("file").text(),
+    )
     cam.post_click("go")
 
 
@@ -311,7 +431,9 @@ def posted_inch():
     path = os.path.join(cam.out_dir(), "2042.ngc")
     text = open(path).read() if os.path.isfile(path) else ""
     check = core.check_gcode(text, {"units": "in"})
-    h.check("an inch program for LinuxCNC", check["units"] == "in" and check["problems"] == [], check)
+    h.check(
+        "an inch program for LinuxCNC", check["units"] == "in" and check["problems"] == [], check
+    )
     h.check("the depth in inches", abs(check["min_z"] + 11.0 / 25.4) < 1e-3, check["min_z"])
     cam.post_click("close")
 
@@ -362,17 +484,28 @@ def reopened():
 
 def after_reopen():
     labels = cam.browser_labels()
-    h.check("the setup and its operations are back, in their order", labels[-4:] == ["Setup1", "[T1] Face1", "[T3] Drill1", "[T2] 2D Contour1"], labels)
+    h.check(
+        "the setup and its operations are back, in their order",
+        labels[-4:] == ["Setup1", "[T1] Face1", "[T3] Drill1", "[T2] 2D Contour1"],
+        labels,
+    )
     states = {n: cam.state(n) for n in ("Face1", "2D Contour1", "Drill1")}
     h.check("with their toolpaths up to date", set(states.values()) == {"valid"}, states)
     h.check("the same toolpaths", {n: cam.stats(n) for n in states} == s["stats"])
-    h.check("the body is as it was saved", round(cam.body().Shape.Volume, 3) == round(s["volume"] + 10 * 60 * 10, 3))
+    h.check(
+        "the body is as it was saved",
+        round(cam.body().Shape.Volume, 3) == round(s["volume"] + 10 * 60 * 10, 3),
+    )
     cam.click_row("[T2] 2D Contour1")
 
 
 def path_after_reopen():
     counts = cam.view_counts()
-    h.check("picking a row draws its toolpath", counts.get("paths", 0) > 10 and counts.get("stock") == 1, counts)
+    h.check(
+        "picking a row draws its toolpath",
+        counts.get("paths", 0) > 10 and counts.get("stock") == 1,
+        counts,
+    )
     h.check("Design", cam.leave())
 
 
