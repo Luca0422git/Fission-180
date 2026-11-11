@@ -3,24 +3,28 @@
 To Object chosen by hand reach (wave 7; the components builder's open item: "with a
 sub-component active, a Cut chosen by hand did not reach another component's body").
 
-Fusion: the operation proposed by itself looks at the active component only; a Cut the
-person chooses goes through every body in its way, other components' too (Objects To Cut;
+Fusion: a Cut goes through every body in its way, other components' too (Objects To Cut;
 Autodesk's article "How to extrude from one component to cut another component", forum
-"extrude-cut through all problem").
+"extrude-cut through all problem"), and it is proposed by itself when the new solid lies
+mostly inside another visible body, whichever component is active (an observation Autodesk's
+J. Strater confirmed; the wave 7 follow-up, builder extrude-2: before, a body of another
+component never made a Cut by itself). A Join stays with the active component's bodies.
 
 The design: the component Nozzle, standing 30 mm along X, with a block 20 x 20 x 10 (4000
 mm3); the empty component Axle, active.
 
 X1  Create Sketch on the Nozzle's top face (the sketch goes into Axle), a circle r 2. E, -4:
-    New Body by itself (the Nozzle is another component's). Cut chosen by hand: the Bodies to
-    Cut row lists the Nozzle's body and the preview takes pi * 4 * 4 out of it. +4 (up, into
-    the air): the dialog says the cut goes through no body, OK is refused and says so. -4
-    again, OK: the Nozzle is cut, Axle holds no solid and is still the active component (the
-    cut used to make the Nozzle active, so the next sketch went into the Nozzle). Undo / Redo.
-X2  The same sketch shown again, E, -4, Intersect chosen by hand: only the part of the
-    Nozzle inside the extrusion is left in the preview. Cancel puts the Nozzle back.
-X3  E, To Object, the Nozzle's underside: New Body by itself, a peg through the Nozzle in
-    Axle (pi * 4 * 10). Cut chosen by hand: a hole through the Nozzle instead. OK.
+    Cut by itself (the circle is pushed into the Nozzle), the Bodies to Cut row lists the
+    Nozzle's body and the preview takes pi * 4 * 4 out of it. Cut chosen by hand (so that it
+    stays); +4 (up, into the air): the dialog says the cut goes through no body, OK is
+    refused and says so. -4 again, OK: the Nozzle is cut, Axle holds no solid and is still
+    the active component (the cut used to make the Nozzle active, so the next sketch went
+    into the Nozzle). Undo / Redo.
+X2  The same sketch shown again, E, -4: Cut by itself again; Intersect chosen by hand: only
+    the part of the Nozzle inside the extrusion is left in the preview. Cancel puts the
+    Nozzle back.
+X3  E, To Object, the Nozzle's underside: the peg lies inside the Nozzle, so a Cut by
+    itself: a hole through the Nozzle (pi * 4 * 10), nothing in Axle. OK.
 """
 import math
 
@@ -149,9 +153,10 @@ def pick_circle():
 
 def x1_proposed():
     typed("-4")
-    h.check("X1 into another component's body: New Body by itself", op() == "New Body", op())
-    h.check("X1 the Nozzle is untouched", near(nozzle_volume(), NOZZLE), nozzle_volume())
-    h.check("X1 the person picks Cut", ui.choose(panel().operation, "Cut"))
+    h.check("X1 pushed into another component's body: Cut by itself", op() == "Cut", op())
+    h.check("X1 the preview takes pi * 4 * 4 out of the Nozzle already",
+            near(nozzle_volume(), NOZZLE - DISC * 4), nozzle_volume())
+    h.check("X1 the person picks Cut (it then stays)", ui.choose(panel().operation, "Cut"))
 
 
 def x1_cut():
@@ -247,7 +252,7 @@ def pick_second():
 
 def x2_intersect():
     typed("-4")
-    h.check("X2 New Body by itself", op() == "New Body", op())
+    h.check("X2 Cut by itself", op() == "Cut", op())
     h.check("X2 the person picks Intersect", ui.choose(panel().operation, "Intersect"))
 
 
@@ -295,14 +300,13 @@ def x3_peg():
     h.caught_up(p)
     h.check("X3 the underside is the object", bool(p.options.get("extent_object")),
             p.options.get("extent_object"))
-    h.check("X3 To Object through another component's body: New Body by itself",
-            op() == "New Body", op())
+    h.check("X3 To Object through another component's body: Cut by itself",
+            op() == "Cut", op())
     made = [b for b in k.all_bodies_of("Axle") if k.volume(b) > 1e-6]
-    h.check("X3 a peg through the Nozzle, in Axle (pi * 4 * 10)",
-            len(made) == 1 and near(k.volume(made[0]), DISC * 10),
-            [k.volume(b) for b in made])
-    h.check("X3 the Nozzle is untouched", near(nozzle_volume(), s["before"]), nozzle_volume())
-    h.check("X3 the person picks Cut", ui.choose(p.operation, "Cut"))
+    h.check("X3 no peg in Axle", not made, [k.volume(b) for b in made])
+    h.check("X3 the preview is a hole through the Nozzle already",
+            near(nozzle_volume(), s["before"] - DISC * 10), nozzle_volume())
+    h.check("X3 the person picks Cut (it stays)", ui.choose(p.operation, "Cut"))
 
 
 def x3_hole():

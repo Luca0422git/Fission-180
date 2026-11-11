@@ -31,10 +31,11 @@ rows marked so.
 | # | Situation (the first row that fits decides) | The dialog shows | Source |
 |---|---|---|---|
 | 1 | The extrusion **starts inside** a body: its first 0.01 mm lies in material (at least 1 % of it). A face pushed in, a profile on a plane through the part. One Side / Two Sides: side one; **Symmetric: both sides** (a profile on a middle plane) | **Cut** | Autodesk (Strater; Learn); Book (the thruster cone pushed up into the rocket "was set to Cut automatically ... exactly as the book says"; the donut bite) |
+| 1b | (wave 7 follow-up, `sf/book-extrude-2`) It lies **mostly inside shown bodies of other components**: more than half of the new solid (a profile pushed into another component's part, To Object through it), whichever component is active, the design's top row included. Those bodies are listed under Bodies to Cut, each with a check box | **Cut** | Autodesk (Strater confirmed a user's reading in "Tool behaviour - unexpected": "if the new body's volume is mostly inside another visible body" it is a Cut); Forum (the automatic Cut happens "even when the cut goes through all components in the assembly"; "extrude-cut through all problem": both components are selected under Objects To Cut). The share of one half is a Guess. A new part that only overlaps another component's part a little is no Cut (row 5: the report's bug 10, a link around another component's pin, 6 % inside) |
 | 2 | It **starts on a face** of a body and goes away from it (the profile is the face, or a sketch on it), also when it runs into another part of the body further on (a column next to it that leans over the face) | **Join** | Autodesk Learn ("when you extrude a face in a direction away from the existing body, the Operation type is set to Join") |
 | 3 | It starts in the air and **reaches into** a body further on, by at least 1 % of its own volume (a profile beside a step, a sketch on a plane above the part extruded down into it, To Object the underside; a sliver along an edge does not count) | **Cut** | Autodesk (Strater: "intersects a solid"); the report (Hot End flats: "the dialog chose Join") |
 | 4 | It only **touches** a body, face to face | **Join** | Autodesk (Strater: "Join/New Body") |
-| 5 | None of these: it touches nothing; the first solid; the active component has no solid yet, whatever body of another component it goes through or touches | **New Body** | Autodesk Learn ("a New Body in the active component"); the report's bug 10 |
+| 5 | None of these: it touches nothing; the first solid; the active component has no solid yet and the extrusion is not mostly inside another component's body (row 1b) | **New Body** | Autodesk Learn ("a New Body in the active component"); the report's bug 10 |
 | | Direction Symmetric, Two Sides, Extent All, To Object, Flip, a typed or dragged distance, a negative distance | The same rows, decided again with each preview (60 ms after the last change; while an arrow is dragged, row 1 shows at once) | Autodesk (the rule names no direction); **before wave 7 a symmetric extrude never cut by itself**, which made the book's donut bite a Join |
 | | The person picks an operation in the list | That operation, from then on, whatever changes in the dialog (`user_picked_operation`); a build that fails keeps the picked operation shown with the reason beside it (it used to show the old one again) | Forum (IdeaStation); Luca's brief |
 | | An extrude edited from the timeline | The saved operation; it never changes by itself | as above |
@@ -86,6 +87,28 @@ operation staying put. Code: `extrude_bodies_core.auto_operation` / `scope` (uni
 `auto_scope`, `extrude_ui._auto_operation` / `_live_operation`, `extrude_finish.SaysWhy` and
 `speaking` (also in Revolve, Sweep, Loft and the primitives). Scenario
 `book_extrude_operation` (ten rows, 72 checks).
+
+### Objects To Cut: a list with check boxes, names with their component (`sf/book-extrude-2`)
+
+Fusion lists the bodies a Cut or Intersect acts on under Objects To Cut (Autodesk, Extrude
+reference: Objects To Cut, whose Auto-Select "re-computes the bodies to cut based on the
+current visibility state"; the support article "How to extrude from one component to cut
+another component": "For Objects to Cut, select only the component that you want to cut
+from"). That each body has a check box there is the brief's description of Fusion's dialog
+(Guess: no page was found that shows it). The Extrude dialog's Bodies to Cut /
+Bodies to Intersect row now has that list under it: one check box for each body in the
+extrusion's way, ticked when the extrude acts on it; a click on a box leaves the body out or
+takes it back (what a click on the body in the view does while the row is active). With
+every box cleared the dialog says that the list is empty and what to do, and OK is refused
+with the reason next to the mouse. A Join shows the list only when two or more bodies are
+in its way.
+
+Bodies are numbered per component (the design's first body and each component's first body
+are all "Body1"), so the list, the row's names and the log name a body with its component:
+"Body1 (Block)" (`bodies.clear_name`; `bodies.named(doc, text)` finds a body from such a
+name, its object name or a label only one body has, and says what to write when several
+bodies share it). Scenario `book_extrude2_across` (37 checks); the older
+`book_extrude_across` follows row 1b (43 checks).
 
 ## Direction and sign (wave 7)
 

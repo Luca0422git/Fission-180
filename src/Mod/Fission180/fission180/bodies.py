@@ -78,6 +78,84 @@ def body_of(obj):
     return parent
 
 
+# -- a body's name, with its component -------------------------------------------------------------
+# Bodies are numbered per component, like Fusion's: the design's first body and every
+# component's first body are all "Body1". Wherever a body is shown or asked for by name
+# outside the browser (a dialog's list, a message, the AI tools' body argument, a script) it
+# is "Body1 (Bracket)": the label with its component's. A body at the top of the design is
+# plain "Body1".
+def clear_name(body):
+    """ "Body1 (Bracket)" for a body in a component, its plain label at the top level."""
+    try:
+        from . import components
+
+        part = components.container_of(body)
+        if part is not None:
+            return "%s (%s)" % (body.Label, part.Label)
+    except Exception:
+        pass
+    try:
+        return body.Label
+    except Exception:
+        return ""
+
+
+def named(doc, text):
+    """([the bodies `text` names], why not exactly one or ""): `text` is a body's object
+    name ("Body003"), its name with its component ("Body1 (Bracket)") or its plain label
+    ("Body1"). A plain label names the body at the top level of the design when there is
+    one of that name there (that is its full name); when only bodies inside components
+    have it and there are several, it is ambiguous and the answer says what to write."""
+    text = str(text or "").strip()
+    if doc is None or not text:
+        return [], "No body is named."
+    everyone = list_bodies(doc)
+    obj = doc.getObject(text)
+    if obj is not None and is_body(obj):
+        return [obj], ""
+    exact = [b for b in everyone if clear_name(b) == text]
+    if len(exact) == 1:
+        return exact, ""
+    labelled = exact or [b for b in everyone if b.Label == text]
+    if len(labelled) == 1:
+        return labelled, ""
+    if not labelled:
+        return [], "There is no body called %s. The bodies are: %s." % (
+            text,
+            ", ".join(clear_name(b) for b in everyone) or "none",
+        )
+    return labelled, "%d bodies are called %s: write it with its component, %s." % (
+        len(labelled),
+        text,
+        " or ".join(_told_apart(labelled)),
+    )
+
+
+def _told_apart(found):
+    """Names that tell these bodies apart: with the component, and with the object name
+    where even that is the same (two components of one name)."""
+    names = [clear_name(b) for b in found]
+    return [n if names.count(n) == 1 else "%s [%s]" % (n, b.Name) for n, b in zip(names, found)]
+
+
+def shown_name(body):
+    """The name to show for a body in a dialog's box or list: its plain label while no
+    other body of the design has it, else with its component ("Body1 (Bracket)"; the body
+    at the top of the design keeps the plain "Body1")."""
+    try:
+        same = [b for b in list_bodies(body.Document) if b.Label == body.Label]
+        if len(same) <= 1:
+            return body.Label
+        return _told_apart(same)[[b.Name for b in same].index(body.Name)]
+    except Exception:
+        return clear_name(body)
+
+
+def list_names(found):
+    """shown_name of each of these bodies."""
+    return [shown_name(b) for b in found]
+
+
 def _next_label(doc, container=None):
     """Fusion numbers bodies per component: the bodies in the same container count."""
     from . import components

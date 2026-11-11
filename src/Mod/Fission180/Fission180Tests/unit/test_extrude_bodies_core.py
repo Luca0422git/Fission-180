@@ -107,6 +107,26 @@ class ScopeTests(unittest.TestCase):
         overlaps, touches = core.scope([], [], ["B"], ["B"])
         self.assertEqual(core.auto_operation(False, touches, overlaps=overlaps), "new_body")
 
+    def test_pushed_into_the_part_of_another_component_is_a_cut(self):
+        # (wave 7 follow-up) Fusion: "mostly inside another visible body" -> Cut, whichever
+        # component is active; nothing of the active component is in the way
+        self.assertEqual(core.auto_operation(False, False, inside_others=True), "cut")
+        # it wins over a Join on the active component's own face (Fusion's first test)
+        self.assertEqual(
+            core.auto_operation(False, True, starts_on=True, inside_others=True), "cut"
+        )
+
+    def test_mostly_inside_is_more_than_half_of_the_new_solid(self):
+        self.assertTrue(core.mostly_inside([60.0], 100.0))
+        self.assertTrue(core.mostly_inside([30.0, 25.0], 100.0))  # two parts together
+        self.assertFalse(core.mostly_inside([50.0], 100.0))  # exactly half is not "mostly"
+        # the book's Strandbeest link around a pin of another component: 2 x pi 1.5^2 of a
+        # link of 2 x (15 x 6 + pi 3^2) = 236.5 mm3 is 6 %: New Body
+        self.assertFalse(core.mostly_inside([14.14], 236.5))
+        self.assertFalse(core.mostly_inside([], 100.0))
+        self.assertFalse(core.mostly_inside([10.0], 0.0))
+        self.assertFalse(core.mostly_inside(["x"], 100.0))
+
 
 class FollowerPlanTests(unittest.TestCase):
     def test_new_cut_creates_one_per_other_body(self):

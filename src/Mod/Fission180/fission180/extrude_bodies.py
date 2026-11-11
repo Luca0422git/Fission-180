@@ -30,7 +30,7 @@ Saved documents store "fission180.extrude_bodies.ExtrudeFollower": keep the name
 
 import FreeCAD as App
 
-from . import bodies
+from . import bodies, warn
 from .extrude import (
     FOLLOWER_ROLE,
     INTERSECT_TYPE,
@@ -839,6 +839,48 @@ def auto_scope(doc, lead=None):
         return names, names
     except Exception:
         return None, None  # (cannot be told: every body counts, as before components)
+
+
+def inside_others(profiles, options, lead=None, own=None, names=None):
+    """[the shown bodies of other components (not in `own`, the names auto_scope gives) that
+    the extrusion lies mostly inside, together], oldest first; [] when it does not, or when
+    `own` is None (the whole design is one component). `names`: only these bodies are
+    tested (the ones in_the_way found the extrusion passing through).
+
+    Fusion proposes Cut when "the new body's volume is mostly inside another visible body"
+    (an observation Autodesk's J. Strater confirmed; forum: the automatic Cut goes "through
+    all components in the assembly"), whichever component is active. That is told apart
+    here from a new part that only overlaps another component's part a little (the book's
+    Strandbeest link around a pin of the Pins component: New Body)."""
+    if own is None:
+        return []
+    from . import extrude_bodies_core as core
+
+    try:
+        profiles = normalize(profiles)
+        if not profiles:
+            return []
+        options = options_with_defaults(options)
+        own = set(own)
+        candidates = [
+            (body, shape)
+            for body, shape in candidate_bodies(profiles[0][0].Document, lead)
+            if body.Name not in own and (names is None or body.Name in names)
+        ]
+        if not candidates:
+            return []
+        prism = tool_prism(profiles, options, [shape for _body, shape in candidates])
+        shared = []
+        for body, shape in candidates:
+            volume = _shared_volume(shape, prism)
+            if volume is not None and volume > VOLUME_TOL:
+                shared.append((body, volume))
+        if not core.mostly_inside([v for _b, v in shared], prism.Volume):
+            return []
+        return [body for body, _v in shared]
+    except Exception as exc:
+        warn("extrude: bodies of other components: %s" % exc)
+        return []
 
 
 def start_state(profiles, options, lead=None, inside=None, on=None):

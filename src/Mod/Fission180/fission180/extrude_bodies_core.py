@@ -75,13 +75,19 @@ def excluded_for_edit(touched, stored):
     return {b for b in touched if b not in stored}
 
 
-def auto_operation(starts_inside, touches, symmetric=False, starts_on=False, overlaps=False):
+def auto_operation(
+    starts_inside, touches, symmetric=False, starts_on=False, overlaps=False, inside_others=False
+):
     """The operation the dialog shows until the person picks one (Fusion's rule; sources in
     parity/extrude-presspull.md, "The Operation rule"), in this order:
 
       starts_inside  the extrusion starts in the material of a body of the active
                      component: a face pushed in, a profile on a plane through the part
                      (a symmetric extrude: on both sides of the profile)         -> Cut
+      inside_others  it lies mostly inside shown bodies of OTHER components (a profile
+                     pushed into the part of another component; Autodesk: "mostly inside
+                     another visible body"). A link that only overlaps another component's
+                     pin is mostly outside it and is no Cut (the report's bug 10)  -> Cut
       starts_on      it starts on a face of a body that belongs to the active component and
                      goes away from it (also when it runs into another part of the body
                      further on: the person is building on that face)            -> Join
@@ -94,7 +100,7 @@ def auto_operation(starts_inside, touches, symmetric=False, starts_on=False, ove
     A symmetric extrude follows the same rule (before wave 7 it never cut by itself: the
     book's donut bite came out as five cylinders joined on). `symmetric` is kept for
     callers of the old signature and changes nothing."""
-    if starts_inside:
+    if starts_inside or inside_others:
         return "cut"
     if starts_on:
         return "join"
@@ -105,6 +111,22 @@ def auto_operation(starts_inside, touches, symmetric=False, starts_on=False, ove
     return "new_body"
 
 
+OTHERS_SHARE = 0.5  # "mostly inside": more than half of the new solid
+
+
+def mostly_inside(shared, volume, share=OTHERS_SHARE):
+    """True when the volumes the new solid shares with other bodies (`shared`, one number
+    per body; bodies do not overlap each other) add up to more than `share` of its own
+    `volume`: Fusion's "the new body's volume is mostly inside another visible body"."""
+    try:
+        volume = float(volume)
+        if volume <= 0.0:
+            return False
+        return sum(max(0.0, float(v)) for v in shared) > share * volume
+    except Exception:
+        return False
+
+
 def scope(names_inside, names_direct, through, touching):
     """What of the bodies in the extrusion's way counts for the automatic operation:
     (overlaps, touches). An automatic Cut looks at the bodies inside the active component
@@ -112,8 +134,9 @@ def scope(names_inside, names_direct, through, touching):
     an automatic Join at the bodies that belong to the active component itself
     (`names_direct`; Fusion joins only bodies of the active component, forum "Recurring
     problem with Join vs New Body"). A body of another component never turns the extrude
-    into a Cut or a Join by itself (the report's bug 10: a new component's first extrude cut
-    the body of another component)."""
+    into a Join, and into a Cut only when the extrusion lies mostly inside it
+    (auto_operation's inside_others; the report's bug 10: a new component's first extrude,
+    a link around a pin, cut the pin of another component)."""
     inside = None if names_inside is None else set(names_inside)
     direct = None if names_direct is None else set(names_direct)
     overlaps = any(inside is None or b in inside for b in through)

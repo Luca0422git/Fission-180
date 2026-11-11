@@ -28,9 +28,13 @@ R7  the person picks Join for R2's square going down: it stays Join through Symm
     typed distance, One Side again and -5 (where the automatic choice is Cut).
 R8  OK that cannot finish says why next to the mouse; starting another command with an edit
     that cannot be built says that the change was not kept (it was dropped without a word).
-R9  a new, empty component is active: a circle over the root's block is a New Body both
-    ways (bug 10: it was a Cut of the other component's block, and -5 a Join into it); the
-    component's own second extrude into its own body is a Cut.
+R9  a new, empty component is active, a circle on the root's block: +5, wholly inside the
+    block, is a Cut by itself with the block under Bodies to Cut (Fusion: "mostly inside
+    another visible body", whichever component is active; wave 7 follow-up); +50, two fifths
+    of it inside the block, is a New Body (bug 10: the report's link around another
+    component's pin was a Cut); -5, away from the block and touching it, is a New Body (it
+    was a Join into the block); the component's own second extrude into its own body is a
+    Cut.
 R10 edit from the timeline: the saved operation shows and stays while the distance changes
     sign; undo / redo; save / reopen reads the operation back.
 """
@@ -516,13 +520,18 @@ def r9_first():
         h.settle()
     h.check("R9 over another component's block, nothing typed: New Body", op() == "New Body", op())
     type_distance("5")
-    h.check("R9 +5 into the other component's block: New Body (it was a Cut)", op() == "New Body", op())
+    h.check("R9 +5, wholly inside the other component's block: Cut by itself", op() == "Cut", op())
+    names = panel()._participant_names(compute=False) or []
+    h.check("R9 the block is under Bodies to Cut", names == [s["root_body"].Name], names)
+    type_distance("50")
+    h.check("R9 +50, two fifths of it inside the block: New Body (bug 10: it was a Cut)",
+            op() == "New Body", op())
     h.check("R9 the block is untouched", near(vol(s["root_body"]), BLOCK), vol(s["root_body"]))
     type_distance("-5")
     h.check("R9 -5 away, touching it: New Body (it was a Join into the block)",
             op() == "New Body", op())
     h.check("R9 the block is still untouched", near(vol(s["root_body"]), BLOCK), vol(s["root_body"]))
-    type_distance("8")
+    type_distance("-8")
     h.task_button("OK")
 
 
@@ -544,11 +553,11 @@ def r9_second():
     if not panel().profiles:
         h.click(V(0, 0, 0))
         h.settle()
-    type_distance("8")
+    type_distance("-8")
     h.check("R9 into the component's own body: Cut by itself", op() == "Cut", op())
     names = panel()._participant_names(compute=False) or []
-    h.check("R9 the row lists what the cut goes through, the other component's block too "
-            "(Fusion's Objects To Cut)", s["own"].Name in names, names)
+    h.check("R9 the row lists what the cut goes through (Fusion's Objects To Cut)",
+            s["own"].Name in names, names)
     h.task_button("Cancel")
 
 
