@@ -98,7 +98,7 @@ def dialog():
     return d if d is not None and d.isVisible() else None
 
 
-# == A ================================================================================================
+# == A =============================================================================================
 def a_new():
     Gui.activateWorkbench("Fission180Workbench")
     App.newDocument("BookUnits")
@@ -122,7 +122,7 @@ def a_inch():
     h.task_button("OK")
 
 
-# == B: sketch + extrude =============================================================================
+# == B: sketch + extrude ===========================================================================
 def b_sketch():
     h.ribbon("Create Sketch")
 
@@ -177,7 +177,7 @@ def b_made():
     h.fit()
 
 
-# == C: chamfer ======================================================================================
+# == C: chamfer ====================================================================================
 def c_chamfer():
     h.click_empty()
     h.ribbon("Chamfer")
@@ -243,7 +243,7 @@ def c_made():
     )
 
 
-# == D: fillet =======================================================================================
+# == D: fillet =====================================================================================
 def d_fillet():
     h.click_empty()
     h.press("f")
@@ -276,7 +276,7 @@ def d_made():
     h.check("D: the corner is rounded", v < s["v_chamfer"] - 1e-3, (v, s["v_chamfer"]))
 
 
-# == E: offset plane ==================================================================================
+# == E: offset plane ===============================================================================
 def e_plane():
     h.click_empty()
     h.ribbon("Offset Plane")
@@ -306,7 +306,7 @@ def e_made():
         h.check("E: 0.25 typed is 0.25 in above the top", b.close(z, 0.75 * IN, 1e-6), z)
 
 
-# == F: Change Parameters ============================================================================
+# == F: Change Parameters ==========================================================================
 def f_open():
     si.menu_item("MODIFY", "Change Parameters")
 
@@ -383,7 +383,7 @@ f_changed.done = lambda: dialog() is None
 f_changed.done_what = "the Parameters dialog closed"
 
 
-# == G: undo and redo =================================================================================
+# == G: undo and redo ==============================================================================
 def undo():
     h.press(QtCore.Qt.Key_Z, QtCore.Qt.ControlModifier)
 
@@ -432,7 +432,7 @@ def g_box_shows_inches():
     print("[Fission 180] units put back %d times" % design_units.put_back_count(), flush=True)
 
 
-# == H: a second design in millimetres ====================================================================
+# == H: a second design in millimetres =============================================================
 def h_second():
     App.newDocument("BookUnitsMm")
     h.fit()
@@ -479,7 +479,7 @@ def h_back_check():
     )
 
 
-# == I: save, close, open =================================================================================
+# == I: save, close, open ==========================================================================
 def i_save():
     path = os.path.join(tempfile.mkdtemp(prefix="fission180-book-units-"), "book_units.FCStd")
     s["path"] = path

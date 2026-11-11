@@ -103,7 +103,7 @@ def told():
     return commands._TOLD.get("msg") or ""
 
 
-# == A: Name = value in Extrude =======================================================================
+# == A: Name = value in Extrude ====================================================================
 def a_new():
     from fission180 import parameters
     import FreeCADGui as Gui
@@ -193,7 +193,7 @@ def a_redone():
     h.check("A: still following it", "Thickness" in formula(), formula())
 
 
-# == B: the list of names, a sum kept ================================================================
+# == B: the list of names, a sum kept ==============================================================
 def b_edit():
     h.click_empty()
     b.timeline_double_click("Extrude 1", click_first=True)
@@ -269,7 +269,7 @@ def b_done():
     )
 
 
-# == C: a typo ==========================================================================================
+# == C: a typo =====================================================================================
 def c_edit():
     h.click_empty()
     b.timeline_double_click("Extrude 1", click_first=True)
@@ -297,7 +297,7 @@ def c_cancelled():
     h.check("C: and the formula", "1.5" in formula(), formula())
 
 
-# == D: Move/Copy ==========================================================================================
+# == D: Move/Copy ==================================================================================
 def d_move():
     h.click_empty()
     h.fit()
@@ -383,7 +383,7 @@ def d_done():
     s["box"] = box()
 
 
-# == E: Change Parameters ====================================================================================
+# == E: Change Parameters ==========================================================================
 def dialog():
     from fission180 import parameters_ui
 

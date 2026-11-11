@@ -2,6 +2,7 @@
 """What a person types in a value box, read Fusion's way (parameters_core.read). Runs
 without FreeCAD. Wave 7, the book parity report: `min(100;max(45;Arm_Length))` gave 0 mm,
 `-2 * Arm_Length` was read as -2 mm, a bare name kept the measured value."""
+
 import os
 import sys
 import unittest
@@ -171,7 +172,9 @@ class Names(unittest.TestCase):
             fc("Sketch.Constraints.x + 2", "length", resolve=lambda text: "length"),
             "Sketch.Constraints.x + 2 mm",
         )
-        self.assertEqual(fc("<<My Sketch>>.Constraints[3] * 2", None), "<<My Sketch>>.Constraints[3] * 2")
+        self.assertEqual(
+            fc("<<My Sketch>>.Constraints[3] * 2", None), "<<My Sketch>>.Constraints[3] * 2"
+        )
 
     def test_to_freecad_with_kinds(self):
         class Kinds(list):
@@ -248,7 +251,9 @@ class Autocomplete(unittest.TestCase):
         self.assertEqual(complete.suggestions("zz", self.NAMES), [])
 
     def test_complete(self):
-        self.assertEqual(complete.complete("2 * Sup", 7, "Support_Width"), ("2 * Support_Width", 17))
+        self.assertEqual(
+            complete.complete("2 * Sup", 7, "Support_Width"), ("2 * Support_Width", 17)
+        )
         self.assertEqual(complete.complete("S / 2", 1, "Support_Width"), ("Support_Width / 2", 13))
 
 

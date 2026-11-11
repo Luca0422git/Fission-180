@@ -184,7 +184,7 @@ def a_check():
     h.shot("A-added")
 
 
-# == B: refusals ====================================================================================
+# == B: refusals ===================================================================================
 def b_open():
     w.click(dialog().add_button)
 
@@ -218,7 +218,7 @@ b_cancel.done = lambda: adder() is None
 b_cancel.done_what = "the Add User Parameter box closed"
 
 
-# == C: a negative length, the book's min / max ===========================================================
+# == C: a negative length, the book's min / max ====================================================
 def c_negative_check():
     h.check(
         "C: Thickness is -2.5 mm (bug 4)", abs(value("Thickness") + 2.5) < 1e-9, value("Thickness")
@@ -249,7 +249,7 @@ def c_limits_check():
     h.check("C: no complaint", d.message.text() == "", d.message.text())
 
 
-# == D: the limits follow ==============================================================================
+# == D: the limits follow ==========================================================================
 def typed(name, text, tag):
     def step():
         type_expression(name, text)
@@ -277,7 +277,7 @@ def d_formula_text():
     )
 
 
-# == E: other units, names FreeCAD reads as units ====================================================
+# == E: other units, names FreeCAD reads as units ==================================================
 def e_check():
     h.check(
         "E: Inch_Size is 2 in = 50.8 mm", abs(value("Inch_Size") - 50.8) < 1e-9, value("Inch_Size")
@@ -299,7 +299,7 @@ def e_check():
     h.check("E: and reads as typed", r is not None and r["shown"].replace(" ", "") == "W+h*2+t", r)
 
 
-# == F: rename =======================================================================================
+# == F: rename =====================================================================================
 def f_rename():
     d = dialog()
     r = table_row("Arm_Length")
@@ -325,7 +325,7 @@ def f_check():
     h.check("F: it keeps its place in the list", order.index("Arm") == 2, order)
 
 
-# == G: delete =======================================================================================
+# == G: delete =====================================================================================
 def g_none_selected():
     d = dialog()
     d.user.setCurrentCell(-1, -1)
@@ -368,7 +368,7 @@ def g_unused_check():
     h.check("G: no complaint", d.message.text() == "", d.message.text())
 
 
-# == H: favourites, filter ==============================================================================
+# == H: favourites, filter =========================================================================
 def star_click(name):
     d = dialog()
     r = table_row(name)
@@ -416,7 +416,7 @@ def h_filter():
     h.shot("H-dialog")
 
 
-# == I: one undo step, Cancel ============================================================================
+# == I: one undo step, Cancel ======================================================================
 def i_ok():
     s["names"] = names()
     d = dialog()

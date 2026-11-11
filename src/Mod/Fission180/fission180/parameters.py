@@ -28,7 +28,14 @@ FEATURE_PROPS = {
     "PartDesign::Fillet": [("Radius", "Radius")],
     "PartDesign::Chamfer": [("Size", "Distance"), ("Size2", "Distance 2"), ("Angle", "Angle")],
     "PartDesign::Thickness": [("Value", "Thickness")],
-    "PartDesign::Hole": [("Diameter", "Diameter"), ("Depth", "Depth")],
+    "PartDesign::Hole": [
+        ("Diameter", "Diameter"),
+        ("Depth", "Depth"),
+        ("HoleCutDiameter", "Counterbore Diameter"),
+        ("HoleCutDepth", "Counterbore Depth"),
+        ("HoleCutCountersinkAngle", "Countersink Angle"),
+        ("DrillPointAngle", "Tip Angle"),
+    ],
     "PartDesign::LinearPattern": [("Occurrences", "Quantity"), ("Offset", "Spacing")],
     "PartDesign::PolarPattern": [("Occurrences", "Quantity"), ("Angle", "Angle")],
     "PartDesign::Draft": [("Angle", "Angle")],
@@ -63,7 +70,19 @@ FISSION180_PROPS["ChamferSets"] = [
         ("Angle%d" % i, "Set %d Angle" % i),
     )
 ]
+FISSION180_PROPS["Thread"] = [("Length", "Length"), ("Offset", "Offset")]
 DIMENSION_TYPES = {"Distance", "DistanceX", "DistanceY", "Radius", "Diameter", "Angle"}
+# A coil's sizes as its dialog shows them (coil.py keeps each in more than one property and
+# works some out from the others: they are read and written through coil.read / coil.update)
+COIL_FIELDS = (
+    ("diameter", "Diameter", "length"),
+    ("revolutions", "Revolutions", "number"),
+    ("height", "Height", "length"),
+    ("pitch", "Pitch", "length"),
+    ("angle", "Angle", "angle"),
+    ("section_size", "Section Size", "length"),
+)
+COIL_PATH = "coil:"
 
 
 def container(doc, create=False):
@@ -771,6 +790,8 @@ def model_parameters(doc):
                 found.append(_row(obj, path, label, quantity, expr))
         elif _is_construction(obj):
             found.extend(_construction_rows(obj))
+        elif getattr(obj, "Fission180Type", "") == "Coil":
+            found.extend(_coil_rows(obj))
         else:
             for prop, label in _props_of(obj):
                 found.append(_row(obj, prop, label, getattr(obj, prop), expressions.get(prop, "")))
@@ -828,7 +849,9 @@ def _props_of(obj):
             (prop, label)
             for prop, label in known
             # hidden or read-only for this feature's mode: not a size of it now
-            if prop in obj.PropertiesList and not obj.getEditorMode(prop)
+            if prop in obj.PropertiesList
+            and not obj.getEditorMode(prop)
+            and not (kind == "Thread" and prop == "Length" and getattr(obj, "FullLength", False))
         ]
     if not (kind or _is_construction(obj)):
         return []
@@ -890,8 +913,65 @@ def _construction_rows(datum):
     return [_row(helper, prop, label, getattr(helper, prop), expr)]
 
 
+def _coil_rows(feature):
+    """A coil's sizes (Diameter, Revolutions, Height, Pitch, Angle, Section Size: the ones
+    its type uses), read the way its dialog reads them."""
+    from . import coil
+
+    try:
+        if not coil.is_ours(feature):
+            return []
+        _ref, options = coil.read(feature)
+        uses = set(coil.USES[options["type"]]) | {"diameter", "section_size"}
+    except Exception:
+        return []
+    formulas = options.get("expressions") or {}
+    rows = []
+    for key, label, kind in COIL_FIELDS:
+        if key not in uses:
+            continue
+        rows.append(
+            {
+                "owner": feature.Label,
+                "object": feature.Name,
+                "path": COIL_PATH + key,
+                "label": label,
+                "value": float(options[key]),
+                "unit": {"length": "mm", "angle": "deg"}.get(kind, ""),
+                "kind": kind,
+                "expression": formulas.get(key, ""),
+            }
+        )
+    return rows
+
+
+def _coil_options(feature):
+    """A coil's sizes and formulas now (to put them back after a refused change)."""
+    from . import coil
+
+    _ref, options = coil.read(feature)
+    kept = {key: options[key] for key, _label, _kind in COIL_FIELDS if key in options}
+    kept["expressions"] = dict(options.get("expressions") or {})
+    return kept
+
+
+def _coil_set(feature, key, got):
+    """One size of a coil typed in Change Parameters: through coil.update, like its dialog."""
+    from . import coil
+
+    options = _coil_options(feature)
+    if got.plain:
+        options["expressions"].pop(key, None)
+    else:
+        options["expressions"][key] = got.formula
+    options[key] = got.value
+    coil.update(feature, options=options)
+
+
 def _value_at(obj, path):
     """What `path` of `obj` holds (a property, a sketch dimension, an offset plane's distance)."""
+    if path.startswith(COIL_PATH):
+        return _coil_options(obj)
     if path.startswith(".Constraints["):
         return obj.getDatum(int(path[len(".Constraints[") : -1]))
     if path == OFFSET_PATH:
@@ -900,7 +980,11 @@ def _value_at(obj, path):
 
 
 def _put_value(obj, path, value):
-    if path == OFFSET_PATH:
+    if path.startswith(COIL_PATH):
+        from . import coil
+
+        coil.update(obj, options=value)
+    elif path == OFFSET_PATH:
         offset = obj.AttachmentOffset
         number = float(getattr(value, "Value", value))
         obj.AttachmentOffset = App.Placement(
@@ -943,6 +1027,8 @@ def kind_of_path(obj, path):
         return "angle" if kind == "Angle" else "length"
     if path == OFFSET_PATH:
         return "length"
+    if path.startswith(COIL_PATH):
+        return {key: kind for key, _label, kind in COIL_FIELDS}[path[len(COIL_PATH) :]]
     type_id = obj.getTypeIdOfProperty(path)
     if "Integer" in type_id or type_id in ("App::PropertyFloat", "App::PropertyFloatConstraint"):
         return "number"
@@ -964,6 +1050,9 @@ def _set(obj, path, text, names=None, unit=None):
     skip = core.display_name(path) if obj is holder else None
     kind = kind_of_path(obj, path)
     got = read(doc, text, kind, unit=unit, skip=skip)
+    if path.startswith(COIL_PATH):
+        _coil_set(obj, path[len(COIL_PATH) :], got)
+        return
     if not got.plain:
         set_expression(obj, path, got.freecad)
         return

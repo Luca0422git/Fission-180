@@ -110,7 +110,7 @@ def dialog():
     return d if d is not None and d.isVisible() else None
 
 
-# == the plate ==========================================================================================
+# == the plate =====================================================================================
 def new_design():
     from fission180 import parameters
 
@@ -175,7 +175,7 @@ def finished():
     h.fit(iso=False)
 
 
-# == A: five areas, one extrude ==========================================================================
+# == A: five areas, one extrude ====================================================================
 def a_hub():
     h.click(V(3, 2, 0))
 
@@ -205,7 +205,7 @@ def a_made():
     h.shot("A-plate")
 
 
-# == B: the parameter changes =============================================================================
+# == B: the parameter changes ======================================================================
 def b_open():
     si.menu_item("MODIFY", "Change Parameters")
 
@@ -254,7 +254,7 @@ def changed(radius):
     return [type_it, check_it]
 
 
-# == C: OK, undo, redo, save and reopen ===================================================================
+# == C: OK, undo, redo, save and reopen ============================================================
 def c_ok():
     d = dialog()
     w.click(

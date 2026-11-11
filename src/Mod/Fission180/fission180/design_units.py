@@ -32,7 +32,7 @@ Other builders: `design_is_inch(doc)` (Thread's default standard, ANSI in an inc
 import FreeCAD as App
 
 _units = {}  # document name -> the unit schema (index) the design was made with or given
-_state = {"installed": False, "observer": None, "put_back": 0, "resync": False}
+_state = {"installed": False, "observer": None, "put_back": 0, "resync": False, "said": set()}
 
 
 def schema_of(doc):
@@ -194,10 +194,12 @@ def _changed(doc, frame):
 
     names = doc.getEnumerationsOfProperty("UnitSystem")
     _state["put_back"] += 1
-    log(
-        "units: %s stays in %s (FreeCAD carried another document's units over)"
-        % (doc.Label, names[held].split(" (")[0])
-    )
+    if doc.Name not in _state["said"]:  # (once for a design: it happens at every rebuild)
+        _state["said"].add(doc.Name)
+        log(
+            "units: %s stays in %s (FreeCAD carried another document's units over)"
+            % (doc.Label, names[held].split(" (")[0])
+        )
     doc.UnitSystem = names[held]
     _resync_later()
 
