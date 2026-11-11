@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180's golden models are 649 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
+Fission 180's golden models are 650 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
 
 ## By feature
 
@@ -400,6 +400,31 @@ Each model is listed under its first tag; its other tags follow it.
 - `sf_revolve_to_vertex_follows`: Revolve dialog: Type To a corner of the part follows when the part changes [fusion-revolve, revolve-to, reference-stability]
 - `sf_revolve_torus`: Revolve dialog: circle r5 at x = 20 about Z, Full: a torus [fusion-revolve]
 
+### hardware (22)
+
+- `hardware_auto_wall_similar`: Two d4.5 holes; a socket head screw put on one hole's WALL with only its length said: M4 from the hole, no second hole, both holes filled [screw, wall, auto, similar]
+- `hardware_bearing_608_bore`: A 608 ball bearing with shields (8 x 22 x 7) clicked into a 22 x 7 bore: flush, filling it [bearing, rim]
+- `hardware_button_head_m4`: An M4x10 ISO 7380 button head on the top face: plain clearance hole, the dome on the face [screw, button]
+- `hardware_countersunk_m4_on_rim`: A d4.5 through hole, then an M4x12 ISO 10642 screw clicked on its rim: the countersink is added, head flush [screw, countersink, rim]
+- `hardware_dowel_3x10`: A 3 x 10 dowel pin (ISO 2338) in a 3 mm hole: flush with the face [pin, rim]
+- `hardware_edit_length`: M3x10 socket head with the hole as deep as the screw, edited to M3x16: the hole follows [screw, edit]
+- `hardware_hex_m6`: An M6 x 20 hex head screw (ISO 4017) on the rim of a 6.6 mm hole [screw, hex, rim]
+- `hardware_inch_nut_quarter`: A 1/4-20 hex nut (ASME B18.2.2) on the top face, no hole made [nut, inch, face]
+- `hardware_inch_shcs_quarter`: A 1/4-20 x 3/4 in socket head cap screw (ASME B18.3) on the rim of a 7.1 mm hole, head on the face [screw, inch, rim]
+- `hardware_insert_m3_hole`: Insert an M3 heat-set insert on the top face: a 4.0 x 6.7 flat hole [insert]
+- `hardware_key_4x4x16`: A 4 x 4 x 16 parallel key with round ends (DIN 6885 A) laid on the top face [key, face]
+- `hardware_lock_washer_m6`: An M6 split lock washer (DIN 127) on the top face, no hole made [washer, face]
+- `hardware_magnet_6x3_pocket`: Insert a 6 x 3 round magnet on the top face: a 6.2 x 3 flat pocket, magnet flush [magnet]
+- `hardware_nut_top`: An M3 ISO 4032 hex nut on the top face: clearance hole, nut on the face [nut]
+- `hardware_oring_as568_012`: An O-ring AS568-012 laid on the top face [oring, inch, face]
+- `hardware_pan_phillips_m3`: An M3 x 6 Phillips pan head screw (ISO 7045) on the rim of a 3.4 mm hole [screw, pan, rim]
+- `hardware_ring_din471_10`: An external retaining ring for a 10 mm shaft (DIN 471) laid on the top face [ring, face]
+- `hardware_set_screw_inch_dog`: A #10-24 x 3/8 in half dog point set screw (ASME B18.3) in a 3.8 mm tap drill hole [setscrew, inch, rim]
+- `hardware_set_screw_m4_cup`: An M4 x 6 cup point set screw (ISO 4029) in a 3.3 mm tap drill hole: flush with the face [setscrew, rim]
+- `hardware_shcs_m3_counterbore`: Insert an M3x10 ISO 4762 screw on the top face: counterbored clearance hole [screw, counterbore]
+- `hardware_shoulder_8x20`: An 8 x 20 shoulder screw (ISO 7379, M6) on the rim of an 8 mm hole: head on the face [shoulder, rim]
+- `hardware_washer_bottom`: An M3 ISO 7089 washer on the bottom face: clearance hole, washer under the part [washer]
+
 ### loft (22)
 
 - `sf_loft_centerline_ends`: Loft along a straight centerline with Direction at the first profile (a prism) [fusion-loft, centerline, end-conditions]
@@ -449,30 +474,6 @@ Each model is listed under its first tag; its other tags follow it.
 - `pp_three_faces_corner`: Press Pull: top, right and back faces +2 meet in one corner [multi-face]
 - `pp_top_pull`: Press Pull: top face of a box +5
 - `pp_top_push`: Press Pull: top face of a box -4
-
-### hardware (21)
-
-- `hardware_bearing_608_bore`: A 608 ball bearing with shields (8 x 22 x 7) clicked into a 22 x 7 bore: flush, filling it [bearing, rim]
-- `hardware_button_head_m4`: An M4x10 ISO 7380 button head on the top face: plain clearance hole, the dome on the face [screw, button]
-- `hardware_countersunk_m4_on_rim`: A d4.5 through hole, then an M4x12 ISO 10642 screw clicked on its rim: the countersink is added, head flush [screw, countersink, rim]
-- `hardware_dowel_3x10`: A 3 x 10 dowel pin (ISO 2338) in a 3 mm hole: flush with the face [pin, rim]
-- `hardware_edit_length`: M3x10 socket head with the hole as deep as the screw, edited to M3x16: the hole follows [screw, edit]
-- `hardware_hex_m6`: An M6 x 20 hex head screw (ISO 4017) on the rim of a 6.6 mm hole [screw, hex, rim]
-- `hardware_inch_nut_quarter`: A 1/4-20 hex nut (ASME B18.2.2) on the top face, no hole made [nut, inch, face]
-- `hardware_inch_shcs_quarter`: A 1/4-20 x 3/4 in socket head cap screw (ASME B18.3) on the rim of a 7.1 mm hole, head on the face [screw, inch, rim]
-- `hardware_insert_m3_hole`: Insert an M3 heat-set insert on the top face: a 4.0 x 6.7 flat hole [insert]
-- `hardware_key_4x4x16`: A 4 x 4 x 16 parallel key with round ends (DIN 6885 A) laid on the top face [key, face]
-- `hardware_lock_washer_m6`: An M6 split lock washer (DIN 127) on the top face, no hole made [washer, face]
-- `hardware_magnet_6x3_pocket`: Insert a 6 x 3 round magnet on the top face: a 6.2 x 3 flat pocket, magnet flush [magnet]
-- `hardware_nut_top`: An M3 ISO 4032 hex nut on the top face: clearance hole, nut on the face [nut]
-- `hardware_oring_as568_012`: An O-ring AS568-012 laid on the top face [oring, inch, face]
-- `hardware_pan_phillips_m3`: An M3 x 6 Phillips pan head screw (ISO 7045) on the rim of a 3.4 mm hole [screw, pan, rim]
-- `hardware_ring_din471_10`: An external retaining ring for a 10 mm shaft (DIN 471) laid on the top face [ring, face]
-- `hardware_set_screw_inch_dog`: A #10-24 x 3/8 in half dog point set screw (ASME B18.3) in a 3.8 mm tap drill hole [setscrew, inch, rim]
-- `hardware_set_screw_m4_cup`: An M4 x 6 cup point set screw (ISO 4029) in a 3.3 mm tap drill hole: flush with the face [setscrew, rim]
-- `hardware_shcs_m3_counterbore`: Insert an M3x10 ISO 4762 screw on the top face: counterbored clearance hole [screw, counterbore]
-- `hardware_shoulder_8x20`: An 8 x 20 shoulder screw (ISO 7379, M6) on the rim of an 8 mm hole: head on the face [shoulder, rim]
-- `hardware_washer_bottom`: An M3 ISO 7089 washer on the bottom face: clearance hole, washer under the part [washer]
 
 ### hole (20)
 
@@ -839,12 +840,12 @@ Each model is listed under its first tag; its other tags follow it.
 | `delete_face` | `delete_face` | 2 | `bodies_delete_face_fillet`, `bodies_delete_face_hole` |
 | `edit` | `set_sketch_dimension`, `edit_step` | 33 | `blend_fillet_edit_radius`, `bodies_combine_follows_tool`, `book_thread_face_offset`, `comp_paste_instance_follows`, `comp_paste_new_independent` |
 | `emboss` | `emboss` | 4 | `emboss_cylinder_deboss`, `emboss_cylinder_rect`, `emboss_flat_deboss`, `emboss_flat_rect` |
-| `expect_bodies` | (a test helper) | 73 | `extrude_multi_cut`, `extrude_multi_cut_all`, `extrude_multi_cut_all_far`, `extrude_multi_cut_edit`, `extrude_multi_cut_excluded` |
+| `expect_bodies` | (a test helper) | 74 | `extrude_multi_cut`, `extrude_multi_cut_all`, `extrude_multi_cut_all_far`, `extrude_multi_cut_edit`, `extrude_multi_cut_excluded` |
 | `expect_component` | (a test helper) | 1 | `sf_cylinder_new_component` |
 | `expect_move_refused` | (a test helper) | 1 | `extrude_multi_move` |
 | `expect_radius` | (a test helper) | 1 | `sf_sweep_guide_surface` |
 | `export_report_expect` | (a test helper) | 2 | `export_report_design`, `export_report_sketch_dxf` |
-| `extrude` | `extrude` | 441 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `extrude` | `extrude` | 442 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `fillet` | (a test helper) | 23 | `bodies_delete_face_fillet`, `bracket_inner_fillet`, `edit_fillet_radius`, `edit_width_after_fillet_and_hole`, `fillet_all_edges` |
 | `fillet_sets` | `fillet_sets` | 14 | `fillet2_chamfer_sets_angle_flip`, `fillet2_chord_90_120`, `fillet2_face_and_its_edge_in_two_sets`, `fillet2_presspull_set_radius`, `fillet2_sets_tangent_chain_each` |
 | `full_round` | `full_round_fillet` | 1 | `fillet2_full_round_rib` |
@@ -853,7 +854,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `history_off` | `capture_design_history` | 1 | `direct_history_off_on` |
 | `history_on` | `capture_design_history` | 1 | `direct_history_off_on` |
 | `hole` | `hole` | 3 | `hole_blind`, `hole_counterbore`, `hole_countersink` |
-| `hole_at` | `hole` | 27 | `hardware_bearing_608_bore`, `hardware_countersunk_m4_on_rim`, `hardware_dowel_3x10`, `hardware_hex_m6`, `hardware_inch_shcs_quarter` |
+| `hole_at` | `hole` | 28 | `hardware_auto_wall_similar`, `hardware_bearing_608_bore`, `hardware_countersunk_m4_on_rim`, `hardware_dowel_3x10`, `hardware_hex_m6` |
 | `hole_points` | `hole` | 1 | `hole_points_flipped` |
 | `import_report_expect` | (a test helper) | 1 | `export_report_imports` |
 | `interference_expect` | (a test helper) | 1 | `inspect_com_interference` |
@@ -895,7 +896,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_flat_pattern` | `flat_pattern` | 19 | `sm_flat_bend_box`, `sm_flat_bend_roundtrip`, `sm_flat_contour_flange`, `sm_flat_corner_closure`, `sm_flat_corner_closure_tangent` |
 | `sf_gear` | `gear` | 7 | `sf_gear_cut_block`, `sf_gear_edit_teeth`, `sf_gear_english`, `sf_gear_internal`, `sf_gear_join_block` |
 | `sf_gear_edit` | `edit_step` | 1 | `sf_gear_edit_teeth` |
-| `sf_hardware` | `insert_hardware` | 21 | `hardware_bearing_608_bore`, `hardware_button_head_m4`, `hardware_countersunk_m4_on_rim`, `hardware_dowel_3x10`, `hardware_edit_length` |
+| `sf_hardware` | `insert_hardware` | 22 | `hardware_auto_wall_similar`, `hardware_bearing_608_bore`, `hardware_button_head_m4`, `hardware_countersunk_m4_on_rim`, `hardware_dowel_3x10` |
 | `sf_hardware_edit` | `edit_step` | 1 | `hardware_edit_length` |
 | `sf_lip` | `lip` | 11 | `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_face_guide`, `plastic2_lip_open_chain` |
 | `sf_lip_edit` | `edit_step` | 1 | `plastic2_lip_swap` |
@@ -942,7 +943,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_unfold` | `unfold` | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
 | `shell` | `shell` | 28 | `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain` |
 | `silhouette_split` | `silhouette_split` | 3 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
-| `sketch` | `create_sketch` | 551 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `sketch` | `create_sketch` | 552 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `sketch_extras` | (a test helper) | 1 | `export_report_sketch_dxf` |
 | `sketch_offset_expect` | (a test helper) | 4 | `sketch_offset_circle_symmetric`, `sketch_offset_rect_edit`, `sketch_offset_rounded_fixed_out`, `sketch_offset_slot_fixed_in` |
 | `sketch_polygon` | `sketch_polygon` | 2 | `sketch_inscribed_pentagon`, `sketch_nut_trap_polygon` |
