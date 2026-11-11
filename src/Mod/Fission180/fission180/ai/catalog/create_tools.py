@@ -874,6 +874,12 @@ define(
 
 
 # -- Hardware -----------------------------------------------------------------------------------
+def _hardware_standards():
+    from ... import hardware_core
+
+    return hardware_core.STANDARD_ORDER
+
+
 def _extra_hardware(args, problems):
     if ("face" in args) == ("edge" in args):
         problems.append("give face + at (a click on a flat face) or edge (a hole's round rim)")
@@ -890,25 +896,39 @@ define(
     "Insert hardware",
     "assemble",
     "INSERT > Hardware (McMaster-Carr / fasteners in Fusion)",
-    "Insert a fastener with the hole it needs: click a flat face of the current body at at "
-    "([x, y, z], design coordinates) or a round edge (a hole's rim). standard iso4762 "
-    "(socket head cap screw), iso7380 (button head), iso10642 (countersunk), iso4032 (hex "
-    'nut), iso7089 (washer), insert (heat-set insert), magnet; size ("3" for M3, "6x3" for '
-    "a magnet), length (mm), flip, make_hole (default true), fit close | normal | loose, "
-    "sink_head (counterbore / countersink for the head), hole_depth all | length, clearance "
-    "(a magnet's pocket, mm). The part becomes its own component.",
+    "Insert a standard part with the hole it needs: click a flat face of the current body at "
+    "at ([x, y, z], design coordinates) or a round edge (a hole's rim: the part sits on its "
+    "axis). standard: metric screws iso4762 (socket head cap), iso7380 (button), iso10642 "
+    "(countersunk), din7984 (low head), iso4017 (hex head), iso7045 / iso1580 (pan head, "
+    "Phillips / slotted); inch screws asme_shcs, asme_bhcs, asme_fhcs, asme_lhcs, asme_hex, "
+    "asme_pan_ph, asme_pan_sl; set screws iso4029 / iso4026 / iso4027 / iso4028 (cup / flat / "
+    "cone / dog) and asme_ss_cup / _flat / _cone / _dog; shoulder screws iso7379, "
+    "asme_shoulder; nuts iso4032, iso4035 (thin), iso7040 (nylon lock), asme_nut, asme_jam, "
+    "asme_locknut; washers iso7089, din127 (split lock), asme_washer_sae, asme_washer_uss, "
+    "asme_lockwasher; O-rings as568 (dash number), oring_metric; ball bearings bearing, "
+    "bearing_inch; retaining rings din471 / din472, asme_ring_ext / asme_ring_int; pins "
+    "iso2338, asme_dowel; keys din6885, asme_key; standoff_hex, spacer_round, insert "
+    '(heat-set), magnet. size: "3" for M3, "1/4" or "#10" for inch threads, "012" for an '
+    'AS568 dash number, "10x2" for a metric O-ring, "6202" for a bearing, "10" for a 10 mm '
+    'shaft or bore, "6x3" for a magnet. length (mm), thread ("" = coarse, or e.g. "1/4-28 '
+    'UNF"), modeled (cut the real thread), variant (a bearing: open | zz | 2rs), flip, '
+    "offset (mm along the axis), make_hole (default true for screws, set screws, nuts, "
+    "washers, inserts, magnets; other parts get none), fit close | normal | loose, sink_head "
+    "(counterbore / countersink for the head), hole_depth all | length, clearance (a "
+    "magnet's pocket, mm). The part becomes its own component.",
     schema(
         {
             "face": kit.selector("the flat face clicked"),
             "at": kit.point3("where on it"),
             "edge": kit.selector("instead: a round edge (a hole's rim)", "edges"),
-            "standard": enum(
-                ["iso4762", "iso7380", "iso10642", "iso4032", "iso7089", "insert", "magnet"],
-                default="iso4762",
-            ),
-            "size": string("e.g. 3 (M3) or 6x3"),
+            "standard": enum(list(_hardware_standards()), default="iso4762"),
+            "size": string("e.g. 3 (M3), 1/4, #10, 012 (AS568), 6202 (a bearing) or 6x3"),
             "length": positive("mm"),
+            "thread": string('"" = the coarse thread, or a fine one, e.g. 1/4-28 UNF'),
+            "modeled": boolean("cut the real thread", default=False),
+            "variant": enum(["open", "zz", "2rs"], default="zz"),
             "flip": boolean(default=False),
+            "offset": number("mm along the axis, out of the part"),
             "make_hole": boolean(default=True),
             "fit": enum(["close", "normal", "loose"], default="normal"),
             "sink_head": boolean(
