@@ -62,6 +62,10 @@ written"). Spec and mapping: `docs/fission180/parity/manufacture.md`.
 - `ai/catalog/__init__.py`: `AI_TOOLS_TO_COME` lists the five `cam_*` steps;
   `test_ai_sheetmetal_plastic_tools.py`: its "nothing waits" check now allows them.
 
+- `tools/fission180/data/fusion-menus.txt`: "Manufacture" is no longer marked out of scope in
+  the workspace list; Fusion's MILLING tab is listed (Scallop, Pencil, Spiral, Radial marked
+  out: FreeCAD's engine has no such strategy).
+
 ## FreeCAD facts and traps
 
 See the last section of the parity doc. The ones that cost time:
@@ -88,10 +92,14 @@ See the last section of the parity doc. The ones that cost time:
 
 - Unit: `test_manufacture_core.py`, 51 tests.
 - Golden: `cam_plate_face_contour_drill`, `cam_block_side_setup`.
-- Scenarios (real input, paced by state): `book_cam_setup`, `book_cam_operations`,
-  `book_cam_program`, `book_cam_refusals`, `book_cam_orientation`.
-- Older scenarios of the shared files: `sim_setup_browser`, `drawing_new`,
-  `sim_setup_documents`.
+- Scenarios (real input, paced by state), 309 checks: `book_cam_setup` (58),
+  `book_cam_operations` (79), `book_cam_program` (87), `book_cam_refusals` (50),
+  `book_cam_orientation` (35).
+- Older scenarios of the shared files: `sim_setup_browser` (67), `drawing_new` (63),
+  `sim_setup_documents` (71), all passing.
+- `ribbon_sweep` with `SWEEP_TABS=cam_milling` found the 3D dialogs' start-up error (fixed);
+  it still reports the Tool Library as a pop-up, which it is by design (Fusion's is a window
+  too). The default sweep (solid, sketch) is not affected.
 
 ## Changelog lines
 
