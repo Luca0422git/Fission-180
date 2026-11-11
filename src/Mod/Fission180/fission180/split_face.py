@@ -111,6 +111,15 @@ def _marked(obj):
     return KEPT in obj.PropertiesList and bool(getattr(obj, KEPT))
 
 
+def kept_unrefined(obj):
+    """True for a step whose Refine is off to keep a split (keep_splits switched it): a
+    dialog that writes the step again leaves its Refine alone."""
+    try:
+        return _marked(obj) and not obj.Refine
+    except Exception:
+        return False
+
+
 def _set_refine(obj, off):
     """One step: Refine off (and marked) to keep a split, or on again when it was off for
     one that is gone. True when it changed."""
@@ -214,8 +223,12 @@ def keep_splits(doc):
                 if not seen:
                     if _set_refine(obj, False):
                         changed.append(obj)
-                elif _marked(obj):
+                elif _marked(obj) and not obj.Refine:
                     pass  # switched for a split that is still before it: stays
+                    # (Marked but with Refine on again: a dialog wrote the step anew, as
+                    # Extrude does at every change of its preview. It is looked at like an
+                    # unmarked step: the mark alone left the split merged for good when the
+                    # first look came between two changes in the dialog, wave 7 replay.)
                 elif "Invalid" in state or "Error" in state or shape.isNull():
                     pass
                 elif obj.Refine and (always or _merged_away(lines, shape)):

@@ -999,6 +999,11 @@ class SketchSession:
         ensure_areas(sketch)  # an older sketch: its areas can be clicked after Finish Sketch
         self.display = DisplayOptions(self)
         self.fixed = FixedColour(self)
+        from . import sketch_axes
+
+        # the sketch's axis lines in the colours of the origin axes they lie along
+        self.axes = sketch_axes.AxisColours(self)
+        self.axes.poke()
         from . import sketch_dimension_signs
 
         # the diameter sign on dimensions to a centerline
@@ -1096,6 +1101,7 @@ class SketchSession:
             self.areas.refresh(self.shading.shaded)
             self.display.apply()
             self.fixed.apply()
+            self.axes.apply()
             self.signs.apply()
             self.frames.update()
         except Exception as exc:
@@ -2217,6 +2223,7 @@ class SketchSession:
         self.close_editor(commit=True)
         remove_stray_editors(self.gl)
         parts = [self.polygon, self.areas, self.shading, self.display, self.fixed, self.check]
+        parts.append(self.axes)
         parts.append(self.frames)
         parts.append(self.select)
         parts.append(self.right_angles)
@@ -2345,6 +2352,7 @@ class _ViewFilter(QtCore.QObject):
                     return True
                 if kind in _REDRAWS:
                     session.fixed.poke()
+                    session.axes.poke()
                 if (
                     kind == QtCore.QEvent.MouseButtonPress
                     and event.button() == QtCore.Qt.RightButton
@@ -2425,6 +2433,7 @@ class _ViewFilter(QtCore.QObject):
                 return True
             if kind in _REDRAWS:
                 session.fixed.poke()  # FreeCAD recolours curves after these
+                session.axes.poke()  # ...and its two axis lines
                 session.signs.poke()  # ...and may write the dimensions' texts again
             if kind == QtCore.QEvent.MouseMove:
                 if event.buttons() == QtCore.Qt.NoButton:

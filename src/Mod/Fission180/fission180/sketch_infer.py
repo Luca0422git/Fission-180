@@ -366,6 +366,7 @@ class Inference:
             # helpers with constraints on the wrong curves, "Sketcher constraint number 15
             # is malformed": sketch_spline_luca A. They keep FreeCAD's own grid rule.)
             result = self._grid_only(view, grid)
+        result = self._landed_on_snap(result, view, start)
         self.last, self.last_px, self.last_step = result, view.px, step
         if kind == QtCore.QEvent.MouseMove:
             self.last_move = (result, view.px, step)
@@ -394,6 +395,28 @@ class Inference:
     # report, Drone: "the construction line's end snapped to the MIDPOINT of the arm line
     # (midpoint constraint) which later fights the arm length". A little more than its zone:
     FREECAD_MIDDLE = 0.06
+
+    def _landed_on_snap(self, result, view, start):
+        """A point a guide or the grid puts exactly on an existing point (an end, a centre,
+        a middle) IS that point (Fusion): the result snaps to it, so the click joins it
+        (Coincident). The pointer itself was too far from that point for its snap: the
+        book's Saturn V fin, closed with a click 2 mm beside its first corner, which the
+        grid put on the corner, got a line ending there unjoined, and no profile (wave 7
+        replay)."""
+        try:
+            if result is None or result.snap is not None:
+                return result
+            if getattr(result, "on_curve_geo", None) is not None or result.on_line:
+                return result
+            snap = self._snap_at(result.point, 0.25 * view.px, start)
+            if snap is None:
+                return result
+            result.point = snap.point
+            result.snap = snap
+            return result
+        except Exception as exc:
+            warn("sketch inference: %s" % exc)
+            return result
 
     def _beside_middle(self, view):
         """The Result for a point on a line or arc that FreeCAD's own snap would pull onto
@@ -557,6 +580,13 @@ class Inference:
         refuses a zero-length second click, so counting clicks could drift); the others
         count their clicks since the shape began."""
         if self.kind == "line":
+            if start is None and len(self.current.get("points") or ()) == 1:
+                # the line's first point is clicked and nothing was committed since: this
+                # click is its end, also when FreeCAD's preview could not be read (seen
+                # on the book's Saturn V fin: the end click started a new record, so the
+                # first point was never made exact, sat 0.09 mm off its grid crossing,
+                # and the closing click of the outline then missed it, wave 7 replay)
+                return 1
             return 0 if start is None else 1
         n = len(self.placed)
         return n if n < core.POINTS.get(self.kind, 0) else None
@@ -1114,6 +1144,10 @@ class Inference:
                 add, drop = self._snap_constraints(key, result.snap, new)
                 constraints += add
                 drops |= drop
+                if add:
+                    more, gone = _guide_now_the_line(sketch, key, result.snap, new)
+                    constraints += more
+                    drops |= gone
                 snap = result.snap
                 held |= {
                     g
@@ -1625,6 +1659,50 @@ def _point_on(sketch, key, curve):
         c.Type == "PointOnObject" and (c.First, c.FirstPos) == tuple(key) and c.Second == curve
         for c in sketch.Constraints
     )
+
+
+def _guide_now_the_line(sketch, key, snap, new):
+    """(constraints to add, indices to drop) when the end `key` (geo, pos) of a new line is
+    joined to the point `snap`, and an older guide constraint already holds the line's
+    other end level or upright with that point (a point placed on a guide from the
+    chain's first point: Vertical between the two). With the line between them that
+    guide is the line's own Horizontal / Vertical: kept as both, the closing Coincident
+    is redundant and was dropped, and the outline stayed open (the book's Saturn V fin,
+    wave 7 replay). The point-to-point guide goes; the line gets the same constraint."""
+    import Sketcher
+
+    try:
+        geo, pos = key
+        if geo not in new or snap.key is None:
+            return [], set()
+        g = sketch.Geometry[geo]
+        if g.TypeId != "Part::GeomLineSegment":
+            return [], set()
+        other = (geo, 1 if pos == 2 else 2)
+        cons = sketch.Constraints
+        # the points the line's other end is joined to (the previous line's end)
+        ends = {other}
+        for c in cons:
+            if c.Type != "Coincident":
+                continue
+            a, b = (c.First, c.FirstPos), (c.Second, c.SecondPos)
+            if a == other:
+                ends.add(b)
+            elif b == other:
+                ends.add(a)
+        drops, adds = set(), []
+        for i, c in enumerate(cons):
+            if c.Type not in ("Horizontal", "Vertical") or c.Second < 0 or c.SecondPos == 0:
+                continue
+            pair = {(c.First, c.FirstPos), (c.Second, c.SecondPos)}
+            if snap.key in pair and pair & ends and len(pair) == 2:
+                drops.add(i)
+                if not _has(sketch, c.Type, geo):
+                    adds.append(Sketcher.Constraint(c.Type, geo))
+        return adds, drops
+    except Exception as exc:
+        warn("sketch inference: %s" % exc)
+        return [], set()
 
 
 def _has(sketch, name, index):

@@ -13,6 +13,7 @@ Double-click the Split Face in the timeline to change it. Document side: split_f
 """
 
 import FreeCAD as App
+import FreeCADGui as Gui
 
 from . import bodies, modify_common as mc, split_face, ui_icon_path, warn
 from .bodies_panel import BodyPanel, edit as _edit, start as _start
@@ -107,7 +108,7 @@ class SplitFacePanel(BodyPanel):
         if self.squares is not None and self.squares.took_click():
             return
         if self.active == "faces":
-            self._pick_face(obj, short)
+            self._pick_face(obj, short, point)
         elif self.active == "tool":
             self._pick_tool(obj, short)
         elif self.active == "direction":
@@ -118,10 +119,45 @@ class SplitFacePanel(BodyPanel):
             self.options["direction"] = ref
             self._after_pick()
 
-    def _pick_face(self, obj, short):
+    def _behind_glyph(self, obj, point):
+        """(object, face name) of the body face behind the origin / construction plane or
+        axis a click landed on, or None. Faces to Split takes faces only, so a plane's square
+        drawn over the part must not take the click meant for the face behind it (the book's
+        rocket: Plane 1's square lies over the very face it is to split; Guess from Fusion's
+        selection filters, as Extrude does since wave 7)."""
+        from . import profile_pick
+
+        try:
+            if not profile_pick.is_glyph(obj):
+                return None
+            view = Gui.ActiveDocument.ActiveView
+            if point is not None:
+                pixel = view.getPointOnViewport(App.Vector(point))
+            else:  # (a plane picked as a whole comes without its point: where the mouse is)
+                from . import taskui
+                from .compat import QtGui
+
+                gl = taskui.view_widget()
+                if gl is None:
+                    return None
+                pixel = profile_pick.coin_pixel(gl, gl.mapFromGlobal(QtGui.QCursor.pos()))
+            found = profile_pick.behind_glyphs(
+                view,
+                pixel,
+                lambda o, s: s.startswith("Face") and o.TypeId != "Sketcher::SketchObject",
+            )
+            return (found[0], found[1]) if found is not None else None
+        except Exception as exc:
+            warn("split face pick: %s" % exc)
+            return None
+
+    def _pick_face(self, obj, short, point=None):
         if not short.startswith("Face"):
-            self.message.setText("Click faces of a body.")
-            return
+            behind = self._behind_glyph(obj, point)
+            if behind is None:
+                self.message.setText("Click faces of a body.")
+                return
+            obj, short = behind
         body = mc.body_of_pick(self, obj)
         if body is None:
             return

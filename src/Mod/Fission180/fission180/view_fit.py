@@ -107,6 +107,11 @@ def object_box(obj):
         if shape is not None and not shape.isNull():
             _add(total, shape.BoundBox, _outer_placement(obj))
             return total
+        if obj.TypeId == "PartDesign::Body":
+            # a body with no shape yet draws nothing of its own: its view provider's box is
+            # the box of its Origin's planes once their eye is on, and Fit then framed those
+            # little squares off-centre in an empty design (book parity report, The Basics)
+            return total
         vp = obj.ViewObject
         if vp is not None and hasattr(vp, "getBoundingBox"):
             _add(total, vp.getBoundingBox())

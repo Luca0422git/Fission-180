@@ -460,6 +460,16 @@ def body_looks(body):
         materials = list(vobj.ShapeAppearance) if vobj is not None else []
     except Exception:
         materials = []
+    try:
+        # A PartDesign body is drawn by its end step: Fission 180's looks (appearance.apply)
+        # are written to the steps' views, not the body's, which keeps FreeCAD's grey (the
+        # book's Saturn V came out of USDZ all grey, wave 7 replay)
+        tip = getattr(body, "Tip", None) if body.TypeId == "PartDesign::Body" else None
+        shown = list(tip.ViewObject.ShapeAppearance) if tip is not None and tip.ViewObject else []
+        if shown:
+            materials = shown
+    except Exception:
+        pass
     if materials:
         return [_look_of(m) for m in materials]
     try:  # a mesh body: one colour and a see-through share (0 - 100)
