@@ -237,19 +237,31 @@ class Autocomplete(unittest.TestCase):
     def test_fragment(self):
         self.assertEqual(complete.fragment("S", 1), (0, "S"))
         self.assertEqual(complete.fragment("2 * Sup", 7), (4, "Sup"))
+        self.assertEqual(complete.fragment("max(10; He", 10), (8, "He"))
         self.assertEqual(complete.fragment("Sketch.Con", 10), (10, ""))  # another object
         self.assertEqual(complete.fragment("5m", 2), (2, ""))  # a unit glued to its number
+        self.assertEqual(complete.fragment("25 in", 5), (5, ""))  # a unit after its number
+        self.assertEqual(complete.fragment("2.5 m", 5), (5, ""))
         self.assertEqual(complete.fragment("5 ", 2), (2, ""))
         self.assertEqual(complete.fragment("Head_Diam", 4), (4, ""))  # inside a word
 
     def test_suggestions(self):
         self.assertEqual(complete.suggestions("S", self.NAMES), ["Support_Width", "Shank_Length"])
         self.assertEqual(complete.suggestions("head", self.NAMES), ["Head_Diam", "Head_Length"])
-        self.assertEqual(complete.suggestions("len", self.NAMES), ["Head_Length", "Shank_Length"])
-        self.assertEqual(complete.suggestions("width", self.NAMES), ["width", "Support_Width"])
+        self.assertEqual(complete.suggestions("len", self.NAMES), [])  # (only names that start so)
+        self.assertEqual(complete.suggestions("w", self.NAMES), ["width"])
+        self.assertEqual(complete.suggestions("width", self.NAMES), [])
         self.assertEqual(complete.suggestions("Support_Width", self.NAMES), [])
         self.assertEqual(complete.suggestions("", self.NAMES), [])
         self.assertEqual(complete.suggestions("zz", self.NAMES), [])
+
+    def test_words_of_the_language_are_left_alone(self):
+        names = ["pitch", "minimum", "mm_gap", "sine", "in_depth", "h", "height"]
+        for word in ("pi", "min", "mm", "sin", "in"):
+            self.assertEqual(complete.suggestions(word, names), [], word)
+        self.assertEqual(complete.suggestions("pit", names), ["pitch"])
+        # a parameter called like a unit is offered with the names that start like it
+        self.assertEqual(complete.suggestions("h", names), ["h", "height"])
 
     def test_complete(self):
         self.assertEqual(

@@ -117,33 +117,25 @@ def put_back_count():
 
 def _asked_for(frame):
     """True when the Python statement that is running sets a document's UnitSystem itself
-    (`doc.UnitSystem = ...`, setattr): the person's or a script's own choice, not FreeCAD
-    carrying another document's units over."""
+    (`doc.UnitSystem = ...`): the person's or a script's own choice, not FreeCAD carrying
+    another document's units over. `frame`: the Python frame FreeCAD was called from when
+    it sent the change (the statement being executed there is looked at)."""
     import dis
 
-    while frame is not None:
-        try:
-            code = frame.f_code
-            if "UnitSystem" in code.co_names or "UnitSystem" in code.co_consts:
-                at = frame.f_lasti
-                last = None
-                for ins in dis.get_instructions(code):
-                    if ins.offset > at:
-                        break
-                    last = ins
-                if last is not None:
-                    if last.opname == "STORE_ATTR" and last.argval == "UnitSystem":
-                        return True
-                    if "CALL" in last.opname and "setattr" in code.co_names:
-                        return True
-        except Exception:
+    if frame is None:
+        return False
+    try:
+        code = frame.f_code
+        if "UnitSystem" not in code.co_names:
             return False
-        # a statement inside this module's own observer is never the asker; one level up is
-        # the statement that made FreeCAD send the change
-        if frame.f_code.co_filename != __file__:
-            return False
-        frame = frame.f_back
-    return False
+        last = None
+        for ins in dis.get_instructions(code):
+            if ins.offset > frame.f_lasti:
+                break
+            last = ins
+        return last is not None and last.opname == "STORE_ATTR" and last.argval == "UnitSystem"
+    except Exception:
+        return False
 
 
 class _Watch:

@@ -77,7 +77,8 @@ from the sandbox.
 | 11 | Delete in use | Refused in red with what uses it (other parameters, steps by their timeline names) | `book_params_dialog` G |
 | 12 | Rename | Type over the name; every formula follows (`renameProperty`), the row keeps its place | `book_params_dialog` F |
 | 13 | Modal | Modal, one undo step, Cancel puts everything back | `book_params_dialog` I |
-| 14 | Model parameters | Grouped by step, in the design's units, including Offset Plane, Coil, Thread, Hole, patterns, primitives (every number a step shows) | `book_params_units` F |
+| 14 | Model parameters | Grouped by step, in the design's units, including Offset Plane, Coil, Thread, Hole, patterns, primitives (every number a step shows) | `book_params_units` F; `parameters_check.py` |
+| 14b | An inch design is inch everywhere | Sketch grid and snap from 1 in, drag steps 0.1 in, the adaptive layout grid in round inches, tooltips "Type a value (in)", limit notes in inches | `book_params_units` B, J; `test_design_units_core.py` |
 | 15 | Units stay | `design_units.py` holds each design to its units | `book_params_units` (149 checks; fails without the guard) |
 | 16 | Thread default | `design_units.design_is_inch(doc)` for the thread builder | see the session log |
 
@@ -98,6 +99,15 @@ reserved.
   letter typed first is the letter's shortcut, as in Fusion while a tool runs.
 - Units Fusion also offers for a parameter (mass, time, area...) are not offered: mm, cm, m,
   in, ft, deg, rad and No Units are.
+- A starred sketch dimension is remembered by its place in the sketch's list: delete a
+  dimension before it and the star sits on the next one (a starred feature size or user
+  parameter stays).
+- A pattern of bodies takes a plain number as its quantity (FreeCAD cannot add bodies while
+  it rebuilds; the modify builder's item).
+- The Move dialog, Joint offsets and other fields without a stored formula take a
+  parameter's value when it is typed and do not follow it afterwards.
+- A length under 0.1 mm is written in µm by FreeCAD's value boxes (the "Standard" unit
+  schema; the only schema that always writes mm would write pressure as kg/(mm*s^2)).
 - `log` is the natural logarithm (FreeCAD's); `ln` is accepted too. Fusion's `log` is base 10
   (Inventor's is): type `log10` for that. `sin(30)` reads 30 as degrees (FreeCAD); Fusion
   wants `30 deg`.

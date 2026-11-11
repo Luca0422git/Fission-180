@@ -439,6 +439,31 @@ def set_a_dimension(doc):
     expect(".Constraints[%d]" % h not in parameters.expressions_of(sk), "plain number: no formula")
 
 
+# == the design's units ===================================================================
+@case
+def units_are_held(doc):
+    """Bug 2: a change of a design's units that nobody asked for is put back; the person's
+    own (Change Active Units) and a script's own (`doc.UnitSystem = ...`) are kept.
+    (FreeCAD's window code is what carries units over; here that is played by a write that
+    is no assignment of the running Python statement.)"""
+    from fission180 import design_units
+
+    design_units.install()
+    names = doc.getEnumerationsOfProperty("UnitSystem")
+    design_units.set_units(doc, 3)
+    expect(design_units.length_unit(doc) == "in" and design_units.design_is_inch(doc), "inch")
+    before = design_units.put_back_count()
+    type(doc).__setattr__(doc, "UnitSystem", names[0])  # nobody's statement: carried over
+    expect(doc.UnitSystem == names[3], "put back to inch: %s" % doc.UnitSystem)
+    expect(design_units.put_back_count() == before + 1, "counted")
+    doc.UnitSystem = names[0]  # a script's own choice
+    expect(doc.UnitSystem == names[0] and design_units.remembered(doc) == 0, doc.UnitSystem)
+    design_units.set_units(doc, 3)  # the person's: Change Active Units
+    expect(doc.UnitSystem == names[3] and design_units.remembered(doc) == 3, doc.UnitSystem)
+    expect(design_units.hint(doc) == "Type a value (in), a parameter or a formula", "hint")
+    expect(design_units.length_text(25.4, doc) == "1 in", design_units.length_text(25.4, doc))
+
+
 def main():
     done = 0
     for fn in CASES:

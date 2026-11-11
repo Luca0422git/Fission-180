@@ -119,6 +119,13 @@ Parity notes with sources: `docs/fission180/parity/parameters.md` (new).
 - After a modal dialog closes on a screen without a window manager, the main window is not
   active again by itself and its shortcuts (Ctrl+Z) do nothing: `activateWindow()`.
 - FreeCAD's adaptive sketch grid is `GridSize x subdivisions^n`: its base decides the unit.
+- **A Python document observer's `slotFinishRestoreDocument` is never called** in FreeCAD
+  1.1.4 (`App/DocumentObserverPython.cpp` has no such slot; the list is: Created, Deleted,
+  Relabel, Activate, Undo, Redo, BeforeChange / Changed (Document and Object), Created /
+  Deleted Object, Recomputed, transactions, dynamic properties, ChangePropertyEditor,
+  Start / FinishSave). `thread_ui.py` (cosmetic threads after a file is opened) and
+  `undo_fast.py` define it and never get it. Opening a file activates the document twice:
+  once empty (before it is loaded), once loaded; `doc.Restoring` is true in between.
 - FreeCAD's unit schema "Standard" writes a length under 0.1 mm in µm and one over 10 m in
   m; the only schema that always writes mm ("Metric small parts & CNC") writes pressure as
   kg/(mm*s^2), so it cannot simply be switched to.
@@ -145,6 +152,16 @@ Parity notes with sources: `docs/fission180/parity/parameters.md` (new).
 - **sketch-b**: the typed Quantity of the sketch pattern (their brief). `sketch_move_tool.py`
   reads a dimension's formula under either spelling now (changed here).
 - **extrude**: `extrude.evaluate` delegates to `parameters.read` (changed here).
+
+**Hard-coded "mm" in user-visible text of other builders' files** (an inch design reads
+millimetres there; `design_units.length_text(mm, doc)` writes a length in the design's
+units): `fillet_ui.py` (the selection-set rows "%g mm", "r %.2f mm", "chord %g mm", the
+radius-point help, the sizes list), `hardware_ui.py` (lengths, "Clearance %g mm", the hole
+line), `joints_ui.py` / `joints_motion_ui.py` ("slide %.2f mm", limits), `flatpattern_ui.py`
+and `browser_ui.py` ("Flat %.2f x %.2f mm"), `insert_ui.py` / `decal_ui.py` ("%.1f x %.1f
+mm" of a canvas, a decal, a mesh), `drawing_ui.py` / `drawing_breakout_ui.py` ("Distance
+(mm)", "Depth (mm)", the " mm" suffix of gap and size boxes), `export_ui.py` (" mm" suffix),
+`extrude_ui.py` (the "%.1f mm2" area message), `thread_ui.py` (the read-out).
 
 ## Shared files touched (the smallest change, each with a comment saying why)
 

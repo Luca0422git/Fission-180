@@ -3,8 +3,8 @@
 Fission180Tests/headless/parameters_check.py and checks every case: a negative length
 (bug 4), every unit, the book's min / max limits, names FreeCAD reads as units, rename and
 delete, favourites through save and reopen, Name = value, a deleted sketch constraint
-(bug 3) and the formulas of a design made before. Skipped when FreeCAD is not found
-(run_tests.sh gives its command in FISSION180_FC_CMD)."""
+(bug 3), the formulas of a design made before, a design held to its units (bug 2).
+Skipped when FreeCAD is not found (run_tests.sh gives its command in FISSION180_FC_CMD)."""
 
 import os
 import re
@@ -14,7 +14,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODULE = os.path.dirname(os.path.dirname(HERE))
-CASES = 16
+CASES = 17
 
 
 def _command():

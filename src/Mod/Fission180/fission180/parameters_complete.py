@@ -41,23 +41,30 @@ def fragment(text, cursor):
     lead = before[:start].rstrip()
     if start and before[start - 1] == ".":
         return cursor, ""  # another object's property
-    if lead and (lead[-1].isdigit() or lead[-1] == ".") and lead == before[:start]:
-        return cursor, ""  # "5m": a unit glued to its number
+    if lead and (lead[-1].isdigit() or lead[-1] == "."):
+        return cursor, ""  # "5 mm", "25 in": the unit of a number, never a name
     return start, match.group(0)
 
 
 def suggestions(word, names, limit=MAX_ROWS):
-    """The parameter names to offer for the typed `word`: the ones that start with it
-    first (in the design's order), then the ones that contain it. Case does not matter.
-    Nothing when the word is already one of the names and no other name starts with it."""
+    """The parameter names to offer for the typed `word`: the ones that start with it, in
+    the design's order. Case does not matter. Nothing when the word is already the only
+    such name, or is a word of the formula language itself (pi, min, sin, mm: Enter must
+    not turn `2 * pi` into `2 * pitch`), unless a parameter is called exactly that."""
     if not word:
         return []
     low = word.lower()
-    starts = [n for n in names if n.lower().startswith(low)]
-    inside = [n for n in names if low in n.lower() and n not in starts]
-    found = starts + inside
+    found = [n for n in names if n.lower().startswith(low)]
     if found == [word]:
         return []
+    if word not in names:
+        try:
+            from . import parameters_core
+
+            if word in parameters_core.RESERVED:  # (mm, in, deg, pi, min, sin...)
+                return []
+        except Exception:
+            pass
     return found[:limit]
 
 
@@ -319,13 +326,11 @@ def _key(obj, event):
     p = popup()
     if p is None:
         return False
+    fills = (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter, QtCore.Qt.Key_Tab)
     if kind == QtCore.QEvent.ShortcutOverride:
-        if event.key() in (
-            QtCore.Qt.Key_Escape,
-            QtCore.Qt.Key_Return,
-            QtCore.Qt.Key_Enter,
-            QtCore.Qt.Key_Tab,
-        ):
+        if event.key() in fills and _already_typed(p):
+            return False  # the name is typed in full: Enter / Tab are the box's own
+        if event.key() in fills or event.key() == QtCore.Qt.Key_Escape:
             event.accept()  # the key is the list's: no shortcut (Esc cancels, Enter is OK)
             return True
         return False
@@ -336,13 +341,28 @@ def _key(obj, event):
         step = 1 if key == QtCore.Qt.Key_Down else -1
         p.setCurrentRow((p.currentRow() + step) % p.count())
         return True
-    if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter, QtCore.Qt.Key_Tab):
+    if key in fills:
+        if _already_typed(p):
+            # nothing to fill in (the lit name is what was typed): the key commits the box,
+            # as without a list (a parameter called "n" typed in a Quantity, then Tab)
+            hide()
+            return False
         accept()
         return True
     if key == QtCore.Qt.Key_Escape:
         hide()
         return True
     return False
+
+
+def _already_typed(p):
+    """True when the list's lit name is exactly the name typed so far."""
+    edit = _state["edit"]
+    item = p.currentItem() if p is not None else None
+    if edit is None or item is None:
+        return False
+    _start, word = fragment(edit.text(), edit.cursorPosition())
+    return word == item.text()
 
 
 def mark(widget):
