@@ -323,6 +323,12 @@ class Canvas(QtWidgets.QWidget):
         if event.button() != QtCore.Qt.LeftButton:
             return
         ui.pause()
+        if ui.dialog_open():
+            # (the open command works at the playhead it was started at)
+            commands.tell(
+                "Finish the open command first (OK or Cancel), then move the playhead or a bar."
+            )
+            return
         hit = self._hit(pos) if pos.y() > RULER_H else None
         if hit is not None:
             action_id, part = hit

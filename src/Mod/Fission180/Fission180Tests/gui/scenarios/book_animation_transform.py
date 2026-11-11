@@ -109,6 +109,21 @@ def refused_unmoved():
 def typed_distance():
     h.check("the preview lifts the Lid 30", a.close(a.shown("Lid"), (0, 0, 30)), a.shown("Lid"))
     h.check("the manipulator went with it", a.close(tuple(a.panel().triad.center), (30, 20, 42)))
+    a.click_time(5.0)
+
+
+def ruler_blocked():
+    h.check(
+        "a click on the ruler under an open command leaves the playhead",
+        abs(a.playhead() - 2.0) < 1e-6,
+        a.playhead(),
+    )
+    h.check(
+        "and says to finish the command first",
+        "Finish the open command first" in a.told(),
+        a.told(),
+    )
+    h.check("the dialog is still open", a.panel() is not None)
     a.type_number("rz", "90")
 
 
@@ -594,6 +609,7 @@ h.run(
         lid_taken,
         refused_unmoved,
         typed_distance,
+        ruler_blocked,
         typed_angle,
         recorded,
         half_way,

@@ -70,6 +70,43 @@ def play_nothing():
 def nothing_to_play():
     h.check("Play on an empty storyboard says why", "nothing to play" in a.told(), a.told())
     h.check("nothing plays", a.played())
+    a.transport("new")
+
+
+nothing_to_play.done = lambda: a.panel() is not None
+nothing_to_play.done_what = "the New Storyboard dialog is open"
+
+
+def new_on_empty():
+    h.check(
+        "the new one comes after the empty Storyboard1",
+        a.field("name").text() == "Storyboard2",
+        a.field("name").text(),
+    )
+    a.ok()
+
+
+new_on_empty.done = a.panel_closed
+new_on_empty.done_what = "the dialog closed"
+
+
+def two_tabs():
+    h.check("two tabs", a.tabs() == ["Storyboard1", "Storyboard2"], a.tabs())
+    h.check(
+        "both are in the design now",
+        a.anim().storyboards(a.doc()) == ["Storyboard1", "Storyboard2"],
+    )
+    h.check("the new one is shown", a.current() == "Storyboard2", a.current())
+    a.undo()
+
+
+def new_undone():
+    h.check("Undo: the design has no storyboard again", a.anim().storyboards(a.doc()) == [])
+    h.check(
+        "and the one empty tab shows",
+        a.tabs() == ["Storyboard1"] and a.current() == "Storyboard1",
+        a.tabs(),
+    )
 
 
 def to_two_seconds():
@@ -278,6 +315,9 @@ h.run(
         entered,
         play_nothing,
         nothing_to_play,
+        new_on_empty,
+        two_tabs,
+        new_undone,
         to_two_seconds,
         at_two_seconds,
         explode,

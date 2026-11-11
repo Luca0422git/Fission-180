@@ -164,6 +164,15 @@ def set_recording(on):
     STATE["recording"] = bool(on)
     _remember_camera()
     _timeline_update()
+    try:  # the big View button's dot: red while recording, yellow while not (Fusion)
+        from . import ui_icon
+
+        ribbon = _ribbon()
+        if ribbon is not None:
+            for button in ribbon.findChildren(QtWidgets.QToolButton, "Fission180Big_View"):
+                button.setIcon(ui_icon("anim_view" if on else "anim_view_off"))
+    except Exception as exc:
+        warn("animation: view button: %s" % exc)
     log("animation: view recording %s" % ("on" if on else "off"))
 
 
@@ -181,6 +190,8 @@ def edit(step, fn, doc=None):
     step None: inside a dialog's own undo step. Returns fn's result; refuses with a message
     next to the mouse (and returns None)."""
     doc = doc or _doc()
+    if step is not None and not commands.finish_open_dialog():
+        return None
     name = current(doc)
     at = playhead(doc)
 
@@ -231,6 +242,17 @@ def _preview_dialog():
     except Exception:
         pass
     return None
+
+
+def dialog_open():
+    """True while a command's dialog is open (any Fission 180 dialog)."""
+    try:
+        from . import taskui
+
+        dialog = taskui.current()
+        return dialog is not None and not getattr(dialog, "_closed", False)
+    except Exception:
+        return False
 
 
 def refresh_view(camera=False, force=False):
@@ -396,17 +418,21 @@ def _play_tick():
 
 def to_start():
     pause()
-    set_playhead(0.0)
+    if commands.finish_open_dialog():
+        set_playhead(0.0)
 
 
 def to_end():
     pause()
-    set_playhead(duration())
+    if commands.finish_open_dialog():
+        set_playhead(duration())
 
 
 def step(forward):
     """The next / previous start or end of an action."""
     pause()
+    if not commands.finish_open_dialog():
+        return
     found = board()
     if found is not None:
         set_playhead(core.step_time(found, playhead(), bool(forward)))
@@ -449,8 +475,8 @@ def _watch_camera(doc):
         STATE["camera_moving"] = now  # still on its way: look again at the next tick
         return
     STATE["camera"], STATE["camera_moving"] = now, None
-    if not STATE["recording"] or _preview_dialog() is not None:
-        return
+    if not STATE["recording"] or dialog_open():
+        return  # (a command is open: its view changes are for looking, not for the film)
     found = board(doc)
     at = playhead(doc)
     if core.in_scratch(at):

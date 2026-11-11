@@ -319,10 +319,10 @@ class Job:
                 animation_view.set_camera(self.view, self.camera)
             from . import animation_ui
 
-            if animation_ui.in_workspace(self.doc):
+            if animation_ui.active() and App.ActiveDocument is self.doc:
                 animation_ui.refresh_view(force=True)
                 animation_ui._remember_camera()
-            else:
+            else:  # (its design is not the one in front any more: drawn as the design has it)
                 animation_view.restore(self.doc)
         except Exception as exc:
             warn("publish video: %s" % exc)

@@ -313,10 +313,10 @@ class NewStoryboardPanel(AnimPanel):
 
     def __init__(self, doc):
         super().__init__(doc, "New Storyboard")
-        names = animation.storyboards(doc)
-        self.field = self.named(QtWidgets.QLineEdit(core.unique_name(names or [])), "name")
-        if not names:
-            self.field.setText(animation.FIRST)
+        # (a design without storyboards shows an empty "Storyboard1": the new one comes
+        # after it, and both are made in the design)
+        names = ui.storyboard_names(doc)
+        self.field = self.named(QtWidgets.QLineEdit(core.unique_name(names)), "name")
         self.layout.addRow("Name", self.field)
         self.kind = self.named(QtWidgets.QComboBox(), "type")
         self.kind.addItem("Clean", True)
@@ -326,8 +326,6 @@ class NewStoryboardPanel(AnimPanel):
             "where the storyboard shown now leaves them."
         )
         self.layout.addRow("Storyboard Type", self.kind)
-        if not names:
-            self.kind.model().item(1).setEnabled(False)
         self.hint(
             "A storyboard is one animation. A design can have several: each has its own tab "
             "under the timeline."
@@ -343,6 +341,8 @@ class NewStoryboardPanel(AnimPanel):
         previous = self.name
 
         def run(data):
+            if not data["storyboards"] and name != animation.FIRST:
+                data["storyboards"].append(core.new_storyboard(animation.FIRST))
             title = core.check_name(data, name)
             start = None
             if not clean:
