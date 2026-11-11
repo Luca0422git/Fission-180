@@ -115,6 +115,20 @@ models: 644 pass, 2 expected failures (as on develop).
    instances, not separate components": separate inserts are separate components). Left as
    it is.
 
+4. The harness's new check "no undo step stays open" (the shell builder) found: Create
+   Sketch on a design without a body, then cancelled, left "Add a Body" open with an empty
+   body (`origin_squares_small`, `book_components_menus`). Root cause:
+   `commands.ensure_body()` runs FreeCAD's Body command, which leaves its step open when it
+   is run from inside another command, and nothing closed it when the plane picker was
+   cancelled. Fix: `commands.drop_made_body` (the open step is aborted, the body goes with
+   it; when a dialog's own step closed it meanwhile it is taken back while it is the newest
+   step), called by `SketchPicker.reject`, by a sketch that could not be made, and by
+   `taskui.Panel._close` for every cancelled dialog (the CONSTRUCT tools, Insert, Section);
+   Box makes its body inside its own step already. `book_components_menus` C relied on the
+   body left behind: it now checks that none is left and sets an empty body up through the
+   module for its drag. New scenario `book_components2_cancel` (29 checks, the undo check
+   strict).
+
 ## FreeCAD facts and traps (1.1.4)
 
 - `view.setActiveObject("pdbody", body)` does not touch the "part" slot; Fission 180's
@@ -170,6 +184,8 @@ models: 644 pass, 2 expected failures (as on develop).
   part is moved later (it still follows when the part changes shape).
 - New Component shows Internal / External; External is greyed and says what to do instead.
 - Align no longer moves a grounded component; it says to unground it first.
+- Create Sketch (or a CONSTRUCT tool) cancelled in an empty design leaves no empty body
+  behind, and Undo is not confused by it.
 
 ## Known issues
 
