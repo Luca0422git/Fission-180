@@ -7,11 +7,16 @@ format is checked by Fission180Tests/golden/hardware_schema.py.
   {"op": "sf_hardware", "id": "hw1", "face": <face selector>, "at": [x, y, z],
    "standard": "iso4762", "size": "3", "length": 10, "make_hole": true, ...}
   {"op": "sf_hardware", "id": "hw1", "edge": <edge selector of one round edge>, ...}
-      Click a flat face of the current body at `at` (design coordinates), or a round edge
-      (a hole's rim): a new component with the part, and its Hole step in the current body.
-      Options: standard (iso4762 | iso7380 | iso10642 | iso4032 | iso7089 | insert |
-      magnet), size ("3", "6x3"), length, flip, make_hole, fit (close | normal | loose),
-      sink_head, hole_depth (all | length), clearance (a magnet's pocket).
+  {"op": "sf_hardware", "id": "hw1", "wall": <face selector of a hole's wall, a countersink
+   or a shaft's side>, "at": [x, y, z] (optional: where it was clicked), ...}
+  {"op": "sf_hardware", "id": "hw1", ...}   (no place: the part comes in at the origin)
+      Click a flat face of the current body at `at` (design coordinates), a round edge (a
+      hole's rim) or a hole's wall: a new component with the part, and its Hole step in the
+      current body. Options: standard (hardware_core.STANDARD_ORDER: iso4762, asme_shcs,
+      iso4029, as568, bearing, din471 ...), size ("3", "1/4", "#10", "6x3", "012", "6202"),
+      length (mm), thread ("" = coarse, or "1/4-28 UNF"), modeled (threads), variant (a
+      bearing: open | zz | 2rs), flip, offset (along the axis), make_hole, fit (close |
+      normal | loose), sink_head, hole_depth (all | length), clearance (a magnet's pocket).
       "hardware_bbox": [xmin, ymin, zmin, xmax, ymax, zmax] checks where the part ended up
       (design coordinates). The measured body stays the clicked one; expect_bodies with the
       step's id measures the part's own body.
@@ -28,7 +33,11 @@ HARDWARE_KEYS = (
     "standard",
     "size",
     "length",
+    "thread",
+    "modeled",
+    "variant",
     "flip",
+    "offset",
     "make_hole",
     "fit",
     "sink_head",
@@ -87,12 +96,26 @@ def op_sf_hardware(self, step):
 
     from fission180 import hardware, hardware_core
 
+    if "edge" not in step and "face" not in step and "wall" not in step:
+        # no place: the part comes in at the origin (Fusion's Insert McMaster-Carr Component)
+        try:
+            feature = hardware.make(self.doc, None, _options(step))
+        except hardware_core.HardwareError as exc:
+            raise BuildError("sf_hardware %r: %s" % (step["id"], exc))
+        self.objects[step["id"]] = feature
+        self.ops[step["id"]] = "sf_hardware"
+        return _settle(self, step, feature)
     tip = self._tip()
     if "edge" in step:
         names = selectors.select(tip.Shape, step["edge"], "edges")
         if len(names) != 1:
             raise BuildError("sf_hardware %r: 'edge' must select one edge" % step["id"])
         pick = (tip, names[0], None)
+    elif "wall" in step:
+        names = selectors.select(tip.Shape, step["wall"], "faces")
+        if len(names) != 1:
+            raise BuildError("sf_hardware %r: 'wall' must select one face" % step["id"])
+        pick = (tip, names[0], App.Vector(*step["at"]) if "at" in step else None)
     else:
         names = selectors.select(tip.Shape, step["face"], "faces")
         if len(names) != 1:

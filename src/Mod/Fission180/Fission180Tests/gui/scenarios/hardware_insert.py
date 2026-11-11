@@ -3,7 +3,7 @@
 
 A  INSERT > Hardware...: the dialog waits for a place (Socket head cap screw ISO 4762,
    M3, 10 mm, Make the hole too and Head sunk in ticked). Click the top face at (12, 8):
-   a new component "M3x10 ISO 4762" with the screw appears at once, and the box gets a
+   a new component "M3 x 10 Socket Head Cap Screw" with the screw appears at once, and the box gets a
    counterbored clearance hole there (measured on the box's shape: 3.4 through, 6.5 x 3.4
    counterbore); the screw's head sits on the counterbore's floor. OK.
 B  Undo (application bar) removes the screw's component and the hole together; Redo brings
@@ -11,7 +11,7 @@ B  Undo (application bar) removes the screw's component and the hole together; R
 C  Type Heat-set insert, click (30, 20): an M3 insert flush in a 4.0 x 6.7 hole. OK.
 D  Type Magnet (6 x 3 first), click (30, 8): a 6.2 x 3 pocket, the magnet flush. OK.
 E  Double-click the Hardware step of the screw in the timeline: the dialog shows it as
-   left; Length 16 mm: the screw grows, the component is renamed "M3x16 ISO 4762", the
+   left; Length 16 mm: the screw grows, the component is renamed "M3 x 16 Socket Head Cap Screw", the
    hole stays. OK.
 F  Hardware..., Heat-set insert, click the rim of the magnet's pocket (a hole that is there
    already): the insert goes on that hole's axis, "Make the hole too" goes off by itself
@@ -142,14 +142,24 @@ def a_waits():
     if p is None:
         return
     types = [p.kind.itemText(i) for i in range(p.kind.count())]
-    h.check("types", types == ["Screw", "Nut", "Washer", "Heat-set insert", "Magnet"], types)
+    h.check(
+        "types",
+        types[:5] == ["Screw", "Set screw", "Shoulder screw", "Nut", "Washer"]
+        and types[-2:] == ["Heat-set insert", "Magnet"]
+        and len(types) == 13,
+        types,
+    )
     h.check("socket head first", p.standard.currentText().startswith("Socket head"))
     h.check("M3, 10 mm", (p.size.currentText(), p.length.currentText()) == ("M3", "10 mm"))
     h.check("make the hole ticked", p.make_hole.isChecked())
     h.check("head sunk in ticked", p.sink.isChecked())
     h.check("nothing made yet", p.target is None and not parts())
     h.check("Place on waits", p.place.button.isChecked())
-    h.check("name M3x10 ISO 4762", p.name.text() == "M3x10 ISO 4762", p.name.text())
+    h.check(
+        "name M3 x 10 Socket Head Cap Screw",
+        p.name.text() == "M3 x 10 Socket Head Cap Screw",
+        p.name.text(),
+    )
     h.shot("1-waiting")
     h.fit()
     h.click(V(12, 8, 10))
@@ -159,7 +169,11 @@ def a_placed():
     p = panel()
     h.check("the screw is made at once", p is not None and p.target is not None)
     h.check("one part", len(parts()) == 1, len(parts()))
-    h.check("component M3x10 ISO 4762", "M3x10 ISO 4762" in component_labels(), component_labels())
+    h.check(
+        "component M3 x 10 Socket Head Cap Screw",
+        "M3 x 10 Socket Head Cap Screw" in component_labels(),
+        component_labels(),
+    )
     h.check("one hole in the box", len(holes()) == 1, len(holes()))
     v = block_volume()
     h.check("counterbored clearance hole", close(v, BOX - SCREW_HOLE), (v, BOX - SCREW_HOLE))
@@ -167,7 +181,9 @@ def a_placed():
         c = centre(parts()[0])
         h.check("the screw is where the click was", near_point(c, V(12, 8, 10)), c)
         faces = round_faces_at(c)
-        h.check("clearance 3.4 from the bottom to the counterbore", faces.get(1.7) == (0.0, 6.6), faces)
+        h.check(
+            "clearance 3.4 from the bottom to the counterbore", faces.get(1.7) == (0.0, 6.6), faces
+        )
         h.check("counterbore 6.5 x 3.4", faces.get(3.25) == (6.6, 10.0), faces)
         box = global_box(parts()[0])
         h.check(
@@ -192,14 +208,22 @@ def a_kept():
 # -- B ---------------------------------------------------------------------------------------------
 def b_undone():
     h.check("Undo: no screw", not parts(), len(parts()))
-    h.check("Undo: no component", "M3x10 ISO 4762" not in component_labels(), component_labels())
+    h.check(
+        "Undo: no component",
+        "M3 x 10 Socket Head Cap Screw" not in component_labels(),
+        component_labels(),
+    )
     h.check("Undo: no hole", not holes() and close(block_volume(), BOX), block_volume())
     s.redo()
 
 
 def b_redone():
     h.check("Redo: the screw", len(parts()) == 1)
-    h.check("Redo: its component", "M3x10 ISO 4762" in component_labels(), component_labels())
+    h.check(
+        "Redo: its component",
+        "M3 x 10 Socket Head Cap Screw" in component_labels(),
+        component_labels(),
+    )
     h.check("Redo: the hole", close(block_volume(), BOX - SCREW_HOLE), block_volume())
     state["screw"] = parts()[0].Name if parts() else None
     open_hardware()
@@ -232,7 +256,7 @@ def c_placed():
         h.check("hole 4.0 wide, 6.7 deep", faces.get(2.0) == (3.3, 10.0), faces)
         box = global_box(new[0])
         h.check("insert flush with the face", box == [-2.3, -2.3, 4.3, 2.3, 2.3, 10.0], box)
-    h.check("component M3 Heat-set insert", "M3 Heat-set insert" in component_labels())
+    h.check("component M3 Heat-Set Insert", "M3 Heat-Set Insert" in component_labels())
     h.shot("3-insert")
     h.task_button("OK")
 
@@ -269,7 +293,7 @@ def d_placed():
         h.check("pocket 6.2 wide, 3 deep", faces.get(3.1) == (7.0, 10.0), faces)
         box = global_box(magnets[0])
         h.check("magnet flush with the face", box == [-3.0, -3.0, 7.0, 3.0, 3.0, 10.0], box)
-    h.check("component Magnet 6x3", "Magnet 6x3" in component_labels(), component_labels())
+    h.check("component Magnet 6 x 3", "Magnet 6 x 3" in component_labels(), component_labels())
     h.shot("4-magnet")
     h.task_button("OK")
 
@@ -303,7 +327,11 @@ def e_longer():
     want = hardware_core.volume({"standard": "iso4762", "size": "3", "length": 16})
     have = screw.Shape.Volume if screw is not None else 0.0
     h.check("the screw grows to 16", close(have, want), (have, want))
-    h.check("renamed M3x16 ISO 4762", "M3x16 ISO 4762" in component_labels(), component_labels())
+    h.check(
+        "renamed M3 x 16 Socket Head Cap Screw",
+        "M3 x 16 Socket Head Cap Screw" in component_labels(),
+        component_labels(),
+    )
     # the insert's and the magnet's holes (made later) wait while the screw is edited (Fusion)
     want_box = BOX - SCREW_HOLE
     h.check("the hole stays (through all)", close(block_volume(), want_box), block_volume())
@@ -315,7 +343,7 @@ def e_longer():
 
 
 def e_kept():
-    h.check("edit kept", panel() is None and "M3x16 ISO 4762" in component_labels())
+    h.check("edit kept", panel() is None and "M3 x 16 Socket Head Cap Screw" in component_labels())
     h.check("still three parts and three holes", len(parts()) == 3 and len(holes()) == 3)
     want_box = BOX - SCREW_HOLE - INSERT_HOLE - MAGNET_HOLE
     h.check("all three holes after OK", close(block_volume(), want_box), block_volume())
