@@ -327,9 +327,7 @@ class TestRealMenus(unittest.TestCase):
         with open(config, encoding="utf-8") as handle:
             greyed = re.findall(r'\bitem\(\s*"([^"]+)",\s*None\s*[,)]', handle.read())
         for label in greyed[:5]:
-            self.assertTrue(
-                any(e.label == label and not e.available for e in self.entries), label
-            )
+            self.assertTrue(any(e.label == label and not e.available for e in self.entries), label)
         self.assertTrue(self.has("tab:drawing", "Export DWG", available=True))
         self.assertFalse(self.has("tab:drawing", "Export DWG", available=False))
 
