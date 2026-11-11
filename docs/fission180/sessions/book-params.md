@@ -145,7 +145,7 @@ Scenarios (real input, paced by state), all PASS on the last commit:
 | `book_params_units` | 156 | an inch design through Extrude, a Chamfer with two sets, Fillet, Offset Plane, a Change Parameters edit, five undos and redos, a second design in mm, save / reopen; the inch grid; model parameters in inches (bug 2: fails without `design_units`) |
 | `book_params_drone` | 85 | a plate of 9 areas whose rim follows Arm_Length, five areas extruded, six parameter changes, undo, redo, save / reopen |
 
-Unit tests: `test_parameters_read.py` (31), `test_parameters_core.py` (10),
+Unit tests: `test_parameters_read.py` (30), `test_parameters_core.py` (10),
 `test_design_units_core.py` (7), `test_parameters_freecad.py` (2, running the 17 cases of
 `Fission180Tests/headless/parameters_check.py` in FreeCAD without a window).
 Whole unit suite: 3164 tests, only `test_ai_docs_contract` fails until the generated docs
