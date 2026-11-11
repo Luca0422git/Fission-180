@@ -179,6 +179,13 @@ def finish_open_dialog():
     finished (OK, or Cancel if OK is not possible) and a sketch being edited is
     closed. Returns True when nothing is open any more."""
     if not Gui.Control.activeDialog():
+        try:  # (wave 7, components-2) a command without a dialog left a body of another
+            # component as the active body: the active component's own body takes new work
+            from . import components
+
+            components.settle_active(App.ActiveDocument)
+        except Exception as exc:
+            warn("active body: %s" % exc)
         return True
     from . import taskui
 
@@ -239,7 +246,11 @@ def _own_tool_running(session, name):
     press does (O again ends Offset, M again keeps Move/Copy with its picks), so it is not
     stopped first."""
     tool = getattr(session, "tool", None)
-    return tool is not None and bool(getattr(tool, "active", False)) and getattr(tool, "command", "") == name
+    return (
+        tool is not None
+        and bool(getattr(tool, "active", False))
+        and getattr(tool, "command", "") == name
+    )
 
 
 def _would_ask(name):

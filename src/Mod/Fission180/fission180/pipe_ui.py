@@ -934,7 +934,8 @@ class PipePanel(Panel, value_limits.LimitedValues):
             try:
                 from . import components
 
-                components.activate_body(body)  # and its (new) component
+                # (wave 7, components-2) not a body of another component that was only cut
+                components.activate_result(body, feature)
             except Exception as exc:
                 warn("could not activate %s: %s" % (body.Label, exc))
         log("Pipe done")

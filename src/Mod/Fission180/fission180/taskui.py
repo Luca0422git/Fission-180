@@ -43,6 +43,13 @@ def current():
 def set_current(dialog):
     _OPEN["dialog"] = dialog
     if dialog is not None:
+        try:  # (wave 7, components-2) Panel._close tells a kept step from a cancelled one
+            dialog._undo_count_at_open = dialog.doc.UndoCount
+            from . import components
+
+            dialog._outside_tips_at_open = components.outside_tips(dialog.doc)
+        except Exception:
+            pass
         try:  # Fusion: starting a command stops the timeline's playback
             from . import timeline_ui
 
@@ -1857,6 +1864,21 @@ class Panel:
     def _close(self):
         if _OPEN["dialog"] is self:
             _OPEN["dialog"] = None
+        try:  # (wave 7, components-2) a command that worked on a body of ANOTHER component
+            # made that body the active one: the active component gets its own body back
+            # (it never changes because of what a command was aimed at, as in Fusion), and
+            # a step that was kept says, next to the mouse, where it went
+            from . import components
+
+            kept = getattr(self, "_undo_count_at_open", None) not in (
+                None,
+                getattr(self.doc, "UndoCount", None),
+            )
+            components.settle_active(
+                self.doc, say=kept, before=getattr(self, "_outside_tips_at_open", None)
+            )
+        except Exception as exc:
+            warn("active component after the dialog: %s" % exc)
         try:  # nothing waits after the dialog (its undo step closed and rebuilt them); a
             # dialog that closed its step itself still gets the marker back after an edit
             from . import edit_rollback, preview

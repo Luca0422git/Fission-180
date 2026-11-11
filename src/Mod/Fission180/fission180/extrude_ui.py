@@ -3014,7 +3014,8 @@ class ExtrudePanel(Panel, value_limits.LimitedValues, live_shapes.LivePanel):
             try:
                 from . import components
 
-                components.activate_body(new_body)  # and its (new) component
+                # (wave 7, components-2) not a body of another component that was only cut
+                components.activate_result(new_body, feature)
             except Exception as exc:
                 warn("could not activate %s: %s" % (new_body.Label, exc))
         log("%s done" % self.title)
