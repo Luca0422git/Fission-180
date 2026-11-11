@@ -207,12 +207,12 @@ class ValueField:
     def settle(self):
         """What was typed and not settled yet (no Enter, Tab or click elsewhere) is taken
         now: OK clicked right after typing "1/8" took the "1" the preview showed (a 1 in
-        fillet instead of 1/8 in; the replay of the book's American Football). Returns
-        False when the text is no value (the dialog then says why and stays open)."""
+        fillet instead of 1/8 in; the replay of the book's American Football). Text that
+        is no value goes to the dialog's _formula_failed, as with Enter: OK then says why
+        and the dialog stays open."""
         if self.raw is None:
-            return True
+            return
         self._finished()
-        return True
 
     def take_text(self, text):
         """`text` typed for this box somewhere else (the value box next to the arrow in the

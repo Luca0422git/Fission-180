@@ -168,6 +168,17 @@ The Render workspace (Projects 19 + 20 entirely, the render parts of 17, 18 and 
 
 ## Tests
 
+Final run through `run_tests.sh`, one scenario after the other: replay_17_football 90,
+replay_18_phone_case 104, replay_27_hilt 260, replay_animation 133, replay_drawings 166,
+replay_manufacture 97: all PASS. Unit: 3682 tests, 2 failures: `test_vex_qa_freecad`
+"parts_list_assembly_twice" (known on develop, another builder's) and the parity checklist
+(regenerated in a commit of its own, then OK). Golden: 649 pass, 2 xfail (as before).
+
+Found on the way, not mine: `fillet_qa` fails 9 checks ("P4 one fillet": `blend_steps.blends()`
+of `h.body()` is empty after OK although the fillet is there) on the untouched base 39fd9e9b
+too (checked on an export of that commit). `fillet_live` failed once on a speed check under
+load and passed on its rerun (and on the base).
+
 Each replay alone, one run each (`.probe/run1.sh`, the harness's own runner without the
 retry): replay_27_hilt 260, replay_drawings 166, replay_animation 133, replay_manufacture 97,
 replay_18_phone_case 104, replay_17_football 90: PASS. Older scenarios of the files changed,
