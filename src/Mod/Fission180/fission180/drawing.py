@@ -889,6 +889,10 @@ def add_projected(parent, kind_name, x, y):
         # Fusion: an isometric view made from a view with a breakout shows its cut
         _add(view, "App::PropertyLinkListGlobal", "Fission180CutSources", _view_sources(parent))
         view.Source = [clip]
+    else:
+        from . import drawing_exploded
+
+        drawing_exploded.inherit(parent, view)  # (an exploded view's projections too)
     view.Direction = V(*direction)
     view.XDirection = V(*xdir)
     view.ScaleType = "Custom"
@@ -1629,13 +1633,13 @@ def round_features(view):
     outer ones (a fillet is only part of a round and is left out)."""
     import Part
 
-    from . import bodies
-
     groups = {}
     for src in _view_sources(view):
         try:
-            shape = bodies.global_shape(src)
+            shape = shape_shown(view, src)
         except Exception:
+            continue
+        if shape is None:
             continue
         for face in shape.Faces:
             surface = face.Surface
@@ -2103,13 +2107,30 @@ def component_anchor(view, body_names, middle=None):
     s = scale_of(view) or 1.0
     candidates = []
     for edge in _visible_edges_local(view):
-        mid = edge.valueAt((edge.FirstParameter + edge.LastParameter) / 2.0)
-        candidates.append((edge.Length, (mid.x, mid.y)))
+        at = (edge.FirstParameter + edge.LastParameter) / 2.0
+        mid = edge.valueAt(at)
+        try:
+            t = edge.tangentAt(at)
+            across = (-t.y, t.x)
+        except Exception:
+            across = (0.0, 0.0)
+        candidates.append((edge.Length, (mid.x, mid.y), across))
     candidates.sort(key=lambda c: -c[0])
     fallback = None
-    for _length, (mx, my) in candidates:
-        local = (mx / s, my / s)
-        if _sight_hit(view, wanted, local, middle=middle) is None:
+    for _length, (mx, my), across in candidates:
+        # The middle of an outline edge is where the sight line only touches its part: on
+        # a round part the line lies along the round face and the measurement finds
+        # nothing (a disc standing alone in an exploded view got no balloon). A point a
+        # little to either side of the edge is looked at too.
+        local = None
+        for step in (0.0, 0.2, -0.2):
+            test = (mx / s + across[0] * step, my / s + across[1] * step)
+            if _sight_hit(view, wanted, test, middle=middle) is not None:
+                local = test
+                break
+            if across == (0.0, 0.0):
+                break
+        if local is None:
             continue  # not on these bodies at all
         if fallback is None:
             fallback = (mx, my)
@@ -2164,7 +2185,9 @@ def _sight_hit(view, bodies, local_point, tolerance=0.05, middle=None):
     for body in bodies:
         try:
             shape = body.Shape
-            place = _parent_placement(body)
+            place = _shown_placement(view, body)
+            if place is False:
+                continue  # (an exploded view whose storyboard hides this part)
             a, b = ends
             if place is not None:
                 back = place.inverse()
@@ -2191,6 +2214,40 @@ def _sight_hit(view, bodies, local_point, tolerance=0.05, middle=None):
         if best is None or depth > best[1] + 1e-6:
             best = (body, depth)
     return best
+
+
+def _shown_placement(view, body):
+    """Where a view shows the component a body sits in: the design's placement, or for an
+    exploded view the storyboard's (None: not moved at all; False: not shown)."""
+    place = _parent_placement(body)
+    try:
+        from . import drawing_exploded
+
+        if not drawing_exploded.shows(view, body):
+            return False
+        move = drawing_exploded.body_move(view, body)
+    except Exception:
+        move = None
+    if move is None:
+        return place
+    return move.multiply(place) if place is not None else move
+
+
+def shape_shown(view, body):
+    """A body's shape where `view` shows it, in the design's coordinates (an exploded view
+    shows its parts where the storyboard puts them), or None when the view hides it."""
+    from . import bodies
+
+    shape = bodies.global_shape(body)
+    try:
+        from . import drawing_exploded
+
+        if not drawing_exploded.shows(view, body):
+            return None
+        move = drawing_exploded.body_move(view, body)
+    except Exception:
+        move = None
+    return shape.transformed(move.toMatrix(), True) if move is not None else shape
 
 
 def _parent_placement(obj):
@@ -2233,6 +2290,27 @@ def component_at(view, local_point, sources=None, middle=None):
     to the viewer along the sight line through it (where two touch, the one in front)."""
     hit = _sight_hit(view, sources or _view_sources(view), local_point, middle=middle)
     return hit[0] if hit is not None else None
+
+
+def component_near(view, local_point, reach, sources=None, middle=None):
+    """component_at for a click: the part at the point, or at one of eight points `reach`
+    (view units) round it. A click on an outline edge lands a hair outside the part as
+    often as inside, and exactly on a round part's outline the sight line only touches."""
+    if middle is None:
+        middle = centre_of(view)
+    found = component_at(view, local_point, sources, middle)
+    if found is not None or reach <= 0:
+        return found
+    for k in range(8):
+        angle = math.pi * k / 4.0
+        test = (
+            local_point[0] + reach * math.cos(angle),
+            local_point[1] + reach * math.sin(angle),
+        )
+        found = component_at(view, test, sources, middle)
+        if found is not None:
+            return found
+    return None
 
 
 def item_for_body(page, body):
@@ -2329,6 +2407,12 @@ def refresh(page):
                 changed |= refresh_depth(view)
         except Exception as exc:
             warn("section depth / breakout of %s: %s" % (view.Label, exc))
+    try:
+        from . import drawing_exploded  # exploded views follow their storyboards
+
+        changed |= drawing_exploded.refresh(page)
+    except Exception as exc:
+        warn("exploded views: %s" % exc)
     table = parts_list_of(page)
     if table is not None:
         try:
@@ -2416,6 +2500,12 @@ def delete_objects(doc, objects):
             ):
                 if alive(helper) and helper.Name not in names:
                     names.append(helper.Name)
+            # an exploded view's copy goes when no view that stays draws it
+            copy = _get(obj, "Fission180Exploded", None)
+            if alive(copy) and copy.Name not in names:
+                users = [u for u in copy.InList if is_view(u) and u.Name not in names]
+                if not users:
+                    names.append(copy.Name)
     rank = {DIMENSION: 0, BALLOON: 0, SYMBOL: 0, ANNOTATION: 0}
     order = [doc.getObject(n) for n in names if doc.getObject(n) is not None]
     order.sort(key=lambda o: (rank.get(o.TypeId, 1), -o.ID))

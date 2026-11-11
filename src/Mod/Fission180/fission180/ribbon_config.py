@@ -1218,7 +1218,12 @@ DRAWING_CREATE = group(
             "dw_section_view",
             note="Click a view, then a closed boundary around what should show inside.",
         ),
-        item("Exploded View", None, "dw_base_view"),
+        item(
+            "Exploded View",
+            "Fission180_DrawingExplodedView",
+            "dw_base_view",
+            note="A view of an animation storyboard's end: the design taken apart.",
+        ),
     ],
 )
 DRAWING_MODIFY = group(
@@ -2023,6 +2028,12 @@ FILE_MENU = [
         "Fission180_NewDrawing",
         "dw_new",
         note="From Design: views of this design on a sheet",
+    ),
+    item(
+        "New Drawing From Animation",
+        "Fission180_NewDrawingFromAnimation",
+        "dw_new",
+        note="An exploded drawing of one of the design's animation storyboards",
     ),
     item("Open", ("Fission180_Open", "Std_Open"), "qa_open", "Ctrl+O"),
     item("Recover Documents", "Fission180_RecoverDocuments", "document"),

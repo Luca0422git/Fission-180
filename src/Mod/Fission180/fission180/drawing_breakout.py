@@ -250,6 +250,11 @@ def add_breakout(view, points, depth=None):
         raise drawing.DrawingError(
             "This view has a breakout already: double-click it to change or remove it."
         )
+    if drawing.alive(drawing._get(view, "Fission180Exploded", None)):
+        raise drawing.DrawingError(
+            "An exploded view takes no breakout: make the breakout on a view of the "
+            "design as it is (Representation: Model)."
+        )
     doc = view.Document
     sources = real_sources(view)
     if not sources:

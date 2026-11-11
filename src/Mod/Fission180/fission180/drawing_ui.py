@@ -16,7 +16,7 @@ import os
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, drawing, log, taskui, ui_icon_path, warn
+from . import commands, drawing, drawing_exploded, log, taskui, ui_icon_path, warn
 from . import drawing_core as core
 from .compat import QtCore, QtGui, QtWidgets
 
@@ -445,6 +445,49 @@ def refresh_drawings(doc_name, again=True):
 
             log("drawing looks failed:\n%s" % traceback.format_exc())
             warn("drawing looks: %s" % exc)
+    if any(d == doc_name for d, _n in drawing_exploded.STALE):
+        recompute_stale(doc_name)
+
+
+def hlr_busy():
+    """TechDraw is drawing a view right now (it removes hidden lines in a thread of Qt's
+    pool). A view asked to recompute meanwhile does nothing and keeps its old lines."""
+    try:
+        return QtCore.QThreadPool.globalInstance().activeThreadCount() > 0
+    except Exception:
+        return False
+
+
+def recompute_stale(doc_name, tries=0):
+    """Draw again the views noted as stale (an exploded view whose storyboard changed, a
+    view changed while TechDraw was still drawing it), once TechDraw is idle."""
+    stale = sorted(n for d, n in drawing_exploded.STALE if d == doc_name)
+    if not stale:
+        return
+    doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+    if doc is None:
+        drawing_exploded.STALE.difference_update({(doc_name, n) for n in stale})
+        return
+    if (hlr_busy() or getattr(doc, "Recomputing", False)) and tries < 1200:
+        STATE["stale_timer"] = True
+        _later(recompute_stale, doc_name, tries + 1, ms=100)
+        return
+    STATE["stale_timer"] = False
+    drawing_exploded.STALE.difference_update({(doc_name, n) for n in stale})
+    for name in stale:
+        view = doc.getObject(name)
+        if not drawing.alive(view):
+            continue
+        try:
+            view.touch()
+            view.recompute()
+        except Exception as exc:
+            warn("view %s not drawn again: %s" % (name, exc))
+    for page in drawing.all_pages(doc):
+        try:
+            apply_view_looks(page)
+        except Exception as exc:
+            log("drawing looks: %s" % exc)
 
 
 DEPTH_WATCH_MS = (3000, 6000, 12000)  # a big section's lines can come later still
@@ -1132,8 +1175,17 @@ class DrawingPanel(taskui.Panel):
         if self._closed:
             return
         try:
+            if hlr_busy():
+                # TechDraw is still drawing: the views this change touched would do nothing
+                # in the recompute and keep their old lines (an option changed twice in a
+                # row on a big assembly). They are drawn again when it is idle.
+                for view in drawing.all_views(self.page):
+                    if "Touched" in view.State:
+                        drawing_exploded.STALE.add((self.doc.Name, view.Name))
             self.doc.recompute()
             apply_view_looks(self.page)
+            if drawing_exploded.STALE:
+                recompute_stale(self.doc.Name)
         except Exception as exc:
             try:
                 self.message.setText(str(exc))
@@ -1224,7 +1276,7 @@ class CreateDrawingPanel(taskui.Panel):
     icon = "dw_new"
     last = None
 
-    def __init__(self, doc, preselect=None):
+    def __init__(self, doc, preselect=None, storyboard=None):
         super().__init__(doc, "New Drawing")
         type(self).last = self
         # preselect: the bodies of the component the command was started on (the browser's
@@ -1235,6 +1287,14 @@ class CreateDrawingPanel(taskui.Panel):
         standard = core.default_standard(units)
         self.reference = QtWidgets.QLabel(doc.Label)
         self.layout.addRow("Design", self.reference)
+        # Fusion's New Drawing > From Animation: the drawing shows a storyboard's end
+        boards = drawing_exploded.storyboards(doc)
+        self.representation = _combo(
+            [drawing_exploded.MODEL] + boards, storyboard if storyboard in boards else None
+        )
+        self.representation.setObjectName("Fission180DrawingRepresentation")
+        if boards:
+            self.layout.addRow("Representation", self.representation)
         self.contents = _combo(["Full Assembly", "Visible Only", "Select"])
         self.contents.setObjectName("Fission180DrawingContents")
         self.layout.addRow("Contents", self.contents)
@@ -1322,6 +1382,9 @@ class CreateDrawingPanel(taskui.Panel):
             return False
         automatic = self.views.currentIndex() == 1
         page = self.page
+        board = self.representation.currentText()
+        if board and board != drawing_exploded.MODEL:
+            drawing._add(page, "App::PropertyString", "Fission180Storyboard", board)
         self.doc.recompute()
         ok = super().accept()
         if ok:
@@ -1367,7 +1430,8 @@ def start_base_view(page):
         open_drawing(page)
     if not commands.finish_open_dialog():
         return None
-    return BaseViewPanel(page).show()
+    storyboard = drawing._get(page, "Fission180Storyboard", "") or None
+    return _open_panel(lambda: BaseViewPanel(page, None, storyboard), "base view")
 
 
 def automatic_views(page):
@@ -1383,10 +1447,14 @@ def automatic_views(page):
         # out as if the isometric view were as small as the part's depth, and the kind of
         # each view was read from its direction on the sheet: a long part's corner view
         # counted as a second "Right" view and no view at all was made)
-        plan = drawing.automatic_plan(page, sources, "Front")
-        scale = plan["scale"]
-        bx, by = plan["views"]["Base"]
-        base = drawing.add_base_view(page, sources, bx, by, "Front", scale=scale)
+        base = drawing.add_base_view(page, sources, 0.0, 0.0, "Front", scale=1.0)
+        storyboard = drawing._get(page, "Fission180Storyboard", "")
+        if storyboard:
+            # a drawing made From Animation: every view shows the storyboard's end
+            drawing_exploded.add_exploded(base, storyboard)
+        plan = drawing.automatic_plan(page, list(base.Source), "Front")
+        drawing.set_scale(base, plan["scale"])
+        base.X, base.Y = plan["views"]["Base"]
         for kind in core.AUTO_KINDS:
             x, y = plan["views"][kind]
             drawing.add_projected(base, kind, x, y)
@@ -1417,7 +1485,7 @@ class BaseViewPanel(DrawingPanel):
     title = "Base View"
     icon = "dw_base_view"
 
-    def __init__(self, page, view=None):
+    def __init__(self, page, view=None, representation=None):
         super().__init__(page, "Base View" if view is None else "Edit View")
         self.editing = view is not None
         sources = [s for s in getattr(page, "Fission180Sources", []) if drawing.alive(s)]
@@ -1437,12 +1505,23 @@ class BaseViewPanel(DrawingPanel):
         self.scale = _combo(core.scale_choices(), core.format_scale(drawing.scale_of(view)), True)
         self.scale.setObjectName("Fission180DrawingScale")
         self.tangent = _combo(core.TANGENT_EDGES, drawing.tangent_of(view))
+        # Fusion's Representation: the design as it is (Model) or one of its animation
+        # storyboards, shown at its end: an exploded view
+        boards = drawing_exploded.storyboards(page.Document)
+        shown = drawing_exploded.storyboard_of(view)
+        if shown and shown not in boards:
+            boards = boards + [shown]  # (its storyboard cannot be read now: it stays)
+        self.representation = _combo([drawing_exploded.MODEL] + boards, shown or None)
+        self.representation.setObjectName("Fission180DrawingRepresentation")
+        if boards:
+            self.layout.addRow("Representation", self.representation)
         self.layout.addRow("Orientation", self.orientation)
         self.layout.addRow("Style", self.style)
         self.layout.addRow("Scale", self.scale)
         self.layout.addRow("Tangent Edges", self.tangent)
         self.show_label = _label_rows(self, view)
         self.auto_boxes = _auto_mark_rows(self, view)
+        self.representation.currentTextChanged.connect(self._representation)
         self.orientation.currentTextChanged.connect(self._orientation)
         self.style.currentTextChanged.connect(self._style)
         self.tangent.currentTextChanged.connect(self._style)
@@ -1453,10 +1532,44 @@ class BaseViewPanel(DrawingPanel):
             if self.placed
             else "Move the view where you want it and click to place it."
         )
+        if representation and not self.editing:
+            if representation in boards:
+                self.representation.setCurrentText(representation)  # (-> _representation)
+            else:
+                self.message.setText(
+                    'The design has no storyboard named "%s": the view shows the design '
+                    "as it is." % representation
+                )
         self.doc.recompute()
 
     def target_view(self):
         return self.view
+
+    def _representation(self, text):
+        """Model or a storyboard: the view (and the views projected from it) show the
+        design as it is, or the storyboard's end. A new view takes the scale its parts
+        then fit the sheet at (an exploded assembly is bigger)."""
+        if self._closed:
+            return
+        try:
+            changed = drawing_exploded.set_representation(self.view, text)
+        except drawing.DrawingError as exc:
+            self.message.setText(str(exc))
+            return
+        except Exception as exc:
+            self.message.setText("The storyboard could not be shown: %s" % exc)
+            warn("representation: %s" % exc)
+            return
+        self.message.setText("")
+        if changed and not self.editing:
+            scale = drawing.automatic_scale(
+                self.page, list(self.view.Source), drawing.orientation_of(self.view)
+            )
+            drawing.set_scale(self.view, scale)
+            self.scale.blockSignals(True)
+            self.scale.setEditText(core.format_scale(scale))
+            self.scale.blockSignals(False)
+        self.schedule()
 
     def _orientation(self, text):
         if not self._closed:
@@ -2725,7 +2838,8 @@ class BalloonPanel(DrawingPanel):
             if view is None or name is None:
                 self.message.setText("Click on an edge of a component.")
                 return True
-            body = drawing.component_at(view, local)
+            reach = self.tolerance() / (drawing.scale_of(view) or 1.0)
+            body = drawing.component_near(view, local, reach)
             item = drawing.item_for_body(self.page, body) if body is not None else None
             if item is None:
                 self.message.setText("That is not one of the parts list's components.")
@@ -3037,6 +3151,10 @@ def fill_workspace_menu(menu):
     new = menu.addAction(QtGui.QIcon(ui_icon_path("dw_new")), "From Design...")
     new.triggered.connect(lambda: _later(Gui.runCommand, "Fission180_NewDrawing"))
     new.setEnabled(doc is not None)
+    # Fusion: Drawing > From Animation (an exploded drawing of a storyboard)
+    anim = menu.addAction(QtGui.QIcon(ui_icon_path("dw_new")), "From Animation...")
+    anim.triggered.connect(lambda: _later(Gui.runCommand, "Fission180_NewDrawingFromAnimation"))
+    anim.setEnabled(doc is not None)
     pages = drawing.drawings(doc) if doc is not None else []
     if pages:
         menu.addSeparator()
@@ -3075,11 +3193,18 @@ class NewDrawingCommand(_Base):
     def IsActive(self):
         return App.ActiveDocument is not None
 
+    from_animation = False
+
     def run(self):
         doc = App.ActiveDocument
         if doc is None:
             commands.tell("Open or make a design first.")
             return
+        if self.from_animation:
+            reason = drawing_exploded.why_none(doc)
+            if reason:
+                commands.tell(reason.replace("choose Exploded View", "make the drawing"))
+                return
         if not drawing.design_bodies(doc):
             commands.tell(
                 "There is nothing to draw yet: the design has no solid bodies. Make a body "
@@ -3097,7 +3222,10 @@ class NewDrawingCommand(_Base):
             show_design(doc)
         if not commands.finish_open_dialog():
             return
-        CreateDrawingPanel(doc, picked)
+        storyboard = None
+        if self.from_animation:
+            storyboard = drawing_exploded.storyboards(doc)[0]
+        CreateDrawingPanel(doc, picked, storyboard)
         Gui.Control.showDialog(CreateDrawingPanel.last)
 
 
@@ -3123,6 +3251,37 @@ def _picked_for_drawing(doc):
             if body.Name in solid_names and body.Name not in [b.Name for b in found]:
                 found.append(body)
     return found, ", ".join(names)
+
+
+class NewDrawingFromAnimationCommand(NewDrawingCommand):
+    """Fusion's File > New Drawing > From Animation: the Create Drawing dialog with a
+    storyboard chosen; the views then show the storyboard's end (an exploded drawing)."""
+
+    title = "New Drawing From Animation"
+    tip = "An exploded drawing: the design as a storyboard of the Animation workspace ends"
+    icon = "dw_new"
+    from_animation = True
+
+
+class ExplodedViewCommand(_Base):
+    """CREATE > Exploded View: a base view of a storyboard (Fusion: Base View with the
+    storyboard chosen under Representation)."""
+
+    title = "Exploded View"
+    tip = "A view of the design taken apart: an animation storyboard's end"
+    icon = "dw_base_view"
+
+    def run(self):
+        page = _need_page()
+        if page is None:
+            return
+        reason = drawing_exploded.why_none(page.Document)
+        if reason:
+            commands.tell(reason)
+            return
+        boards = drawing_exploded.storyboards(page.Document)
+        wanted = drawing._get(page, "Fission180Storyboard", "")
+        _start(BaseViewPanel, None, wanted if wanted in boards else boards[0])
 
 
 class BaseViewCommand(_Base):
@@ -3322,6 +3481,8 @@ class ExportDxfCommand(_Base):
 
 COMMANDS = {
     "Fission180_NewDrawing": NewDrawingCommand,
+    "Fission180_NewDrawingFromAnimation": NewDrawingFromAnimationCommand,
+    "Fission180_DrawingExplodedView": ExplodedViewCommand,
     "Fission180_DrawingBaseView": BaseViewCommand,
     "Fission180_DrawingProjectedView": ProjectedViewCommand,
     "Fission180_DrawingSectionView": SectionViewCommand,
