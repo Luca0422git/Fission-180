@@ -315,6 +315,8 @@ class SnapHover:
                 return False
         except Exception:
             return False
+        if not self._through_opening(hot):
+            return False
         if pick is None:
             return True
         if pick.point is None:
@@ -329,6 +331,34 @@ class SnapHover:
             return (pick.point - hot["point"]).dot(look) > 1e-6
         except Exception:
             return False
+
+    def _through_opening(self, hot):
+        """The pointer looks through the round opening itself: its ray crosses the circle's
+        own plane inside the circle. On the screen a rim seen at a slant is an ellipse far
+        narrower than its radius; a pointer beside it, on a part behind, is not "in the
+        hole" (the book's Pizza Cutter: the pointer crossed the End Cap's rim on its way to
+        the blade's bore, and the click on the blade took the End Cap's centre). True when
+        it cannot be told (a rim seen edge-on)."""
+        from . import hole_snaps_core
+
+        try:
+            radius = float(hot.get("radius") or 0.0)
+            frame = hot.get("frame")
+            if radius <= 0 or frame is None or self.position is None:
+                return True
+            normal = frame.Rotation.multVec(App.Vector(0, 0, 1))
+            look = App.Vector(self.view.getViewDirection())
+            along = normal.dot(look)
+            if abs(along) < 1e-3:
+                return True
+            start = App.Vector(*self.view.getPoint(int(self.position[0]), int(self.position[1])))
+            centre = App.Vector(hot["point"])
+            crossing = start + look * ((centre - start).dot(normal) / along)
+            # (a hole of a few pixels keeps the few pixels around its centre)
+            reach = max(radius, hole_snaps_core.MIN_ZONE_PIXELS * self._scale(centre))
+            return (crossing - centre).Length <= reach
+        except Exception:
+            return True
 
     def _scale(self, point):
         try:

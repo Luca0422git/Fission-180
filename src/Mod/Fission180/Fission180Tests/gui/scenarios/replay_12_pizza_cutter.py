@@ -11,6 +11,7 @@ import FreeCADGui as Gui
 from PySide import QtWidgets
 
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import replay_12_blade_steps as blade
 from Fission180Tests.gui import replay_12_bolt_steps as bolt
 from Fission180Tests.gui import replay_12_bracket_steps as bracket
 from Fission180Tests.gui import replay_12_handle_steps as handle
@@ -375,5 +376,7 @@ SECTIONS += [("bracket", bracket_a), ("bracket2", bracket_b), ("bracket3", brack
 bolt_a, bolt_b = split(bolt.steps(), "slot_sketch")
 bolt_b, bolt_c = split(bolt_b, "exit_isolate")
 SECTIONS += [("bolt", bolt_a), ("bolt2", bolt_b), ("bolt3", bolt_c)]
+blade_a, blade_b = split(blade.steps(), "joint_key")
+SECTIONS += [("blade", blade_a), ("blade2", blade_b)]
 
 h.run("replay_12_pizza_cutter", r.assemble(SECTIONS), paced_by="state")
