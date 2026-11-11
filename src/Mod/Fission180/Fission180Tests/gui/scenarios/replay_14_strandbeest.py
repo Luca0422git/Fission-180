@@ -527,7 +527,12 @@ steps += [
 ]
 steps += r.dimension(
     [lambda: S["a_end"] * 0.5],
-    lambda: S["a_end"] * 0.5 + V(-S["a_end"].y, S["a_end"].x, 0) * 0.5,
+    # (fix-5) 4.5 mm beside the centre line's middle: off the slot's outline (2.5) and inside
+    # the box the line's ends span, Fusion's aligned zone (Inventor forum "aligned
+    # dimensions": aligned "within the bounding box of the end points", horizontal or vertical
+    # outside; sketch_dimension_core.linear_kind). It was 7.5 mm off, above that box: there
+    # Fusion gives the horizontal distance
+    lambda: S["a_end"] * 0.5 + V(-S["a_end"].y, S["a_end"].x, 0) * 0.3,
     "15",
     "a_length",
     a_length_check,

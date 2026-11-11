@@ -144,7 +144,9 @@ def dimension():
 
 
 # == A ======================================================================================
-BESIDE = V(-50, 26, 0)  # beside line A (between the perpendiculars through its ends)
+# beside line A, inside the box its ends span (Fusion's aligned zone, fix-5:
+# sketch_dimension_core.linear_kind); it was (-50, 26), on the box's top edge: a pixel decided
+BESIDE = V(-48, 21, 0)
 PAST = V(-8, 40, 0)  # past its upper end
 
 

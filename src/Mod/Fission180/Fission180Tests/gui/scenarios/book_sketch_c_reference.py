@@ -221,7 +221,11 @@ def b_picked():
     )
     picks = st.tool().picks
     h.check("B ...and picked", len(picks) == 2 and picks[1][0] <= -3, picks)
-    st.click(V(-30, 30, 0))
+    # (fix-5) placed between the two centres, inside the box they span: Fusion's aligned
+    # zone (Inventor forum "aligned dimensions": aligned "within the bounding box of the end
+    # points", horizontal or vertical outside it; sketch_dimension_core.linear_kind). It was
+    # (-30, 30), left of that box: there Fusion gives the vertical distance
+    st.click(V(-15, 30, 0))
 
 
 def b_type():
