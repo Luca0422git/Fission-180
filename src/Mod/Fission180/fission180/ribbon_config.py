@@ -1999,6 +1999,104 @@ CAM_MARKING_LIST = [
     item("Reset Orbit Center", "Fission180_ResetOrbitCenter", "orbit_center"),
 ]
 
+# -- ANIMATION workspace (wave 7, animation: storyboards, exploded views, Publish Video) --------
+# Fusion's ANIMATION toolbar: STORYBOARD, TRANSFORM, ANNOTATION, VIEW, PUBLISH
+# (docs/fission180/parity/animation.md). owner: animation (animation_ui.py); the tab is added
+# to TABS here, in a block of its own.
+ANIM_STORYBOARD = group(
+    "anim_storyboard",
+    "STORYBOARD",
+    ["New Storyboard"],
+    [
+        item("New Storyboard", "Fission180_AnimNewStoryboard", "anim_storyboard"),
+    ],
+)
+ANIM_TRANSFORM = group(
+    "anim_transform",
+    "TRANSFORM",
+    ["Transform Components", "Auto Explode: One Level", "Auto Explode: All Levels"],
+    [
+        item("Transform Components", "Fission180_AnimTransform", "anim_transform"),
+        item("Restore Home", "Fission180_AnimRestoreHome", "anim_home"),
+        SEP,
+        item("Auto Explode: One Level", "Fission180_AnimExplodeOne", "anim_explode_one"),
+        item("Auto Explode: All Levels", "Fission180_AnimExplodeAll", "anim_explode_all"),
+        item("Manual Explode", "Fission180_AnimManualExplode", "anim_explode_manual"),
+        SEP,
+        item("Show/Hide", "Fission180_AnimShowHide", "anim_showhide"),
+    ],
+)
+ANIM_ANNOTATION = group(
+    "anim_annotation",
+    "ANNOTATION",
+    ["Create Callout"],
+    [
+        item("Create Callout", "Fission180_AnimCallout", "anim_callout"),
+    ],
+)
+ANIM_VIEW = group(
+    "anim_view",
+    "VIEW",
+    ["View"],
+    [
+        item(
+            "View",
+            "Fission180_AnimView",
+            "anim_view",
+            note="On: orbiting, panning and zooming with the playhead past the scratch zone "
+            "is recorded as a View action. Off: the view is yours.",
+            toggle="animation_ui:recording",
+        ),
+    ],
+)
+ANIM_PUBLISH = group(
+    "anim_publish",
+    "PUBLISH",
+    ["Publish Video"],
+    [
+        item("Publish Video", "Fission180_AnimPublishVideo", "anim_publish"),
+    ],
+)
+TABS.append(
+    {
+        "id": "anim_animation",
+        "title": "ANIMATION",
+        "contextual": True,
+        "groups": [
+            ANIM_STORYBOARD,
+            ANIM_TRANSFORM,
+            ANIM_ANNOTATION,
+            ANIM_VIEW,
+            ANIM_PUBLISH,
+            SELECT,
+        ],
+    }
+)
+# The right-click marking menu in the ANIMATION workspace (animation_ui.open_marking_menu):
+# the workspace's own commands; nothing that changes the design's geometry.
+ANIM_MARKING_MENU = [
+    item("Repeat", "__repeat__", "compute"),
+    item("Transform Components", "Fission180_AnimTransform", "anim_transform"),
+    item("Show/Hide", "Fission180_AnimShowHide", "anim_showhide"),
+    item("Undo", "Std_Undo", "qa_undo", "Ctrl+Z"),
+    item("Auto Explode: One Level", "Fission180_AnimExplodeOne", "anim_explode_one"),
+    item("Restore Home", "Fission180_AnimRestoreHome", "anim_home"),
+    item("Create Callout", "Fission180_AnimCallout", "anim_callout"),
+    item("Publish Video", "Fission180_AnimPublishVideo", "anim_publish"),
+]
+ANIM_MARKING_LIST = [
+    item("Redo", "Std_Redo", "qa_redo", "Ctrl+Y"),
+    item("Auto Explode: All Levels", "Fission180_AnimExplodeAll", "anim_explode_all"),
+    item("Manual Explode", "Fission180_AnimManualExplode", "anim_explode_manual"),
+    item("New Storyboard", "Fission180_AnimNewStoryboard", "anim_storyboard"),
+    SEP,
+    item("Fit", "Std_ViewFitAll", "nav_fit", "F6"),
+    item("Look At", "Std_AlignToSelection", "nav_lookat"),
+    SEP,
+    item("Set Orbit Center", "Fission180_SetOrbitCenter", "orbit_center"),
+    item("Reset Orbit Center", "Fission180_ResetOrbitCenter", "orbit_center"),
+]
+
 # Fusion's File menu (the application menu), in its order; cloud-only entries (upload,
 # share, recover documents) are left out. Shown first by the quick-access Menu button,
 # above FreeCAD's own menus (ribbon_ui).

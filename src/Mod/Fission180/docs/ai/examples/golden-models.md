@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180's golden models are 631 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
+Fission 180's golden models are 633 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
 
 ## By feature
 
@@ -722,6 +722,11 @@ Each model is listed under its first tag; its other tags follow it.
 - `inspect_com_materials`: Center of Mass of a steel and an aluminium box (mass-weighted) [center-of-mass, material]
 - `inspect_measure_section`: Box with a round boss: Measure distances / angles and Section Analysis cuts [measure, section]
 
+### animation (2)
+
+- `anim_auto_explode_one_level`: Animation: Auto Explode: One Level of a base with a lid and two side pins: the placements at the start, half way and the end; a second explode of two of them; the design never moves [explode, components]
+- `anim_sequential_transform_reverse`: Animation: a Sequential explosion, Transform Components with a turn, Manual Explode, Show/Hide, Restore Home, a storyboard from the end of the previous one, Reverse [explode, components]
+
 ### blend (2)
 
 - `live_spline_top_chamfer`: Live picture on the exact result: spline wall's top edge, chamfer 1 mm [chamfer, live-blend, free-form]
@@ -780,6 +785,14 @@ Each model is listed under its first tag; its other tags follow it.
 |---|---|---|---|
 | `age` | (a test helper) | 2 | `sf_coil_old_narrow_upgraded`, `sf_pipe_old_upgraded` |
 | `align_bodies` | `align` | 3 | `direct_align_block_on_table`, `direct_align_flip_angle`, `direct_align_split_onto_plane` |
+| `anim_expect` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
+| `anim_explode` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
+| `anim_manual_explode` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
+| `anim_restore_home` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
+| `anim_reverse` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
+| `anim_show_hide` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
+| `anim_storyboard` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
+| `anim_transform` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
 | `blend_chamfer` | `chamfer` | 13 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `book_chamfer_after_modeled_thread` |
 | `blend_edit` | `edit_step` | 1 | `blend_edit_keeps_later_chamfer` |
 | `blend_fillet` | `fillet` | 14 | `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain` |
@@ -798,10 +811,10 @@ Each model is listed under its first tag; its other tags follow it.
 | `circular_pattern` | `circular_pattern` | 3 | `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes` |
 | `com_expect` | (a test helper) | 2 | `inspect_com_interference`, `inspect_com_materials` |
 | `combine` | `combine` | 10 | `bodies_combine_cut`, `bodies_combine_cut_cylinder`, `bodies_combine_edit_operation`, `bodies_combine_follows_tool`, `bodies_combine_intersect` |
-| `component_move` | `move_copy` | 3 | `comp_move_captured_roll`, `comp_move_rotate_pivot`, `pattern_bodies_in_moved_component` |
+| `component_move` | `move_copy` | 5 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `comp_move_captured_roll`, `comp_move_rotate_pivot`, `pattern_bodies_in_moved_component` |
 | `component_paste` | `copy_component` | 3 | `comp_paste_instance_follows`, `comp_paste_new_independent`, `export_report_design` |
 | `component_pattern` | `pattern_components` | 2 | `comp_pattern_circular_6`, `comp_pattern_rect_extent` |
-| `components_from_bodies` | `components_from_bodies` | 8 | `comp_move_captured_roll`, `comp_move_rotate_pivot`, `comp_paste_instance_follows`, `comp_paste_new_independent`, `comp_pattern_circular_6` |
+| `components_from_bodies` | `components_from_bodies` | 10 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `comp_move_captured_roll`, `comp_move_rotate_pivot`, `comp_paste_instance_follows` |
 | `construct` | `construct_plane`, `construct_axis`, `construct_point` | 6 | `inspect_angle_plane_notch`, `inspect_construct_all`, `inspect_midplane_hole`, `inspect_offset_plane_boss`, `inspect_offset_plane_to_object` |
 | `construct_expect` | (a test helper) | 6 | `inspect_angle_plane_notch`, `inspect_construct_all`, `inspect_midplane_hole`, `inspect_offset_plane_boss`, `inspect_offset_plane_to_object` |
 | `construct_extrude` | (a test helper) | 5 | `inspect_angle_plane_notch`, `inspect_midplane_hole`, `inspect_offset_plane_boss`, `inspect_offset_plane_to_object`, `inspect_three_points_oblique_hole` |
@@ -830,7 +843,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `interference_expect` | (a test helper) | 1 | `inspect_com_interference` |
 | `live_blend_expect` | (a test helper) | 16 | `live_blend_chamfer_angle`, `live_blend_chamfer_top_face`, `live_blend_chamfer_two_flip`, `live_blend_fillet_boss_feature`, `live_blend_fillet_slot_chain` |
 | `measure_bodies` | (a test helper) | 30 | `bodies_combine_tool_deleted`, `extrude_multi_cut`, `extrude_multi_cut_all`, `extrude_multi_cut_all_far`, `extrude_multi_cut_edit` |
-| `measure_components` | (a test helper) | 3 | `comp_paste_instance_follows`, `comp_paste_new_independent`, `pattern_bodies_in_moved_component` |
+| `measure_components` | (a test helper) | 5 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `comp_paste_instance_follows`, `comp_paste_new_independent`, `pattern_bodies_in_moved_component` |
 | `measure_expect` | (a test helper) | 2 | `inspect_measure_section`, `inspect_three_points_oblique_hole` |
 | `mirror` | (a test helper) | 1 | `mirror_boss` |
 | `modify_edit` | `edit_step` | 2 | `direct_replace_face_edit_down`, `direct_silhouette_edit_to_faces` |
@@ -875,7 +888,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_path_sketch` | (a test helper) | 9 | `sf_join_away_new_body`, `sf_pipe_hollow_half`, `sf_pipe_old_upgraded`, `sf_pipe_param_driven`, `sf_pipe_ring_hollow` |
 | `sf_pipe` | `pipe` | 14 | `sf_join_away_new_body`, `sf_pipe_corner_hollow_cut`, `sf_pipe_corner_intersect`, `sf_pipe_corner_mitre_join`, `sf_pipe_edge_auto_join` |
 | `sf_plastic_rule` | `plastic_rule` | 2 | `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss` |
-| `sf_primitive` | `primitive` | 33 | `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
+| `sf_primitive` | `primitive` | 35 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere` |
 | `sf_primitive_edit` | `edit_step` | 3 | `sf_box_pocket_edit_join`, `sf_coil_edit_turns`, `sf_pipe_triangle_edit` |
 | `sf_refold` | `refold` | 1 | `sm_flat_unfold_cut_refold` |
 | `sf_rest` | `rest` | 3 | `plastic_rest_closed_box`, `plastic_rest_cut`, `plastic_rest_cylinder` |

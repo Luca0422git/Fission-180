@@ -1,0 +1,305 @@
+{
+  "id": "anim_auto_explode_one_level",
+  "title": "Animation: Auto Explode: One Level of a base with a lid and two side pins: the placements at the start, half way and the end; a second explode of two of them; the design never moves",
+  "tags": [
+    "animation",
+    "explode",
+    "components"
+  ],
+  "steps": [
+    {
+      "op": "sf_primitive",
+      "id": "b_base",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 60,
+      "width": 40,
+      "height": 10,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "b_lid",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 60,
+      "width": 40,
+      "height": 4,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "b_right",
+      "kind": "box",
+      "plane": "XY",
+      "x": 60,
+      "y": 15,
+      "length": 20,
+      "width": 10,
+      "height": 6,
+      "operation": "new_body"
+    },
+    {
+      "op": "sf_primitive",
+      "id": "b_left",
+      "kind": "box",
+      "plane": "XY",
+      "x": -20,
+      "y": 15,
+      "length": 20,
+      "width": 10,
+      "height": 6,
+      "operation": "new_body"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "base",
+      "bodies": [
+        "b_base"
+      ],
+      "label": "Base"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "lid",
+      "bodies": [
+        "b_lid"
+      ],
+      "label": "Lid"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "right",
+      "bodies": [
+        "b_right"
+      ],
+      "label": "Right"
+    },
+    {
+      "op": "components_from_bodies",
+      "id": "left",
+      "bodies": [
+        "b_left"
+      ],
+      "label": "Left"
+    },
+    {
+      "op": "component_move",
+      "id": "m_lid",
+      "components": [
+        "lid"
+      ],
+      "move_type": "translate",
+      "dz": 10,
+      "comment": "the Lid sits on the Base: its own placement is 10 up (a storyboard's offset comes on top of it)"
+    },
+    {
+      "op": "measure_components",
+      "steps": [
+        "left"
+      ]
+    },
+    {
+      "op": "anim_storyboard",
+      "id": "sb1"
+    },
+    {
+      "op": "anim_explode",
+      "storyboard": "sb1",
+      "at": 2,
+      "levels": "one"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "base": [
+          0,
+          0,
+          0
+        ],
+        "lid": [
+          0,
+          0,
+          25
+        ],
+        "right": [
+          25,
+          0,
+          0
+        ],
+        "left": [
+          -25,
+          0,
+          0
+        ]
+      },
+      "positions": {
+        "lid": [
+          0,
+          0,
+          35
+        ]
+      },
+      "duration": 2,
+      "actions": 3,
+      "spans": {
+        "lid": [
+          [
+            0,
+            2
+          ]
+        ],
+        "right": [
+          [
+            0,
+            2
+          ]
+        ],
+        "left": [
+          [
+            0,
+            2
+          ]
+        ],
+        "base": []
+      },
+      "storyboards": [
+        "Storyboard1"
+      ],
+      "hidden": [],
+      "design_unchanged": true,
+      "comment": "the whole is 100 long (x -20..80): the gap is a quarter of that, 25. The Base (the biggest) stays; the Lid on it goes up, the pins sideways, each by 25. The Lid's own placement is 10 up, so its origin ends at z 35"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 1,
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          12.5
+        ],
+        "right": [
+          12.5,
+          0,
+          0
+        ],
+        "left": [
+          -12.5,
+          0,
+          0
+        ]
+      },
+      "comment": "half way"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "at": 0,
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          0
+        ],
+        "left": [
+          0,
+          0,
+          0
+        ]
+      },
+      "comment": "at the start everything is where the design has it"
+    },
+    {
+      "op": "anim_explode",
+      "storyboard": "sb1",
+      "at": 4,
+      "levels": "one",
+      "of": [
+        "lid",
+        "right"
+      ],
+      "scale": 2,
+      "comment": "only the Lid and the Right pin, at scale 2: the whole is now 150 long (x -45..105), the gap 2 x 37.5 = 75"
+    },
+    {
+      "op": "anim_expect",
+      "storyboard": "sb1",
+      "offsets": {
+        "lid": [
+          0,
+          0,
+          100
+        ],
+        "right": [
+          100,
+          0,
+          0
+        ],
+        "left": [
+          -25,
+          0,
+          0
+        ]
+      },
+      "spans": {
+        "lid": [
+          [
+            0,
+            2
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "right": [
+          [
+            0,
+            2
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "left": [
+          [
+            0,
+            2
+          ]
+        ]
+      },
+      "duration": 4,
+      "actions": 5,
+      "design_unchanged": true,
+      "comment": "each second action starts where the component's first one ended"
+    }
+  ],
+  "expect": {
+    "volume": 1200,
+    "solids": 1,
+    "bbox": [
+      -20,
+      15,
+      0,
+      0,
+      25,
+      6
+    ],
+    "abs_tol": 0.001,
+    "source": "analytic",
+    "note": "The Left pin as the design has it (20 x 10 x 6): an animation moves nothing in the design. The storyboards' numbers are in the anim_expect steps."
+  }
+}
