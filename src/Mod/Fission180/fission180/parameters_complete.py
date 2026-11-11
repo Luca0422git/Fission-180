@@ -68,7 +68,8 @@ def complete(text, cursor, name):
 
 
 # -- the list under the box ------------------------------------------------------------------------
-_state = {"installed": False, "popup": None, "edit": None, "filter": None, "names": None}
+_state = {"installed": False, "popup": None, "edit": None, "keys": None, "filter": None}
+_state["names"] = None  # a function that gives the names to offer (tests), else the design's
 
 
 def install():
@@ -87,6 +88,22 @@ def install():
         from . import warn
 
         warn("parameter names while typing are off: %s" % exc)
+
+
+def edit_of(widget):
+    """The line edit of the value box `widget`, or None when it is no value box. A spin box
+    (FreeCAD's number field, a pattern's Quantity) takes the keyboard focus itself and
+    hands the keys to the line edit inside it."""
+    from .compat import QtWidgets
+
+    try:
+        if isinstance(widget, QtWidgets.QAbstractSpinBox):
+            if widget.property(MARK) or type(widget).__name__ in VALUE_BOX_PARENTS:
+                return widget.findChild(QtWidgets.QLineEdit)
+            return None
+        return widget if is_value_box(widget) else None
+    except Exception:
+        return None
 
 
 def is_value_box(widget):
@@ -132,18 +149,21 @@ def _names():
 
 def _focus_changed(_old, new):
     try:
-        if new is _state["edit"]:
+        if new is not None and new in (_state["edit"], _state["keys"]):
             return
         _detach()
-        if new is not None and is_value_box(new):
-            _attach(new)
+        edit = edit_of(new) if new is not None else None
+        if edit is not None:
+            _attach(edit, new)
     except Exception as exc:
         from . import warn
 
         warn("parameter names while typing: %s" % exc)
 
 
-def _attach(edit):
+def _attach(edit, keys=None):
+    """Offer names in `edit`; `keys` is the widget the keys arrive at (the edit itself, or
+    the spin box around it)."""
     from .compat import QtCore
 
     class Keys(QtCore.QObject):
@@ -156,26 +176,35 @@ def _attach(edit):
                 warn("parameter names while typing: %s" % exc)
                 return False
 
+    keys = keys if keys is not None else edit
     _state["edit"] = edit
+    _state["keys"] = keys
     _state["filter"] = Keys()
-    edit.installEventFilter(_state["filter"])
+    keys.installEventFilter(_state["filter"])
+    if keys is not edit:
+        edit.installEventFilter(_state["filter"])
     edit.textEdited.connect(_typed)
     edit.destroyed.connect(_gone)
 
 
 def _gone(*_):
     _state["edit"] = None
+    _state["keys"] = None
     _state["filter"] = None
     hide()
 
 
 def _detach():
     edit = _state["edit"]
+    keys = _state["keys"]
     _state["edit"] = None
+    _state["keys"] = None
     hide()
     if edit is None:
         return
     try:
+        if keys is not None and keys is not edit:
+            keys.removeEventFilter(_state["filter"])
         edit.removeEventFilter(_state["filter"])
         edit.textEdited.disconnect(_typed)
         edit.destroyed.disconnect(_gone)
