@@ -1249,11 +1249,7 @@ class SketchSession:
             sketch_pick_ui.stop_waiting()
         except Exception as exc:
             warn("sketch tool: %s" % exc)
-        if (
-            not self.tool_running()
-            and not self._spline_in_progress()
-            and not self._spline_panel_shown()
-        ):
+        if not self.tool_running() and not self._spline_in_progress() and not self._spline_panel_shown():
             return
         kept = []
         try:
@@ -1353,11 +1349,7 @@ class SketchSession:
             if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
                 return
             cursor_on = self.gl is not None and self.gl.cursor().shape() != QtCore.Qt.ArrowCursor
-            if (
-                cursor_on
-                or self._spline_panel_shown()
-                or (self.tool is not None and self.tool.active)
-            ):
+            if cursor_on or self._spline_panel_shown() or (self.tool is not None and self.tool.active):
                 self._orphan_ticks = 0
                 return
             points = self._spline_points()
@@ -1484,10 +1476,7 @@ class SketchSession:
             QtWidgets.QApplication.processEvents()
         if _count_splines(sketch) > splines:
             made = "freecad"
-            log(
-                "spline: made from the points clicked (%d curve(s) added)"
-                % (len(sketch.Geometry) - before)
-            )
+            log("spline: made from the points clicked (%d curve(s) added)" % (len(sketch.Geometry) - before))
         else:
             left = self._spline_points() or points
             if len(left) >= 2:
@@ -2218,9 +2207,7 @@ def paste():
         # said once the tool's panel has settled (its start hid an earlier tip)
         QtCore.QTimer.singleShot(
             150,
-            lambda: commands.tell(
-                "Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."
-            ),
+            lambda: commands.tell("Pasted: drag the arrows (or type X / Y Distance) to place it, then OK."),
         )
 
     QtCore.QTimer.singleShot(0, place)

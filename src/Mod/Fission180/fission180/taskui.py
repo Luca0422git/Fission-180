@@ -241,8 +241,8 @@ class DistanceField:
         if typed is None and self._formula_typed():
             try:  # a parameter or formula typed and not settled yet (Enter is OK at once)
                 return self._read(self._typed).value
-            except ValueError:
-                pass
+            except Exception:
+                pass  # half-typed, or no value: the box's last value until it is settled
         return typed if typed is not None else float(self.widget.property("rawValue"))
 
     def set_value(self, value):
