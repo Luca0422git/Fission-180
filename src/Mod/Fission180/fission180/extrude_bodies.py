@@ -193,7 +193,7 @@ def bodies_in_way(doc, tool, lead=None):
         return [], []
     candidates = candidate_bodies(doc, lead)
     enough = max(VOLUME_TOL, tool.Volume * 1e-6)
-    through, touching = [], []
+    through, touching, along = [], [], []
     for body, shape in candidates:
         try:
             shared = _shared_volume(shape, tool)
@@ -202,11 +202,14 @@ def bodies_in_way(doc, tool, lead=None):
             if shared > enough:
                 through.append(body)
                 touching.append(body)
-            elif shared > VOLUME_TOL or _face_contact(shape, tool) or _curve_contact(shape, tool):
+            elif shared > VOLUME_TOL or _face_contact(shape, tool):
                 touching.append(body)
+            elif _curve_contact(shape, tool):
+                along.append(body)
         except Exception:
             continue
-    return through, _joinable(touching, lead)
+    # (a body met only along a curve counts when nothing else is met: _curve_contact)
+    return through, _joinable(touching or along, lead)
 
 
 def _joinable(touching, lead=None):
@@ -723,7 +726,11 @@ def _curve_contact(shape, tool, curves=()):
         try:
             if edge.Length < CURVE_TOUCH or not box.intersect(edge.BoundBox):
                 continue
-            if all(shape.isInside(p, CURVE_TOL, True) for p in _edge_points(edge)):
+            points = _edge_points(edge)
+            # on the shape's faces: in it counting its faces, not in it without them
+            if all(shape.isInside(p, CURVE_TOL, True) for p in points) and not any(
+                shape.isInside(p, CURVE_TOL, False) for p in points
+            ):
                 return True
         except Exception:
             continue
@@ -751,7 +758,11 @@ def beside(shape, tool, curves=()):
                 continue
             if any(tool.isInside(p, 1e-6, True) for p in _face_samples(face)):
                 return False
-        return _curve_contact(shape, tool, curves)
+        if not _curve_contact(shape, tool, curves):
+            return False
+        # a face in common that the few points above missed (a thin wall's ring, whose
+        # sample points all fell into its hole: golden extrude_thin_tube)
+        return not _face_contact(shape, tool)
     except Exception:
         return False
 
@@ -923,7 +934,7 @@ def in_the_way(profiles, options, lead=None):
     # A sliver (a tapered neighbour flaring over the profile's edge) does not count.
     enough = max(VOLUME_TOL, prism.Volume * 1e-6)
     real = max(VOLUME_TOL, _within_reach(prism, candidates) * START_SHARE)
-    through, touching, overlapping = [], [], []
+    through, touching, overlapping, along = [], [], [], []
     inner = None
     for body, shape in candidates:
         try:
@@ -948,16 +959,18 @@ def in_the_way(profiles, options, lead=None):
                 touching.append(body)
                 if shared > real:
                     overlapping.append(body)
-            elif (
-                shared > VOLUME_TOL
-                or _face_contact(shape, prism)
-                or _curve_contact(
-                    shape, prism, [e for f in global_faces(profiles) for e in f.Edges]
-                )
-            ):
+            elif shared > VOLUME_TOL or _face_contact(shape, prism):
                 touching.append(body)
+            elif _curve_contact(shape, prism, [e for f in global_faces(profiles) for e in f.Edges]):
+                along.append(body)
         except Exception:
             continue
+    # A body met only along a curve is joined only when the extrusion meets nothing else: the
+    # surfboard's fin, whose one contact is the board's outline; a boss that sits on its own
+    # body and only meets the next body along an edge leaves that body alone (golden
+    # extrude_multi_join_edge_touch)
+    if not touching:
+        touching = along
     # (the Join list: only bodies a Join may change, the active component's; components'
     # _joinable, wave 7. The automatic Cut's own scope is the dialog's: auto_scope.)
     return through, _joinable(touching, lead), overlapping
