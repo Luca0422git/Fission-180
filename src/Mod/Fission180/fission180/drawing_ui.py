@@ -16,7 +16,7 @@ import os
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, drawing, log, taskui, ui_icon_path, warn
+from . import commands, drawing, drawing_exploded, log, taskui, ui_icon_path, warn
 from . import drawing_core as core
 from .compat import QtCore, QtGui, QtWidgets
 
@@ -428,7 +428,9 @@ def refresh_drawings(doc_name, again=True):
         return
     if again:
         # a big view's lines can come later than this first look: annotations, marks
-        # and extensions that follow edges look once more (it changes only what moved)
+        # and extensions that follow edges look once more (it changes only what moved):
+        # as soon as TechDraw has drawn the views, and once more after a fixed time
+        _later(_refresh_when_drawn, doc_name, ms=100)
         _later(refresh_drawings, doc_name, False, ms=LATE_REFRESH_MS)
     else:
         _later(_watch_depth, doc_name, 0, ms=DEPTH_WATCH_MS[0])
@@ -445,6 +447,63 @@ def refresh_drawings(doc_name, again=True):
 
             log("drawing looks failed:\n%s" % traceback.format_exc())
             warn("drawing looks: %s" % exc)
+    if any(d == doc_name for d, _n in drawing_exploded.STALE):
+        recompute_stale(doc_name)
+
+
+def hlr_busy():
+    """TechDraw is drawing a view right now (it removes hidden lines in a thread of Qt's
+    pool). A view asked to recompute meanwhile does nothing and keeps its old lines."""
+    try:
+        return QtCore.QThreadPool.globalInstance().activeThreadCount() > 0
+    except Exception:
+        return False
+
+
+def recompute_stale(doc_name, tries=0):
+    """Draw again the views noted as stale (an exploded view whose storyboard changed, a
+    view changed while TechDraw was still drawing it), once TechDraw is idle."""
+    stale = sorted(n for d, n in drawing_exploded.STALE if d == doc_name)
+    if not stale:
+        return
+    doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+    if doc is None:
+        drawing_exploded.STALE.difference_update({(doc_name, n) for n in stale})
+        return
+    if (hlr_busy() or getattr(doc, "Recomputing", False)) and tries < 1200:
+        STATE["stale_timer"] = True
+        _later(recompute_stale, doc_name, tries + 1, ms=100)
+        return
+    STATE["stale_timer"] = False
+    drawing_exploded.STALE.difference_update({(doc_name, n) for n in stale})
+    for name in stale:
+        view = doc.getObject(name)
+        if not drawing.alive(view):
+            continue
+        try:
+            view.touch()
+            view.recompute()
+        except Exception as exc:
+            warn("view %s not drawn again: %s" % (name, exc))
+    for page in drawing.all_pages(doc):
+        try:
+            apply_view_looks(page)
+        except Exception as exc:
+            log("drawing looks: %s" % exc)
+
+
+def _refresh_when_drawn(doc_name, tries=0):
+    """The second look of refresh_drawings, taken when TechDraw has finished drawing the
+    views (it draws in a thread): a centre mark then follows its hole at once, however
+    long the view took (it waited a fixed 1.5 s, too short for a big view and a visible
+    lag on a small one)."""
+    doc = App.getDocument(doc_name) if doc_name in App.listDocuments() else None
+    if doc is None:
+        return
+    if (hlr_busy() or getattr(doc, "Recomputing", False)) and tries < 1200:
+        _later(_refresh_when_drawn, doc_name, tries + 1, ms=100)
+        return
+    refresh_drawings(doc_name, False)
 
 
 DEPTH_WATCH_MS = (3000, 6000, 12000)  # a big section's lines can come later still
@@ -884,8 +943,8 @@ def pick_at(page, point, tolerance, want_vertex=True, kinds=None, curve=None):
         for name, p in _vertexes_of(view):
             d = math.hypot(p.x - local[0], p.y - local[1])
             if d <= tol * 0.6 and (best is None or d < best[0]):
-                best = (d, name)
-        if best is not None:
+                best = (d, name, p)
+        if best is not None and not _seam_only(view, best[2]):
             return view, best[1], local
     best = None
     hidden_shown = bool(getattr(view, "HardHidden", False))
@@ -903,11 +962,46 @@ def pick_at(page, point, tolerance, want_vertex=True, kinds=None, curve=None):
         near.append((round(d, 4), name, visible is None or _signature(edge, s) in visible))
         if visible is not None and _signature(edge, s) not in visible:
             continue
-        if best is None or d < best[0] - 1e-9:
-            best = (d, name)
+        # An edge of the part before a line Fission 180 drew on it: a centre mark's line
+        # runs through its circle's 3, 6, 9 and 12 o'clock points, and a click there took
+        # the mark's line (no dimension, no second mark came of it).
+        drawn = _is_cosmetic(view, name)
+        key = (1 if drawn else 0, d)
+        if best is None or key[0] < best[2][0] or (key[0] == best[2][0] and d < best[0] - 1e-9):
+            best = (d, name, key)
     if best is None and near:
         log("pick at %s: only hidden edges near %s" % (local, near))
     return view, (best[1] if best else None), local
+
+
+def _seam_only(view, point):
+    """True for a view point that is nothing but the seam of a full circle: where a round
+    edge starts and ends, with no other edge ending there. TechDraw makes it a vertex, but
+    to a person it is just a place on the circle: a click on a disc's 3 o'clock point took
+    that point and asked for "the second point" instead of giving the diameter."""
+    import Part
+
+    probe = Part.Vertex(App.Vector(point.x, point.y, 0))
+    touching = []
+    for name, edge in _edges_of(view):
+        try:
+            if edge.distToShape(probe)[0] < 1e-6 and not _is_cosmetic(view, name):
+                touching.append(edge)  # (a centre mark's line crossing there is no corner)
+        except Exception:
+            continue
+    return bool(touching) and all(edge.isClosed() for edge in touching)
+
+
+def _is_cosmetic(view, name):
+    """True for an edge that is no part of the model: a cosmetic line (a centre mark, an
+    edge extension, a pattern's circle) or a TechDraw centre line."""
+    for getter in ("getCosmeticEdgeBySelection", "getCenterLineBySelection"):
+        try:
+            if getattr(view, getter)(name) is not None:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _is_curve(edge, curve):
@@ -971,6 +1065,47 @@ def snap_point(view, local, tolerance):
             if d <= tol and (best is None or d < best[0]):
                 best = (d, q)
     return best[1] if best else local
+
+
+# ------------------------------------------------------------------ lengths in the drawing's units
+def unit_of(page):
+    """The unit a drawing's dialogs show lengths in: the drawing's own ("mm" or "in",
+    chosen in Create Drawing), as Fusion's drawing dialogs do."""
+    return "in" if drawing.units_of(page) == "in" else "mm"
+
+
+def to_units(mm, page):
+    return mm / core.MM_PER_IN if unit_of(page) == "in" else mm
+
+
+def from_units(value, page):
+    return value * core.MM_PER_IN if unit_of(page) == "in" else value
+
+
+def units_text(mm, page):
+    """A length as a dialog's text field shows it (no unit: the row's caption has it)."""
+    return core._short(round(to_units(mm, page), 4))
+
+
+class LengthBox(QtWidgets.QDoubleSpinBox):
+    """A length box in the drawing's units (an inch drawing read " mm" everywhere: wave
+    7, the params builder's list). mm() / set_mm() talk millimetres with the code."""
+
+    def __init__(self, page, lo_mm, hi_mm, value_mm):
+        super().__init__()
+        self.page = page
+        inch = unit_of(page) == "in"
+        self.setDecimals(3 if inch else 2)
+        self.setSingleStep(0.05 if inch else 1.0)
+        self.setRange(to_units(lo_mm, page), to_units(hi_mm, page))
+        self.setSuffix(" in" if inch else " mm")
+        self.set_mm(value_mm)
+
+    def mm(self):
+        return from_units(self.value(), self.page)
+
+    def set_mm(self, value_mm):
+        self.setValue(to_units(value_mm, self.page))
 
 
 # ------------------------------------------------------------------ dialogs: shared base
@@ -1132,8 +1267,17 @@ class DrawingPanel(taskui.Panel):
         if self._closed:
             return
         try:
+            if hlr_busy():
+                # TechDraw is still drawing: the views this change touched would do nothing
+                # in the recompute and keep their old lines (an option changed twice in a
+                # row on a big assembly). They are drawn again when it is idle.
+                for view in drawing.all_views(self.page):
+                    if "Touched" in view.State:
+                        drawing_exploded.STALE.add((self.doc.Name, view.Name))
             self.doc.recompute()
             apply_view_looks(self.page)
+            if drawing_exploded.STALE:
+                recompute_stale(self.doc.Name)
         except Exception as exc:
             try:
                 self.message.setText(str(exc))
@@ -1168,13 +1312,47 @@ def _start(panel_class, *args):
     page = _need_page()
     if page is None:
         return None
+    return _open_panel(lambda: panel_class(page, *args), panel_class.__name__)
+
+
+def _open_panel(make, name="drawing command"):
+    """Make a drawing dialog and show it; one that refuses to start (a DrawingError: "make
+    the parts list first") says why next to the mouse and leaves nothing behind."""
+    before = _sheet_handler()
     try:
-        return panel_class(page, *args).show()
+        return make().show()
     except drawing.DrawingError as exc:
+        _drop_half_made(before)
         commands.tell(str(exc))
     except Exception as exc:
-        warn("%s: %s" % (panel_class.__name__, exc))
+        _drop_half_made(before)
+        warn("%s: %s" % (name, exc))
     return None
+
+
+def _sheet_handler():
+    inp = STATE.get("input")
+    return inp.handler if inp is not None else None
+
+
+def _drop_half_made(before):
+    """A dialog that refused in its __init__ had already opened its undo step and taken
+    the sheet's mouse: it is put away like a cancelled one. Left as it was, the next mouse
+    move on the sheet went to a dialog with half its fields ("'TablePanel' object has no
+    attribute 'view'", found with a six-component design) and its open undo step swallowed
+    the next command's."""
+    half = _sheet_handler()
+    if half is None or half is before:
+        return
+    try:
+        half.reject()
+    except Exception as exc:
+        log("half-made drawing dialog: %s" % exc)
+    inp = STATE.get("input")
+    if inp is not None and inp.handler is half:
+        inp.handler = None
+    if taskui._OPEN.get("dialog") is half:
+        taskui._OPEN["dialog"] = None
 
 
 def _single_base(page):
@@ -1190,13 +1368,25 @@ class CreateDrawingPanel(taskui.Panel):
     icon = "dw_new"
     last = None
 
-    def __init__(self, doc):
+    def __init__(self, doc, preselect=None, storyboard=None):
         super().__init__(doc, "New Drawing")
         type(self).last = self
+        # preselect: the bodies of the component the command was started on (the browser's
+        # right-click > Create Drawing). Fusion: "The Contents setting is automatically set
+        # to Select and the component is added to the selection set."
+        wanted = {b.Name for b in (preselect or []) if drawing.alive(b)}
         units = _design_units(doc)
         standard = core.default_standard(units)
         self.reference = QtWidgets.QLabel(doc.Label)
         self.layout.addRow("Design", self.reference)
+        # Fusion's New Drawing > From Animation: the drawing shows a storyboard's end
+        boards = drawing_exploded.storyboards(doc)
+        self.representation = _combo(
+            [drawing_exploded.MODEL] + boards, storyboard if storyboard in boards else None
+        )
+        self.representation.setObjectName("Fission180DrawingRepresentation")
+        if boards:
+            self.layout.addRow("Representation", self.representation)
         self.contents = _combo(["Full Assembly", "Visible Only", "Select"])
         self.contents.setObjectName("Fission180DrawingContents")
         self.layout.addRow("Contents", self.contents)
@@ -1207,7 +1397,8 @@ class CreateDrawingPanel(taskui.Panel):
             item = QtWidgets.QListWidgetItem(_body_caption(body))
             item.setData(QtCore.Qt.UserRole, body.Name)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            ticked = not wanted or body.Name in wanted
+            item.setCheckState(QtCore.Qt.Checked if ticked else QtCore.Qt.Unchecked)
             self.bodies.addItem(item)
         for flat in _flat_patterns(doc):
             # Fusion: a sheet metal part's flat pattern can be drawn instead (sm-flat)
@@ -1232,6 +1423,8 @@ class CreateDrawingPanel(taskui.Panel):
         self.standard.currentTextChanged.connect(self._standard_changed)
         self.finish_layout()
         self.page = None
+        if wanted:
+            self.contents.setCurrentText("Select")
 
     def _contents_changed(self, text):
         try:
@@ -1281,6 +1474,9 @@ class CreateDrawingPanel(taskui.Panel):
             return False
         automatic = self.views.currentIndex() == 1
         page = self.page
+        board = self.representation.currentText()
+        if board and board != drawing_exploded.MODEL:
+            drawing._add(page, "App::PropertyString", "Fission180Storyboard", board)
         self.doc.recompute()
         ok = super().accept()
         if ok:
@@ -1326,7 +1522,8 @@ def start_base_view(page):
         open_drawing(page)
     if not commands.finish_open_dialog():
         return None
-    return BaseViewPanel(page).show()
+    storyboard = drawing._get(page, "Fission180Storyboard", "") or None
+    return _open_panel(lambda: BaseViewPanel(page, None, storyboard), "base view")
 
 
 def automatic_views(page):
@@ -1338,30 +1535,37 @@ def automatic_views(page):
         return None
     doc.openTransaction("Automatic Views")
     try:
-        projection = page.ProjectionType
-        scale = drawing.automatic_scale(page, sources, "Front")
-        axes = core.view_axes(*drawing.orientation_axes("Front"))
-        w, h, d = drawing.model_extent(sources, axes)
-        gap = 15.0
-        sx = 1.0 if projection == "Third angle" else -1.0
-        dx = sx * ((w + d) / 2.0 * scale + gap)
-        dy = sx * ((h + d) / 2.0 * scale + gap)
-        x0, y0, x1, y1 = core.drawing_area(drawing.standard_of(page), drawing.sheet_of(page))
-        block_w = (w + d) * scale + gap
-        block_h = (h + d) * scale + gap
-        cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-        bx = cx - sx * (block_w / 2.0 - w * scale / 2.0)
-        by = cy - sx * (block_h / 2.0 - h * scale / 2.0)
-        base = drawing.add_base_view(page, sources, bx, by, "Front", scale=scale)
-        for vx, vy in ((0.0, dy), (dx, 0.0), (dx, dy)):
-            kind = core.projected_kind(vx, vy, projection)
-            drawing.add_projected(base, kind, bx + vx, by + vy)
+        # the scale and the places at which the four views do not touch (they were laid
+        # out as if the isometric view were as small as the part's depth, and the kind of
+        # each view was read from its direction on the sheet: a long part's corner view
+        # counted as a second "Right" view and no view at all was made)
+        base = drawing.add_base_view(page, sources, 0.0, 0.0, "Front", scale=1.0)
+        storyboard = drawing._get(page, "Fission180Storyboard", "")
+        if storyboard:
+            # a drawing made From Animation: every view shows the storyboard's end
+            drawing_exploded.add_exploded(base, storyboard)
+        # (the base view's own orientation: a flat pattern is drawn from the top)
+        plan = drawing.automatic_plan(page, list(base.Source), drawing.orientation_of(base))
+        drawing.set_scale(base, plan["scale"])
+        base.X, base.Y = plan["views"]["Base"]
+        for kind in core.AUTO_KINDS:
+            x, y = plan["views"][kind]
+            drawing.add_projected(base, kind, x, y)
         doc.recompute()
         taskui._end_transaction(doc)
     except Exception as exc:
         taskui._end_transaction(doc, abort=True)
         warn("automatic views: %s" % exc)
+        commands.tell(
+            "The automatic views could not be made (%s). Place them yourself: "
+            "CREATE > Base View, then Projected View." % exc
+        )
         return None
+    if not plan["fits"]:
+        commands.tell(
+            "The design is too big for this sheet even at the smallest scale: the views "
+            "overlap. Choose a bigger sheet, or scale the base view down (double-click it)."
+        )
     _later(refresh_drawings, doc.Name, ms=100)
     return base
 
@@ -1374,7 +1578,7 @@ class BaseViewPanel(DrawingPanel):
     title = "Base View"
     icon = "dw_base_view"
 
-    def __init__(self, page, view=None):
+    def __init__(self, page, view=None, representation=None):
         super().__init__(page, "Base View" if view is None else "Edit View")
         self.editing = view is not None
         sources = [s for s in getattr(page, "Fission180Sources", []) if drawing.alive(s)]
@@ -1394,12 +1598,23 @@ class BaseViewPanel(DrawingPanel):
         self.scale = _combo(core.scale_choices(), core.format_scale(drawing.scale_of(view)), True)
         self.scale.setObjectName("Fission180DrawingScale")
         self.tangent = _combo(core.TANGENT_EDGES, drawing.tangent_of(view))
+        # Fusion's Representation: the design as it is (Model) or one of its animation
+        # storyboards, shown at its end: an exploded view
+        boards = drawing_exploded.storyboards(page.Document)
+        shown = drawing_exploded.storyboard_of(view)
+        if shown and shown not in boards:
+            boards = boards + [shown]  # (its storyboard cannot be read now: it stays)
+        self.representation = _combo([drawing_exploded.MODEL] + boards, shown or None)
+        self.representation.setObjectName("Fission180DrawingRepresentation")
+        if boards:
+            self.layout.addRow("Representation", self.representation)
         self.layout.addRow("Orientation", self.orientation)
         self.layout.addRow("Style", self.style)
         self.layout.addRow("Scale", self.scale)
         self.layout.addRow("Tangent Edges", self.tangent)
         self.show_label = _label_rows(self, view)
         self.auto_boxes = _auto_mark_rows(self, view)
+        self.representation.currentTextChanged.connect(self._representation)
         self.orientation.currentTextChanged.connect(self._orientation)
         self.style.currentTextChanged.connect(self._style)
         self.tangent.currentTextChanged.connect(self._style)
@@ -1410,10 +1625,44 @@ class BaseViewPanel(DrawingPanel):
             if self.placed
             else "Move the view where you want it and click to place it."
         )
+        if representation and not self.editing:
+            if representation in boards:
+                self.representation.setCurrentText(representation)  # (-> _representation)
+            else:
+                self.message.setText(
+                    'The design has no storyboard named "%s": the view shows the design '
+                    "as it is." % representation
+                )
         self.doc.recompute()
 
     def target_view(self):
         return self.view
+
+    def _representation(self, text):
+        """Model or a storyboard: the view (and the views projected from it) show the
+        design as it is, or the storyboard's end. A new view takes the scale its parts
+        then fit the sheet at (an exploded assembly is bigger)."""
+        if self._closed:
+            return
+        try:
+            changed = drawing_exploded.set_representation(self.view, text)
+        except drawing.DrawingError as exc:
+            self.message.setText(str(exc))
+            return
+        except Exception as exc:
+            self.message.setText("The storyboard could not be shown: %s" % exc)
+            warn("representation: %s" % exc)
+            return
+        self.message.setText("")
+        if changed and not self.editing:
+            scale = drawing.automatic_scale(
+                self.page, list(self.view.Source), drawing.orientation_of(self.view)
+            )
+            drawing.set_scale(self.view, scale)
+            self.scale.blockSignals(True)
+            self.scale.setEditText(core.format_scale(scale))
+            self.scale.blockSignals(False)
+        self.schedule()
 
     def _orientation(self, text):
         if not self._closed:
@@ -1466,10 +1715,13 @@ class ProjectedPanel(DrawingPanel):
         if not drawing.base_views(page):
             raise drawing.DrawingError("Place a base view first (CREATE > Base View).")
         self.finish_layout()
+        # Fusion: the parent view is clicked first (one that is already selected counts).
+        # While the only base view was the parent by itself, a look-alike preview followed
+        # the mouse before any click, and the click "on the base view to start" took it
+        # away again: "the base view shifted" (book parity report, projects 21 + 22).
         preselected = [v for v in _selected_views(page) if v.TypeId == drawing.PART_VIEW]
-        start = preselected[0] if len(preselected) == 1 else _single_base(page)
-        if start is not None:
-            self._use(start)
+        if len(preselected) == 1:
+            self._use(preselected[0])
         else:
             self.say("Click the view to project from.")
 
@@ -1486,10 +1738,19 @@ class ProjectedPanel(DrawingPanel):
             self.message.setText("")
             self._use(view)
             return True
+        # where the click is, also when no mouse move came before it (a pointer that
+        # jumps to the place and clicks)
+        self.on_move(point, event)
         if self.preview is not None:
             self.placed.append(self.preview)
             self.preview = None
+            self.message.setText("")
             self.say("Placed. Click to place another one; Enter or Esc when done.")
+        elif not self.message.text():
+            self.message.setText(
+                "Move off the view to the side (or the corner) the new view should stand "
+                "on, then click."
+            )
         return True
 
     def on_move(self, point, event):
@@ -1500,8 +1761,9 @@ class ProjectedPanel(DrawingPanel):
         dx, dy = point[0] - px, point[1] - py
         if not core.outside(dx, dy, half_w, half_h):
             self._drop_preview()
+            self.message.setText("")
             return
-        kind = core.projected_kind(dx, dy, self.page.ProjectionType)
+        kind = core.projected_kind(dx, dy, self.page.ProjectionType, half_w, half_h)
         taken = {
             getattr(v, "Fission180Kind", "")
             for v in drawing.children_of(self.parent)
@@ -1509,7 +1771,13 @@ class ProjectedPanel(DrawingPanel):
         }
         if kind in taken:
             self._drop_preview()
+            # (never silently nothing: say why no view follows the mouse here)
+            self.message.setText(
+                "This view already has a %s view. Move to another side or to a corner (an "
+                "isometric view)." % drawing._kind_label(kind)
+            )
             return
+        self.message.setText("")
         ox, oy = core.projected_offset(kind, dx, dy)
         if self.preview is not None and getattr(self.preview, "Fission180Kind", "") != kind:
             self._drop_preview()
@@ -1581,7 +1849,7 @@ class SectionPanel(DrawingPanel):
         mode, value = drawing.section_depth(section) if section is not None else ("Full", 10.0)
         self.depth = _combo(drawing.DEPTH_MODES, mode)
         self.depth.setObjectName("Fission180SectionDepth")
-        self.distance = QtWidgets.QLineEdit(core._short(value or 10.0))
+        self.distance = QtWidgets.QLineEdit(units_text(value or 10.0, page))
         self.distance.setObjectName("Fission180SectionDistance")
         self.hatch = QtWidgets.QCheckBox("Hatch the cut faces")
         self.hatch.setChecked(section is None or section.CutSurfaceDisplay != "Hide")
@@ -1590,7 +1858,7 @@ class SectionPanel(DrawingPanel):
         self.layout.addRow("Scale", self.scale)
         self.layout.addRow("Style", self.style)
         self.layout.addRow("Section Depth", self.depth)
-        self.layout.addRow("Distance (mm)", self.distance)
+        self.layout.addRow("Distance (%s)" % unit_of(page), self.distance)
         self.layout.addRow(self.hatch)
         self.show_label = _label_rows(self, section, with_text=False)
         self.auto_boxes = _auto_mark_rows(self, section)
@@ -1838,7 +2106,7 @@ class SectionPanel(DrawingPanel):
     def _depth_value(self):
         mode = self.depth.currentText()
         try:
-            value = float(self.distance.text().replace(",", "."))
+            value = from_units(float(self.distance.text().replace(",", ".")), self.page)
         except ValueError:
             value = 0.0
         return (mode, value)
@@ -1876,7 +2144,7 @@ class SectionPanel(DrawingPanel):
             return False
         mode, value = self._depth_value()
         if mode == "Distance" and value <= 0:
-            self.message.setText("Type how far behind the cut the section shows (more than 0 mm).")
+            self.message.setText("Type how far behind the cut the section shows (more than 0).")
             return False
         return super().accept()
 
@@ -2121,10 +2389,7 @@ class BreakPanel(DrawingPanel):
         self.view = None
         self.a = None
         self.broken = None
-        self.gap = QtWidgets.QDoubleSpinBox()
-        self.gap.setRange(1.0, 100.0)
-        self.gap.setSuffix(" mm")
-        self.gap.setValue(10.0)
+        self.gap = LengthBox(page, 1.0, 100.0, 10.0)
         self.gap.setObjectName("Fission180DrawingGap")
         self.layout.addRow("Gap", self.gap)
         self.gap.valueChanged.connect(self._gap)
@@ -2151,7 +2416,7 @@ class BreakPanel(DrawingPanel):
             self.say("Click where the break ends.")
             return True
         try:
-            self.broken = drawing.add_break(self.view, self.a, local, self.gap.value())
+            self.broken = drawing.add_break(self.view, self.a, local, self.gap.mm())
         except drawing.DrawingError as exc:
             self.message.setText(str(exc))
             return True
@@ -2175,9 +2440,9 @@ class BreakPanel(DrawingPanel):
             else:
                 self.overlay_line((x - half_w - 3, q[1]), (x + half_w + 3, q[1]))
 
-    def _gap(self, value):
+    def _gap(self, _value):
         if self.broken is not None:
-            self.broken.Gap = value
+            self.broken.Gap = self.gap.mm()
             self.schedule()
 
     def accept(self):
@@ -2464,10 +2729,7 @@ class TextPanel(DrawingPanel):
         self.text = QtWidgets.QPlainTextEdit("\n".join(note.Text) if note is not None else "")
         self.text.setObjectName("Fission180DrawingText")
         self.text.setMaximumHeight(90)
-        self.size = QtWidgets.QDoubleSpinBox()
-        self.size.setRange(1.0, 50.0)
-        self.size.setSuffix(" mm")
-        self.size.setValue(float(note.TextSize) if note is not None else 3.5)
+        self.size = LengthBox(page, 1.0, 50.0, float(note.TextSize) if note is not None else 3.5)
         self.size.setObjectName("Fission180DrawingTextHeight")
         self.layout.addRow("Text", self.text)
         self.layout.addRow("Height", self.size)
@@ -2506,7 +2768,7 @@ class TextPanel(DrawingPanel):
         width = abs(x1 - x0)
         centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
         lines = self.text.toPlainText().splitlines() or ["Text"]
-        self.note = drawing.add_text(self.page, lines, centre, self.size.value(), width or None)
+        self.note = drawing.add_text(self.page, lines, centre, self.size.mm(), width or None)
         self.clear_overlay()
         self.say("Type the text, then OK.")
         self.schedule()
@@ -2529,7 +2791,7 @@ class TextPanel(DrawingPanel):
             return
         lines = self.text.toPlainText().splitlines() or [""]
         self.note.Text = lines
-        self.note.TextSize = self.size.value()
+        self.note.TextSize = self.size.mm()
         self.schedule()
 
     def on_key(self, key, event):
@@ -2595,15 +2857,25 @@ class TablePanel(DrawingPanel):
             self.message.setText(str(exc))
             return True
         self.clear_overlay()
+        rows = drawing.table_rows(self.table)
         self.say(
             "Parts list with %d row%s and %d balloon%s. OK to finish."
             % (
-                len(drawing.table_rows(self.table)),
-                "" if len(drawing.table_rows(self.table)) == 1 else "s",
+                len(rows),
+                "" if len(rows) == 1 else "s",
                 len(balloons),
                 "" if len(balloons) == 1 else "s",
             )
         )
+        have = {b.Text for b in balloons}
+        without = [str(r["PartNumber"]) for r in rows if str(r["Item"]) not in have]
+        if without:
+            # (never a row without its balloon and no word about it)
+            self.message.setText(
+                "No balloon for %s: this view does not show %s (hidden behind other "
+                "parts). Use TABLES > Balloon on a view that does."
+                % (", ".join(without), "it" if len(without) == 1 else "them")
+            )
         self.schedule()
         return True
 
@@ -2621,6 +2893,13 @@ class TablePanel(DrawingPanel):
         return super().accept()
 
 
+class PartsListPanel(TablePanel):
+    """TABLES > Parts List (Fusion has it beside Table, whose dialog starts on Parts List
+    too): the same command under the name the book uses."""
+
+    title = "Parts List"
+
+
 class BalloonPanel(DrawingPanel):
     """Fusion's Balloon: click a component's edge on a view, then where the balloon
     goes; its number is the component's item in the parts list."""
@@ -2633,7 +2912,7 @@ class BalloonPanel(DrawingPanel):
         if drawing.parts_list_of(page) is None:
             raise drawing.DrawingError(
                 "Balloons number the parts list's rows: make the parts list first "
-                "(TABLES > Table)."
+                "(TABLES > Parts List)."
             )
         self.origin = None
         self.made = []
@@ -2646,7 +2925,8 @@ class BalloonPanel(DrawingPanel):
             if view is None or name is None:
                 self.message.setText("Click on an edge of a component.")
                 return True
-            body = drawing.component_at(view, local)
+            reach = self.tolerance() / (drawing.scale_of(view) or 1.0)
+            body = drawing.component_near(view, local, reach)
             item = drawing.item_for_body(self.page, body) if body is not None else None
             if item is None:
                 self.message.setText("That is not one of the parts list's components.")
@@ -2656,7 +2936,7 @@ class BalloonPanel(DrawingPanel):
             self.say("Click where balloon %s goes." % item)
             return True
         view, origin, item = self.origin
-        self.made.append(drawing.add_balloon(view, origin, point, item).Name)
+        self.made.append(drawing.add_balloon_at(view, origin, point, item).Name)
         self.origin = None
         self.clear_overlay()
         self.say("Balloon %s placed. Click the next component, or Enter / Esc." % item)
@@ -2695,10 +2975,7 @@ class EditViewPanel(DrawingPanel):
         self.style.currentTextChanged.connect(self._style)
         self.gap = None
         if view.TypeId == drawing.BROKEN:
-            self.gap = QtWidgets.QDoubleSpinBox()
-            self.gap.setRange(1.0, 100.0)
-            self.gap.setSuffix(" mm")
-            self.gap.setValue(float(view.Gap))
+            self.gap = LengthBox(page, 1.0, 100.0, float(view.Gap))
             self.layout.addRow("Gap", self.gap)
             self.gap.valueChanged.connect(self._gap)
         self.show_label = _label_rows(self, view)
@@ -2713,8 +2990,8 @@ class EditViewPanel(DrawingPanel):
         drawing.set_view_style(self.view, text)
         self.schedule()
 
-    def _gap(self, value):
-        self.view.Gap = value
+    def _gap(self, _value):
+        self.view.Gap = self.gap.mm()
         self.schedule()
 
 
@@ -2725,17 +3002,13 @@ def edit_view(view):
     page = drawing.page_of(view)
     if page is None:
         return None
-    try:
-        if drawing.kind(view) == "BaseView":
-            return BaseViewPanel(page, view).show()
-        if drawing.is_section(view):
-            return SectionPanel(page, view).show()
-        if view.TypeId == drawing.DETAIL:
-            return DetailPanel(page, view).show()
-        return EditViewPanel(page, view).show()
-    except Exception as exc:
-        warn("edit view: %s" % exc)
-    return None
+    if drawing.kind(view) == "BaseView":
+        return _open_panel(lambda: BaseViewPanel(page, view), "edit view")
+    if drawing.is_section(view):
+        return _open_panel(lambda: SectionPanel(page, view), "edit view")
+    if view.TypeId == drawing.DETAIL:
+        return _open_panel(lambda: DetailPanel(page, view), "edit view")
+    return _open_panel(lambda: EditViewPanel(page, view), "edit view")
 
 
 class TitleBlockPanel(DrawingPanel):
@@ -2770,11 +3043,7 @@ class TitleBlockPanel(DrawingPanel):
     def start(cls, page):
         if not commands.finish_open_dialog():
             return None
-        try:
-            return cls(page).show()
-        except drawing.DrawingError as exc:
-            commands.tell(str(exc))
-        return None
+        return _open_panel(lambda: cls(page), "title block")
 
 
 # ------------------------------------------------------------------ delete
@@ -2872,15 +3141,28 @@ class ExportDialog(QtWidgets.QDialog):
         try:
             from . import export_report_ui, export_ui
 
+            if self.report_kind is None:
+                return  # (a table's CSV: nothing of the sheet is in it to lose)
             export_report_ui.report_losses(
                 self.page.Document,
                 self.page,
-                "drawing_" + self.kind,
+                "drawing_" + (self.report_kind or self.kind),
                 export_ui.files_label(self.paths),
                 which=which,
             )
         except Exception as exc:
             warn("drawing export report: %s" % exc)
+
+    report_kind = ""  # "" = the dialog's kind; a DWG is its DXF converted: "dxf"
+
+    def _write(self, path, which):
+        """Write the file(s); the paths written (drawing_export_ui's dialogs override)."""
+        from . import drawing_sheets
+
+        if self.kind == "pdf":
+            drawing_sheets.export_pdf(self.page, path, which)
+            return [path]
+        return drawing_sheets.export_dxf(self.page, path, which)
 
     def _browse(self):
         try:
@@ -2905,15 +3187,14 @@ class ExportDialog(QtWidgets.QDialog):
             if not name.lower().endswith("." + self.kind):
                 name += "." + self.kind
             path = os.path.join(folder, name)
-            from . import drawing_sheets
-
+            if not os.path.isdir(folder):
+                self.message.setText(
+                    "There is no folder %s: choose one that exists (Browse...)." % folder
+                )
+                return
             which = "all" if self.sheets.currentIndex() == 0 else "current"
-            if self.kind == "pdf":
-                drawing_sheets.export_pdf(self.page, path, which)
-                self.paths = [path]
-            else:
-                self.paths = drawing_sheets.export_dxf(self.page, path, which)
-                path = self.paths[0]
+            self.paths = self._write(path, which)
+            path = self.paths[0]
             self.path = path
             log("exported %s" % ", ".join(self.paths))
             if self.open_after.isChecked():
@@ -2921,6 +3202,8 @@ class ExportDialog(QtWidgets.QDialog):
             self.accept()
             commands.tell("Exported %s" % path)
             self._report(which)
+        except drawing.DrawingError as exc:
+            self.message.setText(str(exc))  # (a refusal that says what to do: no error)
         except Exception as exc:
             self.message.setText("Could not export: %s" % exc)
             warn("export %s: %s" % (self.kind, exc))
@@ -2952,6 +3235,10 @@ def fill_workspace_menu(menu):
     new = menu.addAction(QtGui.QIcon(ui_icon_path("dw_new")), "From Design...")
     new.triggered.connect(lambda: _later(Gui.runCommand, "Fission180_NewDrawing"))
     new.setEnabled(doc is not None)
+    # Fusion: Drawing > From Animation (an exploded drawing of a storyboard)
+    anim = menu.addAction(QtGui.QIcon(ui_icon_path("dw_new")), "From Animation...")
+    anim.triggered.connect(lambda: _later(Gui.runCommand, "Fission180_NewDrawingFromAnimation"))
+    anim.setEnabled(doc is not None)
     pages = drawing.drawings(doc) if doc is not None else []
     if pages:
         menu.addSeparator()
@@ -2990,23 +3277,95 @@ class NewDrawingCommand(_Base):
     def IsActive(self):
         return App.ActiveDocument is not None
 
+    from_animation = False
+
     def run(self):
         doc = App.ActiveDocument
         if doc is None:
             commands.tell("Open or make a design first.")
             return
+        if self.from_animation:
+            reason = drawing_exploded.why_none(doc)
+            if reason:
+                commands.tell(reason.replace("choose Exploded View", "make the drawing"))
+                return
         if not drawing.design_bodies(doc):
             commands.tell(
                 "There is nothing to draw yet: the design has no solid bodies. Make a body "
                 "first, then File > New Drawing."
             )
             return
+        picked, named = _picked_for_drawing(doc)
+        if named and not picked:
+            commands.tell(
+                "%s has no solid body to draw yet. Make a body in it first, or choose "
+                "File > New Drawing for the whole design." % named
+            )
+            return
         if active_page() is not None:
             show_design(doc)
         if not commands.finish_open_dialog():
             return
-        CreateDrawingPanel(doc)
+        storyboard = None
+        if self.from_animation:
+            storyboard = drawing_exploded.storyboards(doc)[0]
+        CreateDrawingPanel(doc, picked, storyboard)
         Gui.Control.showDialog(CreateDrawingPanel.last)
+
+
+def _picked_for_drawing(doc):
+    """(bodies, names) of the components or bodies selected when New Drawing starts (the
+    browser's right-click > Create Drawing selects its component first): the solid bodies
+    inside them, sub-components included. ([], "") with nothing of the kind selected."""
+    from . import components
+
+    solids = drawing.design_bodies(doc)
+    solid_names = {b.Name for b in solids}
+    found, names = [], []
+    try:
+        selected = [o for o in Gui.Selection.getSelection(doc.Name) if o is not None]
+    except Exception:
+        selected = []
+    for obj in selected:
+        if not components.is_component(obj):
+            continue  # (a face or body clicked in the view is no choice of contents)
+        inside = components.bodies_in(doc, obj, recursive=True)
+        names.append(obj.Label)
+        for body in inside:
+            if body.Name in solid_names and body.Name not in [b.Name for b in found]:
+                found.append(body)
+    return found, ", ".join(names)
+
+
+class NewDrawingFromAnimationCommand(NewDrawingCommand):
+    """Fusion's File > New Drawing > From Animation: the Create Drawing dialog with a
+    storyboard chosen; the views then show the storyboard's end (an exploded drawing)."""
+
+    title = "New Drawing From Animation"
+    tip = "An exploded drawing: the design as a storyboard of the Animation workspace ends"
+    icon = "dw_new"
+    from_animation = True
+
+
+class ExplodedViewCommand(_Base):
+    """CREATE > Exploded View: a base view of a storyboard (Fusion: Base View with the
+    storyboard chosen under Representation)."""
+
+    title = "Exploded View"
+    tip = "A view of the design taken apart: an animation storyboard's end"
+    icon = "dw_base_view"
+
+    def run(self):
+        page = _need_page()
+        if page is None:
+            return
+        reason = drawing_exploded.why_none(page.Document)
+        if reason:
+            commands.tell(reason)
+            return
+        boards = drawing_exploded.storyboards(page.Document)
+        wanted = drawing._get(page, "Fission180Storyboard", "")
+        _start(BaseViewPanel, None, wanted if wanted in boards else boards[0])
 
 
 class BaseViewCommand(_Base):
@@ -3132,6 +3491,15 @@ class TableCommand(_Base):
         _start(TablePanel)
 
 
+class PartsListCommand(_Base):
+    title = "Parts List"
+    tip = "The components a view shows, listed with item numbers, and a balloon on each"
+    icon = "dw_table"
+
+    def run(self):
+        _start(PartsListPanel)
+
+
 class BalloonCommand(_Base):
     title = "Balloon"
     tip = "A numbered balloon pointing at a component (needs the parts list)"
@@ -3197,6 +3565,8 @@ class ExportDxfCommand(_Base):
 
 COMMANDS = {
     "Fission180_NewDrawing": NewDrawingCommand,
+    "Fission180_NewDrawingFromAnimation": NewDrawingFromAnimationCommand,
+    "Fission180_DrawingExplodedView": ExplodedViewCommand,
     "Fission180_DrawingBaseView": BaseViewCommand,
     "Fission180_DrawingProjectedView": ProjectedViewCommand,
     "Fission180_DrawingSectionView": SectionViewCommand,
@@ -3212,6 +3582,7 @@ COMMANDS = {
     "Fission180_DrawingDiameterDimension": DiameterDimensionCommand,
     "Fission180_DrawingText": TextCommand,
     "Fission180_DrawingTable": TableCommand,
+    "Fission180_DrawingPartsList": PartsListCommand,
     "Fission180_DrawingBalloon": BalloonCommand,
     "Fission180_DrawingEditView": EditViewCommand,
     "Fission180_DrawingTitleBlock": TitleBlockCommand,

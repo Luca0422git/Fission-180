@@ -428,18 +428,26 @@ def c_undone():
         not left,
         (left, App.ActiveDocument.UndoNames[:4], App.ActiveDocument.RedoNames[:4]),
     )
+    # (wave 7, the book parity report: "Ctrl+Z after drawing a polyline only removed its
+    # auto-constraints, not the lines": FreeCAD's "Add Auto-Constraints" step now goes
+    # with the line's own step, as Fusion takes a drawn line back in one Ctrl+Z)
     h.check(
-        "C: ...and keeps the line (FreeCAD's own step)",
-        len(si.lines(s["sk"])) == s["c_lines"],
+        "C: ...and the line itself, in the same Ctrl+Z",
+        len(si.lines(s["sk"])) == s["c_lines"] - 1,
         len(si.lines(s["sk"])),
     )
     h.press("y", CTRL)
 
 
 def c_redone():
+    h.check(
+        "C: one Ctrl+Y brings the line back",
+        len(si.lines(s["sk"])) == s["c_lines"],
+        len(si.lines(s["sk"])),
+    )
     found = [c for c in on(s["c_line"]) if c[0] in ("Perpendicular", "Coincident")]
     h.check(
-        "C: one Ctrl+Y brings both back",
+        "C: ...with both constraints",
         len(found) == 2,
         (found, App.ActiveDocument.UndoNames[:4], App.ActiveDocument.RedoNames[:4]),
     )

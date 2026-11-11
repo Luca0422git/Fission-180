@@ -57,8 +57,36 @@ def _manufacture_browser(doc=None):
         return None
 
 
+# The ANIMATION workspace's rows (animation_browser.py, wave 7 animation): their kinds start
+# with "sim_anim_", so they take the SIMULATION hooks below, which hand them to
+# animation_browser (like MANUFACTURE's).
+SIM_RENAMABLE += ("sim_anim_storyboard", "sim_anim_document")
+
+
+def _animation_browser(doc=None):
+    """animation_browser while the design is in the ANIMATION workspace, else None."""
+    try:
+        from . import animation_ui
+
+        if not animation_ui.in_workspace(doc):
+            return None
+        from . import animation_browser
+
+        return animation_browser
+    except Exception as exc:
+        warn("animation browser: %s" % exc)
+        return None
+
+
 def _simulation_tree(doc):
     """The study tree while the design is in the SIMULATION workspace, else None."""
+    anim = _animation_browser(doc)  # ANIMATION workspace: storyboards and components
+    if anim is not None:
+        try:
+            return anim.tree(doc)
+        except Exception as exc:
+            warn("animation browser: %s" % exc)
+            return None
     cam = _manufacture_browser(doc)  # MANUFACTURE workspace: its setups tree (wave 7 cam)
     if cam is not None:
         try:
@@ -85,6 +113,7 @@ def _simulation_call(name, *args):
         from . import simulation_browser
 
         simulation_browser = _manufacture_browser() or simulation_browser  # (wave 7 cam)
+        simulation_browser = _animation_browser() or simulation_browser  # (wave 7 animation)
 
         return getattr(simulation_browser, name)(*args)
     except Exception as exc:
@@ -1704,6 +1733,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         try:
             node = core.find(self._tree, key) if self._tree is not None else None
             if node is None or node["visible"] is None:
+                return
+            if str(node["kind"]).startswith("sim_anim_"):  # ANIMATION workspace: Show/Hide
+                _simulation_call("toggle_eye", self, node)
                 return
             rows = self._eye_targets(node)
             if len(rows) > 1:

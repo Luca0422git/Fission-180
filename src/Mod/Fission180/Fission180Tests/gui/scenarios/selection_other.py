@@ -72,7 +72,7 @@ def a_list_open():
     )
     bottom = [r for r in rows if r.startswith(pretty(names()["bottom"]))]
     h.check("A the bottom face, behind it, is listed too", len(bottom) == 1, rows)
-    h.check("A the body is listed after a separator", "" in rows and rows[-1] == "Body", rows)
+    h.check("A the body is listed after a separator", "" in rows and rows[-1] == App.ActiveDocument.getObject("Body").Label, rows)
     h.shot("A-select-other")
     si.let_go(st["pos"])
 

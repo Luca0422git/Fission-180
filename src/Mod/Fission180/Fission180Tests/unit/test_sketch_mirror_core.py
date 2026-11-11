@@ -49,7 +49,10 @@ class Ties(unittest.TestCase):
         )
 
     def test_a_circle_by_its_centre(self):
-        self.assertEqual(mc.ties(mc.CIRCLE, 2, 7, False), [("Equal", 2, 0, 7, 0), ("Symmetric", 2, mc.MID, 7, mc.MID)])
+        self.assertEqual(
+            mc.ties(mc.CIRCLE, 2, 7, False),
+            [("Equal", 2, 0, 7, 0), ("Symmetric", 2, mc.MID, 7, mc.MID)],
+        )
 
     def test_helpers_of_a_curve_are_not_tied_twice(self):
         self.assertEqual(mc.ties(mc.LINE, 3, 8, False, aligned=True), [])
@@ -89,3 +92,18 @@ class Box(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OnTheMirrorLine(unittest.TestCase):
+    def test_distance_from_the_line(self):
+        self.assertAlmostEqual(mc.line_distance((3, 4), (0, 0), (0, 10)), 3.0)
+        self.assertAlmostEqual(mc.line_distance((5, 5), (0, 0), (2, 2)), 0.0)
+
+    def test_tolerance_for_an_ordinary_curve(self):
+        # the report: ends two thousandths of an inch apart (0.025 mm from the line each)
+        self.assertGreaterEqual(mc.on_line_tolerance(35.0), 0.025)
+        self.assertLessEqual(mc.on_line_tolerance(35.0), 0.1)
+
+    def test_tolerance_shrinks_with_a_tiny_curve(self):
+        self.assertAlmostEqual(mc.on_line_tolerance(1.0), 0.05)
+        self.assertGreater(mc.on_line_tolerance(0.0), 0.0)

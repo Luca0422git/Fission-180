@@ -27,7 +27,9 @@ class BreakoutPanel(DrawingPanel):
         self.closed = view is not None and drawing_breakout.has_breakout(view)
         data = drawing_breakout.breakout_of(view) if self.closed else None
         depth = data["depth"] if data else None
-        self.distance = QtWidgets.QLineEdit("" if depth is None else "%g" % depth)
+        self.distance = QtWidgets.QLineEdit(
+            "" if depth is None else drawing_ui.units_text(depth, page)
+        )
         self.distance.setObjectName("Fission180BreakoutDistance")
         self.distance.setToolTip("How deep the cut goes from the front of the parts")
         self.default_button = QtWidgets.QPushButton("Default")
@@ -36,7 +38,7 @@ class BreakoutPanel(DrawingPanel):
         row = QtWidgets.QHBoxLayout()
         row.addWidget(self.distance, 1)
         row.addWidget(self.default_button)
-        self.layout.addRow("Depth (mm)", row)
+        self.layout.addRow("Depth (%s)" % drawing_ui.unit_of(page), row)
         self.distance.editingFinished.connect(self._depth)
         self.default_button.clicked.connect(self._default)
         if self.closed:
@@ -52,7 +54,7 @@ class BreakoutPanel(DrawingPanel):
 
     def _value(self):
         try:
-            return float(self.distance.text().replace(",", "."))
+            return drawing_ui.from_units(float(self.distance.text().replace(",", ".")), self.page)
         except ValueError:
             return -1.0
 
@@ -60,7 +62,9 @@ class BreakoutPanel(DrawingPanel):
         if self._closed or self.view is None:
             return
         try:
-            self.distance.setText("%g" % drawing_breakout.default_depth(self.view))
+            self.distance.setText(
+                drawing_ui.units_text(drawing_breakout.default_depth(self.view), self.page)
+            )
         except Exception as exc:
             warn("breakout depth: %s" % exc)
             return
@@ -99,7 +103,9 @@ class BreakoutPanel(DrawingPanel):
                 return True
             self.view = view
             self.message.setText("")
-            self.distance.setText("%g" % drawing_breakout.default_depth(view))
+            self.distance.setText(
+                drawing_ui.units_text(drawing_breakout.default_depth(view), self.page)
+            )
             self.say("Click the points of a boundary around what should show inside.")
             return True
         local = drawing.page_to_local(self.view, point)
@@ -124,7 +130,7 @@ class BreakoutPanel(DrawingPanel):
             return True
         value = self._value()
         if value <= 0:
-            self.message.setText("Type how deep the breakout goes (more than 0 mm).")
+            self.message.setText("Type how deep the breakout goes (more than 0).")
             return True
         try:
             drawing_breakout.add_breakout(self.view, self.points, value)

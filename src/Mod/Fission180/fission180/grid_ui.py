@@ -180,6 +180,17 @@ def draw(doc, view=None):
     light.model = coin.SoLightModel.BASE_COLOR
     node.addChild(pick)
     node.addChild(light)
+    # (wave 7, sketch-a) Fit frames the design, never this grid: it is four view heights
+    # wide, so every Fit zoomed out further (a design with only a sketch ended up 24 m
+    # tall, the book parity report). FreeCAD's own group for what Fit leaves out.
+    holder = node
+    try:
+        skip = coin.SoType.fromName("SoSkipBoundingGroup").createInstance()
+        if skip is not None:
+            node.addChild(skip)
+            holder = skip
+    except Exception as exc:
+        warn("layout grid: %s" % exc)
     for lines, color in ((minors, MINOR_COLOR), (majors, MAJOR_COLOR)):
         if not lines:
             continue
@@ -195,7 +206,7 @@ def draw(doc, view=None):
         line_set.numVertices.setValues(0, len(lines), [2] * len(lines))
         for item in (material, coords, line_set):
             sep.addChild(item)
-        node.addChild(sep)
+        holder.addChild(sep)
     _STATE["nodes"][doc.Name] = node
     for v in _views(doc):
         try:
@@ -269,6 +280,15 @@ def apply_to_sketch(sketch):
         # (FreeCAD's adaptive sketch grid steps in GridSize x subdivisions^n: with one
         # inch as its base an inch design's grid and snap are in inches)
         spacing = major_spacing(sketch.Document)
+        try:
+            # (wave 7, sketch-a) FreeCAD's GridSize is the distance between two grid
+            # LINES, Major Grid Spacing the distance between two major ones; an inch
+            # design gets an inch grid: sketch_grid.py
+            from . import sketch_grid
+
+            spacing = sketch_grid.line_spacing(sketch, adaptive, spacing, int(get("Subdivisions")))
+        except Exception as exc:
+            warn("sketch grid: %s" % exc)
         current = float(getattr(vp.GridSize, "Value", vp.GridSize))
         if abs(current - spacing) > 1e-9:
             vp.GridSize = spacing

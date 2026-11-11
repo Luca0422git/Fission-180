@@ -17,8 +17,9 @@ PARAM = ("User parameter:BaseApp/Preferences/Mod/Fission180/SketchInference", "A
 
 
 def enabled():
-    """Preferences > Design > "Auto project the face's edges when sketching on a face"
-    (default on: Luca's wish; Fusion's own option exists and is off by default)."""
+    """Preferences > Design > "Auto project geometry on active sketch plane" (Fusion's
+    name for it since wave 7; default on: Luca's wish of 2026-10-16, Fusion's own is said
+    to be off by default)."""
     try:
         return App.ParamGet(PARAM[0]).GetBool(PARAM[1], True)
     except Exception:
@@ -108,6 +109,23 @@ def auto_ids(sketch):
         return set(getattr(sketch, PROPERTY, ()) or ())
     except Exception:
         return set()
+
+
+def auto_curves_left(sketch):
+    """True while at least one of the curves Auto project made is still in the sketch
+    (also as a "missing reference" copy of a face that is gone for now)."""
+    import Sketcher
+
+    ids = set(auto_ids(sketch))
+    if not ids:
+        return False
+    try:
+        for geo in list(sketch.ExternalGeo)[2:]:
+            if Sketcher.ExternalGeometryFacade(geo).Id in ids:
+                return True
+    except Exception:
+        return True  # (cannot tell: as before)
+    return False
 
 
 def missing_edges(sketch, obj, sub):
@@ -207,7 +225,9 @@ def source(sketch):
     for linked, subs in sketch.ExternalGeometry or []:
         if linked is obj:
             for s in [subs] if isinstance(subs, str) else list(subs):
-                if s == sub or sketch_external.plain_sub(obj, s) == sketch_external.plain_sub(obj, sub):
+                if s == sub or sketch_external.plain_sub(obj, s) == sketch_external.plain_sub(
+                    obj, sub
+                ):
                     return obj, sketch_external.plain_sub(obj, s)
     return obj, None
 
@@ -218,6 +238,12 @@ def _followable(sketch):
     from . import hole
 
     if ANCHOR not in sketch.PropertiesList or not auto_ids(sketch):
+        return None
+    if not auto_curves_left(sketch):
+        # The person deleted the Auto-projected edges from the sketch: they stay deleted
+        # (wave 7, the book parity report: "deleting the auto-projected edges does not
+        # stick: Finish Sketch puts them back"; Fusion's projected curves are the
+        # person's to delete, forum "Help with unwanted auto projected geometry").
         return None
     if sketch.MapMode != "FlatFace" or not sketch.AttachmentSupport:
         return None
@@ -294,7 +320,13 @@ def _state(sketch, step):
             for o, subs in sketch.ExternalGeometry or []
         ]
         place = sketch.Placement
-        return (step.Name, step.Shape.hashCode(), tuple(links), tuple(place.Base), tuple(place.Rotation.Q))
+        return (
+            step.Name,
+            step.Shape.hashCode(),
+            tuple(links),
+            tuple(place.Base),
+            tuple(place.Rotation.Q),
+        )
     except Exception:
         return None
 

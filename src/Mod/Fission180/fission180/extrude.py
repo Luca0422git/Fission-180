@@ -248,10 +248,39 @@ def face_areas(sketch):
         return set()
 
 
+_SLIVERS = {}  # (document, sketch) -> (shape stamp, {"InternalFaceN"})
+
+
+def sliver_areas(sketch):
+    """{"InternalFaceN"} of the sketch's areas that are no profile: slivers of next to no
+    area, left where pattern copies or tangent curves lie on each other (the book's
+    carabiner offered 27 "regions", many of them slivers). They keep their numbers (an old
+    step may name one); they are only never offered (sketch_area_id_core.slivers)."""
+    try:
+        if sketch.InternalShape.isNull():
+            return set()
+        key = (sketch.Document.Name, sketch.Name)
+        stamp = (_stamp(sketch), sketch.InternalShape.hashCode())
+        cached = _SLIVERS.get(key)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+        from . import sketch_area_id_core
+
+        faces = list(sketch.InternalShape.Faces)
+        thin = sketch_area_id_core.slivers(
+            [f.Area for f in faces], [f.OuterWire.Length for f in faces]
+        )
+        found = {"InternalFace%d" % (i + 1) for i in thin}
+        _SLIVERS[key] = (stamp, found)
+        return found
+    except Exception:
+        return set()
+
+
 def profile_regions(sketch):
-    """regions() without the areas only the face's projected edges bound (face_areas):
-    the profiles a click or an automatic pick offers."""
-    own = face_areas(sketch)
+    """regions() without the areas only the face's projected edges bound (face_areas) and
+    without slivers (sliver_areas): the profiles a click or an automatic pick offers."""
+    own = face_areas(sketch) | sliver_areas(sketch)
     return [(sub, face) for sub, face in regions(sketch) if sub not in own]
 
 
@@ -529,8 +558,101 @@ def interior_point(face):
     return center
 
 
+# -- which way is "plus" on the Front plane ---------------------------------------------------
+# Fusion's Front plane (XZ) looks the other way than FreeCAD's: its normal is +Y, away from
+# someone looking at the front of the design (a sketch on it has x = X and y = -Z), FreeCAD's
+# is -Y. So Fusion's "Extrude -6" of a sketch on the Front plane comes towards you (the book's
+# Strandbeest: "towards you") and went away in Fission 180. A sketch that Extrude is used on
+# for the first time gets the mark FRONT; from then on its extrudes count their distances
+# Fusion's way. Sketches of designs made before (their extrudes were typed FreeCAD's way)
+# have no mark and keep FreeCAD's.
+FRONT = "Fission180FrontNormal"
+
+
+def _support_objects(obj):
+    for name in ("AttachmentSupport", "Support"):
+        try:
+            value = getattr(obj, name)
+        except Exception:
+            continue
+        found = []
+        for item in value or []:
+            try:
+                found.append(item[0] if isinstance(item, (tuple, list)) else item)
+            except Exception:
+                continue
+        if found:
+            return found
+    return []
+
+
+def on_front_plane(sketch):
+    """True when the sketch lies on the origin's Front (XZ) plane or on a construction plane
+    made from it and parallel to it (an offset plane), looking FreeCAD's way (-Y in its
+    body)."""
+    try:
+        normal = sketch.Placement.Rotation.multVec(Z)
+        if (normal - App.Vector(0, -1, 0)).Length > 1e-6:
+            return False
+        obj, depth = sketch, 0
+        while depth < 6:
+            supports = _support_objects(obj)
+            if not supports:
+                return False
+            obj = supports[0]
+            if obj.TypeId == "App::Plane":
+                return getattr(obj, "Role", "") == "XZ_Plane"
+            if obj.TypeId not in ("PartDesign::Plane", "Part::DatumPlane"):
+                return False
+            depth += 1
+    except Exception:
+        return False
+    return False
+
+
+def fusion_side(sketch):
+    """-1.0 for a sketch on the Front plane that counts its extrudes Fusion's way (FRONT),
+    else 1.0: what the sketch's own normal is multiplied by."""
+    try:
+        if getattr(sketch, FRONT, False) and on_front_plane(sketch):
+            return -1.0
+    except Exception:
+        pass
+    return 1.0
+
+
+def adopt_fusion_side(sketch, lead=None):
+    """Mark a sketch on the Front plane that no step uses yet (`lead`: the extrude or rib
+    being made does not count): its extrudes, and the One Side of its ribs and webs, go
+    Fusion's way from now on. True when marked."""
+    try:
+        if not is_sketch(sketch) or FRONT in sketch.PropertiesList:
+            return False
+        if not on_front_plane(sketch):
+            return False
+        for user in sketch.InList:
+            if user is lead or user.TypeId == "PartDesign::Body":
+                continue
+            if is_extrude(user) or getattr(user, ROLE, "") == "ExtrudeProfile":
+                return False  # an extrude (or its helper) already counts on its direction
+            if getattr(user, "Fission180Type", "") in ("Rib", "Web"):
+                return False  # a rib's One Side counts on it too (rib.plane_of)
+        sketch.addProperty(
+            "App::PropertyBool", FRONT, "Fission180", "Plus is away from the front, as in Fusion", 0
+        )
+        sketch.setEditorMode(FRONT, 2)
+        touched = "Touched" in sketch.State
+        setattr(sketch, FRONT, True)
+        if not touched:
+            sketch.purgeTouched()  # a note only: the sketch itself is the same
+        return True
+    except Exception:
+        return False
+
+
 def profile_normal(profiles, local=False):
-    """The Fusion extrude direction for distance > 0: the sketch's normal, or the outward
+    """The Fusion extrude direction for distance > 0: the sketch's normal (turned round for
+    a sketch on the Front plane that goes Fusion's way: fusion_side), or the outward
     normal of a picked body face. Global unless local=True (body coordinates)."""
     profiles = normalize(profiles)
     if not profiles:
@@ -538,7 +660,9 @@ def profile_normal(profiles, local=False):
     obj, sub = profiles[0]
     if is_sketch(obj) or is_text(obj):
         placement = obj.Placement if local else obj.getGlobalPlacement()
-        return placement.Rotation.multVec(Z)
+        normal = placement.Rotation.multVec(Z)
+        side = fusion_side(obj) if is_sketch(obj) else 1.0
+        return normal * side if side < 0 else normal
     faces = local_faces(obj, sub)
     if not faces:
         raise ExtrudeError("The picked face no longer exists. Pick the profile again.")
@@ -773,6 +897,8 @@ def own_feature_needed(options):
     tapers every extent)."""
     if options["operation"] == "intersect" or options.get("thin"):
         return True
+    if options.get("merge_profiles"):
+        return True  # touching profiles tapered as one outline (tapers_as_one)
     sides = [("extent", "taper", 1)]
     if options["direction"] == "two_sides":
         sides.append(("extent2", "taper2", 2))
@@ -790,6 +916,24 @@ def own_feature_needed(options):
             if abs(float(options.get("object_offset" + suffix) or 0.0)) > 1e-9:
                 return True
     return False
+
+
+def tapers_as_one(profiles, options):
+    """True when the extrude has a taper and some of its profiles touch: Fusion tapers them
+    as one outline (extrude_prism.merged_faces), which FreeCAD's Pad and Pocket cannot (they
+    lean every face by itself), so Fission 180's own extrude feature builds it."""
+    tapers = [options.get("taper", 0.0)]
+    if options.get("direction") == "two_sides":
+        tapers.append(options.get("taper2", 0.0))
+    if options.get("thin") or not any(abs(float(t or 0.0)) > 1e-9 for t in tapers):
+        return False
+    try:
+        from . import extrude_prism
+
+        faces = global_faces(profiles)
+        return len(faces) > 1 and len(extrude_prism.merged_faces(faces)) < len(faces)
+    except Exception:
+        return False
 
 
 def curved_face(ref):
@@ -981,7 +1125,9 @@ def _save_meta(feature, meta):
 
 def _mark(obj, role):
     if ROLE not in obj.PropertiesList:
-        obj.addProperty("App::PropertyString", ROLE, "Fission180", "What Fission 180 made this for", 0)
+        obj.addProperty(
+            "App::PropertyString", ROLE, "Fission180", "What Fission 180 made this for", 0
+        )
         obj.setEditorMode(ROLE, 2)
     setattr(obj, ROLE, role)
 
@@ -1921,6 +2067,7 @@ def build(profiles, options, name="Extrude", feature=None, hide=True):
     options = options_with_defaults(options)
     profiles = check_profiles(profiles, thin=options["thin"])
     check_options(options)
+    options["merge_profiles"] = tapers_as_one(profiles, options)
     participants = participants_for(feature, profiles, options)
     if participants is not None and not participants:
         if options["operation"] == "join":

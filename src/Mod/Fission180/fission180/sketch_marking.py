@@ -31,7 +31,12 @@ RING = [
     item("Undo", "Std_Undo", "qa_undo", "Ctrl+Z"),
     item("Finish Sketch", "Fission180_FinishSketch", "finish_sketch"),
     item("Center Diameter Circle", "Sketcher_CreateCircle", "sk_circle_center", "C"),
-    item("Sketch Dimension", "Sketcher_Dimension", "sk_dimension", "D"),
+    item(
+        "Sketch Dimension",
+        ("Fission180_SketchDimension", "Sketcher_Dimension"),
+        "sk_dimension",
+        "D",
+    ),
     item("2-Point Rectangle", "Sketcher_CreateRectangle", "sk_rect_2pt", "R"),
 ]
 
@@ -69,6 +74,22 @@ def _text_entries():
         return text_ui.marking_entries()
     except Exception:
         return []
+
+
+def _dimension_entries():
+    """Toggle Driven while a dimension is selected or under the pointer (Fusion's right-click
+    menu on a dimension)."""
+    try:
+        session = _session()
+        if session is None:
+            return []
+        from . import sketch_dimension_tool
+
+        if sketch_dimension_tool.remember_at_hand(session.sketch):
+            return [item("Toggle Driven", "Fission180_SketchToggleDriven", "sk_dimension")]
+    except Exception as exc:
+        warn("sketch marking menu: %s" % exc)
+    return []
 
 
 def _tool_running():
@@ -114,7 +135,7 @@ def _menu_class():
                     int(RADIUS * math.cos(angle)), int(-RADIUS * math.sin(angle))
                 )
                 self.slots.append(self._slot(entry, pos, available))
-            listing = build_menu(self, _text_entries() + LIST, available)
+            listing = build_menu(self, _dimension_entries() + _text_entries() + LIST, available)
             self.list = QtWidgets.QListWidget(self)
             self.list.setObjectName("Fission180MarkingList")
             self.list.setFixedWidth(200)

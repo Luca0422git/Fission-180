@@ -184,6 +184,67 @@ def fit_scale(content_w, content_h, area_w, area_h):
     return values[-1]
 
 
+AUTO_GAP = 25.0  # mm of paper between automatic views (room for dimensions and balloons)
+AUTO_KINDS = ("Top", "Right", "FrontTopRight")  # the views Automatic adds to the base view
+
+
+def automatic_layout(base, top, right, iso, area, projection, gap=AUTO_GAP):
+    """Fusion's Automatic views: where the base view, the view from above, the view from
+    the right and an isometric view go, and at which scale, so that none overlaps another
+    and all stay inside `area` (x0, y0, x1, y1 in page mm). base / top / right / iso are
+    each view's (width, height) in mm at 1:1.
+
+    Third angle: base bottom left, Top above it, Right beside it, the isometric view in the
+    top right corner; first angle mirrors both ways. The scale is the largest standard one
+    at which the block of four fits (the smallest one when even that does not fit).
+    Returns {"scale", "views": {"Base" | "Top" | "Right" | "FrontTopRight": (x, y)},
+    "rects": {the same: (x0, y0, x1, y1)}, "fits"}."""
+    x0, y0, x1, y1 = area
+    area_w, area_h = x1 - x0, y1 - y0
+    col0 = max(base[0], top[0])  # the base view and the view above / below it
+    col1 = max(right[0], iso[0])
+    row0 = max(base[1], right[1])  # the base view and the view beside it
+    row1 = max(top[1], iso[1])
+    values = [float(a) / b for a, b in SCALES]
+    scale, fits = values[-1], False
+    for value in values:
+        if (col0 + col1) * value + gap <= area_w and (row0 + row1) * value + gap <= area_h:
+            scale, fits = value, True
+            break
+    block_w = (col0 + col1) * scale + gap
+    block_h = (row0 + row1) * scale + gap
+    left = (x0 + x1) / 2.0 - block_w / 2.0
+    bottom = (y0 + y1) / 2.0 - block_h / 2.0
+    # third angle places (x of each column's middle, y of each row's middle)
+    xs = (left + col0 * scale / 2.0, left + col0 * scale + gap + col1 * scale / 2.0)
+    ys = (bottom + row0 * scale / 2.0, bottom + row0 * scale + gap + row1 * scale / 2.0)
+    if projection == "First angle":  # mirrored: the view from above goes below
+        xs = (x0 + x1 - xs[0], x0 + x1 - xs[1])
+        ys = (y0 + y1 - ys[0], y0 + y1 - ys[1])
+    views = {
+        "Base": (xs[0], ys[0]),
+        "Top": (xs[0], ys[1]),
+        "Right": (xs[1], ys[0]),
+        "FrontTopRight": (xs[1], ys[1]),
+    }
+    sizes = {"Base": base, "Top": top, "Right": right, "FrontTopRight": iso}
+    rects = {}
+    for name, (x, y) in views.items():
+        w, h = sizes[name][0] * scale, sizes[name][1] * scale
+        rects[name] = (x - w / 2.0, y - h / 2.0, x + w / 2.0, y + h / 2.0)
+    return {"scale": scale, "views": views, "rects": rects, "fits": fits}
+
+
+def rects_overlap(a, b, margin=0.0):
+    """True when two rectangles (x0, y0, x1, y1) overlap or come nearer than `margin`."""
+    return not (
+        a[2] + margin <= b[0]
+        or b[2] + margin <= a[0]
+        or a[3] + margin <= b[1]
+        or b[3] + margin <= a[1]
+    )
+
+
 # ------------------------------------------------------------------ the title block
 # (key, caption, x, y, width, height, value size); x, y = bottom left of the cell, inside
 # the title block (its bottom left is 0, 0), millimetres. An original layout.
@@ -491,16 +552,39 @@ _THIRD_ANGLE_SECTORS = (
 ISOMETRIC_KINDS = ("FrontTopRight", "FrontTopLeft", "FrontBottomLeft", "FrontBottomRight")
 
 
-def projected_kind(dx, dy, projection):
+def projected_kind(dx, dy, projection, half_w=0.0, half_h=0.0):
     """Which projected view a mouse offset (dx, dy) from the parent view's centre makes
-    (page mm, y up). Third angle: up shows the Top view; first angle: up shows the Bottom."""
+    (page mm, y up). Third angle: up shows the Top view; first angle: up shows the Bottom.
+
+    The direction is measured from the parent view's box (half_w x half_h round its
+    centre), not from its centre: straight beside the box is an orthographic view, beyond
+    one of its corners the 45 degree sectors decide. Measured from the centre, the corner
+    of a long flat view (a 200 x 7 mm drumstick) lay at 18 degrees and counted as "Right":
+    a click there made nothing (book parity report, projects 21 + 22)."""
     if abs(dx) < 1e-9 and abs(dy) < 1e-9:
         return None
+    ex = max(0.0, abs(dx) - max(0.0, half_w))
+    ey = max(0.0, abs(dy) - max(0.0, half_h))
+    if ex < 1e-9 and ey < 1e-9:
+        ex, ey = abs(dx), abs(dy)  # over the box: the plain direction from its centre
+    ex = ex if dx >= 0 else -ex
+    ey = ey if dy >= 0 else -ey
     if projection == "First angle":
-        dx, dy = -dx, -dy
-    angle = math.degrees(math.atan2(dy, dx)) % 360.0
+        ex, ey = -ex, -ey
+    angle = math.degrees(math.atan2(ey, ex)) % 360.0
     sector = int(((angle + 22.5) % 360.0) // 45.0)
     return _THIRD_ANGLE_SECTORS[sector]
+
+
+def projected_place(kind, projection):
+    """The side of its parent a projected view of the kind `kind` stands on: (sx, sy), each
+    -1, 0 or 1 (third angle: the Top view above, (0, 1); first angle: below)."""
+    index = _THIRD_ANGLE_SECTORS.index(kind)
+    angle = math.radians(index * 45.0)
+    sx, sy = int(round(math.cos(angle))), int(round(math.sin(angle)))
+    if projection == "First angle":
+        sx, sy = -sx, -sy
+    return sx, sy
 
 
 def projected_offset(kind, dx, dy):
@@ -997,6 +1081,90 @@ def balloon_spot(view_center, anchor, half_w, half_h, index, gap=12.0):
     return x, y
 
 
+BALLOON_SIZE = 18.0  # mm from one balloon to the next (TechDraw draws a 13.4 mm circle)
+BALLOON_GAP = 12.0  # mm from the view's box to the middle of its balloons
+
+
+def spread(values, lo, hi, step):
+    """Places along a line for the sorted wanted places `values` so that neighbours are at
+    least `step` apart, each as near its wanted place as that allows; inside lo..hi when
+    they fit (centred on lo..hi when there are too many)."""
+    if not values:
+        return []
+    out = [float(v) for v in values]
+    for _ in range(200):
+        moved = False
+        for i in range(len(out) - 1):
+            short = step - (out[i + 1] - out[i])
+            if short > 1e-9:
+                out[i] -= short / 2.0
+                out[i + 1] += short / 2.0
+                moved = True
+        if not moved:
+            break
+    for i in range(1, len(out)):  # (whatever the relaxation left: never overlapping)
+        out[i] = max(out[i], out[i - 1] + step)
+    if out[-1] - out[0] > hi - lo:
+        shift = (lo + hi) / 2.0 - (out[0] + out[-1]) / 2.0
+    else:
+        shift = max(0.0, lo - out[0]) - max(0.0, out[-1] - hi)
+    return [v + shift for v in out]
+
+
+def balloon_layout(box, anchors, blocked=(), area=None, gap=BALLOON_GAP, size=BALLOON_SIZE):
+    """Where the balloons of one view go so that none sits on another: a list of (x, y),
+    one per anchor (page mm; `anchors` are the points the arrows start at, on the view).
+
+    Each balloon goes out of the view's `box` (x0, y0, x1, y1) on the side nearest its
+    anchor that has room: a side is passed over when another view (`blocked`, rectangles)
+    or the edge of `area` is nearer than a balloon needs. Along a side the balloons keep
+    the order of their anchors (so the leaders do not cross) and at least `size` between
+    their middles. With no free side at all the nearest side is used all the same."""
+    x0, y0, x1, y1 = box
+    need = gap + size / 2.0 + 1.0
+    strips = {
+        "left": (x0 - need, y0, x0, y1),
+        "right": (x1, y0, x1 + need, y1),
+        "bottom": (x0, y0 - need, x1, y0),
+        "top": (x0, y1, x1, y1 + need),
+    }
+
+    def free(side):
+        strip = strips[side]
+        if area is not None and (
+            strip[0] < area[0] or strip[1] < area[1] or strip[2] > area[2] or strip[3] > area[3]
+        ):
+            return False
+        return not any(rects_overlap(strip, other) for other in blocked)
+
+    order = ("left", "right", "bottom", "top")
+    usable = [side for side in order if free(side)] or list(order)
+    chosen = []
+    for ax, ay in anchors:
+        distance = {"left": ax - x0, "right": x1 - ax, "bottom": ay - y0, "top": y1 - ay}
+        chosen.append(min(usable, key=lambda side: (distance[side], order.index(side))))
+    spots = [None] * len(anchors)
+    for side in order:
+        members = [i for i in range(len(anchors)) if chosen[i] == side]
+        if not members:
+            continue
+        upright = side in ("left", "right")  # the balloons stand above one another
+        along = 1 if upright else 0
+        members.sort(key=lambda i: (anchors[i][along], i))
+        lo, hi = (y0, y1) if upright else (x0, x1)
+        places = spread([anchors[i][along] for i in members], lo, hi, size)
+        for i, value in zip(members, places):
+            if side == "left":
+                spots[i] = (x0 - gap, value)
+            elif side == "right":
+                spots[i] = (x1 + gap, value)
+            elif side == "bottom":
+                spots[i] = (value, y0 - gap)
+            else:
+                spots[i] = (value, y1 + gap)
+    return spots
+
+
 # ------------------------------------------------------------------ DXF (R12) writer
 class DxfWriter:
     """A small DXF writer (AutoCAD R12 / AC1009: no handles, read by every CAD program).
@@ -1146,3 +1314,82 @@ def read_dxf_entities(text):
     if current is not None:
         entities.append(current)
     return entities
+
+
+# ------------------------------------------------------------------ centre mark patterns
+def pattern_shape(points, tolerance=1e-3):
+    """What the centres of a pattern of holes lie on: ("line", a, b) for two or more on one
+    straight line (a, b: its outermost centres), ("circle", centre, radius) for three or
+    more on one circle (a bolt circle), None when they are neither (or fewer than two)."""
+    pts = []
+    for p in points:
+        q = (float(p[0]), float(p[1]))
+        if all(math.hypot(q[0] - o[0], q[1] - o[1]) > tolerance for o in pts):
+            pts.append(q)
+    if len(pts) < 2:
+        return None
+    a = pts[0]
+    b = max(pts, key=lambda p: math.hypot(p[0] - a[0], p[1] - a[1]))
+    length = math.hypot(b[0] - a[0], b[1] - a[1])
+    ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+    off = [abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) for p in pts]
+    if max(off) <= tolerance:
+        along = sorted(pts, key=lambda p: (p[0] - a[0]) * ux + (p[1] - a[1]) * uy)
+        return ("line", along[0], along[-1])
+    if len(pts) < 3:
+        return None
+    # the circle through the first centre, the one farthest from it and the one farthest
+    # from the line between those two
+    c = pts[off.index(max(off))]
+    d = 2.0 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]))
+    if abs(d) < 1e-12:
+        return None
+    aa, bb, cc = a[0] ** 2 + a[1] ** 2, b[0] ** 2 + b[1] ** 2, c[0] ** 2 + c[1] ** 2
+    cx = (aa * (b[1] - c[1]) + bb * (c[1] - a[1]) + cc * (a[1] - b[1])) / d
+    cy = (aa * (c[0] - b[0]) + bb * (a[0] - c[0]) + cc * (b[0] - a[0])) / d
+    radius = math.hypot(a[0] - cx, a[1] - cy)
+    if any(abs(math.hypot(p[0] - cx, p[1] - cy) - radius) > tolerance for p in pts):
+        return None
+    return ("circle", (cx, cy), radius)
+
+
+# ------------------------------------------------------------------ balloons: renumber, align
+def renumbered(items, old, new):
+    """Item numbers after the row numbered `old` is given `new`: the row that had `new`
+    takes `old` (numbers stay one of a kind). items: {key: number}; a copy is returned."""
+    out = dict(items)
+    first = [k for k, v in out.items() if v == old]
+    second = [k for k, v in out.items() if v == new]
+    if not first or old == new:
+        return out
+    out[first[0]] = new
+    if second:
+        out[second[0]] = old
+    return out
+
+
+def aligned(spots, line_at):
+    """Balloon places lined up: on a level line through y = line_at[1] when they are spread
+    more sideways than upwards, on an upright line through x = line_at[0] otherwise. Each
+    keeps its other coordinate. Returns (the new places, "horizontal" | "vertical")."""
+    if not spots:
+        return [], "horizontal"
+    xs = [p[0] for p in spots]
+    ys = [p[1] for p in spots]
+    if max(xs) - min(xs) >= max(ys) - min(ys):
+        return [(x, line_at[1]) for x, _y in spots], "horizontal"
+    return [(line_at[0], y) for _x, y in spots], "vertical"
+
+
+# ------------------------------------------------------------------ a table as CSV
+def csv_text(cells):
+    """Rows of text as CSV (commas; a cell with a comma, a quote or a line break in
+    quotes), lines ending CR LF as spreadsheets write them."""
+    import csv
+    import io
+
+    handle = io.StringIO()
+    writer = csv.writer(handle, lineterminator="\r\n")
+    for row in cells:
+        writer.writerow(["" if cell is None else str(cell) for cell in row])
+    return handle.getvalue()

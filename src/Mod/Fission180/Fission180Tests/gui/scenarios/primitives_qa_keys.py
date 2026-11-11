@@ -92,6 +92,16 @@ def box_text(p, key):
         return None
 
 
+def canvas_length(p):
+    """What the Length box on the canvas holds while the Box is placed (wave 7: the digits
+    typed over the view go into Fusion's size box on the work surface; Tab or Enter takes
+    them into the dialog. They used to go straight into the dialog's field)."""
+    try:
+        return p.value_boxes.boxes[p.PLACING + "length"].text()
+    except Exception as exc:
+        return "no Length box on the canvas: %s" % exc
+
+
 # == K1: Box, sizes typed over the view =====================================================
 def new_design():
     Gui.activateWorkbench("Fission180Workbench")
@@ -121,17 +131,13 @@ def k1_type_length():
 def k1_length_more():
     p = pi.panel("BoxPanel")
     h.check("K1 the view did not jump (FreeCAD's key 3)", camera() == s["camera"])
-    h.check(
-        "K1 3 went into Length",
-        p is not None and near(p.length.value(), 3.0),
-        p and p.length.value(),
-    )
+    h.check("K1 3 went into Length", canvas_length(p) == "3", canvas_length(p))
     keys_to_focus("0")
 
 
 def k1_tab():
     p = pi.panel("BoxPanel")
-    h.check("K1 Length 30", p is not None and near(p.length.value(), 30.0), p and p.length.value())
+    h.check("K1 Length 30", canvas_length(p) == "30", canvas_length(p))
     key_to_focus(QtCore.Qt.Key_Tab)
     keys_to_focus("20", enter=True)
 

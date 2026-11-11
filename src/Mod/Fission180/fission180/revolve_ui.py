@@ -29,7 +29,8 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import bodies_row_ui, commands, drag_guard, extrude, handle_look, handles3d, log, preview
+from . import bodies_row_ui, commands, drag_guard, extrude, extrude_finish, handle_look
+from . import handles3d, log, preview
 from . import origin_look, profile_pick, protractor, revolve, taskui, ui_icon_path
 from . import value_limits, warn
 from .compat import QtCore, QtWidgets
@@ -60,6 +61,10 @@ PLANE_PICKED = ((0.30, 0.62, 0.95), 0.78)  # light: it stays shown
 AXIS_PICKED = (0.12, 0.53, 0.90)
 PICK_PIXELS = 8.0  # how near a drawn axis a click must be (viewport pixels)
 ON_LINE_PIXELS = 4.0  # this near, the drawn axis wins over what else is under the mouse
+# An area that is not picked yet wins over a line unless the click is right on the line: the
+# book's nozzle has profiles a few pixels wide along the axis, and after the first profile
+# every click meant for the next one went to the axis.
+EXACT_PIXELS = 1.5
 
 
 def _combo(pairs, current):
@@ -574,10 +579,27 @@ class AxisPicker:
         self.usable = usable
         self._paint_all()
 
+    def distance_at(self, position):
+        """How many pixels the mouse is from the nearest drawn line; None when none is
+        within reach."""
+        found = self._nearest(position)
+        return found[0] if found is not None else None
+
     def line_at(self, position):
         """The line (as in self.lines) within a few pixels of the mouse, or None. Right
         on a drawn axis, the axis wins; only near it, whatever else is under the mouse
         (a profile area, a sketch line, the part) wins: that is what the person aims at."""
+        best = self._nearest(position)
+        if best is None:
+            return None
+        if best[0] > ON_LINE_PIXELS and self.competing is not None and self.competing(position):
+            return None
+        if self._hidden_at(position, best[1]):
+            return None
+        return best[1]
+
+    def _nearest(self, position):
+        """(pixels, line) of the visible line nearest the mouse within PICK_PIXELS."""
         try:
             px, py = float(position[0]), float(position[1])
         except Exception:
@@ -599,13 +621,7 @@ class AxisPicker:
             distance = math.hypot(px - cx, py - cy)
             if distance <= PICK_PIXELS and (best is None or distance < best[0]):
                 best = (distance, line)
-        if best is None:
-            return None
-        if best[0] > ON_LINE_PIXELS and self.competing is not None and self.competing(position):
-            return None
-        if self._hidden_at(position, best[1]):
-            return None
-        return best[1]
+        return best
 
     def _hidden_at(self, position, line):
         """True if the part is in front of the drawn line under the mouse (the line is
@@ -685,7 +701,8 @@ class _RegionPicker(profile_pick.ProfilePicker):
     def __init__(self, view, sketches, on_pick, occluder=None, on_line=None, paused=None):
         self._on_line = on_line
         self._paused = paused  # () -> True while another box (Type To's object) waits
-        super().__init__(view, sketches, on_pick, occluder=occluder)
+        # through: a shown sketch's profile wins over the body in front of it (Fusion)
+        super().__init__(view, sketches, on_pick, occluder=occluder, through=True)
 
     def _is_paused(self):
         try:
@@ -970,7 +987,7 @@ def newest_single_region(body):
 
 
 # -- the dialog ------------------------------------------------------------------------------------
-class RevolvePanel(Panel):
+class RevolvePanel(extrude_finish.SaysWhy, Panel):
     title = "Revolve"
     icon = "revolve"
     last = None
@@ -1353,12 +1370,18 @@ class RevolvePanel(Panel):
         elif not profiles and self.auto_pick:
             single = newest_single_region(self.body)
             profiles = [single] if single else []
+            if not profiles:
+                # Fusion's rule, as in Extrude: the one profile that is in view, whichever
+                # body or component its sketch is in
+                found = profile_pick.only_visible_profiles(self.body)
+                profiles = found if len(found) == 1 else []
         try:
             Gui.Selection.clearSelection()
         except Exception:
             pass
         self.profiles = profiles
         self.axis = axis
+        self._centerline_axis()
         self._refresh_picks()
         self._next_field()
         self._collect()
@@ -1411,7 +1434,8 @@ class RevolvePanel(Panel):
                 self._axis_clicked,
                 blocked=lambda position: self._picking_to()
                 or self.active == "bodies"
-                or self._handle_at(position),
+                or self._handle_at(position)
+                or self._new_area_wins(position),
                 competing=self._something_else_at,
             )
         except Exception as exc:
@@ -1463,8 +1487,11 @@ class RevolvePanel(Panel):
         not count: inside an area, the area is what the person clicks.)"""
         if self._handle_at(position):
             return True
-        if self.axes is not None and self.axes.line_at(position) is not None:
+        new_area = self._new_area_at(position)
+        if not new_area and self.axes is not None and self.axes.line_at(position) is not None:
             return True
+        if new_area and not self._new_area_wins(position):
+            return True  # right on a drawn axis
         try:
             info = Gui.ActiveDocument.ActiveView.getObjectInfo((int(position[0]), int(position[1])))
         except Exception:
@@ -1475,8 +1502,60 @@ class RevolvePanel(Panel):
             return False
         obj = self.doc.getObject(str(info.get("Object", "")))
         if extrude.is_sketch(obj):
-            return True
+            # An area not picked yet: the sketch lines beside the mouse are its outline, and
+            # the area is meant unless the click is right on one.
+            return self._right_on(position, info) if new_area else True
         return self._edge_on_border(position, info)
+
+    def _right_on(self, position, info):
+        """True when the mouse is within EXACT_PIXELS of the sketch line FreeCAD found
+        under it (`info` of getObjectInfo)."""
+        try:
+            if not info or not str(info.get("Component", "")).startswith("Edge"):
+                return False
+            obj = self.doc.getObject(str(info.get("Object", "")))
+            if not extrude.is_sketch(obj):
+                return False
+            # (the point FreeCAD reports lies under the mouse, wherever the line is: the
+            # line itself is measured, on the screen)
+            edge = revolve.to_global(obj.Shape.getElement(str(info["Component"])), obj)
+            view = Gui.ActiveDocument.ActiveView
+            px, py = float(position[0]), float(position[1])
+            points = [view.getPointOnViewport(p) for p in edge.discretize(24)]
+            for (ax, ay), (bx, by) in zip(points, points[1:]):
+                dx, dy = bx - ax, by - ay
+                length2 = dx * dx + dy * dy
+                t = 0.0 if length2 < 1e-12 else ((px - ax) * dx + (py - ay) * dy) / length2
+                t = max(0.0, min(1.0, t))
+                if math.hypot(px - (ax + dx * t), py - (ay + dy * t)) <= EXACT_PIXELS:
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _new_area_at(self, position):
+        """True when the mouse is inside a profile area that is not picked yet."""
+        picker = self.picker
+        if picker is None:
+            return False
+        try:
+            hit = picker._region_hit(position)
+        except Exception:
+            return False
+        if hit is None:
+            return False
+        region = hit[0]
+        return (region[0].Name, region[1]) not in {extrude.key(p) for p in self.profiles}
+
+    def _new_area_wins(self, position):
+        """True when a click here adds a profile, although a drawn axis is within reach:
+        the mouse is inside an area that is not picked yet and not right on the axis (an
+        area that is picked already leaves the click to the axis along its edge: the
+        person has the profile and is picking the axis)."""
+        if not self._new_area_at(position):
+            return False
+        distance = self.axes.distance_at(position) if self.axes is not None else None
+        return distance is None or distance > EXACT_PIXELS
 
     def _edge_near(self, position, reach=4):
         """The pick of a part edge a few pixels from `position`, or None. The press sees the
@@ -1537,10 +1616,8 @@ class RevolvePanel(Panel):
         return any(handle.hit(position) for handle in self.handles.values())
 
     def _occluder(self):
-        base = self._base_feature()
-        if base is None or base.Shape.isNull():
-            return None
-        return revolve.to_global(base.Shape, base)
+        """The part before this revolve; None while its body is hidden."""
+        return profile_pick.shown_part(self._base_feature(), revolve.to_global)
 
     def _unwatch(self):
         if self.observer is not None:
@@ -1961,7 +2038,22 @@ class RevolvePanel(Panel):
         self.message.setText("")
         return ""
 
+    def _centerline_axis(self):
+        """(wave 7, sketch-a) Fusion: the profile sketch's one Centerline is the axis by
+        itself (sketch_centerline.py; the Sketch Palette's Linetype)."""
+        if self.axis is not None or not self.profiles or self.editing:
+            return
+        try:
+            from . import sketch_centerline
+
+            ref = sketch_centerline.revolve_axis(self.profiles)
+            if ref is not None:
+                self.axis = revolve.axis_from_pick(*ref)
+        except Exception as exc:
+            warn("revolve: centerline axis: %s" % exc)
+
     def _picks_changed(self):
+        self._centerline_axis()
         self._refresh_picks()
         if not self.profiles or self.axis is None:
             if self.target is not None and not self.editing:
@@ -2187,7 +2279,9 @@ class RevolvePanel(Panel):
         self.bodies_row.built(self.target)
         self.bodies_row.show_cut(self.options["operation"], bool(self.error))
         self._show_bodies_row()
-        if self.error and self.target is not None:
+        # (never over the person's own choice: that stays as picked, with the reason
+        # it cannot be built beside it; extrude_ui does the same)
+        if self.error and self.target is not None and not self.user_picked_operation:
             actual = self._feature_operation()
             if actual != self.options["operation"]:
                 self.options["operation"] = actual
@@ -2353,6 +2447,7 @@ class RevolvePanel(Panel):
             return
         super().finish()
 
+    @extrude_finish.speaking
     def accept(self):
         if self._closed:
             return True
@@ -2405,12 +2500,8 @@ class RevolvePanel(Panel):
         self._close()
         new_body = revolve.owner_body(feature)
         if new_body is not None and new_body is not self.body:
-            try:
-                from . import components
-
-                components.activate_body(new_body)  # and its (new) component
-            except Exception as exc:
-                warn("could not activate %s: %s" % (new_body.Label, exc))
+            # its (new) body and component; never another component's body a Cut changed
+            extrude_finish.activate_result(new_body, self.options.get("operation"))
         log("%s done" % self.title)
         return True
 

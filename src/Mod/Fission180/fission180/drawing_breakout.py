@@ -245,10 +245,15 @@ def add_breakout(view, points, depth=None):
     if len(points) < 3 or abs(core.polygon_area(points)) < 1e-6:
         raise drawing.DrawingError("Click at least three points around the area to break out.")
     if depth is not None and depth <= 0:
-        raise drawing.DrawingError("Type how deep the breakout goes (more than 0 mm).")
+        raise drawing.DrawingError("Type how deep the breakout goes (more than 0).")
     if has_breakout(view):
         raise drawing.DrawingError(
             "This view has a breakout already: double-click it to change or remove it."
+        )
+    if drawing.alive(drawing._get(view, "Fission180Exploded", None)):
+        raise drawing.DrawingError(
+            "An exploded view takes no breakout: make the breakout on a view of the "
+            "design as it is (Representation: Model)."
         )
     doc = view.Document
     sources = real_sources(view)
@@ -278,7 +283,7 @@ def set_depth(view, depth):
     if data is None or not drawing.alive(clip):
         return False
     if depth is not None and depth <= 0:
-        raise drawing.DrawingError("Type how deep the breakout goes (more than 0 mm).")
+        raise drawing.DrawingError("Type how deep the breakout goes (more than 0).")
     _write(view, clip, data["points"], depth)
     return True
 
