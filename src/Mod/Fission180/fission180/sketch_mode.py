@@ -133,6 +133,10 @@ PARAMS = [
     (SKETCHER_GENERAL, "Bool", "BSplineDegreeVisible", False),
     (SKETCHER_GENERAL, "Bool", "BSplineKnotMultiplicityVisible", False),
     (SKETCHER_GENERAL, "Bool", "BSplinePoleWeightVisible", False),
+    # FreeCAD draws the control polygon of every spline, a fit point spline's too (wave 7,
+    # the book parity report: "Fusion shows just the curve"). Off; Fission 180 draws the
+    # control frame itself for the splines whose control circles are shown (ControlFrames).
+    (SKETCHER_GENERAL, "Bool", "BSplineControlPolygonVisible", False),
 ]
 
 # Sketch palette options (Fusion's defaults); remembered between sessions.
@@ -174,6 +178,12 @@ SPLINE_COMMANDS = (
     "Sketcher_CompCreateBSpline",
 )
 SPLINE_STEP = "Add Sketch B-Spline"
+# the spline tools whose clicks are fit points (the curve goes through them)
+FIT_SPLINE_COMMANDS = (
+    "Fission180_SketchFitSpline",
+    "Sketcher_CreateBSplineByInterpolation",
+    "Sketcher_CreatePeriodicBSplineByInterpolation",
+)
 # Commands after which a new dimension gets the in-place value box.
 DIMENSION_COMMANDS = {
     "Sketcher_Dimension",
@@ -897,6 +907,7 @@ class SketchSession:
         self.last_press = None
         self._drawing_cursor = False  # what the view's cursor said last (drawing_cursor)
         self.undo_steps = 0  # steps of the undo list made in this sketch (_count_undo)
+        self._tidy_seen = len(sketch.Geometry)  # curves already looked at by _tidy_new
         try:
             self._undo_names = tuple(self.doc.UndoNames)
         except Exception:
@@ -919,6 +930,7 @@ class SketchSession:
         except Exception as exc:
             warn("right-angle marks: %s" % exc)
         self.polygon = PolygonPreview(self)
+        self.frames = ControlFrames(self)  # control point splines' control frames
         from .sketch_line import LineChain
 
         self.line = LineChain(self)
@@ -997,6 +1009,7 @@ class SketchSession:
             self.areas.refresh(self.shading.shaded)
             self.display.apply()
             self.fixed.apply()
+            self.frames.update()
         except Exception as exc:
             warn("sketch display: %s" % exc)
         if self.right_angles is not None:
@@ -1016,9 +1029,15 @@ class SketchSession:
                 self.infer.commit_signal(kind)
             except Exception as exc:
                 warn("sketch inference: %s" % exc)
+        if kind in ("undo", "redo", "abort"):
+            try:
+                self._tidy_seen = len(self.sketch.Geometry)
+            except Exception:
+                pass
         if kind == "commit":
             self._typed_since_commit = False  # the next shape: nothing typed yet
             QtCore.QTimer.singleShot(0, self._repair)
+            QtCore.QTimer.singleShot(0, self._tidy_new)
             self.line.committed()
             self.fillet_watch.committed()
         if kind == "commit" and grew:
@@ -1054,6 +1073,86 @@ class SketchSession:
             if self.undo_steps < 0:
                 doc_name, name = self.doc_name, self.name
                 QtCore.QTimer.singleShot(0, lambda: _back_into_sketch(doc_name, name))
+
+    def _tidy_new(self):
+        """A spline or an ellipse FreeCAD's tools just made is shown as Fusion shows it
+        (sketch_draw_helpers.py): a spline's helper constraints are not drawn, a fit point
+        spline's control circles neither; an ellipse loses its two focus points, and one
+        drawn level or upright is held so (Fusion infers it while drawing: the book's
+        ellipse is fully defined by its dimensions). In a step glued to the shape's own
+        (one Ctrl+Z). From a timer after FreeCAD's commit."""
+        if self.closed:
+            return
+        try:
+            sketch = self.sketch
+            geometry = sketch.Geometry
+            seen, self._tidy_seen = self._tidy_seen, len(geometry)
+            if len(geometry) <= seen:
+                return
+            from . import sketch_draw_helpers as helpers
+
+            new = range(seen, len(geometry))
+            splines = [i for i in new if geometry[i].TypeId == helpers.BSPLINE]
+            ellipses = [i for i in new if geometry[i].TypeId == helpers.ELLIPSE]
+            if not splines and not ellipses:
+                return
+            from . import recent
+
+            fit = recent.running_tool() in FIT_SPLINE_COMMANDS
+            doc = self.doc
+            infer = self.infer
+            if infer is not None:
+                infer._applying = True  # (our own step: no shape of the tool's)
+            doc.openTransaction(INFER_STEP)
+            try:
+                for spline in splines:
+                    helpers.tidy_spline(sketch, spline, fit)
+                for ellipse in reversed(ellipses):
+                    major, _minor = helpers.tidy_ellipse(sketch, ellipse)
+                    self._level_ellipse(major)
+                sketch.solve()
+            except Exception:
+                doc.abortTransaction()
+                raise
+            finally:
+                if infer is not None:
+                    infer._applying = False
+            doc.commitTransaction()
+            self._tidy_seen = len(sketch.Geometry)
+            if infer is not None:
+                infer.seen = sketch.GeometryCount
+                infer.invalidate()
+        except Exception as exc:
+            warn("sketch helpers: %s" % exc)
+
+    def _level_ellipse(self, major):
+        """The major axis of an ellipse just drawn within HVDegrees of level or upright
+        gets Horizontal / Vertical (dropped again if the sketch cannot take it)."""
+        import math
+
+        import Sketcher
+
+        from . import sketch_infer
+
+        if major is None:
+            return
+        sketch = self.sketch
+        line = sketch.Geometry[major]
+        d = line.EndPoint - line.StartPoint
+        if d.Length < 1e-9:
+            return
+        tol = math.radians(float(sketch_infer.setting("HVDegrees")))
+        angle = abs(math.atan2(d.y, d.x))
+        if min(angle, math.pi - angle) <= tol:
+            name = "Horizontal"
+        elif abs(angle - math.pi / 2.0) <= tol:
+            name = "Vertical"
+        else:
+            return
+        index = sketch.addConstraint(Sketcher.Constraint(name, major))
+        if sketch.solve() < 0 or sketch.RedundantConstraints or sketch.ConflictingConstraints:
+            sketch.delConstraint(index)
+            sketch.solve()
 
     def _close_editor_after_undo(self):
         """Undo and Redo put the sketch's curves and dimensions back as whole lists, so the
@@ -1971,6 +2070,7 @@ class SketchSession:
         self.close_editor(commit=True)
         remove_stray_editors(self.gl)
         parts = [self.polygon, self.areas, self.shading, self.display, self.fixed, self.check]
+        parts.append(self.frames)
         parts.append(self.select)
         parts.append(self.right_angles)
         if self.sketch3d is not None:
@@ -3487,6 +3587,95 @@ class PolygonPreview:
         self.stop()
 
 
+class ControlFrames:
+    """The control frame of a control point spline: a dashed line through its control
+    points, as Fusion draws it. FreeCAD's own control polygon is switched off (it draws
+    one for every spline, a fit point spline's too: PARAMS); this draws one only for the
+    splines whose control circles are shown (not on the hidden layer:
+    sketch_draw_helpers.py). Redrawn when the sketch changes (not while a point is being
+    dragged: it follows at the release)."""
+
+    NAME = "Fission180ControlFrames"
+    COLOR = "#f5a623"  # the dashed orange of construction curves
+
+    def __init__(self, session):
+        self.session = session
+        self.drawn = []  # the polylines drawn last (sketch points), for the tests
+
+    def polylines(self):
+        from . import sketch_draw_helpers as helpers
+
+        sketch = self.session.sketch
+        hidden = helpers.hidden(sketch)
+        out = []
+        for i, geo in enumerate(sketch.Geometry):
+            if geo.TypeId != helpers.BSPLINE:
+                continue
+            poles = helpers.aligned_to(sketch, i).get("BSplineControlPoint", [])
+            if not poles or all(p in hidden for p in poles):
+                continue
+            points = [(p.x, p.y) for p in geo.getPoles()]
+            if len(points) >= 2:
+                if geo.isPeriodic():
+                    points.append(points[0])
+                out.append(points)
+        return out
+
+    def update(self):
+        if self.session.closed or editing_sketch() is not self.session.sketch:
+            return
+        try:
+            from pivy import coin
+
+            lines = self.polylines()
+            root = self.session.view.getSceneGraph()
+            node, parent = find_node(root, self.NAME)
+            if not lines:
+                if node is not None and parent is not None:
+                    parent.removeChild(node)
+                self.drawn = []
+                return
+            if node is None:
+                _coords, edit_root = find_node(root, "EditCurvesCoordinate")
+                if edit_root is None:
+                    return
+                node = coin.SoSeparator()
+                node.setName(self.NAME)
+                style = coin.SoDrawStyle()
+                style.lineWidth = 1
+                style.linePattern = 0x0F0F
+                color = coin.SoBaseColor()
+                color.rgb.setValue(*_rgb(self.COLOR))
+                pick = coin.SoPickStyle()
+                pick.style = coin.SoPickStyle.UNPICKABLE
+                for child in (pick, style, color, coin.SoCoordinate3(), coin.SoLineSet()):
+                    node.addChild(child)
+                edit_root.addChild(node)
+            coords, lineset = node.getChild(3), node.getChild(4)
+            flat = [(x, y, 0.004) for line in lines for x, y in line]
+            coords.point.setValues(0, len(flat), flat)
+            coords.point.setNum(len(flat))
+            counts = [len(line) for line in lines]
+            lineset.numVertices.setValues(0, len(counts), counts)
+            lineset.numVertices.setNum(len(counts))
+            self.drawn = lines
+        except Exception as exc:
+            warn("spline control frame: %s" % exc)
+
+    def remove(self):
+        # (only while the sketch is still open: FreeCAD deletes its edit nodes, ours under
+        # them, when it closes; a deleted node must not be touched)
+        try:
+            if editing_sketch() is self.session.sketch:
+                root = self.session.view.getSceneGraph()
+                node, parent = find_node(root, self.NAME)
+                if node is not None and parent is not None:
+                    parent.removeChild(node)
+        except Exception:
+            pass
+        self.drawn = []
+
+
 def _patch_profilelib():
     """FreeCAD's polygon tool finishes through ProfileLib.RegularPolygon.makeRegularPolygon
     (Python). While Fission 180's circumscribed polygon runs, the clicked point is the
@@ -3510,7 +3699,17 @@ def _patch_profilelib():
     ):
         mode = _state["polygon"]
         if not mode or not mode.get("circumscribed"):
-            return original(sketch, sides, centerPoint, firstCornerPoint, construction)
+            geos, cons = len(sketch.Geometry), len(sketch.Constraints)
+            made = original(sketch, sides, centerPoint, firstCornerPoint, construction)
+            try:
+                from . import sketch_draw_helpers
+
+                ids = list(range(geos, len(sketch.Geometry)))
+                if len(ids) == int(sides) + 1:  # FreeCAD's: the sides, then their circle
+                    sketch_draw_helpers.tidy_polygon(sketch, ids, int(sides), False, cons)
+            except Exception as exc:
+                warn("polygon: %s" % exc)
+            return made
         from . import sketch_polygon
 
         sketch_polygon.add_polygon(sketch, sides, centerPoint, firstCornerPoint, True, construction)

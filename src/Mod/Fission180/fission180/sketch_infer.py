@@ -324,8 +324,12 @@ class Inference:
         if not view.ok:
             return None
         result, grid = self._infer(view, start)
-        if result is None:
-            # a free point: the grid alone places it, within a reach on the screen
+        if result is None and tool != "spline":
+            # a free point: the grid alone places it, within a reach on the screen. (Not
+            # a spline's points: FreeCAD's spline tool keeps each clicked point loose until
+            # the spline is made, and a point moved after its click left the spline's
+            # helpers with constraints on the wrong curves, "Sketcher constraint number 15
+            # is malformed": sketch_spline_luca A. They keep FreeCAD's own grid rule.)
             result = self._grid_only(view, grid)
         self.last, self.last_px, self.last_step = result, view.px, step
         if kind in PRESSES:
@@ -361,6 +365,8 @@ class Inference:
         width comes from it). None: FreeCAD's own snap does the same."""
         try:
             session = self.session
+            if self.kind == "spline":
+                return None  # (a spline's points keep FreeCAD's own grid rule: _plan)
             grid = _grid_size(session)
             if not grid:
                 return None
@@ -555,6 +561,11 @@ class Inference:
             for i in helpers
             if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
         }
+        from . import sketch_draw_helpers
+
+        # ...nor are a shape's helper curves that are not drawn (a polygon's corner circle
+        # and spoke, a fit point spline's control circles: sketch_draw_helpers.py)
+        helper_circles |= sketch_draw_helpers.hidden(sketch)
         for i, geo in enumerate(sketch.Geometry):
             if i in helper_circles:
                 continue
