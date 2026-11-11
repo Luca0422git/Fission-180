@@ -859,6 +859,16 @@ def resolve(doc, ident, what="step, body or component"):
     found = [o for o in doc.Objects if o.Label == ident]
     if len(found) == 1:
         return found[0]
+    # A body by its name with its component, "Body1 (Bracket)": bodies are numbered per
+    # component, so the design's first body and each component's first are all "Body1".
+    # The plain "Body1" is the body at the top of the design when there is one.
+    from .. import bodies
+
+    named, why = bodies.named(doc, ident)
+    if len(named) == 1:
+        return named[0]
+    if len(named) > 1 and all(bodies.is_body(o) for o in found):
+        raise UserError(why)
     try:
         from .. import timeline_ops
 

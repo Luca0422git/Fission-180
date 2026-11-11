@@ -82,8 +82,14 @@ class Builder:
 
     def learn(self):
         """Know every object of the design by its Name and Label (new ones keep their id)."""
+        from fission180 import bodies
+
         for obj in self.doc.Objects:
-            for key in (obj.Name, obj.Label):
+            keys = [obj.Name, obj.Label]
+            if obj.TypeId == "PartDesign::Body":
+                # "Body1 (Bracket)": every component's first body is called Body1
+                keys.append(bodies.clear_name(obj))
+            for key in keys:
                 if key not in self.objects:
                     self.objects[key] = obj
                     if obj.TypeId == "Sketcher::SketchObject":

@@ -127,10 +127,12 @@ class BodiesRow:
         else:
             names = core.participants(touched, self.excluded)
         self._highlight(names if active else [])
-        labels = []
-        for name in names:
-            obj = self.panel.doc.getObject(name)
-            labels.append(obj.Label if obj is not None else name)
+        # (two bodies of one name, each its component's first: "Body1 (Bracket)")
+        found = [self.panel.doc.getObject(name) for name in names]
+        if all(obj is not None for obj in found):
+            labels = bodies.list_names(found)
+        else:
+            labels = [obj.Label if obj is not None else n for n, obj in zip(names, found)]
         self.field.set_text(core.count_text(len(labels)))
         text = core.names_text(labels)
         if not labels:

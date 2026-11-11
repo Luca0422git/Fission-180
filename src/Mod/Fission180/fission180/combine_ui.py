@@ -92,7 +92,8 @@ class CombinePanel(BodyPanel):
     def _show_picks(self):
         target = self.options["target"]
         if target is not None:
-            text = target.Label
+            # (extrude-2) with its component when several bodies have this name
+            text = bodies.shown_name(target)
         elif self.options.get("frozen_target") and self.options["new_body"]:
             text = "Deleted body (kept as it was)"
         else:
