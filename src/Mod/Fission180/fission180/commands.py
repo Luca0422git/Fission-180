@@ -268,6 +268,11 @@ def make_way_for(name):
         cmd = None
     if cmd is None:
         return True
+    if name in ("Std_Undo", "Std_Redo") and not _active(cmd):
+        # nothing to undo / redo: never a reason to finish the sketch or close a panel
+        # (Ctrl+Y with nothing to redo left the open sketch; sf/book-sketch-b)
+        tell("Nothing to %s." % ("undo" if name == "Std_Undo" else "redo"))
+        return False
     if _in_sketch() and _is_sketch_command(name) and name not in KEEPS_SKETCH_TOOL:
         # a sketch tool replaces the running one, Fission 180's own (Line, Fillet...) too:
         # FreeCAD's Rectangle started from the ribbon left Fission 180's Line chain or Fillet

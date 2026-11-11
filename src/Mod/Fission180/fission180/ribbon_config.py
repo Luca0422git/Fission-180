@@ -1126,7 +1126,12 @@ SKETCH_CREATE = group(
                 ),  # owner: surface-3
             ],
         ),
-        item("Sketch Dimension", "Sketcher_Dimension", "sk_dimension", "D"),
+        item(
+            "Sketch Dimension",
+            ("Fission180_SketchDimension", "Sketcher_Dimension"),
+            "sk_dimension",
+            "D",
+        ),
     ],
 )
 SKETCH_MODIFY = group(

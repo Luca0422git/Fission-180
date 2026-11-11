@@ -505,6 +505,13 @@ class Inference:
         helper_circles = {
             i for i in helpers if i < len(sketch.Geometry) and sketch.Geometry[i].TypeId == "Part::GeomCircle"
         }
+        try:
+            from . import sketch_helpers
+
+            # (Fission 180's hidden helper lines, a circular pattern's spokes: never snapped to)
+            helper_circles |= sketch_helpers.hidden(sketch)
+        except Exception:
+            pass
         for i, geo in enumerate(sketch.Geometry):
             if i in helper_circles:
                 continue

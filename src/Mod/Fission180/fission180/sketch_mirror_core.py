@@ -4,6 +4,8 @@ mirrored about a line, and which Symmetric / Equal constraints tie each mirrored
 its original (the same pairs FreeCAD's SketchObject::addSymmetric makes when asked for
 symmetry constraints, which its Python binding cannot ask for)."""
 
+import math
+
 LINE = "Part::GeomLineSegment"
 CIRCLE = "Part::GeomCircle"
 ELLIPSE = "Part::GeomEllipse"
@@ -67,6 +69,26 @@ def ties(kind, orig, new, swapped, aligned=False):
     return []
 
 
+ON_LINE_MM = 0.1  # an end this near the mirror line was meant to be on it...
+ON_LINE_SHARE = 0.05  # ...unless the curve itself is tiny: then this share of its length
+
+
+def on_line_tolerance(length):
+    """How near the mirror line an end point of a curve of that length must be to count as
+    lying ON it (the book parity report: mirrored end points on the mirror line were left
+    two thousandths of an inch from their originals, and the profile did not close)."""
+    return max(1e-7, min(ON_LINE_MM, ON_LINE_SHARE * float(length)))
+
+
+def line_distance(p, a, b):
+    """Distance of the point p from the (endless) line through a and b."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    n = math.hypot(dx, dy)
+    if n < 1e-12:
+        return math.hypot(p[0] - a[0], p[1] - a[1])
+    return abs(dx * (p[1] - a[1]) - dy * (p[0] - a[0])) / n
+
+
 KEPT = ("InternalAlignment", "Coincident")
 
 
@@ -107,7 +129,12 @@ def boxed(polylines, start, end):
     """The keys of the polylines {key: [screen points]} the box from `start` to `end` (screen
     pixels) takes: dragged left to right (window) the ones fully inside, right to left
     (crossing) the ones it touches. A point off the view (None) is outside."""
-    box = (min(start[0], end[0]), min(start[1], end[1]), max(start[0], end[0]), max(start[1], end[1]))
+    box = (
+        min(start[0], end[0]),
+        min(start[1], end[1]),
+        max(start[0], end[0]),
+        max(start[1], end[1]),
+    )
     window = end[0] >= start[0]
     x0, y0, x1, y1 = box
     edges = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]

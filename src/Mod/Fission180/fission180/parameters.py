@@ -824,6 +824,8 @@ def model_parameters(doc):
             for i, constraint in enumerate(obj.Constraints):
                 if constraint.Type not in DIMENSION_TYPES or not constraint.Driving:
                     continue
+                if constraint.InVirtualSpace:
+                    continue  # the unseen ties of a sketch pattern or offset: not parameters
                 path = ".Constraints[%d]" % i
                 label = constraint.Name or "d%d" % (i + 1)
                 quantity = obj.getDatum(i)

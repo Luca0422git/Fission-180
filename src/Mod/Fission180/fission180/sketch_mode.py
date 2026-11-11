@@ -115,6 +115,10 @@ PARAMS = [
     # "non-intrusive" setting must stay on: off, FreeCAD shows its user warnings ("Wrong
     # selection"...) as blocking message boxes instead.
     (NOTIFICATIONS, "Bool", "NonIntrusiveNotificationsEnabled", True),
+    # FreeCAD's modal "Sketcher Constraint Substitution" box (Tangent on curves whose ends
+    # are joined) never shows: Fusion says nothing there (sf/book-sketch-b; Fission 180's
+    # own Tangent does the same swap without a word, sketch_constrain_tools.py)
+    (SKETCHER_GENERAL, "Bool", "NotifyConstraintSubstitutions", False),
     (NOTIFICATIONS, "Int", "MaxOpenNotifications", 0),
     # Fusion: every closed area of a sketch is a profile you can click, also after Finish
     # Sketch and before any command (then E or Q uses it). FreeCAD can do that when a
@@ -666,6 +670,12 @@ def _start(sketch):
     try:
         _state["session"] = SketchSession(sketch)
         log("sketch %s: Fusion sketch mode on" % sketch.Label)
+        try:
+            from . import sketch_helpers
+
+            sketch_helpers.opened(_state["session"])  # hidden helper lines stay unseen
+        except Exception as exc:
+            warn("sketch helper lines: %s" % exc)
     except Exception as exc:
         warn("sketch mode: %s" % exc)
 
@@ -783,6 +793,15 @@ def label_point(sketch, index):
         return center + direction * (radius + c.LabelDistance)
     if c.Type not in ("Distance", "DistanceX", "DistanceY"):
         return None
+    try:
+        # every form of a length dimension: from the origin, to a projected point, a point
+        # to a line (sf/book-sketch-b; the code below knew two points of sketch curves)
+        from . import sketch_dimension_tool
+
+        spot = sketch_dimension_tool.label_point(sketch, index)
+        return App.Vector(spot[0], spot[1], 0) if spot is not None else None
+    except Exception:
+        pass
 
     def point(geo, pos):
         g = sketch.Geometry[geo]
@@ -1808,6 +1827,17 @@ class SketchSession:
                         return True
                     QtCore.QTimer.singleShot(0, lambda: self.edit_dimension(index, pos))
                     return True
+        try:
+            # the text of a vertical or slanted dimension is turned along it: FreeCAD only
+            # finds its middle (sf/book-sketch-b, the book report: "hard to hit")
+            from . import sketch_dimension_tool
+
+            found = sketch_dimension_tool.dimension_at(self, pos)
+            if found is not None and self.sketch.Constraints[found].Driving:
+                QtCore.QTimer.singleShot(0, lambda: self.edit_dimension(found, pos))
+                return True
+        except Exception as exc:
+            warn("dimension box: %s" % exc)
         return False
 
     def chain_clicked(self, pos):
@@ -2460,7 +2490,10 @@ class DimensionEditor(theme.OwnBackground, QtWidgets.QFrame):
         # Fusion refuses sizes of 0 or less: a dimension of 0 collapses the curve (FreeCAD's
         # solver then fails and the sketch breaks).
         if value <= 1e-7:
-            raise ValueError("The value must be more than 0.")
+            raise ValueError(
+                "The value must be more than 0. To make two things meet use Coincident; to "
+                "line them up, Horizontal/Vertical or Collinear."
+            )
         if angle and value >= 360.0:
             raise ValueError("The angle must be less than 360 deg.")
         try:

@@ -167,9 +167,15 @@ class SketchOffset(draw.DrawTool):
 
     def _curve_at(self, raw):
         """The sketch curve under the pointer (not the axes), or None."""
-        hit = self.geometry().curve_at(raw, draw.pick_pixels() * self._px())
-        if hit is None or hit[0] in (-1, -2):
-            return None
+        geo = self.geometry()
+        tol = draw.pick_pixels() * self._px()
+        # the sketch's own curves first: a line clicked where it crosses an axis is the
+        # line (the axis, just as near, used to win and the click was refused)
+        hit = geo.curve_at(raw, tol, own=True)
+        if hit is None:
+            hit = geo.curve_at(raw, tol)  # a projected curve
+            if hit is None or hit[0] in (-1, -2):
+                return None
         return hit[0]
 
     def _chain_of(self, geo):
@@ -640,6 +646,12 @@ class SketchOffset(draw.DrawTool):
         return []
 
     def after_make(self, kept):
+        try:
+            from . import sketch_helpers
+
+            sketch_helpers.made(self.session)  # its square lines are hidden helper lines
+        except Exception as exc:
+            warn("Offset: %s" % exc)
         _last["distance"] = self.made.get("distance")
         _last["curves"] = list(self.curves)
         _last["note"] = self.note
