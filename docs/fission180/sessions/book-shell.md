@@ -103,6 +103,22 @@ checks and the items the params builder handed over.
   its icon), `exchange2_export` (Save As Mesh's own dialog), `misc_preferences` (orientation on
   General), and the unit tests of the ribbon order, the General page's groups and F6.
 
+- **The export report's line about names** (the full run on develop failed `export_report`
+  after extrude's merge: a design's first body is "Body1" now, and the scenario expected
+  "the names of 1 body"). Checked with real STEP round trips (a throw-away probe: export,
+  open the file, compare): one body alone at the top keeps its name (Body1, Bracket); two
+  bodies Body1 / Body2 come back as they were (0 lost, predicted 0); Body1 / Bracket: Bracket
+  comes back as Body2 (1, predicted 1); "Bottom Screw", "Nut & Bolt", "Gehäuse ü" at the top
+  come back as Body1, Body2, Body3 (3, predicted 3: a body's own name never survives beside
+  another body, with or without spaces, "&" or umlauts); in components "Arm & Lever ü"
+  (Body1, Pin 2), "Single" (Kopf), "Plain" (Body1): the component names all survive, Pin 2
+  and Kopf become Body2 and Body1 (2, predicted 2); one component exported alone: 1,
+  predicted 1. So `export_report.step_names_lost` was already true for the new names: with
+  the default names there is nothing to say, and it says nothing. The scenario was what
+  was out of date: its first body is renamed Bracket now, the message says "the names of 1
+  body", and the STEP file is opened again to see Body1 and Body2. Unit test `StepNamesTest`.
+- **The smoke test** checked the old order of the ribbon's groups: it follows.
+
 ## The harness (`Fission180Tests/gui/harness.py`)
 
 After every step of every scenario, beside the Report view's errors:

@@ -12,8 +12,10 @@ A  UTILITIES > Export, STL (Binary), name "parts", Export: the message "Exported
    colours of 1 body; the same line is in the Report view.
 B  A click on its x: the message goes away.
 C  Export, STEP, Export: the message lists the timeline, the sketches, the parameter and
-   the name of 1 body (Body comes back as Body1), but no colours: with the window open the
-   STEP file keeps them (it holds box1's orange, read in the file itself).
+   the name of 1 body (the first body was renamed Bracket: a STEP file read again numbers
+   the bodies Body1, Body2, so Bracket comes back as Body1; the file is opened to see it),
+   but no colours: with the window open the STEP file keeps them (it holds box1's orange,
+   read in the file itself).
 D  Export, 3MF, Selected bodies with only box2 ticked: names and unit are kept; the message
    lists box2's 1 step (its sketch was drawn in box1's body, active then) and no colour (box2
    has no look).
@@ -23,6 +25,7 @@ import os
 import shutil
 
 import FreeCAD as App
+import FreeCADGui as Gui
 from PySide import QtWidgets
 
 from Fission180Tests.gui import blend_steps as b
@@ -79,6 +82,10 @@ def setup():
     doc.saveAs(os.path.join(OUT, "parts_design.FCStd"))
     i.record_exports()
     first = bodies.list_bodies(doc)[0]
+    # (wave 7) a name the person gave: since the first body of a design is called Body1
+    # (extrude), a STEP round trip changed no name of this design any more, and the
+    # message's line about names had nothing to say
+    first.Label = "Bracket"
     appearance.set_body(first, appearance.custom(ORANGE))
     appearance.apply(first)
     parameters.add_user(doc, "wall", "mm", "2")
@@ -182,7 +189,26 @@ def c_check():
     h.check("C the message shows", notice() is not None, text)
     for part in ("Exported parts.step", "the timeline (4 steps)", "2 sketches", "1 parameter"):
         h.check("C message says %r" % part, part in text, text)
-    h.check("C the name of 1 body (Body comes back as Body1)", "the names of 1 body" in text, text)
+    h.check(
+        "C the name of 1 body (Bracket comes back as Body1)", "the names of 1 body" in text, text
+    )
+    if os.path.isfile(path):
+        # what the message says is what the file does: read again, the bodies are Body1, Body2
+        from fission180 import bodies as bodies_module
+        from fission180 import exchange_ui
+
+        design = App.ActiveDocument.Name
+        opened = exchange_ui.open_file(path)
+        labels = sorted(x.Label for x in bodies_module.list_bodies(opened))
+        h.check(
+            "C read again, the file's bodies are Body1 and Body2",
+            labels == ["Body1", "Body2"],
+            labels,
+        )
+        Gui.getDocument(opened.Name).Modified = False
+        App.closeDocument(opened.Name)
+        App.setActiveDocument(design)
+        Gui.setActiveDocument(design)
     h.check("C no colours lost: STEP keeps them with the window open", "colours" not in text, text)
     h.check("C no mesh merge for STEP", "one mesh" not in text, text)
     if os.path.isfile(path):

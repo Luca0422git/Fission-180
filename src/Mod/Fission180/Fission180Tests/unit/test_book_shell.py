@@ -198,6 +198,34 @@ class DesignUnitTest(unittest.TestCase):
         self.assertEqual(insert.design_unit(None), "Millimeter")
 
 
+class StepNamesTest(unittest.TestCase):
+    """What the export report's line about names rests on (exchange_core.body_labels),
+    checked against real STEP round trips in wave 7: a file read again numbers the bodies
+    of each component Body1, Body2 ...; one body alone at the top keeps its name. So "Body1"
+    and "Body2" come back as they were, and any name a person gave ("Bracket", "Nut & Bolt",
+    "Gehäuse") is lost unless the body is alone at the top."""
+
+    def test_names_that_come_back(self):
+        from fission180 import exchange_core as xcore
+
+        self.assertEqual(xcore.body_labels(2, True, None), ["Body1", "Body2"])
+        self.assertEqual(xcore.body_labels(1, True, "Bracket"), ["Bracket"])
+        self.assertEqual(xcore.body_labels(1, False, "Bracket"), ["Body1"])
+        self.assertEqual(xcore.body_labels(3, False, "Arm"), ["Body1", "Body2", "Body3"])
+
+    def test_how_many_are_lost(self):
+        from fission180 import exchange_core as xcore
+
+        def lost(labels, at_root=True, part=None):
+            back = xcore.body_labels(len(labels), at_root, part)
+            return sum(1 for a, b in zip(labels, back) if a != b)
+
+        self.assertEqual(lost(["Body1", "Body2"]), 0)  # (the new default names)
+        self.assertEqual(lost(["Bracket", "Body2"]), 1)
+        self.assertEqual(lost(["Bottom Screw", "Nut & Bolt", "Gehäuse ü"]), 3)
+        self.assertEqual(lost(["Body1", "Pin 2"], False), 1)
+
+
 class DataPanelFoldersTest(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="fission180-dp-")
