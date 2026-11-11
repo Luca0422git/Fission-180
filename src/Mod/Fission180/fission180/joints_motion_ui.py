@@ -52,6 +52,135 @@ def _motion_label(motion):
     return "Angle" if motion == "angle" else "Distance"
 
 
+# -- Motion Study graph ---------------------------------------------------------------------------
+GRAPH_COLOURS = ("#4fa8f0", "#f0a04f", "#6fd08c", "#e06f9a", "#b08cf0", "#d8d060")
+
+
+class StudyGraph(QtWidgets.QWidget):
+    """Fusion's Motion Study graph: each joint's value drawn as a line over the steps 0 to
+    100, a dot at each key point, the playhead as a vertical line. A click on a joint's
+    line picks that joint and that step (the dialog then takes the value typed)."""
+
+    MARGIN = 10
+
+    def __init__(self, on_click):
+        super().__init__()
+        self.setObjectName("Fission180Study_graph")
+        self.setMinimumHeight(120)
+        self.setToolTip(
+            "Click a joint's line at a step, type its value there and press Enter (a key "
+            "point); the line shows the joint's value over the steps"
+        )
+        self.on_click = on_click
+        self.lanes = []  # [(joint name, label, [[step, value], ...])]
+        self.playhead = 0.0
+
+    def set_data(self, lanes, playhead=None):
+        self.lanes = [(n, label, [list(k) for k in keys]) for n, label, keys in lanes]
+        if playhead is not None:
+            self.playhead = float(playhead)
+        self.update()
+
+    def set_playhead(self, step):
+        self.playhead = float(step)
+        self.update()
+
+    def point_of(self, name, step):
+        """The widget pixel of joint `name`'s line at `step` (tests click there)."""
+        for lane, _label, keys in self.lanes:
+            if lane == name:
+                value = motion_core.study_value(keys, step)
+                low, high = motion_core.graph_range(keys)
+                return QtCore.QPoint(
+                    int(round(motion_core.graph_x(step, self.width(), self.MARGIN))),
+                    int(round(motion_core.graph_y(value, low, high, self.height(), self.MARGIN))),
+                )
+        return None
+
+    def mousePressEvent(self, event):
+        try:
+            if event.button() != QtCore.Qt.LeftButton or not self.lanes:
+                return
+            pos = event.pos()
+            step = motion_core.graph_step(pos.x(), self.width(), self.MARGIN)
+            index = motion_core.graph_lane(
+                [keys for _n, _l, keys in self.lanes], step, pos.y(), self.height(), self.MARGIN
+            )
+            if index is not None:
+                self.on_click(self.lanes[index][0], step)
+        except Exception as exc:
+            warn("Motion Study graph: %s" % exc)
+
+    def paintEvent(self, _event):
+        from .compat import QtGui
+
+        try:
+            painter = QtGui.QPainter(self)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            w, h, m = self.width(), self.height(), self.MARGIN
+            painter.fillRect(self.rect(), QtGui.QColor("#20262e"))
+            grid = QtGui.QPen(QtGui.QColor("#3a444f"))
+            painter.setPen(grid)
+            for step in (0, 25, 50, 75, 100):
+                x = int(round(motion_core.graph_x(step, w, m)))
+                painter.drawLine(x, m, x, h - m)
+            painter.drawLine(m, h - m, w - m, h - m)
+            for index, (_name, label, keys) in enumerate(self.lanes):
+                colour = QtGui.QColor(GRAPH_COLOURS[index % len(GRAPH_COLOURS)])
+                line = motion_core.graph_line(keys, w, h, m)
+                pen = QtGui.QPen(colour)
+                pen.setWidthF(2.0)
+                painter.setPen(pen)
+                for a, b in zip(line, line[1:]):
+                    painter.drawLine(QtCore.QPointF(*a), QtCore.QPointF(*b))
+                low, high = motion_core.graph_range(keys)
+                painter.setBrush(colour)
+                for step, value in keys:
+                    centre = QtCore.QPointF(
+                        motion_core.graph_x(step, w, m), motion_core.graph_y(value, low, high, h, m)
+                    )
+                    painter.drawEllipse(centre, 3.5, 3.5)
+                painter.drawText(m + 4, m + 12 + 13 * index, label)
+            head = QtGui.QPen(QtGui.QColor("#e8e8e8"))
+            head.setStyle(QtCore.Qt.DashLine)
+            painter.setPen(head)
+            x = int(round(motion_core.graph_x(self.playhead, w, m)))
+            painter.drawLine(x, m, x, h - m)
+            painter.end()
+        except Exception as exc:
+            warn("Motion Study graph: %s" % exc)
+
+
+class _EnterSetsPoint(QtCore.QObject):
+    """Enter in the Step or the value box of Motion Study sets the key point (Fusion: type
+    the value, press Enter, the model updates); it does not press the dialog's OK, which
+    threw a half-made study's typing away."""
+
+    def __init__(self, panel):
+        super().__init__()
+        self.panel = panel
+
+    def eventFilter(self, obj, event):
+        try:
+            if event.type() == QtCore.QEvent.KeyPress and event.key() in (
+                QtCore.Qt.Key_Return,
+                QtCore.Qt.Key_Enter,
+            ):
+                panel = self.panel
+                if panel is not None and not panel._closed:
+                    panel._enter_pressed(obj)
+                return True
+            if event.type() == QtCore.QEvent.ShortcutOverride and event.key() in (
+                QtCore.Qt.Key_Return,
+                QtCore.Qt.Key_Enter,
+            ):
+                event.accept()
+                return True
+        except Exception:
+            pass
+        return False
+
+
 # -- Motion Link -----------------------------------------------------------------------------------
 class MotionLinkPanel(_JointsPanel):
     """Fusion's Motion Link dialog."""
@@ -596,8 +725,13 @@ class MotionStudyPanel(_JointsPanel):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.table.setMinimumHeight(120)
+        self.table.setMinimumHeight(90)
+        self.graph = StudyGraph(self._graph_clicked)
+        self.layout.addRow(self.graph)
         self.layout.addRow(self.table)
+        self.enter_filter = _EnterSetsPoint(self)
+        self._watch_enter(self.step)
+        self._watch_enter(self.value_field.widget)
         self.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.slider.setObjectName("Fission180Study_slider")
         self.slider.setRange(0, motion_core.STUDY_STEPS)
@@ -622,6 +756,50 @@ class MotionStudyPanel(_JointsPanel):
         self.play.setCheckable(True)
         self.play.toggled.connect(lambda on: self._guarded(lambda: self._play(on)))
         self.layout.addRow(QtWidgets.QLabel(""), self.play)
+
+    # -- Enter and the graph -----------------------------------------------------------------
+    def _watch_enter(self, widget):
+        """Enter in this box (or the line it types into) sets the point."""
+        try:
+            widget.installEventFilter(self.enter_filter)
+            for child in widget.findChildren(QtWidgets.QLineEdit):
+                child.installEventFilter(self.enter_filter)
+        except Exception as exc:
+            warn("Motion Study: %s" % exc)
+
+    def _enter_pressed(self, widget):
+        """Enter in the Step or the value box: what was typed is taken, then the point is
+        set (the value box reads its text when it loses the keyboard)."""
+        try:
+            for box in (self.step, self.value_field.widget):
+                if hasattr(box, "interpretText"):
+                    box.interpretText()
+        except Exception:
+            pass
+        self._guarded(self._set_point)
+
+    def _graph_clicked(self, name, step):
+        """A click on a joint's line: that joint and step are the current ones, the value
+        box shows the line's value there and takes the typing (Enter sets the point)."""
+        if self._closed or self.doc.getObject(name) is None:
+            return
+        self._play(False)
+        hole_common.set_combo(self.joint_box, name)
+        self._joint_changed()
+        self.step.setValue(int(step))
+        now = motion_core.study_value(self.data["keys"].get(name, []), step)
+        if now is not None:
+            self.value_field.set_value(round(now, 6))
+        self.slider.setValue(int(step))
+        try:
+            self.value_field.widget.setFocus()
+            self.value_field.widget.selectAll()
+        except Exception:
+            pass
+
+    def _show_graph(self):
+        lanes = [(jt.Name, jt.Label, self.data["keys"].get(jt.Name, [])) for jt in self._joints()]
+        self.graph.set_data(lanes, self.slider.value())
 
     # -- the form ---------------------------------------------------------------------------
     def _joints(self):
@@ -654,6 +832,7 @@ class MotionStudyPanel(_JointsPanel):
         finally:
             self._quiet = False
         self._joint_changed()
+        self._show_graph()
 
     def _joint_changed(self):
         name = self.joint_box.currentData()
@@ -668,6 +847,7 @@ class MotionStudyPanel(_JointsPanel):
             self.layout.setWidget(position[0], QtWidgets.QFormLayout.FieldRole, field.widget)
             self.value_field.widget.setParent(None)
             self.value_field = field
+            self._watch_enter(field.widget)
         self.value_field.widget.setObjectName("Fission180Study_value")
         self.value_caption.setText(_motion_label(motion))
 
@@ -727,7 +907,14 @@ class MotionStudyPanel(_JointsPanel):
         self.data["keys"][name] = [list(k) for k in keys]
         self._fill()
         hole_common.set_combo(self.joint_box, name)
+        self.took()
         self.changed()
+        # the model shows the point just set (Fusion: "press Enter, the model updates")
+        if not self.playing:
+            if self.slider.value() != self.step.value():
+                self.slider.setValue(self.step.value())
+            else:
+                self._pose(float(self.step.value()))
 
     def _delete_point(self):
         rows = sorted({i.row() for i in self.table.selectedIndexes()})
@@ -749,6 +936,7 @@ class MotionStudyPanel(_JointsPanel):
         joints.study_pose(self.doc, self.data, step)
 
     def _scrub(self, value):
+        self.graph.set_playhead(value)
         if self._quiet or self.playing:
             return
         self._pose(float(value))

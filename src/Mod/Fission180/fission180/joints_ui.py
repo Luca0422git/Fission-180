@@ -1478,6 +1478,7 @@ class JointPanel(_JointsPanel):
         self._pending_animation = False
         self._realign = False  # a Position / type / axis change: the component goes to it
         self._rejoin = False
+        self._repicked = set()  # the sides clicked again while editing
         super().__init__(doc, "Joint" if feature is None else "Edit Joint", feature is not None)
         JointPanel.last = self
         self.target = feature
@@ -1486,6 +1487,7 @@ class JointPanel(_JointsPanel):
             self.activate(self.slots["comp1"].first_box())
             if show_motion:
                 self.tabs.setCurrentIndex(1)
+            self._ask_lost_side(feature)
         else:
             self.activate("comp1")
             Gui.Selection.clearSelection()  # Fusion's Joint starts with its own picks
@@ -1494,6 +1496,19 @@ class JointPanel(_JointsPanel):
         self.dirty = True
         self._timer.stop()
         self._recompute()
+
+    def _ask_lost_side(self, joint):
+        """The joint lost the face or edge one side was made on: say which, and let that
+        side's box wait for the click that picks it again."""
+        try:
+            lost = [n for n, i in (("comp1", 0), ("comp2", 1)) if joints.lost_side(joint, i)]
+            if not lost:
+                return
+            self.tabs.setCurrentIndex(0)
+            self.activate(self.slots[lost[0]].first_box())
+            self.refuse(joints.lost_text(joint))
+        except Exception as exc:
+            warn("Joint: %s" % exc)
 
     # -- form --------------------------------------------------------------------------------------
     def build_form(self):
@@ -1695,6 +1710,7 @@ class JointPanel(_JointsPanel):
             self.clear_markers()
         if self.joint is not None:
             self._rejoin = True
+            self._repicked.add(name)
         self.changed()
 
     def cleared(self, name):
@@ -1828,16 +1844,17 @@ class JointPanel(_JointsPanel):
         else:
             if self._rejoin:
                 self._rejoin = False
-                joints._set_json(
-                    self.joint,
-                    joints.PROPS["snap1"],
-                    joints.snap_record(pick1, self.snaps["comp1"]),
-                )
-                joints._set_json(
-                    self.joint,
-                    joints.PROPS["snap2"],
-                    joints.snap_record(pick2, self.snaps["comp2"]),
-                )
+                # only the side(s) clicked again get a new record: the other keeps what it
+                # remembers of its face (where it is, its heading, its hole)
+                again = self._repicked or {"comp1", "comp2"}
+                for name, key, pick in (("comp1", "snap1", pick1), ("comp2", "snap2", pick2)):
+                    if name in again:
+                        joints._set_json(
+                            self.joint,
+                            joints.PROPS[key],
+                            joints.snap_record(pick, self.snaps[name]),
+                        )
+                self._repicked = set()
                 joints.set_references(self.joint, pick1, pick2)
                 made = True
             joints.set_type(self.joint, kind, pick1, pick2)
@@ -1934,6 +1951,13 @@ class AsBuiltPanel(_JointsPanel):
                 if joints.fusion_type(feature) != "rigid"
                 else "components"
             )
+            if joints.lost_reference(feature):
+                self.refuse(
+                    joints.lost_text(feature).replace(
+                        "Right-click it > Edit Joint and pick that side again.",
+                        "Click its position again (a snap point on one of the two components).",
+                    )
+                )
         else:
             self.activate("components")
             self.start_from_selection()

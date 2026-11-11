@@ -1055,6 +1055,16 @@ def likeness(shape, element, sig, size=None):
         return None
 
 
+def _same_kind(shape, element, sig):
+    """True when `element` is the same kind of thing `sig` describes (a flat face, a round
+    edge...): a name FreeCAD kept through an edit that now names another kind of element
+    names another element."""
+    other = element_signature(shape, element)
+    if other is None or not sig or other.get("type") != sig.get("type"):
+        return False
+    return other.get("surface") == sig.get("surface") and other.get("curve") == sig.get("curve")
+
+
 def find_alike(shape, sig):
     """The element of `shape` most like what `sig` describes (likeness), or None."""
     if not sig:
@@ -1178,7 +1188,11 @@ def repair_side(joint, index):
         name = element_name(sub).lstrip("?")
         if name and name not in wanted:
             wanted.append(name)
-    rename, changed = {}, False
+    rename, changed, gone = {}, False, False
+    try:  # FreeCAD follows element names through a body's own history when it has them
+        mapped = int(getattr(shape, "ElementMapSize", 0) or 0) > 0
+    except Exception:
+        mapped = False
     for name in wanted:
         sig = sigs.get(name)
         lost = any(element_name(s) == "?" + name for s in subs)
@@ -1195,9 +1209,12 @@ def repair_side(joint, index):
             continue
         found = find_element(shape, sig)
         if found is None:
-            if not lost and likeness(shape, name, sig) is not None:
-                # the same element, changed by an edit (FreeCAD kept its name): where it
-                # is now is what the next edit is compared with
+            if not lost and (
+                likeness(shape, name, sig) is not None or (mapped and _same_kind(shape, name, sig))
+            ):
+                # the same element, changed by an edit: FreeCAD kept its name (it follows
+                # the names through the body's history), or it still looks like itself.
+                # Where it is now is what the next edit is compared with
                 fresh = element_signature(shape, name)
                 if fresh is not None and fresh != sig:
                     sigs[name] = fresh
@@ -1205,10 +1222,19 @@ def repair_side(joint, index):
                 continue
             found = find_alike(shape, sig)
         if found is None:
-            continue  # gone for good: the joint says so (note_lost) and stays where it is
+            # gone for good, or its name now belongs to something else: the joint says so
+            # (note_lost) and stays where it is, rather than jump onto another face
+            gone = True
+            continue
         if found == name and not lost:
             continue
         rename[name] = found
+    if bool(record.get("lost")) != gone:
+        if gone:
+            record["lost"] = True
+        else:
+            record.pop("lost", None)
+        changed = True
     if rename:
         for old, new in rename.items():
             sigs[new] = element_signature(shape, new) or sigs.get(old)
@@ -1271,9 +1297,9 @@ WARNING_PROP = "Fission180Warning"  # timeline_ops.WARNING: the step's yellow no
 def lost_text(joint):
     """What a joint with a lost reference says (the timeline's note, the dialogs)."""
     sides = []
-    for ref in (joint.Reference1, joint.Reference2):
+    for index, ref in enumerate((joint.Reference1, joint.Reference2)):
         try:
-            if ref and any("?" in (s or "") for s in ref[1]):
+            if ref and lost_side(joint, index):
                 sides.append(ref[0].Label)
         except Exception:
             continue
@@ -1664,17 +1690,27 @@ def rolled_back(obj):
         return False
 
 
-def lost_reference(joint):
-    """True when a reference of the joint names an element FreeCAD no longer finds on the
-    part ("?Face6"): the joint cannot follow its geometry until it is found again
-    (repair_references) or picked again."""
+LOST_MARK = '"lost": true'  # in a side's snap record: its element is gone (repair_side)
+
+
+def lost_side(joint, index):
+    """True when side `index` of the joint lost what it was made on: FreeCAD no longer
+    finds the element its reference names ("?Face6"), or the name now belongs to something
+    else and the element was not found again (the record's "lost")."""
     try:
-        for ref in (joint.Reference1, joint.Reference2):
-            if ref and len(ref) > 1 and any("?" in (sub or "") for sub in ref[1]):
-                return True
+        ref = joint.Reference1 if index == 0 else joint.Reference2
+        if ref and len(ref) > 1 and any("?" in (sub or "") for sub in ref[1]):
+            return True
+        text = getattr(joint, PROPS["snap1" if index == 0 else "snap2"], "") or ""
+        return LOST_MARK in text
     except Exception:
         return False
-    return False
+
+
+def lost_reference(joint):
+    """True when a side of the joint lost the face or edge it was made on: the joint cannot
+    follow its geometry until it is found again (repair_references) or picked again."""
+    return lost_side(joint, 0) or lost_side(joint, 1)
 
 
 def lost_joints(doc):
@@ -1772,7 +1808,7 @@ class JointProxy(_JointBase):
         try:
             if ref is None:
                 return App.Placement()
-            if not _utils().isRefValid(ref, 1) or rolled_back(joint):
+            if not _utils().isRefValid(ref, 1) or rolled_back(joint) or lost_side(joint, index):
                 # its element is lost, or the marker stands before it (its body may not be
                 # there yet): the joint origin stays where it last was on its component
                 return App.Placement(joint.Placement1 if index == 0 else joint.Placement2)
@@ -2890,14 +2926,10 @@ def tie_own_motions(joint, angle=None, slide=None, lead=None):
         return angle, slide
     first, second, ratio, offset = tied
     values = {"angle": angle, "slide": slide}
-    if lead not in values or values[lead] is None:
-        lead = first if values[first] is not None else second
-    if lead == first:
-        values[second] = motion_core.linked_value(values[first], ratio, offset)
-    else:
-        back = motion_core.unlinked_value(values[second], ratio, offset)
-        if back is not None:
-            values[first] = back
+    leading = "second" if lead == second and values[second] is not None else "first"
+    values[first], values[second] = motion_core.tied_values(
+        ratio, offset, values[first], values[second], leading
+    )
     return values["angle"], values["slide"]
 
 
