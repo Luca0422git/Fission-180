@@ -45,10 +45,56 @@ Not hitches, but facts a replay has to know:
 Skipped (the report skipped them too, and gives no positions): the twelve 0.2 x 0.6 rectangles
 with their mirrors and the ribs between the tubes.
 
+## Project 7, Geocache Hide: `replay_07_geocache` (190 checks, PASS)
+
+Replayed, in one design: Cylinder 33 x 16 typed on the canvas (OK before the centre is
+refused with the reason), Body1 renamed "Bottom Screw" by a double-click in the browser,
+Chamfer 3 on the top edge, Thread on the side (M33x3.5 offered, Modeled), Thread 1 dragged in
+front of Chamfer 1 (the thread then runs into the chamfer), Offset Face -0.25 on the thread
+(one click takes the whole thread), the knob (Cylinder 40, Height -8 typed: grows away from
+the screw, Join), Coil (0.1 rev, -10, Triangular (Internal), Inside, 1, Cut), Mirror of Coil 1
+about XZ from the browser, Circular Pattern of Coil 1 + Mirror 1 about Z, 25 (light preview,
+built once on OK outside the window's process: 20-50 s on this machine, with a progress
+window), the Top Cap (a sketch on Front, six lines drawn freehand and dimensioned, Revolve
+about Z from the browser: New Body), the screw hidden with its eye, Thread on the cap's inner
+wall (Modeled remembered, Full Length off, 18), Offset Plane -30 from XZ, a sketch on it with
+the words (Height 7.5, centred), Emboss 0.75 onto the cap, a second sketch with Insert SVG
+(0.3, both flips, -15 / 2), Create Group of the whole timeline, Section Analysis on XZ,
+Ctrl+Z / Ctrl+Y, save, close, open again from Home.
+
+| Report line | What happened | Fusion (source) | Root cause | Fix |
+|---|---|---|---|---|
+| 1306-1307 | Cylinder Height -8 for the knob (the centre on the screw's plane): the -8 went into the Diameter (the knob came out 8 across, 50 high) | Right after placing, the number typed is the height (Book; Fusion's on-canvas flow) | The Height arrow's box was off the screen (the first preview is 50 high); `PlacedPanel.typing_field` then gave the last size typed (Diameter) | `primitives_ui.PlacedPanel.typing_field` / `typing_box` / new `_just_placed`: right after placing, the READY_KEY (Height) field takes the number when its box is not shown |
+| 1315-1319 | The knurl: only the mirror's 25 copies were cut, the coil's copies cut nothing (half the knurl) | The pattern repeats both features (Book) | FreeCAD keeps a feature's tool solid (AddSubShape) in the feature's own coordinates; a feature takes the Placement of the step before it, here the knob primitive's (z -8); `pattern.feature_tools` took it as it was: 8 mm too high | `pattern.add_sub_shape` (new), used by `feature_tools`, `objects_center`, `feature_of_face`. Same mistake fixed in `extrude_bodies.lead_tool` (`_placed_tool`, new). Golden `pattern_circ_after_primitive_off_origin`, headless `replay_c_check` |
+| 1346-1347 | Emboss: the offset plane in front of the cap took the click meant for the cap's face | Fusion's Faces box takes faces only: the click reaches the face (Guess, from how selection filters work) | `emboss_ui.EmbossPanel._take` ignored a plane | `_take`: a plane clicked while the Faces box is active looks behind it (`_face_behind`, new, `view.getObjectsInfo`) |
+| 1355-1356 ("OK") | After Create Group of the whole timeline, the next recompute (Section Analysis's) rebuilt every step, the knurl too: 35 s, no progress note | A group is a timeline folder; nothing is rebuilt (Autodesk help "Timeline groups") | `timeline_ops._set_group` adding the group properties touched the steps (their Output flag notwithstanding) | `timeline_ops._untouched` (new) around `_set_group` and `rename_group`: a step not touched before stays untouched. Section now 1.2 s |
+
+Where the report was wrong about Fusion, or the stand-in differs:
+
+- The cap's internal thread on a 33 bore is offered M33x3.5 (the nearest nominal, Autodesk
+  tech tip; thread_tables.closest), not the report's M36x3: it fits the screw, as the book wants.
+  The threaded hole then goes to the minor diameter (Autodesk forum "BUG thread changes the
+  hole diameter": as designed), so the cap gains material.
+- Thread remembers Modeled from the last thread (Fusion does): the replay leaves it ticked.
+- A click on a wall with another wall in front picks the front one, in Fusion too: the replay
+  hides the screw (its eye) and clicks the far inner wall through the open end.
+- The words are on two lines: the stand-in cap (39 across) is smaller than the book's.
+- The cap profile is dimensioned inner wall before outer wall: with the outer wall set first
+  (after Scale at first dimension had grown the sketch 1.5 times) its top came below the inner
+  top and the profile crossed itself; the solver moves only what a dimension pulls (Fusion too).
+- The knurl's groove pair is a V (the coil and its mirror meet at the top), so the replay
+  counts the grooves at mid height: 50, 7.2 degrees apart. (`book_modifyc_knurl` checks the
+  removed volume against a pair measured with 3 copies; it would also pass with half the
+  grooves. Not changed: its stand-in is built by script, where the coil has no offset.)
+
 ## Changelog lines
 
 - A dimension between two points that you place straight to the left or right of them is the vertical distance, and straight above or below them the horizontal one, however near you place it.
 - In Rectangular Pattern, after you click the first direction the next click sets the second direction, so you can click two edges one after the other as in Fusion.
+- A number typed right after placing a Box, Cylinder or other shape goes into its Height, also when the Height arrow is outside the view.
+- A pattern of features made after a Box or Cylinder that is not at the origin repeats the features in the right place (the Geocache knurl had only half its grooves).
+- Emboss takes the face behind a construction plane when you click through the plane.
+- Grouping steps in the timeline no longer makes the design rebuild every step afterwards (a Section Analysis after Create Group waited half a minute).
 
 ## Known issues
 
