@@ -110,6 +110,34 @@ class Search(unittest.TestCase):
         works = Counter(-1.0)
         self.assertEqual(vl.search(works, 1.0, 50.0, 0.01), (None, False))
 
+    def test_not_a_limit_after_a_short_scan(self):
+        # nothing works: the start value and SCAN_TRIES values between, then no limit
+        works = Counter(-1.0)
+        self.assertEqual(vl.search(works, 0.1, 1.0, 0.01), (None, False))
+        self.assertEqual(len(works.calls), 1 + vl.SCAN_TRIES)
+
+    def test_the_smallest_size_refused_a_bigger_one_built(self):
+        # a fillet on a lofted skin (wave 7, fix-8): OpenCASCADE refuses 0.1 mm and builds
+        # 0.15 to 0.49 mm; 1 mm typed is held at 0.49 (it ended with "no limit", no note)
+        works = Counter(0.4999, lower=0.12)
+        limit, exact = vl.search(works, 0.1, 1.0, 0.01)
+        self.assertEqual(limit, 0.49)
+        self.assertTrue(exact)
+        self.assertLess(len(works.calls), 20)
+        limiter = vl.Limiter()
+        key = vl.make_key("skin")
+        self.assertEqual(limiter.find(key, Counter(0.4999, lower=0.12), 1.0, 0.1), 0.49)
+        self.assertEqual(limiter.clamp(key, 1.0, typed=True), 0.49)
+        self.assertEqual(limiter.note, "1 mm does not fit: limited to 0.49 mm")
+
+    def test_scan_values(self):
+        self.assertEqual(
+            [round(v, 4) for v in vl._between(0.1, 1.0, 4)], [0.1585, 0.2512, 0.3981, 0.631]
+        )
+        self.assertEqual(vl._between(1.0, 3.0, 3), [1.5, 2.0, 2.5])
+        self.assertEqual(vl._between(-0.5, 2.0, 4), [0.0, 0.5, 1.0, 1.5])
+        self.assertEqual(vl._between(1.0, 1.0, 4), [])
+
     def test_good_known_is_not_built(self):
         works = Counter(3.4789)
         vl.search(works, 1.0, 50.0, 0.01, good_known=True)

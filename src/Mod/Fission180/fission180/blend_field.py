@@ -183,6 +183,13 @@ class ValueField:
         try:
             self.raw = text
             number = parse_number(text, self.unit)
+            if number is not None and self.formula and self._alive():
+                # a plain number typed over a formula replaces it from the first key, as the
+                # arrows do (_spun): the step drops the expression, and the number is held at
+                # the largest size that fits like any typed (50 typed after "100/2" got no
+                # note, and the step kept the formula's 50: "could not build"; wave 7, fix-8)
+                self.formula = ""
+                self.panel._formula_changed(self.key)
             if number is None:
                 # (replay-g) a sum or a fraction that is whole now ("1/8" in an inch
                 # design) is previewed too: the preview stayed on the "1" typed first, a
