@@ -1350,6 +1350,11 @@ class BlendPanel(Panel):
         every set's picks and every other value (not the one being changed)."""
         spec = copy.deepcopy(self.spec)
         self._put(spec, row, what, None)
+        for one in spec.get("sets", []):
+            # (how many picks a set has is in self.groups below; "count" is only written
+            # when Fission 180's own step takes over, which can happen in the middle of a
+            # search (fillet_robust), and the note made before it was then dropped)
+            one.pop("count", None)
         return value_limits.make_key(
             self.kind,
             self.info.shape if self.info is not None else None,
@@ -1360,7 +1365,11 @@ class BlendPanel(Panel):
             spec,
             row,
             what,
-            self._uses_step(),
+            # (not _uses_step(): that also turns True in the middle of a search, the moment
+            # a size is built by another route than the kernel's one run (fillet_robust);
+            # the note "50 mm does not fit: limited to 6 mm" was then dropped as made for
+            # other inputs, and the size was held without a word)
+            self._needs_step(),
         )
 
     @staticmethod

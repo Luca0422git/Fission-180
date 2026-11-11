@@ -76,6 +76,10 @@ def _scratch(type_id):
     active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
     doc = App.newDocument("Fission180Kernel", "kernel", True, True)
     try:
+        # FreeCAD writes a hidden document's units into the active design at every property
+        # change in it (report bug 2: "units go back to mm after some Chamfer OKs"): with
+        # the design's own units there is nothing to carry over
+        same_units(doc, active)
         # No undo here: a dialog's undo step is the application's active transaction, and a
         # document that joined it and was closed ended it (the dialog's step was committed
         # half-way, its Cancel / Ctrl+Z then left a "Delete" step behind)
@@ -101,6 +105,16 @@ def _scratch(type_id):
                 App.setActiveDocument(active)
             except Exception:
                 pass
+
+
+def same_units(scratch, design_name):
+    """Give a throw-away document the units of the design it works for (see _scratch)."""
+    try:
+        design = App.getDocument(design_name) if design_name else None
+        if design is not None and scratch.UnitSystem != design.UnitSystem:
+            scratch.UnitSystem = design.UnitSystem
+    except Exception:
+        pass
 
 
 def renamed(shape, scratch_tag, tag):
@@ -136,17 +150,36 @@ def kernel(kind, shape, items, tag=None):
     from . import fillet_robust
 
     fillet_robust.reset()
+    broken = None
     try:
-        return kernel_once(kind, shape, items, tag)
-    except KernelError as exc:
-        if not items:
-            raise
+        early = fillet_robust.first(kind, shape, items, tag, kernel_once) if items else None
+        if early is not None:
+            return early
         try:
-            return fillet_robust.retry(kind, shape, items, tag, kernel_once, exc)
-        except fillet_robust.Refused as refused:
-            error = KernelError(str(refused))
-            error.way = fillet_robust.in_the_way(shape, refused.blockers, len(items), kind)
-            raise error
+            result = kernel_once(kind, shape, items, tag)
+            if fillet_robust.sound(result, shape):
+                return result
+            # OpenCASCADE also "succeeds" with a solid that is not one (open, or its faces
+            # crossing: the Tensegrity's 40 mm chamfer): that is a failure like any other
+            broken = result
+            exc = KernelError("command not done")
+        except KernelError as error:
+            if not items:
+                raise
+            exc = error
+        return fillet_robust.retry(kind, shape, items, tag, kernel_once, exc)
+    except fillet_robust.Refused as refused:
+        if broken is not None and len(broken.Solids) > max(1, len(shape.Solids)):
+            return broken  # in pieces: compute() says so
+        raise _refusal(kind, shape, items, refused)
+
+
+def _refusal(kind, shape, items, refused):
+    from . import fillet_robust
+
+    error = KernelError(str(refused))
+    error.way = fillet_robust.in_the_way(shape, refused.blockers, len(items), kind, refused.why)
+    return error
 
 
 def kernel_once(kind, shape, items, tag=None):
@@ -157,7 +190,8 @@ def kernel_once(kind, shape, items, tag=None):
     if not items:
         raise blend.BlendError("Select the edges to %s." % ("round" if kind == "fillet" else kind))
     sizes = {(round(a, 12), round(b, 12)) for _i, a, b in items}
-    edges = [shape.Edges[i - 1] for i, _a, _b in items]
+    every = shape.Edges  # (FreeCAD builds this list anew at every `shape.Edges`)
+    edges = [every[i - 1] for i, _a, _b in items]
     try:
         if len(sizes) == 1:
             a, b = items[0][1], items[0][2]

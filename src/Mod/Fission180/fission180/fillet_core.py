@@ -193,6 +193,48 @@ def full_round_radius(width):
     return float(width) / 2.0
 
 
+# -- the cross-section of a blend --------------------------------------------------------------
+def section(kind, gamma, size1, size2=None):
+    """The cross-section of a fillet / chamfer, in the plane across the edge: the corner at
+    (0, 0), the first face along +x, the second face along the direction at `gamma` (the
+    angle of the wedge the blend fills, radians: 90 degrees on a box edge).
+
+    chamfer: `size1` along the first face, `size2` along the second, joined by a line.
+    fillet:  radius `size1`: the arc tangent to both faces. It touches each face
+             R / tan(gamma / 2) from the corner; its centre is R / sin(gamma / 2) from the
+             corner, on the line that halves the wedge.
+
+    {"p1", "p2": where the blend meets the two faces; "middle": the arc's point nearest the
+    corner (fillet); "center" (fillet); "area": what the blend removes or adds per unit of
+    edge length}. fillet_section.py sweeps it along the edge."""
+    gamma = float(gamma)
+    size1 = float(size1)
+    size2 = size1 if size2 is None else float(size2)
+    if not TINY < gamma < math.pi - TINY:
+        raise SetError("The two faces do not meet at a corner here.")
+    if size1 <= 0 or size2 <= 0:
+        raise SetError("The size must be more than 0 mm.")
+    across = (math.cos(gamma), math.sin(gamma))
+    if kind == "chamfer":
+        return {
+            "p1": (size1, 0.0),
+            "p2": (size2 * across[0], size2 * across[1]),
+            "area": 0.5 * size1 * size2 * math.sin(gamma),
+        }
+    radius = size1
+    reach = radius / math.tan(gamma / 2.0)
+    far = radius / math.sin(gamma / 2.0)
+    half = (math.cos(gamma / 2.0), math.sin(gamma / 2.0))
+    return {
+        "p1": (reach, 0.0),
+        "p2": (reach * across[0], reach * across[1]),
+        "center": (far * half[0], far * half[1]),
+        "middle": ((far - radius) * half[0], (far - radius) * half[1]),
+        # the kite corner - p1 - centre - p2 less the slice of the disc inside it
+        "area": reach * radius - radius * radius * (math.pi - gamma) / 2.0,
+    }
+
+
 # -- the settings ------------------------------------------------------------------------------
 def new_set(kind="fillet", mode="fillet", like=None):
     """A new row of the selection box: Fusion gives it the values of the row before."""
