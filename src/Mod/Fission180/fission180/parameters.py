@@ -7,6 +7,7 @@ document, so they are saved with it and any expression can use them
 Model parameters are the dimensions already in the design: feature values
 (extrude length, fillet radius, ...) and sketch dimensions.
 """
+
 import FreeCAD as App
 
 from . import parameters_core as core
@@ -73,141 +74,499 @@ def container(doc, create=False):
     return obj
 
 
-def user_names(doc):
-    """Every parameter a formula can name: the user's own and the derived ones."""
+def _in_group(doc, groups):
     obj = container(doc)
     if obj is None:
         return []
-    return [p for p in obj.PropertiesList if obj.getGroupOfProperty(p) in (GROUP, DERIVED_GROUP)]
+    names = [
+        core.display_name(p) for p in obj.PropertiesList if obj.getGroupOfProperty(p) in groups
+    ]
+    order = {name: i for i, name in enumerate(_list(obj, ORDER_PROP))}
+    if order:  # the order the person made them in, also after a rename (FreeCAD moves the
+        # renamed property to the end)
+        names.sort(key=lambda n: order.get(n, len(order)))
+    return names
+
+
+class Names(list):
+    """The parameter names of a design, with what parameters_core.to_freecad needs to give
+    the numbers of a formula their units: each parameter's kind and the design's units."""
+
+    kinds = None
+    unit = "mm"
+
+
+def user_names(doc):
+    """Every parameter a formula can name: the user's own and the derived ones."""
+    names = Names(_in_group(doc, (GROUP, DERIVED_GROUP)))
+    obj = container(doc)
+    try:
+        names.kinds = {
+            n: core.kind_of_type(obj.getTypeIdOfProperty(core.prop_name(n))) for n in names
+        }
+        names.unit = design_unit(doc)
+    except Exception:
+        names.kinds = None
+    return names
 
 
 def own_names(doc):
     """The user's own parameters (the ones Change Parameters edits)."""
-    obj = container(doc)
-    if obj is None:
-        return []
-    return [p for p in obj.PropertiesList if obj.getGroupOfProperty(p) == GROUP]
+    return _in_group(doc, (GROUP,))
 
 
 def derived_names(doc):
+    return _in_group(doc, (DERIVED_GROUP,))
+
+
+def kinds(doc):
+    """{parameter name: "length" / "angle" / "number"} of every parameter a formula can name."""
+    obj = container(doc)
+    out = {}
+    for name in user_names(doc):
+        out[name] = core.kind_of_type(obj.getTypeIdOfProperty(core.prop_name(name)))
+    return out
+
+
+def design_unit(doc):
+    """The design's length unit ("mm", "in"...): what a number without a unit means."""
+    try:
+        from . import browser_core
+
+        return browser_core.doc_length_unit(doc)
+    except Exception:
+        return "mm"
+
+
+# -- what the container remembers beside the values ------------------------------------------------
+UNITS_PROP = "Fission180Units"  # {parameter: the unit it is shown in ("in", "rad")}
+FAVORITES_PROP = "Fission180Favorites"  # user parameter names and model "Object:path" keys
+ORDER_PROP = "Fission180Order"  # the user parameters in the order they were made
+
+
+def _list(obj, prop):
+    try:
+        return list(getattr(obj, prop)) if obj is not None and prop in obj.PropertiesList else []
+    except Exception:
+        return []
+
+
+def _remember(doc, prop, kind, value):
+    obj = container(doc, create=True)
+    if prop not in obj.PropertiesList:
+        obj.addProperty(kind, prop, "Fission180", "Fission 180", 4)  # hidden
+    if getattr(obj, prop) != value:
+        setattr(obj, prop, value)
+
+
+def unit_of_parameter(doc, name):
+    """The unit a user parameter is shown and typed in: the one it was made with, else the
+    design's units (a length), degrees (an angle) or none."""
     obj = container(doc)
     if obj is None:
-        return []
-    return [p for p in obj.PropertiesList if obj.getGroupOfProperty(p) == DERIVED_GROUP]
+        return ""
+    prop = core.prop_name(name)
+    if prop not in obj.PropertiesList:
+        return ""
+    kind = core.kind_of_type(obj.getTypeIdOfProperty(prop))
+    try:
+        unit = (
+            dict(getattr(obj, UNITS_PROP)).get(name) if UNITS_PROP in obj.PropertiesList else None
+        )
+    except Exception:
+        unit = None
+    if unit is not None and core.PARAMETER_UNITS.get(unit) == kind:
+        return unit
+    return {"length": design_unit(doc), "angle": "deg", "number": ""}[kind]
+
+
+def favorites(doc):
+    """The favourites: user parameter names and model parameter keys ("Pad:Length")."""
+    return _list(container(doc), FAVORITES_PROP)
+
+
+def model_key(row):
+    return "%s:%s" % (row["object"], row["path"])
+
+
+def set_favorite(doc, key, on=True):
+    """Star or unstar a user parameter (its name) or a model parameter (model_key(row))."""
+    now = favorites(doc)
+    if on and key not in now:
+        _remember(doc, FAVORITES_PROP, "App::PropertyStringList", now + [key])
+    elif not on and key in now:
+        _remember(doc, FAVORITES_PROP, "App::PropertyStringList", [k for k in now if k != key])
+
+
+def number_text(value, digits=6):
+    """A number as the Parameters dialog writes it: no trailing zeros, never '-0'."""
+    text = ("%." + str(digits) + "f") % float(value)
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return "0" if text in ("-0", "") else text
+
+
+def value_text(value, unit):
+    """A value in base units (mm, degrees, a number) written in `unit`: '4 in', '30 deg'."""
+    number = number_text(float(value) / core.per_unit(unit))
+    return "%s %s" % (number, unit) if unit else number
+
+
+def _row_of(doc, obj, name, expressions, derived=False):
+    prop = core.prop_name(name)
+    value = getattr(obj, prop)
+    base = value.Value if hasattr(value, "Value") else float(value)
+    kind = core.kind_of_type(obj.getTypeIdOfProperty(prop))
+    unit = unit_of_parameter(doc, name)
+    formula = "" if derived else core.from_freecad(expressions.get(prop, ""))
+    return {
+        "name": name,
+        "unit": unit,
+        "kind": kind,
+        "expression": formula,
+        # what the Expression column shows: the formula, or the value with its unit
+        "shown": formula or value_text(base, unit),
+        "value": base,  # in mm / degrees
+        "display": number_text(base / core.per_unit(unit)),  # in the parameter's unit
+        "comment": obj.getDocumentationOfProperty(prop),
+        "favorite": name in _list(obj, FAVORITES_PROP),
+    }
 
 
 def derived_parameters(doc):
     """[{name, unit, value, comment}] of the parameters a Derive brought in (Fusion shows
     them greyed: they change in their source design)."""
     obj = container(doc)
-    rows = []
-    for name in derived_names(doc):
-        value = getattr(obj, name)
-        rows.append(
-            {
-                "name": name,
-                "unit": core.unit_of(obj.getTypeIdOfProperty(name)),
-                "expression": "",
-                "value": value.Value if hasattr(value, "Value") else value,
-                "comment": obj.getDocumentationOfProperty(name),
-            }
-        )
-    return rows
+    return [_row_of(doc, obj, name, {}, derived=True) for name in derived_names(doc)]
 
 
 def user_parameters(doc):
-    """[{name, unit, expression, value, comment}] in creation order."""
+    """[{name, unit, kind, expression, shown, value, display, comment, favorite}] in the
+    order they were made. `value` is in mm / degrees, `display` in the parameter's unit."""
     obj = container(doc)
-    rows = []
     if obj is None:
-        return rows
+        return []
     expressions = dict(obj.ExpressionEngine)
-    for name in own_names(doc):
-        value = getattr(obj, name)
-        rows.append(
-            {
-                "name": name,
-                "unit": core.unit_of(obj.getTypeIdOfProperty(name)),
-                "expression": core.from_freecad(expressions.get(name, "")),
-                "value": value.Value if hasattr(value, "Value") else value,
-                "comment": obj.getDocumentationOfProperty(name),
-            }
-        )
-    return rows
+    return [_row_of(doc, obj, name, expressions) for name in own_names(doc)]
 
 
-def add_user(doc, name, unit="mm", text="1", comment=""):
+def add_user(doc, name, unit="mm", text="1", comment="", favorite=True):
+    """A new user parameter. `unit`: mm, cm, m, in, ft, deg, rad or "" (no unit): what it is
+    shown in, and what a number typed for it without a unit means."""
     core.check_name(name, existing=set(user_names(doc)))
+    kind = core.property_type(unit)
     obj = container(doc, create=True)
-    obj.addProperty(core.property_type(unit), name, GROUP, comment)
-    set_user(doc, name, text)
+    obj.addProperty(kind, core.prop_name(name), GROUP, comment)
+    units = dict(getattr(obj, UNITS_PROP)) if UNITS_PROP in obj.PropertiesList else {}
+    units[name] = unit
+    _remember(doc, UNITS_PROP, "App::PropertyMap", units)
+    _remember(doc, ORDER_PROP, "App::PropertyStringList", own_names(doc))
+    try:
+        set_user(doc, name, text)
+    except Exception:
+        _forget(doc, name)  # no half-made parameter left behind
+        raise
+    if favorite:  # Fusion lists a new user parameter under Favorites
+        set_favorite(doc, name, True)
     return obj
+
+
+def _forget(doc, name, new=None):
+    """Drop (or rename to `new`) a parameter in what the container remembers beside it."""
+    obj = container(doc)
+    prop = core.prop_name(name)
+    if new is None and prop in obj.PropertiesList:
+        obj.removeProperty(prop)
+    if UNITS_PROP in obj.PropertiesList:
+        units = dict(getattr(obj, UNITS_PROP))
+        unit = units.pop(name, None)
+        if new is not None and unit is not None:
+            units[new] = unit
+        _remember(doc, UNITS_PROP, "App::PropertyMap", units)
+    for prop_list in (FAVORITES_PROP, ORDER_PROP):
+        now = _list(obj, prop_list)
+        if name in now:
+            swapped = [new if k == name else k for k in now if new is not None or k != name]
+            _remember(doc, prop_list, "App::PropertyStringList", swapped)
 
 
 def remove_user(doc, name):
     if name in derived_names(doc):
         raise core.ParameterError(
-            "'%s' comes from another design (Derive): untick it in the Derive to remove it."
-            % name
+            "'%s' comes from another design (Derive): untick it in the Derive to remove it." % name
         )
     users = _users_of(doc, name)
     if users:
         raise core.ParameterError(
             "'%s' is used by: %s. Change those first." % (name, ", ".join(users))
         )
-    container(doc).removeProperty(name)
+    _forget(doc, name)
+
+
+def rename_user(doc, name, new):
+    """Rename a user parameter; every formula that names it follows (Fusion does the same)."""
+    if name == new:
+        return
+    if name in derived_names(doc):
+        raise core.ParameterError(
+            "'%s' comes from another design (Derive): rename it there." % name
+        )
+    if name not in own_names(doc):
+        raise core.ParameterError("There is no parameter named '%s'." % name)
+    core.check_name(new, existing=set(user_names(doc)))
+    obj = container(doc)
+    order = own_names(doc)
+    obj.renameProperty(core.prop_name(name), core.prop_name(new))
+    _remember(doc, ORDER_PROP, "App::PropertyStringList", [new if n == name else n for n in order])
+    _forget(doc, name, new)
+
+
+def set_unit(doc, name, unit):
+    """Change the unit a user parameter is shown and typed in (Fusion's Unit column). The
+    same kind of unit (mm -> in): the size stays, it is only written in the other unit.
+    Another kind (a length made an angle or a number): its number stays ("10 mm" becomes
+    "10 deg"), and a formula must still give the new kind."""
+    if name not in own_names(doc):
+        raise core.ParameterError("There is no parameter named '%s'." % name)
+    if unit not in core.PARAMETER_UNITS:
+        raise core.ParameterError("Unit must be one of: mm, cm, m, in, ft, deg, rad, No Units.")
+    obj = container(doc)
+    prop = core.prop_name(name)
+    old_unit = unit_of_parameter(doc, name)
+    old_kind = core.kind_of_type(obj.getTypeIdOfProperty(prop))
+    new_kind = core.PARAMETER_UNITS[unit]
+    units = dict(getattr(obj, UNITS_PROP)) if UNITS_PROP in obj.PropertiesList else {}
+    if new_kind == old_kind:
+        units[name] = unit
+        _remember(doc, UNITS_PROP, "App::PropertyMap", units)
+        return
+    row = [r for r in user_parameters(doc) if r["name"] == name][0]
+    order = own_names(doc)
+    favorite = row["favorite"]
+    text = row["expression"] or row["display"]
+    comment = row["comment"]
+    obj.removeProperty(prop)
+    obj.addProperty(core.property_type(unit), prop, GROUP, comment)
+    units[name] = unit
+    _remember(doc, UNITS_PROP, "App::PropertyMap", units)
+    try:
+        set_user(doc, name, text)
+    except Exception as exc:
+        # back to what it was: a formula of the old kind cannot give the new one
+        obj.removeProperty(prop)
+        obj.addProperty(core.property_type(old_unit), prop, GROUP, comment)
+        units[name] = old_unit
+        _remember(doc, UNITS_PROP, "App::PropertyMap", units)
+        set_user(doc, name, row["expression"] or value_text(row["value"], old_unit))
+        raise core.ParameterError("%s cannot be %s: %s" % (name, core.KIND_WORDS[new_kind], exc))
+    finally:
+        _remember(doc, ORDER_PROP, "App::PropertyStringList", order)
+        set_favorite(doc, name, favorite)
 
 
 def _users_of(doc, name):
     import re
 
-    needle = "%s.%s" % (core.CONTAINER, name)
+    prop = core.prop_name(name)
+    needle = "%s.%s" % (core.CONTAINER, prop)
+    whole = re.compile(
+        r"(?:<<%s>>|%s)\.%s(?![A-Za-z0-9_])" % (core.CONTAINER, core.CONTAINER, prop)
+    )
     # Another parameter's formula ("half = w / 2") lives in the container itself, where
     # FreeCAD writes the reference without the container's name ("w / 2"): look for the bare
     # name there (before, deleting w left half with a broken formula).
-    bare = re.compile(r"(?<![A-Za-z0-9_.])%s(?![A-Za-z0-9_])" % re.escape(name))
+    bare = re.compile(r"(?<![A-Za-z0-9_.])%s(?![A-Za-z0-9_])" % re.escape(prop))
     holder = container(doc)
+    labels = _step_names(doc)
     found = []
     for obj in doc.Objects:
         for path, expr in obj.ExpressionEngine:
-            if obj is holder and path != name and bare.search(expr):
-                found.append("the parameter %s" % path)
+            if obj is holder and path != prop and (bare.search(expr) or whole.search(expr)):
+                found.append("the parameter %s" % core.display_name(path))
                 continue
-            if needle in expr or ("<<%s>>.%s" % (core.CONTAINER, name)) in expr:
-                found.append(obj.Label)
+            if obj is not holder and needle in expr and whole.search(expr):
+                found.append(labels.get(obj.Name) or obj.Label)
                 break
     return found
+
+
+def users_of(doc, name):
+    """What uses the user parameter `name` (other parameters, steps), as the timeline and
+    the Parameters dialog name them."""
+    return _users_of(doc, name)
 
 
 def set_user(doc, name, text):
     """A number ('25', '25 mm') or an expression ('width / 2')."""
     if name in derived_names(doc):
         raise core.ParameterError(
-            "'%s' comes from another design (Derive): change it there and update the Derive."
-            % name
+            "'%s' comes from another design (Derive): change it there and update the Derive." % name
         )
     obj = container(doc)
-    _set(obj, name, text, user_names(doc))
+    if obj is None or core.prop_name(name) not in obj.PropertiesList:
+        raise core.ParameterError("There is no parameter named '%s'." % name)
+    _set(obj, core.prop_name(name), text, user_names(doc), unit=unit_of_parameter(doc, name))
+
+
+# -- reading what a person typed, in this design -------------------------------------------------
+def _host(doc):
+    """An object that can compute a formula for this design (FreeCAD computes them in the
+    context of an object), or None in a design with no objects."""
+    host = container(doc)
+    if host is None and doc.Objects:
+        host = doc.Objects[0]
+    return host
+
+
+def compute(doc, expr, host=None):
+    """The value of a formula in FreeCAD's spelling: a Quantity, a number or a bool."""
+    host = host or _host(doc)
+    if host is not None:
+        return host.evalExpression(expr)
+    return App.Units.Quantity(expr)  # an empty design: arithmetic only
+
+
+def _kind_of_value(value):
+    unit = getattr(value, "Unit", None)
+    if unit is None or unit == App.Units.Unit():
+        return "number"
+    if unit == App.Units.Quantity("1 mm").Unit:
+        return "length"
+    if unit == App.Units.Quantity("1 deg").Unit:
+        return "angle"
+    return str(getattr(unit, "Type", "") or "other").lower()
+
+
+def _resolver(doc):
+    def resolve(text):
+        kind = _kind_of_value(compute(doc, text))
+        return kind if kind in ("length", "angle", "number") else None
+
+    return resolve
+
+
+def read(doc, text, expect=None, create=False, unit=None, skip=None, comment=""):
+    """Understand what a person typed in a value box of this design: a number ("25",
+    "1 in"), a parameter or formula Fusion's way ("Head_Length", "Arm_Length + 5",
+    "min(100; max(45; Arm_Length))"), or `Name = value`, which makes the user parameter
+    `Name` and uses it (`create`; Fusion's quick way to make a parameter).
+
+    `expect`: what the box takes ("length", "angle", "number", or a field's unit "mm" /
+    "deg" / ""; None for anything). `unit`: what a length without a unit is in (the design's
+    units when None). `skip`: a parameter the formula may not name (itself).
+    Returns parameters_core.Read with `.value` computed (mm, degrees or a number) and
+    `.created` (the parameter made, or None). Raises ParameterError with the reason, in
+    words for the person."""
+    expect = core.KIND_OF.get(expect, expect)
+    name, rest = core.split_assignment(text)
+    if name is not None:
+        if not create:
+            raise core.ParameterError(
+                "'%s' cannot be made here: add it in MODIFY > Change Parameters." % name
+            )
+        if name in user_names(doc):
+            raise core.ParameterError(
+                "A parameter named '%s' already exists: type %s to use it, or change its "
+                "value in MODIFY > Change Parameters." % (name, name)
+            )
+        core.check_name(name)
+        first = read(doc, rest, expect, unit=unit)
+        kind = first.kind if first.kind in ("length", "angle", "number") else expect
+        new_unit = {"length": unit or design_unit(doc), "angle": "deg"}.get(kind, "")
+        add_user(doc, name, new_unit, rest, comment)
+        out = read(doc, name, expect, unit=unit)
+        out.created = name
+        return out
+    params = kinds(doc)
+    if skip is not None:
+        params.pop(skip, None)
+    length_unit = unit if unit in core.LENGTH_UNITS else design_unit(doc)
+    angle_unit = unit if unit in core.ANGLE_UNITS else "deg"
+    try:
+        out = core.read(rest, params, length_unit, expect, True, _resolver(doc), angle_unit)
+    except core.ParameterError as mine:
+        if skip is not None and skip in kinds(doc) and skip in _names_in(rest):
+            raise core.ParameterError("'%s' cannot be worked out from itself." % skip)
+        # something FreeCAD's formulas can do that Fission 180's reader does not know
+        try:
+            expr = core.to_freecad(rest, params)
+            compute(doc, expr)
+        except Exception:
+            raise mine
+        out = core.Read()
+        out.freecad, out.formula = expr, core.from_freecad(expr)
+    out.created = None
+    if out.plain:
+        return out
+    try:
+        value = compute(doc, out.freecad)
+    except Exception as exc:
+        raise core.ParameterError("'%s' is not a value here: %s" % (rest, _reason(exc)))
+    found = _kind_of_value(value)
+    if expect is not None and found != expect:
+        if found == "number" and out.kind is None and expect in ("length", "angle"):
+            # a formula on other objects' values without a unit: in the design's units
+            out.freecad = "(%s) * 1 %s" % (
+                out.freecad,
+                length_unit if expect == "length" else "deg",
+            )
+            out.formula = core.from_freecad(out.freecad)
+            value = compute(doc, out.freecad)
+        else:
+            raise core.ParameterError(
+                "'%s' is %s, not %s. Type %s, for example %s."
+                % (
+                    rest,
+                    core.KIND_WORDS.get(found, "a value in %s" % found),
+                    core.KIND_WORDS[expect],
+                    core.KIND_WORDS[expect],
+                    core.KIND_EXAMPLES[expect],
+                )
+            )
+    out.kind = found if found in ("length", "angle", "number") else out.kind
+    try:
+        out.value = float(getattr(value, "Value", value))
+    except Exception:
+        raise core.ParameterError("'%s' is not a number." % rest)
+    return out
+
+
+def _names_in(text):
+    import re
+
+    return set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text or ""))
+
+
+def _reason(exc):
+    """FreeCAD's words for a formula it cannot compute, in plain language."""
+    text = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+    low = text.lower()
+    if "unit mismatch" in low or "same unit" in low or "not matching unit" in low:
+        return "its values do not have the same kind of unit (a length with an angle or a number)."
+    if "failed to parse" in low or "syntax error" in low:
+        return "it is not a formula Fission 180 can read."
+    if "division by zero" in low or "divide by zero" in low:
+        return "it divides by zero."
+    return text
+
+
+def value_of(doc, text, expect=None):
+    """The value typed ("25", "Arm_Length / 2"): a float in mm, degrees or a number."""
+    return read(doc, text, expect).value
 
 
 def model_parameters(doc):
-    """[{owner, object, path, label, value, unit, expression}] for every dimension in the design."""
+    """[{owner, object, path, label, value, unit, expression, shown, favorite, kind}] for
+    every dimension in the design. `value` is in mm / degrees; `shown` is what the Expression
+    column shows (the formula, or the value in the design's units)."""
     rows = []
+    stars = set(favorites(doc))
+    labels = _step_names(doc)
+    length_unit = design_unit(doc)
     for obj in doc.Objects:
         expressions = dict(obj.ExpressionEngine)
-        if obj.TypeId in FEATURE_PROPS:
-            for prop, label in FEATURE_PROPS[obj.TypeId]:
-                if prop not in obj.PropertiesList or obj.getEditorMode(prop):
-                    continue  # hidden or read-only for this feature's mode
-                value = getattr(obj, prop)
-                rows.append(_row(obj, prop, label, value, expressions.get(prop, "")))
-        elif getattr(obj, "Fission180Type", "") in FISSION180_PROPS:
-            for prop, label in FISSION180_PROPS[obj.Fission180Type]:
-                if prop not in obj.PropertiesList or obj.getEditorMode(prop):
-                    continue  # hidden: not used by this feature's choices
-                value = getattr(obj, prop)
-                rows.append(_row(obj, prop, label, value, expressions.get(prop, "")))
-        elif obj.TypeId == "Sketcher::SketchObject":
+        found = []
+        if obj.TypeId == "Sketcher::SketchObject":
             for i, constraint in enumerate(obj.Constraints):
                 if constraint.Type not in DIMENSION_TYPES or not constraint.Driving:
                     continue
@@ -217,20 +576,108 @@ def model_parameters(doc):
                 expr = expressions.get(path, "")
                 if not expr and constraint.Name:
                     expr = expressions.get(".Constraints.%s" % constraint.Name, "")
-                rows.append(_row(obj, path, label, quantity, expr))
+                found.append(_row(obj, path, label, quantity, expr))
+        else:
+            for prop, label in _props_of(obj):
+                found.append(_row(obj, prop, label, getattr(obj, prop), expressions.get(prop, "")))
+        for row in found:
+            row["owner"] = labels.get(obj.Name) or obj.Label
+            unit = {"length": length_unit, "angle": "deg"}.get(row["kind"], "")
+            row["display_unit"] = unit
+            row["shown"] = row["expression"] or value_text(row["value"], unit)
+            row["display"] = value_text(row["value"], unit)
+            row["favorite"] = model_key(row) in stars
+        rows.extend(found)
     return rows
+
+
+# Properties every object has, or that are no size of a step: never listed.
+_NOT_PARAMETERS = {
+    "Label",
+    "Label2",
+    "Placement",
+    "Visibility",
+    "AttachmentOffset",
+    "MapPathParameter",
+}
+_NUMBER_TYPES = (
+    "App::PropertyLength",
+    "App::PropertyDistance",
+    "App::PropertyAngle",
+    "App::PropertyQuantity",
+    "App::PropertyQuantityConstraint",
+    "App::PropertyInteger",
+    "App::PropertyIntegerConstraint",
+    "App::PropertyFloat",
+    "App::PropertyFloatConstraint",
+)
+_QUIET_GROUPS = {"Base", "Fission180", "Attachment", "Part Design", "Refine"}
+
+
+def _words(prop):
+    """'InsideThickness' -> 'Inside Thickness'."""
+    import re
+
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", prop)
+
+
+def _props_of(obj):
+    """[(property, label)] of the sizes of a step shown as model parameters: the known ones
+    by their Fusion names, and for Fission 180's own steps (a coil, an offset plane, a
+    thread, a hole, a pattern, a primitive...) every number the step has and shows."""
+    known = FEATURE_PROPS.get(obj.TypeId)
+    kind = getattr(obj, "Fission180Type", "")
+    if known is None:
+        known = FISSION180_PROPS.get(kind)
+    if known is not None:
+        return [
+            (prop, label)
+            for prop, label in known
+            # hidden or read-only for this feature's mode: not a size of it now
+            if prop in obj.PropertiesList and not obj.getEditorMode(prop)
+        ]
+    if not (kind or _is_construction(obj)):
+        return []
+    out = []
+    for prop in obj.PropertiesList:
+        if prop in _NOT_PARAMETERS or prop.startswith("Fission180"):
+            continue
+        try:
+            if obj.getTypeIdOfProperty(prop) not in _NUMBER_TYPES or obj.getEditorMode(prop):
+                continue
+            if obj.getGroupOfProperty(prop) in _QUIET_GROUPS:
+                continue
+            status = obj.getPropertyStatus(prop)
+            if "Hidden" in status or "ReadOnly" in status or "Output" in status:
+                continue
+        except Exception:
+            continue
+        out.append((prop, _words(prop)))
+    return out
+
+
+def _is_construction(obj):
+    """A construction plane / axis / point made by CONSTRUCT (its sizes: Offset, Angle)."""
+    try:
+        from . import construct
+
+        return construct.PROP_KEY in obj.PropertiesList
+    except Exception:
+        return False
 
 
 def _row(obj, path, label, value, expr):
     number = value.Value if hasattr(value, "Value") else value
     unit = str(value.Unit) if hasattr(value, "Unit") else ""
+    kind = "angle" if "Angle" in unit else ("length" if "Length" in unit else "number")
     return {
         "owner": obj.Label,
         "object": obj.Name,
         "path": path,
         "label": label,
         "value": number,
-        "unit": "deg" if "Angle" in unit else ("mm" if "Length" in unit else ""),
+        "unit": "deg" if kind == "angle" else ("mm" if kind == "length" else ""),
+        "kind": kind,
         "expression": core.from_freecad(expr),
     }
 
@@ -241,38 +688,62 @@ def set_model(doc, row, text):
 
 
 def is_plain_number(text):
-    """'25', '25 mm', '1.5 in', '30 deg' -> True; 'width * 2', 'Sketch.x' -> False."""
-    import re
-
-    words = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text)
-    if any(w not in core.RESERVED or w in ("pi", "e") for w in words):
-        return False
-    try:
-        App.Units.Quantity(text)
-        return True
-    except Exception:
-        return False
+    """'25', '25 mm', '1.5 in', '30 deg', '-2,5' -> True; 'width * 2', '9 * 1.02',
+    'Sketch.x' -> False (a formula: Fusion keeps what was typed)."""
+    return core.is_plain(text)
 
 
-def _set(obj, path, text, names):
-    """Plain numbers set the value; anything else becomes an expression."""
+def _kind_of_path(obj, path):
+    if path.startswith(".Constraints["):
+        kind = obj.Constraints[int(path[len(".Constraints[") : -1])].Type
+        return "angle" if kind == "Angle" else "length"
+    type_id = obj.getTypeIdOfProperty(path)
+    if "Integer" in type_id or type_id in ("App::PropertyFloat", "App::PropertyFloatConstraint"):
+        return "number"
+    if type_id in ("App::PropertyQuantity", "App::PropertyQuantityConstraint"):
+        found = _kind_of_value(getattr(obj, path))
+        return found if found in ("length", "angle", "number") else None
+    return core.kind_of_type(type_id)
+
+
+def _set(obj, path, text, names=None, unit=None):
+    """Plain numbers set the value; anything else becomes an expression. A number without a
+    unit is in the design's units (`unit`: in that unit, a user parameter's own)."""
     text = (text or "").strip()
     if not text:
         obj.setExpression(path, None)
         return
-    if not is_plain_number(text):
-        obj.setExpression(path, core.to_freecad(text, names))
+    doc = obj.Document
+    holder = container(doc)
+    skip = core.display_name(path) if obj is holder else None
+    kind = _kind_of_path(obj, path)
+    got = read(doc, text, kind, unit=unit, skip=skip)
+    if not got.plain:
+        obj.setExpression(path, got.freecad)
         return
     obj.setExpression(path, None)
-    number = App.Units.Quantity(text)
     if path.startswith(".Constraints["):
-        obj.setDatum(int(path[len(".Constraints[") : -1]), number)
-    elif "Integer" in obj.getTypeIdOfProperty(path):
-        setattr(obj, path, int(round(number.Value)))
-    elif obj.getTypeIdOfProperty(path) == "App::PropertyFloat":
-        setattr(obj, path, number.Value)
-    else:
-        setattr(obj, path, number)
+        obj.setDatum(
+            int(path[len(".Constraints[") : -1]),
+            (
+                App.Units.Quantity("%r mm" % got.value)
+                if kind == "length"
+                else App.Units.Quantity("%r deg" % got.value)
+            ),
+        )
+        return
+    type_id = obj.getTypeIdOfProperty(path)
+    if "Integer" in type_id:
+        setattr(obj, path, int(round(got.value)))
+        return
+    setattr(obj, path, got.value)
+    held = getattr(obj, path)
+    held = held.Value if hasattr(held, "Value") else float(held)
+    if abs(held - got.value) > 1e-9 and obj is holder:
+        # FreeCAD holds this kind of property inside limits (an App::PropertyLength of an
+        # older design at 0 or more, an angle within one turn): a formula is not held back
+        suffix = {"length": " mm", "angle": " deg"}.get(kind, "")
+        obj.setExpression(path, "%r%s" % (got.value, suffix))
 
 
 # -- Change Parameters checked on a trial ------------------------------------------------------
@@ -438,7 +909,6 @@ NOT_SOLID_STEPS = (
     "PartDesign::ShapeBinder",
     "PartDesign::SubShapeBinder",
 )
-
 
 
 def _step_names(doc):
