@@ -127,7 +127,12 @@ def _centre_of(session, point, obj, edges, facing=None):
     height = session.gl.height()
     round_ones, centres = [], []
     for edge in edges:
-        curve = getattr(edge, "Curve", None)
+        try:
+            # (a loft's or a sweep's edge can have no curve OCC can name: reading .Curve
+            # raises "undefined curve type", not AttributeError; such an edge is not round)
+            curve = edge.Curve
+        except Exception:
+            continue
         if curve is None or curve.TypeId != "Part::GeomCircle":
             continue
         if facing is not None:
