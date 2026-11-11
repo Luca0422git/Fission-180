@@ -120,6 +120,36 @@ an axis made in the active component (the report's "Bug" with Axis Through Cylin
 Not replayed: Ellipse, Fit Point Spline, Loft with Rails and Hole Extent All (the report
 did not re-test them and gives no shapes; they have their own scenarios).
 
+## Tests
+
+- Replays: `replay_14_strandbeest` 255, `replay_15_gear_train` 158, `replay_16_robotic_hand`
+  234 checks, all PASS on the final commit.
+- Unit: 3692 tests, one failure, the known `test_vex_qa_freecad` "parts_list_assembly_twice"
+  (another builder's). New tests: `test_sketch_draw_core.ValueBoxKeys`,
+  `test_book_sketch_c.RoundEdgeCentre`, `test_hole_snaps_core.ClickWhereLit`,
+  `test_gear_core` (4 new, one limit updated: 1.146 -> 1.18),
+  `test_primitives_core.test_snap_points_on_one_spot_give_the_first_listed`.
+- Golden: 649 pass, 2 known xfail.
+- Older scenarios of the changed functions, all PASS: book_sketch_c_names, sketch_tools_slots,
+  sketch_tools_circles, sketch_tools_draw, sketch_tools_modify, sketch_tools_project,
+  book_params_sketch, book_sketch_a_shapes, book_sketch_c_reference,
+  book_sketch_b_dimension_edge, book_joints_snap, book_joints_limits, book_joints_edit,
+  book_joints_motion, book_joints_study, book_joints_survive, joints_components,
+  joints2_motion, book_components_nested, book_components_new, book_components_pattern,
+  components2_pattern, book_modifyc_mirror_assembly, book_components_move,
+  book_components2_structure, bodies_qa_2, book_shell_dialogs, book_shell_ribbon,
+  ribbon_customize, misc_scripts (changed, below), gear_spur, gear_types, gear_refuse,
+  book_modify_gear (changed), book_modify_edit_feature, primitives_qa, primitives_box,
+  book_extrude_primitives, book_components_primitive.
+- Changed older scenarios: `book_modify_gear` (Fusion's root fillet limit: the book's 0.88
+  is made for 100 teeth, the refusal is tested with 0.89); `misc_scripts` P2 (the window
+  closes once a script ran, Fusion's way).
+- `joints2_slider` fails at S5 (the wall, made with Create Components from Bodies, is the
+  design's first component and so grounded by `components_ui.ground_first`; a drag of it is
+  refused). None of my changes touch that path: it comes from the first-component rule of
+  wave 7 (the harness does not switch "FirstComponentGrounded" off for older scenarios,
+  although book_components_new's notes say it does). For the components builder.
+
 ## Notes for other builders (not changed by me)
 
 - FreeCAD's own Line / Circle / Rectangle boxes (`sketch_field_names.FieldNames.wants`)
