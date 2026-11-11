@@ -58,7 +58,7 @@ checks and the items the params builder handed over.
   the origin when there is nothing. Layout Grid on by default, drawn round the point the
   view looks at (it was drawn round the camera's own position: off to a side in an
   isometric view), red X / green Y lines, an origin dot, optional Reference Numbers, inside
-  `SoSkipBoundingGroup`. The harness unticks the grid for the older scenarios (they read
+  `SoSkipBoundingGroup`; not drawn while a sketch is edited (the sketch has its own grid). The harness unticks the grid for the older scenarios (they read
   the colours of the empty view), as components did for the grounded first component.
   A new design is no longer "changed" and has nothing to undo (Ctrl+Z removed its Origin),
   and Capture design history = off now holds for Home's New design too (the preference was

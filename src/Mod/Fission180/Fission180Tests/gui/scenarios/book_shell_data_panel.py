@@ -272,8 +272,6 @@ c_escape.done = lambda: field() is None
 
 def c_narrow():
     """A long path does not widen the panel (the browser was squeezed to a strip)."""
-    from fission180 import browser_ui
-
     deep = os.path.join(
         book(), FUND, "A folder with quite a long name", "And another one inside it"
     )

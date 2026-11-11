@@ -188,6 +188,8 @@ def draw(doc, view=None):
     _detach(doc.Name)
     if not get("LayoutGrid"):
         return
+    if editing_sketch() is not None:
+        return  # a sketch being edited has its own grid, on its own plane (one grid at a time)
     step = current_step(view)
     _STATE["step"] = step
     try:
@@ -331,7 +333,14 @@ def _tick():
             return
         cx, cy = ground_centre(view)
         step = current_step(view)
-        sig = (doc.Name, step, round(cx / step), round(cy / step), bool(get("ReferenceNumbers")))
+        sig = (
+            doc.Name,
+            step,
+            round(cx / step),
+            round(cy / step),
+            bool(get("ReferenceNumbers")),
+            editing_sketch() is not None,
+        )
         if sig != _LAST["sig"]:
             _LAST["sig"] = sig
             draw(doc, view)

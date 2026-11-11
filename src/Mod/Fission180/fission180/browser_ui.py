@@ -2398,8 +2398,10 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             return False
         sub = menu.addMenu("Move to Component")
         sub.setObjectName("Fission180MoveToMenu")
+        from .shown_names import shown_name
+
         for label, target in targets:
-            action = sub.addAction(label)
+            action = sub.addAction(shown_name(label))  # ("Nut & Bolt" keeps its &)
             self._handlers[action] = lambda t=target, m=list(moving): self._move_objects(m, t)
         return True
 

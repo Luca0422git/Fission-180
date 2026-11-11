@@ -171,6 +171,47 @@ def a_window():
     h.check("A the window's own bars: every button paints", not blank, blank[:12])
 
 
+def a_parentless():
+    """A box made without a parent, as FreeCAD's importers and add-ons make theirs."""
+    box = QtWidgets.QMessageBox()
+    box.setWindowTitle("A box without a parent")
+    box.setText("This text must be readable: dark on light or light on dark.")
+    box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+    box.setModal(False)
+    s["box"] = box
+    box.show()
+
+
+a_parentless.done = lambda: s.get("box") is not None and s["box"].isVisible()
+
+
+def a_parentless_check():
+    from fission180 import theme
+
+    box = s.pop("box")
+    h.view_drawn()
+    QtWidgets.QApplication.processEvents()
+    label = box.findChild(QtWidgets.QLabel, "qt_msgbox_label")
+    h.check(
+        "A a box without a parent: its text is readable",
+        label is not None and h.painted(label, need=40, contrast=90),
+    )
+    corner = box.mapToGlobal(QtCore.QPoint(4, box.height() - 4))
+    image = (
+        QtWidgets.QApplication.primaryScreen().grabWindow(0, corner.x(), corner.y(), 2, 2).toImage()
+    )
+    ground = image.pixelColor(0, 0)
+    want = si.rgb(theme.CHROME)
+    near = all(
+        abs(a - b) <= 12 for a, b in zip((ground.red(), ground.green(), ground.blue()), want)
+    )
+    h.check("A ... on the theme's ground, not white", near, (ground.name(), theme.CHROME))
+    blank = h.blank_buttons(box)
+    h.check("A ... its button paints", not blank, blank)
+    box.close()
+    box.deleteLater()
+
+
 def a_light():
     from fission180 import theme
 
@@ -524,7 +565,7 @@ h.run(
     "book_shell_dialogs",
     [setup]
     + walk_steps(WALK)
-    + [a_window, a_light]
+    + [a_window, a_parentless, a_parentless_check, a_light]
     + walk_steps([WALK[0], WALK[8]], " (light look)")
     + [
         a_dark,

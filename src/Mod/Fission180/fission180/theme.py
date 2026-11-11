@@ -320,6 +320,11 @@ QPushButton {{ background: {button}; color: {text}; border: 1px solid {line}; bo
     padding: 4px 14px; }}
 QPushButton:hover {{ background: {hover}; }}
 QPushButton:default {{ border: 1px solid {accent}; }}
+/* Every dialog has the theme's ground. A dialog made as a child of the main window had it
+   already (the rule at the top); one made without a parent (FreeCAD's SVG importer's
+   question, add-ons' boxes) kept the system's light ground under the theme's light text:
+   "white on a white background" (book parity report). */
+QDialog, QMessageBox, QInputDialog {{ background: {chrome}; color: {text}; }}
 /* A plain tool button in a dialog (Parameters' "+" and "-", Save's "..."): without a rule it
    kept the system's light button under the theme's light text, a blank white square (book
    parity report, bug 1). The bars with rules of their own (the ribbon, the timeline, the

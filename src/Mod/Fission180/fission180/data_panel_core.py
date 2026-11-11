@@ -256,8 +256,6 @@ def upload_target(folder, path, exists=os.path.exists):
 
 
 # -- folders and projects (wave 7) ----------------------------------------------------------------
-
-# -- folders and projects (wave 7) ------------------------------------------------------------------
 NEW_PROJECT = "New Project"
 
 

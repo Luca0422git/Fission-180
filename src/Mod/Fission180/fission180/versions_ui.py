@@ -2467,7 +2467,7 @@ def _ensure_dock():
     dock.setTitleBarWidget(_panel_title(dock))
     main.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
     _state["dock"], _state["panel"] = dock, panel
-    _panel_beside_browser(main, dock)
+    _state["beside"] = _panel_beside_browser(main, dock)
     return dock
 
 
@@ -2501,27 +2501,32 @@ def _panel_beside_browser(main, dock):
     """Fusion's Data Panel comes in on the left over the whole height, the browser beside
     it. FreeCAD put a new dock under the browser, where it was a small square (book parity
     report). Only where the browser is docked on the left; a floating or moved browser is
-    left alone."""
+    left alone. True when the two stand side by side afterwards."""
     try:
         from . import browser_ui
 
         browser = browser_ui._state.get("dock")
         if browser is None or browser.isFloating() or not browser.isVisible():
-            return
+            return False  # (Home is in front: tried again the next time the panel shows)
+        if dock.isFloating() or main.dockWidgetArea(dock) != QtCore.Qt.LeftDockWidgetArea:
+            return True  # the person moved the panel: theirs
         if main.dockWidgetArea(browser) != QtCore.Qt.LeftDockWidgetArea:
-            return
+            return True
         if browser_ui._in_overlay(browser):
-            return
+            return False
         wide = max(browser.width(), 200)  # the browser keeps the width it had
         main.splitDockWidget(dock, browser, QtCore.Qt.Horizontal)
         # Qt shares the browser's old width between the two unless each has a least width
         # (the browser came out 64 pixels wide): the 3D view gives the room
-        _state["browser_min"] = (browser, browser.minimumWidth())
+        if not _state.get("browser_min"):
+            _state["browser_min"] = (browser, browser.minimumWidth())
         browser.setMinimumWidth(wide)
         dock.setMinimumWidth(PANEL_WIDTH - 30)
         main.resizeDocks([dock, browser], [PANEL_WIDTH, wide], QtCore.Qt.Horizontal)
+        return True
     except Exception as exc:
         warn("data panel: beside the browser: %s" % exc)
+        return True
 
 
 def panel():
@@ -2530,6 +2535,8 @@ def panel():
 
 def show_panel():
     dock = _ensure_dock()
+    if not _state.get("beside"):  # (it was made while Home hid the browser)
+        _state["beside"] = _panel_beside_browser(_main(), dock)
     _browser_width(True)
     dock.show()
     dock.raise_()
@@ -3208,7 +3215,7 @@ def out_of_date_menu(menu, doc):
     """Fill the application bar's Out-of-Date menu for `doc` (ribbon_ui calls this)."""
     items = out_of_date(doc)
     for kind, _name, words in items:
-        action = menu.addAction(words)
+        action = menu.addAction(str(words).replace("&", "&&"))  # (a name's & stays)
         action.setEnabled(False)
     menu.addSeparator()
     if any(kind in ("link", "derive") for kind, _n, _w in items):

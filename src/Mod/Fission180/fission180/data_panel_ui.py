@@ -1905,7 +1905,7 @@ class DataPanel(QtWidgets.QWidget):
                     if original:
                         twin = os.path.join(os.path.dirname(path), original)
                         menu.addAction(
-                            "Compare with %s" % core.design_name(original),
+                            "Compare with %s" % core.design_name(original).replace("&", "&&"),
                             lambda: vui.compare_files(path, twin),
                         )
                         menu.addAction("Keep This One", lambda: self.keep_copy(path, twin))
