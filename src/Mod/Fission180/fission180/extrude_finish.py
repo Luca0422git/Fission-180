@@ -9,7 +9,8 @@ command started while the dialog was open finishes the dialog first (taskui.Pane
 or Cancel when OK is refused): the edit was dropped without a word.
 
 `SaysWhy` is mixed into the feature dialogs of Extrude, Revolve, Sweep, Loft and the
-primitives:
+primitives (Box, Cylinder, Sphere, Torus, Coil); `speaking` wraps the accept() of the ones
+with many ways out:
 
   refuse(text)   OK was pressed and the dialog stays open: the reason in the dialog and next
                  to the mouse (commands.tell), so the click is answered
@@ -39,6 +40,25 @@ def dropped(title, reason, editing=False):
     return "%s: %s" % (what, reason) if reason else what + "."
 
 
+def speaking(accept):
+    """Decorator for a dialog's accept(): when OK is refused (accept returns False) the
+    reason the dialog shows is also said next to the mouse, so the click is answered. For
+    the dialogs whose accept() has many ways out (Revolve, Sweep, Loft, the primitives)."""
+
+    def wrapped(self, *args, **kwargs):
+        result = accept(self, *args, **kwargs)
+        if result is False and not getattr(self, "_closed", False):
+            try:
+                self._say(not_finished(self._what(), self.message.text()))
+            except Exception:
+                pass
+        return result
+
+    wrapped.__name__ = getattr(accept, "__name__", "accept")
+    wrapped.__doc__ = accept.__doc__
+    return wrapped
+
+
 class SaysWhy:
     """Mixin for a taskui.Panel (before Panel in the bases)."""
 
@@ -53,18 +73,24 @@ class SaysWhy:
         return False
 
     def worth_saying(self):
-        """True when the dialog holds work that a silent Cancel would lose (override)."""
-        return True
+        """True when the dialog holds work that a silent Cancel would lose: a step being
+        edited, or one with a preview (override for more)."""
+        if getattr(self, "editing", False):
+            return True
+        try:
+            return self.feature() is not None
+        except Exception:
+            return False
 
     def finish(self):
         """Another command is starting: keep this edit if it is valid; else drop it and say
         so (it was dropped without a word)."""
-        self._finishing = True
+        self._ending_for_another = True
         try:
             if self.accept():
                 return
         finally:
-            self._finishing = False
+            self._ending_for_another = False
         reason, say = "", False
         try:
             reason = self.message.text()
@@ -80,8 +106,15 @@ class SaysWhy:
         return title[5:] if title.startswith("Edit ") else title
 
     def _say(self, text):
-        if getattr(self, "_finishing", False):
+        if getattr(self, "_ending_for_another", False):
             return  # (finish() says it once, after the dialog closed)
+        import time
+
+        last = getattr(self, "_said", None)
+        now = time.monotonic()
+        if last is not None and last[0] == text and now - last[1] < 0.5:
+            return  # (refuse() and the accept wrapper both speak: once is enough)
+        self._said = (text, now)
         try:
             from . import commands
 

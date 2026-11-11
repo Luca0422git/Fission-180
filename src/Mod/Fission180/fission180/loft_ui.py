@@ -20,7 +20,8 @@ in the dialog, which then stays open.
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import bodies_row_ui, commands, curve_pick, curves, extrude, log, loft, loft_ends_core
+from . import bodies_row_ui, commands, curve_pick, curves, extrude, extrude_finish, log
+from . import loft, loft_ends_core
 from . import preview, profile_pick, taskui, ui_icon_path, warn
 from .compat import QtCore, QtGui, QtWidgets
 from .hole_common import SelectionField
@@ -99,7 +100,7 @@ def _picked_points():
     return points
 
 
-class LoftPanel(Panel):
+class LoftPanel(extrude_finish.SaysWhy, Panel):
     title = "Loft"
     icon = "loft"
     last = None
@@ -969,6 +970,7 @@ class LoftPanel(Panel):
         self.message.setText("⚠ " + text if text else "")
 
     # -- OK / Cancel ------------------------------------------------------------------------------------
+    @extrude_finish.speaking
     def accept(self):
         if self._closed:
             return True

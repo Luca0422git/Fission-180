@@ -29,7 +29,8 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import bodies_row_ui, commands, drag_guard, extrude, handle_look, handles3d, log, preview
+from . import bodies_row_ui, commands, drag_guard, extrude, extrude_finish, handle_look
+from . import handles3d, log, preview
 from . import origin_look, profile_pick, protractor, revolve, taskui, ui_icon_path
 from . import value_limits, warn
 from .compat import QtCore, QtWidgets
@@ -986,7 +987,7 @@ def newest_single_region(body):
 
 
 # -- the dialog ------------------------------------------------------------------------------------
-class RevolvePanel(Panel):
+class RevolvePanel(extrude_finish.SaysWhy, Panel):
     title = "Revolve"
     icon = "revolve"
     last = None
@@ -2264,7 +2265,9 @@ class RevolvePanel(Panel):
         self.bodies_row.built(self.target)
         self.bodies_row.show_cut(self.options["operation"], bool(self.error))
         self._show_bodies_row()
-        if self.error and self.target is not None:
+        # (never over the person's own choice: that stays as picked, with the reason
+        # it cannot be built beside it; extrude_ui does the same)
+        if self.error and self.target is not None and not self.user_picked_operation:
             actual = self._feature_operation()
             if actual != self.options["operation"]:
                 self.options["operation"] = actual
@@ -2430,6 +2433,7 @@ class RevolvePanel(Panel):
             return
         super().finish()
 
+    @extrude_finish.speaking
     def accept(self):
         if self._closed:
             return True
