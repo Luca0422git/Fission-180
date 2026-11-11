@@ -113,7 +113,7 @@ def a_type():
 def a_stays():
     ed = editor()
     h.check("A: after Enter the box stays open", ed is not None)
-    h.check("A: and says why", ed is not None and "Not a value" in ed.message.text())
+    h.check("A: and says why", ed is not None and "no parameter named" in ed.message.text())
     h.click(EMPTY)
 
 

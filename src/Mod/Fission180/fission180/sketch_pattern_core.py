@@ -4,9 +4,15 @@ FreeCAD, no Qt: unit tested (Fission180Tests/unit/test_sketch_pattern_core.py).
 
 The spacing rules are the body patterns' (pattern_core): Quantity counts the original,
 Distance is the Extent (original to last copy) or the Spacing (copy to copy) as the Distance
-Type says, Symmetric repeats the copies on the other side; a circular pattern is Full (evenly
-round the whole circle), Angle (from the original to Total Angle) or Symmetric (the Angle
-pattern on both sides). Here they work on sketch points (x, y).
+Type says; a circular pattern is Full (evenly round the whole circle) or Angle (from the
+original to Total Angle). Here they work on sketch points (x, y).
+
+Symmetric (wave 7, the book parity report): Quantity is the number of instances IN ALL,
+spread to both sides of the original, which stays in the middle (the book: Rectangular
+Pattern, Symmetric, Quantity 5: five holes; until wave 7 Quantity counted each side, 5 gave
+9). An even Quantity cannot be symmetric about the original: the extra copy goes to the
+positive side. The Distance (Extent) and the Total Angle span the whole pattern, first
+instance to last.
 
 Also here: what a drag of a handle makes of the value (the arrow of a direction, the disc of
 the total angle), and which constraints a copy gets (see copied_constraints).
@@ -60,16 +66,56 @@ def apply_all(move, points):
 
 
 # -- where the copies go ----------------------------------------------------------------------
+def _both_sides(quantity, step):
+    """Offsets of `quantity` instances spread to both sides of the original (0, first):
+    half of the copies after it, the others before it (one more after when they cannot be
+    shared evenly)."""
+    quantity = int(quantity)
+    after = quantity // 2
+    before = quantity - 1 - after
+    return (
+        [0.0] + [step * k for k in range(1, after + 1)] + [-step * k for k in range(1, before + 1)]
+    )
+
+
+def linear_offsets(quantity, distance, distribution="extent", direction_type="one"):
+    """Signed offsets of the instances from the original, the original (0) first."""
+    if direction_type != "symmetric":
+        return pcore.linear_offsets(quantity, distance, distribution, "one")
+    quantity = int(quantity)
+    if quantity < 1:
+        raise PatternError("The quantity must be at least 1.")
+    return _both_sides(quantity, pcore.step_of(quantity, distance, distribution))
+
+
+def circular_angles(quantity, angle=360.0, kind="full"):
+    """Angles (degrees) of the instances, the original (0) first."""
+    if kind != "symmetric":
+        return pcore.circular_angles(quantity, angle, kind)
+    quantity = int(quantity)
+    if quantity < 1:
+        raise PatternError("The quantity must be at least 1.")
+    if quantity == 1:
+        return [0.0]
+    if abs(float(angle)) < 1e-9:
+        raise PatternError("The total angle must not be 0.")
+    if abs(abs(float(angle)) - 360.0) < 1e-9:
+        step = 360.0 / quantity  # the whole circle: the last copy does not land on the first
+    else:
+        step = float(angle) / (quantity - 1)
+    return _both_sides(quantity, step)
+
+
 def rect_moves(d1, q1, dist1, d2, q2, dist2, distribution="extent", type1="one", type2="one"):
     """[("move", (dx, dy))] of every copy (the original not included), in rows along
     direction d1 and columns along d2 (unit vectors; d2 None: one direction only)."""
     u1 = unit(d1)
-    offsets1 = pcore.linear_offsets(q1, dist1, distribution, type1)
+    offsets1 = linear_offsets(q1, dist1, distribution, type1)
     offsets2 = [0.0]
     u2 = (0.0, 0.0)
     if d2 is not None and int(q2) > 1:
         u2 = unit(d2)
-        offsets2 = pcore.linear_offsets(q2, dist2, distribution, type2)
+        offsets2 = linear_offsets(q2, dist2, distribution, type2)
     out = []
     for a, b in pcore.grid(offsets1, offsets2)[1:]:
         out.append(("move", (u1[0] * a + u2[0] * b, u1[1] * a + u2[1] * b)))
@@ -77,18 +123,57 @@ def rect_moves(d1, q1, dist1, d2, q2, dist2, distribution="extent", type1="one",
 
 
 def rect_count(q1, type1="one", q2=1, type2="one"):
-    """Instances of a rectangular pattern, the original included."""
-    return pcore.instance_count(q1, type1) * pcore.instance_count(q2, type2)
+    """Instances of a rectangular pattern, the original included (Symmetric or not: the
+    Quantity is the number of instances)."""
+    return max(1, int(q1)) * max(1, int(q2))
 
 
 def circular_moves(centre, quantity, angle=360.0, kind="full"):
     """[("turn", centre, degrees)] of every copy (the original not included)."""
-    angles = pcore.circular_angles(quantity, angle, kind)
+    angles = circular_angles(quantity, angle, kind)
     return [("turn", (float(centre[0]), float(centre[1])), a) for a in angles[1:]]
 
 
+def unique_moves(moves, tolerance=1e-7):
+    """`moves` without the ones that put a copy exactly on the original or on an earlier
+    copy (a turn of 360 degrees, two turns a whole turn apart, a move of nothing): two
+    curves on one spot cannot be told apart or clicked (the book parity report: overlapping
+    arcs left behind), and split the sketch's areas into slivers."""
+    seen = [("move", 0.0, 0.0)]
+    out = []
+    for move in moves:
+        if move[0] == "move":
+            key = ("move", float(move[1][0]), float(move[1][1]))
+            same = [
+                k
+                for k in seen
+                if k[0] == "move" and math.hypot(k[1] - key[1], k[2] - key[2]) <= tolerance
+            ]
+            if not same and abs(key[1]) <= tolerance and abs(key[2]) <= tolerance:
+                same = [key]
+        else:
+            turn = float(move[2]) % 360.0
+            key = ("turn", turn, 0.0)
+            same = [
+                k
+                for k in seen
+                if (k[0] == "turn" and min(abs(k[1] - turn), 360.0 - abs(k[1] - turn)) <= tolerance)
+                or (
+                    k[0] == "move"
+                    and k[1] == 0.0
+                    and k[2] == 0.0
+                    and min(turn, 360.0 - turn) <= tolerance
+                )
+            ]
+        if same:
+            continue
+        seen.append(key)
+        out.append(move)
+    return out
+
+
 def circular_count(quantity, kind="full"):
-    return pcore.instance_count(quantity, "symmetric" if kind == "symmetric" else "one")
+    return max(1, int(quantity))
 
 
 def check_rect(q1, dist1, q2, dist2, type1="one", type2="one"):
@@ -334,3 +419,106 @@ def _is_geo_slot(kind, count, index):
     if kind == "Symmetric":
         return index in (0, 2, 4)
     return False
+
+
+# -- tying the copies to the originals ---------------------------------------------------------
+# Fusion's sketch pattern keeps its copies where the pattern puts them: they follow the
+# original and the sketch stays fully constrained (the book parity report: Fission 180's
+# copies were only Equal to the original, 25 to 79 loose degrees of freedom, they drifted by
+# micrometres and later dimensions did not move them). FreeCAD has no pattern constraint;
+# each copy is tied point by point (sketch_pattern_ties.py):
+#   a line by its two ends, a circle by its centre and Equal, an arc by its two ends and
+#   Equal, a point by itself;
+#   points the originals share (a Coincident between picked curves) are tied once: the
+#   copies get that Coincident too, and one of the joined points carries the tie.
+LINE, CIRCLE, ARC, POINT = (
+    "Part::GeomLineSegment",
+    "Part::GeomCircle",
+    "Part::GeomArcOfCircle",
+    "Part::GeomPoint",
+)
+TIED_TYPES = (LINE, CIRCLE, ARC, POINT)
+
+
+def tie_points(kind):
+    """((pos, ...), equal) for a curve of that type: the points that carry its ties and
+    whether it also needs Equal with its copy."""
+    if kind == LINE:
+        return (1, 2), False
+    if kind == CIRCLE:
+        return (3,), True
+    if kind == ARC:
+        return (1, 2), True
+    if kind == POINT:
+        return (1,), False
+    return (), False
+
+
+def tie_plan(types, coincidents):
+    """What ties a copy of the picked curves: (points, equals, joins).
+    types {geo: TypeId} of the picked curves that can be tied; coincidents [(g1, p1, g2, p2)]
+    the point-to-point Coincidents among them. points: the (geo, pos) to tie to the original
+    (one per group of joined points); equals: the curves that need Equal with their copy;
+    joins: the coincidents to repeat among the copy's curves."""
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    order = []
+    equals = []
+    for geo in types:
+        positions, equal = tie_points(types[geo])
+        for pos in positions:
+            order.append((geo, pos))
+            find((geo, pos))
+        if equal:
+            equals.append(geo)
+    joins = []
+    for g1, p1, g2, p2 in coincidents:
+        if g1 not in types or g2 not in types or p1 == 0 or p2 == 0:
+            continue
+        joins.append((g1, p1, g2, p2))
+        a, b = (g1, p1), (g2, p2)
+        if a in parent and b in parent:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
+    seen = set()
+    points = []
+    for point in order:
+        root = find(point)
+        if root in seen:
+            continue
+        seen.add(root)
+        points.append(point)
+    return points, equals, joins
+
+
+def wrap_turn(degrees):
+    """A turn as the angle FreeCAD's Angle constraint takes: radians in (-pi, pi]."""
+    d = (float(degrees) + 180.0) % 360.0 - 180.0
+    if d <= -180.0 + 1e-12:
+        d = 180.0
+    return math.radians(d)
+
+
+def nearest_copy(point, copies, tolerance):
+    """The index of the copy (a list of polylines each) nearest to `point` within
+    `tolerance`, or None: the instance a Suppression click means."""
+    best = None
+    for index, polylines in enumerate(copies):
+        for poly in polylines:
+            for a, b in zip(poly, poly[1:]):
+                d = segment_distance(point, a, b)
+                if d <= tolerance and (best is None or d < best[0]):
+                    best = (d, index)
+            if len(poly) == 1:
+                d = math.hypot(poly[0][0] - point[0], poly[0][1] - point[1])
+                if d <= tolerance and (best is None or d < best[0]):
+                    best = (d, index)
+    return best[1] if best else None

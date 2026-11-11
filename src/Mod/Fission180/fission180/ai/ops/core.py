@@ -658,8 +658,9 @@ class Builder:
         if not refs:
             raise BuildError("%s %r: nothing picked" % (kind, step["id"]))
         try:
-            blend.trial(kind, info, refs, options)  # the dialog refuses what fails here
-            feature = blend.make(self.body, base, refs, kind, options, step["id"])
+            # the dialog refuses what fails here; Fission 180's own step where only another
+            # route than the kernel's one run builds it (after a modeled thread)
+            feature = blend.make_best(self.body, base, refs, kind, options, step["id"])
         except blend.BlendError as exc:
             raise BuildError("%s %r: %s" % (kind, step["id"], exc))
         self.objects[step["id"]] = feature

@@ -435,7 +435,7 @@ def b_negative_check():
 
 
 def b_text_check():
-    _box_says("abc", "Not a value")
+    _box_says("abc", "no parameter named 'abc'")  # (wave 7: a name is read as a parameter)
     si.type_text("3 kg")
 
 
@@ -1105,13 +1105,17 @@ def l_parallel():
     h.ribbon("Parallel")
 
 
-# FreeCAD notes that one line is not enough before Fission 180 starts the pick mode.
-l_parallel.notes_ok = ("Select at least two lines", "Wrong selection")
-
-
 def l_waits():
-    h.check("L: Parallel with one line selected starts and waits", si.drawing())
-    h.check("L: says what to do", "click what to constrain" in si.tooltip(), si.tooltip())
+    # (wave 7: Parallel is Fission 180's own pick tool; the selected line is its first pick,
+    # as in Fusion, and the hint beside the pointer says what to click next. It used to be
+    # FreeCAD's command, restarted in its pick mode with the selection dropped.)
+    from fission180 import sketch_draw
+
+    tool = sketch_draw.current_tool()
+    h.check("L: Parallel with one line selected starts and waits", si.drawing() and tool is not None)
+    h.check("L: the selected line is its first pick", tool is not None and len(tool.picks) == 1)
+    hint = tool.hint_text() if tool is not None else ""
+    h.check("L: says what to do", "click the line" in hint, hint)
     h.check("L: no constraint yet", len(s["sk"].Constraints) == s["count"])
     si.click(s["mids"][0])
 

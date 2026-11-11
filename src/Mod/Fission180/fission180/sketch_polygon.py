@@ -102,7 +102,13 @@ def add_polygon(sketch, sides, center, point, circumscribed, construction=False)
         constraints.append(Sketcher.Constraint("Tangent", lines[0], inner))
         constraints.append(Sketcher.Constraint("Coincident", helper, 1, outer, 3))
         constraints.append(Sketcher.Constraint("Symmetric", lines[0], 1, lines[0], 2, helper, 2))
+    first = len(sketch.Constraints)
     sketch.addConstraint(constraints)
+    from . import sketch_draw_helpers
+
+    # Fusion shows the polygon, not what holds it together: the helper constraints are not
+    # drawn, nor a circumscribed polygon's corner circle and spoke (sketch_draw_helpers.py)
+    sketch_draw_helpers.tidy_polygon(sketch, ids, sides, circumscribed, first)
     return ids
 
 

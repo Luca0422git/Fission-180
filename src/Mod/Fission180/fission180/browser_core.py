@@ -330,6 +330,11 @@ def _folders(objects, active_body, component):
             if obj.get("describe"):
                 node["tip"] = node["tip"] or obj["describe"]
             flat_patterns.append(node)
+        elif type_id in SKETCH_TYPES and obj.get("helper") == "HoleSketch":
+            # the sketch Fission 180 keeps for a Single Hole's point: Fusion's hole has no
+            # sketch row (book parity report: 'each single Hole adds a "Hole 1 Sketch" row
+            # under Sketches'). The hole is edited from the timeline.
+            pass
         elif type_id in SKETCH_TYPES:
             # Fusion: a padlock on the icon of a fully constrained sketch
             sketches.append(
@@ -458,7 +463,11 @@ def build(
     children = [settings, _node("views", "Named Views", "folder", "views", children=named)]
     children += folders
     children += components  # Fusion lists the components after the root's own folders
-    root = _node("document", doc_label, "document", "document", children=children)
+    # (wave 7) a design that holds components is an assembly: Fusion's stacked icon
+    root = _node(
+        "document", doc_label, "assembly" if components else "document", "document",
+        children=children,
+    )
     root["active"] = active_component is None  # the root component's activate mark
     if root["active"] and components:
         root["tip"] = "Active component (root): new sketches and bodies go here"
@@ -596,9 +605,13 @@ MENUS = {
         "-",
         "Ground",
         "-",
+        "Move/Copy",  # (wave 7: Fusion's component menu has it; Move opens on the component)
         "Copy",
         "Paste",
         "Paste New",
+        "-",
+        "Create Drawing",  # (wave 7: the DRAWING workspace's Create Drawing)
+        "Properties",  # (wave 7: shown when the Properties command exists)
         "-",
         "Show/Hide",
         "Selectable/Unselectable",
@@ -647,6 +660,7 @@ MENUS = {
         "Edit Joint Limits",
         "Drive Joints",
         "Animate Joint",
+        "Animate Joint Relationships",
         "-",
         "Show/Hide",
         "Suppress",
@@ -795,9 +809,7 @@ def eye_rows(rows):
     shows it again with its own eye), then the others in their order. ``rows``: nodes with
     a "depth" (folders above them) where known."""
     shown = [n for n in rows if n.get("visible") is not None]
-    parts = sorted(
-        [n for n in shown if n["kind"] == "component"], key=lambda n: n.get("depth", 0)
-    )
+    parts = sorted([n for n in shown if n["kind"] == "component"], key=lambda n: n.get("depth", 0))
     return parts + [n for n in shown if n["kind"] != "component"]
 
 

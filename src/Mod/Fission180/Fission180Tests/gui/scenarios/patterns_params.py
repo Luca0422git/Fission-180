@@ -15,6 +15,7 @@
 
 Hand-derived: box 12000; a through hole r 2 removes pi 2^2 10.
 """
+
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtCore, QtWidgets
@@ -215,9 +216,17 @@ def bodies_formula():
 
 def bodies_refused():
     p = ps.panel()
-    h.check("the dialog says why", "plain number" in p.message.text(), p.message.text())
-    h.check("no formula taken", "quantity" not in p.options["expressions"])
-    h.check("the field is as it was", p.quantity.value() == 2, p.quantity.value())
+    # Fusion takes a parameter here; each copy of a body is a body of its own, so Fission 180
+    # takes the number the parameter gives now and says that it is kept as a number (wave 7,
+    # the book's Metric Bolt; it was refused: "takes a plain number as its quantity")
+    h.check("no refusal", not p.message.text(), p.message.text())
+    h.check(
+        "the dialog says the number is what n gives now, and that it is kept as a number",
+        "Quantity 2 is what 'n' gives now" in p.info.text() and "keeps the number" in p.info.text(),
+        p.info.text(),
+    )
+    h.check("no formula kept", "quantity" not in p.options["expressions"])
+    h.check("the field shows n's value", p.quantity.value() == 2, p.quantity.value())
     h.press(QtCore.Qt.Key_Escape)
 
 

@@ -230,5 +230,76 @@ class ModeTests(unittest.TestCase):
         self.assertTrue(close(core.project_to_plane((3, 4, 9), (0, 0, 5), (0, 0, 2)), (3, 4, 5)))
 
 
+class TiedMotionTests(unittest.TestCase):
+    """Fusion's Link with Same Joint: a screw of 2 mm pitch (slide = angle x 2 / 360)."""
+
+    RATIO = 2.0 / 360.0
+
+    def test_the_turn_takes_the_slide_along(self):
+        self.assertEqual(mc.tied_values(self.RATIO, 0.0, first=720.0), (720.0, 4.0))
+
+    def test_the_slide_takes_the_turn_along(self):
+        first, second = mc.tied_values(self.RATIO, 0.0, second=1.0)
+        self.assertAlmostEqual(first, 180.0)
+        self.assertEqual(second, 1.0)
+
+    def test_both_given_the_lead_counts(self):
+        self.assertEqual(mc.tied_values(self.RATIO, 0.0, 360.0, 9.0, "first"), (360.0, 2.0))
+        first, second = mc.tied_values(self.RATIO, 0.0, 360.0, 1.0, "second")
+        self.assertAlmostEqual(first, 180.0)
+        self.assertEqual(second, 1.0)
+
+    def test_offset_and_reverse(self):
+        ratio = mc.link_ratio(360.0, 2.0, reverse=True)
+        self.assertAlmostEqual(mc.tied_values(ratio, 0.5, first=360.0)[1], -1.5)
+
+    def test_nothing_asked_nothing_given(self):
+        self.assertEqual(mc.tied_values(self.RATIO, 0.0), (None, None))
+
+    def test_a_zero_ratio_keeps_the_leading_value(self):
+        self.assertEqual(mc.tied_values(0.0, 0.0, 30.0, 5.0, "second"), (30.0, 5.0))
+
+
+class StudyGraphTests(unittest.TestCase):
+    """The Motion Study graph: 220 px wide, 120 high, a margin of 10."""
+
+    W, H, M = 220, 120, 10
+
+    def test_steps_and_pixels_go_both_ways(self):
+        self.assertEqual(mc.graph_x(0, self.W, self.M), 10)
+        self.assertEqual(mc.graph_x(100, self.W, self.M), 210)
+        self.assertEqual(mc.graph_x(50, self.W, self.M), 110)
+        for step in (0, 25, 50, 99, 100):
+            self.assertEqual(mc.graph_step(mc.graph_x(step, self.W, self.M), self.W, self.M), step)
+        self.assertEqual(mc.graph_step(-50, self.W, self.M), 0)
+        self.assertEqual(mc.graph_step(999, self.W, self.M), 100)
+
+    def test_higher_values_are_higher_up(self):
+        low, high = mc.graph_range([[0, 0.0], [100, 360.0]])
+        self.assertEqual((low, high), (0.0, 360.0))
+        self.assertEqual(mc.graph_y(360.0, low, high, self.H, self.M), 10)
+        self.assertEqual(mc.graph_y(0.0, low, high, self.H, self.M), 110)
+
+    def test_a_flat_line_gets_room(self):
+        low, high = mc.graph_range([[0, 5.0]])
+        self.assertLess(low, 5.0)
+        self.assertGreater(high, 5.0)
+        self.assertEqual(mc.graph_y(5.0, low, high, self.H, self.M), 60)
+
+    def test_the_line_is_flat_before_and_after_its_points(self):
+        line = mc.graph_line([[25, 0.0], [75, 10.0]], self.W, self.H, self.M)
+        self.assertEqual([round(x) for x, _y in line], [10, 60, 160, 210])
+        self.assertEqual([round(y) for _x, y in line], [110, 110, 10, 10])
+        self.assertEqual(mc.graph_line([], self.W, self.H, self.M), [])
+
+    def test_a_click_means_the_nearest_line(self):
+        rising = [[0, 0.0], [100, 10.0]]
+        falling = [[0, 10.0], [100, 0.0]]
+        self.assertEqual(mc.graph_lane([rising, falling], 0, 108, self.H, self.M), 0)
+        self.assertEqual(mc.graph_lane([rising, falling], 0, 12, self.H, self.M), 1)
+        self.assertEqual(mc.graph_lane([rising, falling], 100, 12, self.H, self.M), 0)
+        self.assertIsNone(mc.graph_lane([[]], 50, 60, self.H, self.M))
+
+
 if __name__ == "__main__":
     unittest.main()

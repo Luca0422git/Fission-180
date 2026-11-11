@@ -133,7 +133,28 @@ class CombineFeature:
             raise CombineError(
                 "Its tool bodies are gone (deleted?). Edit the Combine and pick the tool bodies."
             )
-        result = combine_shapes(base, shapes, obj.Operation.lower())
+        try:
+            result = combine_shapes(base, shapes, obj.Operation.lower())
+        except CombineError as exc:
+            if obj.Operation.lower() == "cut" and "leave nothing" in str(exc):
+                # which body is cut by which (the book parity run got "Cut would leave nothing
+                # of the target body" for a bolt and a wall and could not tell why: the bolt,
+                # picked first, was the target, and it lies wholly inside the wall)
+                target = bodies.body_of(base_obj) if base_obj is not None else None
+                names = [b.Label for b in (bodies.body_of(t) for t in tools) if b is not None]
+                raise CombineError(
+                    "Cut would leave nothing of %s: it lies wholly inside %s. The target is "
+                    "the body that is cut and kept (the first one picked), the tools are what "
+                    "is taken out of it: to cut %s out of %s instead, pick them the other "
+                    "way round."
+                    % (
+                        target.Label if target is not None else "the target body",
+                        " and ".join(names) or "the tool bodies",
+                        target.Label if target is not None else "it",
+                        " and ".join(names) or "the tool body",
+                    )
+                )
+            raise
         shape = bodies.as_result(result, refine=bool(obj.Refine))
         obj.Shape = bodies.to_local(shape, body)
 

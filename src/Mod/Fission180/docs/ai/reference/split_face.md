@@ -62,5 +62,5 @@ Done: AI: Split face. Its id is 'SplitFace'. Bodies now: Body1: 6283.19 mm3, 20 
 
 ## See also
 
-- Golden models built with its steps (read one with docs_read golden/<id>): `direct_split_face_closest_point`, `direct_split_face_extend`, `direct_split_face_then_press_pull`, `direct_split_face_yz`, `surface4_split_face_merge`
+- Golden models built with its steps (read one with docs_read golden/<id>): `book_pattern_repeats_split_face`, `book_split_face_kept_by_later_extrude`, `direct_split_face_closest_point`, `direct_split_face_extend`, `direct_split_face_then_press_pull`, `direct_split_face_yz`, `surface4_split_face_merge`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

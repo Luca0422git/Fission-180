@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180's golden models are 625 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
+Fission 180's golden models are 633 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
 
 ## By feature
 
@@ -345,8 +345,9 @@ Each model is listed under its first tag; its other tags follow it.
 - `bodies_split_two_planes`: Split Body with two splitting tools at once (YZ and XZ planes): four bodies, one step [split]
 - `bodies_split_yz`: A box centred on the origin split by the YZ origin plane into two bodies [split]
 
-### pattern (24)
+### pattern (25)
 
+- `book_pattern_repeats_split_face`: Saturn V: a feature pattern with a Split Face among its features [split, book]
 - `flange_polar_holes`: Disc r40 x 10 with 6 holes r4 on a circular pattern [circular]
 - `modify2_pattern_adjust_to_slope`: Wedge, a hole cut from below up to the sloped top, repeated 3 times with Compute Option Adjust [compute-option, adjust, fusion-dialog]
 - `modify2_pattern_identical_to_slope`: The same wedge and hole, repeated 3 times with Compute Option Identical [compute-option, identical, fusion-dialog]
@@ -547,6 +548,23 @@ Each model is listed under its first tag; its other tags follow it.
 - `shell_filleted_box`: Enclosure: box 60x40x30, vertical edges r5, shell 2 open top [fillet, enclosure]
 - `shell_open_box`: Box 60x40x30 shelled 2 mm inward, top removed [enclosure]
 
+### thread (14)
+
+- `book_chamfer_after_modeled_thread`: A 3 mm chamfer made after a modeled M33x3.5 thread [chamfer, book, robust]
+- `book_thread_dragged_before_chamfer`: Geocache screw: the Thread dragged before the Chamfer in the timeline [chamfer, book, timeline, robust]
+- `book_thread_m6_in_6mm_hole`: Hot End: a 6 mm hole threaded: M6x1 is offered and the hole gets its minor diameter [hole, book]
+- `book_thread_pipe_g14`: Tesla Turbine: an ISO pipe thread G 1/4 on a d13.157 pipe end [pipe, book]
+- `book_thread_stops_at_chamfer`: Geocache screw: chamfer 3, then a modeled M33x3.5 thread (it stops at the chamfer) [chamfer, book]
+- `book_thread_survives_deleted_chamfer`: The chamfer under a thread deleted: the thread stays, over the whole shaft [chamfer, book, timeline]
+- `thread_edit_length`: Modeled M6x1 thread, 8 long, edited to 5 [modeled, edit]
+- `thread_hole_modeled`: Modeled inside M6x1 thread in a d5 through hole (size taken from the hole) [modeled, inside]
+- `thread_second_after_modeled`: Two cosmetic threads on one boss; the first made Modeled afterwards: the second stays [modeled, edit]
+- `thread_shaft_cosmetic`: Cosmetic M6 thread on a d6 x 12 boss [cosmetic]
+- `thread_shaft_modeled`: Modeled M6x1 thread over the whole d6 x 12 boss [modeled]
+- `thread_shaft_modeled_6e`: Modeled M6x1 thread of class 6e on a d6 shaft (the class moves it in) [modeled, class]
+- `thread_shaft_partial`: Modeled M6x1 thread 8 long, 2 in from the end of the boss [modeled, partial]
+- `thread_two_holes`: One modeled M6x1 thread on two d5 through holes at once [modeled, inside, multiple]
+
 ### sketch (12)
 
 - `sketch_face_line_through_circle`: Block 100x40x20, sketch on its top with the face's edges projected, a line across the face and a circle r6 on it: both halves of the circle extruded 10 [auto-project, regions]
@@ -621,17 +639,6 @@ Each model is listed under its first tag; its other tags follow it.
 - `sf_scale_non_uniform`: Box scaled non uniformly X 2, Y 1, Z 0.5 about the origin [fission180-scale]
 - `sf_scale_non_uniform_keeps_faces`: Scale 2, Press Pull the top 5, the scale edited to Non Uniform 2 / 1 / 1: the Press Pull keeps the top [edit, press-pull, reference-stability]
 - `sf_scale_uniform`: Box 40x30x10 scaled 2 about the origin [fission180-scale]
-
-### thread (8)
-
-- `thread_edit_length`: Modeled M6x1 thread, 8 long, edited to 5 [modeled, edit]
-- `thread_hole_modeled`: Modeled inside M6x1 thread in a d5 through hole (size taken from the hole) [modeled, inside]
-- `thread_second_after_modeled`: Two cosmetic threads on one boss; the first made Modeled afterwards: the second stays [modeled, edit]
-- `thread_shaft_cosmetic`: Cosmetic M6 thread on a d6 x 12 boss [cosmetic]
-- `thread_shaft_modeled`: Modeled M6x1 thread over the whole d6 x 12 boss [modeled]
-- `thread_shaft_modeled_6e`: Modeled M6x1 thread of class 6e on a d6 shaft (the class moves it in) [modeled, class]
-- `thread_shaft_partial`: Modeled M6x1 thread 8 long, 2 in from the end of the boss [modeled, partial]
-- `thread_two_holes`: One modeled M6x1 thread on two d5 through holes at once [modeled, inside, multiple]
 
 ### gear (7)
 
@@ -768,6 +775,10 @@ Each model is listed under its first tag; its other tags follow it.
 
 - `modify2_replace_face_cone`: A box's top face replaced onto the face of a cone (another body) [cone, fusion-dialog]
 
+### split (1)
+
+- `book_split_face_kept_by_later_extrude`: Saturn V: a split face stays split under the next extrude [refine, book]
+
 ## By design-step op
 
 | Op | Built by the tools | Models | Some of them |
@@ -782,7 +793,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `anim_show_hide` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
 | `anim_storyboard` | (a test helper) | 2 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse` |
 | `anim_transform` | (a test helper) | 1 | `anim_sequential_transform_reverse` |
-| `blend_chamfer` | `chamfer` | 9 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `live_blend_chamfer_angle` |
+| `blend_chamfer` | `chamfer` | 13 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `book_chamfer_after_modeled_thread` |
 | `blend_edit` | `edit_step` | 1 | `blend_edit_keeps_later_chamfer` |
 | `blend_fillet` | `fillet` | 14 | `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature`, `blend_fillet_edit_radius`, `blend_fillet_presspull_radius`, `blend_fillet_slot_chain` |
 | `blend_insert` | `fillet`, `chamfer` | 1 | `blend_insert_chamfer_before_fillet` |
@@ -807,7 +818,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `construct` | `construct_plane`, `construct_axis`, `construct_point` | 6 | `inspect_angle_plane_notch`, `inspect_construct_all`, `inspect_midplane_hole`, `inspect_offset_plane_boss`, `inspect_offset_plane_to_object` |
 | `construct_expect` | (a test helper) | 6 | `inspect_angle_plane_notch`, `inspect_construct_all`, `inspect_midplane_hole`, `inspect_offset_plane_boss`, `inspect_offset_plane_to_object` |
 | `construct_extrude` | (a test helper) | 5 | `inspect_angle_plane_notch`, `inspect_midplane_hole`, `inspect_offset_plane_boss`, `inspect_offset_plane_to_object`, `inspect_three_points_oblique_hole` |
-| `delete` | `delete_step` | 5 | `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `hole_second_survives_first`, `tl_delete_before_fillet`, `tl_delete_hole` |
+| `delete` | `delete_step` | 6 | `book_thread_survives_deleted_chamfer`, `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `hole_second_survives_first`, `tl_delete_before_fillet` |
 | `delete_bodies` | `delete_bodies` | 2 | `bodies_combine_new_body_target_deleted`, `bodies_combine_tool_deleted` |
 | `delete_face` | `delete_face` | 2 | `bodies_delete_face_fillet`, `bodies_delete_face_hole` |
 | `edit` | `set_sketch_dimension`, `edit_step` | 32 | `blend_fillet_edit_radius`, `bodies_combine_follows_tool`, `comp_paste_instance_follows`, `comp_paste_new_independent`, `edit_extrude_then_shell` |
@@ -817,7 +828,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `expect_move_refused` | (a test helper) | 1 | `extrude_multi_move` |
 | `expect_radius` | (a test helper) | 1 | `sf_sweep_guide_surface` |
 | `export_report_expect` | (a test helper) | 2 | `export_report_design`, `export_report_sketch_dxf` |
-| `extrude` | `extrude` | 417 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `extrude` | `extrude` | 425 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `fillet` | (a test helper) | 23 | `bodies_delete_face_fillet`, `bracket_inner_fillet`, `edit_fillet_radius`, `edit_width_after_fillet_and_hole`, `fillet_all_edges` |
 | `fillet_sets` | `fillet_sets` | 14 | `fillet2_chamfer_sets_angle_flip`, `fillet2_chord_90_120`, `fillet2_face_and_its_edge_in_two_sets`, `fillet2_presspull_set_radius`, `fillet2_sets_tangent_chain_each` |
 | `full_round` | `full_round_fillet` | 1 | `fillet2_full_round_rib` |
@@ -836,7 +847,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `measure_expect` | (a test helper) | 2 | `inspect_measure_section`, `inspect_three_points_oblique_hole` |
 | `mirror` | (a test helper) | 1 | `mirror_boss` |
 | `modify_edit` | `edit_step` | 2 | `direct_replace_face_edit_down`, `direct_silhouette_edit_to_faces` |
-| `move` | `move_step` | 2 | `extrude_multi_move`, `tl_move_fillet_earlier` |
+| `move` | `move_step` | 3 | `book_thread_dragged_before_chamfer`, `extrude_multi_move`, `tl_move_fillet_earlier` |
 | `move_bodies` | `move_copy` | 14 | `bodies_move_copy`, `bodies_move_edit`, `bodies_move_free`, `bodies_move_point_to_point`, `bodies_move_point_to_position` |
 | `move_face` | `move_copy` | 6 | `modify2_move_face_boss_down`, `modify2_move_face_edit`, `modify2_move_face_hole`, `modify2_move_face_tilt`, `modify2_move_face_top` |
 | `move_face_edit` | `edit_step` | 1 | `modify2_move_face_edit` |
@@ -847,7 +858,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `pattern_rect` | `pattern` | 2 | `edit_pattern_count`, `plate_hole_grid` |
 | `press_pull` | `press_pull` | 25 | `blend_fillet_presspull_radius`, `direct_history_off_on`, `direct_split_face_then_press_pull`, `fillet2_presspull_set_radius`, `pp_boss_grow` |
 | `press_pull_type` | `press_pull` | 4 | `modify2_presspull_modify_extrude`, `modify2_presspull_modify_offset`, `modify2_presspull_modify_pocket`, `modify2_presspull_new_offset` |
-| `rectangular_pattern` | `rectangular_pattern` | 17 | `mirror_hole_and_its_pattern`, `modify2_pattern_adjust_to_slope`, `modify2_pattern_identical_to_slope`, `modify2_pattern_multibody_cut`, `pattern_bodies_in_moved_component` |
+| `rectangular_pattern` | `rectangular_pattern` | 18 | `book_pattern_repeats_split_face`, `mirror_hole_and_its_pattern`, `modify2_pattern_adjust_to_slope`, `modify2_pattern_identical_to_slope`, `modify2_pattern_multibody_cut` |
 | `remove_bodies` | `remove_bodies` | 1 | `direct_remove_body` |
 | `reopen` | (a test helper) | 9 | `fillet2_two_sets`, `live_fillet2_two_sets`, `picks_fillet_chamfer_kept_after_reopen`, `sf_coil_old_narrow_upgraded`, `sf_pipe_old_upgraded` |
 | `reopen_check` | (a test helper) | 2 | `extrude_multi_cut_reopen`, `surface3_stitch_join` |
@@ -915,14 +926,14 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_unfold` | `unfold` | 2 | `sm_flat_unfold_cut_refold`, `sm_flat_unfold_one_bend` |
 | `shell` | `shell` | 28 | `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain` |
 | `silhouette_split` | `silhouette_split` | 3 | `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere` |
-| `sketch` | `create_sketch` | 527 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
+| `sketch` | `create_sketch` | 535 | `blend_chamfer_angle`, `blend_chamfer_top_face`, `blend_chamfer_two_flip`, `blend_edit_keeps_later_chamfer`, `blend_fillet_boss_feature` |
 | `sketch_extras` | (a test helper) | 1 | `export_report_sketch_dxf` |
 | `sketch_offset_expect` | (a test helper) | 4 | `sketch_offset_circle_symmetric`, `sketch_offset_rect_edit`, `sketch_offset_rounded_fixed_out`, `sketch_offset_slot_fixed_in` |
 | `sketch_polygon` | `sketch_polygon` | 2 | `sketch_inscribed_pentagon`, `sketch_nut_trap_polygon` |
 | `sketch_trim` | `sketch_trim` | 1 | `sketch_trim_union` |
 | `split_body` | `split_body` | 11 | `bodies_split_by_body`, `bodies_split_edit_tool`, `bodies_split_face_extended`, `bodies_split_sketch_line`, `bodies_split_two_planes` |
-| `split_face` | `split_face` | 5 | `direct_split_face_closest_point`, `direct_split_face_extend`, `direct_split_face_then_press_pull`, `direct_split_face_yz`, `surface4_split_face_merge` |
+| `split_face` | `split_face` | 7 | `book_pattern_repeats_split_face`, `book_split_face_kept_by_later_extrude`, `direct_split_face_closest_point`, `direct_split_face_extend`, `direct_split_face_then_press_pull` |
 | `suppress` | `suppress_step` | 9 | `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `extrude_multi_move`, `hole_second_survives_first`, `plastic2_lip_suppress` |
-| `thread` | `thread` | 8 | `thread_edit_length`, `thread_hole_modeled`, `thread_second_after_modeled`, `thread_shaft_cosmetic`, `thread_shaft_modeled` |
+| `thread` | `thread` | 14 | `book_chamfer_after_modeled_thread`, `book_thread_dragged_before_chamfer`, `book_thread_m6_in_6mm_hole`, `book_thread_pipe_g14`, `book_thread_stops_at_chamfer` |
 | `unsuppress` | `suppress_step` | 8 | `extrude_multi_cut_timeline`, `extrude_multi_join_delete`, `extrude_multi_move`, `hole_second_survives_first`, `plastic2_lip_suppress` |
 | `use_body` | `surface_modify`, `activate` | 26 | `extrude_multi_cut`, `extrude_multi_cut_all`, `extrude_multi_cut_all_far`, `extrude_multi_cut_edit`, `extrude_multi_cut_excluded` |

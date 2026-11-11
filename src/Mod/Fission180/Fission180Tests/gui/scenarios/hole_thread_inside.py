@@ -5,8 +5,10 @@
 2. H, click the boss's side: the hole goes in square to the surface where it was clicked
    (d2, depth 3, flat). OK.
 3. H, a d5 through hole in the top face at (8, 8). OK.
-4. Click the wall of that hole, then CREATE > Thread: an inside thread M6x1 (6H) starts on
-   it at once, cosmetic; Modeled cuts it. OK, Ctrl+Z, Ctrl+Y.
+4. Click the wall of that hole, then CREATE > Thread: an inside thread M5x0.8 (6H) starts on
+   it at once, cosmetic (Fusion offers the size nearest the hole's diameter and gives the
+   hole the thread's minor diameter; until wave 7 a hole was matched by its tap drill: M6);
+   Modeled cuts it. OK, Ctrl+Z, Ctrl+Y.
 
 Hand-derived:
   the radial hole starts on the plane touching the boss (R 3) at the click, so it removes
@@ -55,7 +57,7 @@ def inside_removed():
     from fission180 import thread_tables
 
     # a modeled thread lies in the middle of its class's zone (6H in a hole)
-    d = thread_tables.find("iso", "M6x1")
+    d = thread_tables.find("iso", "M5x0.8")
     return thread_core.class_removed_volume(d, "6H", True, 2.5, 10.0)
 
 
@@ -186,8 +188,8 @@ def inside():
         return
     h.check("an inside thread", "Inside" in p.info.text(), p.info.text())
     h.check(
-        "size from the tap drill: M6x1",
-        p.designation.currentText() == "M6x1",
+        "size from the hole's diameter: M5x0.8",
+        p.designation.currentText() == "M5x0.8",
         p.designation.currentText(),
     )
     h.check(
@@ -200,7 +202,7 @@ def inside():
 def modeled():
     v = h.solid_volume()
     expect = s["v"] - inside_removed()
-    h.check("modeled inside M6x1 through 10 mm", hs.close(v, expect), (v, expect))
+    h.check("modeled inside M5x0.8 through 10 mm", hs.close(v, expect), (v, expect))
     h.check("valid solid", h.body().Shape.isValid())
     h.shot("2-inside")
     h.task_button("OK")

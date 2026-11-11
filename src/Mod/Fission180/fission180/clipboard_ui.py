@@ -113,10 +113,14 @@ def paste(into=None, new=False):
         try:
             for part in parts:
                 where = _target(doc, instances.definition(part) or part, into)
+                # (wave 7) the paste stands on the occurrence that was copied, not on
+                # its original: a copy of Bolt:5 starts where Bolt:5 is (book parity
+                # report, Tesla Turbine: its place was lost)
+                here = instances.global_placement(part)
                 if new:
-                    made.append(instances.paste_new(part, where))
+                    made.append(instances.paste_new(part, where, placement=here))
                 else:
-                    made.append(instances.make_instance(part, where))
+                    made.append(instances.make_instance(part, where, placement=here))
             doc.recompute()
         except Exception as exc:
             doc.abortTransaction()

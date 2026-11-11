@@ -12,6 +12,13 @@ a chain of its own.
 A box drag in the sketch (FreeCAD's own window / crossing box): Fusion's modifiers, the
 same as on the part (parity/selection.md): a plain box replaces the selection, Shift adds,
 Ctrl adds what was not selected and removes what was.
+
+A click on a curve, point or dimension (Autodesk "Selection in Fusion", the book parity
+report of 2026-11-10): a plain click makes it the selection, replacing what was selected;
+Ctrl adds what was not selected and removes what was; Shift only adds. FreeCAD's sketch
+toggles on every click, whatever the keys (a plain click on a second curve added it). While
+a command collects curves (Rectangular Pattern waiting for its curves and Enter) a plain
+click adds, as in Fusion's selection boxes.
 """
 
 TOL = 1e-6
@@ -64,3 +71,48 @@ def toggled(before, boxed):
     boxed_set = set(boxed)
     before_set = set(before)
     return [k for k in before if k not in boxed_set] + [k for k in boxed if k not in before_set]
+
+
+AXES = ("H_Axis", "V_Axis")
+
+
+def places_dimension(preview, picked, under_pointer):
+    """A click while the Dimension tool runs: True when it places the dimension that
+    follows the pointer, False when it picks what is under the pointer.
+
+    preview: a dimension already follows the pointer; picked: how many things the tool
+    has picked; under_pointer: the names FreeCAD lights there ("Edge3", "H_Axis"...).
+
+    Fusion: the things to dimension are picked (one, or two), then a click places the
+    dimension. A third thing is never picked, and the sketch's own axes are no curves:
+    FreeCAD's tool took any click on a curve or an axis for one more pick, so a dimension
+    placed over the Y axis or over another line became an angle or a driven dimension
+    (the book parity report: Drone, Pizza Cutter, Hot End)."""
+    if not preview:
+        return False  # nothing to place yet: the click picks
+    if not under_pointer:
+        return True  # empty space: FreeCAD places it anyway
+    if picked >= 2:
+        return True
+    return all(name in AXES for name in under_pointer)
+
+
+def click_plan(shift, ctrl, collecting):
+    """What a click on something does with the selection: "replace", "add" or "toggle"."""
+    if ctrl:
+        return "toggle"
+    if shift:
+        return "add"
+    return "toggle" if collecting else "replace"
+
+
+def after_click(before, clicked, plan):
+    """The selection after a click: `before` what was selected when the button went down,
+    `clicked` what the click was on (one curve or point; several dimensions drawn on one
+    another), in a stable order (what stays first)."""
+    clicked = list(dict.fromkeys(clicked))
+    if plan == "replace":
+        return clicked
+    if plan == "add":
+        return list(before) + [k for k in clicked if k not in before]
+    return toggled(before, clicked)

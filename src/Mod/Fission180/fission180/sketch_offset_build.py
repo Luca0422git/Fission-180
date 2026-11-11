@@ -237,6 +237,14 @@ def add_offset(sketch, chains, curves, results, distance, construction=False):
             sketch.setLabelPosition(dimension, distance / 2.0 + max(2.0, 0.5 * distance))
         except Exception:
             pass
+    try:
+        # the square lines work unseen (wave 7, the book parity report: "besides the offset
+        # lines it adds short connector lines"; Fusion's offset shows the parallel curve only)
+        from . import sketch_helpers
+
+        sketch_helpers.hide(sketch, helpers)
+    except Exception as exc:
+        log("Offset: the helper lines stay visible (%s)" % exc)
     return {
         "curves": new_curves,
         "helpers": helpers,

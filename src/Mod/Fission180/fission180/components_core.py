@@ -166,17 +166,18 @@ def paste_new_label(label, labels):
 
 # -- picking a component in the 3D view -------------------------------------------------------
 def component_to_pick(chain, active):
-    """The component a click picks when Move's Object type is Components (Fusion selects the
-    occurrence just below the active component on the way to what was clicked).
+    """The component a click in the window picks when components are asked for (Move's
+    Components, a pattern of components): the one that directly holds what was clicked,
+    also inside a subassembly. Fusion's subassemblies are flexible: a part of one is
+    picked, dragged and moved on its own, and a whole subassembly is picked by its browser
+    row. (Until wave 7 this gave the component just below the active one, so with the
+    design's row active a click on a bolt of a subassembly took the whole subassembly:
+    book parity report, Tesla Turbine and Gear Train.)
     ``chain``: the containers of the clicked object, nearest first (names); ``active``: the
-    active component (None: the root). None when the object lies in no component."""
+    active component (None: the root; kept for callers, it no longer decides). None when
+    the object lies in no component."""
     chain = list(chain)
-    if not chain:
-        return None
-    if active is None or active not in chain:
-        return chain[-1]
-    index = chain.index(active)
-    return chain[index - 1] if index > 0 else chain[0]
+    return chain[0] if chain else None
 
 
 # -- Move: Set Pivot ---------------------------------------------------------------------------

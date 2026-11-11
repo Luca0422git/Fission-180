@@ -210,6 +210,25 @@ class ComponentMovePanel(MovePanel):
         return None
 
     # -- the pivot, the size of the manipulator ------------------------------------------------
+    def _new_pivot(self):
+        """The manipulator starts on the ORIGIN of the first component picked, so a typed
+        angle turns the component about its own origin, as in Fusion (book parity report,
+        Drone: a pasted motor turned 180 degrees about the middle of its solids landed
+        6.4 mm off; the Gear Train's gear). Set Pivot moves it for this command."""
+        if getattr(self, "_pivot_user", False) and self.options["pivot"] is not None:
+            return  # a pivot set with Set Pivot stays
+        parts = list(self._moving())
+        if not parts:
+            return
+        part = parts[0]
+        try:
+            outer = component_move.container_placement(part)
+            before = outer.multiply(App.Placement(self._befores.get(part.Name, part.Placement)))
+            self.options["pivot"] = list(before.Base)
+        except Exception as exc:
+            warn("Move: the component's origin: %s" % exc)
+            super()._new_pivot()
+
     def _unmoved(self):
         """The components' solids as they were when the dialog took them."""
         found = []

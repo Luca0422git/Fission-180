@@ -122,6 +122,31 @@ def _ready():
     return commands.finish_open_dialog()
 
 
+def _dragged_far(press, release):
+    """True when a button was let go further from where it was pressed than a click
+    wobbles (Qt's drag distance)."""
+    if press is None or release is None:
+        return False
+    return (release - press).manhattanLength() >= QtWidgets.QApplication.startDragDistance()
+
+
+def _own_step_of_dialog(name):
+    """The title of the open command dialog when step `name` is the one it is making or
+    editing right now (its preview is a real step, so the timeline shows it), else ""."""
+    try:
+        from . import taskui
+
+        dialog = taskui.current()
+        if dialog is None:
+            return ""
+        feature = dialog.feature()
+        if feature is None or feature.Name != name:
+            return ""
+        return str(getattr(dialog, "title", "") or "its command")
+    except Exception:
+        return ""
+
+
 class _Marker(QtWidgets.QFrame):
     """The history marker. Drag it left or right and drop it between steps."""
 
@@ -236,9 +261,16 @@ class _ItemButton(QtWidgets.QToolButton):
             return
         pos = event.globalPosition().toPoint()
         dragging = self._dragging
+        press = self._press
         self._press = None
         self._dragging = False
         try:
+            if not dragging and _dragged_far(press, pos):
+                # A fast drag: the button was let go far from where it was pressed before
+                # any move was told (the book parity run: "a real slow drag works, a fast
+                # drag did nothing"). It is a drag all the same, not a click.
+                self.timeline.begin_drag(self)
+                dragging = True
             if dragging:
                 self.timeline.end_drag(pos)
             else:
@@ -439,10 +471,14 @@ class _GroupButton(QtWidgets.QToolButton):
             return
         pos = event.globalPosition().toPoint()
         dragging = self._dragging
+        press = self._press
         self._press = None
         self._dragging = False
         self.setDown(False)
         try:
+            if not dragging and _dragged_far(press, pos):
+                self.timeline.begin_drag(self)  # a fast drag (see the step's button)
+                dragging = True
             if dragging:
                 self.timeline.end_drag(pos)
             else:
@@ -752,7 +788,11 @@ class TimelineWidget(QtWidgets.QWidget):
             widget = entry.widget()
             if widget is None:
                 continue
-            if keep_steps and isinstance(widget, _ItemButton) and widget.item.name not in self._spare:
+            if (
+                keep_steps
+                and isinstance(widget, _ItemButton)
+                and widget.item.name not in self._spare
+            ):
                 self._spare[widget.item.name] = widget
                 continue
             self._drop(widget)
@@ -1199,7 +1239,14 @@ class TimelineWidget(QtWidgets.QWidget):
         hint.move(self._drop_x(slot) - 1, 2)
         hint.show()
         self._drop_hint = (hint, reason)
-        QtWidgets.QToolTip.showText(global_pos, reason, self)
+        # next to the pointer, and once more a moment later (the tip of a drop is hidden at
+        # once by the mouse still moving: the book parity run saw "nothing happens")
+        try:
+            from . import commands
+
+            commands.tell(reason)
+        except Exception:
+            QtWidgets.QToolTip.showText(global_pos, reason, self)
         _remember("info", "timeline: %s" % reason)
 
         def clear():
@@ -1243,7 +1290,22 @@ class TimelineWidget(QtWidgets.QWidget):
         return doc.getObject(name) if doc is not None else None
 
     def edit(self, name):
-        if self._object(name) is None or not _ready():
+        if self._object(name) is None:
+            return
+        own = _own_step_of_dialog(name)
+        if own:
+            # The step is the open dialog's own (not finished yet): "editing" it would
+            # first end that dialog, and a dialog that cannot finish (a value that does
+            # not fit) is cancelled, which removes the step. Book parity report, bug 20:
+            # "Edit Feature on a Gear step opened nothing and the step vanished".
+            from . import commands
+
+            commands.tell(
+                "%s is still open for this step: finish it with OK (or Cancel) in its "
+                "dialog first." % own
+            )
+            return
+        if not _ready():
             return
         obj = self._object(name)  # finishing the open command may have removed it
         if obj is None:
@@ -1392,7 +1454,11 @@ class TimelineWidget(QtWidgets.QWidget):
         x = max(0, min(top_left.x(), self.width() - width))
         rect = QtCore.QRect(x, max(0, top_left.y()), width, header.height())
         self._editor = InlineEditor(
-            self, rect, header.name, lambda t: self._group_renamed(gid, t), "Fission180TimelineRename"
+            self,
+            rect,
+            header.name,
+            lambda t: self._group_renamed(gid, t),
+            "Fission180TimelineRename",
         )
 
     def _group_renamed(self, gid, text):
@@ -1484,21 +1550,36 @@ class TimelineWidget(QtWidgets.QWidget):
         # Fusion's timeline settings switch the design to direct modeling too (it asks).
         no_history = menu.addAction("Do Not Capture Design History")
         no_history.setEnabled(_doc() is not None and not _base_feature_open())
-        self._busy += 1
-        try:
-            chosen = menu.exec_(QtGui.QCursor.pos())
-        finally:
-            self._busy -= 1
-        if chosen is no_history:
-            _later(Gui.runCommand, "Fission180_DoNotCaptureDesignHistory")
-        if chosen is to_end:
-            _later(self.roll_to_end)
-        elif chosen is expand:
-            self._open_groups |= groups
-            _later(self.refresh, True)
-        elif chosen is collapse:
-            self._open_groups -= groups
-            _later(self.refresh, True)
+
+        def chose(chosen):
+            if chosen is no_history:
+                _later(Gui.runCommand, "Fission180_DoNotCaptureDesignHistory")
+            if chosen is to_end:
+                _later(self.roll_to_end)
+            elif chosen is expand:
+                self._open_groups |= groups
+                _later(self.refresh, True)
+            elif chosen is collapse:
+                self._open_groups -= groups
+                _later(self.refresh, True)
+
+        def closed():
+            self._busy = max(0, self._busy - 1)
+            menu.deleteLater()
+
+        # A plain pop-up (not exec_: that waits inside the button's click until an entry
+        # is taken, which froze whatever had pressed the button from a script or a remote
+        # hand: the book parity run could only open it with a real click).
+        menu.triggered.connect(chose)
+        menu.aboutToHide.connect(closed)
+        self._busy += 1  # no rebuild under an open menu
+        button = self.findChild(QtWidgets.QToolButton, "Fission180Timeline_settings")
+        if button is not None:
+            menu.popup(
+                button.mapToGlobal(QtCore.QPoint(0, 0)) - QtCore.QPoint(0, menu.sizeHint().height())
+            )
+        else:
+            menu.popup(QtGui.QCursor.pos())
 
     def _menu(self, button, global_pos):
         item = button.item
@@ -1557,7 +1638,7 @@ class TimelineWidget(QtWidgets.QWidget):
         if many:
             menu.addSeparator()
             ok, _reason = core.can_group(self._timeline, self._selected)
-            add("Group Features", self.group_selected, ok)
+            add("Create Group", self.group_selected, ok)  # Fusion's name (Autodesk help)
         self._busy += 1  # no rebuild under an open menu
         try:
             chosen = menu.exec_(global_pos)

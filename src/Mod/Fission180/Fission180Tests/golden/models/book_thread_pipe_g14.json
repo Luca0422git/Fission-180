@@ -1,0 +1,49 @@
+{
+  "id": "book_thread_pipe_g14",
+  "title": "Tesla Turbine: an ISO pipe thread G 1/4 on a d13.157 pipe end",
+  "tags": [
+    "thread",
+    "pipe",
+    "book"
+  ],
+  "steps": [
+    {
+      "op": "sketch",
+      "id": "s1",
+      "plane": "XY",
+      "geometry": [
+        {
+          "circle": [
+            0,
+            0,
+            6.5785
+          ]
+        }
+      ]
+    },
+    {
+      "op": "extrude",
+      "id": "e1",
+      "profile": "s1",
+      "distance": 20
+    },
+    {
+      "op": "thread",
+      "id": "t1",
+      "faces": {
+        "type": "cylinder",
+        "radius": 6.5785,
+        "count": 1
+      },
+      "modeled": true,
+      "standard": "pipe"
+    }
+  ],
+  "expect": {
+    "volume": 2383.2326753624816,
+    "solids": 1,
+    "rel_tol": 2e-05,
+    "source": "analytic",
+    "note": "ISO 228-1 G 1/4: major 13.157, 19 threads per inch, the 55 degree form cut with flats P/6 wide and 0.640327 P deep: V = pi 6.5785^2 20 - thread_core.class_removed_volume(G 1/4, A, external, 6.5785, 20)"
+  }
+}

@@ -143,6 +143,20 @@ def _isolated_names(doc):
     return components_ui.ISOLATED.get(doc.Name if doc else None)
 
 
+PROPERTIES_COMMAND = "Fission180_Properties"  # (wave 7) the component menu's Properties
+
+
+def _is_isolate_target(doc, obj):
+    """True when `obj` is what Isolate shows now (itself, or something around or inside
+    it was isolated): its menu offers Exit Isolate. Anything else offers Isolate."""
+    from . import components_ui
+
+    try:
+        return components_ui.is_isolate_target(doc, obj)
+    except Exception:
+        return True
+
+
 def _used_up_bodies(doc):
     """Bodies a Combine (without Keep Tools) has used up: Fusion takes them out of the
     browser. While a body-tool dialog is open they stay, so they can be picked here."""
@@ -355,6 +369,7 @@ def _objects(doc):
                     else None
                 ),
                 "role": getattr(obj, "Role", None),
+                "helper": getattr(obj, "Fission180Role", ""),  # made for a step (a Hole's sketch)
                 "fission180_type": getattr(obj, "Fission180Type", ""),
                 # The component the row is in (None: the root); a component's own row
                 # carries its parent component, like any other member.
@@ -430,6 +445,11 @@ def _never_a_row(obj, origins=None):
     tid = obj.TypeId
     if tid == "PartDesign::FeatureBase":
         return True
+    if tid in ("PartDesign::Plane", "Part::Part2DObjectPython"):
+        # (wave 7) a hidden reference to another component's face or plane: what a sketch
+        # of the active component hangs on (components.REF_ROLE)
+        if getattr(obj, "Fission180Role", "") == "ComponentRef":
+            return True
     if tid == "Part::FeaturePython":
         return getattr(obj, "Fission180Type", "") == "InstanceCopy"
     if tid in ORIGIN_FEATURE_TYPES:
@@ -1345,6 +1365,15 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             self._last_click = None  # a drag is no click
             self.viewport().update()
             try:
+                # (wave 7) the row under the pointer NOW is where it lands: the tree is
+                # rebuilt and expanded again after every drop, and a second drag landed on
+                # the row that was lit before the rows moved (book parity report, Gear Train)
+                _item, under = self._node_at(event.position().toPoint())
+                if under is not None and under["kind"] in DROP_TARGETS:
+                    key = under["key"] if press is None or under["key"] != press[0] else None
+            except Exception as exc:
+                warn("browser drag: %s" % exc)
+            try:
                 moving = [i.data(1, ROLE_NODE) for i in self.selectedItems()]
                 moving = [n for n in moving if n["kind"] in DRAGGABLE]
                 pressed = core.find(self._tree, press[0]) if self._tree is not None else None
@@ -2175,6 +2204,9 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Edit Decal": lambda: _edit_object(obj),
             "Calibrate": lambda: self._run_with(obj, "Fission180_CalibrateCanvas"),
             "Ground": lambda: _joint_action("toggle_ground", obj),
+            "Move/Copy": lambda: self._run_with(obj, "Fission180_Move"),
+            "Create Drawing": lambda: self._run_with(obj, "Fission180_NewDrawing"),
+            "Properties": lambda: self._run_with(obj, PROPERTIES_COMMAND),
             "Edit Joint": lambda: _edit_object(obj),
             "Edit Rigid Group": lambda: _edit_object(obj),
             "Edit Joint Origin": lambda: _edit_object(obj),
@@ -2184,6 +2216,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Edit Joint Limits": lambda: _joint_action("edit_joint_limits", obj),
             "Drive Joints": lambda: _joint_action("drive", obj),
             "Animate Joint": lambda: _joint_action("animate", obj),
+            "Animate Joint Relationships": lambda: _joint_action("animate_relationships", obj),
             "Suppress": lambda: self._toggle_suppress(obj),
             "Open Drawing": lambda: _open_drawing(obj),
             "Copy": lambda: _clipboard_action("copy", node, obj, selected_nodes, self),
@@ -2198,6 +2231,12 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             "Show/Hide Bend Extents": lambda: _flat_pattern_toggle(obj, "ShowBendExtents"),
         }
         isolated = _isolated_names(doc)
+        if isolated and obj is not None and not _is_isolate_target(doc, obj):
+            # (wave 7) Isolate on another row while something is isolated isolates that
+            # row instead (a component made while another was isolated only offered Exit
+            # Isolate: book parity report, Pizza Cutter)
+            isolated = None
+            handlers["Isolate"] = lambda: (self._unisolate(), self._isolate(obj, targets))
         if node["kind"] in ("body", "component") and isolated:
             handlers["Isolate"] = lambda: self._unisolate()
         entries = core.menu_for(node)
@@ -2224,11 +2263,14 @@ class BrowserWidget(QtWidgets.QTreeWidget):
             if entry == "Isolate" and isolated:
                 text = "Exit Isolate"
             if entry == "Ground":
-                text = "Unground" if node.get("grounded") else "Ground"
+                # Fusion's names since 2024 (Ground to Parent replaced Ground)
+                text = "Unground From Parent" if node.get("grounded") else "Ground to Parent"
             if entry == "Suppress":
                 text = "Unsuppress" if node.get("status") == "suppressed" else "Suppress"
             if entry in ("Activate Body", "Activate") and node["active"]:
                 continue
+            if entry == "Properties" and PROPERTIES_COMMAND not in Gui.listCommands():
+                continue  # (the Properties dialog is the appearance work's)
             if entry in ("Paste", "Paste New") and not _can_paste(doc, entry == "Paste New"):
                 continue  # nothing copied (Paste New: no component copied)
             if entry == "Rebuild with Timeline (AI)..." and obj is not None and _rebuilt_body(obj):
@@ -2417,6 +2459,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 if shown.ViewObject is not None and not shown.ViewObject.Visibility:
                     shown.ViewObject.Visibility = True
         components_ui.ISOLATED[doc.Name] = hidden
+        components_ui.ISOLATE_TARGETS[doc.Name] = [t.Name for t in targets]
         log("%d isolated (%d hidden)" % (len(targets), len(hidden)))
 
     def _unisolate(self):
@@ -2635,12 +2678,12 @@ class UnitsPanel:
 
 
 def set_units(doc, schema, as_default=False):
-    """Units of a design (FreeCAD keeps them per document since 1.0)."""
-    names = doc.getEnumerationsOfProperty("UnitSystem")
-    doc.UnitSystem = names[schema]
-    App.Units.setSchema(schema)
-    if as_default:
-        App.ParamGet("User parameter:BaseApp/Preferences/Units").SetInt("UserSchema", schema)
+    """Units of a design (FreeCAD keeps them per document since 1.0). design_units holds the
+    design to them from here on (FreeCAD's window code carried other documents' units over:
+    bug 2 of the book parity report)."""
+    from . import design_units
+
+    design_units.set_units(doc, schema, as_default)
     try:
         Gui.updateGui()
     except Exception:
@@ -2731,7 +2774,9 @@ class _OverlayGuard(QtCore.QObject):
     def eventFilter(self, obj, event):
         try:
             if event.type() == QtCore.QEvent.ParentChange and _state.get("dock") is obj:
-                QtCore.QTimer.singleShot(0, lambda: _state.get("dock") is obj and _out_of_overlay(obj))
+                QtCore.QTimer.singleShot(
+                    0, lambda: _state.get("dock") is obj and _out_of_overlay(obj)
+                )
         except Exception:
             pass
         return False
@@ -2765,7 +2810,9 @@ def _give_back_overlays():
     kept = _state.pop("overlays", None) or {}
     for area, names in kept.items():
         try:
-            App.ParamGet(OVERLAY_PARAMS + area).SetString("Widgets", "".join(n + "," for n in names))
+            App.ParamGet(OVERLAY_PARAMS + area).SetString(
+                "Widgets", "".join(n + "," for n in names)
+            )
         except Exception as exc:
             warn("browser: overlay %s: %s" % (area, exc))
 

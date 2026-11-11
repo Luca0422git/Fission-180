@@ -61,6 +61,7 @@ def _send_to_choices():
         ]
     )
 
+
 # Fusion's Pan, Zoom, Orbit Shortcuts presets: (value, label, FreeCAD navigation style or None
 # when Fission 180 cannot give it, why not).
 MOUSE_PRESETS = [
@@ -385,6 +386,17 @@ OPTIONS = [
         apply="components",
     ),
     _option(
+        "first_component_grounded",
+        "design",
+        "First component Ground to Parent",
+        "bool",
+        True,
+        (PREFS, "Bool", "FirstComponentGrounded"),
+        group="General",
+        tip="The first component made at each level of a design is grounded: it stays put "
+        "while the parts joined to it move. Right-click it > Unground From Parent to free it.",
+    ),
+    _option(
         "sketch_guides",
         "design",
         "Show inference guides while sketching",
@@ -406,13 +418,14 @@ OPTIONS = [
     _option(
         "sketch_auto_project",
         "design",
-        "Auto project the face's edges when sketching on a face",
+        "Auto project geometry on active sketch plane",
         "bool",
         True,
         (INFERENCE, "Bool", "AutoProject"),
         group="Sketch",
         tip="A new sketch on a flat face of the part gets the face's edges as projected "
-        "(purple) curves, so the shapes you draw against them make profiles.",
+        "(purple) curves, so the shapes you draw against them make profiles. Delete them "
+        "in the sketch if you do not want them: they stay deleted.",
     ),
     # -- General > API ----------------------------------------------------------------------
     _option(

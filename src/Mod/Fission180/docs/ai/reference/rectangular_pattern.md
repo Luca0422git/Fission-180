@@ -76,5 +76,5 @@ Done: AI: Rectangular pattern. Its id is 'Pattern1'. Bodies now: Body1: 25178.1 
 ## See also
 
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `mirror_hole_and_its_pattern`, `modify2_pattern_adjust_to_slope`, `modify2_pattern_identical_to_slope`, `modify2_pattern_multibody_cut`, `pattern_bodies_in_moved_component`, `pattern_bodies_move_original_after`, `pattern_bodies_rect_new`, `pattern_edit_keeps_later_fillet`, `pattern_edit_quantity_fusion`, `pattern_fission180_extrude`, `pattern_quantity_parameter`, `pattern_rect_features_any_order` and 5 more
+- Golden models built with its steps (read one with docs_read golden/<id>): `book_pattern_repeats_split_face`, `mirror_hole_and_its_pattern`, `modify2_pattern_adjust_to_slope`, `modify2_pattern_identical_to_slope`, `modify2_pattern_multibody_cut`, `pattern_bodies_in_moved_component`, `pattern_bodies_move_original_after`, `pattern_bodies_rect_new`, `pattern_edit_keeps_later_fillet`, `pattern_edit_quantity_fusion`, `pattern_fission180_extrude`, `pattern_quantity_parameter` and 6 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

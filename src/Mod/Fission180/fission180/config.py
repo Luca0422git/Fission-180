@@ -197,6 +197,8 @@ PREFERRED = {
     # Fusion's T trims a piece, or every piece a press-drag crosses; P is its Project
     "Sketcher_Trimming": "Fission180_SketchTrim",
     "Sketcher_Projection": "Fission180_SketchProject",
+    # Fusion's Sketch Dimension: the placing click is never a pick (sketch_dimension_tool.py)
+    "Sketcher_Dimension": "Fission180_SketchDimension",
     # Fusion's Save: Name + Location on the first save, a version description after.
     "Std_Save": "Fission180_Save",
     # Fusion's Open also takes STEP / IGES files and opens them as designs with components.

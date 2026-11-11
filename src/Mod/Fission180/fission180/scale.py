@@ -482,9 +482,10 @@ def sketch_point(sketch, point=None):
 def _expression_bound(sketch, index, name):
     try:
         for path, _expr in sketch.ExpressionEngine:
-            if path == ".Constraints[%d]" % index:
+            path = path.lstrip(".")  # (bound with or without the leading dot)
+            if path == "Constraints[%d]" % index:
                 return True
-            if name and path == ".Constraints.%s" % name:
+            if name and path == "Constraints.%s" % name:
                 return True
     except Exception:
         pass

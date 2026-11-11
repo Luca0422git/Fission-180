@@ -1849,25 +1849,34 @@ class BlendPanel(Panel):
         """Fission 180's own step builds this (or already holds it)."""
         if self.target is not None and fillet_sets.is_sets(self.target):
             return True
+        if getattr(self, "_robust", False):
+            return True  # only another route than the kernel's one run builds it
         return self._needs_step()
 
     def _trial(self):
         """Build the blend without touching the document; BlendError says why it fails."""
-        if self._uses_step():
-            fillet_sets.compute(
-                self.info.shape,
-                self.spec,
-                self._flat(),
-                self.refs2,
-                self.features,
-                self.features2,
-            )
-        else:
-            # check_build: a Distance and Angle chamfer is built in a throw-away document
-            # (trial() cannot build it); FreeCAD's own step kept the last good shape when
-            # it failed, and the dialog showed no reason
-            row = self._native_row()
-            blend.check_build(self.kind, self.info, self.groups[row], self.spec["sets"][row])
+        from . import fillet_robust
+
+        with fillet_robust.source(self.base):
+            if self._uses_step():
+                fillet_sets.compute(
+                    self.info.shape,
+                    self.spec,
+                    self._flat(),
+                    self.refs2,
+                    self.features,
+                    self.features2,
+                )
+            else:
+                # check_build: a Distance and Angle chamfer is built in a throw-away
+                # document (trial() cannot build it); FreeCAD's own step kept the last good
+                # shape when it failed, and the dialog showed no reason
+                row = self._native_row()
+                blend.check_build(self.kind, self.info, self.groups[row], self.spec["sets"][row])
+                if fillet_robust.used():
+                    # built by another route than the kernel's one run (after a modeled
+                    # thread: fillet_robust): FreeCAD's own step cannot, Fission 180's can
+                    self._robust = True
 
     def _preview(self):
         if self._limit_searching() and not self._closed:
@@ -1935,6 +1944,7 @@ class BlendPanel(Panel):
             blend.recompute_keeping(self.doc, self.keep)
             if optimistic and not self._target_ok():
                 self._back_to_good()
+                was_plain = not self._uses_step()
                 try:
                     self._trial()
                     reason = None
@@ -1942,6 +1952,11 @@ class BlendPanel(Panel):
                     reason = str(exc)
                 if reason is not None:
                     self._failed(reason)
+                    return
+                if was_plain and self._uses_step():
+                    # only Fission 180's own step builds this size: once more, with it
+                    self._good, self._good_last = None, False
+                    self._preview()
                     return
             self._remember_good()
         if self._edit is not None:
@@ -2047,7 +2062,9 @@ class BlendPanel(Panel):
         except Exception:
             pass
         self.target = new
-        log("%s is now Fission 180's own step %s (more than FreeCAD's one size)" % (label, new.Name))
+        log(
+            "%s is now Fission 180's own step %s (more than FreeCAD's one size)" % (label, new.Name)
+        )
 
     def _discard_target(self):
         """Every pick dropped (x, or the last edge clicked again) while making a new blend:

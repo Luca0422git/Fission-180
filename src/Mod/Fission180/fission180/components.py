@@ -266,15 +266,316 @@ def new_body_in(doc, container, label=None):
 
 
 def body_for_new(src_body, component=False):
-    """The body a feature's New Body / New Component result goes into: a new body beside
-    the source body, or a new body inside a new component. Fusion puts the new component
-    under the active component (the source body's one when no GUI decides)."""
+    """The body a feature's New Body / New Component result goes into: a new body in the
+    ACTIVE component, or a new body inside a new component under the active component.
+    Fusion puts every new body in the active component, whatever was clicked (book parity
+    report, bug 6: the gasket extruded from the housing's face went into the housing).
+    Without a GUI nothing is active: the source body's component then."""
     doc = src_body.Document
+    home = new_home(doc, src_body)
     if not component:
-        return new_body_in(doc, container_of(src_body))
-    parent = active_component(doc) if App.GuiUp else container_of(src_body)
-    part = new_component(doc, parent=parent)
+        body = new_body_in(doc, home)
+        try:
+            # the new body shows what was built in the source body's coordinates: it stands
+            # where the source body stands (two components moved differently)
+            here = _container_placement(home)
+            there = _container_placement(container_of(src_body))
+            if not here.isSame(there, 1e-12):
+                body.Placement = here.inverse().multiply(there).multiply(src_body.Placement)
+        except Exception as exc:
+            warn("%s: could not line the new body up: %s" % (body.Label, exc))
+        return body
+    part = new_component(doc, parent=home)
     return new_body_in(doc, part)
+
+
+# -- where new things go: one rule (wave 7, the book parity report's bugs 5 - 8) -------------
+def new_home(doc, picked=None):
+    """The component a new body, sketch, plane, axis, point... goes into: the ACTIVE
+    component, whatever was clicked to make it (Fusion: "geometry made through the UI goes
+    into the active component"). Without a GUI nothing is active (the golden builder, the
+    headless tests): the component of what it is built on then, as before."""
+    if App.GuiUp:
+        return active_component(doc)
+    return container_of(picked) if picked is not None else None
+
+
+def body_of(obj):
+    """The body an object is in (a body is its own); None outside every body."""
+    if is_body(obj):
+        return obj
+    parent = _parent_group(obj)
+    while parent is not None and parent.TypeId != BODY:
+        parent = _parent_group(parent)
+    return parent
+
+
+def in_active(obj, doc=None):
+    """True when ``obj`` (a body, or something inside one) sits directly in the active
+    component: work started on it can go into its own body. Without a GUI: always."""
+    if not App.GuiUp:
+        return True
+    try:
+        doc = doc or obj.Document
+        return container_of(body_of(obj) or obj) is active_component(doc)
+    except Exception:
+        return False
+
+
+def host_body(picked, work=None):
+    """The body a new sketch or construction made on ``picked`` (a face's step, a plane, an
+    edge's step) goes into. FreeCAD keeps such things inside a body; Fusion keeps them in
+    the active component. So: the body of what was picked when that body is in the active
+    component (as before components), else ``work``, the active component's own body
+    (commands.find_body() / ensure_body()): never a body of another component, and the
+    active component never changes because of what was clicked."""
+    owner = body_of(picked) if picked is not None else None
+    if owner is not None and in_active(owner):
+        return owner
+    return work if work is not None else owner
+
+
+def has_solids(component, doc=None, recursive=False):
+    """True when the component (None: the root) holds a body with a solid: the first
+    feature of a component without one starts as New Body in Fusion (bug 10)."""
+    from . import bodies
+
+    doc = doc or (component.Document if component is not None else App.ActiveDocument)
+    if doc is None:
+        return False
+    for body in bodies_in(doc, component, recursive=recursive):
+        try:
+            if bodies.has_solid(body) and not getattr(body, "Fission180RolledHidden", False):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def may_change(body, doc=None, lead=None):
+    """True when a feature made now may JOIN ``body``, and when ``body`` counts for the
+    operation a dialog proposes by itself: only bodies of the active component do.
+    Fusion: "the Operation type is set to create a New Body in the active component";
+    a Join "works when you activate the component you want to join to" (forum); a new
+    component's first extrude starts as New Body, whatever body of another component it
+    overlaps (book parity report, bug 10: it came up as Cut and silently cut another
+    component's pin). A Cut the person chooses still goes through every body in its way,
+    as in Fusion (Objects To Cut). ``lead``: a step being edited works in its own
+    component, whichever is active now (editing an older step must not drop the body it
+    joins). Without a GUI nothing is active: always True."""
+    if not App.GuiUp or body is None:
+        return True
+    try:
+        home = container_of(body)
+        if home is active_component(doc or body.Document):
+            return True
+        if lead is not None and alive(lead):
+            return home is container_of(body_of(lead) or lead)
+    except Exception:
+        return True
+    return False
+
+
+def whole_pick(root, sub):
+    """(object, sub) of a selection entry read unresolved (Gui.Selection.getSelectionEx("",
+    0) gives the top container and the path down from it). A whole object picked through
+    its containers, as a nested component's browser row is ("Stator", "Housing."), is that
+    object itself; anything else is returned as it came. (Book parity report, bug 15: the
+    joint dialogs read the top container, so a nested component's row picked the whole
+    subassembly, and the second row dropped it again.)"""
+    sub = sub or ""
+    if not sub.endswith("."):
+        return root, sub
+    try:
+        inner = root.getSubObject(sub, retType=1)
+    except Exception:
+        inner = None
+    if inner is not None and is_component(inner):
+        return inner, ""
+    return root, sub
+
+
+# -- a reference to something of another component -------------------------------------------
+REF_ROLE = "ComponentRef"  # timeline_ops.ROLE value: a helper, never a step or a browser row
+ROLE_PROP = "Fission180Role"
+REF_OBJECT = "Part::Part2DObjectPython"  # a Body takes only sketch-like helpers (extrude.py)
+REF_FRAME = "Frame"  # on a reference: where the other body stood for this one
+
+
+def reference_frame(body, obj):
+    """Where the body of ``obj`` stands as seen from ``body`` now (both in the design's
+    coordinates): what a reference keeps from the moment it is made."""
+    theirs = body_of(obj)
+    if theirs is not None:
+        there = theirs.getGlobalPlacement()
+    else:
+        there = _container_placement(container_of(obj))
+    return body.getGlobalPlacement().inverse().multiply(there)
+
+
+class ReferenceCopy:
+    """A hidden copy, inside a body, of a face, an edge or a corner of a step of ANOTHER
+    body or component (reference_binder). Saved documents store
+    "fission180.components.ReferenceCopy": keep the name and the properties.
+
+    Source: the step and the elements copied (its only dependency). Frame: where the other
+    body stood for this one when the reference was made. The copy is the elements as they
+    are now, placed by that frame."""
+
+    def __init__(self, obj):
+        obj.Proxy = self
+        self.ensure_properties(obj)
+
+    @staticmethod
+    def ensure_properties(obj):
+        props = obj.PropertiesList
+        if "Source" not in props:
+            obj.addProperty("App::PropertyLinkSubGlobal", "Source", "Reference", "What it copies")
+        if REF_FRAME not in props:
+            obj.addProperty(
+                "App::PropertyPlacement", REF_FRAME, "Reference", "Where the other body stood"
+            )
+        if ROLE_PROP not in props:
+            obj.addProperty("App::PropertyString", ROLE_PROP, "Fission180", "Helper of", 0)
+            obj.setEditorMode(ROLE_PROP, 2)
+        if getattr(obj, ROLE_PROP) != REF_ROLE:
+            setattr(obj, ROLE_PROP, REF_ROLE)
+
+    def onDocumentRestored(self, obj):
+        self.ensure_properties(obj)
+
+    def execute(self, obj):
+        import Part
+
+        source, subs = reference_source(obj)
+        if source is None or not alive(source):
+            return  # what it copied was deleted: the copy stays as it was (the sketch too)
+        frame = getattr(obj, REF_FRAME)
+        shapes = []
+        for sub in subs:
+            shape = _element(source, sub)
+            if shape is None:
+                return  # the element is not there now (rolled back): the copy stays
+            # An element carries a location of its own (a pad's top face: its height). It is
+            # worked into the geometry with the frame: FreeCAD puts the object's Placement
+            # in its place afterwards (transformShape alone left the face at z 0).
+            total = frame.multiply(shape.Placement)
+            shape.Placement = App.Placement()
+            if not total.isIdentity():
+                shape = shape.transformed(total.toMatrix(), True)
+            shapes.append(shape)
+        if not shapes:
+            return
+        obj.Shape = shapes[0] if len(shapes) == 1 else Part.makeCompound(shapes)
+
+    def dumps(self):
+        return None
+
+    def loads(self, state):
+        return None
+
+    __getstate__ = dumps
+    __setstate__ = loads
+
+
+def _element(source, sub):
+    """A copy of the element ``sub`` of ``source``, or None. FreeCAD marks a reference whose
+    history changed as missing ("?Edge3": the sketch behind the step was redrawn): the
+    element with that number is taken then, as FreeCAD's own dialogs show it."""
+    names = [sub]
+    plain = (sub or "").lstrip("?").rsplit(".", 1)[-1]
+    if plain.startswith(";") or ":" in plain:
+        try:
+            plain = source.Shape.getElementName(plain, 0) or plain
+        except Exception:
+            pass
+    if plain and plain not in names:
+        names.append(plain)
+    for name in names:
+        try:
+            return source.Shape.getElement(name).copy()
+        except Exception:
+            continue
+    return None
+
+
+def reference_source(ref):
+    """(object, [subs]) a reference made by reference_binder() copies, or (None, [])."""
+    try:
+        link = ref.Source
+    except Exception:
+        return None, []
+    if not link or link[0] is None:
+        return None, []
+    return link[0], [s for s in (list(link[1]) or []) if s]
+
+
+def is_reference(obj):
+    try:
+        return obj.TypeId == REF_OBJECT and getattr(obj, ROLE_PROP, "") == REF_ROLE
+    except Exception:
+        return False
+
+
+def find_reference(body, obj, subs):
+    """The reference in ``body`` that already copies exactly ``subs`` of ``obj``, or None."""
+    wanted = sorted(subs)
+    for candidate in body.Group:
+        if not is_reference(candidate):
+            continue
+        source, found = reference_source(candidate)
+        if source is obj and sorted(found) == wanted:
+            return candidate
+    return None
+
+
+def reference_binder(body, obj, subs, before=None):
+    """A hidden copy inside ``body`` of the elements ``subs`` ("Face6", "Edge3", "Vertex1")
+    of ``obj``, a step of another body or component: what a sketch of the active component
+    is put on, projects from or measures to when the thing clicked belongs to another
+    component (Fusion references it directly; FreeCAD's sketch may only link inside its own
+    body). One per element set (an existing one is reused). ``before``: an object of the
+    body it must stand before (the sketch that will use it).
+
+    The copy (ReferenceCopy) depends on the step only, and stands where the other body
+    stood for this one when the reference was made:
+
+    - it follows the other part when that part CHANGES (a hole made wider, a block longer);
+    - it does not follow later MOVES of either component: what is modelled on it keeps its
+      shape when a joint or Move moves a part, as in Fusion, where a projection is worked
+      out where the parts stood at the sketch's place in the timeline (and as extrude.py's
+      profile copies: "the body's own geometry would shift every time the solver moved it");
+    - a later step of the other body may use what hangs on it (a Cut of the Nozzle from a
+      sketch put on the Nozzle's face).
+
+    FreeCAD 1.1.4 facts behind it (probed): a PartDesign SubShapeBinder linked through the
+    other component follows every move and makes that Cut a dependency cycle; linked
+    straight to the step it loses the element's own location (a pad's top face lands at
+    z 0) and does not get it back when the step changes."""
+    subs = [s for s in subs if s]
+    existing = find_reference(body, obj, subs)
+    if existing is not None:
+        return existing
+    doc = body.Document
+    ref = doc.addObject(REF_OBJECT, "Reference")
+    ReferenceCopy(ref)
+    if before is not None:
+        body.insertObject(ref, before, False)
+    else:
+        body.addObject(ref)
+    owner = component_of(obj)
+    ref.Label = "Reference to %s" % (owner.Label if owner is not None else obj.Label)
+    setattr(ref, REF_FRAME, reference_frame(body, obj))
+    ref.Source = (obj, list(subs))
+    if App.GuiUp:
+        try:
+            ref.ViewObject.Proxy = 0
+            ref.ViewObject.Visibility = False
+            if "ShowInTree" in ref.ViewObject.PropertiesList:
+                ref.ViewObject.ShowInTree = False
+        except Exception:
+            pass
+    return ref
 
 
 def drop_if_empty(component):
@@ -321,6 +622,10 @@ def place(obj, component, keep_position=True):
     except Exception as exc:
         warn("%s: could not keep its position: %s" % (obj.Label, exc))
     _carry_decals(obj)
+    if is_body(obj) and component is not None and not is_unused(obj):
+        # the body with the part arrived: an empty body Fission 180 made there for a sketch
+        # that went elsewhere is not left behind (it would take the next sketch)
+        drop_unused_bodies(component, keep=obj)
     log("%s moved to %s" % (obj.Label, component.Label if component is not None else "the root"))
     return True
 
@@ -547,7 +852,46 @@ def preferred_body(doc, component):
         if is_body(body) and container_of(body) is component:
             return body
     found = bodies_in(doc, component)
+    if len(found) > 1:
+        # (wave 7) a body with something in it before an older body that is still empty
+        # (one made for a sketch that was never drawn): new work joined the empty one,
+        # beside the part it was meant for
+        used = [b for b in found if not is_unused(b)]
+        if used:
+            return used[0]
     return found[0] if found else None
+
+
+def is_unused(body):
+    """True for a body nothing was ever put in: no sketch, no step, no construction (only
+    its origin). Fission 180 makes one when a command needs a body in the active component;
+    it has no row in the browser."""
+    try:
+        if not is_body(body) or body.BaseFeature is not None:
+            return False
+        return not any(o.TypeId != "App::Origin" for o in body.Group)
+    except Exception:
+        return False
+
+
+def drop_unused_bodies(component, keep=None):
+    """Remove the bodies of a component that nothing was ever put in (is_unused), except
+    ``keep``: after a body with the real part was moved in beside one (book parity report:
+    Move to Component "leaves an empty, invalid Body behind"). Returns how many went."""
+    if component is None:
+        return 0
+    gone = 0
+    for body in list(bodies_in(component.Document, component)):
+        if body is keep or not is_unused(body):
+            continue
+        try:
+            name = body.Name
+            body.removeObjectsFromDocument()
+            component.Document.removeObject(name)
+            gone += 1
+        except Exception as exc:
+            warn("could not remove the empty body %s: %s" % (body.Label, exc))
+    return gone
 
 
 def editable(component):

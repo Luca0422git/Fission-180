@@ -67,5 +67,5 @@ Done: AI: Thread. Its id is 'Thread1'. Bodies now: Body1: 2177.67 mm3, 10 x 10 x
 ## See also
 
 - Recipe: [threaded fastener (hex bolt M8 x 30)](fission180://docs/recipes/threaded-fastener.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `thread_edit_length`, `thread_hole_modeled`, `thread_second_after_modeled`, `thread_shaft_cosmetic`, `thread_shaft_modeled`, `thread_shaft_modeled_6e`, `thread_shaft_partial`, `thread_two_holes`
+- Golden models built with its steps (read one with docs_read golden/<id>): `book_chamfer_after_modeled_thread`, `book_thread_dragged_before_chamfer`, `book_thread_m6_in_6mm_hole`, `book_thread_pipe_g14`, `book_thread_stops_at_chamfer`, `book_thread_survives_deleted_chamfer`, `thread_edit_length`, `thread_hole_modeled`, `thread_second_after_modeled`, `thread_shaft_cosmetic`, `thread_shaft_modeled`, `thread_shaft_modeled_6e` and 2 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

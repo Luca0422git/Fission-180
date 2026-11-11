@@ -359,6 +359,13 @@ def internal_geometry(sketch):
                 out.add(c.First)
         except Exception:
             continue
+    try:
+        # ...and Fission 180's own hidden helper lines (a circular pattern's spokes)
+        from . import sketch_helpers
+
+        out |= sketch_helpers.hidden(sketch)
+    except Exception:
+        pass
     return out
 
 
