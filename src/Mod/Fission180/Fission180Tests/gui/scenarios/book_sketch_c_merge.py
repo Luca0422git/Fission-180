@@ -30,6 +30,10 @@ origin.
      person's back (the copies and the original go, as selected)
   I  tool first: CREATE > Mirror, two plain clicks collect two lines as Objects (the second
      click does not replace the first)
+  J  Line with a typed length while the upright guide shows, after Qt told the view that the
+     pointer "left" it (FreeCAD's value box under the pointer): the line is still exactly
+     upright (sketch-a's "no guide stays behind when the pointer leaves" dropped the guide
+     the typed line was to follow)
 """
 
 import FreeCAD as App
@@ -376,6 +380,50 @@ def i_check():
     )
     end_tool()
     b.no_modal("the merged tools")
+
+
+# == J ======================================================================================
+def j_line():
+    s["n"] = len(sk().Geometry)
+    h.press("l")
+
+
+def j_first():
+    click(V(-72, -30, 0))
+
+
+def j_up():
+    # nearly straight up: the upright guide shows
+    st.hover(V(-71.7, -22, 0), towards=V(0.02, 1.0, 0))
+
+
+def j_leave_and_type():
+    from PySide6 import QtWidgets
+
+    # FreeCAD's value box grows under the pointer while a value is typed: Qt then tells the
+    # 3D view that the pointer "left" it, though it is still over the view (GitHub's run:
+    # the typed 12 was no longer upright, sketch_qa_keys R2)
+    QtWidgets.QApplication.sendEvent(h.gl_widget(), QtCore.QEvent(QtCore.QEvent.Leave))
+    QtWidgets.QApplication.processEvents()
+    si.type_text("12")
+
+
+def j_check():
+    end_tool()
+    lines = [
+        g
+        for i, g in enumerate(sk().Geometry)
+        if i >= s["n"] and g.TypeId == "Part::GeomLineSegment"
+    ]
+    h.check("J one line was drawn", len(lines) == 1, len(lines))
+    if lines:
+        g = lines[0]
+        h.check("J 12 typed: it is 12 long", abs(g.length() - 12) < 1e-6, g.length())
+        h.check(
+            "J ...and exactly upright, though the view was told the pointer left it",
+            abs(g.StartPoint.x - g.EndPoint.x) < 1e-7,
+            (g.StartPoint, g.EndPoint),
+        )
     st.sketch_ok("at the end")
 
 
@@ -425,6 +473,11 @@ h.run(
         i_click_1,
         i_click_2,
         i_check,
+        j_line,
+        j_first,
+        j_up,
+        j_leave_and_type,
+        j_check,
     ],
     paced_by="state",
 )

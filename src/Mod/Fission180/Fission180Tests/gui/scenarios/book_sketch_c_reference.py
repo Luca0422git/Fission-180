@@ -205,7 +205,11 @@ def b_centre():
 
 def b_pin():
     h.check("B the circle's centre is picked", st.tool() is not None and len(st.tool().picks) == 1)
-    st.click(V(3.5355, 43.5355, 20))  # the Pins' top edge (clear of the sketch's Y axis)
+    # the Pins' top edge (clear of the sketch's Y axis), 3 pixels OUTSIDE the outline: no
+    # edge is under that pixel (GitHub's renderer answers the face or nothing beside an
+    # outline edge: book_sketch_b_dimension_edge failed there); within a few pixels counts
+    out = 3 * si.mm_per_pixel(sk()) * 0.7071
+    st.click(V(3.5355 + out, 43.5355 + out, 20))
 
 
 def b_picked():
