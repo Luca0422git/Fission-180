@@ -271,6 +271,17 @@ def make_way_for(name):
         cmd = None
     if cmd is None:
         return True
+    if name in NOTHING_TO:
+        # (wave 7, modify-c) Undo / Redo with a command's dialog open: the dialog takes it
+        # (Undo cancels the command, as the Ctrl+Z key does); FreeCAD's Undo must not run
+        # under the open dialog (preview.dialog_takes; the book parity report's bug 18)
+        try:
+            from . import preview
+
+            if preview.dialog_takes(name):
+                return False
+        except Exception as exc:
+            warn("%s with a dialog open: %s" % (name, exc))
     if name in NOTHING_TO and not _active(cmd):
         # (wave 7, sketch-a) Undo or Redo with nothing to take back or bring back: it never
         # ends what is open to "make way". Ctrl+Y pressed once too often inside a sketch
