@@ -838,6 +838,18 @@ def display_names(doc, objs):
     return core.display_names(rows)
 
 
+def shown_label(obj):
+    """The name the browser and the timeline show for `obj` ("Sketch 4" for the sketch
+    FreeCAD calls Sketch003, "Plane 2" for Plane001, "Origin" for the origin point): a
+    dialog or a message names things as the person sees them named."""
+    try:
+        if obj.TypeId == "App::Point" and getattr(obj, "Role", "") == "Origin":
+            return "Origin"
+        return display_names(obj.Document, obj.Document.Objects).get(obj.Name) or obj.Label
+    except Exception:
+        return getattr(obj, "Label", "")
+
+
 def snapshot(doc, deps=True):
     """(features, tips) for timeline_core.build(). ``deps`` (what each step uses) is
     only needed to reorder; the timeline's 0.4 s refresh leaves it out."""

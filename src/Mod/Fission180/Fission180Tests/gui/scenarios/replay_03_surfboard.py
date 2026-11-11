@@ -11,11 +11,14 @@ import FreeCADGui as Gui
 from PySide import QtCore
 
 from Fission180Tests.gui import harness as h
+from Fission180Tests.gui import insert_steps as ins_file
 from Fission180Tests.gui import inspect_steps as ins
+from Fission180Tests.gui import looks_steps as k
 from Fission180Tests.gui import plane_input as pl
 from Fission180Tests.gui import replay_b_steps as r
 from Fission180Tests.gui import sketch_input as si
 from Fission180Tests.gui import sketch_tools_steps as st
+from Fission180Tests.gui import timeline_input as tl
 from Fission180Tests.gui import widget_input as w
 
 V = App.Vector
@@ -336,10 +339,293 @@ def loft_made():
     h.shot("board")
 
 
+# -- Appearance (A): Polystyrene, its pattern scaled to 25 % ----------------------------------
+ON_BOARD = V(72, 0, 9)  # the top of the board over the second section
+
+
+def board():
+    return r.bodies()[0]
+
+
+def look_open():
+    h.click_empty()
+    h.press("a")
+
+
+look_open.done = lambda: k.panel() is not None
+look_open.done_what = "the Appearance dialog is open"
+
+
+def look_search():
+    p = k.panel()
+    w.click(p.search)
+    w.type_text(p.search, "polystyrene")
+
+
+def look_drop():
+    names = k.library_labels()
+    h.check("Appearance: the search finds a Polystyrene look", "Polystyrene foam" in names, names)
+    h.check("Appearance: the view takes the swatch", k.drop_look("Polystyrene foam", ON_BOARD))
+
+
+def look_edit():
+    data = k.stored(board())["body"] or {}
+    h.check("Appearance: the board is Polystyrene", data.get("key") == "polystyrene", data)
+    h.check("Appearance: it has a pattern (a texture)", bool(data.get("texture")), data)
+    k.double_click_design("Polystyrene foam")
+
+
+look_edit.done = lambda: k.editor() is not None
+look_edit.done_what = "the look's editor is open"
+
+
+def look_scale():
+    e = k.editor()
+    h.check("Appearance: the editor has a Scale", e.scale.isEnabled())
+    k.type_field(e.scale, "25")
+
+
+def look_ok():
+    data = k.stored(board())["body"] or {}
+    h.check("Appearance: Scale 25 % is stored", abs(data.get("scale", 100) - 25.0) < 1e-6, data)
+    w.click(k.editor().ok_button)
+
+
+look_ok.done = lambda: k.editor() is None
+look_ok.done_what = "the editor is closed"
+
+
+def look_close():
+    groups, triangles = k.pattern_drawn(board().Tip)
+    h.check("Appearance: the pattern is drawn on the board", groups >= 1 and triangles > 50)
+    h.shot("polystyrene")
+    h.task_button("OK")
+
+
+look_close.done = lambda: k.panel() is None
+look_close.done_what = "the Appearance dialog is closed"
+
+
+# -- INSERT > Canvas on the Front plane -------------------------------------------------------
+def canvas():
+    found = ins_file.canvases()
+    return found[0] if found else None
+
+
+def canvas_open():
+    # (the book's picture is a download of its publisher: a stand-in picture, 80 x 40 pixels)
+    ins_file.use_file(ins_file.fixture("canvas.png"))
+    h.click_empty()
+    h.fit()
+    si.menu_item("INSERT", "Canvas")
+
+
+canvas_open.done = lambda: ins_file.panel() is not None
+canvas_open.done_what = "the Canvas dialog is open"
+
+
+def canvas_face():
+    p = ins_file.panel()
+    h.check("Canvas: the dialog waits for a face", p.title == "Canvas" and canvas() is None)
+    pl.click_square("XZ_Plane")
+
+
+canvas_face.done = lambda: canvas() is not None
+canvas_face.done_what = "the canvas shows on the Front plane"
+
+
+def canvas_scale():
+    p = ins_file.panel()
+    c = canvas()
+    S["canvas_size"] = (c.XSize.Value, c.YSize.Value)
+    print("[replay] canvas", c.Placement, c.XSize, c.YSize, p.plane_label.text(), flush=True)
+    ins_file.set_spin(p.scale_xy, 8.25)
+    h.caught_up(p)
+
+
+def canvas_flip():
+    p = ins_file.panel()
+    c = canvas()
+    h.check(
+        "Canvas: Scale Plane XY 8.25 makes it 8.25 times as large",
+        near(c.XSize.Value, 8.25 * S["canvas_size"][0], 1e-4)
+        and near(c.YSize.Value, 8.25 * S["canvas_size"][1], 1e-4),
+        (c.XSize, c.YSize, S["canvas_size"]),
+    )
+    ins_file.set_check(p.flip_h, True)
+    h.caught_up(p)
+
+
+def canvas_ok():
+    h.shot("canvas")
+    h.task_button("OK")
+
+
+canvas_ok.done = lambda: ins_file.panel() is None
+canvas_ok.done_what = "the Canvas dialog is closed"
+
+
+def canvas_made():
+    c = canvas()
+    labels = r.browser_labels()
+    h.check("Canvas: in the browser's Canvases folder", "Canvases" in labels, labels)
+    normal = c.Placement.Rotation.multVec(V(0, 0, 1))
+    h.check("Canvas: it lies on the Front plane", abs(abs(normal.y) - 1.0) < 1e-6, normal)
+    print("[replay] canvas made", c.Placement, c.XSize, c.YSize, labels, flush=True)
+
+
+# -- the fin: a sketch on the Front plane, the board's outline (Intersect), a spline -----------
+def fin_sketch():
+    h.click_empty()
+    h.fit()
+    h.ribbon("Create Sketch")
+
+
+def fin_plane():
+    pl.click_square("XZ_Plane")
+
+
+fin_plane.done = lambda: h.in_sketch() is not None
+fin_plane.done_what = "the sketch on the Front plane is open"
+
+
+def fin_intersect():
+    sketch = r.note_sketch()
+    S["fin"] = sketch
+    normal = sketch.getGlobalPlacement().Rotation.multVec(V(0, 0, 1))
+    h.check("Fin: the sketch lies on the Front plane", abs(abs(normal.y) - 1.0) < 1e-6, normal)
+    print("[replay] fin sketch", sketch.getGlobalPlacement(), r.local(V(100, 0, 5)), flush=True)
+    # a closer look at the board, a thin sliver from the front (the report: "the first
+    # clicks missed it; zooming in worked")
+    r.look_at(V(70, 0, 3), 90.0)
+    S["external"] = len(sketch.ExternalGeo)
+    si.menu_item("CREATE", "Intersect")
+
+
+def fin_click_plane():
+    # a click on the board where an offset plane crosses it, seen edge-on (a yellow line):
+    # the plane is in front. FreeCAD's tool failed there with a traceback in the Report view.
+    h.click(V(72, 0, 7))
+
+
+def fin_plane_line():
+    sketch = r.sk()
+    made = sketch.ExternalGeo[S["external"] :]
+    h.check(
+        "Fin: Intersect on a plane's line brings in the line where the planes cut",
+        len(made) == 1 and made[0].TypeId == "Part::GeomLineSegment",
+        [g.TypeId for g in made],
+    )
+    if made:
+        x = r.g(made[0].StartPoint).x
+        h.check("Fin: ...the line of Plane 2, at x = 72", near(x, 72.0), x)
+    said = si.notifications()
+    print("[replay] said", said, flush=True)
+    st.undo()
+
+
+def fin_click_board():
+    sketch = r.sk()
+    h.check(
+        "Fin: Ctrl+Z takes the plane's line back, the tool goes on",
+        len(sketch.ExternalGeo) == S["external"],
+        len(sketch.ExternalGeo),
+    )
+    h.click(V(90, 0, 6.5))  # the board, seen from the front
+
+
+def fin_outline():
+    sketch = r.sk()
+    made = sketch.ExternalGeo[S["external"] :]
+    h.check("Fin: Intersect draws the board's outline in the sketch", len(made) >= 2, len(made))
+    h.shot("fin-intersect")
+    r.end_tool()
+    # the board's underside: the outline curve that is lower in the middle of the board
+    S["under"] = min(made, key=lambda g: r.on_curve_at_x(g, 72.0).y)
+    S["n"] = len(sketch.Geometry)
+    r.look_at(V(116, 0, -2), 60.0)
+    si.menu_item("CREATE", "Fit Point Spline")
+
+
+def fin_spline_points():
+    first = r.on_curve_at_x(S["under"], 100.0)
+    last = r.on_curve_at_x(S["under"], 132.0)
+    S["ends"] = (first, last)
+    for point in (first, V(110, -8, 0), V(124, -10, 0), last):
+        r.click(point)
+
+
+def fin_spline_enter():
+    st.enter()
+
+
+def fin_spline_made():
+    r.end_tool()
+    sketch = r.sk()
+    splines = [
+        i
+        for i in range(S["n"], len(sketch.Geometry))
+        if sketch.Geometry[i].TypeId == "Part::GeomBSplineCurve"
+    ]
+    h.check("Fin: one fit point spline", len(splines) == 1, splines)
+    if not splines:
+        return
+    S["spline"] = splines[0]
+    curve = sketch.Geometry[splines[0]]
+    on = [
+        (c.Type, c.First, c.FirstPos, c.Second, c.SecondPos)
+        for c in sketch.Constraints
+        if c.Type == "PointOnObject" and c.Second <= -3
+    ]
+    print("[replay] spline", curve.StartPoint, curve.EndPoint, S["ends"], on, r.dof(), flush=True)
+    h.check("Fin: its first and last point snapped onto the purple curve", len(on) == 2, on)
+    for end in (curve.StartPoint, curve.EndPoint):
+        gap = S["under"].toShape().distToShape(__import__("Part").Vertex(end))[0]
+        h.check("Fin: an end of the spline lies on the board's outline", gap < 1e-6, gap)
+    st.sketch_ok("Fin")
+    # the book: select the spline, Fix/Unfix
+    r.click(curve.value((curve.FirstParameter + curve.LastParameter) * 0.37))
+
+
+def fin_fix():
+    names = [n for sel in Gui.Selection.getSelectionEx() for n in sel.SubElementNames]
+    h.check("Fin: the spline is selected", names == ["Edge%d" % (S["spline"] + 1)], names)
+    si.menu_item("CONSTRAINTS", "Fix/Unfix")
+
+
+def fin_fixed():
+    sketch = r.sk()
+    print("[replay] fixed", [(c.Type, c.First) for c in sketch.Constraints if c.Type in ("Block", "Lock")], r.dof(), si.notifications(), flush=True)
+    h.check("Fin: fully defined after Fix/Unfix", r.dof() == 0, r.dof())
+    st.sketch_ok("Fin, fixed")
+    h.shot("fin-sketch")
+    h.ribbon("Finish Sketch")
+
+
+fin_fixed.done = lambda: h.in_sketch() is None
+fin_fixed.done_what = "the sketch is finished"
+
+
+def canvas_hide():
+    h.fit()
+    tl.click_eye("Canvases")
+
+
+def canvas_hidden():
+    h.check("the Canvases eye hides the canvas", not canvas().ViewObject.Visibility)
+    h.fit()
+    h.shot("fin-sketch-done")
+
+
 STEPS = [home, first_design, plus_tab]
 for _n, (_d, _major, _minor, _up) in enumerate(SECTIONS):
     STEPS += section_steps(_n, _d, _major, _minor, _up)
 STEPS += [loft_open, loft_pick(3), loft_pick(2), loft_pick(1), loft_pick(0), loft_origin]
 STEPS += [loft_pointed, loft_made]
+STEPS += [look_open, look_search, look_drop, look_edit, look_scale, look_ok, look_close]
+STEPS += [canvas_open, canvas_face, canvas_scale, canvas_flip, canvas_ok, canvas_made]
+STEPS += [fin_sketch, fin_plane, fin_intersect, fin_click_plane, fin_plane_line]
+STEPS += [fin_click_board, fin_outline, fin_spline_points, fin_spline_enter, fin_spline_made]
+STEPS += [fin_fix, fin_fixed, canvas_hide, canvas_hidden]
 
 h.run("replay_03_surfboard", STEPS, paced_by="state")

@@ -88,6 +88,23 @@ def look_at(point, height):
     h.view_still()
 
 
+def local(point):
+    """A global point in the open sketch's own coordinates."""
+    return sk().getGlobalPlacement().inverse().multVec(point)
+
+
+def on_curve_at_x(curve, x, samples=600):
+    """The point of a sketch curve whose x is nearest `x` (where a person sees the curve
+    cross a grid line)."""
+    lo, hi = curve.FirstParameter, curve.LastParameter
+    best = None
+    for i in range(samples + 1):
+        point = curve.value(lo + (hi - lo) * i / samples)
+        if best is None or abs(point.x - x) < abs(best.x - x):
+            best = point
+    return best
+
+
 def geo(index):
     return sk().Geometry[index]
 

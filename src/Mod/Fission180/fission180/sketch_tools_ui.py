@@ -252,6 +252,12 @@ class WatchedTool:
         if not self.active:
             return
         self.active = False
+        after, self.after = getattr(self, "after", None), None
+        if after is not None:
+            try:
+                after()
+            except Exception as exc:
+                warn("%s: %s" % (self.title, exc))
         timer, self.timer = self.timer, None
         if timer is not None:
             try:
@@ -372,6 +378,102 @@ class SketchIntersect(_SketchCommand):
             "Click faces or edges of the part: where the sketch's plane cuts them comes into "
             "the sketch.",
         )
+        tool = watched_tool()
+        session = sketch_mode.current()
+        if tool is not None and session is not None and session.gl is not None:
+            tool.after = _PlaneClicks(session).stop
+
+
+PLANE_TYPES = ("PartDesign::Plane", "Part::DatumPlane", "App::Plane")
+
+
+class _PlaneClicks(QtCore.QObject):
+    """A click on a construction or origin plane while FreeCAD's Intersection tool runs.
+
+    FreeCAD's tool takes the click and then fails: "Not able to add external shape element
+    Plane", with a traceback in the Report view and nothing in the sketch (the book's
+    surfboard: four offset planes cross the board in the front view, each a yellow line;
+    replay-b, wave 7). Here the click is taken before FreeCAD's tool sees it: a plane that
+    stands square to the sketch gives the line where the two planes cut (FreeCAD can project
+    such a plane, and for it the projection is that line); any other plane is refused with
+    the reason. Qt's own events only (an event filter on the 3D view's widget)."""
+
+    DRAG_PIXELS = 4
+
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+        self.gl = session.gl
+        self.press = None
+        self.gl.installEventFilter(self)
+
+    def stop(self):
+        try:
+            self.gl.removeEventFilter(self)
+        except Exception:
+            pass
+
+    def _plane_at(self, pos):
+        ratio = self.gl.devicePixelRatioF() or 1.0
+        try:
+            spot = (pos.x() * ratio, (self.gl.height() - pos.y()) * ratio)
+            info = self.session.view.getObjectInfo(spot)
+            if not info:
+                return None
+            obj = App.getDocument(str(info["Document"])).getObject(str(info["Object"]))
+            return obj if obj is not None and obj.TypeId in PLANE_TYPES else None
+        except Exception:
+            return None
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            left = kind in (
+                QtCore.QEvent.MouseButtonPress,
+                QtCore.QEvent.MouseButtonRelease,
+            ) and (event.button() == QtCore.Qt.LeftButton)
+            if left and kind == QtCore.QEvent.MouseButtonPress:
+                plane = self._plane_at(event.pos())
+                self.press = (QtCore.QPoint(event.pos()), plane) if plane is not None else None
+                return plane is not None
+            if left and self.press is not None:
+                (at, plane), self.press = self.press, None
+                if (event.pos() - at).manhattanLength() <= self.DRAG_PIXELS:
+                    QtCore.QTimer.singleShot(0, lambda: self._clicked(plane))
+                return True
+        except Exception as exc:
+            warn("Intersect: %s" % exc)
+        return False
+
+    def _clicked(self, plane):
+        session = self.session
+        try:
+            if session.closed or sketch_mode.current() is not session:
+                return
+            from . import timeline_ops
+
+            sketch = session.sketch
+            doc = sketch.Document
+            name = timeline_ops.shown_label(plane)
+            count = len(sketch.ExternalGeo)
+            doc.openTransaction("Intersect")
+            try:
+                sketch.addExternal(plane.Name, "", True, False)
+                doc.recompute()
+                made = len(sketch.ExternalGeo) > count
+            except Exception:
+                made = False
+            if made:
+                doc.commitTransaction()
+                commands.tell("Intersect: the line where %s cuts the sketch's plane." % name)
+            else:
+                doc.abortTransaction()
+                commands.tell(
+                    "Intersect: %s does not stand square to the sketch, so its line cannot "
+                    "be brought in. Click a face or an edge of the part." % name
+                )
+        except Exception as exc:
+            warn("Intersect: %s" % exc)
 
 
 # -- Sketch Dimension ----------------------------------------------------------------

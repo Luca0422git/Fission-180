@@ -56,18 +56,10 @@ END_PROPS = {
 
 
 def shown_label(obj):
-    """The name the browser and the timeline show for `obj` ("Sketch 4" for the sketch
-    FreeCAD calls Sketch003, "Origin" for the origin point): a dialog names things as the
-    person sees them named."""
-    try:
-        if obj.TypeId == "App::Point" and getattr(obj, "Role", "") == "Origin":
-            return "Origin"
-        from . import timeline_ops
+    """The name the browser and the timeline show for `obj` (timeline_ops.shown_label)."""
+    from . import timeline_ops
 
-        names = timeline_ops.display_names(obj.Document, obj.Document.Objects)
-        return names.get(obj.Name) or obj.Label
-    except Exception:
-        return obj.Label
+    return timeline_ops.shown_label(obj)
 
 
 def profile_text(index, profile):
