@@ -353,7 +353,7 @@ def c_done():
     h.check("C the circle is 40 across", abs(c.Radius - 20.0) < 1e-6, c.Radius)
     h.check("C ... a diameter dimension", len(cons("Diameter")) == 1, b.cons())
     h.check("C its centre still 40 out, on the axis", st.vnear(c.Center, V(40, 0, 0)), c.Center)
-    h.check("C the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    r.fully_constrained("C", freedom)
     st.sketch_ok("C")
     b.no_modal("C the first sketch")
     h.shot("C-circle")
@@ -648,7 +648,7 @@ def f_fix():
 
 def f_fixed():
     h.check("F a click on the spline fixes it", b.has("Block", s["spline"]), b.cons())
-    h.check("F the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    r.fully_constrained("F", freedom)
     st.esc()
     b.no_modal("F the spline sketch")
     h.shot("F-spline")
@@ -857,7 +857,7 @@ def h_fix():
 def h_fixed():
     blocked = sorted(c.First for c in sk().Constraints if c.Type == "Block")
     h.check("H Fix/Unfix fixes the three circles", blocked == [0, 1, 2], b.cons())
-    h.check("H the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    r.fully_constrained("H", freedom)
     st.esc()
     b.no_modal("H the circles' sketch")
     h.shot("H-circles")

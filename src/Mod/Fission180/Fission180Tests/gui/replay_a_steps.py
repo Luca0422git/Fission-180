@@ -418,3 +418,14 @@ def pan_to(point):
     end = QtCore.QPoint(start.x() + middle.x() - at.x(), start.y() + middle.y() - at.y())
     h.drag(start, end, button=QtCore.Qt.MiddleButton)
     h.view_still()
+
+
+def fully_constrained(where, freedom):
+    """The Sketch Palette comes to say Fully constrained (it reads the solver on its own
+    timer, which settling does not wait for)."""
+    h.wait_for(
+        lambda: freedom() == "Fully constrained", "%s the palette to say Fully constrained" % where
+    )
+    h.check(
+        "%s the palette says Fully constrained" % where, freedom() == "Fully constrained", freedom()
+    )

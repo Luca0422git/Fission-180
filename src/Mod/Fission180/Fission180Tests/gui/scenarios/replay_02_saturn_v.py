@@ -275,7 +275,7 @@ def a_finish():
     st.esc()
     radii = sorted(round(g.Radius, 6) for g in circles())
     h.check("A the circles are 24 and 58 across", radii == [12.0, 29.0], radii)
-    h.check("A the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    r.fully_constrained("A", freedom)
     st.sketch_ok("A")
     b.no_modal("A the first sketch")
     h.ribbon("Finish Sketch")
@@ -1092,7 +1092,7 @@ def h_finish():
     h.check(
         "H ... its centre on the rim, on the X axis", st.vnear(centre, V(29, 0, 0), 1e-5), centre
     )
-    h.check("H the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    r.fully_constrained("H", freedom)
     st.sketch_ok("H")
     b.no_modal("H the thruster's sketch")
     s["thruster"] = sk()
@@ -1388,7 +1388,7 @@ def i_fin_done():
         {(round(p.x, 6), round(p.y, 6)) for _i, g in lines() for p in (g.StartPoint, g.EndPoint)}
     )
     h.check("I the fin is the book's", corners == sorted(FIN), corners)
-    h.check("I the palette says Fully constrained", freedom() == "Fully constrained", freedom())
+    r.fully_constrained("I", freedom)
     st.sketch_ok("I")
     b.no_modal("I the fin's sketch")
     s["before_fin"] = body().Shape.copy()
