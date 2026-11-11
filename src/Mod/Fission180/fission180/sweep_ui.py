@@ -522,6 +522,8 @@ class SweepPanel(Panel):
                 occluder=self._occluder,
                 skip=self._not_an_area,
             )
+            # a shown sketch's profile wins over the body in front of it (Fusion)
+            self.picker.set_through()
         except Exception as exc:
             warn("sweep: profile shading unavailable: %s" % exc)
 
@@ -535,10 +537,8 @@ class SweepPanel(Panel):
         return curve_pick.line_under_mouse(self.doc, position)
 
     def _occluder(self):
-        base = self._base_feature()
-        if base is None or base.Shape.isNull():
-            return None
-        return curves.to_global(base.Shape, base)
+        """The part before this step; None while its body is hidden."""
+        return profile_pick.shown_part(self._base_feature(), curves.to_global)
 
     def _unwatch(self):
         if self.observer is not None:

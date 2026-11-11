@@ -6,6 +6,63 @@ negative taper narrows) and everyday Fusion behaviour. Implemented in
 `profile_pick.py` picking, `presspull_core.py` geometry, `presspull_ui.py` dialog, `preview.py`
 dialog helpers). Status: **built and tested with real clicks, not yet signed off by Luca**.
 
+## The Operation rule (wave 7, branch `sf/book-extrude`, 2026-11-11)
+
+The book parity report's third pattern: "The Extrude Operation keeps changing" (Symmetric
+turned a Cut into a Join, a new component's first extrude cut another component, an edit to
+Cut showed Join again, OK "did nothing"). The rule, as one table. Sources: **Autodesk**: Jeff
+Strater (Autodesk) on the forum, thread "extrude - what happened": "If the Extrude intersects
+a solid, it will default to Cut. If not, it will default to Join/New Body. But, at any time,
+you can change this by changing the 'Operation' setting in the tool"; Autodesk Learn, "Create
+solids from sketches": a profile that touches nothing is a New Body "in the active
+component", a face extruded away from its body a Join, and "when the new extrusion overlaps an
+existing solid body, the Operation type automatically switches to Cut". **Forum**: "Recurring
+problem with Join vs New Body" (accepted answer): Join only joins bodies of the active
+component ("without that activation, has to be New Body, as there is nothing in the other
+Component ... to join to"); "Cannot Join Bodies with Extrude": the same; IdeaStation "Stop
+automatically changing the operation from New Body to Cut": the operation used to change
+after the person had chosen one, and people asked for that to stop. **Forum** "Tool
+behaviour - unexpected" gives another reading (mostly inside a body: Cut; mostly outside
+but touching or overlapping: Join); the book contradicts it (its thruster cone, 46 % inside
+the rocket, comes up as Cut in Fusion, "exactly as the book says"), so Fission 180 follows
+Autodesk's own sentence. **Book**: the report quoting *Mastering Autodesk Fusion*. **Guess**:
+rows marked so.
+
+| Situation | The dialog shows | Source |
+|---|---|---|
+| The extrusion shares volume with a shown body of the active component (it starts inside one, or reaches into one further on: a profile in the air above a step, To Object the underside) | **Cut** | Autodesk (Strater; Learn) |
+| It only touches a body that belongs to the active component, face to face (a profile on a face, extruded away) | **Join** | Autodesk (Learn); Forum (only the active component's bodies) |
+| Neither (it touches nothing; the first solid; the active component has no solid yet, whatever body of another component it goes through or touches) | **New Body** | Autodesk (Learn); the report's bug 10; that another component's body never decides is a **Guess** made on purpose (below) |
+| Direction Symmetric, Two Sides, Extent All, To Object, Flip, a typed or dragged distance, a negative distance | The same three rows, decided again with each preview (60 ms after the last change; while an arrow is dragged the Cut of an extrusion that starts in a body shows at once) | Autodesk (the rule names no direction); **the old rule never cut a symmetric extrude**, which made the book's donut bite a Join |
+| The person picks an operation in the list | That operation, from then on, whatever changes in the dialog (`user_picked_operation`); a build that fails keeps the picked operation shown with the reason beside it (it used to show the old one again) | Forum (IdeaStation); Luca's brief |
+| An extrude edited from the timeline | The saved operation; it never changes by itself | as above |
+| Enter in the distance box | OK: what the dialog shows is made (the automatic choice is settled for the typed value first) | Fusion (everyday use); the report |
+| OK cannot finish (distance 0, nothing to cut, a failed build) | The dialog stays open with the reason, and the reason is said next to the mouse ("Extrude is not finished: ..."), so the click is answered | the report's pattern 1 (silent failures); **Guess** for the wording |
+| Another command is started while the dialog cannot finish | The dialog is cancelled (as before) and says so next to the mouse: "The change to Extrude was not kept: ..." (it was dropped without a word) | the report (Hot End: "feature edits that end with a warning were silently not saved") |
+
+Which bodies count (`extrude_bodies.auto_scope`, `extrude_bodies_core.scope`): for the
+automatic **Cut**, the bodies inside the active component, the components in it included
+(the root active: every body); for the automatic **Join**, the bodies that belong to the
+active component itself. **Deliberate difference from what Fusion probably does:** Fusion's
+Cut reaches bodies of other components (forum "extrude-cut through all problem" asks for an
+"Active Component" option), so with component A active an extrude through a body of
+component B most likely comes up as Cut there too. In Fission 180 the *automatic* choice
+never changes a body outside the active component (the report's bug 10: "it overlapped a
+body in another component and cut it, silently changing that component"). Picking Cut by
+hand works as in Fusion: the Bodies to Cut row lists every shown body in the way, other
+components' too, and each can be clicked away.
+
+What changed against the rule before wave 7 ("Cut when the first 0.01 mm starts inside a
+body; a symmetric extrude never cuts by itself; any shown body counts"): a symmetric extrude
+follows the rule; an extrusion that starts in the air and reaches into a body is a Cut; Two
+Sides or Symmetric from a face with one side running into the body is a Cut (scenarios
+`extrudeface_sides` Q3 / Q4 and `extrudeface_drag` D5 now pick Join by hand there); bodies of
+other components no longer decide. Code: `extrude_bodies_core.auto_operation` / `scope` (unit
+`test_extrude_bodies_core`), `extrude_bodies.starts_in_material` / `auto_scope`,
+`extrude_ui._auto_operation` / `_live_operation`, `extrude_finish.SaysWhy` (also mixed into
+Revolve, Sweep, Loft and the primitives). Scenario `book_extrude_operation` (ten rows, 72
+checks).
+
 ## Values past what fits stop at the limit (Luca's decision, 2026-10-21)
 
 **This deliberately differs from Fusion.** Fusion refuses a value that does not fit (a

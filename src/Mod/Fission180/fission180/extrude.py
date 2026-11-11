@@ -248,10 +248,39 @@ def face_areas(sketch):
         return set()
 
 
+_SLIVERS = {}  # (document, sketch) -> (shape stamp, {"InternalFaceN"})
+
+
+def sliver_areas(sketch):
+    """{"InternalFaceN"} of the sketch's areas that are no profile: slivers of next to no
+    area, left where pattern copies or tangent curves lie on each other (the book's
+    carabiner offered 27 "regions", many of them slivers). They keep their numbers (an old
+    step may name one); they are only never offered (sketch_area_id_core.slivers)."""
+    try:
+        if sketch.InternalShape.isNull():
+            return set()
+        key = (sketch.Document.Name, sketch.Name)
+        stamp = (_stamp(sketch), sketch.InternalShape.hashCode())
+        cached = _SLIVERS.get(key)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+        from . import sketch_area_id_core
+
+        faces = list(sketch.InternalShape.Faces)
+        thin = sketch_area_id_core.slivers(
+            [f.Area for f in faces], [f.OuterWire.Length for f in faces]
+        )
+        found = {"InternalFace%d" % (i + 1) for i in thin}
+        _SLIVERS[key] = (stamp, found)
+        return found
+    except Exception:
+        return set()
+
+
 def profile_regions(sketch):
-    """regions() without the areas only the face's projected edges bound (face_areas):
-    the profiles a click or an automatic pick offers."""
-    own = face_areas(sketch)
+    """regions() without the areas only the face's projected edges bound (face_areas) and
+    without slivers (sliver_areas): the profiles a click or an automatic pick offers."""
+    own = face_areas(sketch) | sliver_areas(sketch)
     return [(sub, face) for sub, face in regions(sketch) if sub not in own]
 
 
