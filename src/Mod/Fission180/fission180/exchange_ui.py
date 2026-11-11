@@ -409,8 +409,8 @@ class SaveAsDXFCommand:
 
 
 def save_as_mesh(obj=None):
-    """Right-click a body or component > Save As Mesh: the Export dialog on it, a mesh type
-    chosen (Fusion's Save As Mesh: Format, Unit Type, Structure, Refinement)."""
+    """Right-click a body or component > Save As Mesh: Fusion's Save As Mesh dialog on it
+    (Format, Unit Type, Structure, Refinement, Send to 3D Print Utility)."""
     from . import export_ui
 
     doc = App.ActiveDocument
@@ -429,7 +429,8 @@ def save_as_mesh(obj=None):
     if obj is None:
         commands.tell("Select a body or a component first, then Save As Mesh.")
         return None
-    dialog = export_ui.ExportDialog(doc, preset=obj, mesh=True)
+    # (wave 7) Fusion's Save As Mesh dialog, with Send to 3D Print Utility
+    dialog = export_ui.SaveAsMeshDialog(doc, obj)
     dialog.show()
     return dialog
 

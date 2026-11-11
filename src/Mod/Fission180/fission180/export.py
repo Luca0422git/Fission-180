@@ -45,6 +45,8 @@ FORMATS = [
     ("STL (ASCII)", ".stl", "stl_ascii"),
     ("3MF", ".3mf", "3mf"),
     ("OBJ", ".obj", "obj"),
+    # (wave 7) for AR viewers: the bodies as meshes with their colours (export_usd.py)
+    ("USDZ", ".usdz", "usdz"),
 ]
 MESH_FORMATS = ["STL (Binary)", "STL (ASCII)", "3MF", "OBJ"]
 PRINT_FORMATS = ["3MF", "STL (Binary)", "STL (ASCII)", "OBJ"]
@@ -399,6 +401,8 @@ def export_mesh_files(
     path = with_extension(path, extension)
     meshes = []
     inverse = frame.inverse().toMatrix() if frame is not None and not frame.isIdentity() else None
+    if format_entry(fmt)[2] == "usdz":
+        return _export_usdz(doc, body_list, path, level, surface, normal, per_body, inverse)
     for body in body_list:
         mesh = body_mesh(body, surface, normal, level)
         if inverse is not None:
@@ -419,6 +423,115 @@ def export_mesh_files(
         written.append((path, write_meshes(meshes, path, fmt, unit)))
     for file_path, count in written:
         log("export: %s (%d triangles)" % (file_path, count))
+    return written
+
+
+# -- USDZ (AR) --------------------------------------------------------------------------------
+DEFAULT_LOOK = {"color": (0.8, 0.8, 0.8), "opacity": 1.0}
+
+
+def _look_of(material):
+    """{"color", "opacity", "metallic", "roughness"} of one of FreeCAD's view materials."""
+    try:
+        color = tuple(float(c) for c in material.DiffuseColor[:3])
+        opacity = 1.0 - float(getattr(material, "Transparency", 0.0) or 0.0)
+        shine = float(getattr(material, "Shininess", 0.0) or 0.0)
+        return {
+            "color": color,
+            "opacity": max(0.0, min(1.0, opacity)),
+            "metallic": 0.0,
+            "roughness": max(0.05, min(1.0, 1.0 - shine)),
+        }
+    except Exception:
+        return dict(DEFAULT_LOOK)
+
+
+def body_looks(body):
+    """The looks a body is drawn with: one for the whole body, or one per face when faces
+    were given looks of their own (as many as the body's solid has faces). Without the
+    window (a script): the default grey."""
+    try:
+        vobj = body.ViewObject
+        materials = list(vobj.ShapeAppearance) if vobj is not None else []
+    except Exception:
+        materials = []
+    if not materials:
+        return [dict(DEFAULT_LOOK)]
+    return [_look_of(m) for m in materials]
+
+
+def _look_key(look):
+    return (
+        tuple(round(c, 4) for c in look["color"]),
+        round(look.get("opacity", 1.0), 4),
+        round(look.get("roughness", 0.5), 4),
+    )
+
+
+def usd_parts(body, surface=None, normal=None, level=DEFAULT_REFINEMENT, inverse=None):
+    """What a body is written to USDZ as: [{"name", "points", "triangles", "color",
+    "opacity", ...}], one part for a body of one look, one per look for a body whose faces
+    have looks of their own (the Donut's pink icing on a brown ring)."""
+
+    def placed(point):
+        if inverse is not None:
+            point = inverse.multVec(point)
+        return (point.x, point.y, point.z)
+
+    looks = body_looks(body)
+    distinct = {_look_key(look) for look in looks}
+    if len(distinct) > 1 and not is_mesh_body(body):
+        shape = shape_of(body)
+        if len(shape.Faces) == len(looks):
+            deviation = refinement_values(level, surface, normal)[0]
+            groups, order = {}, []
+            for face, look in zip(shape.Faces, looks):
+                key = _look_key(look)
+                if key not in groups:
+                    groups[key] = dict(look, points=[], triangles=[])
+                    order.append(key)
+                group = groups[key]
+                points, triangles = face.tessellate(float(deviation))
+                base = len(group["points"])
+                group["points"] += [placed(p) for p in points]
+                flip = face.Orientation == "Reversed"
+                for a, b, c in triangles:
+                    tri = (a + base, c + base, b + base) if flip else (a + base, b + base, c + base)
+                    group["triangles"].append(tri)
+            parts = []
+            for index, key in enumerate(order):
+                name = body.Label if index == 0 else "%s (%d)" % (body.Label, index + 1)
+                parts.append(dict(groups[key], name=name))
+            return parts
+    mesh = body_mesh(body, surface, normal, level)
+    points, triangles = mesh.Topology
+    part = dict(looks[0], name=body.Label)
+    part["points"] = [placed(p) for p in points]
+    part["triangles"] = [tuple(t) for t in triangles]
+    return [part]
+
+
+def _export_usdz(doc, body_list, path, level, surface, normal, per_body, inverse):
+    from . import export_usd
+
+    name = os.path.splitext(os.path.basename(path))[0]
+    per = []
+    for body in body_list:
+        per.append((body.Label, usd_parts(body, surface, normal, level, inverse)))
+    written = []
+    try:
+        if per_body and len(per) > 1:
+            folder = os.path.dirname(path)
+            files = body_file_names([label for label, _p in per], folder, name, ".usdz")
+            for file_path, (label, parts) in zip(files, per):
+                written.append((file_path, export_usd.write_usdz(file_path, parts, label)))
+        else:
+            parts = [part for _label, group in per for part in group]
+            written.append((path, export_usd.write_usdz(path, parts, name)))
+    except export_usd.UsdError as exc:
+        raise ExportError(str(exc))
+    for file_path, count in written:
+        log("export: %s (%d triangles, USDZ in metres, Y up)" % (file_path, count))
     return written
 
 

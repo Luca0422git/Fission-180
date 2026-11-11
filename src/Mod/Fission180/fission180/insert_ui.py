@@ -51,10 +51,9 @@ def pick_file(kind):
         prefs = App.ParamGet(PREFS)
         start = prefs.GetString("LastInsertFolder", "")
         if not start or not os.path.isdir(start):
-            doc = App.ActiveDocument
-            start = (
-                os.path.dirname(doc.FileName) if doc and doc.FileName else os.path.expanduser("~")
-            )
+            from . import versions_ui
+
+            start = versions_ui.start_folder(App.ActiveDocument)
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             Gui.getMainWindow(), TITLES[kind], start, FILTERS[kind]
         )
@@ -79,10 +78,9 @@ def pick_files(kind):
         prefs = App.ParamGet(PREFS)
         start = prefs.GetString("LastInsertFolder", "")
         if not start or not os.path.isdir(start):
-            doc = App.ActiveDocument
-            start = (
-                os.path.dirname(doc.FileName) if doc and doc.FileName else os.path.expanduser("~")
-            )
+            from . import versions_ui
+
+            start = versions_ui.start_folder(App.ActiveDocument)
         paths, _ = QtWidgets.QFileDialog.getOpenFileNames(
             Gui.getMainWindow(), TITLES[kind], start, FILTERS[kind]
         )

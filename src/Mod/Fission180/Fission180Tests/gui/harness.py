@@ -1685,7 +1685,14 @@ def painted(widget, need=6, contrast=48):
     `need` of its pixels differ from its most common colour by `contrast` (of 255) in some
     channel. A light text on the system's light button, or no text at all, is a blank square
     (book parity report: Parameters' "+" and "-", Save's "...")."""
-    image = widget.grab().toImage()
+    # what is on the screen (a widget's own picture leaves out what shows through it: a
+    # flat button's ground is its panel's)
+    top = widget.mapToGlobal(QtCore.QPoint(0, 0))
+    image = (
+        QtWidgets.QApplication.primaryScreen()
+        .grabWindow(0, top.x(), top.y(), widget.width(), widget.height())
+        .toImage()
+    )
     counts = {}
     for x in range(image.width()):
         for y in range(image.height()):

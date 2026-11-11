@@ -335,14 +335,20 @@ def p7_save_as_mesh():
 
 
 def p7_check():
-    d = dialog()
-    h.check("P7 the Export dialog opened", d is not None)
-    if d is None:
+    # (wave 7) Save As Mesh opens Fusion's Save As Mesh dialog, not the general Export one
+    from fission180 import export_ui
+
+    d = export_ui.SaveAsMeshDialog.last
+    shown = d is not None and isinstance(d, export_ui.SaveAsMeshDialog) and d.isVisible()
+    h.check("P7 the Save As Mesh dialog opened", shown)
+    if not shown:
         return
-    h.check("P7 on the component", d.what.currentText() == "A component", d.what.currentText())
-    h.check("P7 Drive", d.component.currentText() == "Drive", d.component.currentText())
-    h.check("P7 3MF", d.type.currentText() == "3MF", d.type.currentText())
-    h.check("P7 named after it", d.name.text() == "Drive", d.name.text())
+    h.check("P7 on the component", d.component is not None and d.component.Label == "Drive")
+    ticked = sorted(b.Label for b in d.bodies.chosen())
+    h.check("P7 its bodies are ticked", len(ticked) >= 1, ticked)
+    h.check("P7 3MF", d.format.currentText() == "3MF", d.format.currentText())
+    name = os.path.basename(d.default_path())
+    h.check("P7 named after it", name == "Drive.3mf", name)
     d.reject()
 
 

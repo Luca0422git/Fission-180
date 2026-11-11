@@ -682,10 +682,10 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def _choices(self, opt):
         if opt["key"] == "language":
-            try:
-                names = sorted(Gui.supportedLocales().keys())
-            except Exception:
-                names = ["English"]
+            # (wave 7) only what Fission 180 really has: English (the list held FreeCAD's
+            # dozens of languages, none of which changes a word of Fission 180), and the
+            # language FreeCAD runs in now when that is another one, so it can be left
+            names = core.languages(_current_language())
             return [(n, n, True, "") for n in names]
         if opt["key"] == "default_material":
             from . import material

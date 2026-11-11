@@ -26,6 +26,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import drag_guard, increments, log, warn
+from .shown_names import fit_names, shown_name  # noqa: F401  (taskui.shown_name)
 from .compat import QtCore, QtGui, QtWidgets
 
 _OPEN = {"dialog": None}
@@ -1429,34 +1430,6 @@ class ArrowDragger(BoxCarrier):
 NAMES_WIDTH = 250  # px: the widest the text of a button showing picked names gets
 PANEL_WIDTH = 560  # px: the widest a command dialog's own content may ask for
 _NAMES = "fission180_names"
-
-
-def shown_name(text):
-    """A name as a button, a check box, a tab or a menu entry must be given it: Qt reads "&"
-    there as the mark of a keyboard letter and drops it ("Nut & Bolt" showed as "Nut  Bolt")."""
-    return str(text).replace("&", "&&")
-
-
-def fit_names(text, width, measure, separator=", "):
-    """`text` (names joined by ", ") shortened to `width` pixels: the first names that fit and
-    how many more ("Arm, Base + 5 more"), one name too long cut with "…". measure(text) gives
-    a text's width in pixels."""
-    text = str(text)
-    if width <= 0 or measure(text) <= width:
-        return text
-    names = text.split(separator)
-    if len(names) > 1:
-        for count in range(len(names) - 1, 0, -1):
-            short = "%s + %d more" % (separator.join(names[:count]), len(names) - count)
-            if measure(short) <= width:
-                return short
-        tail = " + %d more" % (len(names) - 1)
-        head = names[0]
-    else:
-        tail, head = "", text
-    while len(head) > 1 and measure(head + "…" + tail) > width:
-        head = head[:-1]
-    return head.rstrip() + "…" + tail
 
 
 def set_names(button, text, width=None):

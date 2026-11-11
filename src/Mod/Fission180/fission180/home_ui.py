@@ -1254,6 +1254,13 @@ def new_design():
         if not commands.finish_open_dialog():
             return None
         doc = App.newDocument("Untitled")
+        try:  # the Design preferences (no design history) before its first body is made:
+            # with the body there the design counted as one already in use
+            from . import preferences_ui
+
+            preferences_ui._new_design(doc.Name)
+        except Exception as exc:
+            warn("home: new design preferences: %s" % exc)
         commands.ensure_body()
         try:  # (wave 7) Fusion's first view: Home (isometric), the origin in the middle
             from . import view_fit
@@ -1261,6 +1268,13 @@ def new_design():
             view_fit.show_new_design(doc)
         except Exception as exc:
             warn("home: new design view: %s" % exc)
+        try:
+            # a new design is as it was made: nothing to undo (Ctrl+Z took its Origin
+            # away), nothing to save yet (closing it untouched asked about changes)
+            doc.clearUndos()
+            Gui.getDocument(doc.Name).Modified = False
+        except Exception as exc:
+            warn("home: new design: %s" % exc)
         log("home: new design %s" % doc.Name)
         return doc
     except Exception as exc:
