@@ -550,6 +550,30 @@ class BackgroundSearch(unittest.TestCase):
         self.assertEqual(p.ended, [3.47])
         self.assertEqual(p.value, 3.47)  # held at the limit at the end
 
+    def test_no_build_while_the_person_types(self):
+        # the book replay (Fire Piston): a size typed right after a pick waited behind one
+        # trial build per key; the search rests for INPUT_REST_S after a key or a press
+        import time
+
+        p = SoonPanel()
+        self.assertEqual(p.edit_soon(2.0), "ok")
+        self.assertEqual(p.edit_soon(20.0), "later")
+        job = p._limit_job
+        pressed = [time.perf_counter()]
+        job.last_input = lambda: pressed[0]
+        builds = p.builds
+        for _ in range(5):
+            pressed[0] = time.perf_counter()  # a key every tick
+            p.run(1)
+        self.assertEqual(p.builds, builds)
+        self.assertEqual(job.timer.interval, vl.Background.PAUSE_POLL_MS)
+        pressed[0] = time.perf_counter() - vl.Background.INPUT_REST_S - 0.01  # the hands rest
+        p.run(40)
+        self.assertGreater(p.builds, builds)
+        self.assertEqual(p.ended, [3.47])
+        job.last_input = lambda: None  # nothing pressed since the search started: no wait
+        self.assertFalse(job._typing())
+
     def test_finish_does_not_wait_for_the_drag(self):
         p = SoonPanel()
         p.edit_soon(2.0)
