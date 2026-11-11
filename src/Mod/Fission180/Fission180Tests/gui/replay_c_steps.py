@@ -5,6 +5,9 @@ Real input only: every helper here clicks, drags or types.
 
 Kept outside scenarios/ because every file there is run as a scenario."""
 
+import os
+import tempfile
+
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtCore, QtGui, QtWidgets
@@ -34,6 +37,9 @@ def user_defaults():
     App.ParamGet(grid_ui.PARAMS).RemBool("LayoutGrid")
     grid_ui.redraw_all()
     h.STRICT["undo"] = True
+    # designs are saved in a folder of this run (a person's is Documents/Fission 180 Designs)
+    files = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Fission180/Files")
+    files.SetString("ProjectFolder", tempfile.mkdtemp(prefix="fission180-replay-c-"))
 
 
 def defaults_are_on(tag):
@@ -315,3 +321,111 @@ def value_editor():
 def named(fn, name):
     fn.__name__ = name
     return fn
+
+
+# == saving and opening again ======================================================================
+def save_steps(tag, name):
+    """Ctrl+S, the name typed, Save (a new design's first save: Name and Location)."""
+    from Fission180Tests.gui import versions_input as vi
+
+    state = {}
+
+    def save():
+        h.press("s", CTRL)
+
+    save.done = lambda: vi.save_dialog() is not None or vi.version_dialog() is not None
+    save.done_what = "the Save dialog"
+
+    def fill():
+        if vi.save_dialog() is not None:
+            vi.fill_save_dialog(name=name)
+            vi.click_save()
+        else:
+            vi.accept_save()
+
+    def saved():
+        return (
+            vi.save_dialog() is None
+            and vi.version_dialog() is None
+            and bool(doc().FileName)
+            and os.path.isfile(doc().FileName)
+        )
+
+    fill.done = saved
+    fill.done_what = "the design to be saved"
+    fill.timeout_s = 120
+
+    def check():
+        path = doc().FileName
+        state["path"] = path
+        h.check("%s saved as %s" % (tag, name), os.path.basename(path) == name + ".FCStd", path)
+        h.check("%s nothing unsaved is left" % tag, not Gui.getDocument(doc().Name).Modified)
+
+    save.__name__, fill.__name__, check.__name__ = (
+        "%s_save" % tag,
+        "%s_save_name" % tag,
+        "%s_saved" % tag,
+    )
+    return [save, fill, check]
+
+
+def reopen_steps(tag, name):
+    """The design's tab closed (Home shows), then opened again with a double-click on its
+    tile under Recent."""
+    from Fission180Tests.gui import polish2_steps as p2
+
+    state = {}
+
+    def home():
+        from fission180 import home_ui
+
+        return home_ui.view()
+
+    def tile():
+        tiles = home().row("recent").list
+        for i in range(tiles.count()):
+            item = tiles.item(i)
+            if item.text().split("\n")[0] == name:
+                tiles.scrollToItem(item)
+                home().scroll.ensureWidgetVisible(tiles)
+                return tiles.viewport(), tiles.visualItemRect(item).center()
+        return tiles.viewport(), None
+
+    def close():
+        state["path"] = doc().FileName
+        state["name"] = doc().Name
+        p2.close_tab(doc())
+
+    def closed():
+        from fission180 import home_ui
+
+        return state.get("name") not in App.listDocuments() and home_ui.is_active()
+
+    close.done = closed
+    close.done_what = "the design to close and Home to show"
+
+    def open_():
+        viewport, pos = tile()
+        if h.check("%s Home lists %s under Recent" % (tag, name), pos is not None):
+            w.double_click(viewport, pos)
+
+    def opened():
+        d = App.ActiveDocument
+        return d is not None and d.FileName == state.get("path") and not d.Recomputing
+
+    open_.done = opened
+    open_.done_what = "the saved design to open"
+    open_.timeout_s = 180
+
+    def fit():
+        h.fit()
+        h.check(
+            "%s the design is open again" % tag, doc().FileName == state["path"], doc().FileName
+        )
+
+    close.__name__, open_.__name__, fit.__name__ = (
+        "%s_close" % tag,
+        "%s_open" % tag,
+        "%s_opened" % tag,
+    )
+    return [close, open_, fit]

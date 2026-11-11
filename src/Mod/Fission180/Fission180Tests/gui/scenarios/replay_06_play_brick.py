@@ -26,7 +26,6 @@ import math
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide import QtCore, QtWidgets
 
 from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import plane_input as pl
@@ -649,7 +648,8 @@ def tangent_steps(k, angle):
         d = g.EndPoint - g.StartPoint
         off = abs((c - g.StartPoint).cross(d).z) / d.Length
         h.check(
-            "F frame line %d touches the stud's rim (the report: no constraint was added)" % (k + 1),
+            "F frame line %d touches the stud's rim (the report: no constraint was added)"
+            % (k + 1),
             r.near(off, TOP_R, 1e-6),
             (off, TOP_R),
         )
@@ -667,7 +667,9 @@ def f_finish():
 
     tangents = [c for _i, c in r.cons(("Tangent",))]
     h.check("F four Tangent constraints", len(tangents) == 4, len(tangents))
-    h.check("F the frame is held (5 free before)", r.dof() < s["dof_free"], (s["dof_free"], r.dof()))
+    h.check(
+        "F the frame is held (5 free before)", r.dof() < s["dof_free"], (s["dof_free"], r.dof())
+    )
     text = r.doc().getObject(s["text"])
     box = ti.letters_box(text)
     c = to_sketch(STUD)
@@ -853,6 +855,516 @@ def g_done():
     h.shot("G-turned")
 
 
+# == H: the tubes inside ===========================================================================
+INNER_Z = H - 1.2  # the underside of the brick's top, before it was turned over
+TUBES = [V(7.9 + PITCH * i, 7.9, INNER_Z) for i in range(3)]  # as built (before the turn)
+OUTER_R, INNER_R = 6.51 / 2.0, 2.4
+DEPTH = 8.4
+
+
+def h_sketch():
+    h.ribbon("Create Sketch")
+
+
+def h_face():
+    # the inner face, up now (near the far wall: the near wall hides the rest in this view)
+    h.click(flipped(V(12, 13.2, INNER_Z)))
+
+
+h_face.done = lambda: h.in_sketch() is not None
+h_face.done_what = "the sketch on the inner face is open"
+
+
+def tube(i):
+    """The sketch point of tube i's centre (where it has to end up)."""
+    return to_sketch(flipped(TUBES[i]))
+
+
+def h_start():
+    sk = r.sk()
+    s["tube_sketch"] = sk.Name
+    z = sk.getGlobalPlacement().Base.z
+    h.check("H the sketch is on the inner face", r.near(z, flipped(TUBES[0]).z), z)
+    s["geo0"] = len(sk.Geometry)
+    s["rough"] = []
+    # (zoomed in on the three tubes, as a person does: the grid Snap uses gets finer)
+    r.zoom_on(flipped(TUBES[1]), 13.0)
+    h.press("c")
+
+
+def circle_steps(i, outer):
+    """A circle drawn freehand: a click for the centre (the second of a pair on the first
+    one's centre point: concentric by inference), a click for the size."""
+
+    def centre():
+        if outer:
+            # (roughly where the tube goes: Snap puts the click on the grid)
+            r.sclick(tube(i) + V(0.1, 0.1, 0))
+        else:
+            c = r.sk().Geometry[s["rough"][-1]].Center
+            r.sclick(V(c.x, c.y, 0))
+
+    def size():
+        c = r.sk().Geometry[s["rough"][-1]].Center if not outer else None
+        if outer:
+            before = {k for k, _g in r.geo("Part::GeomCircle")}
+            s["before"] = before
+            r.sclick(tube(i) + V(0.1 + 3.0, 0.1, 0))
+        else:
+            s["before"] = {k for k, _g in r.geo("Part::GeomCircle")}
+            r.sclick(V(c.x + 2.0, c.y, 0))
+
+    def drawn():
+        new = [k for k, _g in r.geo("Part::GeomCircle") if k not in s["before"]]
+        h.check("H circle %d %s drawn" % (i + 1, "outer" if outer else "inner"), len(new) == 1, new)
+        if not new:
+            return
+        if not outer:
+            a = r.sk().Geometry[s["rough"][-1]].Center
+            b = r.sk().Geometry[new[0]].Center
+            h.check("H ...on the first one's centre", (a - b).Length < 1e-6, (a, b))
+            joined = [
+                c
+                for _k, c in r.cons(("Coincident",))
+                if {c.First, c.Second} == {s["rough"][-1], new[0]}
+            ]
+            h.check("H ...concentric by inference (a constraint, not luck)", len(joined) == 1)
+        s["rough"].append(new[0])
+
+    tag = "%d_%s" % (i, "outer" if outer else "inner")
+    return [
+        r.named(centre, "h_circle_%s_centre" % tag),
+        r.named(size, "h_circle_%s_size" % tag),
+        r.named(drawn, "h_circle_%s_drawn" % tag),
+    ]
+
+
+def outer(i):
+    return s["rough"][2 * i]
+
+
+def inner(i):
+    return s["rough"][2 * i + 1]
+
+
+def on_circle(index, angle):
+    g = r.sk().Geometry[index]
+    a = math.radians(angle)
+    return V(g.Center.x + g.Radius * math.cos(a), g.Center.y + g.Radius * math.sin(a), 0)
+
+
+def h_end_circle():
+    r.esc()
+    r.esc()
+    h.check("H six circles", len(s["rough"]) == 6, s["rough"])
+    h.check("H the sketch is still open", r.sk() is not None)
+    Gui.Selection.clearSelection()
+
+
+def equal_steps(which, name):
+    """Ctrl+click three circles, CONSTRAINTS > Equal (the book: "hold Ctrl")."""
+
+    def pick(i):
+        def step():
+            from Fission180Tests.gui import sketch_input as si
+
+            si.click_held(r.g(on_circle(which(i), 200 + 20 * i)), r.CTRL)
+
+        return r.named(step, "h_equal_%s_pick_%d" % (name, i))
+
+    def equal():
+        picked = [n for x in Gui.Selection.getSelectionEx() for n in x.SubElementNames]
+        h.check(
+            "H Ctrl+click adds: three circles selected (the report: Ctrl did not add)",
+            len(picked) == 3,
+            picked,
+        )
+        si_menu("CONSTRAINTS", "Equal")
+
+    def check():
+        radii = [r.sk().Geometry[which(i)].Radius for i in range(3)]
+        h.check("H the three %s circles are equal" % name, max(radii) - min(radii) < 1e-6, radii)
+        r.sketch_clean("H equal %s:" % name)
+        r.esc()
+        Gui.Selection.clearSelection()
+
+    return [pick(0), pick(1), pick(2), r.named(equal, "h_equal_%s" % name)] + [
+        r.named(check, "h_equal_%s_check" % name)
+    ]
+
+
+def diameter_steps(which, value, name):
+    def pick():
+        r.sclick(on_circle(which(0), 100))
+
+    def place():
+        # (in empty space below the pair: a click on another curve is a second pick)
+        g = r.sk().Geometry[outer(0)]
+        dx = -1.0 if name == "outer" else 1.0
+        r.sclick(V(g.Center.x + dx, g.Center.y - g.Radius - 1.6, 0))
+
+    def typed():
+        h.check("H the value box is open", r.value_editor() is not None, r.focus_name())
+        r.keyboard(value)
+        r.enter()
+
+    def check():
+        radii = [r.sk().Geometry[which(i)].Radius for i in range(3)]
+        h.check(
+            "H all three %s circles are %s across" % (name, value),
+            all(r.near(2 * x, float(value), 1e-6) for x in radii),
+            radii,
+        )
+
+    return [
+        r.named(pick, "h_dia_%s_pick" % name),
+        r.named(place, "h_dia_%s_place" % name),
+        r.named(typed, "h_dia_%s_type" % name),
+        r.named(check, "h_dia_%s_check" % name),
+    ]
+
+
+def h_dimension():
+    h.press("d")
+
+
+def centre_of(i):
+    c = r.sk().Geometry[outer(i)].Center
+    return V(c.x, c.y, 0)
+
+
+def place_steps(name, a, b, value, across):
+    """D between two points (a function each), placed straight below them for the distance
+    across, straight beside them for the distance up."""
+
+    def pick_a():
+        r.sclick(a())
+
+    def pick_b():
+        r.sclick(b())
+
+    def place():
+        p, q = a(), b()
+        if across:
+            r.sclick(V((p.x + q.x) / 2.0, min(p.y, q.y) - 2.5, 0))
+        else:
+            r.sclick(V(min(p.x, q.x) - 2.5, (p.y + q.y) / 2.0, 0))
+
+    def typed():
+        h.check("H %s: the value box is open" % name, r.value_editor() is not None, r.focus_name())
+        r.keyboard(value)
+        r.enter()
+
+    return [
+        r.named(pick_a, "h_%s_pick_a" % name),
+        r.named(pick_b, "h_%s_pick_b" % name),
+        r.named(place, "h_%s_place" % name),
+        r.named(typed, "h_%s_type" % name),
+    ]
+
+
+def h_level():
+    r.esc()
+    si_menu("CONSTRAINTS", "Horizontal/Vertical")
+
+
+def level_steps(i):
+    def first():
+        r.sclick(centre_of(i - 1))
+
+    def second():
+        r.sclick(centre_of(i))
+
+    return [r.named(first, "h_level_%d_a" % i), r.named(second, "h_level_%d_b" % i)]
+
+
+def h_finish():
+    r.esc()
+    want = [tube(i) for i in range(3)]
+    got = sorted((centre_of(i) for i in range(3)), key=lambda p: (p.x, p.y))
+    want = sorted(want, key=lambda p: (p.x, p.y))
+    h.check(
+        "H the tubes are between the studs, 8 mm apart",
+        all((a - b).Length < 1e-5 for a, b in zip(got, want)),
+        (got, want),
+    )
+    r.sketch_clean("H")
+    h.check("H the six circles are fully constrained", r.dof() == 0, r.dof())
+    h.shot("H-sketch")
+    h.ribbon("Finish Sketch")
+
+
+h_finish.done = lambda: h.in_sketch() is None
+h_finish.done_what = "Finish Sketch closed the sketch"
+
+
+STEEP = V(-0.35, 0.35, -1)  # from above, into the open brick
+
+
+def h_extrude():
+    r.look_from(STEEP)
+    Gui.Selection.clearSelection()
+    h.press("e")
+
+
+def ring_steps(i):
+    def step():
+        mid = (OUTER_R + INNER_R) / 2.0
+        h.click(flipped(TUBES[i]) + V(mid * 0.6, -mid * 0.8, 0))
+
+    return r.named(step, "h_ring_%d" % i)
+
+
+def h_distance():
+    from fission180 import extrude_ui
+
+    from Fission180Tests.gui import arrow_input as arrows
+
+    p = extrude_ui.ExtrudePanel.last
+    h.check("H the three rings are the profiles", len(p.profiles) == 3, p.profiles)
+    arrows.give_distance("%g" % DEPTH)
+    s["operation"] = p.operation.currentText()
+    h.task_button("OK")
+
+
+h_distance.done = r.no_dialog
+h_distance.done_what = "OK finished the Extrude"
+h_distance.timeout_s = 120
+
+
+def h_tubes():
+    ring = math.pi * (OUTER_R**2 - INNER_R**2) * DEPTH
+    want = s["v_brick"] + 3 * ring
+    h.check("H up from the inner face is a Join", s.get("operation") == "Join", s.get("operation"))
+    h.check("H three tubes 6.51 / 4.8 across, 8.4 long", r.near(vol(), want, 1e-6), (vol(), want))
+    h.check(
+        "H they end level with the brick's rim", r.box_near(body().Shape, s["box_before"], 1e-4)
+    )
+    s["v_tubes"] = vol()
+    r.nothing_broken("H tubes:")
+    r.look_from(STEEP)
+    Gui.Selection.clearSelection()
+    si_menu("MODIFY", "Draft")
+
+
+h_tubes.done = lambda: draft_panel() is not None
+h_tubes.done_what = "the Draft dialog is open"
+
+
+def h_pull():
+    top = flipped(V(TUBES[1].x, TUBES[1].y, 0))  # a tube's end face (the brick's rim level)
+    mid = (OUTER_R + INNER_R) / 2.0
+    h.click(top + V(mid * 0.6, -mid * 0.8, 0))
+
+
+def tube_face_steps(i, inside):
+    def step():
+        p = draft_panel()
+        s["faces"] = len(p.names())
+        top = flipped(V(TUBES[i].x, TUBES[i].y, 0))
+        # the view looks along (-1, 1, ...): the far inside wall and the near outside wall
+        # of a tube are in view just below its end
+        k = math.sqrt(0.5)
+        if inside:
+            h.click(top + V(-INNER_R * k, INNER_R * k, -1.0))
+        else:
+            h.click(top + V(OUTER_R * k, -OUTER_R * k, -1.5))
+
+    def check():
+        p = draft_panel()
+        h.check(
+            "H draft: tube %d %s wall picked (one more face)"
+            % (i + 1, "inside" if inside else "outside"),
+            len(p.names()) == s["faces"] + 1,
+            p.names(),
+        )
+
+    tag = "%d_%s" % (i, "in" if inside else "out")
+    return [r.named(step, "h_draft_face_%s" % tag), r.named(check, "h_draft_face_%s_check" % tag)]
+
+
+def h_draft_ok():
+    from Fission180Tests.gui import dialog_input as di
+
+    p = draft_panel()
+    h.check("H the tube's end is the pull direction", p.plane_ref is not None, p.plane_ref)
+    h.check("H six faces to draft", len(p.names()) == 6, p.names())
+    di.type_into(p.angle.widget, "1")
+    h.caught_up(p)
+    h.check("H nothing is refused", not p.message.text(), p.message.text())
+    h.task_button("OK")
+
+
+h_draft_ok.done = lambda: draft_panel() is None
+h_draft_ok.done_what = "OK finished the Draft"
+h_draft_ok.timeout_s = 180
+
+
+def leaning():
+    """The round faces that lean 1 degree (a cone's half angle, either way)."""
+    return [
+        f
+        for f in body().Shape.Faces
+        if f.Surface.TypeId == "Part::GeomCone"
+        and abs(abs(math.degrees(f.Surface.SemiAngle)) - 1.0) < 1e-6
+    ]
+
+
+def h_drafted():
+    # 8 studs, outside and (since the Shell) inside, and the three tubes outside and inside
+    h.check("H the six tube walls lean 1 degree", len(leaning()) == 16 + 6, len(leaning()))
+    tubes = [f for f in leaning() if f.Area > 100]
+    h.check(
+        "H the tubes get thicker towards the brick's top (narrower at their free end)",
+        len(tubes) == 6 and sorted(round(f.Area, 0) for f in tubes) == [123.0] * 3 + [176.0] * 3,
+        sorted(round(f.Area, 1) for f in tubes),
+    )
+    h.check("H one valid solid", body().Shape.isValid() and len(body().Shape.Solids) == 1)
+    s["v_drafted"] = vol()
+    r.nothing_broken("H draft:")
+    h.fit()
+    h.shot("H-tubes")
+
+
+# == I: red plastic, turned back, undo and redo, saved =============================================
+RED = "Glossy plastic, red"
+
+
+def i_appearance():
+    from Fission180Tests.gui import looks_steps as ls
+
+    ls.open_appearance()
+
+
+i_appearance.done = lambda: __import__("Fission180Tests.gui.looks_steps").gui.looks_steps.panel()
+i_appearance.done_what = "the Appearance dialog is open"
+
+
+def i_search():
+    from Fission180Tests.gui import looks_steps as ls
+    from Fission180Tests.gui import widget_input as w
+
+    p = ls.panel()
+    w.click(p.search)
+    w.type_text(p.search, "red plastic")
+
+
+def i_drop():
+    from Fission180Tests.gui import looks_steps as ls
+
+    names = ls.library_labels()
+    h.check(
+        'I the search "red plastic" finds the red plastics (the report: no search)',
+        RED in names and all("red" in n.lower() for n in names),
+        names,
+    )
+    ls.drop_look(RED, flipped(V(16, 0.0, 5.0)))  # onto the brick's front wall
+
+
+def i_look():
+    from Fission180Tests.gui import looks_steps as ls
+
+    h.check(
+        "I the brick is red plastic", ls.body_look_label(body()) == RED, ls.body_look_label(body())
+    )
+    h.check("I the dialog asks nothing", ls.question() is None)
+    h.task_button("OK")
+
+
+i_look.done = r.no_dialog
+i_look.done_what = "OK closed the Appearance dialog"
+
+
+def i_red():
+    from Fission180Tests.gui import looks_steps as ls
+
+    h.click_empty()
+    h.fit()
+    rgb = ls.screen_rgb(flipped(V(16, 0.0, 5.0)))
+    h.check("I the screen shows the brick red", ls.hue_like(rgb, (0.80, 0.08, 0.08), 0.12), rgb)
+    h.shot("I-red")
+    h.press("m")
+
+
+i_red.done = lambda: move_panel() is not None
+i_red.done_what = "the Move dialog is open"
+
+
+def i_back_angle():
+    from Fission180Tests.gui import bodies_steps as bs
+
+    p = move_panel()
+    h.check("I Body1 is the object to move", [b.Label for b in p.options["bodies"]] == ["Body1"])
+    bs.type_value(p.angle_fields[1].widget, "180")
+
+
+def i_back():
+    import Part
+
+    shape = body().Shape
+    h.check("I the brick is the right way up again", r.box_near(shape, s["box_before"], 1e-4))
+    probe = Part.makeSphere(0.3, V(3.9, 3.9, H + 0.9))
+    h.check(
+        "I the studs point up",
+        shape.common(probe).Volume > 0.5 * probe.Volume,
+        shape.common(probe).Volume,
+    )
+    h.check("I the same solid", r.near(shape.Volume, s["v_drafted"], 1e-6), shape.Volume)
+    h.check("I still red", __import__("fission180.appearance").appearance.effective(body()))
+    s["titles"] = r.timeline()
+    r.nothing_broken("I")
+    h.fit()
+    h.shot("I-done")
+
+
+def i_undo(count):
+    def step():
+        r.undo()
+
+    return [r.named(step, "i_undo_%d" % k) for k in range(count)]
+
+
+def i_redo(count):
+    def step():
+        r.redo()
+
+    return [r.named(step, "i_redo_%d" % k) for k in range(count)]
+
+
+def i_undone():
+    # the second Move, the look, the Draft and the tubes' Extrude taken back
+    h.check(
+        "I four Ctrl+Z: the turned brick without tubes", r.near(vol(), s["v_brick"], 1e-6), vol()
+    )
+    h.check("I ...its timeline is shorter", len(r.timeline()) < len(s["titles"]), r.timeline())
+    h.check("I ...no dialog and no sketch opened", r.no_dialog() and h.in_sketch() is None)
+    r.nothing_broken("I undo:")
+
+
+def i_redone():
+    h.check("I four Ctrl+Y: the finished brick", r.near(vol(), s["v_drafted"], 1e-6), vol())
+    h.check("I ...the same timeline", r.timeline() == s["titles"], (r.timeline(), s["titles"]))
+    h.check("I ...the right way up", r.box_near(body().Shape, s["box_before"], 1e-4))
+    r.nothing_broken("I redo:")
+
+
+def i_reopened():
+    made = r.solid_bodies()
+    h.check("I reopened: one body, Body1", [b.Label for b in made] == ["Body1"], made)
+    s["body"] = made[0].Name
+    h.check("I reopened: the same solid", r.near(vol(), s["v_drafted"], 1e-6), vol())
+    h.check("I reopened: the same timeline", r.timeline() == s["titles"], r.timeline())
+    r.nothing_broken("I reopened:")
+    # the book's brick: 31.8 x 15.8 x 9.6, studs 4.8 across and 1.8 high (PLAY 0.1 on top)
+    h.check(
+        "I the finished brick has the book's sizes",
+        r.box_near(body().Shape, [0, 0, 0, L, W, H + STUD_H + 0.1], 1e-4),
+        r.bbox(body().Shape),
+    )
+    h.fit()
+    h.shot("I-reopened")
+
+
 steps = r.home_steps() + [a_box, a_plane, a_corner, a_length, a_width, a_height, a_done]
 steps += [b_sketch, b_face, b_circle, b_centre, b_diameter, b_drawn]
 steps += [b_dim_x_pick, b_dim_x_origin, b_dim_x_place, b_dim_x_value]
@@ -869,5 +1381,26 @@ steps += [f_finish, f_letters, f_extrude, f_distance, f_done]
 steps += [f_pattern_type, f_pattern_feature, f_direction_box, d_edge_x, d_edge_y, d_values]
 steps += [f_pattern_ok, f_patterned]
 steps += [g_move, g_body, g_angle, g_ok, g_done]
+steps += [h_sketch, h_face, h_start]
+for _i in range(3):
+    steps += circle_steps(_i, True) + circle_steps(_i, False)
+steps += [h_end_circle] + equal_steps(outer, "outer") + equal_steps(inner, "inner")
+steps += [h_dimension] + diameter_steps(outer, "6.51", "outer")
+steps += diameter_steps(inner, "4.8", "inner")
+# (the brick is turned over: the third pair drawn is the one nearest the sketch's origin)
+steps += place_steps("x0", lambda: centre_of(2), lambda: V(0, 0, 0), "7.9", True)
+steps += place_steps("y0", lambda: centre_of(2), lambda: V(0, 0, 0), "7.9", False)
+steps += [h_level] + level_steps(1) + level_steps(2) + [r.named(h_dimension, "h_dimension_2")]
+steps += place_steps("x1", lambda: centre_of(2), lambda: centre_of(1), "8", True)
+steps += place_steps("x2", lambda: centre_of(1), lambda: centre_of(0), "8", True)
+steps += [h_finish, h_extrude, ring_steps(0), ring_steps(1), ring_steps(2), h_distance, h_tubes]
+steps += [h_pull]
+for _i in range(3):
+    steps += tube_face_steps(_i, False) + tube_face_steps(_i, True)
+steps += [h_draft_ok, h_drafted]
+steps += [i_appearance, i_search, i_drop, i_look, i_red, g_body, i_back_angle]
+steps += [r.named(g_ok, "i_back_ok"), i_back]
+steps += i_undo(4) + [i_undone] + i_redo(4) + [i_redone]
+steps += r.save_steps("i", "Play Brick") + r.reopen_steps("i", "Play Brick") + [i_reopened]
 
 h.run("replay_06_play_brick", steps, paced_by="state")
