@@ -135,13 +135,82 @@ def built():
     h.ribbon("Chamfer")
 
 
+# On the inner corner's edge (it runs along y from -3 to 3), nearer its back end. In this
+# view the arm's front leaning edge starts at the corner's front end and runs on the screen
+# within 0-4 px of it (1.4 px at the middle): GitHub's runner, aiming at the middle, clicked
+# that edge (a 6 mm chamfer on the arm instead of the corner's 20 mm). 1.5 mm behind the
+# middle it is 4 px away (the back leaning edge 6.7 px) and the click selects the corner.
+CORNER = V(3.4, 1.5, 6)
+ARM_EDGE = V(13.4, -3, 37.5)  # on a long edge of the arm
+
+
+def picked_through(p, point):
+    """The dialog's one pick is the edge that runs through `point`."""
+    import Part
+
+    if p is None or len(p.refs) != 1 or not p.refs[0].startswith("Edge"):
+        return False
+    edge = p.info.shape.getElement(p.refs[0])
+    return edge.distToShape(Part.Vertex(point))[0] < 1e-6
+
+
+def click_lit(point, reach=3):
+    """Like a person: the pointer over the pixels around `point` (nearest first) until the
+    edge through `point` lights up under it (FreeCAD's preselection), then the click there.
+    (h.click_edge goes to the nearest pixel where FreeCAD's getObjectInfo sees any edge: it
+    never reports this inside corner, only the leaning edge beside it; and a click one pixel
+    off the corner's line selects a face.)"""
+    import Part
+    from PySide import QtCore, QtWidgets
+    from PySide6 import QtTest
+
+    from Fission180Tests.gui import selection_input
+
+    h.uncover(point)
+    vertex = Part.Vertex(point)
+    centre = h.screen_point(point)
+    for radius in range(0, reach + 1):
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                if max(abs(dx), abs(dy)) != radius:
+                    continue
+                pos = QtCore.QPoint(centre.x() + dx, centre.y() + dy)
+                h.move(pos)
+                h.view_drawn()
+                lit = selection_input.preselected()
+                if not lit or not lit[1].split(".")[-1].startswith("Edge"):
+                    continue
+                try:
+                    obj = App.ActiveDocument.getObject(lit[0])
+                    edge = Part.getShape(obj, lit[1], needSubElement=True)
+                    if edge.distToShape(vertex)[0] > 1e-6:
+                        continue
+                except Exception:
+                    continue
+                h.press_pace()
+                h.move(pos)
+                QtTest.QTest.mouseClick(
+                    h.gl_widget(), QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, pos
+                )
+                QtWidgets.QApplication.processEvents()
+                h.state["last_click"] = "lit click %s (%+d, %+d) on %s" % (
+                    (pos.x(), pos.y()),
+                    dx,
+                    dy,
+                    lit,
+                )
+                return True
+    h.check("the edge through %s lights up near it" % (tuple(point),), False)
+    return False
+
+
 def pick_corner():
-    h.click_edge(V(3.4, 0, 6))
+    click_lit(CORNER)
 
 
 def type_20():
     p = panel()
-    if h.check("the inner corner's edge is picked", p is not None and len(p.refs) == 1, p):
+    if h.check("the inner corner's edge is picked", picked_through(p, CORNER), p and p.refs):
         b.type_into(p.distance.widget, "20")
 
 
@@ -273,12 +342,12 @@ def all_undone():
 
 def pick_arm_edge():
     # a long edge of the arm: the face beside it is the arm's 6 mm thickness
-    h.click_edge(V(13.4, -3, 37.5))
+    h.click_edge(ARM_EDGE)
 
 
 def type_50():
     p = panel()
-    if h.check("the arm's long edge is picked", p is not None and len(p.refs) == 1, p):
+    if h.check("the arm's long edge is picked", picked_through(p, ARM_EDGE), p and p.refs):
         b.type_into(p.distance.widget, "50")
 
 
