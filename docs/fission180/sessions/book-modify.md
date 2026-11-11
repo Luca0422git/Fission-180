@@ -14,7 +14,7 @@ and GUI probe scenarios with real input for dialogs, before anything was changed
 | A chamfer after a modeled thread is refused at every size | Yes, on the kernel itself | `shape.makeChamfer` fails ("BRep_API: command not done") for 3, 1, 0.5 and 0.2 mm on the end of a threaded d33 shaft: the end edge is cut through by the grooves |
 | Thread suggests M7 for a 6 mm hole | Yes | The first pass matched a hole by its tap drill (a guess). Autodesk: the size nearest the face, and the hole is then given the thread's minor diameter. With the old rule a 6 mm hole threaded M6 got no thread at all (the grooves lay in the air): the report logged that step "OK" without seeing it |
 | Thread defaults to ISO in an inch design / to the last standard in a mm design | Yes | One remembered standard for every design |
-| "Click it again to drop it" does not work from another view | Yes, for a modeled preview | The click lands on the preview's grooves, which are not on the picked face |
+| "Click it again to drop it" does not work from another view | Yes, for a modeled preview | The selection gate let only cylinder faces through (the preview's grooves are B-spline faces), and FreeCAD gives (0, 0, 0) as the picked point of such a click, which was looked up on the part: the bottom face |
 | No ISO pipe / NPT thread types | Yes | Only the Hole had taper pipe threads |
 | The split is lost at the next Extrude | Yes | PartDesign's Refine merges faces on one plane / cylinder; nothing can mark an edge "keep" (tried: wrapping one half's surface in a trimmed surface does not stop ModelRefine) |
 | A feature pattern with a Split Face is refused | Yes | `pattern.feature_tools` raised for a step that changes no volume |
@@ -134,7 +134,28 @@ Knurl (a Coil groove, its Mirror, a Circular Pattern of both; `book_modify_knurl
 
 The pattern is built once per value the dialog shows (3, then 25) and not again by OK.
 
+## Scenarios (real input; `book_modify_*`)
+
+| Scenario | Checks | What it proves |
+|---|---|---|
+| `book_modify_thread_chamfer` | 52 | chamfer, thread, the Thread dragged before the Chamfer (slow and fast), the chamfer deleted, a chamfer after a modeled thread, its edit, the drag back, a refused drag |
+| `book_modify_thread_inch` | 36 | Unified by default and inches in an inch design, drop by clicking the thread, NPT on its cone, G sizes, ISO again in a mm design |
+| `book_modify_gear` | 48 | SpurGear in Scripts and Add-Ins, bug 19 (the refusal, the operation kept), bug 20 (Edit Feature while the dialog is open, and after), component names |
+| `book_modify_edit_feature` | 197 | Edit Feature / Cancel / OK over 16 kinds of steps |
+| `book_modify_split_pattern` | 191 | a split kept under the next feature, both halves pickable, a pattern with a Split Face, a direction by a click beside an edge, undo / redo, the split deleted |
+| `book_modify_knurl` | 17 | the 25x knurl pattern: built once per value, valid, under 240 s |
+
+Older scenarios changed for the new (Fusion) behaviour: `hole` (the hole's sketch has no
+browser row: edited from the timeline), `hole_qa_thread` T4 and `hole_thread_inside` (a hole
+takes the size of its diameter), `misc_scripts` (the SpurGear entry), `patterns_params` (a
+body pattern takes a parameter's value), `timeline_browser`, `timeline_browser_qa3`,
+`polish2_timeline_groups` (Create Group).
+
 ## FreeCAD facts and traps
+
+- **`Gui.Selection`'s PickedPoints can hold (0, 0, 0)** for a click on a face of a body's
+  shown step picked through the body: check that a picked point lies on the picked face
+  before using it (`thread_ui._face_clicked`).
 
 - **FreeCAD 1.1's Python document observer gets no `slotBeforeRecomputeDocument`.** Only
   `slotRecomputedDocument` arrives. `timeline_ops.RecomputeGuard.slotBeforeRecomputeDocument`
