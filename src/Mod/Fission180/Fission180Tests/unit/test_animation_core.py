@@ -363,7 +363,8 @@ class Editing(unittest.TestCase):
 class Storyboards(unittest.TestCase):
     def test_names(self):
         self.assertEqual(core.unique_name([]), "Storyboard1")
-        self.assertEqual(core.unique_name(["Storyboard1", "Storyboard3"]), "Storyboard2")
+        self.assertEqual(core.unique_name(["Storyboard1", "Storyboard3"]), "Storyboard4")
+        self.assertEqual(core.unique_name(["Explode"]), "Storyboard2")
         self.assertEqual(core.copy_name(["A"], "A"), "A (copy)")
         self.assertEqual(core.copy_name(["A", "A (copy)"], "A"), "A (copy 2)")
 
@@ -389,7 +390,7 @@ class Storyboards(unittest.TestCase):
                 "active": "missing",
             }
         )
-        self.assertEqual([b["name"] for b in data["storyboards"]], ["A", "A 1"])
+        self.assertEqual([b["name"] for b in data["storyboards"]], ["A", "A 2"])
         self.assertEqual(len(data["storyboards"][0]["actions"]), 1)
         self.assertEqual(data["storyboards"][0]["actions"][0]["id"], 1)
         self.assertEqual(data["active"], "A")
@@ -600,6 +601,70 @@ class Avi(unittest.TestCase):
         self.assertEqual(video.even(641), 640)
         self.assertEqual(video.even(1), 2)
         self.assertTrue(video.numbered("/tmp/x", 0, "png").endswith("frame_00001.png"))
+
+
+class GoldenSteps(unittest.TestCase):
+    """The format checks of the animation steps (Fission180Tests/golden/animation_schema.py)."""
+
+    def model(self, *steps):
+        box = {
+            "op": "sf_primitive",
+            "id": "b1",
+            "kind": "box",
+            "plane": "XY",
+            "length": 10,
+            "width": 10,
+            "height": 10,
+            "operation": "new_component",
+        }
+        return {
+            "id": "m",
+            "title": "t",
+            "tags": ["animation"],
+            "steps": [box, {"op": "anim_storyboard", "id": "sb"}] + list(steps),
+            "expect": {"volume": 1000, "source": "analytic", "note": "n"},
+        }
+
+    def test_a_good_model_passes(self):
+        from Fission180Tests.golden import schema
+
+        schema.validate(
+            self.model(
+                {"op": "anim_explode", "storyboard": "sb", "at": 2, "levels": "all"},
+                {
+                    "op": "anim_manual_explode",
+                    "storyboard": "sb",
+                    "picks": [{"of": "b1", "axis": "Z+"}],
+                    "distance": 5,
+                },
+                {"op": "anim_transform", "storyboard": "sb", "of": ["b1"], "move": [1, 0, 0]},
+                {"op": "anim_expect", "storyboard": "sb", "offsets": {"b1": [1, 0, 0]}},
+            )
+        )
+
+    def test_mistakes_are_named(self):
+        from Fission180Tests.golden import schema
+
+        for step in (
+            {"op": "anim_explode", "storyboard": "nope"},
+            {"op": "anim_explode", "storyboard": "b1"},
+            {"op": "anim_explode", "storyboard": "sb", "levels": "some"},
+            {"op": "anim_explode", "storyboard": "sb", "at": -1},
+            {"op": "anim_explode", "storyboard": "sb", "of": ["ghost"]},
+            {
+                "op": "anim_manual_explode",
+                "storyboard": "sb",
+                "picks": [{"of": "b1", "axis": "up"}],
+                "distance": 5,
+            },
+            {"op": "anim_manual_explode", "storyboard": "sb", "picks": [], "distance": 5},
+            {"op": "anim_transform", "storyboard": "sb", "of": ["b1"]},
+            {"op": "anim_transform", "storyboard": "sb", "of": ["b1"], "move": [1, 2]},
+            {"op": "anim_expect", "storyboard": "sb", "offsets": {"ghost": [0, 0, 0]}},
+            {"op": "anim_expect", "storyboard": "sb", "spans": {"b1": [[0]]}},
+        ):
+            with self.assertRaises(schema.ModelError, msg=str(step)):
+                schema.validate(self.model(step))
 
 
 if __name__ == "__main__":

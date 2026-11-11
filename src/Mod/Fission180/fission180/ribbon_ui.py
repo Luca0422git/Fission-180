@@ -670,11 +670,12 @@ class RibbonWidget(QtWidgets.QWidget):
         # Fusion's ANIMATION workspace (wave 7 animation, animation_ui): before Simulation in
         # the list, as in Fusion. Picking another workspace leaves it (animation_ui also
         # notices one entered some other way).
-        animation = QtGui.QAction(ui_icon("workspace_animation"), "Animation", menu)
+        animation = menu.addAction(ui_icon("workspace_animation"), "Animation")
         animation.setObjectName("Fission180WorkspaceAnimation")
         animation.setCheckable(True)
         animation.setChecked(getattr(self, "_anim_mode", False) and not self._drawing_mode)
         design.setChecked(design.isChecked() and not animation.isChecked())
+        menu.removeAction(animation)
         menu.insertAction(simulation, animation)
         try:
             from . import animation_ui

@@ -65,8 +65,10 @@ class Catalogue(unittest.TestCase):
         self.assertEqual(catalog.tool("surface_modify")["category"], "surface")
 
     def test_no_op_waits_for_its_tool(self):
-        # (wave 7: the MANUFACTURE steps wait for their tools; none of these tabs' does)
-        self.assertEqual([op for op in catalog.AI_TOOLS_TO_COME if not op.startswith("cam_")], [])
+        # (wave 7: the MANUFACTURE and ANIMATION steps wait for their tools; none of these
+        # tabs' does)
+        waiting = [op for op in catalog.AI_TOOLS_TO_COME if not op.startswith(("cam_", "anim_"))]
+        self.assertEqual(waiting, [])
         built = set()
         for t in catalog.TOOLS:
             built |= set(t["ops"])
@@ -183,9 +185,7 @@ class SheetMetalSteps(unittest.TestCase):
         self.assertEqual(bend["face"], [10, 10, 1])
         self.assertEqual(bend["options"], {"override_radius": True, "radius": 3})
         hem = _steps("hem", {"edges": [[50, 15, 21]], "type": "rolled", "bend_radius": 1})[0]
-        self.assertEqual(
-            hem["options"], {"type": "rolled", "override": True, "radius_override": 1}
-        )
+        self.assertEqual(hem["options"], {"type": "rolled", "override": True, "radius_override": 1})
         join = _steps("join_by_bend", {"first": [1, 2, 3], "other": "f1", "second": [4, 5, 6]})[0]
         closure = _steps(
             "corner_closure", {"dominant": [1, 2, 3], "submissive": [4, 5, 6], "relief": "tear"}

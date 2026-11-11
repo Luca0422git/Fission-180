@@ -389,9 +389,10 @@ def _action(raw):
 
 
 def unique_name(names, base="Storyboard"):
-    """Storyboard1, Storyboard2... (Fusion's names): the first one not taken."""
+    """Storyboard1, Storyboard2... (Fusion's names): numbered after how many there are (a
+    renamed first one still makes the next "Storyboard2"), the next number not taken."""
     taken = set(names)
-    n = 1
+    n = len(taken) + 1
     while "%s%d" % (base, n) in taken:
         n += 1
     return "%s%d" % (base, n)
