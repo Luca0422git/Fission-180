@@ -16,9 +16,10 @@ Appearance
   D  Apply To Faces, "Glossy plastic, blue", click the top face: only that face is blue. OK.
   E  a boss on top (Extrude): the top face is still blue, the rest red (the look follows the
      face through later steps).
-  F  custom colour: type #3366CC, Enter, Use, click the body; Cancel: red with the blue face
-     again.
+  F  custom colour: type #3366CC, Enter, Use, click the body (it asks whether the top face
+     keeps its look: Remove); Cancel: red with the blue face again.
 """
+
 import FreeCAD as App
 from PySide import QtCore
 
@@ -265,7 +266,7 @@ def d_ok():
     h.task_button("OK")
 
 
-# -- E: a later step --------------------------------------------------------------------------------
+# -- E: a later step ---------------------------------------------------------------------------
 def e_check():
     cols = colors()
     top = top_face_index()
@@ -300,6 +301,12 @@ def f_type_hex():
 
 
 def f_click_body():
+    # The body's top face has a look of its own (D): Fusion asks whether the faces keep
+    # theirs or the whole body takes the new look (wave 7, book parity report bug 17; before,
+    # a body look silently replaced them). Remove: the whole body, as this path checks.
+    from Fission180Tests.gui import looks_steps
+
+    looks_steps.answer("Remove")
     h.click(V(35, 25, 10))
 
 
@@ -340,6 +347,9 @@ def g_drop_rubber():
     h.check("a swatch drag carries its look", appearance_ui.look_of(mime) is not None)
     widget = h.gl_widget()
     pos = h.screen_point(V(35, 25, 10))
+    from Fission180Tests.gui import looks_steps
+
+    looks_steps.answer("Remove")  # (the top face has its own look again after F's Cancel)
     actions = QtCore.Qt.CopyAction
     enter = QtGui.QDragEnterEvent(pos, actions, mime, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
     QtWidgets.QApplication.sendEvent(widget, enter)

@@ -9,9 +9,9 @@ file is out of date.
 
 ## Headline
 
-**Fusion commands present: 553 / 713 (77.6%)**
+**Fusion commands present: 554 / 713 (77.7%)**
 
-In the areas Fission 180 builds (without the 72 entries left out on purpose, see the end): **553 / 641 (86.3%)**.
+In the areas Fission 180 builds (without the 72 entries left out on purpose, see the end): **554 / 641 (86.4%)**.
 
 What the number means:
 
@@ -122,7 +122,7 @@ What the number means:
 | | Ring | 9 | 9 | 100.0% |
 | | Overflow list | 8 | 7 | 87.5% |
 | | While a command runs | 2 | 2 | 100.0% |
-| **BROWSER** | all | **121** | **95** | **78.5%** |
+| **BROWSER** | all | **121** | **96** | **79.3%** |
 | | Design (top node) | 13 | 9 | 69.2% |
 | | Units | 1 | 1 | 100.0% |
 | | Named Views | 1 | 1 | 100.0% |
@@ -130,7 +130,7 @@ What the number means:
 | | Origin | 1 | 1 | 100.0% |
 | | Folder (Bodies, Sketches, Construction...) | 1 | 1 | 100.0% |
 | | Component | 30 | 18 | 60.0% |
-| | Body | 20 | 14 | 70.0% |
+| | Body | 20 | 15 | 75.0% |
 | | Mesh body | 5 | 5 | 100.0% |
 | | Sketch | 11 | 8 | 72.7% |
 | | Construction plane, axis or point | 6 | 6 | 100.0% |
@@ -251,7 +251,7 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 
 - Overflow list > Fix/Unfix (not sure)
 
-### BROWSER (26)
+### BROWSER (25)
 
 - Design (top node) > Show All Components (not sure)
 - Design (top node) > Physical Material (not sure)
@@ -272,7 +272,6 @@ Fusion commands Fission 180 does not have (the entries left out on purpose are a
 - Body > Move/Copy
 - Body > Create Selection Set
 - Body > Texture Map Controls
-- Body > Properties
 - Body > Cut
 - Body > Display Detail Control (not sure)
 - Sketch > Redefine Sketch Plane
@@ -349,18 +348,18 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 Fission 180's own additions (beyond Fusion), entries Fusion has in a place the list does
 not cover, or a name the alias file should map. Greyed entries are left out.
 
-- `tab:solid`: Gear, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part...
-- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part...
-- `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis
-- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part...
-- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Design Advice, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:solid`: Gear, Texture Map Controls, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties
+- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Component Color Swatch, Properties, Design Advice, Insert Component, Insert STEP, Insert Catalogue Part...
 - `tab:utilities`: Export, Export Everything, Add-on Manager, AI, Add an AI App, AI Chat, AI Activity, Rebuild with Timeline (AI)..., Compare with Reference, Finish Rebuild, Stop Rebuild..., FreeCAD Tools, Project and Recovery Settings, Version History, Recover Documents, Save As, Fission 180 Diagnostics, Report a Problem, Command Search
-- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part..., Toggle Construction
+- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Component Color Swatch, Properties, Insert Component, Insert STEP, Insert Catalogue Part..., Toggle Construction
 - `tab:drawing`: Bend Note, Bend Table
-- `tab:flat_pattern`: Environmental Map Analysis
-- `tab:sim_setup`: Environmental Map Analysis
+- `tab:flat_pattern`: Environmental Map Analysis, Component Color Swatch, Properties
+- `tab:sim_setup`: Environmental Map Analysis, Component Color Swatch, Properties
 - `tab:sim_results`: Legend Min/Max, Undeformed Model, Loads and Constraints
-- `tab:cam_milling`: Environmental Map Analysis
+- `tab:cam_milling`: Environmental Map Analysis, Component Color Swatch, Properties
 - `file`: Home, Version History, Export Everything, Insert Mesh, Insert STEP, Insert SVG, Insert DXF, Canvas, Insert Design, Project and Recovery Settings, Connect a Cloud or NAS, AI Panel, Add an AI App, AI Activity, AI Chat, FreeCAD Tools
 - `quick`: Menu, New, Open
 - `nav`: Theme, Ground Plane, Show All, Two Views Horizontal, Two Views Vertical

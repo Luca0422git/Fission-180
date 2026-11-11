@@ -154,6 +154,12 @@ SOLID_MODIFY = group(
         SEP,
         item("Physical Material", ("Fission180_PhysicalMaterial", "Std_SetMaterial"), "material"),
         item("Appearance", ("Fission180_Appearance", "Std_SetAppearance"), "appearance", "A"),
+        item(  # owner: looks (wave 7)
+            "Texture Map Controls",
+            "Fission180_TextureMapControls",
+            "appearance",
+            note="How a textured look's pattern lies on a body: projection, turn, size.",
+        ),
         item(
             "Manage Materials",
             ("Fission180_ManageMaterials", "Material_Edit"),
@@ -241,6 +247,18 @@ INSPECT = group(
             "component_colors",
             "Shift+N",
             toggle="component_colors_ui:is_on",
+        ),
+        item(  # owner: looks (wave 7); also in the timeline's Settings menu, as in Fusion
+            "Component Color Swatch",
+            "Fission180_ComponentColorSwatch",
+            "component_colors",
+            toggle="component_colors_ui:swatch_on",
+        ),
+        item(  # owner: looks (wave 7); Fusion: right-click a component or a body
+            "Properties",
+            "Fission180_Properties",
+            "material",
+            note="Mass, volume, area, centre of mass and size of what is selected.",
         ),
     ],
 )
