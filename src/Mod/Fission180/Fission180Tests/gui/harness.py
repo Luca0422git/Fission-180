@@ -1710,13 +1710,32 @@ def painted(widget, need=6, contrast=48):
     return seen >= need
 
 
+def on_screen(widget):
+    """Whether a person sees the whole widget: shown, not cut off by a scroll area and
+    nothing lying over its middle (a page behind another tab is "visible" to Qt too)."""
+    try:
+        if not widget.isVisible() or widget.visibleRegion().boundingRect() != widget.rect():
+            return False
+        top = QtWidgets.QApplication.widgetAt(widget.mapToGlobal(widget.rect().center()))
+        while top is not None:
+            if top is widget:
+                return True
+            top = top.parentWidget()
+        return False
+    except RuntimeError:
+        return False
+
+
 def blank_buttons(root):
-    """The visible buttons under `root` that have a text or an icon to show and paint
-    nothing readable: [description]."""
+    """The buttons under `root` that a person sees (on_screen), can use (a greyed one is
+    dim on purpose) and that have a text or an icon to show, yet paint nothing readable:
+    [description]."""
     blank = []
     for button in root.findChildren(QtWidgets.QAbstractButton):
         try:
-            if not button.isVisible() or button.width() < 6 or button.height() < 6:
+            if button.width() < 6 or button.height() < 6 or not button.isEnabled():
+                continue
+            if not on_screen(button):
                 continue
             if not button.text().strip() and button.icon().isNull():
                 continue

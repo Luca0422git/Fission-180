@@ -513,8 +513,23 @@ def _temp_document():
     closing it leaves FreeCAD's active document pointing at the closed one in the GUI."""
     import FreeCAD as App
 
-    active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
-    return App.newDocument("Fission180Import", "import", True, True), active
+    design = App.ActiveDocument
+    active = design.Name if design is not None else None
+    scratch = App.newDocument("Fission180Import", "import", True, True)
+    same_units(scratch, design)
+    return scratch, active
+
+
+def same_units(scratch, design):
+    """A throw-away document takes the design's units as it is made. FreeCAD shows every
+    length in the units of the document it last touched: a hidden document left in
+    millimetres set an inch design's dialogs back to mm (book parity report, bug 2; the
+    design's own units are held by design_units either way)."""
+    try:
+        if design is not None and scratch is not None:
+            scratch.UnitSystem = design.UnitSystem
+    except Exception:
+        pass
 
 
 def _close_temp(doc, active):

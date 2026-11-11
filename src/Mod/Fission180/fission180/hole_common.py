@@ -58,7 +58,11 @@ class SelectionField:
         self.widget = QtWidgets.QWidget()
         row = QtWidgets.QHBoxLayout(self.widget)
         row.setContentsMargins(0, 0, 0, 0)
-        self.button = QtWidgets.QPushButton(empty)
+        # (wave 7, shell) a button that keeps "&" and shortens a long list of names to the
+        # room it has, so the dialog never grows past the panel (taskui.NamesButton)
+        from . import taskui
+
+        self.button = taskui.NamesButton(empty)
         self.button.setCheckable(True)
         self.button.clicked.connect(self._clicked)
         self.clear = QtWidgets.QToolButton()

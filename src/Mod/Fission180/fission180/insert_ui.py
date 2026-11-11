@@ -43,6 +43,17 @@ TITLES = {
 INFO_STYLE = "color: #9fb3c8;"
 
 
+def _length(mm):
+    """A length as the design's units write it ("25.4 mm", "1 in"): an inch design read
+    millimetres in the Insert dialogs' notes (wave 7)."""
+    try:
+        from . import design_units
+
+        return design_units.length_text(float(mm))
+    except Exception:
+        return "%.1f mm" % float(mm)
+
+
 def pick_file(kind):
     """The file dialog of an Insert command (remembers the folder). None when cancelled."""
     if FILE_PICKER is not None:
@@ -656,11 +667,11 @@ class InsertMeshPanel(_InsertPanel):
         try:
             info = insert.mesh_info(insert.kernel_copy(self.obj))
             size = info["size"]
-            text = "%d triangles, %.1f x %.1f x %.1f mm%s" % (
+            text = "%d triangles, %s x %s x %s%s" % (
                 info["facets"],
-                size[0],
-                size[1],
-                size[2],
+                _length(size[0]),  # (wave 7: in the design's units)
+                _length(size[1]),
+                _length(size[2]),
                 "" if info["solid"] else "; the mesh is not watertight (open edges)",
             )
             self.say(text)
@@ -1521,9 +1532,14 @@ class CanvasPanel(_PlaneHandles, _InsertPanel):
         else:
             self.target = feature
             self.say(
-                "%d x %d pixels, %.1f x %.1f mm. Drag the arrows to move it, the curved "
+                "%d x %d pixels, %s x %s. Drag the arrows to move it, the curved "
                 "handle to turn it, the right arrow to scale it."
-                % (feature.PixelWidth, feature.PixelHeight, feature.XSize, feature.YSize)
+                % (
+                    feature.PixelWidth,
+                    feature.PixelHeight,
+                    _length(feature.XSize),
+                    _length(feature.YSize),
+                )
             )
             self.make_handles()
         Gui.Selection.clearSelection()
@@ -1563,10 +1579,10 @@ class CanvasPanel(_PlaneHandles, _InsertPanel):
         self.plane_label.setText(label)
         self.apply()
         self.say(
-            "%d x %d pixels, %.1f x %.1f mm. Drag the arrows to move it, the curved handle "
+            "%d x %d pixels, %s x %s. Drag the arrows to move it, the curved handle "
             "to turn it, the right arrow to scale it. To size it exactly: right-click the "
             "canvas in the browser > Calibrate."
-            % (self.pixels[0], self.pixels[1], size[0], size[1])
+            % (self.pixels[0], self.pixels[1], _length(size[0]), _length(size[1]))
         )
         _refresh_browser()
         self.make_handles()

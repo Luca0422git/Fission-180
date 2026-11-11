@@ -169,6 +169,9 @@ def _mirror_document(doc, scope, target, chosen, shown_only=True, frame=None):
     active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
     tmp = App.newDocument("Fission180ExportCAD", "export", True, True)
     try:
+        from . import insert
+
+        insert.same_units(tmp, doc)  # (FreeCAD carries a hidden document's units over)
         tops = []
         mirror = None
         if scope == "bodies":
@@ -378,9 +381,13 @@ def export_dxf(target, path):
     folder = os.path.dirname(path)
     if folder and not os.path.isdir(folder):
         os.makedirs(folder, exist_ok=True)
-    active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
+    design = App.ActiveDocument
+    active = design.Name if design is not None else None
     tmp = App.newDocument("Fission180ExportDXF", "export", True, True)
     try:
+        from . import insert
+
+        insert.same_units(tmp, design)  # (FreeCAD carries a hidden document's units over)
         feature = tmp.addObject("Part::Feature", "Curves")
         feature.Label = target[0].Label
         feature.Shape = compound

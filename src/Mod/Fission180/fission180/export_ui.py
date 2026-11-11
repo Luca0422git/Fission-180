@@ -150,10 +150,20 @@ class _RefinementRows:
         self.level.setCurrentText(export.DEFAULT_REFINEMENT)
         self.level.currentIndexChanged.connect(lambda *_: self._level_changed())
         form.addRow("Refinement", self.level)
+        # (wave 7) shown in the design's units (an inch design read " mm"); the values
+        # this row gives out stay millimetres
+        self.unit, self.per_unit = "mm", 1.0
+        try:
+            from . import browser_core, design_units
+
+            self.unit = design_units.length_unit()
+            self.per_unit = float(browser_core.MM_PER_UNIT.get(self.unit, 1.0))
+        except Exception:
+            self.unit, self.per_unit = "mm", 1.0
         self.surface = QtWidgets.QDoubleSpinBox()
-        self.surface.setDecimals(4)
-        self.surface.setRange(0.0001, 100.0)
-        self.surface.setSuffix(" mm")
+        self.surface.setDecimals(4 if self.per_unit == 1.0 else 6)
+        self.surface.setRange(0.0001 / self.per_unit, 100.0 / self.per_unit)
+        self.surface.setSuffix(" " + self.unit)
         self.surface.setKeyboardTracking(False)
         self.normal = QtWidgets.QDoubleSpinBox()
         self.normal.setDecimals(1)
@@ -175,7 +185,7 @@ class _RefinementRows:
             surface, normal = export.REFINEMENT[level]
             self.surface.blockSignals(True)
             self.normal.blockSignals(True)
-            self.surface.setValue(surface)
+            self.surface.setValue(surface / self.per_unit)
             self.normal.setValue(normal)
             self.surface.blockSignals(False)
             self.normal.blockSignals(False)
@@ -188,7 +198,11 @@ class _RefinementRows:
             self.on_change()
 
     def values(self):
-        return (self.level.currentText(), self.surface.value(), self.normal.value())
+        return (
+            self.level.currentText(),
+            self.surface.value() * self.per_unit,
+            self.normal.value(),
+        )
 
     def set_triangles(self, count):
         self.triangles.setText("" if count is None else "{:,}".format(count).replace(",", " "))
@@ -522,9 +536,7 @@ class ExportDialog(_MeshDialog):
                     "surface": surface,
                     "normal": normal,
                 }
-            export_report_ui.report_losses(
-                self.doc, objects, fmt, files_label(written), **options
-            )
+            export_report_ui.report_losses(self.doc, objects, fmt, files_label(written), **options)
         except Exception as exc:
             warn("export report: %s" % exc)
 
@@ -697,9 +709,7 @@ class PrintDialog(_MeshDialog):
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
-        start = slicer_core.default_target(
-            self.found, export.print_send_to(), self.other_program
-        )
+        start = slicer_core.default_target(self.found, export.print_send_to(), self.other_program)
         self.send_to.setCurrentIndex(max(0, self.send_to.findData(start)))
         self.send_to.currentIndexChanged.connect(lambda *_: self._send_to_changed(True))
         self._send_to_changed(False)

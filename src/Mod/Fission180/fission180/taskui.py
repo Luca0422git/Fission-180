@@ -1510,6 +1510,9 @@ def set_names(button, text, width=None):
     "&" stays, and a text wider than `width` (NAMES_WIDTH) is shortened with the full list
     as the tool tip. names_of(button) gives the full text back."""
     text = str(text)
+    if isinstance(button, NamesButton) and width is None:
+        button.set_names(text)
+        return
     width = NAMES_WIDTH if width is None else width
     try:
         measure = button.fontMetrics().horizontalAdvance
@@ -1526,6 +1529,65 @@ def set_names(button, text, width=None):
     except Exception:
         pass
     button.setText(shown_name(short))
+
+
+class NamesButton(QtWidgets.QPushButton):
+    """A dialog's selection button: it shows the names picked, as many as its width has
+    room for ("Arm, Base + 5 more"), "&" kept, and never asks its dialog for more room than
+    the panel has (it takes what the row leaves and shortens its text to that)."""
+
+    PADDING = 22  # px round the text inside the button
+
+    def __init__(self, text="", parent=None):
+        super().__init__(parent)
+        self._full = ""
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.set_names(text)
+
+    def set_names(self, text):
+        self._full = str(text)
+        self.setProperty(_NAMES, self._full)
+        self._refit()
+        self.updateGeometry()
+
+    def names(self):
+        return self._full
+
+    def _room(self):
+        return max(40, self.width() - self.PADDING) if self.isVisible() else NAMES_WIDTH
+
+    def _refit(self):
+        measure = self.fontMetrics().horizontalAdvance
+        short = fit_names(self._full, min(self._room(), NAMES_WIDTH), measure)
+        shown = shown_name(short)
+        if shown != QtWidgets.QPushButton.text(self):
+            QtWidgets.QPushButton.setText(self, shown)
+        self.setToolTip(self._full.replace(", ", "\n") if short != self._full else "")
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        measure = self.fontMetrics().horizontalAdvance
+        hint.setWidth(min(measure(self._full), NAMES_WIDTH) + self.PADDING)
+        return hint
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setWidth(70)
+        return hint
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        try:
+            self._refit()
+        except Exception:
+            pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        try:
+            self._refit()
+        except Exception:
+            pass
 
 
 def names_of(button):
@@ -1579,6 +1641,8 @@ class _WidthGuard(QtCore.QObject):
             try:
                 if child.sizeHint().width() <= limit * 0.6:
                     continue
+                if isinstance(child, NamesButton):
+                    continue  # (it fits itself to the room it gets)
                 if isinstance(child, (QtWidgets.QPushButton, QtWidgets.QCheckBox)):
                     set_names(child, names_of(child), int(limit * 0.5))
                 elif isinstance(child, QtWidgets.QLabel) and not child.wordWrap():

@@ -253,6 +253,8 @@ def upload_target(folder, path, exists=os.path.exists):
         n += 1
         target = os.path.join(folder, "%s %d%s" % (base, n, ext))
     return target
+
+
 # -- folders and projects (wave 7) ----------------------------------------------------------------
 
 # -- folders and projects (wave 7) ------------------------------------------------------------------

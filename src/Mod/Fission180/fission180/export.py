@@ -317,9 +317,13 @@ def write_meshes(named_meshes, path, fmt, unit="Millimeter"):
     # 3MF / OBJ: through Mesh features in a throw-away document, one object per body.
     import FreeCAD as App
 
-    active = App.ActiveDocument.Name if App.ActiveDocument is not None else None
+    design = App.ActiveDocument
+    active = design.Name if design is not None else None
     doc = App.newDocument("Fission180Export", "export", True, True)
     try:
+        from . import insert
+
+        insert.same_units(doc, design)  # (FreeCAD carries a hidden document's units over)
         features = []
         for name, mesh in named_meshes:
             feature = doc.addObject("Mesh::Feature", "Body")

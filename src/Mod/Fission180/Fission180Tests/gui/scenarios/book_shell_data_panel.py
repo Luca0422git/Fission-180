@@ -164,7 +164,9 @@ def a_look():
     h.check("A the panel is on the left", main.dockWidgetArea(d) == QtCore.Qt.LeftDockWidgetArea)
     dx = d.mapToGlobal(QtCore.QPoint(0, 0)).x()
     bx = browser.mapToGlobal(QtCore.QPoint(0, 0)).x()
-    h.check("A ... left of the browser, not under it", dx + d.width() <= bx + 4, (dx, d.width(), bx))
+    h.check(
+        "A ... left of the browser, not under it", dx + d.width() <= bx + 4, (dx, d.width(), bx)
+    )
     h.check(
         "A ... over the whole height",
         d.height() >= browser.height() - 4 and d.height() > 500,
@@ -183,7 +185,9 @@ def a_look():
 
 # -- B ---------------------------------------------------------------------------------------
 def b_new_project():
-    h.check("B a New Project button", vi.child(panel(), "Fission180DataPanelNewProject") is not None)
+    h.check(
+        "B a New Project button", vi.child(panel(), "Fission180DataPanelNewProject") is not None
+    )
     vi.panel_button("NewProject")
 
 
@@ -193,7 +197,9 @@ b_new_project.done_what = "the new project's name field"
 
 def b_type():
     f = field()
-    h.check("B the name is ready to type", f.hasFocus() and f.selectedText() == "New Project", f.text())
+    h.check(
+        "B the name is ready to type", f.hasFocus() and f.selectedText() == "New Project", f.text()
+    )
     no_dialog("B")
     h.check("B the project is there already", os.path.isdir(os.path.join(s["root"], "New Project")))
     type_name(BOOK)
@@ -205,7 +211,9 @@ b_type.done_what = "the name to be taken"
 
 def b_made():
     h.check("B the project folder has it", os.path.isdir(book()), os.listdir(s["root"]))
-    h.check("B ... under that name only", not os.path.exists(os.path.join(s["root"], "New Project")))
+    h.check(
+        "B ... under that name only", not os.path.exists(os.path.join(s["root"], "New Project"))
+    )
     item = card(BOOK)
     h.check("B its card", item is not None, names())
     h.check("B ... is selected", item is not None and item.isSelected())
@@ -231,7 +239,9 @@ c_new_folder.done_what = "the new folder's name field"
 
 def c_type():
     f = field()
-    h.check("C the name is ready to type", f.hasFocus() and f.selectedText() == "New Folder", f.text())
+    h.check(
+        "C the name is ready to type", f.hasFocus() and f.selectedText() == "New Folder", f.text()
+    )
     no_dialog("C")
     type_name(FUND)
 
@@ -240,7 +250,11 @@ c_type.done = lambda: field() is None
 
 
 def c_made():
-    h.check("C the folder is in the project", os.path.isdir(os.path.join(book(), FUND)), os.listdir(book()))
+    h.check(
+        "C the folder is in the project",
+        os.path.isdir(os.path.join(book(), FUND)),
+        os.listdir(book()),
+    )
     sub = card(FUND).data(QtCore.Qt.UserRole + 3)
     h.check("C ... shown as a folder", sub == "Folder", sub)
     vi.panel_button("NewFolder")
@@ -260,7 +274,9 @@ def c_narrow():
     """A long path does not widen the panel (the browser was squeezed to a strip)."""
     from fission180 import browser_ui
 
-    deep = os.path.join(book(), FUND, "A folder with quite a long name", "And another one inside it")
+    deep = os.path.join(
+        book(), FUND, "A folder with quite a long name", "And another one inside it"
+    )
     os.makedirs(deep)
     panel().set_folder(deep)
     s["deep"] = deep
@@ -280,7 +296,9 @@ def c_narrow_check():
 
 
 def c_stray():
-    h.check("C Esc keeps the folder as New Folder", os.path.isdir(os.path.join(book(), "New Folder")))
+    h.check(
+        "C Esc keeps the folder as New Folder", os.path.isdir(os.path.join(book(), "New Folder"))
+    )
     h.check("C two folders", sorted(os.listdir(book())) == [FUND, "New Folder"], os.listdir(book()))
 
 
@@ -318,7 +336,11 @@ d_refused.done = lambda: field() is None
 
 def d_renamed():
     h.check("D renamed", sorted(os.listdir(book())) == [FUND, "Stray"], os.listdir(book()))
-    h.check("D the status is the folder's again", "folder" in panel().status.text(), panel().status.text())
+    h.check(
+        "D the status is the folder's again",
+        "folder" in panel().status.text(),
+        panel().status.text(),
+    )
     pos = card_pos("Stray")
     w.click(panel().list.viewport(), pos)
     QtTest.QTest.keyClick(panel().list, QtCore.Qt.Key_F2)
@@ -462,11 +484,20 @@ g_pick.done_what = "the folder to move"
 def g_moved():
     moved = os.path.join(book(), "Archive", "Parts")
     gear = os.path.join(moved, "Gear.FCStd")
-    h.check("G the folder is in Archive", os.path.isdir(moved), os.listdir(os.path.join(book(), "Archive")))
+    h.check(
+        "G the folder is in Archive",
+        os.path.isdir(moved),
+        os.listdir(os.path.join(book(), "Archive")),
+    )
     h.check("G ... with its design", os.path.isfile(gear))
-    h.check("G ... the folder in it and its file", os.path.isfile(os.path.join(moved, "Inner", "notes.txt")))
+    h.check(
+        "G ... the folder in it and its file",
+        os.path.isfile(os.path.join(moved, "Inner", "notes.txt")),
+    )
     versions = ui().store_of(gear).versions()
-    h.check("G the design kept its version", [v.description for v in versions] == ["first"], versions)
+    h.check(
+        "G the design kept its version", [v.description for v in versions] == ["first"], versions
+    )
     h.check("G it is said", "moved to Archive" in m.told(), m.told())
     s["gear"] = gear
     pos = card_pos("Archive")
@@ -501,9 +532,14 @@ def g_copied():
     h.check("G the original stays", os.path.isfile(s["gear"]))
     versions = ui().store_of(copy).versions()
     h.check("G the copy is a design of its own (v1)", len(versions) == 1, versions)
-    h.check("G ... with the other files", os.path.isfile(os.path.join(book(), FUND, "Parts", "Inner", "notes.txt")))
+    h.check(
+        "G ... with the other files",
+        os.path.isfile(os.path.join(book(), FUND, "Parts", "Inner", "notes.txt")),
+    )
     doc = App.openDocument(s["gear"])
-    h.check("G the moved design opens", doc is not None and abs(doc.Body.Shape.Volume - 1000) < 1e-6)
+    h.check(
+        "G the moved design opens", doc is not None and abs(doc.Body.Shape.Volume - 1000) < 1e-6
+    )
     App.closeDocument(doc.Name)
     panel().set_folder(os.path.join(book(), FUND))
 
@@ -513,7 +549,9 @@ def h_new():
     h.press("n", QtCore.Qt.ControlModifier)
 
 
-h_new.done = lambda: App.ActiveDocument is not None and App.ActiveDocument.Label.startswith("Untitled")
+h_new.done = lambda: App.ActiveDocument is not None and App.ActiveDocument.Label.startswith(
+    "Untitled"
+)
 h_new.done_what = "a new design"
 
 
@@ -533,8 +571,15 @@ def tree_path(d):
 def h_dialog():
     d = vi.save_dialog()
     fund = os.path.join(book(), FUND)
-    h.check("H Location is the folder open in the Data Panel", d.location.text() == fund, d.location.text())
-    h.check("H the folders are shown in the dialog", d.tree.isVisible() and d.tree.topLevelItemCount() == 1)
+    h.check(
+        "H Location is the folder open in the Data Panel",
+        d.location.text() == fund,
+        d.location.text(),
+    )
+    h.check(
+        "H the folders are shown in the dialog",
+        d.tree.isVisible() and d.tree.topLevelItemCount() == 1,
+    )
     h.check("H ... with that folder selected", tree_path(d) == fund, tree_path(d))
     blank = h.blank_buttons(d)
     h.check("H every button of the Save dialog paints (the ...)", not blank, blank)
@@ -554,7 +599,11 @@ def h_dialog():
 def h_clicked():
     d = vi.save_dialog()
     archive = os.path.join(book(), "Archive")
-    h.check("H a click on a folder there changes the Location", d.location.text() == archive, d.location.text())
+    h.check(
+        "H a click on a folder there changes the Location",
+        d.location.text() == archive,
+        d.location.text(),
+    )
     w.click(d.new_folder)
 
 
@@ -572,7 +621,11 @@ h_clicked.done_what = "the new folder's name in the tree"
 def h_name_folder():
     d = vi.save_dialog()
     edit = editor(d)
-    h.check("H New Folder: its name is ready to type in the tree", edit.text() == "New Folder", edit.text())
+    h.check(
+        "H New Folder: its name is ready to type in the tree",
+        edit.text() == "New Folder",
+        edit.text(),
+    )
     edit.selectAll()
     QtTest.QTest.keyClicks(edit, "Saved Here")
     QtTest.QTest.keyClick(edit, QtCore.Qt.Key_Return)
@@ -587,7 +640,9 @@ def h_fill():
     target = os.path.join(book(), "Archive", "Saved Here")
     h.check("H the dialog is still open", d is not None)
     h.check("H Location is the new folder", d.location.text() == target, d.location.text())
-    h.check("H no New Folder left", not os.path.exists(os.path.join(book(), "Archive", "New Folder")))
+    h.check(
+        "H no New Folder left", not os.path.exists(os.path.join(book(), "Archive", "New Folder"))
+    )
     # back to the book's folder with a click in the tree, then the name and Save
     top = d.tree.topLevelItem(0)
     for i in range(top.childCount()):
@@ -607,7 +662,10 @@ h_fill.done_what = "the design to be saved in the folder"
 
 
 def h_saved():
-    h.check("H the design is in the open folder", App.ActiveDocument.FileName.startswith(os.path.join(book(), FUND)))
+    h.check(
+        "H the design is in the open folder",
+        App.ActiveDocument.FileName.startswith(os.path.join(book(), FUND)),
+    )
     h.check("H the panel shows it", card("Classic Donut") is not None, names())
     h.check("H it is v1", len(ui().store_of(App.ActiveDocument.FileName).versions()) == 1)
 
@@ -632,10 +690,17 @@ i_reopen.done = shown
 
 
 def i_back():
-    h.check("I back on the folder it showed", panel().folder == os.path.join(book(), FUND), panel().folder)
+    h.check(
+        "I back on the folder it showed",
+        panel().folder == os.path.join(book(), FUND),
+        panel().folder,
+    )
     from fission180 import data_panel_core as dp
 
-    h.check("I a folder that is gone: the project folder", dp.remembered_folder(s["root"], "/nowhere") == s["root"])
+    h.check(
+        "I a folder that is gone: the project folder",
+        dp.remembered_folder(s["root"], "/nowhere") == s["root"],
+    )
     ui().SYSTEM_TRASH = None
     ui().hide_panel()
 

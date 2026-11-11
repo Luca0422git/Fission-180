@@ -144,10 +144,14 @@ class DialogFitTest(unittest.TestCase):
         del importlib
 
     def test_inside_stays(self):
-        self.assertEqual(self.fitted((100, 100, 400, 300), (0, 0, 1920, 1080)), (100, 100, 400, 300))
+        self.assertEqual(
+            self.fitted((100, 100, 400, 300), (0, 0, 1920, 1080)), (100, 100, 400, 300)
+        )
 
     def test_off_the_right_edge_comes_back(self):
-        self.assertEqual(self.fitted((1800, 100, 400, 300), (0, 0, 1920, 1080)), (1520, 100, 400, 300))
+        self.assertEqual(
+            self.fitted((1800, 100, 400, 300), (0, 0, 1920, 1080)), (1520, 100, 400, 300)
+        )
 
     def test_too_wide_is_narrowed(self):
         self.assertEqual(self.fitted((0, 0, 2400, 300), (0, 0, 1920, 1080)), (0, 0, 1920, 300))

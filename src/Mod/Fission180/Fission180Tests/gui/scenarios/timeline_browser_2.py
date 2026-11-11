@@ -510,7 +510,11 @@ def check_undo_move():
 
 
 def activate_body1():
-    double_click_row("Bracket")
+    # (wave 7) a double-click on a body's name renames it (the book's "double-click Body1");
+    # on its icon it activates the body, as it always did
+    browser = tree()
+    item = browser.row("Bracket")
+    w.double_click(browser.viewport(), browser.icon_point(item))
 
 
 def check_active():
