@@ -343,13 +343,13 @@ Each of these Fusion entries counts as present through the same Fission 180 entr
 Fission 180's own additions (beyond Fusion), entries Fusion has in a place the list does
 not cover, or a name the alias file should map. Greyed entries are left out.
 
-- `tab:solid`: Gear, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
+- `tab:solid`: Gear, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:surface`: Merge, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part...
 - `tab:mesh`: Delete Faces, User Coordinate System, Environmental Map Analysis
-- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP
-- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Design Advice, Insert Component, Insert STEP
+- `tab:sheet_metal`: Lofted Flange, Join by Bend, Corner Closure, User Coordinate System, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part...
+- `tab:plastic`: Assign Plastic Rule, User Coordinate System, Environmental Map Analysis, Design Advice, Insert Component, Insert STEP, Insert Catalogue Part...
 - `tab:utilities`: Export, Export Everything, Add-on Manager, AI, Add an AI App, AI Chat, AI Activity, Rebuild with Timeline (AI)..., Compare with Reference, Finish Rebuild, Stop Rebuild..., FreeCAD Tools, Project and Recovery Settings, Version History, Recover Documents, Save As, Fission 180 Diagnostics, Report a Problem, Command Search
-- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Insert Component, Insert STEP, Toggle Construction
+- `tab:sketch`: Isoparametric Curve, Environmental Map Analysis, Insert Component, Insert STEP, Insert Catalogue Part..., Toggle Construction
 - `tab:drawing`: Bend Note, Bend Table
 - `tab:flat_pattern`: Environmental Map Analysis
 - `tab:sim_setup`: Environmental Map Analysis
