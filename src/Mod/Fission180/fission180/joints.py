@@ -2671,7 +2671,15 @@ def _run_solver(asm, doc):
     for p in nested:
         p.Placement = places[p.Name]  # the solver reads it as a place in design coordinates
     try:
-        with _only_active(doc):
+        # FreeCAD's solver writes its own red lines to the Report view when it gives up
+        # ("<Assembly> AssemblyObject.cpp(170): Solve failed: iterNo > iterMax", "vector::
+        # _M_range_check: __n (which is 84) >= this->size()"): a Rigid joint previewed
+        # across a closed loop did (the book's Strandbeest, Joint (J) on the last link
+        # before its Type is set). The code it returns is what the dialogs explain
+        # (solve_message); its own lines are kept out (wave 7, replay-f).
+        from . import preview
+
+        with _only_active(doc), preview.quiet():
             return int(asm.solve())
     finally:
         solved = {p.Name: App.Placement(p.Placement) for p in nested}

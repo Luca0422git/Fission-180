@@ -172,6 +172,8 @@ class SnapHover:
         self.allow = allow
         self.enabled = True
         self.position = None
+        self._pressed = None  # where the left button last came down (viewport pixels)
+        self._looked = None  # the pointer's place the lit dot was last chosen for
         self.key = None
         self.pick = None
         self.candidates = []
@@ -215,6 +217,7 @@ class SnapHover:
         try:
             if info.get("Button") != "BUTTON1" or info.get("State") != "DOWN":
                 return
+            self._pressed = tuple(info.get("Position") or self.position or ()) or None
             if not (self.enabled and self.holding and self.on_click is not None):
                 return
             position = tuple(info.get("Position") or self.position or ())
@@ -249,6 +252,7 @@ class SnapHover:
             if not self.candidates:
                 self.clear(keep_key=True)
                 return
+            self._looked = self.position
             hot = self._choose()
             shown = self._visible(hot)
             if hot is not self.hot or shown != self._drawn or self.switch.getNumChildren() == 0:
@@ -461,11 +465,22 @@ class SnapHover:
             and self.hot is not None
             and self.pick.part is pick.part
             and self.pick.obj is pick.obj
-            and self.pick.element == pick.element
+            and (self.pick.element == pick.element or self._pressed_where_lit())
         ):
             return self.hot
         found = self._candidates(pick)
         return joints.nearest_snap(found, point)
+
+    def _pressed_where_lit(self):
+        """True when the click came down on the pixel the lit dot was chosen for. The dot
+        that is lit is the dot a click takes: the hover looks a few pixels around the
+        pointer for an edge, FreeCAD's own selection of the same click does not, so a click
+        on a round wall next to its rim was the wall's while the rim's centre was lit, and
+        took the dot nearest in space instead (the end of the arc: the book's Strandbeest,
+        "Joint (J) to close the loop ... hovering picks the wrong one"; wave 7, replay-f)."""
+        from . import hole_snaps_core
+
+        return hole_snaps_core.same_pixel(self._pressed, self._looked)
 
     # -- drawing -----------------------------------------------------------------------------------
     def _size(self):

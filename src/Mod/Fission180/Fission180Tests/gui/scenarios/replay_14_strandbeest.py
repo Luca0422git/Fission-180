@@ -762,8 +762,11 @@ def as_built(tag, first, second, labels, at, hover=None, edge=False):
 
     def kind():
         p = j.panel()
-        h.check("%s: %s and %s are taken" % (tag, labels[0], labels[1]),
-                [x.Label for x in p.parts] == list(labels), [x.Label for x in p.parts])
+        h.check(
+            "%s: %s and %s are taken" % (tag, labels[0], labels[1]),
+            [x.Label for x in p.parts] == list(labels),
+            [x.Label for x in p.parts],
+        )
         h.check("%s: Type Revolute chosen" % tag, j.choose_type(p, "Revolute"))
 
     def aim():
@@ -775,9 +778,11 @@ def as_built(tag, first, second, labels, at, hover=None, edge=False):
 
     def position():
         spot = bj.hot(j.panel())
-        h.check("%s: the centre is lit under the pointer" % tag,
-                spot is not None and (spot["point"] - at()).Length < 1e-4,
-                spot and (spot["kind"], spot["point"], at()))
+        h.check(
+            "%s: the centre is lit under the pointer" % tag,
+            spot is not None and (spot["point"] - at()).Length < 1e-4,
+            spot and (spot["kind"], spot["point"], at()),
+        )
         target = (hover or at)()
         if edge:
             h.click_edge(target)
@@ -796,17 +801,27 @@ def as_built(tag, first, second, labels, at, hover=None, edge=False):
 
     def made():
         joint = bj.joint(name)
-        h.check("%s: %s made, a Revolute joint" % (tag, name),
-                joint is not None and joint.JointType == "Revolute", bj.labels())
-        h.check("%s: nothing moved (as-built)" % tag,
-                not any(bj.moved(a, c) for a, c in zip(places(), S["before"])))
-        h.check("%s: the solver is happy" % tag, jm().solve(bj.doc()) == 0, jm().broken_joints(bj.doc()))
+        h.check(
+            "%s: %s made, a Revolute joint" % (tag, name),
+            joint is not None and joint.JointType == "Revolute",
+            bj.labels(),
+        )
+        h.check(
+            "%s: nothing moved (as-built)" % tag,
+            not any(bj.moved(a, c) for a, c in zip(places(), S["before"])),
+        )
+        h.check(
+            "%s: the solver is happy" % tag, jm().solve(bj.doc()) == 0, jm().broken_joints(bj.doc())
+        )
         if joint is not None:
             frame = jm().global_of(joint.Reference1) if hasattr(joint, "Reference1") else None
             S.setdefault("frames", {})[name] = frame
         r.no_open_step("As-built Joint")
 
-    return [r.named(x, "%s_%s" % (tag, x.__name__)) for x in (command, one, two, kind, aim, position, ok, made)]
+    return [
+        r.named(x, "%s_%s" % (tag, x.__name__))
+        for x in (command, one, two, kind, aim, position, ok, made)
+    ]
 
 
 def on_a():
@@ -831,7 +846,9 @@ def b_rim_at_a():
 
 
 def joints_made():
-    h.check("8 three joints", bj.labels() == ["Revolute 1", "Revolute 2", "Revolute 3"], bj.labels())
+    h.check(
+        "8 three joints", bj.labels() == ["Revolute 1", "Revolute 2", "Revolute 3"], bj.labels()
+    )
     rows = t.children("Joints") or []
     h.check("8 they are in the browser's Joints folder", all(n in rows for n in bj.labels()), rows)
     h.shot("8-joints")
@@ -841,9 +858,295 @@ steps += [r.activate(""), front_view]
 steps += as_built("j1", on_a, lambda: V(GROUND, -6, 0), ("A Link", "Pins"), lambda: V(0, -6, 0))
 # (the first pin now carries Revolute 1's glyph at its centre, which takes a click like
 # Fusion's joint glyphs do: the Pins are picked on the second pin)
-steps += as_built("j2", on_d, lambda: V(GROUND, -6, 0), ("DGF Plate", "Pins"), lambda: V(GROUND, -6, 0))
-steps += as_built("j3", on_b, on_a, ("B Link", "A Link"), lambda: front(S["a_end"], -4),
-                  hover=b_rim_at_a, edge=True)
+steps += as_built(
+    "j2", on_d, lambda: V(GROUND, -6, 0), ("DGF Plate", "Pins"), lambda: V(GROUND, -6, 0)
+)
+steps += as_built(
+    "j3",
+    on_b,
+    on_a,
+    ("B Link", "A Link"),
+    lambda: front(S["a_end"], -4),
+    hover=b_rim_at_a,
+    edge=True,
+)
 steps += [joints_made]
+
+
+# == 9: Joint (J) closes the loop: B Link onto DGF Plate at the rocker's hole =====================
+# The report: "Fail -> workaround. Joint (J) to close the loop: ... hovering picks the wrong
+# one ... OK was refused. The As-built Revolute closed the loop instead." Here: J, the round
+# end of the coupler (its wall: the dots are on its axis), then the round end of the rocker
+# under it; both dots are the same point (the two layers meet there), so nothing moves.
+def loop_point(y):
+    return front(S["d_end"], y)
+
+
+def wall(y):
+    """A point on the top of the round ends at the rocker's hole, at depth y."""
+    return front(S["d_end"] + V(0, 2.5, 0), y)
+
+
+def j_key():
+    S["before"] = places()
+    j.press_j()
+
+
+j_key.done = lambda: j.panel() is not None
+j_key.done_what = "the Joint dialog is open"
+
+
+def aim_at_dot(part_label, want, depths):
+    """Move the pointer over the round end of `part_label` at the rocker's hole until the
+    dot at `want` is the lit one, as a person does (the dots of a round wall are on its
+    axis; which one is lit follows the pointer). True when it is lit."""
+    for depth in depths:
+        for side in (0.0, 0.35, -0.35):
+            up = V(side, 1.0, 0).normalize() * 2.5
+            bj.hover_point(front(S["d_end"] + up, depth))
+            hov = bj.hover_of(j.panel())
+            if hov is None or hov.pick is None or hov.pick.part.Label != part_label:
+                continue
+            spot = hov.hot
+            if spot is not None and (spot["point"] - want).Length < 1e-4:
+                return True
+    return False
+
+
+def click_here():
+    """Click where the pointer rests (the dot lit there is the one taken)."""
+    from PySide import QtGui
+
+    pos = h.gl_widget().mapFromGlobal(QtGui.QCursor.pos())
+    QtTest.QTest.mouseClick(h.gl_widget(), QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, pos)
+    QtWidgets.QApplication.processEvents()
+    h.settle()
+
+
+def j_pick_b():
+    lit = aim_at_dot("B Link", loop_point(-2), (-2.3, -2.6, -2.9, -3.3))
+    hov = bj.hover_of(j.panel())
+    h.check(
+        "9 on the coupler's round end the dot where the two layers meet can be lit",
+        lit,
+        hov and hov.pick and (hov.pick.part.Label, hov.hot and (hov.hot["kind"], hov.hot["point"])),
+    )
+    click_here()
+
+
+def front_of(point):
+    """A point of the design as a point of a Front-plane sketch."""
+    return V(point.x, point.z, 0)
+
+
+def j_pick_d():
+    p = j.panel()
+    snap = p.snaps["comp1"]
+    h.check(
+        "9 component 1 is the coupler, at the hole's axis",
+        snap is not None and (snap["point"] - loop_point(-2)).Length < 1e-4,
+        snap and snap["point"],
+    )
+    h.check("9 component 2 waits", p.active == "comp2", p.active)
+    lit = aim_at_dot("DGF Plate", loop_point(-2), (-1.7, -1.4, -1.0, -0.6))
+    hov = bj.hover_of(j.panel())
+    # the report: "with two coplanar overlapping links, hovering picks the wrong one"
+    h.check(
+        "9 on the rocker's round end (under the coupler's) the same point can be lit",
+        lit,
+        hov and hov.pick and (hov.pick.part.Label, hov.hot and (hov.hot["kind"], hov.hot["point"])),
+    )
+    click_here()
+
+
+def j_type():
+    p = j.panel()
+    h.check("9 a joint is previewed", len(jm().joints(bj.doc())) == 4, bj.labels())
+    # the Type is still the dialog's first one; a joint that cannot hold in the loop is
+    # explained in the dialog, never by FreeCAD's solver in the Report view
+    S["said_before_type"] = (p.type_box.currentText(), p.message.text())
+    print(
+        "[Fission 180] replay: before the Type is set: %s / %r" % S["said_before_type"], flush=True
+    )
+    h.check("9 Type Revolute chosen", j.choose_type(p, "Revolute"))
+
+
+def j_ok():
+    p = j.panel()
+    h.caught_up(p)
+    h.check("9 no problem said", p.message.text() == "", p.message.text())
+    h.shot("9-joint-closing")
+    j.ok()
+
+
+j_ok.done = lambda: j.panel() is None
+j_ok.done_what = "OK is taken (the report: OK was refused)"
+
+
+def j_made():
+    joint = bj.joint("Revolute 4")
+    h.check(
+        "9 Revolute 4 closes the loop",
+        joint is not None and joint.JointType == "Revolute",
+        bj.labels(),
+    )
+    h.check(
+        "9 nothing moved: the links were in place",
+        not any(bj.moved(a, c, 1e-3) for a, c in zip(places(), S["before"])),
+        (places(), S["before"]),
+    )
+    h.check(
+        "9 the solver is happy with the closed loop",
+        jm().solve(bj.doc()) == 0 and not jm().broken_joints(bj.doc()),
+        jm().broken_joints(bj.doc()),
+    )
+    r.no_open_step("Joint")
+    S["home"] = places()
+
+
+steps += [j_key, j_pick_b, j_pick_d, j_type, j_ok, j_made]
+
+
+# == 10: the crank dragged: the whole loop follows ================================================
+def angle(name):
+    return jm().value(bj.joint(name))[0]
+
+
+def drag_crank():
+    import math
+
+    front_view()
+    S["undos"] = list(bj.doc().UndoNames)
+    start = S["a_end"] * 0.5
+    c, s_ = math.cos(math.radians(35)), math.sin(math.radians(35))
+    end = V(start.x * c - start.y * s_, start.x * s_ + start.y * c, 0)
+    h.drag(h.screen_point(front(start, -2)), h.screen_point(front(end, -2)), steps=16)
+    h.settle("the drag to be applied")
+
+
+def dragged():
+    from fission180 import joints_drag
+
+    h.check("10 the crank turned", abs(angle("Revolute 1")) > 10, angle("Revolute 1"))
+    # the report: "the rocker (DGF) stayed put (loop not followed while dragging)"
+    h.check("10 the rocker swung with it", abs(angle("Revolute 2")) > 2, angle("Revolute 2"))
+    now = places()
+    h.check("10 the coupler moved", bj.moved(now[1], S["home"][1]))
+    h.check(
+        "10 every joint of the loop still holds",
+        not jm().broken_joints(bj.doc()),
+        jm().broken_joints(bj.doc()),
+    )
+    last = joints_drag.last() or {}
+    h.check(
+        "10 it was a drag along the crank's joint",
+        last.get("joint") == bj.joint("Revolute 1").Name,
+        last,
+    )
+    names = list(bj.doc().UndoNames)
+    h.check(
+        "10 one undo step",
+        names[1:3] == S["undos"][0:2] and names[0] != S["undos"][0],
+        (names[:3], S["undos"][:2]),
+    )
+    r.no_open_step("the drag")
+    h.shot("10-dragged")
+
+
+def drag_undone():
+    h.check(
+        "10 Ctrl+Z: every link is back",
+        not any(bj.moved(a, c) for a, c in zip(places(), S["home"])),
+    )
+    h.check("10 the loop holds", not jm().broken_joints(bj.doc()))
+
+
+steps += [drag_crank, dragged, r.undo, drag_undone]
+
+
+# == 11: Animate Joint (the joint alone) and Animate Joint Relationships (the whole loop) =========
+def animate_alone():
+    h.fit()
+    j.browser_menu("Revolute 1", "Animate Joint")
+    S["alone"] = bj.sample(
+        bj.standalone_animator,
+        bj.joint("Revolute 1"),
+        [r.part(n) for n in ("A Link", "B Link", "DGF Plate")],
+    )
+
+
+def watched_alone():
+    from Fission180Tests.gui import blend_steps
+
+    samples = S.get("alone") or []
+    h.check("11 Animate Joint plays", len(samples) >= 5, len(samples))
+    h.check("11 the crank turns", bj.spread(x["angle"] for x in samples) > 40)
+    still = all(not bj.moved(x["places"][2], S["home"][2]) for x in samples)
+    h.check("11 alone: the rocker stands still (Fusion: only this joint)", still)
+    animator = bj.standalone_animator()
+    h.check("11 it is the joint alone", animator is not None and animator.alone)
+    blend_steps.press_guarded(QtCore.Qt.Key_Escape)
+
+
+def stopped():
+    h.check(
+        "11 Esc: every link stands where it was",
+        not any(bj.moved(a, c) for a, c in zip(places(), S["home"])),
+    )
+    h.check("11 the loop holds", not jm().broken_joints(bj.doc()))
+    entries = [e[0] for e in t.row_menu_entries("Revolute 1")]
+    h.check(
+        "11 the menu has both animations (the report: only one)",
+        "Animate Joint" in entries and "Animate Joint Relationships" in entries,
+        entries,
+    )
+
+
+def animate_all():
+    j.browser_menu("Revolute 1", "Animate Joint Relationships")
+    S["all"] = bj.sample(
+        bj.standalone_animator,
+        bj.joint("Revolute 1"),
+        [r.part(n) for n in ("A Link", "B Link", "DGF Plate")],
+    )
+
+
+def watched_all():
+    from Fission180Tests.gui import blend_steps
+
+    samples = S.get("all") or []
+    h.check("11 Animate Joint Relationships plays", len(samples) >= 5, len(samples))
+    h.check("11 the crank turns", bj.spread(x["angle"] for x in samples) > 40)
+    swing = bj.spread(jm_angle(x["places"][2]) for x in samples)
+    h.check("11 the rocker swings with it", swing > 5, swing)
+    h.check("11 the coupler follows", any(bj.moved(x["places"][1], S["home"][1]) for x in samples))
+    animator = bj.standalone_animator()
+    h.check("11 with its relationships", animator is not None and not animator.alone)
+    h.shot("11-animating")
+    blend_steps.press_guarded(QtCore.Qt.Key_Escape)
+
+
+def jm_angle(place):
+    """The turn (degrees) about Y of a part's place (bj.place: base + quaternion)."""
+    import math
+
+    qy, qw = place[4], place[6]
+    return math.degrees(2 * math.atan2(qy, qw))
+
+
+animate_alone.while_busy = watched_alone.while_busy = True
+animate_all.while_busy = watched_all.while_busy = True
+
+
+def stopped_all():
+    h.check(
+        "11 Esc: every link stands where it was",
+        not any(bj.moved(a, c) for a, c in zip(places(), S["home"])),
+    )
+    h.check("11 the loop holds", not jm().broken_joints(bj.doc()))
+    r.no_open_step("the animations")
+
+
+steps += [animate_alone, watched_alone, stopped, animate_all, watched_all, stopped_all]
 
 h.run("replay_14_strandbeest", steps, paced_by="state")

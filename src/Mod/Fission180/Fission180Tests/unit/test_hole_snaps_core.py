@@ -187,6 +187,23 @@ class ManyDots(unittest.TestCase):
         self.assertEqual(core.nearest_indices(pts, (0, 0, 0), 2), [1, 2])
 
 
+class ClickWhereLit(unittest.TestCase):
+    """The dot that is lit is the dot a click takes when the click comes down on the pixel
+    the dot was chosen for (wave 7, replay-f: the Strandbeest's closing Joint)."""
+
+    def test_the_same_spot(self):
+        self.assertTrue(core.same_pixel((667, 512), (667, 512)))
+        self.assertTrue(core.same_pixel((667, 512), (668, 513)))  # 1.41 pixels
+
+    def test_the_pointer_moved_on(self):
+        self.assertFalse(core.same_pixel((667, 512), (670, 512)))
+
+    def test_nothing_known(self):
+        self.assertFalse(core.same_pixel(None, (1, 1)))
+        self.assertFalse(core.same_pixel((1, 1), None))
+        self.assertFalse(core.same_pixel((), (1, 1)))
+
+
 class ClickTakes(unittest.TestCase):
     """The hover shows the dots of what a click selects (FreeCAD's pick priority)."""
 

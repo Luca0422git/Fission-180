@@ -204,6 +204,14 @@ def choose_hot(candidates, pointer, reach=1e9, snap_pixels=SNAP_PIXELS):
     return None
 
 
+def same_pixel(a, b, tol=2.0):
+    """True when two pointer places ((x, y) pixels, or None) are the same spot on the
+    screen: a click that came down where the lit dot was chosen takes that dot."""
+    if not a or not b:
+        return False
+    return math.hypot(a[0] - b[0], a[1] - b[1]) <= tol
+
+
 def zone_pixels(radius_pixels):
     return max(MIN_ZONE_PIXELS, ZONE * radius_pixels)
 
