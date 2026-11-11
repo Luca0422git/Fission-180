@@ -152,9 +152,15 @@ def _library(answer, run):
     return None
 
 
-def libraries(*expected):
+def libraries(*expected, any_document=False):
+    """The libraries cam_tools lists (any_document: a design may or may not be open, as
+    when the runner's other sessions ran before this one; its Document library is not
+    looked at)."""
+
     def check(answer, run):
         rows = {row["library"]: row["tools"] for row in _json(answer)["libraries"]}
+        if any_document:
+            rows.pop("document", None)
         if tuple(rows) != expected:
             return "libraries %s, expected %s" % (list(rows), list(expected))
         if rows["sample:mm"] != 43 or rows["sample:in"] != 26:
@@ -230,8 +236,12 @@ def _undo_names(expected_first):
 
 TOOL_6 = {"library": "sample:mm", "id": "sample-mm-flat-6"}
 CAM = [
-    # (without a design there is no Document library)
-    {"tool": "cam_tools", "args": {}, "check": libraries("local:Local", "sample:mm", "sample:in")},
+    # (the Tool Library can be read before any design is open)
+    {
+        "tool": "cam_tools",
+        "args": {},
+        "check": libraries("local:Local", "sample:mm", "sample:in", any_document=True),
+    },
     {"tool": "new_design", "args": {"name": "CamPlate"}},
     {"tool": "cam_setups", "args": {}, "contains": ["no setup yet"]},
     {

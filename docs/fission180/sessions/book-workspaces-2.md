@@ -144,7 +144,22 @@ looked for where `winget` and `C:\Program Files` put it. Nothing is bundled.
 Headless: `Fission180Tests/headless/workspace_tools.py`, 90 calls (every tool, its numbers
 against the golden models', its refusals). Unit: `test_ai_workspace_tools.py`,
 `test_workspace_switch.py`, new cases in `test_manufacture_core.py` and
-`test_animation_core.py`. The results of the final round are in the builder's report.
+`test_animation_core.py`.
+
+The final round, after merging `develop` with all thirteen areas in it (d248501c): unit 3664
+tests OK; golden `cam_*` and `anim_*` 4 of 4; `--only headless`: the runner 555 calls on 172
+tools, none missing (one check of this session's own first call assumed no design was open
+yet, corrected and the runner run again: 0 failed), documentation examples 197 items / 1343
+calls 0 failed, the AI agent end to end 81 checks 0 failed, Auto Timeline 153 + 15 checks
+and 71 recognised parts 0 failed. Scenarios, each alone: the five above, and the older ones
+of the files changed: book_cam_setup 58, book_cam_operations 79, book_cam_program 87,
+book_cam_refusals 50, book_cam_orientation 35, book_animation_workspace 75,
+book_animation_switching 76, book_animation_explode 79, book_animation_playback 37,
+book_animation_publish 67, book_animation_transform 99, book_animation_storyboards 124,
+sim_setup_workspace 70, simres_workspace 71, home_tab_panels 14, ai_docs_gui 19: all PASS.
+
+The run was cut off once (usage credits, a machine restart) between items 3 and 4; the
+worktree survived and nothing had to be redone but the scenario that was running.
 
 ## Shared files touched
 
