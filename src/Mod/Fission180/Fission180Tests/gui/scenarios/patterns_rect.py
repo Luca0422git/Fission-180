@@ -105,8 +105,11 @@ def direction_picked():
         p.fields["direction"].button.text() == "X Axis",
         p.fields["direction"].button.text(),
     )
-    h.check("origin axes hidden again", p.axis_picker is None)
-    h.check("Objects box active again", p.fields["objects"].button.isChecked())
+    # (wave 7, the book replay) Fusion's one Axes box takes two picks, so after the first
+    # direction the second direction's box takes the next click (the book's Play Brick:
+    # "click the two edges"); it was the Objects box, which never took the second edge
+    h.check("origin axes still drawn, for the second direction", p.axis_picker is not None)
+    h.check("the second Direction box is active", p.fields["direction2"].button.isChecked())
     h.check("preview made", p.target is not None)
     v = h.solid_volume()
     h.check("preview: 2 holes", ps.close(v, ps.BOX - 2 * HOLE), v)

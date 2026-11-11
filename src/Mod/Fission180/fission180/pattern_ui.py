@@ -1736,10 +1736,20 @@ class PatternPanel(Panel):
             return
         self.options[name] = ref
         self.message.setText("")
+        first_time = name == "direction" and not getattr(self, "_direction2_asked", False)
         if name == "direction" and self.options.get("direction2") is None:
             self.options["direction2"] = self._perpendicular(ref)
         self._default_distances(name)
-        self.activate("objects")
+        # (wave 7, the book replay: the Play Brick, "click the two edges") Fusion's one Axes
+        # box takes two picks: after the first direction the next click in the view is the
+        # second direction (it went to Objects, so the second edge was not taken and the
+        # second direction stayed the one Fission 180 had worked out). Once only: a first
+        # direction picked again later leaves the second alone.
+        if first_time and not self.editing and "direction2" in self.fields:
+            self._direction2_asked = True
+            self.activate("direction2")
+        else:
+            self.activate("objects")
         self._changed(new_geometry=True)
 
     def _perpendicular(self, ref):

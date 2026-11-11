@@ -27,6 +27,20 @@ class LinearKind(unittest.TestCase):
         self.assertEqual(dc.linear_kind(A, B, (25.0, 5.0)), dc.VERTICAL)
         self.assertEqual(dc.linear_kind(A, B, (-12.0, 5.0)), dc.VERTICAL)
 
+    def test_just_left_of_two_points_is_vertical_just_below_horizontal(self):
+        # the book's Play Brick: a stud's centre at (6, 6), "3.9 from the origin" twice;
+        # the second dimension put to the left at half height was the slanted distance
+        origin, centre = (0.0, 0.0), (3.9, 6.0)
+        self.assertEqual(dc.linear_kind(origin, centre, (-3.0, 3.0)), dc.VERTICAL)
+        self.assertEqual(dc.linear_kind(origin, centre, (5.0, 3.0)), dc.VERTICAL)
+        self.assertEqual(dc.linear_kind(origin, centre, (1.95, -3.0)), dc.HORIZONTAL)
+        self.assertEqual(dc.linear_kind(origin, centre, (1.95, 7.0)), dc.HORIZONTAL)
+
+    def test_in_the_box_and_square_to_the_line_in_a_corner_is_aligned(self):
+        self.assertEqual(dc.linear_kind(A, B, (5.0, 5.5)), dc.ALIGNED)
+        self.assertEqual(dc.linear_kind(A, B, (-2.0, 12.0)), dc.ALIGNED)
+        self.assertEqual(dc.linear_kind(A, B, (13.0, -1.0)), dc.ALIGNED)
+
     def test_a_level_or_upright_line_is_always_aligned(self):
         for cursor in ((5.0, -30.0), (40.0, 3.0), (-9.0, -9.0)):
             self.assertEqual(dc.linear_kind((0, 0), (10, 0), cursor), dc.ALIGNED)
