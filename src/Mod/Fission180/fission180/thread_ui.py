@@ -940,6 +940,45 @@ def _suppressed(obj):
         return bool(getattr(obj, "Suppressed", False))
 
 
+# (wave 7, library-2) Any other step may say its own cosmetic threads in this hidden
+# property: a JSON list like thread.computed's "threads" (base, axis, radius, z0, z1,
+# internal, in the step's coordinates), each with its "pitch" and "left". INSERT > Hardware's
+# parts do (hardware.cosmetic_threads): a screw's thread is drawn like a Thread step's.
+OWN_SPOTS = "Fission180CosmeticThreads"
+
+
+def _own_spots(place, obj):
+    import json
+
+    found = []
+    try:
+        rows = json.loads(getattr(obj, OWN_SPOTS, "") or "[]")
+    except Exception:
+        return found
+    for t in rows:
+        try:
+            frame = App.Placement(
+                App.Vector(*t["base"]), App.Rotation(App.Vector(0, 0, 1), App.Vector(*t["axis"]))
+            )
+            radius = float(t["radius"])
+            lift = max(0.01, radius * 0.004)
+            r = radius - lift if t.get("internal") else radius + lift
+            found.append(
+                (
+                    place.multiply(frame),
+                    r,
+                    float(t.get("pitch", 1.0)),
+                    float(t["z0"]),
+                    float(t["z1"]),
+                    bool(t.get("left", False)),
+                    [],
+                )
+            )
+        except Exception:
+            continue
+    return found
+
+
 def cosmetic_spots(doc):
     """Every cosmetic thread to draw in a document: [(placement, radius, pitch, z0, z1, left,
     circles)] with the placement taking the thread's frame (z = axis) to global coordinates
@@ -995,6 +1034,8 @@ def cosmetic_spots(doc):
                             [(t["major"], -lift)],  # the major diameter at the hole's mouth
                         )
                     )
+            elif getattr(obj, OWN_SPOTS, ""):  # (library-2) a step that says its own
+                found += _own_spots(place, obj)
     return found
 
 

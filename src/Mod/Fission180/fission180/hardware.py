@@ -78,6 +78,85 @@ def solid(options):
     return shape
 
 
+# -- the cosmetic thread ---------------------------------------------------------------------------
+# A part whose threads are not modeled shows its thread as the dashed helix the Thread tool
+# draws for a cosmetic thread (Fusion's fasteners carry the Thread feature, cosmetic unless
+# modeled). thread_ui.cosmetic_spots draws what a step says in the hidden property
+# "Fission180CosmeticThreads" (JSON, in the step's own coordinates): the Hardware step says
+# it, and so does the base step of every occurrence's body.
+COSMETIC = "Fission180CosmeticThreads"
+
+
+def cosmetic_threads(options):
+    """[{"base", "axis", "radius", "pitch", "z0", "z1", "internal", "left"}] of a part's
+    thread while it is not modeled, in its component's coordinates; [] for a part without a
+    thread or with a modeled one."""
+    from . import thread
+
+    o = core.with_defaults(options)
+    if o["modeled"] or not hardware_shapes.can_thread(o):
+        return []
+    chosen = core.designation(o)
+    if chosen is None:
+        return []
+    dm = core.dims(o["standard"], o["size"])
+    internal = o["kind"] in ("nut", "standoff")
+    raw = hardware_shapes.raw_solid(o)
+    face = hardware_shapes._thread_face(raw, dm["d"] / 2.0, lowest=not internal)
+    if face is None:
+        return []
+    cylinder = thread.Cylinder(face)
+    z0, z1 = cylinder.z0, cylinder.z1
+    if not internal:  # from the tip over the standard thread length, as threaded() cuts it
+        long = min(core.thread_length(o), cylinder.length)
+        if cylinder.axis.z > 0:
+            z1 = z0 + long
+        else:
+            z0 = z1 - long
+    place = local_placement(o)
+    base = place.multVec(cylinder.base)
+    axis = place.Rotation.multVec(cylinder.axis)
+    return [
+        {
+            "base": [base.x, base.y, base.z],
+            "axis": [axis.x, axis.y, axis.z],
+            "radius": cylinder.radius,
+            "pitch": float(chosen.pitch),
+            "z0": z0,
+            "z1": z1,
+            "internal": internal,
+            "left": False,
+        }
+    ]
+
+
+def _say_threads(step, text):
+    if COSMETIC not in step.PropertiesList:
+        if not text:
+            return
+        step.addProperty("App::PropertyString", COSMETIC, "Fission180", "Cosmetic threads", 4)
+    if getattr(step, COSMETIC) != text:
+        setattr(step, COSMETIC, text)
+
+
+def mark_threads(feature):
+    """Keep what the part's steps say about its cosmetic thread in line with its options:
+    the Hardware step and the base step of each occurrence's body."""
+    try:
+        rows = cosmetic_threads(load_meta(feature).get("options", {}))
+    except Exception as exc:
+        log("hardware: no cosmetic thread (%s)" % exc)
+        rows = []
+    text = json.dumps(rows, sort_keys=True) if rows else ""
+    _say_threads(feature, text)
+    doc = feature.Document
+    for part in occurrences(feature)[1:]:
+        for body in components.bodies_in(doc, part):
+            for step in body.Group:
+                if step.TypeId == "PartDesign::FeatureBase":
+                    _say_threads(step, text)
+
+
 # -- the step --------------------------------------------------------------------------------------
 class HardwareFeature:
     """The Hardware step: its solid comes from the options in "Fission180Hardware". Saved in
@@ -302,6 +381,49 @@ def _place_component(component, place):
         component.Placement = wanted
 
 
+def fit_to_place(options, place, given=()):
+    """The options a part takes from the hole (or shaft, or round edge) it is put on, as the
+    dialog does (Fusion's Size and Length: Automatic): a retaining ring turns into the kind
+    that fits, the size is read off the diameter, no second hole is made, and the head sits
+    in the hole's counterbore or countersink. `given`: the options the caller set itself
+    (kept as they are). A flat face changes nothing."""
+    o = core.with_defaults(options)
+    if not place.get("rim"):
+        return o
+    standard = core.standard_for_place(o["standard"], place["is_hole"])
+    if standard != o["standard"]:
+        o = core.change_standard(o, standard)
+    if "size" not in given:
+        size = None
+        for diameter in (place.get("hole_diameter"), place.get("diameter")):
+            if diameter is None or size is not None:
+                continue
+            size = core.size_for_hole(
+                o["standard"], diameter, current=o["size"], is_hole=place["is_hole"]
+            )
+        if size is not None and size != o["size"]:
+            o["size"] = size
+            if "thread" not in given:
+                o["thread"] = ""
+            if core.has_length(o["standard"]):
+                o["length"] = core.fit_length(o["standard"], size, o.get("length"))
+    if "make_hole" not in given:
+        o["make_hole"] = False
+    if not o["make_hole"] and "sink_head" not in given:
+        o["sink_head"], o["seat"] = core.seat_for_hole(
+            o,
+            {
+                "is_hole": place["is_hole"],
+                "diameter": place["diameter"],
+                "hole_diameter": place["hole_diameter"],
+                "cbore_depth": place["cbore_depth"],
+                "cone": place["cone"],
+                "shoulder": place.get("shoulder", False),
+            },
+        )
+    return core.check(o)
+
+
 # -- the hole --------------------------------------------------------------------------------------
 def _hole_base(body, own_hole):
     if own_hole is not None and hole.owner_body(own_hole) is body:
@@ -502,6 +624,7 @@ def make(doc, pick, options, more=None):
         _save_meta(feature, meta)
     _material(body, options)
     _look(body, options)
+    mark_threads(feature)
     if body_target is not None:
         hole.show_tip(body_target)
     log(
@@ -556,6 +679,7 @@ def update(feature, pick=None, options=None, more=None):
     except Exception as exc:
         warn("hardware: %s" % exc)
     _save_meta(feature, meta)
+    mark_threads(feature)
     if component is not None:
         _rename_occurrences(feature, component)
     if before["kind"] != merged["kind"]:
