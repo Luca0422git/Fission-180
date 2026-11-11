@@ -1668,6 +1668,293 @@ def joint_ring_made():
     h.shot("10-oring-cap")
 
 
+# == 10: the End Cap joined to the Piston Body; Isolate (report 1722-1724) =========================
+def _plane_face(label, x_in):
+    shape = r.shape_of(label)
+    found = [
+        f
+        for f in shape.Faces
+        if f.Surface.TypeId == "Part::GeomPlane" and abs(f.CenterOfMass.x - x_in * IN) < 0.05
+    ]
+    return max(found, key=lambda f: f.Area) if found else None
+
+
+def joint_pick_cap_head():
+    from Fission180Tests.gui import book_joints_steps as bj
+
+    r.cube_click("home")
+    h.fit()
+    face = _plane_face("End Cap", CAP_X1)
+    spot = r.seen_spot(face) if face is not None else None
+    if not h.check("the face under the End Cap's head is in view", spot is not None):
+        return
+    bj.hover_point(spot)
+    hot = bj.hot(j.joint_panel())
+    h.check(
+        "its lit snap is on the axis, under the head",
+        hot is not None and (hot["point"] - V(CAP_X1 * IN, 0, 0)).Length < 1e-4,
+        hot and (hot["kind"], hot["point"]),
+    )
+    h.click(spot)
+
+
+def joint_pick_body_end():
+    from Fission180Tests.gui import book_joints_steps as bj
+
+    p = j.joint_panel()
+    h.check("the End Cap is component 1", p.snaps["comp1"] is not None and p.active == "comp2")
+    r.orbit(-260, 0)  # the Piston Body's end face comes into view
+    face = _plane_face("Piston Body", 0.0)
+    spot = r.seen_spot(face) if face is not None else None
+    if not h.check("the Piston Body's end face is in view", spot is not None, r.looking()):
+        return
+    bj.hover_point(spot)
+    hot = bj.hot(p)
+    # (the threaded hole's mouth is not round any more: its centre must still be the axis)
+    h.check(
+        "its lit snap is on the axis, at the body's end",
+        hot is not None and (hot["point"] - V(0, 0, 0)).Length < 1e-4,
+        hot and (hot["kind"], hot["point"]),
+    )
+    h.click(spot)
+
+
+def joint_cap_ok():
+    p = j.joint_panel()
+    h.check("both sides are picked", p.snaps["comp1"] is not None and p.snaps["comp2"] is not None)
+    h.check("no problem shown", p.message.text() == "", p.message.text())
+    r.ok()
+
+
+joint_cap_ok.done = lambda: j.joint_panel() is None
+joint_cap_ok.done_what = "the Joint dialog closed"
+
+CAP_HOME = [-CAP_HEAD * IN, -R_OUT * IN, -R_OUT * IN, CAP_SHANK * IN, R_OUT * IN, R_OUT * IN]
+
+
+def cap_joined():
+    # report 1722: "it moved 1 in and the O-ring (rigidly joined) moved with it"
+    r.check_box("the End Cap moved 1 in: its head on the body's end, the shank inside", "End Cap", CAP_HOME)
+    box = _ring_box(ORING_CAP)
+    seat = ORING_CS / 2 * IN
+    h.check("the O-ring came with it", abs((box[0] + box[3]) / 2 - seat) < 1e-3 and abs(box[1] + box[4]) < 1e-3, box)
+    r.check_box("the grounded Piston Body stayed", "Piston Body", [0, -R_OUT * IN, -R_OUT * IN, 4 * IN, R_OUT * IN, R_OUT * IN])
+    rigid = [x.Label for x in j.joint_list() if x.Label.startswith("Rigid")]
+    h.check("two Rigid joints", len(rigid) == 2, [x.Label for x in j.joint_list()])
+    inch("the End Cap's Joint")
+    r.timeline_ok("the End Cap's Joint")
+    r.cube_click("home")
+    h.fit()
+    h.shot("10-cap-joined")
+
+
+def _shown(label):
+    return all(t.shown(b) for b in r.bodies_of(label)) and t.shown(r.part(label))
+
+
+def isolate_cap():
+    S["menu"] = [e[0] for e in t.row_menu_entries("End Cap")]
+    t.row_menu("End Cap", "Isolate")
+
+
+def isolated_cap():
+    h.check("the menu offers Isolate", "Isolate" in S["menu"], S["menu"])
+    h.check("only the End Cap is shown", _shown("End Cap") and not _shown("Piston Body") and not t.shown(r.part(ORING_CAP)))
+    S["menu"] = [e[0] for e in t.row_menu_entries("End Cap")]
+    h.shot("10-isolated")
+    # (the book: Unisolate; the same entry under Fission 180's own name)
+    t.row_menu("End Cap", "Exit Isolate")
+
+
+def unisolated():
+    h.check("the isolated row offers Exit Isolate", "Exit Isolate" in S["menu"], S["menu"])
+    h.check("everything is shown again", _shown("End Cap") and _shown("Piston Body") and t.shown(r.part(ORING_CAP)))
+    look_is("Aluminium, anodized blue", "Piston Body", "Exit Isolate")  # report 1744
+    look_is("Brass", "End Cap", "Exit Isolate")
+    inch("Isolate")
+
+
+# == 11: Piston End and Piston (report 1725-1733) ===================================================
+# Stand-ins: the knob "Piston End" d0.70 x 0.75 at the body's open end (x 4 to 4.75), and the
+# "Piston" rod d5/16 from x 1 to 4.5 with the O-ring's groove 0.09 wide, its middle 5/32 from
+# the tip, its floor d0.208 (AS568-009).
+KNOB_X0, KNOB_T = 4.0, 0.75
+ROD_X0, ROD_LEN, R_ROD, R_GROOVE, GROOVE_W = 1.0, 3.5, 5.0 / 16 / 2, 0.208 / 2, 0.09
+ROD_LAND = 5.0 / 32 - GROOVE_W / 2
+KNOB_GRID = [(11, 0), (11, 1), (13, 1), (13, 0)]
+ROD_GRID = [(9, 0), (9, 2), (10, 2), (10, 1), (11, 1), (11, 2), (18, 2), (18, 0)]
+
+
+def draw(grid, key):
+    def step():
+        pitch = r.grid_pitch()
+        S["pitch"] = S["pitch_now"] = pitch
+        S["first"] = r.polyline([V(x * pitch, y * pitch, 0) for x, y in grid])
+        lines = [g for g in r.sk().Geometry[S["first"] :] if g.TypeId == "Part::GeomLineSegment"]
+        ends = sorted((round(g.StartPoint.x / pitch, 6), round(g.StartPoint.y / pitch, 6)) for g in lines)
+        h.check("every corner on the grid crossing that was clicked", ends == sorted(grid), ends)
+
+    return r.named(step, key + "_polyline")
+
+
+def _corner(index):
+    """Where line `index` of the polyline starts (a sketch point)."""
+    return V(r.sk().Geometry[_line(index)].StartPoint)
+
+
+def knob_dim_radius():
+    r.dimension([r.mid(_line(0))], _beside(0, -1.0, 0), "0.70/2")
+
+
+def knob_scaled():
+    sketch = r.sk()
+    App.Console.PrintMessage(
+        "[Fission 180] replay: knob sketch external %d constraints %s expressions %s\n"
+        % (
+            len(sketch.ExternalGeo),
+            [(c.Type, c.First, c.Second) for c in sketch.Constraints],
+            sketch.ExpressionEngine,
+        )
+    )
+    h.check("0.70/2 typed is 0.35 in", r.near(sketch.Geometry[_line(0)].length(), R_OUT * IN))
+    h.check("the whole sketch was scaled with it", r.near(sketch.Geometry[_line(1)].length(), 2 * R_OUT * IN, 1e-6))
+    S["pitch_now"] = R_OUT * IN
+    h.fit(iso=False)
+
+
+def knob_dim_thick():
+    r.dimension([r.mid(_line(1))], _beside(1, 0, 0.7), "0.75")
+
+
+def knob_dim_place():
+    # the knob's inner face is 4 in from the origin: that side's line, then the origin
+    at = r.mid(_line(0))
+    r.dimension([at, V(0, 0, 0)], V(at.x / 2.0, -0.8 * S["pitch_now"], 0), "4")
+
+
+def _profile_is(points, where):
+    sketch = r.sk()
+    got = sorted(
+        (round(g.StartPoint.x / IN, 5), round(g.StartPoint.y / IN, 5))
+        for g in sketch.Geometry[S["first"] :]
+        if g.TypeId == "Part::GeomLineSegment"
+    )
+    want = sorted((round(a, 5), round(b, 5)) for a, b in points)
+    h.check("%s: the profile has its numbers" % where, got == want, got)
+    r.fully_constrained(where)
+    inch(where + "'s dimensions")
+
+
+KNOB = [(KNOB_X0, 0), (KNOB_X0, R_OUT), (KNOB_X0 + KNOB_T, R_OUT), (KNOB_X0 + KNOB_T, 0)]
+
+
+def knob_dimensioned():
+    _profile_is(KNOB, "Piston End")
+    h.shot("10-knob-sketch")
+
+
+def revolve_axis_at(x_in):
+    def step():
+        p = _revolve()
+        h.check("the one profile is taken by itself", len(p.profiles) == 1, p.profiles)
+        h.fit()
+        h.click(V(x_in * IN, 0, 0))  # the X axis where it sticks out of the parts
+
+    return r.named(step, "revolve_axis")
+
+
+def revolve_new_body():
+    p = _revolve()
+    axis = p.axis
+    ok = axis is not None and "X_Axis" in str(getattr(axis[0], "Role", axis))
+    h.check("the X axis is the axis", ok, axis)
+    # report 1727: "the next Revolve then JOINED the piston rod into it"; pattern 3: "a new
+    # component's first extrude defaults to Cut"
+    operation = p.options.get("operation")
+    h.check("New Body by itself: the component is empty", operation in ("new_body", "new"), operation)
+    r.ok()
+
+
+revolve_new_body.done = lambda: _revolve() is None
+revolve_new_body.done_what = "the Revolve dialog closed"
+
+
+def knob_revolved():
+    r.check_volume("the knob, by Pappus", "Piston End", r.pappus([(a * IN, b * IN) for a, b in KNOB]), 1e-6)
+    box = [KNOB_X0 * IN, -R_OUT * IN, -R_OUT * IN, (KNOB_X0 + KNOB_T) * IN, R_OUT * IN, R_OUT * IN]
+    r.check_box("the knob at the body's open end", "Piston End", box)
+    r.check_box("the End Cap is where the joint put it", "End Cap", CAP_HOME)
+    inch("the knob's Revolve")
+    r.timeline_ok("the knob's Revolve")
+
+
+def rod_dim_land():
+    r.dimension([r.mid(_line(1))], _beside(1, 0, 1.0), "5/32-0.09/2")
+
+
+def rod_scaled():
+    sketch = r.sk()
+    h.check("5/32-0.09/2 typed is 0.11125 in", r.near(sketch.Geometry[_line(1)].length(), ROD_LAND * IN, 1e-9), sketch.Geometry[_line(1)].length() / IN)
+    S["pitch_now"] = ROD_LAND * IN
+    h.fit(iso=False)
+
+
+def rod_dim_groove():
+    App.Console.PrintMessage("[Fission 180] replay: rod tip after scale x=%.4f in\n" % (r.mid(_line(0)).x / IN))
+    r.dimension([r.mid(_line(3))], _beside(3, 0, -1.5), "0.09")
+
+
+def rod_dim_radius():
+    r.dimension([r.mid(_line(0))], _beside(0, -1.5, 0), "5/16/2")
+
+
+def rod_dim_floor():
+    r.dimension([r.mid(_line(3)), V(0, 0, 0)], _beside(3, 1.5, -3.0), "0.208/2")
+
+
+def rod_dim_length():
+    # tip to end: the two upright end lines
+    a, b = r.mid(_line(0)), r.mid(_line(6))
+    r.dimension([a, b], V((a.x + b.x) / 2.0, -2.0 * S["pitch_now"], 0), "3.5")
+
+
+def rod_dim_place():
+    # the tip is tied to the origin first (1 in from it), so that the dimensions after it
+    # move the rest of the profile and not the tip
+    at = r.mid(_line(0))
+    r.dimension([at, V(0, 0, 0)], V(at.x / 2.0, -3.5 * S["pitch_now"], 0), "1")
+
+
+def _rod():
+    x0, x1, x2, x3 = ROD_X0, ROD_X0 + ROD_LAND, ROD_X0 + ROD_LAND + GROOVE_W, ROD_X0 + ROD_LEN
+    return [(x0, 0), (x0, R_ROD), (x1, R_ROD), (x1, R_GROOVE), (x2, R_GROOVE), (x2, R_ROD), (x3, R_ROD), (x3, 0)]
+
+
+def rod_dimensioned():
+    sketch = r.sk()
+    App.Console.PrintMessage(
+        "[Fission 180] replay: rod first %s constraints %s\n"
+        % (S["first"], [(c.Type, c.First, c.FirstPos, c.Second, c.SecondPos, round(c.Value / IN, 4)) for c in sketch.Constraints if c.Type.startswith("Dist")])
+    )
+    _profile_is(_rod(), "Piston")
+    h.shot("10-rod-sketch")
+
+
+def rod_revolved():
+    want = r.pappus([(a * IN, b * IN) for a, b in _rod()])
+    S["v_rod"] = want
+    r.check_volume("the rod with its groove, by Pappus", "Piston", want, 1e-6)
+    # report 1725-1730 (bug 9): the Piston End's body was MOVED into Piston and the rod joined it
+    h.check("one body in Piston, one in Piston End", len(r.bodies_of("Piston")) == 1 and len(r.bodies_of("Piston End")) == 1)
+    r.check_volume("the knob is as it was (nothing joined it)", "Piston End", r.pappus([(a * IN, b * IN) for a, b in KNOB]), 1e-6)
+    box = [ROD_X0 * IN, -R_ROD * IN, -R_ROD * IN, (ROD_X0 + ROD_LEN) * IN, R_ROD * IN, R_ROD * IN]
+    r.check_box("the rod inside the Piston Body's bore", "Piston", box)
+    look_is("Aluminium, anodized blue", "Piston Body", "the rod's Revolve")
+    inch("the rod's Revolve")
+    r.timeline_ok("the rod's Revolve")
+    h.shot("10-rod-revolved")
+
+
 def steps():
     return r.stages(
         "replay_10",
@@ -1851,6 +2138,67 @@ def steps():
                     joint_ring_offset,
                     joint_ring_ok,
                     joint_ring_made,
+                ],
+            ),
+            (
+                "assemble",
+                [
+                    joint_start,
+                    joint_pick_cap_head,
+                    joint_pick_body_end,
+                    joint_cap_ok,
+                    cap_joined,
+                    isolate_cap,
+                    isolated_cap,
+                    unisolated,
+                ],
+            ),
+            (
+                "piston_end",
+                component_steps("Piston End", "knob")
+                + [
+                    create_sketch,
+                    sketch_on_xy,
+                    draw(KNOB_GRID, "knob"),
+                    knob_dim_radius,
+                    knob_scaled,
+                    knob_dim_thick,
+                    knob_dim_place,
+                    knob_dimensioned,
+                    r.finish_sketch,
+                    cap_revolve_open,
+                    revolve_axis_at(5.3),
+                    revolve_new_body,
+                    knob_revolved,
+                    root_activate,
+                    group_loose_first,
+                    group_loose_last,
+                    group_loose_create,
+                    group_rename("Piston End"),
+                    group_name("Piston End"),
+                    grouped("Piston End"),
+                ],
+            ),
+            (
+                "piston",
+                component_steps("Piston", "rod")
+                + [
+                    create_sketch,
+                    sketch_on_xy,
+                    draw(ROD_GRID, "rod"),
+                    rod_dim_land,
+                    rod_scaled,
+                    rod_dim_place,
+                    rod_dim_groove,
+                    rod_dim_radius,
+                    rod_dim_floor,
+                    rod_dim_length,
+                    rod_dimensioned,
+                    r.finish_sketch,
+                    cap_revolve_open,
+                    revolve_axis_at(5.3),
+                    revolve_new_body,
+                    rod_revolved,
                 ],
             ),
         ],
