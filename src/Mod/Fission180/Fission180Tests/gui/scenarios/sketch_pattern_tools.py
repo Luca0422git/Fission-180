@@ -362,6 +362,8 @@ def c_before_drag2():
 # -- D: OK -------------------------------------------------------------------------------------------
 def d_ok():
     s["undo"] = len(App.ActiveDocument.UndoNames)
+    s["sk"].solve()
+    s["dof"] = s["sk"].DoF
     click_widget("Fission180PatternOK")
 
 
@@ -383,8 +385,16 @@ def d_made():
     h.check("D: every copy exactly 8 / 12 apart", not missing, missing[:4])
     kinds = si.constraint_types(sk)
     h.check("D: the copies' corners are joined (Coincident copied)", kinds.count("Coincident") >= 4 * 8, kinds.count("Coincident"))
-    h.check("D: level and upright as the original", kinds.count("Horizontal") >= 16 and kinds.count("Vertical") >= 16,
-            (kinds.count("Horizontal"), kinds.count("Vertical")))
+    # (wave 7: the copies are TIED to the original point by point, sketch_pattern_ties.py;
+    # they no longer carry Horizontal / Vertical of their own, they follow the original's)
+    made = sk.Geometry[s["count"]:]
+    level = [g for g in made if abs(g.StartPoint.y - g.EndPoint.y) < 1e-9]
+    upright = [g for g in made if abs(g.StartPoint.x - g.EndPoint.x) < 1e-9]
+    h.check("D: level and upright as the original", len(level) == 14 and len(upright) == 14,
+            (len(level), len(upright)))
+    before = sk.DoF
+    h.check("D: the copies add no freedom (tied to the original)", sk.solve() == 0 and sk.DoF == s["dof"],
+            (sk.DoF, s.get("dof"), before))
     h.check("D: the sketch solves", sk.solve() == 0)
     h.check("D: no conflicting or redundant constraints",
             not list(sk.ConflictingConstraints) and not list(sk.RedundantConstraints),
@@ -551,11 +561,18 @@ def f_ok():
 def f_made():
     h.settle("the pattern")
     sk = s["sk"]
-    h.check("F: 3 new circles", len(sk.Geometry) == s["count"] + 3, len(sk.Geometry))
-    centres = [(g.Center.x, g.Center.y) for g in sk.Geometry[s["count"]:]]
+    # (wave 7: the copies are tied to the original through hidden helper lines from the
+    # centre, sketch_pattern_ties.py: counted apart from the curves a person sees)
+    from fission180 import sketch_helpers
+
+    unseen = sketch_helpers.hidden(sk)
+    new = [g for i, g in enumerate(sk.Geometry) if i >= s["count"] and i not in unseen]
+    h.check("F: 3 new circles", len(new) == 3 and all(g.TypeId == "Part::GeomCircle" for g in new), len(new))
+    h.check("F: the helper lines that tie them are hidden", len(unseen) == 4, len(unseen))
+    centres = [(g.Center.x, g.Center.y) for g in new]
     for want in ((0, 15), (-15, 0), (0, -15)):
         h.check("F: a copy exactly at %s" % (want,), any(math.dist(c, want) < 1e-9 for c in centres), centres)
-    radii = [g.Radius for g in sk.Geometry[s["count"]:]]
+    radii = [g.Radius for g in new]
     h.check("F: the copies have the original's radius", all(abs(r - 2.0) < 1e-9 for r in radii), radii)
     ties = [c for c in sk.Constraints if c.Type == "Equal" and 4 in (c.First, c.Second)]
     h.check("F: each copy is Equal to the original (its Radius holds them)", len(ties) == 3, len(ties))

@@ -34,12 +34,19 @@ and Rectangular Pattern opened a small box (quantity and spacing only). Now:
   its preview, handles, wheel and panel go when it ends.
 
 The copies are exact copies of the picked curves, moved or turned by Part's geometry
-transform (no solver involved), the way the body patterns place theirs (pattern_core). They
-keep the originals' shape (sketch_pattern_core.copied_constraints: the constraints among
-the picked curves, a size dimension of an original as Equal between it and every copy);
-where they are is not constrained (Fusion's pattern constraint has no FreeCAD equivalent),
-so they stay put until moved. FreeCAD's addRectangularArray is not used: it cannot do a
-direction other than at right angles, Symmetric or a circle.
+transform, the way the body patterns place theirs (pattern_core), and TIED to the originals
+(wave 7, the book parity report; sketch_pattern_ties.py): they follow the original and a
+later dimension, and a sketch that was fully constrained stays so, like Fusion's pattern
+(until wave 7 the copies were only Equal to the original: free to move, 25 to 79 loose
+degrees of freedom in the book's sketches, profiles that did not close by micrometres).
+Splines, ellipses and conic curves cannot be tied (the solver has no handle on their
+shape): their copies keep their shape (sketch_pattern_core.copied_constraints) and stay
+where they are put. FreeCAD's addRectangularArray is not used: it cannot do a direction
+other than at right angles, Symmetric or a circle.
+
+Suppression (Fusion: a check box over each instance): tick Suppression in the panel, then
+click the copies to leave out (a click brings one back). Symmetric: Quantity is the number
+of instances in all (sketch_pattern_core).
 
 The maths: sketch_pattern_core (unit tested). Never lets an exception out of an event
 handler: every handler warns and carries on.
@@ -57,6 +64,7 @@ from .compat import QtCore, QtWidgets
 from .pattern_core import PatternError
 
 OBJECTS, CENTER, DIRECTION, DIRECTION2 = "objects", "center", "direction", "direction2"
+SUPPRESS = "suppress"  # clicks leave copies out / bring them back
 LINE_TYPE = "Part::GeomLineSegment"
 PERPENDICULAR = "perpendicular"  # Direction 2 at right angles to Direction 1
 DISTANCE_TYPES = [("Extent", "extent"), ("Spacing", "spacing")]
@@ -255,6 +263,8 @@ class _PatternTool(draw.DrawTool):
         self._pos = None
         self._wheel = None
         self._copies_cache = None  # (moves, objects, polylines of the copies)
+        self.suppressed = set()  # indices (into the moves) of the copies left out
+        self.untied = []  # the curves whose copies could not be tied (splines, ellipses)
         self._defaults()
 
     def _defaults(self):
@@ -297,7 +307,34 @@ class _PatternTool(draw.DrawTool):
         return []
 
     def ready(self):
-        return bool(self.objects) and not self.error and bool(self.moves_now)
+        return bool(self.objects) and not self.error and bool(self.kept_moves())
+
+    def kept_moves(self):
+        """The moves of the copies that are made (not suppressed), in order."""
+        return [m for i, m in enumerate(self.moves_now) if i not in self.suppressed]
+
+    def set_suppressing(self, on):
+        """Suppression in the panel: clicks on copies leave them out / bring them back."""
+        self.field = SUPPRESS if on else OBJECTS
+        self.hover = None
+        self._changed()
+
+    def toggle_suppressed(self, index):
+        if index in self.suppressed:
+            self.suppressed.discard(index)
+        else:
+            self.suppressed.add(index)
+        log(
+            "%s: copy %d %s"
+            % (self.title, index + 1, "left out" if index in self.suppressed else "back")
+        )
+        self._changed()
+
+    def copy_at(self, raw):
+        """The index of the copy under the pointer (its preview), or None."""
+        originals = self.originals()
+        copies = [[core.apply_all(move, poly) for poly in originals] for move in self.moves_now]
+        return core.nearest_copy(raw, copies, draw.pick_pixels() * self._px())
 
     # -- what can be picked ---------------------------------------------------------------
     def _helpers(self):
@@ -412,6 +449,7 @@ class _PatternTool(draw.DrawTool):
             self.error = str(exc)
         except Exception as exc:
             self.error = "This pattern cannot be made: %s" % exc
+        self.suppressed = {i for i in self.suppressed if i < len(self.moves_now)}
 
     def moves(self):
         return []
@@ -424,14 +462,22 @@ class _PatternTool(draw.DrawTool):
         """Polylines of the copies, where they will be (kept until the moves or the Objects
         change: a hover redraws the preview without working the copies out again)."""
         cache = self._copies_cache
-        if cache is None or cache[0] is not self.moves_now or cache[1] != tuple(self.objects):
+        key = (tuple(self.objects), tuple(sorted(self.suppressed)))
+        if cache is None or cache[0] is not self.moves_now or cache[1] != key:
             originals = self.originals()
-            out = []
-            for move in self.moves_now:
+            out, left_out = [], []
+            for index, move in enumerate(self.moves_now):
                 for poly in originals:
-                    out.append(core.apply_all(move, poly))
-            cache = self._copies_cache = (self.moves_now, tuple(self.objects), out)
+                    (left_out if index in self.suppressed else out).append(
+                        core.apply_all(move, poly)
+                    )
+            cache = self._copies_cache = (self.moves_now, key, out, left_out)
         return list(cache[2])
+
+    def suppressed_copies(self):
+        """Polylines of the copies left out (Suppression), shown struck out (red)."""
+        self.copies()
+        return list(self._copies_cache[3])
 
     def _guides(self):
         return []
@@ -441,13 +487,15 @@ class _PatternTool(draw.DrawTool):
             sketch = self.sketch
             picked = self.originals()
             hover = [draw.curve_points(sketch, self.hover)] if self.hover is not None else []
+            if self.field == SUPPRESS:
+                hover = []
             drops = self.field == OBJECTS and self.hover in self.objects
             self.preview.show(
                 curves=self.copies(),
                 picked=picked + [p for p in self._guides() if p],
                 guides=list(extra_guides),
                 marks=[p for p in hover if p] if not drops else [],
-                remove=[p for p in hover if p] if drops else [],
+                remove=([p for p in hover if p] if drops else []) + self.suppressed_copies(),
                 points=self._points(),
             )
         except Exception as exc:
@@ -673,6 +721,13 @@ class _PatternTool(draw.DrawTool):
         self._picked(hit)
 
     def _picked(self, hit):
+        if self.field == SUPPRESS:
+            index = self.copy_at(self.last.raw) if self.last is not None else None
+            if index is None:
+                self.say("Suppression: click a copy to leave it out (again to bring it back).")
+                return
+            self.toggle_suppressed(index)
+            return
         if self.field == OBJECTS:
             if hit is None:
                 self.say("click a curve of the sketch to repeat it.")
@@ -696,6 +751,10 @@ class _PatternTool(draw.DrawTool):
             self.accept()
 
     def accept(self):
+        if self.panel is not None:
+            # a value typed into a field and not yet taken (the report: a typed Quantity 4
+            # kept the old 3 until the field was committed: OK never takes the keyboard)
+            self.panel.commit()
         if not self.objects:
             self.say("click the curves to repeat first.")
             return
@@ -704,21 +763,37 @@ class _PatternTool(draw.DrawTool):
             self.say(self.error)
             self._changed()
             return
-        if not self.moves_now:
-            self.say(self.prompt())
+        if not self.kept_moves():
+            self.say(
+                "every copy is left out (Suppression): bring one back."
+                if self.moves_now
+                else self.prompt()
+            )
             return
         self.make()  # one undo step; ends the tool when it worked
         if self.active:
             self.say("the sketch did not take the pattern (the report says why).")
+            return
+        if self.untied:
+            from . import commands
+
+            commands.tell(
+                "%s: splines, ellipses and conic curves cannot be tied to their original "
+                "(the sketch solver has no handle on them): %d cop%s of such a curve keep "
+                "their shape and stay where they are; dimension them if they must not move."
+                % (self.title, len(self.untied), "y" if len(self.untied) == 1 else "ies")
+            )
 
     # -- making it -------------------------------------------------------------------------------
     def build(self, construction):
-        """The copies (exact: Part's geometry transform), their constraints to add if they
-        fit (DrawTool.make adds them with sketch_explain.add_checked)."""
+        """The copies (exact: Part's geometry transform) and what ties them to the originals
+        (sketch_pattern_ties): added here, kept out of sight, checked."""
         import Sketcher
 
+        from . import sketch_explain, sketch_helpers, sketch_pattern_ties
+
         sketch = self.sketch
-        moves = self.moves()
+        moves = self.kept_moves()
         geos = sketch.Geometry
         picked = [g for g in self.objects if 0 <= g < len(geos)]
         with_helpers = {
@@ -745,15 +820,27 @@ class _PatternTool(draw.DrawTool):
             if bool(sketch.getConstruction(first + i)) != want:
                 sketch.setConstruction(first + i, want)
         made = list(range(first, first + len(copies)))
-        ties = []
         turns = self.kind == "circular"
-        for m in range(len(moves)):
-            mapping = {g: first + m * count + k for k, g in enumerate(picked)}
-            copied, tied = core.copied_constraints(items, mapping, turns=turns)
+        mappings = [
+            {g: first + m * count + k for k, g in enumerate(picked)} for m in range(len(moves))
+        ]
+        # the copies of curves that can be tied (lines, circles, arcs, points) follow their
+        # originals; the others (splines, ellipses) keep their shape as before
+        ties, lines, tied, untied = sketch_pattern_ties.build(
+            sketch, picked, moves, mappings, getattr(self, "center", None)
+        )
+        loose = set(untied)
+        shape = []
+        for mapping in mappings:
+            copied, sized = core.copied_constraints(items, mapping, turns=turns)
+            by_copy = {v: k for k, v in mapping.items()}
             for kind, args in copied:
-                ties.append(Sketcher.Constraint(kind, *args))
-            for kind, (a, b) in tied:
-                ties.append(Sketcher.Constraint(kind, a, b))
+                # (what joins or shapes a curve that cannot be tied; the tied ones need none)
+                if any(by_copy.get(a) in loose for a in args if isinstance(a, int)):
+                    shape.append(Sketcher.Constraint(kind, *args))
+            for kind, (a, b) in sized:
+                if a in loose:
+                    shape.append(Sketcher.Constraint(kind, a, b))
             for g in picked:
                 if g in with_helpers:
                     try:
@@ -761,18 +848,45 @@ class _PatternTool(draw.DrawTool):
                     except Exception as exc:
                         warn("%s: %s" % (self.title, exc))
         self.made = made
-        return ties
+        self.untied = [g for g in untied if g not in self._helpers()]
+        if lines:
+            sketch_helpers.hide(sketch, lines)
+            sketch_helpers.made(self.session)
+        start = len(sketch.Constraints)
+        if ties:
+            # they are right by construction; should the sketch not take them all (curves
+            # tied to each other in a way the plan does not know), they are tried one by one
+            sketch.addConstraint(ties)
+            code = sketch.solve()
+            if code != 0 or sketch.RedundantConstraints or sketch.ConflictingConstraints:
+                for i in range(len(sketch.Constraints) - 1, start - 1, -1):
+                    sketch.delConstraint(i, True)
+                kept = sketch_explain.add_checked(sketch, ties)
+                log("%s: %d of %d ties fit" % (self.title, len(kept), len(ties)))
+        hidden = list(range(start, len(sketch.Constraints)))
+        if hidden:
+            try:
+                sketch.setVirtualSpace(hidden, True)  # Fusion shows a pattern, not its ties
+            except Exception:
+                pass
+        self.tied_count = len(hidden)
+        return shape
 
     def after_make(self, kept):
+        made = len(self.kept_moves())
         log(
-            "%s: %d curve(s) repeated, %d cop%s (%d constraint(s) tie them: %s)"
+            "%s: %d curve(s) repeated, %d cop%s, %d left out (%d hidden constraint(s) tie "
+            "them to the originals, %d shape constraint(s); the sketch has %s degree(s) of "
+            "freedom)"
             % (
                 self.title,
                 len(self.objects),
-                len(self.moves_now),
-                "y" if len(self.moves_now) == 1 else "ies",
+                made,
+                "y" if made == 1 else "ies",
+                len(self.suppressed),
+                getattr(self, "tied_count", 0),
                 len(kept),
-                ", ".join(sorted({c.Type for c in kept})) or "none",
+                getattr(self.sketch, "DoF", "?"),
             )
         )
 
@@ -785,6 +899,7 @@ class _PatternTool(draw.DrawTool):
                 "values": dict(self.values),
                 "error": self.error,
                 "made": list(self.made),
+                "suppressed": sorted(self.suppressed),
                 "handles": sorted(self.looks),
             }
         )
@@ -825,6 +940,8 @@ class SketchRectangularPattern(_PatternTool):
             return "click a line for the direction (a line, an axis or a projected line)."
         if self.error:
             return self.error
+        if self.field == SUPPRESS:
+            return "click a copy to leave it out (again to bring it back)."
         return "drag the arrows or type the values; OK or Enter makes the pattern."
 
     # -- directions -------------------------------------------------------------------------
@@ -988,6 +1105,8 @@ class SketchCircularPattern(_PatternTool):
             return "click Center Point's Select in the panel, then the centre point."
         if self.error:
             return self.error
+        if self.field == SUPPRESS:
+            return "click a copy to leave it out (again to bring it back)."
         return "drag the disc round or type the values; OK or Enter makes the pattern."
 
     def _after_preselection(self):
@@ -1200,6 +1319,14 @@ class PatternPanel(theme.OwnBackground, QtWidgets.QFrame):
             self.angle_label = QtWidgets.QLabel("Total Angle")
             layout.addRow(self.angle_label, field.widget)
             self.fields["angle"] = field
+        self.suppression = QtWidgets.QCheckBox("Suppression")
+        self.suppression.setObjectName("Fission180PatternSuppression")
+        self.suppression.setToolTip(
+            "Leave copies out: tick this, then click the copies to leave out (a click on "
+            "one left out brings it back)"
+        )
+        self.suppression.toggled.connect(self._suppressing)
+        layout.addRow(self.suppression)
         self.message = QtWidgets.QLabel("")
         self.message.setObjectName("Fission180PatternMessage")
         self.message.setWordWrap(True)
@@ -1275,6 +1402,17 @@ class PatternPanel(theme.OwnBackground, QtWidgets.QFrame):
         except Exception as exc:
             warn("%s: %s" % (self.tool.title, exc))
 
+    def _suppressing(self, on):
+        if self._quiet:
+            return
+        try:
+            self.tool.set_suppressing(bool(on))
+            gl = self.tool.session.gl
+            if gl is not None and not self.tool.session.closed:
+                gl.setFocus()
+        except Exception as exc:
+            warn("%s: %s" % (self.tool.title, exc))
+
     def _chosen(self, key, box):
         if self._quiet:
             return
@@ -1310,6 +1448,18 @@ class PatternPanel(theme.OwnBackground, QtWidgets.QFrame):
                 text = "⚠ " + tool.error
             elif tool.objects and tool.kind == "circular" and tool.center_point() is None:
                 text = "Next: Center Point, then click the point to turn about."
+            elif tool.field == SUPPRESS or tool.suppressed:
+                text = "Suppression: %d of %d cop%s left out (shown red). Click a copy." % (
+                    len(tool.suppressed),
+                    len(tool.moves_now),
+                    "y" if len(tool.moves_now) == 1 else "ies",
+                )
+            if self.suppression.isChecked() != (tool.field == SUPPRESS):
+                self._quiet = True
+                try:
+                    self.suppression.setChecked(tool.field == SUPPRESS)
+                finally:
+                    self._quiet = False
             self.message.setText(text)
             self.message.setVisible(bool(text))
         except RuntimeError:
@@ -1358,6 +1508,16 @@ class PatternPanel(theme.OwnBackground, QtWidgets.QFrame):
             full = tool.values.get("circular_type") == "full"
             self.fields["angle"].widget.setVisible(not full)
             self.angle_label.setVisible(not full)
+
+    def commit(self):
+        """Take what is typed in a field and not committed yet (a Quantity typed with the
+        keyboard counts when Enter is pressed or the field is left; OK must take it too)."""
+        for widget in self.fields.values():
+            try:
+                if isinstance(widget, QtWidgets.QSpinBox):
+                    widget.interpretText()
+            except Exception as exc:
+                warn("%s: %s" % (self.tool.title, exc))
 
     def keyPressEvent(self, event):
         try:

@@ -132,7 +132,15 @@ class Geometry:
         # (geo, curve) for "which curve is under the pointer" (axes -1, -2 first)
         self.hits = [(-1, curves[0]), (-2, curves[1])]
         items = [("point", -1, (0.0, 0.0))]  # snap point descriptions (sketch_infer_core)
+        try:
+            from . import sketch_helpers
+
+            unseen = sketch_helpers.hidden(sketch)  # (hidden helper lines: never snapped to)
+        except Exception:
+            unseen = set()
         for i, geo in enumerate(sketch.Geometry):
+            if i in unseen:
+                continue
             try:
                 construction = bool(sketch.getConstruction(i))
             except Exception:

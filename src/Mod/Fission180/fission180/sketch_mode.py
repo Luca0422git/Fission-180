@@ -670,6 +670,12 @@ def _start(sketch):
     try:
         _state["session"] = SketchSession(sketch)
         log("sketch %s: Fusion sketch mode on" % sketch.Label)
+        try:
+            from . import sketch_helpers
+
+            sketch_helpers.opened(_state["session"])  # hidden helper lines stay unseen
+        except Exception as exc:
+            warn("sketch helper lines: %s" % exc)
     except Exception as exc:
         warn("sketch mode: %s" % exc)
 

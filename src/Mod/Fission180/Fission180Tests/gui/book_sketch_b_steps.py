@@ -167,3 +167,60 @@ def undo_names():
 
 def mid(g):
     return g.value((g.FirstParameter + g.LastParameter) / 2.0)
+
+
+# -- a tool's panel at the top of the sketch panel ------------------------------------------------
+def panel(name):
+    """The visible panel called `name` (a tool's panel in the sketch panel), or None."""
+    w = Gui.getMainWindow().findChild(QtWidgets.QFrame, name)
+    return w if w is not None and w.isVisible() else None
+
+
+def in_panel(panel_name, name):
+    p = panel(panel_name)
+    return p.findChild(QtWidgets.QWidget, name) if p is not None else None
+
+
+def panel_click(panel_name, name):
+    """A real click on the panel's widget `name`."""
+    from PySide6 import QtTest
+
+    w = in_panel(panel_name, name)
+    if not h.check("%s has %s" % (panel_name, name), w is not None and w.isVisible()):
+        return
+    spot = w.rect().center()
+    if isinstance(w, QtWidgets.QCheckBox):
+        spot = QtCore.QPoint(10, w.height() // 2)  # its box (the row is wider than its text)
+    h.pointer_to(w, spot)
+    QtTest.QTest.mouseClick(w, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, spot)
+    QtWidgets.QApplication.processEvents()
+
+
+def panel_type(panel_name, name, text, enter=True):
+    """Click into the panel's field `name`, replace its text by typing; Enter only when
+    asked (a value typed and left uncommitted is what a person often does)."""
+    from PySide6 import QtTest
+
+    w = in_panel(panel_name, name)
+    if not h.check("%s has %s" % (panel_name, name), w is not None):
+        return
+    w.setFocus()
+    QtTest.QTest.mouseClick(w, QtCore.Qt.LeftButton)
+    QtTest.QTest.keyClick(w, QtCore.Qt.Key_A, QtCore.Qt.ControlModifier)
+    QtTest.QTest.keyClicks(w, str(text))
+    if enter:
+        QtTest.QTest.keyClick(w, QtCore.Qt.Key_Return)
+    QtWidgets.QApplication.processEvents()
+
+
+def panel_choose(panel_name, name, text):
+    from Fission180Tests.gui import blend_steps
+
+    w = in_panel(panel_name, name)
+    if h.check("%s has %s" % (panel_name, name), w is not None):
+        blend_steps.choose(w, text)
+
+
+def dof():
+    sk().solve()
+    return sk().DoF

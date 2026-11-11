@@ -147,15 +147,22 @@ def signed_angle(r1, r2):
 
 
 # -- where the label goes -------------------------------------------------------------------------
+def level_stretch(kind, p1, p2):
+    """The stretch a dimension between p1 and p2 is drawn along: the two points for an
+    aligned one; for a horizontal (vertical) one the level (upright) stretch through the
+    SECOND point (FreeCAD 1.1.4 measures a label's distance from there: seen on screen)."""
+    if kind == HORIZONTAL:
+        return (p1[0], p2[1]), p2
+    if kind == VERTICAL:
+        return (p2[0], p1[1]), p2
+    return p1, p2
+
+
 def linear_label(kind, p1, p2, cursor):
     """(LabelDistance, LabelPosition) that put a length dimension's text at the pointer, the
     way FreeCAD places it: off the middle of the measured stretch p1 -> p2 (for a horizontal
-    or vertical dimension: of its level or upright stretch)."""
-    q = p2
-    if kind == HORIZONTAL:
-        q = (p2[0], p1[1])
-    elif kind == VERTICAL:
-        q = (p1[0], p2[1])
+    or vertical dimension: of its level or upright stretch, level_stretch)."""
+    p1, q = level_stretch(kind, p1, p2)
     d = _sub(q, p1)
     length = _len(d)
     if length < EPS:

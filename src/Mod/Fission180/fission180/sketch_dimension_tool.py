@@ -722,11 +722,7 @@ def label_point(sketch, index):
     pair = measured_points(sketch, index)
     if pair is None:
         return None
-    p1, p2 = pair
-    if c.Type == "DistanceX":
-        p2 = (p2[0], p1[1])
-    elif c.Type == "DistanceY":
-        p2 = (p1[0], p2[1])
+    p1, p2 = core.level_stretch(c.Type, pair[0], pair[1])
     d = (p2[0] - p1[0], p2[1] - p1[1])
     length = math.hypot(*d)
     if length < 1e-9:
@@ -783,11 +779,7 @@ def dimension_at(session, pos):
             pair = measured_points(sketch, index)
         if spot is None or pair is None:
             continue
-        p1, p2 = pair
-        if c.Type == "DistanceX":
-            p2 = (p2[0], p1[1])
-        elif c.Type == "DistanceY":
-            p2 = (p1[0], p2[1])
+        p1, p2 = core.level_stretch(c.Type, pair[0], pair[1])
         try:
             cx, cy = pixel(spot)
             ax, ay = pixel(p1)

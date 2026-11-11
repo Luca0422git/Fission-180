@@ -96,10 +96,14 @@ class Labels(unittest.TestCase):
         self.assertAlmostEqual(distance, 4.0)
         self.assertAlmostEqual(position, 2.0)
 
-    def test_horizontal_label_uses_the_level_stretch(self):
+    def test_horizontal_label_uses_the_level_stretch_through_the_second_point(self):
+        # FreeCAD 1.1.4 draws a horizontal distance level with its SECOND point (y = 6)
         distance, position = dc.linear_label(dc.HORIZONTAL, (0, 0), (10, 6), (5, -3))
-        self.assertAlmostEqual(distance, -3.0)
+        self.assertAlmostEqual(distance, -9.0)
         self.assertAlmostEqual(position, 0.0)
+        self.assertEqual(dc.level_stretch(dc.HORIZONTAL, (0, 0), (10, 6)), ((0, 6), (10, 6)))
+        self.assertEqual(dc.level_stretch(dc.VERTICAL, (0, 0), (10, 6)), ((10, 0), (10, 6)))
+        self.assertEqual(dc.level_stretch(dc.ALIGNED, (0, 0), (10, 6)), ((0, 0), (10, 6)))
 
     def test_radial_label(self):
         distance, angle = dc.radial_label((0, 0), 5.0, (0, 9))

@@ -38,9 +38,23 @@ class RectMoves(unittest.TestCase):
         expect = sorted((10.0 * i, 15.0 * j) for i in range(3) for j in range(3))[1:]
         self.assertEqual(offsets(moves), expect)
 
-    def test_symmetric(self):
-        moves = core.rect_moves((1, 0), 2, 7.0, (0, 1), 1, 1.0, "spacing", "symmetric")
+    def test_symmetric_quantity_is_the_number_of_instances(self):
+        # the book (wave 7): Rectangular Pattern, Symmetric, Quantity 5: five holes, the
+        # original in the middle (it used to count each side: 9)
+        moves = core.rect_moves((1, 0), 5, 2.0, (0, 1), 1, 1.0, "spacing", "symmetric")
+        self.assertEqual(offsets(moves), [(-4.0, 0.0), (-2.0, 0.0), (2.0, 0.0), (4.0, 0.0)])
+        moves = core.rect_moves((1, 0), 3, 7.0, (0, 1), 1, 1.0, "spacing", "symmetric")
         self.assertEqual(offsets(moves), [(-7.0, 0.0), (7.0, 0.0)])
+
+    def test_symmetric_extent_spans_the_whole_pattern(self):
+        moves = core.rect_moves((1, 0), 5, 20.0, (0, 1), 1, 1.0, "extent", "symmetric")
+        self.assertEqual(offsets(moves), [(-10.0, 0.0), (-5.0, 0.0), (5.0, 0.0), (10.0, 0.0)])
+
+    def test_symmetric_even_quantity_puts_the_extra_copy_after(self):
+        moves = core.rect_moves((1, 0), 4, 3.0, (0, 1), 1, 1.0, "spacing", "symmetric")
+        self.assertEqual(offsets(moves), [(-3.0, 0.0), (3.0, 0.0), (6.0, 0.0)])
+        moves = core.rect_moves((1, 0), 2, 7.0, (0, 1), 1, 1.0, "spacing", "symmetric")
+        self.assertEqual(offsets(moves), [(7.0, 0.0)])
 
     def test_slanted_direction_is_made_unit(self):
         moves = core.rect_moves((3, 4), 2, 10.0, None, 1, 0.0)
@@ -63,7 +77,9 @@ class RectMoves(unittest.TestCase):
             core.check_rect(60, 10.0, 60, 10.0)  # 3600 instances: too many
 
     def test_count(self):
-        self.assertEqual(core.rect_count(3, "symmetric", 2, "one"), 10)
+        self.assertEqual(core.rect_count(3, "symmetric", 2, "one"), 6)
+        self.assertEqual(core.rect_count(3, "one", 2, "one"), 6)
+        self.assertEqual(core.circular_count(3, "symmetric"), 3)
 
 
 class CircularMoves(unittest.TestCase):
@@ -76,9 +92,17 @@ class CircularMoves(unittest.TestCase):
         moves = core.circular_moves((0, 0), 3, 90.0, "angle")
         self.assertEqual([m[2] for m in moves], [45.0, 90.0])
 
-    def test_symmetric(self):
-        moves = core.circular_moves((0, 0), 2, 30.0, "symmetric")
-        self.assertEqual(sorted(m[2] for m in moves), [-30.0, 30.0])
+    def test_symmetric_quantity_is_the_number_of_instances(self):
+        # the report (Carabiner): Symmetric, Quantity 3, 90 degrees gave 5 slots over 180
+        moves = core.circular_moves((0, 0), 3, 90.0, "symmetric")
+        self.assertEqual(sorted(m[2] for m in moves), [-45.0, 45.0])
+        moves = core.circular_moves((0, 0), 5, 120.0, "symmetric")
+        self.assertEqual(sorted(m[2] for m in moves), [-60.0, -30.0, 30.0, 60.0])
+        self.assertEqual(core.circular_moves((0, 0), 1, 90.0, "symmetric"), [])
+
+    def test_symmetric_whole_circle(self):
+        moves = core.circular_moves((0, 0), 4, 360.0, "symmetric")
+        self.assertEqual(sorted(m[2] for m in moves), [-90.0, 90.0, 180.0])
 
     def test_turned_point_exact(self):
         self.assertTrue(near(core.apply(("turn", (10, 0), 90.0), (20, 0)), (10, 10)))
@@ -243,6 +267,62 @@ class Vectors(unittest.TestCase):
         p = core.rotate((3.0, 4.0), (1.0, 1.0), 360.0)
         self.assertTrue(near(p, (3.0, 4.0), 1e-12))
         self.assertAlmostEqual(math.hypot(*core.rotate((3, 4), (0, 0), 37.0)), 5.0)
+
+
+class Ties(unittest.TestCase):
+    L, C, A, P = core.LINE, core.CIRCLE, core.ARC, core.POINT
+
+    def test_a_line_alone_is_tied_by_both_ends(self):
+        points, equals, joins = core.tie_plan({4: self.L}, [])
+        self.assertEqual(points, [(4, 1), (4, 2)])
+        self.assertEqual(equals, [])
+        self.assertEqual(joins, [])
+
+    def test_a_circle_by_its_centre_and_equal(self):
+        points, equals, joins = core.tie_plan({2: self.C}, [])
+        self.assertEqual(points, [(2, 3)])
+        self.assertEqual(equals, [2])
+
+    def test_an_arc_by_its_ends_and_equal(self):
+        points, equals, joins = core.tie_plan({2: self.A}, [])
+        self.assertEqual(points, [(2, 1), (2, 2)])
+        self.assertEqual(equals, [2])
+
+    def test_a_triangle_is_tied_by_three_corners(self):
+        # three lines joined end to start: each corner is tied once, the joins are repeated
+        types = {0: self.L, 1: self.L, 2: self.L}
+        joined = [(0, 2, 1, 1), (1, 2, 2, 1), (2, 2, 0, 1)]
+        points, equals, joins = core.tie_plan(types, joined)
+        self.assertEqual(points, [(0, 1), (0, 2), (1, 2)])
+        self.assertEqual(joins, joined)
+
+    def test_joins_to_curves_that_are_not_picked_do_not_count(self):
+        points, equals, joins = core.tie_plan({0: self.L}, [(0, 2, 9, 1)])
+        self.assertEqual(points, [(0, 1), (0, 2)])
+        self.assertEqual(joins, [])
+
+    def test_a_point_on_a_curve_is_no_join(self):
+        points, equals, joins = core.tie_plan({0: self.L, 1: self.L}, [(0, 2, 1, 0)])
+        self.assertEqual(len(points), 4)
+        self.assertEqual(joins, [])
+
+    def test_points_that_cannot_be_tied(self):
+        self.assertEqual(core.tie_points("Part::GeomBSplineCurve"), ((), False))
+        self.assertEqual(core.tie_points(core.POINT), ((1,), False))
+
+    def test_wrap_turn(self):
+        self.assertAlmostEqual(core.wrap_turn(90.0), math.pi / 2)
+        self.assertAlmostEqual(core.wrap_turn(270.0), -math.pi / 2)
+        self.assertAlmostEqual(core.wrap_turn(180.0), math.pi)
+        self.assertAlmostEqual(core.wrap_turn(-180.0), math.pi)
+        self.assertAlmostEqual(core.wrap_turn(-45.0), -math.pi / 4)
+
+    def test_nearest_copy(self):
+        copies = [[[(10, 0), (20, 0)]], [[(10, 10), (20, 10)]], [[(0, 30)]]]
+        self.assertEqual(core.nearest_copy((15, 0.4), copies, 1.0), 0)
+        self.assertEqual(core.nearest_copy((15, 9.5), copies, 1.0), 1)
+        self.assertEqual(core.nearest_copy((0.2, 30), copies, 1.0), 2)
+        self.assertIsNone(core.nearest_copy((15, 5), copies, 1.0))
 
 
 if __name__ == "__main__":
