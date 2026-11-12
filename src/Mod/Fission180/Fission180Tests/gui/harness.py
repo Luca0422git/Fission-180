@@ -2036,6 +2036,10 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
         # Each scenario starts in a fresh FreeCAD profile (run_tests.sh), so the choices
         # Fission 180 remembers between sessions (selection mode, display style, preferences,
         # keys, pins) are the defaults already: no reset needed for them.
+        # FISSION180_USER_DEFAULTS=1: every scenario with a new user's settings (the three
+        # below left at their defaults: wave 7, builder regress, a sweep of the everyday
+        # scenarios with what a person really gets)
+        user_defaults = os.environ.get("FISSION180_USER_DEFAULTS", "0") == "1"
         try:
             # (wave 7, sketch-c) Fusion's Snap puts every free sketch point on a grid
             # crossing (on by default: sketch_infer "GridSnapFull"). The scenarios written
@@ -2044,12 +2048,14 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
             # book_sketch_c_grid turns it on and tests it.
             from fission180 import sketch_infer
 
-            App.ParamGet(sketch_infer.PARAMS).SetBool("GridSnapFull", False)
+            if not user_defaults:
+                App.ParamGet(sketch_infer.PARAMS).SetBool("GridSnapFull", False)
             # ...and Fusion's "Scale entire sketch at first dimension" (on by default)
             # scales everything drawn so far when the first dimension gets its value: the
             # scenarios written before it type a first dimension and then click the other
             # curves where they were. book_sketch_c_scale turns it on and tests it.
-            App.ParamGet(sketch_infer.PARAMS).SetBool("ScaleAtFirstDimension", False)
+            if not user_defaults:
+                App.ParamGet(sketch_infer.PARAMS).SetBool("ScaleAtFirstDimension", False)
         except Exception as exc:
             print("[Fission 180] grid snap reset failed: %s" % exc, flush=True)
         try:
@@ -2059,8 +2065,9 @@ def run(name, steps, check_errors_each_step=True, start_ms=2500, paced_by="timer
             # off, as a person who unticked it. book_shell_new_design tests the default.
             from fission180 import grid_ui
 
-            grid_ui.put("LayoutGrid", False)
-            grid_ui.redraw_all()
+            if not user_defaults:
+                grid_ui.put("LayoutGrid", False)
+                grid_ui.redraw_all()
         except Exception as exc:
             print("[Fission 180] layout grid reset failed: %s" % exc, flush=True)
         try:  # the first-start welcome line on Home shows once per profile: a fresh profile
