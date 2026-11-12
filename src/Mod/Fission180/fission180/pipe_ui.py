@@ -18,7 +18,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import commands, handle_look_core, log, pipe, preview, primitives, profile_pick
-from . import ui_icon_path, value_limits, warn
+from . import bodies_row_ui, ui_icon_path, value_limits, warn
 from .compat import QtCore, QtWidgets
 from .primitives import PrimitiveError
 from .primitives_ui import (
@@ -735,7 +735,7 @@ class PipePanel(Panel, value_limits.LimitedValues):
             return
         try:
             before = self.target
-            self.target = pipe.build(self.path, self.options, feature=self.target, body=self.body)
+            self.target = self._build_beside_hidden()
             self.error = ""
             if before is None or self.target is not before:
                 self._geometry_changed = True
@@ -754,11 +754,26 @@ class PipePanel(Panel, value_limits.LimitedValues):
                 set_combo(self.operation, actual)
                 self._quiet = False
 
+    def _build_beside_hidden(self):
+        """pipe.build, leaving a hidden work body alone (wave 7, fix-9 / fix-10): a Cut or
+        Intersect picked by hand is refused with the reason, a Join makes a new body and says
+        why (bodies_row_ui.hidden_work_body)."""
+        operation = self.options["operation"]
+        built, refusal, self.hidden_note = bodies_row_ui.hidden_work_body(
+            self, self._source_body(), operation, lambda: pipe.tool_shape(self.path, self.options)
+        )
+        if refusal:
+            raise PrimitiveError(refusal)
+        options = self.options if built == operation else dict(self.options, operation=built)
+        return pipe.build(self.path, options, feature=self.target, body=self.body)
+
     def feature(self):
         return self.target
 
     def show_status(self):
         value_limits.show_note(getattr(self, "limit_label", None), "")
+        if self.path:
+            self.info.setText(getattr(self, "hidden_note", ""))  # (empty otherwise)
         if self.formula_error:
             self.message.setText("⚠ " + self.formula_error)
             return

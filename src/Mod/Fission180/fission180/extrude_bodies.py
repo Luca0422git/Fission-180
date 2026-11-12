@@ -311,22 +311,54 @@ def participants_for(feature, profiles, options):
     return sorted(result, key=lambda b: b.ID)
 
 
-def nothing_touched(options, what="extrusion", doc=None):
-    """Why a Cut or Intersect that goes through no body is refused. With `doc`: when the
-    design has hidden bodies, the text says that they are left out and which to show
-    (wave 7, replay-d: the Hot End's bore revolved as a Cut with the Nozzle's body hidden
-    read "does not go through any body", though the bore is drawn right in it; Fusion also
-    leaves hidden bodies out of the bodies to cut, Autodesk Extrude reference: "Auto-Select
-    re-computes the bodies to cut based on the current visibility state")."""
-    text = _nothing_touched(options, what)
-    hidden = hidden_solids(doc) if doc is not None else []
-    if hidden:
-        names = ", ".join(hidden[:3]) + (" ..." if len(hidden) > 3 else "")
-        text += " Hidden bodies are not cut (%s %s hidden): show it, then start again." % (
-            names,
-            "is" if len(hidden) == 1 else "are",
-        )
-    return text
+def nothing_touched(options, what="extrusion", doc=None, hidden=None):
+    """Why a Cut or Intersect that goes through no body is refused. `hidden`: the names of
+    the hidden bodies the step reaches (hidden_reached); without it, with `doc`, every
+    hidden body that holds a solid. The text then says that they are left out and which to
+    show (hidden_note; wave 7, replay-d: the Hot End's bore revolved as a Cut with the
+    Nozzle's body hidden read "does not go through any body", though the bore is drawn
+    right in it; Fusion also leaves hidden bodies out of the bodies to cut, Autodesk Extrude
+    reference: "Auto-Select re-computes the bodies to cut based on the current visibility
+    state")."""
+    if hidden is None:
+        hidden = hidden_solids(doc) if doc is not None else []
+    note = hidden_note(hidden, options["operation"])
+    if not note:
+        return _nothing_touched(options, what)
+    # (fix-10) not "does not go through any body, change the profile": it may go right
+    # through a hidden one, and showing that is the way out
+    if options["operation"] == "intersect":
+        text = "The %s goes through no shown body, so Intersect would leave nothing." % what
+    else:
+        text = "The %s goes through no shown body, so it cuts nothing." % what
+    return "%s %s" % (text, note)
+
+
+def hidden_note(names, operation):
+    """The one sentence for hidden bodies left out (extrude_bodies_core.hidden_note)."""
+    from .extrude_bodies_core import hidden_note as note
+
+    return note(names, operation)
+
+
+def hidden_reached(doc, tool_fn, lead=None):
+    """The names (as the browser shows them) of the hidden bodies a new step's solid passes
+    through or touches face to face: those its Cut, Intersect or Join leaves out only
+    because they are hidden (candidate_bodies). tool_fn(reach) gives the step's solid in
+    design coordinates; `reach`: those bodies' solids (an extrusion "All" runs past them).
+    [] when there are none or it cannot be told."""
+    try:
+        candidates = candidate_bodies(doc, lead, hidden=True)
+        if not candidates:
+            return []
+        tool = tool_fn([shape for _body, shape in candidates])
+        if tool is None or tool.isNull() or not tool.Solids:
+            return []
+        enough = max(VOLUME_TOL, tool.Volume * 1e-6)
+        found = [b for b, shape in candidates if _overlaps(shape, tool, True, enough)]
+        return bodies.list_names(found)
+    except Exception:
+        return []
 
 
 def hidden_solids(doc):
@@ -496,14 +528,15 @@ def _kept_when_hidden(lead):
     return names
 
 
-def candidate_bodies(doc, lead=None):
+def candidate_bodies(doc, lead=None, hidden=False):
     """[(body, its solid before the extrude)] for the bodies an extrude can act on: those
     shown and holding a solid, not used up by another step (Combine). A hidden body (its
     eye, or its component's, closed) is left out of a new extrude: Fusion's bodies to cut
     are "based on the current visibility state" (Autodesk Extrude reference); a body the
     extrude already acts on stays, hidden or not (hiding a body to see the others must not
     drop it from the extrude on the next edit). (wave 7, fix-9) A body kept on to draw a
-    sketch of it, its solid hidden, is hidden here too (bodies.is_shown)."""
+    sketch of it, its solid hidden, is hidden here too (bodies.is_shown). hidden=True: the
+    bodies left out only because they are hidden instead (hidden_reached)."""
     own = {f.Name for f in followers_of(lead)} if lead is not None else set()
     used = {name for name, step in bodies.consumers(doc).items() if step.Name not in own}
     kept = _kept_when_hidden(lead)
@@ -512,7 +545,10 @@ def candidate_bodies(doc, lead=None):
     for body in bodies.list_bodies(doc):
         if body.Name in used:
             continue
-        if body.Name not in kept and (not bodies.is_shown(body) or bodies.solid_hidden(body)):
+        left_out = body.Name not in kept and (
+            not bodies.is_shown(body) or bodies.solid_hidden(body)
+        )
+        if left_out != bool(hidden):
             continue
         try:
             # (only read here and by the checks that use the candidates: not copied)
