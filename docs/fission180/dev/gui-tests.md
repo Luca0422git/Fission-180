@@ -264,4 +264,9 @@ compiled again (an artifact of attempt 1 is there for attempt 2: the scenario de
   window is not maximized here: 1800 x 1000; wave 7, fix-7 reproduced two GitHub-only
   failures this way, each with GitHub's own message). An aim that depends on a pixel finds
   it by state, on a few rows and, if none has it, after moving the view a fraction of a
-  pixel (`fix3_dimension_through_planes.x_axis_pixel_under`).
+  pixel (`fix3_dimension_through_planes.x_axis_pixel_under`). A check that a line is drawn
+  where it is also a body's outline (a block's sketch on its bottom edge) must not ask what
+  is picked FIRST at its pixel: the face or the line, by rounding (regress_hide_show picked
+  Face2 on GitHub, the sketch here, drawn in both; wave 7, fix-10). It asks whether the line
+  is picked there at all, with nothing in front of the point (`regress_steps._sketch_at`,
+  FreeCAD's `getObjectsInfo`, which lists everything at a pixel and never a hidden object).
