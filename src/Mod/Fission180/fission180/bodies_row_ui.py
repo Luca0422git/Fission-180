@@ -16,6 +16,22 @@ from . import extrude_bodies_core as core
 from .compat import QtWidgets
 
 
+def hidden_source(panel):
+    """True when the profile's body of a NEW revolve / sweep / loft (the dialog's
+    _source_body(), else its body) holds a solid the person hid (wave 7, fix-9). Fusion
+    leaves a hidden body alone: the automatic operation does not count it (New Body), the
+    row does not list it, no preview is built in it. An edit keeps its own body."""
+    try:
+        if getattr(panel, "editing", False):
+            return False
+        source = getattr(panel, "_source_body", None)
+        body = source() if source is not None else getattr(panel, "body", None)
+        return body is not None and bodies.solid_hidden(body)
+    except Exception as exc:
+        warn("hidden body: %s" % exc)
+        return False
+
+
 class BodiesRow:
     """One dialog's Objects To Cut row. `field` is the dialog's selection box named
     "bodies" (it calls panel.activate("bodies") / panel.clear_field("bodies")); `what`
@@ -96,6 +112,8 @@ class BodiesRow:
             self.problem = extrude_bodies.nothing_touched(
                 {"operation": operation}, self.what, getattr(self.panel, "doc", None)
             )
+            if hidden_source(self.panel):
+                return []  # (wave 7, fix-9) never a preview inside a hidden body
             return None
         names = core.participants(touched, self.excluded)
         if touched and not names:
@@ -125,7 +143,7 @@ class BodiesRow:
         touched = self.touched(operation)
         if touched is None:
             body = self.panel.body
-            names = [body.Name] if body is not None else []
+            names = [body.Name] if body is not None and not hidden_source(self.panel) else []
         else:
             names = core.participants(touched, self.excluded)
         self._highlight(names if active else [])

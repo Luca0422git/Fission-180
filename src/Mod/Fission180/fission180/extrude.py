@@ -2039,7 +2039,11 @@ def hide_sketches(profiles):
                 # Only a visible one: setting it again is a change FreeCAD records, and an
                 # edit OK'd without a change then left an undo step that did nothing.
                 if obj.ViewObject.Visibility:
-                    obj.ViewObject.Visibility = False
+                    from . import body_visibility
+
+                    # (wave 7, fix-9) a hidden body kept on only to draw this sketch goes
+                    # back to plainly hidden with it (its solid ready to show with its eye)
+                    body_visibility.show_sketch(obj, False)
             except Exception:
                 pass
 

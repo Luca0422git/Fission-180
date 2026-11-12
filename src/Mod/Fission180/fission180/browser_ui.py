@@ -2610,8 +2610,7 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                 hidden.append(name)
         for target in targets:
             for shown in [target] + components.ancestors(target):
-                if shown.ViewObject is not None and not shown.ViewObject.Visibility:
-                    shown.ViewObject.Visibility = True
+                components_ui.show_isolated(shown)
         components_ui.ISOLATED[doc.Name] = hidden
         components_ui.ISOLATE_TARGETS[doc.Name] = [t.Name for t in targets]
         log("%d isolated (%d hidden)" % (len(targets), len(hidden)))

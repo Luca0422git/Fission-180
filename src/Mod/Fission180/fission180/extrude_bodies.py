@@ -498,10 +498,12 @@ def _kept_when_hidden(lead):
 
 def candidate_bodies(doc, lead=None):
     """[(body, its solid before the extrude)] for the bodies an extrude can act on: those
-    shown and holding a solid, not used up by another step (Combine). A hidden body is left
-    out of a new extrude, as one Fusion does not show is not in the way (guess); a body the
+    shown and holding a solid, not used up by another step (Combine). A hidden body (its
+    eye, or its component's, closed) is left out of a new extrude: Fusion's bodies to cut
+    are "based on the current visibility state" (Autodesk Extrude reference); a body the
     extrude already acts on stays, hidden or not (hiding a body to see the others must not
-    drop it from the extrude on the next edit)."""
+    drop it from the extrude on the next edit). (wave 7, fix-9) A body kept on to draw a
+    sketch of it, its solid hidden, is hidden here too (bodies.is_shown)."""
     own = {f.Name for f in followers_of(lead)} if lead is not None else set()
     used = {name for name, step in bodies.consumers(doc).items() if step.Name not in own}
     kept = _kept_when_hidden(lead)
@@ -510,7 +512,7 @@ def candidate_bodies(doc, lead=None):
     for body in bodies.list_bodies(doc):
         if body.Name in used:
             continue
-        if not bodies.is_shown(body) and body.Name not in kept:
+        if body.Name not in kept and (not bodies.is_shown(body) or bodies.solid_hidden(body)):
             continue
         try:
             # (only read here and by the checks that use the candidates: not copied)

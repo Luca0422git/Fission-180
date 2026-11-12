@@ -289,6 +289,14 @@ Home view with the Layout Grid on; and Undo pressed while a dialog is open cance
 - **Commands that did nothing without a word now say why** next to the pointer (features,
   joints, Gear, the timeline, sketch constraints), and a dialog cancelled by another command
   says the change was not kept. A browser right-click no longer ends the command you are in.
+- **A sketch drawn after hiding a body now shows as soon as you finish it** (it went into the
+  hidden body and stayed invisible with its eye open). It no longer belongs to that body, so
+  hiding or deleting the body leaves the sketch alone, as in Fusion.
+- **Extrude, Revolve, Sweep, Loft, Box and the other shapes leave hidden bodies alone**: they no
+  longer propose Cut or Join because of a hidden body, list it under Bodies to Cut, draw it
+  being cut or change it (since 0.1.0-beta.3.3.8 a hidden body that had been shown and hidden
+  again could be cut away). Editing a sketch of a hidden body keeps the body hidden; an Offset
+  Plane made while the body was hidden shows; Isolate shows a body hidden with a sketch on.
 - **Fillet and Chamfer never go quiet**: a size that does not fit is held at the largest that
   fits, with its note, also on lofted surfaces where even small sizes can fail (it stayed in the
   box with no note and OK did nothing); a refused OK says why next to the pointer too; a number
