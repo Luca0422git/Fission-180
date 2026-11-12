@@ -130,6 +130,17 @@ The waits that came up most, and the state each stood for:
 `FISSION180_PACED_BY=state tools/fission180/run_tests.sh --scenario NAME` runs an unconverted
 scenario without its fixed waits: the steps that then fail are the ones that need a `done`.
 
+## A new user's settings
+
+`harness.run` switches three of wave 7's defaults off for every scenario: full grid snap,
+"scale the sketch at the first dimension" and the layout grid (the older scenarios click free
+sketch points at exact coordinates and read the empty view's colours). A person has all three
+on, so a scenario of everyday use should run with them: the `regress_*` scenarios put them back
+themselves (`regress_steps.user_defaults`), and `FISSION180_USER_DEFAULTS=1
+tools/fission180/run_tests.sh --scenario a,b` runs any scenario with them (a sweep: a failure
+is then either a click that now lands on a grid crossing, as designed, or a bug; builder
+regress found one this way: a circle drawn on a coarse grid made nothing).
+
 ## Proving it holds
 
 A green run proves little: the flaky scenarios also passed on most runs.
