@@ -338,6 +338,37 @@ def grid_snap(value, grid, reach=None):
     return nearest if abs(value - nearest) < tol else value
 
 
+def flat_with(point, previous, flat):
+    """True when `point` as the next click of a shape makes it of no size: on the point the
+    shape started from, or (`flat`: a rectangle) level with it in either direction."""
+    if dist(point, previous) < 1e-9:
+        return True
+    return bool(flat) and (abs(point[0] - previous[0]) < 1e-9 or abs(point[1] - previous[1]) < 1e-9)
+
+
+def crossing_apart(raw, grid, previous, flat=False):
+    """The grid crossing nearest the pointer `raw` that does not make the shape of no size
+    with its previous click (flat_with), or None. With Fusion's full grid snap a circle's
+    rim, a line's end or a rectangle's corner clicked within half a grid step of the centre
+    or first corner landed on it, and FreeCAD then made nothing at all, without a word (a
+    5 mm circle on a 10 mm grid: wave 7, builder regress). The next crossing out is where
+    the pointer is closest to a shape that has a size."""
+    if not grid or grid <= 0:
+        return None
+    i0 = math.floor(raw[0] / grid)
+    j0 = math.floor(raw[1] / grid)
+    best = None
+    for i in range(i0 - 1, i0 + 3):
+        for j in range(j0 - 1, j0 + 3):
+            q = (i * grid, j * grid)
+            if flat_with(q, previous, flat):
+                continue
+            d = dist(q, raw)
+            if best is None or d < best[0] - 1e-12:
+                best = (d, q)
+    return best[1] if best is not None else None
+
+
 def grid_capped(raw, grid, reach):
     """Where the grid puts the free point `raw` when a grid line's pull ends at `reach`
     (mm) before FreeCAD's fifth of the spacing, as a Result (its `grid`: the coordinates

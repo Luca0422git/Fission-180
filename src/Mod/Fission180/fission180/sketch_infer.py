@@ -111,6 +111,7 @@ KINDS = (
 )
 PRESSES = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)
 SWALLOW = "swallow"  # _plan: the event is ours (the tangent-arc drag), FreeCAD never sees it
+NOT_A_CLICK = object()  # _release_of_click: the event is no release of a click
 VERTEX_POSITIONS = {
     "Part::GeomPoint": (1,),
     "Part::GeomLineSegment": (1, 2),
@@ -196,6 +197,7 @@ class Inference:
         self._items = []  # the curves as sketch_infer_core descriptions (snap points)
         self._snaps = []  # their snap points (sketch_infer_core.SnapPoint)
         self._flip = False  # Autoconstraints back on at the next commit (Ctrl click)
+        self._press = None  # (where, plan) of the last press: its release goes there too
         self._applying = False
         self._queued = False
         self.overlay = Overlay(session)
@@ -248,7 +250,11 @@ class Inference:
         if self.busy or event.type() not in KINDS:
             return False
         try:
-            plan = self._plan(obj, event)
+            plan = self._release_of_click(event)
+            if plan is NOT_A_CLICK:
+                plan = self._plan(obj, event)
+            if event.type() in PRESSES:
+                self._press = (QtCore.QPointF(event.position()), plan)
         except Exception as exc:
             warn("sketch inference: %s" % exc)
             self.overlay.clear()
@@ -270,6 +276,25 @@ class Inference:
             except Exception as exc:
                 warn("sketch inference: %s" % exc)
         return True
+
+    def _release_of_click(self, event):
+        """The plan of a click's release: where its press went (NOT_A_CLICK for any other
+        event, a drag, or a press the tangent arc took). The press and the release of one
+        click are one point: worked out again for the release, a pointer half way between
+        two grid crossings went to one at the press and to the other at the release (the
+        press had become the shape's first point by then), and FreeCAD's circle tool made a
+        circle 0.05 mm across round a plate's middle (sketch_draw with full grid snap on, a
+        new user's setting since wave 7: builder regress)."""
+        if event.type() != QtCore.QEvent.MouseButtonRelease:
+            return NOT_A_CLICK
+        press, self._press = self._press, None
+        if press is None or press[1] == SWALLOW:
+            return NOT_A_CLICK
+        at, plan = press
+        moved = (event.position() - at).manhattanLength()
+        if moved > QtWidgets.QApplication.startDragDistance():
+            return NOT_A_CLICK
+        return plan
 
     def _plan(self, obj, event):
         """(position, free, nogrid, result, px) for the copy FreeCAD gets, SWALLOW for an
@@ -367,6 +392,7 @@ class Inference:
             # is malformed": sketch_spline_luca A. They keep FreeCAD's own grid rule.)
             result = self._grid_only(view, grid)
         result = self._landed_on_snap(result, view, start)
+        result = self._apart_from_start(result, view, grid, step, start)
         self.last, self.last_px, self.last_step = result, view.px, step
         if kind == QtCore.QEvent.MouseMove:
             self.last_move = (result, view.px, step)
@@ -395,6 +421,52 @@ class Inference:
     # report, Drone: "the construction line's end snapped to the MIDPOINT of the arm line
     # (midpoint constraint) which later fights the arm length". A little more than its zone:
     FREECAD_MIDDLE = 0.06
+
+    # shapes made of no size when their next click is level with the first one
+    FLAT_KINDS = ("rect", "rect_center")
+
+    def _apart_from_start(self, result, view, grid, step, start):
+        """A free point that the grid would put on the point the shape started from (a
+        circle's centre, a line's start, a rectangle's first corner; for a rectangle also
+        level with it) goes to the nearest grid crossing that gives the shape a size.
+
+        Fusion's full grid snap (GridSnapFull, wave 7 sketch-c) takes every free point to
+        its nearest crossing: on a coarse grid (10 mm, the step FreeCAD's adaptive grid
+        jumps to when the view is a little further out) a 5 mm circle's rim landed on its
+        centre, FreeCAD made no circle and nothing was said (builder regress: the sketch on
+        an offset plane drew nothing; 0.1.0-beta.3.3.10 drew the circle). The pointer right
+        on that point, a snap, a guide or a point on a curve are left as they are."""
+        try:
+            if not step or not grid:
+                return result
+            if result is not None and (
+                result.snap is not None
+                or result.guides
+                or result.on_line
+                or getattr(result, "on_curve_geo", None) is not None
+            ):
+                return result
+            previous = start if start is not None else (self.placed[-1] if self.placed else None)
+            if previous is None:
+                return result
+            flat = self.kind in self.FLAT_KINDS
+            if result is not None:
+                point = result.point
+            else:  # FreeCAD's own rule (a fifth of the spacing) places the point
+                point = (core.grid_snap(view.raw[0], grid), core.grid_snap(view.raw[1], grid))
+            if not core.flat_with(point, previous, flat):
+                return result
+            if core.dist(view.raw, previous) <= _pick_pixels(view.ratio) * view.px:
+                return result  # the pointer is on that point: meant (FreeCAD says no)
+            crossing = core.crossing_apart(view.raw, grid, previous, flat)
+            if crossing is None:
+                return result
+            # (a crossing: FreeCAD's own grid snap stays on and puts the pixel's point
+            # exactly on it, as for any free point on a crossing)
+            return core.Result(crossing)
+        except Exception as exc:
+            warn("sketch inference: %s" % exc)
+            return result
 
     def _landed_on_snap(self, result, view, start):
         """A point a guide or the grid puts exactly on an existing point (an end, a centre,

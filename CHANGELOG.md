@@ -289,6 +289,9 @@ Home view with the Layout Grid on; and Undo pressed while a dialog is open cance
 - **Commands that did nothing without a word now say why** next to the pointer (features,
   joints, Gear, the timeline, sketch constraints), and a dialog cancelled by another command
   says the change was not kept. A browser right-click no longer ends the command you are in.
+- **A small circle, line or rectangle drawn with Snap on no longer vanishes**: a rim, end or
+  corner clicked near the first point goes to the nearest grid crossing that gives the shape a
+  size (a 5 mm circle on a coarse grid made nothing at all, without a word).
 - **A sketch drawn after hiding a body now shows as soon as you finish it** (it went into the
   hidden body and stayed invisible with its eye open). It no longer belongs to that body, so
   hiding or deleting the body leaves the sketch alone, as in Fusion.
