@@ -25,6 +25,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import bodies, commands, drag_guard, extrude_finish, handle_look, handles3d, log
+from . import bodies_row_ui
 from . import preview
 from . import primitives
 from . import profile_pick, taskui, ui_icon_path, value_limits, warn
@@ -1554,9 +1555,13 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         self.user_picked_operation = True
         self._changed()
 
+    def _work_body(self):
+        """The body the step acts on: the plane's or face's body, else the dialog's."""
+        return primitives.owner_body(self.ref[0]) if self.ref else self.body
+
     def _base_shape(self):
         """The part the step builds on (global), for the operation Fusion picks."""
-        body = primitives.owner_body(self.ref[0]) if self.ref else self.body
+        body = self._work_body()
         if body is None:
             return None
         if not self.editing and bodies.solid_hidden(body):
@@ -1634,7 +1639,7 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
             return
         try:
             before = self.target
-            self.target = self._build()
+            self.target = self._build_beside_hidden()
             self.error = ""
             if before is None or self.target is not before:
                 self._geometry_changed = True
@@ -1652,6 +1657,24 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
                 set_combo(self.operation, actual)
                 self._quiet = False
 
+    def _build_beside_hidden(self):
+        """_build(), leaving a hidden work body alone (wave 7, fix-9 / fix-10): a Cut or
+        Intersect picked by hand is refused with the reason (it cut the hidden body, unseen),
+        a Join makes a new body and says why (bodies_row_ui.hidden_work_body)."""
+        operation = self.options["operation"]
+        built, refusal, self.hidden_note = bodies_row_ui.hidden_work_body(
+            self, self._work_body(), operation, self._tool
+        )
+        if refusal:
+            raise PrimitiveError(refusal)
+        if built == operation:
+            return self._build()
+        self.options["operation"] = built  # (the box keeps showing the person's choice)
+        try:
+            return self._build()
+        finally:
+            self.options["operation"] = operation
+
     def _feature_operation(self):
         try:
             return self._read(self.target)[1]["operation"]
@@ -1663,6 +1686,8 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
 
     def show_status(self):
         value_limits.show_note(getattr(self, "limit_label", None), "")
+        if self.state == "ready":
+            self.info.setText(getattr(self, "hidden_note", ""))  # (empty otherwise when ready)
         if self.formula_error:
             self.message.setText("⚠ " + self.formula_error)
             return

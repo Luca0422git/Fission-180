@@ -300,6 +300,10 @@ Home view with the Layout Grid on; and Undo pressed while a dialog is open cance
   being cut or change it (since 0.1.0-beta.3.3.8 a hidden body that had been shown and hidden
   again could be cut away). Editing a sketch of a hidden body keeps the body hidden; an Offset
   Plane made while the body was hidden shows; Isolate shows a body hidden with a sketch on.
+- **A Cut that reaches only a hidden body says so and names it** ("Hidden bodies are not cut
+  (Body1 is hidden): show it, then start again"), in Extrude, Revolve, Sweep and Loft; Revolve
+  said "There is no solid to cut yet". Box, Cylinder, Sphere, Torus, Coil, Gear and Pipe leave a
+  hidden body alone also when Cut or Join is picked by hand.
 - **Fillet and Chamfer never go quiet**: a size that does not fit is held at the largest that
   fits, with its note, also on lofted surfaces where even small sizes can fail (it stayed in the
   box with no note and OK did nothing); a refused OK says why next to the pointer too; a number

@@ -14,7 +14,9 @@ fix9_hidden_body_sketch_extrude, gone on with). Real input only, a person's defa
      Body1 hidden and unchanged, plainly hidden again (its sketch went with its extrude).
   D  Body2 hidden too (both bodies hidden, Body2 the active one): SOLID > CREATE > Box on XY,
      60 x 60, 120 high, through both hidden bodies: New Body (it proposed Join into the
-     hidden Body2), both bodies unchanged.
+     hidden Body2), both bodies unchanged. Cut picked by hand: refused, the dialog says that
+     hidden bodies are not cut (it cut the hidden Body2, unseen); Join picked by hand: a new
+     body, and it says that hidden bodies are not joined (wave 7, fix-10); New Body again.
   E  CONSTRUCT > Offset Plane from XY, 50, with every body hidden: the plane shows.
   F  Save, close, reopen: the hidden bodies stay hidden, the new ones shown.
 """
@@ -319,11 +321,59 @@ def d_check():
     hidden("D", "Body1")
     hidden("D", "Body2")
     h.shot("D-box")
-    keyboard(key=QtCore.Qt.Key_Return)
+    h.check("D Cut chosen by hand", ui.choose(p.operation, "Cut"))
 
 
-d_check.done = pi.no_dialog
-d_check.done_what = "Enter finished the Box"
+def _bodies_kept(tag):
+    unchanged(tag, "Body1", S["cube"])
+    unchanged(tag, "Body2", S["cyl"])
+    hidden(tag, "Body1")
+    hidden(tag, "Body2")
+
+
+def d_cut():
+    p = pi.panel("BoxPanel")
+    h.caught_up(p)
+    text = p.message.text()
+    h.check(
+        "D Cut: refused, hidden bodies are not cut (Body2, the work body, named)",
+        "Hidden bodies are not cut (Body2 is hidden)" in text,
+        text,
+    )
+    _bodies_kept("D Cut")
+    h.shot("D-cut-refused")
+    h.check("D Join chosen by hand", ui.choose(p.operation, "Join"))
+
+
+def d_join():
+    p = pi.panel("BoxPanel")
+    h.caught_up(p)
+    h.check("D Join: no warning", not p.message.text(), p.message.text())
+    h.check(
+        "D Join: it says hidden bodies are not joined",
+        "Hidden bodies are not joined (Body2 is hidden)" in p.info.text(),
+        p.info.text(),
+    )
+    home = owner(p.target) if p.target is not None else None
+    h.check(
+        "D Join: the box is in a new body",
+        home is not None and home not in (body("Body1"), body("Body2")),
+        home.Label if home is not None else None,
+    )
+    _bodies_kept("D Join")
+    h.shot("D-join-new-body")
+    h.check("D New Body chosen again", ui.choose(p.operation, "New Body"))
+
+
+def d_back():
+    p = pi.panel("BoxPanel")
+    h.caught_up(p)
+    h.check("D New Body: no note", not p.message.text() and not p.info.text(), p.info.text())
+    h.task_button("OK")
+
+
+d_back.done = pi.no_dialog
+d_back.done_what = "OK finished the Box"
 
 
 def d_made():
@@ -429,7 +479,8 @@ steps += [a_isolate, a_isolated]
 steps += [b_edit, b_editing, b_done]
 steps += one_extrude("c_e", V(CUBE / 2, CUBE / 2, CUBE), TALL)
 steps += [c_check, c_cut, c_back, r.named(ok, "c_ok"), c_made]
-steps += [d_box, d_plane, d_corner, d_sizes, d_height, d_check, d_made]
+steps += [d_box, d_plane, d_corner, d_sizes, d_height, d_check, d_cut, d_join, d_back]
+steps += [d_made]
 steps += [e_plane, e_pick, e_distance, e_ok, e_made]
 steps += [f_save, f_open, f_check]
 

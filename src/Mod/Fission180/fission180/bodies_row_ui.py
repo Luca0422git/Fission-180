@@ -32,6 +32,37 @@ def hidden_source(panel):
         return False
 
 
+def hidden_work_body(panel, body, operation, tool_fn=None):
+    """For a dialog that acts on one work body (Box, Cylinder, Sphere, Torus, Coil, Gear,
+    Pipe): (the operation to build, the refusal, the note). A NEW step whose work body
+    holds a solid the person hid leaves it alone, as Extrude does (wave 7, fix-9 / fix-10):
+    a Cut or Intersect is refused with the reason (nothing is built in the hidden body: it
+    was cut, unseen), a Join makes a new body and says why (extrude_bodies.hidden_note).
+    tool_fn() gives the step's solid (design coordinates) or None; a Join that does not
+    even touch the body makes a new body anyway, without the note. Otherwise (operation,
+    "", "")."""
+    try:
+        if operation not in ("join", "cut", "intersect") or body is None:
+            return operation, "", ""
+        if getattr(panel, "editing", False) or not bodies.solid_hidden(body):
+            return operation, "", ""
+        note = extrude_bodies.hidden_note(bodies.list_names([body]), operation)
+        if operation != "join":
+            return operation, note, ""
+        try:
+            tool = tool_fn() if tool_fn is not None else None
+        except Exception:
+            tool = None
+        if tool is not None:
+            shape = bodies.global_shape(body, copy=False)
+            if not extrude_bodies._overlaps(shape, tool, True):
+                note = ""
+        return "new_body", "", note
+    except Exception as exc:
+        warn("hidden body: %s" % exc)
+        return operation, "", ""
+
+
 class BodiesRow:
     """One dialog's Objects To Cut row. `field` is the dialog's selection box named
     "bodies" (it calls panel.activate("bodies") / panel.clear_field("bodies")); `what`
@@ -54,6 +85,7 @@ class BodiesRow:
         self.stored = None  # editing: the names the step was saved with
         self.way = None  # (names it passes through, names it touches), or None
         self.problem = ""  # e.g. a cut that goes through no body (OK refused)
+        self.hidden = []  # names of the hidden bodies left out, nothing shown in the way
         self.highlight = None
         self.closed = False
         self.paused = False  # body hiding paused while a Join merges bodies (see built())
@@ -98,22 +130,41 @@ class BodiesRow:
             return None
         return self.way[1] if operation == "join" else self.way[0]
 
+    def hidden_reached(self):
+        """The hidden bodies the solid of the last test passes through or touches (left out
+        of the bodies to change: hidden_note names them)."""
+        tool = self.tool
+        if tool is None:
+            return []
+        lead = getattr(self.panel, "target", None)
+        return extrude_bodies.hidden_reached(self.panel.doc, lambda _reach: tool, lead)
+
     def for_build(self, operation):
         """options["bodies"] for the build: the bodies in the way minus those clicked away;
         None when it cannot be told or the operation acts on no body (the profile's body
         only, as before). Raises ValueError when every body was clicked away."""
         self.problem = ""
+        self.hidden = []
         if operation not in ("join", "cut", "intersect"):
             return None
         touched = self.touched(operation)
         if touched is None:
             return None
-        if not touched and operation in ("cut", "intersect"):
+        if not touched:
+            hidden = self.hidden = self.hidden_reached()
+            if operation == "join":
+                return []  # a Join that touches no shown body makes a new body (the build)
             self.problem = extrude_bodies.nothing_touched(
-                {"operation": operation}, self.what, getattr(self.panel, "doc", None)
+                {"operation": operation}, self.what, None, hidden=hidden
             )
-            if hidden_source(self.panel):
-                return []  # (wave 7, fix-9) never a preview inside a hidden body
+            if hidden_source(self.panel) or (hidden and not getattr(self.panel, "editing", 0)):
+                # (wave 7, fix-9) never a preview inside a hidden body; (fix-10) nor a cut of
+                # the profile's own body when only hidden bodies are in the way. A sketch
+                # drawn on an origin plane while the body was hidden is in an empty body
+                # beside it: FreeCAD's Groove there showed the revolved solid, and the dialog
+                # said "There is no solid to cut yet" of the Hot End's bore. Nothing is
+                # built; the reason shows.
+                raise ValueError(self.problem)
             return None
         names = core.participants(touched, self.excluded)
         if touched and not names:
@@ -161,6 +212,10 @@ class BodiesRow:
                 if operation == "join"
                 else "The %s goes through no body." % self.what
             )
+            if self.hidden:  # (wave 7, fix-10) it reaches hidden bodies: say so
+                text = text.replace("no body", "no shown body")
+                if operation == "join":  # (a refused Cut says it in the dialog's message)
+                    text += "\n" + extrude_bodies.hidden_note(self.hidden, operation)
         if active:
             text += "\nClick a body to leave it out or take it back."
         self.names.setText(text)

@@ -2560,6 +2560,8 @@ class ExtrudePanel(
         self._inside_cache = None  # (signature by side, starts inside a body) of the last test
         self._sync_paused = False
         self._bodies_problem = ""  # e.g. a cut that goes through no body (OK refused)
+        self._hidden_left_out = []  # hidden bodies in the way, no shown one (names)
+        self._hidden_cache = (None, [])  # (_way_key, names) of the last hidden_reached
 
     def _read_bodies(self, read):
         stored = read.pop("bodies", None)
@@ -2739,23 +2741,31 @@ class ExtrudePanel(
         """options["bodies"] for extrude.build: the bodies in the way minus those clicked
         away; None when it cannot be told (the profile's body only, as before)."""
         self._bodies_problem = ""
+        self._hidden_left_out = []
         operation = self.options.get("operation")
         if operation not in ("join", "cut", "intersect"):
             return None
         touched = self._touched_names()
         if touched is None:
             return None
-        if not touched and operation in ("cut", "intersect"):
+        if not touched and operation == "join":
+            # a Join that touches no shown body makes a new body (extrude.build)
+            self._hidden_left_out = self._hidden_reached()
+        elif not touched:
             # Nothing in the way: the preview stays a cut of the profile's own body (it
             # removes nothing), the operation stays as picked (the next change, a Flip,
             # may reach a body), and the dialog says why OK is refused.
+            hidden = self._hidden_left_out = self._hidden_reached()
             self._bodies_problem = extrude_bodies.nothing_touched(
-                {"operation": operation}, doc=self.doc
+                {"operation": operation}, hidden=hidden
             )
-            if self._src_hidden():
+            if self._src_hidden() or (hidden and not self.editing):
                 # (wave 7, fix-9) never a preview inside a hidden body: it was drawn being
-                # cut, red, and then kept in Bodies to Cut. Nothing is built; the reason shows.
-                return []
+                # cut, red, and then kept in Bodies to Cut. (fix-10) Nor a cut of the
+                # profile's own body when only hidden bodies are in the way (a sketch drawn
+                # on an origin plane while the body was hidden is in an empty body beside
+                # it). Nothing is built; the reason shows.
+                raise extrude.ExtrudeError(self._bodies_problem)
             return None
         names = bodies_core.participants(touched, self.excluded)
         if touched and not names:
@@ -2765,6 +2775,26 @@ class ExtrudePanel(
             )
         found = [self.doc.getObject(n) for n in names]
         return [b for b in found if b is not None]
+
+    def _hidden_reached(self):
+        """The hidden bodies the extrusion as it is set now passes through or touches (left
+        out of the bodies to change: hidden_note names them); tested once per setting."""
+        key = self._way_key
+        if key is not None and self._hidden_cache[0] == key:
+            return self._hidden_cache[1]
+        try:
+            options = extrude.options_with_defaults(self._build_options() or self.options)
+            profiles = self.profiles
+            found = extrude_bodies.hidden_reached(
+                self.doc,
+                lambda reach: extrude_bodies.tool_prism(profiles, options, reach),
+                lead=self.target,
+            )
+        except Exception as exc:
+            warn("extrude hidden bodies: %s" % exc)
+            found = []
+        self._hidden_cache = (key, found)
+        return found
 
     def _bodies_built(self):
         """After a build: a Join that merges bodies, or a cut that takes all of one, keeps
@@ -2832,6 +2862,10 @@ class ExtrudePanel(
                 if operation == "join"
                 else "The extrusion goes through no body."
             )
+            if self._hidden_left_out:  # (wave 7, fix-10) it reaches hidden bodies: say so
+                text = text.replace("no body", "no shown body")
+                if operation == "join":  # (a refused Cut says it in the dialog's message)
+                    text += "\n" + extrude_bodies.hidden_note(self._hidden_left_out, operation)
         gone = self._used_up_labels()
         if gone:
             text += "\n" + bodies_core.used_up_text(gone)

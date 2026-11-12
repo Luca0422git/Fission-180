@@ -13,7 +13,8 @@ undo step left open fails it):
   6  Extrude Sketch 2's square. Bug B: the dialog proposed Cut, listed Body1 under Bodies to
      Cut (ticked) and drew the hidden Body1 being cut, red. Fusion leaves a hidden body alone:
      not proposed, not listed, not drawn, not changed. Expected: New Body, no Bodies to Cut
-     row, Body1 stays hidden and as it was.
+     row, Body1 stays hidden and as it was. Cut picked by hand: nothing is cut, the dialog
+     says that hidden bodies are not cut and names Body1 (wave 7, fix-10); New Body again.
 
 Then the same design a person goes on with: undo / redo of the extrude and of a hide, save,
 close and reopen (the hidden body stays hidden, the sketch keeps its eye).
@@ -40,6 +41,7 @@ from Fission180Tests.gui.fix9_steps import (
     where,
     zoom_out,
 )
+from Fission180Tests.gui import dialog_input as ui
 from Fission180Tests.gui import harness as h
 from Fission180Tests.gui import replay_f_steps as r
 from Fission180Tests.gui import timeline_input as ti
@@ -160,6 +162,38 @@ def bug_b():
         p.target.Label if p.target is not None else None,
     )
     h.shot("6-extrude-sketch2")
+    h.check("6 Cut chosen by hand", ui.choose(p.operation, "Cut"))
+
+
+def cut_by_hand():
+    """Sketch 2 is in an empty body beside the hidden Body1 (fix-9): a Cut picked by hand
+    reaches only the hidden Body1. Nothing is cut and the dialog says why, naming Body1, in
+    the words every tool uses (wave 7, fix-10: Revolve said "There is no solid to cut yet"
+    in the same place)."""
+    p = r.extrude_panel()
+    h.caught_up(p)
+    b = body("Body1")
+    text = p.message.text()
+    h.check(
+        "6 Cut: hidden bodies are not cut, naming Body1",
+        "Hidden bodies are not cut (Body1 is hidden)" in text,
+        text,
+    )
+    h.check(
+        "6 Cut: nothing built in Body1",
+        b.Tip is not None and b.Tip.Name == S["tip"],
+        b.Tip.Label if b.Tip is not None else None,
+    )
+    h.check("6 Cut: Body1 stays hidden", eye("Body1") is False and not drawn(b), eye("Body1"))
+    h.check("6 Cut: Body1 is unchanged", r.near(k.volume(b), S["cube"]), k.volume(b))
+    h.shot("6-cut-refused")
+    h.check("6 New Body chosen again", ui.choose(p.operation, "New Body"))
+
+
+def new_body_again():
+    p = r.extrude_panel()
+    h.caught_up(p)
+    h.check("6 New Body: the message is gone", not p.message.text(), p.message.text())
 
 
 def new_body_made():
@@ -265,7 +299,7 @@ steps += rectangle("s2", V(0, 0, 0), V(BIG, BIG, 0), [0, 0, BIG, BIG])
 steps += [r.named(r.finish_sketch, "s2_finish"), bug_a]
 steps += [show_body1, body1_shown, body1_hidden_again]
 steps += one_extrude("e2", V(BIG * 0.6, BIG * 0.6, 0), HIGH)
-steps += [bug_b, r.named(ok, "e2_ok"), new_body_made]
+steps += [bug_b, cut_by_hand, new_body_again, r.named(ok, "e2_ok"), new_body_made]
 steps += [undo_extrude, after_undo, after_redo, shown_again, save_close, reopen, reopened]
 
 h.run("fix9_hidden_body_sketch_extrude", steps, paced_by="state")

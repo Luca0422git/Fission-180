@@ -45,6 +45,27 @@ def used_up_text(labels):
     return "%s are wholly inside the cut, so they go." % names_text(labels)
 
 
+HIDDEN_VERBS = {"join": "joined", "intersect": "intersected"}  # (else "cut")
+
+
+def hidden_note(labels, operation):
+    """The one sentence every tool says when its Cut, Intersect or Join leaves hidden bodies
+    out (Extrude, Revolve, Sweep, Loft, Pipe, Coil, Box and the other shapes): which, and
+    how to take them in. "" without names. (Wave 7, fix-10: since fix-9 left the hidden
+    body out, Revolve said "There is no solid to cut yet" of the Hot End's bore, cut with
+    the Nozzle's body hidden as the book does it: there was a solid, only hidden.)"""
+    labels = [x for x in labels or [] if x]
+    if not labels:
+        return ""
+    one = len(labels) == 1
+    return "Hidden bodies are not %s (%s %s hidden): show %s, then start again." % (
+        HIDDEN_VERBS.get(operation, "cut"),
+        ", ".join(labels[:3]) + (" ..." if len(labels) > 3 else ""),
+        "is" if one else "are",
+        "it" if one else "them",
+    )
+
+
 def participants(touched, excluded):
     """The bodies the extrude acts on: those in its way, minus the ones clicked away
     (order kept)."""

@@ -24,6 +24,22 @@ class RowTextTests(unittest.TestCase):
         self.assertEqual(core.count_text(1), "1 body")
         self.assertEqual(core.count_text(2), "2 bodies")
 
+    def test_hidden_bodies_left_out(self):
+        # wave 7, fix-10: one sentence for every tool (Extrude, Revolve, Sweep, Loft, Pipe,
+        # Coil, the shapes), naming the hidden bodies and how to take them in
+        self.assertEqual(
+            core.hidden_note(["Body1"], "cut"),
+            "Hidden bodies are not cut (Body1 is hidden): show it, then start again.",
+        )
+        self.assertEqual(
+            core.hidden_note(["Body1", "Lid"], "join"),
+            "Hidden bodies are not joined (Body1, Lid are hidden): show them, then start again.",
+        )
+        self.assertIn("not intersected", core.hidden_note(["Body1"], "intersect"))
+        self.assertIn("(A, B, C ... are hidden)", core.hidden_note(["A", "B", "C", "D"], "cut"))
+        self.assertEqual(core.hidden_note([], "cut"), "")
+        self.assertEqual(core.hidden_note(None, "join"), "")
+
     def test_names(self):
         self.assertEqual(core.names_text(["Body1", "Body2"]), "Body1, Body2")
         self.assertEqual(core.names_text([]), "")

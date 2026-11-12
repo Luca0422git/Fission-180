@@ -197,25 +197,57 @@ def nothing_drawn(point, what):
     )
 
 
+def picked_all_at(point):
+    """Everything FreeCAD's 3D view picks at the 3D point's pixel, nearest first: [(object
+    name, sub-element, the 3D point picked there or None)]. A hidden object is never picked;
+    unlike picked_at, what lies behind the first thing is listed too."""
+    try:
+        found = h.view().getObjectsInfo(h.view().getPointOnViewport(point)) or []
+    except Exception:
+        return []
+    result = []
+    for item in found:
+        at = V(item["x"], item["y"], item["z"]) if "x" in item else None
+        result.append((item.get("Object"), item.get("Component"), at))
+    return result
+
+
+def _sketch_at(sketch, point):
+    """(the sketch is picked at the point's pixel, the first thing picked lies on the point,
+    what was picked). Not "is the sketch picked FIRST": a sketch line that is also a body's
+    outline edge (the block's own profile, its bottom edge) shares its pixel row with the
+    body's face, and whether the pixel's centre falls just on the face or just off it is
+    rounding: on GitHub's 1538 x 770 view the face (Face2) came first, on a 1538 x 769 one
+    the sketch (wave 7, fix-10; the sketch was drawn in both, a blue line on that edge). A
+    hidden sketch is never picked, and a line hidden behind something has that something
+    first, away from the point."""
+    found = picked_all_at(point)
+    names = [name for name, _sub, _at in found]
+    front = found[0][2] if found else None
+    on_point = front is not None and (front - point).Length < 0.5
+    return sketch.Name in names, on_point, [(n, s) for n, s, _at in found]
+
+
 def sketch_drawn(sketch, point, what):
     """Check: the sketch's line through the 3D point is on the screen (FreeCAD picks the
-    sketch there)."""
-    picked, mean, top = look(point, radius=1)
-    ok = picked is not None and picked[0] == sketch.Name
+    sketch there, and nothing is in front of the point)."""
+    _picked, _mean, top = look(point, radius=1)
+    picked, on_point, found = _sketch_at(sketch, point)
     return h.check(
         "%s: %s is drawn" % (what, sketch.Label),
-        ok,
-        "picked %s, brightest %s; sketch Visibility %s" % (picked, top, shown(sketch)),
+        picked and on_point,
+        "picked %s (the first on the point: %s), brightest %s; sketch Visibility %s"
+        % (found, on_point, top, shown(sketch)),
     )
 
 
 def sketch_not_drawn(sketch, point, what):
-    picked, mean, top = look(point, radius=1)
-    ok = picked is None or picked[0] != sketch.Name
+    _picked, _mean, top = look(point, radius=1)
+    picked, _on_point, found = _sketch_at(sketch, point)
     return h.check(
         "%s: %s is not drawn" % (what, sketch.Label),
-        ok,
-        "picked %s, brightest %s; sketch Visibility %s" % (picked, top, shown(sketch)),
+        not picked,
+        "picked %s, brightest %s; sketch Visibility %s" % (found, top, shown(sketch)),
     )
 
 
