@@ -279,7 +279,11 @@ def is_shown(obj):
     tool asking here (wave 7, fix-9: Extrude proposed Cut, listed the hidden Body1 under
     Bodies to Cut and drew it being cut, red)."""
     try:
-        if is_body(obj):
+        if is_body(obj) and App.GuiUp:
+            # (with the GUI only: without it nothing is on a screen, and a step's own
+            # Visibility is whatever PartDesign left it, so the solid's eye means nothing;
+            # golden tl_insert_before_fillet: a boss added with the marker rolled back went
+            # into a new body because the rolled-back Tip's Visibility was off)
             from . import body_visibility
 
             return body_visibility.body_shown(obj)
