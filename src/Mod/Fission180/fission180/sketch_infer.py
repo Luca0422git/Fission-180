@@ -111,6 +111,7 @@ KINDS = (
 )
 PRESSES = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick)
 SWALLOW = "swallow"  # _plan: the event is ours (the tangent-arc drag), FreeCAD never sees it
+NOT_A_CLICK = object()  # _release_of_click: the event is no release of a click
 VERTEX_POSITIONS = {
     "Part::GeomPoint": (1,),
     "Part::GeomLineSegment": (1, 2),
@@ -196,6 +197,7 @@ class Inference:
         self._items = []  # the curves as sketch_infer_core descriptions (snap points)
         self._snaps = []  # their snap points (sketch_infer_core.SnapPoint)
         self._flip = False  # Autoconstraints back on at the next commit (Ctrl click)
+        self._press = None  # (where, plan) of the last press: its release goes there too
         self._applying = False
         self._queued = False
         self.overlay = Overlay(session)
@@ -248,7 +250,11 @@ class Inference:
         if self.busy or event.type() not in KINDS:
             return False
         try:
-            plan = self._plan(obj, event)
+            plan = self._release_of_click(event)
+            if plan is NOT_A_CLICK:
+                plan = self._plan(obj, event)
+            if event.type() in PRESSES:
+                self._press = (QtCore.QPointF(event.position()), plan)
         except Exception as exc:
             warn("sketch inference: %s" % exc)
             self.overlay.clear()
@@ -270,6 +276,25 @@ class Inference:
             except Exception as exc:
                 warn("sketch inference: %s" % exc)
         return True
+
+    def _release_of_click(self, event):
+        """The plan of a click's release: where its press went (NOT_A_CLICK for any other
+        event, a drag, or a press the tangent arc took). The press and the release of one
+        click are one point: worked out again for the release, a pointer half way between
+        two grid crossings went to one at the press and to the other at the release (the
+        press had become the shape's first point by then), and FreeCAD's circle tool made a
+        circle 0.05 mm across round a plate's middle (sketch_draw with full grid snap on, a
+        new user's setting since wave 7: builder regress)."""
+        if event.type() != QtCore.QEvent.MouseButtonRelease:
+            return NOT_A_CLICK
+        press, self._press = self._press, None
+        if press is None or press[1] == SWALLOW:
+            return NOT_A_CLICK
+        at, plan = press
+        moved = (event.position() - at).manhattanLength()
+        if moved > QtWidgets.QApplication.startDragDistance():
+            return NOT_A_CLICK
+        return plan
 
     def _plan(self, obj, event):
         """(position, free, nogrid, result, px) for the copy FreeCAD gets, SWALLOW for an
