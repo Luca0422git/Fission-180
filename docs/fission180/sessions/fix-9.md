@@ -80,15 +80,20 @@ sketch with the part shown (or on its face) works as before.
 
 ## Runs (one scenario per fresh profile, all PASS)
 
-New: `fix9_hidden_body_sketch_extrude` 73, `fix9_hidden_body_tools` 75; both at GitHub's
-770-pixel view too (throwaway copies, window one pixel taller, gui-tests.md): 74 and 70.
+New, on the last commit: `fix9_hidden_body_sketch_extrude` 73, `fix9_hidden_body_tools` 75;
+both at GitHub's 770-pixel view too (throwaway copies, window one pixel taller, gui-tests.md):
+74 and 76. Before the fixes the first failed 15 checks as Luca saw it (above).
 Regression: `book_extrude_operation` 74, `book_extrude_across` 43, `book_extrude2_across` 37,
-`book_extrude_picking` 49, `book_components_active` 95, `book_components2_cross` 238,
-`browser_ghost` 33, `browser_empty_body` 213, `browser_sketch_in_hidden_body` 27,
-`browser_multi_select` 86, `extrude_hidden_sketch` 9, `bodies_combine` 93, `bodies_qa` 317,
-`bodies_qa_2` 240, `bodies_timeline` 65, `book_extrude_primitives` 48, `components_basic`
-252, `extrude_multibody_edit` 138 (more in the final report); unit suite 3754 tests OK
-(10 skipped).
+`book_extrude_picking` 49, `book_extrude2_planes` 114, `book_extrude_primitives` 48,
+`book_components_active` 95, `book_components2_cross` 238, `book_components2_cancel` 29,
+`book_components2_refs` 70, `book_components_menus` 42, `browser_ghost` 33,
+`browser_empty_body` 213, `browser_sketch_in_hidden_body` 27, `browser_multi_select` 86,
+`extrude_hidden_sketch` 9, `extrude_multibody_edit` 138, `extrude_presspull_qa3` 75,
+`bodies_combine` 93, `bodies_qa` 317, `bodies_qa_2` 240, `bodies_timeline` 65,
+`components_basic` 252, `revolve_qa_bodies` 228, `construct_live` 13,
+`gaps_offset_plane_to` 38, `sketch_qa` 461, `replay_00_basics` 102, `replay_01_donut` 197,
+`replay_03_surfboard` 163; unit suite 3754 tests OK (10 skipped). Not run here: the golden
+models and the full suite (no geometry code changed; GitHub runs them).
 
 ## Shared files touched
 
