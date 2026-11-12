@@ -717,6 +717,8 @@ def create_sketch(body, target):
     doc = body.Document
     doc.openTransaction("Create Sketch")
     try:
+        if _for_a_sketch_body(body, target):
+            body, target = _sketch_body(body, target)
         if across:  # (the reference first: it stands before the sketch in the body)
             target, shown, point = _across(body, target, shown)
         sketch = body.newObject("Sketcher::SketchObject", "Sketch")
@@ -730,6 +732,48 @@ def create_sketch(body, target):
         raise
     doc.commitTransaction()
     return sketch
+
+
+ORIGIN_ROLES = tuple(PLANES)
+
+
+def _for_a_sketch_body(body, target):
+    """True when a sketch on `target` must not go into `body`: the body holds a solid the
+    person hid and the sketch goes on an origin plane (wave 7, fix-9).
+
+    Fusion keeps a sketch in the component, never in a body, so hiding a body never hides a
+    sketch and the next Extrude of it starts as New Body. FreeCAD keeps a sketch inside a
+    body and draws it through that body: Luca's Sketch 2, drawn on the XY plane after he
+    hid Body1, went into Body1 (the active body), did not show after Finish Sketch, and its
+    Extrude proposed cutting the hidden Body1. Such a sketch now goes into a body of its
+    own, empty, in the same component: the kind of body Create Sketch makes for a new
+    design's first sketch (no row in the browser until something solid is made in it;
+    the sketch shows in Sketches as any other). Hiding or deleting Body1 then leaves the
+    sketch alone, and its Extrude's New Body fills that body (Body2), as in Fusion."""
+    try:
+        from . import bodies
+
+        plane, sub = target
+        if sub or plane.TypeId not in PLANE_TYPES:
+            return False
+        if getattr(plane, "Role", "") not in ORIGIN_ROLES:
+            return False
+        return bodies.solid_hidden(body)
+    except Exception as exc:
+        warn("Create Sketch: %s" % exc)
+        return False
+
+
+def _sketch_body(body, target):
+    """(new empty body beside `body`, its own origin plane in the role of `target`'s plane).
+    Made inside the Create Sketch undo step; the new body becomes the active one (new work
+    goes where the newest sketch is, as after any Create Sketch)."""
+    from . import components
+
+    new = components.body_beside(body)
+    plane = components.same_role_plane(new, target[0])
+    log("Create Sketch: %s is hidden, the sketch goes into a body of its own" % body.Label)
+    return new, (plane, "")
 
 
 def _across(body, target, shown):
@@ -835,6 +879,7 @@ def open_sketch(sketch):
     try:  # (FreeCAD hides the sketch while it is open: sketch_mode._show_finished)
         key = (sketch.Document.Name, sketch.Name)
         _SHOWN_BEFORE[key] = bool(sketch.ViewObject is not None and sketch.ViewObject.Visibility)
+        _HIDDEN_AT_OPEN[key] = _body_hidden(sketch)  # (before FreeCAD's edit shows anything)
     except Exception as exc:
         warn("sketch: %s" % exc)
     _no_support_shown(sketch)
@@ -906,6 +951,19 @@ def show_design_at(sketch):
             for o in body.Group
             if o.isDerivedFrom("PartDesign::Feature") and o.ViewObject is not None
         ]
+        hidden = _HIDDEN_AT_OPEN.get((sketch.Document.Name, sketch.Name))
+        if hidden is None:  # (opened by FreeCAD's own commands: as it is now)
+            hidden = not body_visibility.body_shown(body)
+        if hidden:
+            # (wave 7, fix-9) the person hid the body (a sketch of it shows on its own):
+            # editing the sketch leaves its solid hidden, as in Fusion. FreeCAD's edit
+            # shows the objects the sketch projects from (Show links: Auto project put the
+            # face's edges in): their step goes again, in the same TempoVis (put back as
+            # it was by Finish Sketch).
+            on = [o for o in solids if o.ViewObject.Visibility]
+            if on:
+                tv.hide(on)
+            return
         if step is not None and step.ViewObject is not None and not step.ViewObject.Visibility:
             tv.show([step])  # PartDesign hides the step shown before (TempoVis notes it)
         others = [o for o in solids if o is not step and o.ViewObject.Visibility]
@@ -936,11 +994,24 @@ def used_by_feature(sketch):
 
 CONTAINERS = ("PartDesign::Body", "App::Part", "App::DocumentObjectGroup", "App::Origin")
 _SHOWN_BEFORE = {}  # (design, sketch name): the sketch was shown when it was opened
+_HIDDEN_AT_OPEN = {}  # (design, sketch name): its body's solid was hidden when it was opened
+
+
+def _body_hidden(sketch):
+    """True when the body a sketch is in holds a solid the person hid (fix-9)."""
+    try:
+        from . import bodies
+
+        body = sketch.getParentGeoFeatureGroup()
+        return body is not None and bodies.solid_hidden(body)
+    except Exception:
+        return False
 
 
 def shown_before_edit(doc_name, name):
     """The sketch was shown when Fission 180 opened it (open_sketch); None when it was
-    opened some other way. Asked once."""
+    opened some other way. Asked once (at Finish Sketch)."""
+    _HIDDEN_AT_OPEN.pop((doc_name, name), None)  # (the edit is over)
     return _SHOWN_BEFORE.pop((doc_name, name), None)
 
 

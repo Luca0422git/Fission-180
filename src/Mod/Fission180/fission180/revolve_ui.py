@@ -2192,7 +2192,8 @@ class RevolvePanel(extrude_finish.SaysWhy, Panel):
         when there is no solid yet), unless the user picked the operation."""
         if self.user_picked_operation or not self.profiles:
             return
-        base = self._base_feature()
+        # (wave 7, fix-9) a hidden body is not proposed: New Body
+        base = None if bodies_row_ui.hidden_source(self) else self._base_feature()
         shape = None
         if base is not None and not base.Shape.isNull():
             shape = revolve.to_global(base.Shape, base)

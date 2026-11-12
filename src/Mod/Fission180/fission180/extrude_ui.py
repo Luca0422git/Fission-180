@@ -2716,12 +2716,21 @@ class ExtrudePanel(
         base = self._base_feature()
         return base is not None and not base.Shape.isNull() and bool(base.Shape.Solids)
 
+    def _src_hidden(self):
+        """The profile's body holds a solid the person hid (a sketch of it shows on its own):
+        a new extrude leaves it alone, as Fusion leaves every hidden body (wave 7, fix-9).
+        An edit keeps acting on the body it was made in."""
+        if self.editing:
+            return False
+        body = self._source_body()
+        return body is not None and bodies.solid_hidden(body)
+
     def _base_joinable(self):
         """What stands in for "touches a body" while the bodies in the way cannot be told
         (no distance yet): the profile's own body has a solid and belongs to the active
         component (a face of another component's body is no reason to show Join)."""
-        if not self._base_has_solid():
-            return False
+        if not self._base_has_solid() or self._src_hidden():
+            return False  # (wave 7, fix-9) a hidden body is no reason to show Join
         _inside, direct = self._auto_scope()
         body = self._source_body()
         return direct is None or (body is not None and body.Name in direct)
@@ -2743,6 +2752,10 @@ class ExtrudePanel(
             self._bodies_problem = extrude_bodies.nothing_touched(
                 {"operation": operation}, doc=self.doc
             )
+            if self._src_hidden():
+                # (wave 7, fix-9) never a preview inside a hidden body: it was drawn being
+                # cut, red, and then kept in Bodies to Cut. Nothing is built; the reason shows.
+                return []
             return None
         names = bodies_core.participants(touched, self.excluded)
         if touched and not names:
@@ -2803,7 +2816,7 @@ class ExtrudePanel(
         names = self._participant_names(compute=False) if self._way is not None else None
         if names is None:
             body = self._source_body()
-            names = [body.Name] if body is not None else []
+            names = [body.Name] if body is not None and not self._src_hidden() else []
         self._highlight_bodies(names if self.active == "bodies" else [])
         # (two bodies of one name, each its component's first: "Body1 (Bracket)")
         found = [self.doc.getObject(name) for name in names]

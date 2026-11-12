@@ -24,7 +24,8 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, drag_guard, extrude_finish, handle_look, handles3d, log, preview
+from . import bodies, commands, drag_guard, extrude_finish, handle_look, handles3d, log
+from . import preview
 from . import primitives
 from . import profile_pick, taskui, ui_icon_path, value_limits, warn
 from .compat import QtCore, QtGui, QtWidgets
@@ -1558,6 +1559,8 @@ class PlacedPanel(extrude_finish.SaysWhy, Panel, value_limits.LimitedValues):
         body = primitives.owner_body(self.ref[0]) if self.ref else self.body
         if body is None:
             return None
+        if not self.editing and bodies.solid_hidden(body):
+            return None  # (wave 7, fix-9) a hidden body is never proposed: New Body
         if self.target is not None and primitives.owner_body(self.target) is body:
             return primitives.base_shape(body, before=self.target)
         return primitives.base_shape(body)

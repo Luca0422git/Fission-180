@@ -70,11 +70,23 @@ def isolate(obj):
             other.ViewObject.Visibility = False
             hidden.append(name)
     for shown in [obj] + components.ancestors(obj):
-        if shown.ViewObject is not None and not shown.ViewObject.Visibility:
-            shown.ViewObject.Visibility = True
+        show_isolated(shown)
     ISOLATED[doc.Name] = hidden
     ISOLATE_TARGETS[doc.Name] = [obj.Name]
     log("%s isolated (%d hidden)" % (obj.Label, len(hidden)))
+
+
+def show_isolated(obj):
+    """Isolate shows what it keeps. A body by its eye (body_visibility): a body hidden while a
+    sketch of it shows is on with its solid off, and stayed invisible when isolated (wave
+    7, fix-9)."""
+    from . import body_visibility
+
+    if body_visibility.is_body(obj):
+        if not body_visibility.body_shown(obj):
+            body_visibility.show_body(obj, True)
+    elif obj.ViewObject is not None and not obj.ViewObject.Visibility:
+        obj.ViewObject.Visibility = True
 
 
 def is_isolate_target(doc, obj):

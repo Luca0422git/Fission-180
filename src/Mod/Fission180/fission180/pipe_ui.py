@@ -661,6 +661,10 @@ class PipePanel(Panel, value_limits.LimitedValues):
         body = self._source_body()
         if body is None:
             return None
+        from . import bodies
+
+        if not self.editing and bodies.solid_hidden(body):
+            return None  # (wave 7, fix-9) a hidden body is never proposed: New Body
         if self.target is not None and pipe.owner_body(self.target) is body:
             return primitives.base_shape(body, before=self.target)
         return primitives.base_shape(body)

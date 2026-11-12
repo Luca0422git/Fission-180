@@ -1374,6 +1374,7 @@ def make(body, key, refs, values=None, points=None, offset=None):
     body = target_body(refs, body) or body
     if body is None:
         raise ConstructError("There is no body to put the construction in.")
+    body, refs = _off_hidden_body(body, refs)
     spec = SPECS[key]
     doc = body.Document
     datum = body.newObject(spec["type"], SHORT_NAMES[spec["type"]])
@@ -1381,6 +1382,37 @@ def make(body, key, refs, values=None, points=None, offset=None):
     _mark(datum, key)
     update(datum, key, refs, values, points)
     return datum
+
+
+ORIGIN_ROLES = ("X_Axis", "Y_Axis", "Z_Axis", "XY_Plane", "XZ_Plane", "YZ_Plane", "Origin")
+
+
+def _off_hidden_body(body, refs):
+    """(body, refs) for a new construction: built only on the origin (or on nothing) while
+    `body` holds a solid the person hid, it goes into an empty body beside it, on that
+    body's own origin (wave 7, fix-9). FreeCAD draws a body's constructions through the
+    body: an Offset Plane from XY made while the active body was hidden never showed.
+    Fusion keeps construction geometry in the component, where hiding a body never hides
+    it. A construction on a picked face or edge stays in that face's body (as before)."""
+    try:
+        from . import bodies, components
+
+        if not App.GuiUp or not bodies.solid_hidden(body):
+            return body, refs
+        for obj, _sub in refs:
+            if getattr(obj, "Role", "") not in ORIGIN_ROLES:
+                return body, refs  # (built on the part, or on another construction)
+        new = components.body_beside(body)
+        moved = [(components.same_role_plane(new, obj), sub) for obj, sub in refs]
+        from . import log
+
+        log("%s is hidden: the construction goes into a body of its own" % body.Label)
+        return new, moved
+    except Exception as exc:
+        from . import warn
+
+        warn("construction beside a hidden body: %s" % exc)
+        return body, refs
 
 
 def _mark(datum, key):
