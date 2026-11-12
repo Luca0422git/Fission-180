@@ -65,11 +65,20 @@ there at all and the first thing picked lies on the point (nothing in front of t
 not drawn = the sketch is not picked there. The reason is at the function; gui-tests.md has
 the rule.
 
-## Runs (see the final report for the numbers)
+## Runs (one scenario at a time, each in a fresh profile, all PASS)
 
-Every scenario run alone at the sandbox view; the two failing ones and
-`fix9_hidden_body_sketch_extrude` also at 770 (throwaway copies, not committed). Unit suite and
-golden models (extrude_bodies is shared with scripts).
+At the sandbox's 1538 x 769 view: `replay_11_hot_end` 100, `regress_hide_show` 57,
+`regress_bodies_combine` 47, `regress_fillet_chamfer` 35, `regress_first_part` 47,
+`regress_hole` 30, `regress_look_measure_tabs` 29, `regress_offset_plane` 51,
+`regress_pattern_mirror` 62, `regress_presspull_shell` 28, `regress_revolve_move` 28,
+`regress_save_reopen` 37, `regress_undo_redo` 83, `fix9_hidden_body_sketch_extrude` 80,
+`fix9_hidden_body_tools` 95, `revolve_qa` 347, `revolve_qa_bodies` 228, `revolve_basic` 76,
+`sweep_loft_qa_loft` 255, `sweep_loft_sweep` 72, `book_extrude_operation` 74,
+`browser_sketch_in_hidden_body` 27. At GitHub's 1538 x 770 (throwaway copies, not committed):
+`replay_11_hot_end` 100, `regress_hide_show` 57, `fix9_hidden_body_sketch_extrude` 80.
+Before the fixes both failing scenarios failed here with GitHub's message (the Hot End at both
+sizes, regress_hide_show at 770 only). Unit suite 3763 OK (10 skipped); golden models 652 pass,
+2 xfail (as before).
 
 ## Shared files touched
 
