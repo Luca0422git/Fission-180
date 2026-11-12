@@ -193,8 +193,13 @@ def f_clean_up():
     """(not a person's step) the test's design file goes from the computer's folder"""
     try:
         App.closeDocument(App.ActiveDocument.Name)
-        if s.get("file") and os.path.exists(s["file"]):
-            os.remove(s["file"])
+        if s.get("file"):
+            import glob
+
+            stem = os.path.splitext(s["file"])[0]
+            for path in [s["file"]] + glob.glob(stem + ".*.FCBak"):  # (FreeCAD's backup too)
+                if os.path.exists(path):
+                    os.remove(path)
     except Exception as exc:
         r.info("clean up: %s" % exc)
 
