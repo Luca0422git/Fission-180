@@ -893,3 +893,37 @@ class TypedLength(unittest.TestCase):
         self.assertFalse(
             core.pointer_angle(core.VERTICAL, math.radians(90), (20, 0), (20, 0), 0.04)
         )
+
+
+class ApartFromTheStart(unittest.TestCase):
+    """Full grid snap never makes a shape of no size (builder regress, wave 7): a circle's rim
+    or a line's end that the nearest crossing would put on the centre / start goes to the
+    nearest crossing that gives the shape a size."""
+
+    def test_flat_with(self):
+        self.assertTrue(core.flat_with((20.0, 10.0), (20.0, 10.0), False))
+        self.assertFalse(core.flat_with((30.0, 10.0), (20.0, 10.0), False))
+        # a rectangle level with its first corner has no width or no height
+        self.assertTrue(core.flat_with((30.0, 10.0), (20.0, 10.0), True))
+        self.assertTrue(core.flat_with((20.0, 40.0), (20.0, 10.0), True))
+        self.assertFalse(core.flat_with((30.0, 20.0), (20.0, 10.0), True))
+
+    def test_the_rim_leaves_the_centre(self):
+        # the offset plane's sketch: centre on (20, 10), the rim clicked at (25, 15) on a
+        # 10 mm grid, where (20, 10) is one of the four nearest crossings
+        got = core.crossing_apart((25.0, 15.0), 10.0, (20.0, 10.0))
+        self.assertIsNotNone(got)
+        self.assertNotEqual(got, (20.0, 10.0))
+        self.assertAlmostEqual(core.dist(got, (25.0, 15.0)), math.hypot(5.0, 5.0))
+
+    def test_the_nearest_other_crossing(self):
+        # just beside the centre: the crossing next to it on the pointer's side
+        self.assertEqual(core.crossing_apart((23.0, 10.5), 10.0, (20.0, 10.0)), (30.0, 10.0))
+        self.assertEqual(core.crossing_apart((19.5, 6.0), 10.0, (20.0, 10.0)), (20.0, 0.0))
+
+    def test_a_rectangle_gets_width_and_height(self):
+        got = core.crossing_apart((24.0, 11.0), 10.0, (20.0, 10.0), flat=True)
+        self.assertEqual(got, (30.0, 20.0))
+
+    def test_no_grid(self):
+        self.assertIsNone(core.crossing_apart((1.0, 1.0), None, (0.0, 0.0)))

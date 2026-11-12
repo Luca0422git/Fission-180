@@ -231,13 +231,19 @@ def user_defaults():
     defaults switched off (full grid snap, scale at the first dimension, the layout grid:
     harness.run); a person has them on, so these scenarios put them back (a setting that
     does not exist in an older version is simply not there)."""
+    import os
+
+    skip = os.environ.get("REGRESS_KEEP", "").split(",")  # (for bisecting a difference)
     try:
         from fission180 import sketch_infer
 
         for key in ("GridSnapFull", "ScaleAtFirstDimension"):
-            App.ParamGet(sketch_infer.PARAMS).RemBool(key)
+            if key not in skip:
+                App.ParamGet(sketch_infer.PARAMS).RemBool(key)
     except Exception:
         pass
+    if "LayoutGrid" in skip:
+        return
     try:
         from fission180 import grid_ui
 
