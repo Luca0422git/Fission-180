@@ -8,7 +8,7 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
-## 0.1.0-beta.4.0.0
+## 0.1.0-beta.4.0.1
 
 **The fourth beta: the Fusion tutorial book, replayed.** Fission 180 0.1.0-beta.3.3.9 was taken
 through *Mastering Autodesk Fusion* (2nd edition) chapter by chapter, with a real mouse and

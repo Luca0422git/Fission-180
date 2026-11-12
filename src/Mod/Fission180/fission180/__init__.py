@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 # Fission 180's version lives in one file, VERSION next to this package (the C++ build, the
 # installer and the release scripts read the same file). The literal is the fallback if the
 # file is missing; Fission180Tests/unit/test_version_core.py checks both say the same.
-_FALLBACK_VERSION = "0.1.0-beta.4.0.0"
+_FALLBACK_VERSION = "0.1.0-beta.4.0.1"
 
 
 def _read_version():

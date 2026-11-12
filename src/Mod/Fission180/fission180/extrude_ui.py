@@ -2838,6 +2838,10 @@ class ExtrudePanel(
         if self.active == "bodies":
             text += "\nClick a body to leave it out or take it back."
         self.bodies_names.setText(text)
+        # the tick boxes below already name each body: the line only shows when it says more
+        # than the names (Luca's screenshot: "Body1" once as text, then again as a tick box)
+        names_only = labels and text == bodies_core.names_text(labels)
+        self.bodies_names.setVisible(not (names_only and not self.bodies_checks.isHidden()))
 
     def _show_body_checks(self, show):
         """The check boxes of the bodies in the way (ticked: the extrude acts on it)."""

@@ -20,7 +20,9 @@ routine; plus follow-ups and fix-1..4) [x] a replay of every book project with r
 acceptance test: replay-a..g, scenarios `replay_<nn>_*`, all PASS on the merged code; partly
 replayed: the Hot End about a third, the Carabiner up to its path, the Football's laces) [x]
 VERSION / `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [ ] "Fission
-180 tests" green [ ] **Luca: release**: QUICK route (no compiled file changed since 3.3.10:
+180 tests" green [ ] **Luca: release**: numbered **0.1.0-beta.4.0.1** (Luca installed CI's
+quick-update artifact of 81f756ec, which already called itself 4.0.0, and Update now only offers a
+strictly newer version; 4.0.0 was never published). QUICK route (no compiled file changed since 3.3.10:
 `git diff 7813ef69..develop` touches only `src/Mod/Fission180`, `docs`, `tools`): Actions >
 Fission 180 patch release once the tests are green on the release commit. 3.3.10 is published
 (`Release` = `7813ef69`). Model: Fable 5.2 ran the wave until its usage credits ran out
@@ -37,6 +39,20 @@ unittest skips the FreeCAD-backed tests: components-2 missed a failure that way)
 twenty branches that each passed alone broke 18 scenarios (two builders' fillet changes
 collided): budget an integration round after every batch of merges; keep pushes to develop
 rare while GitHub's full run (~75 min) is in progress (each push cancels it).
+After the replays (2026-11-12, Opus): GitHub's full runs went 20 -> 18 -> 14 -> 3 -> 1 failing
+scenarios, each round an integration clash (two builders' rules for the same thing) or a
+difference of GitHub's 3D view (1538x770, this sandbox 1538x769: fix-7 documented how to copy it
+in gui-tests.md). Luca then installed the candidate and in two minutes found: a sketch made while
+Body1 was hidden did not show, and its Extrude proposed Cut on the hidden Body1 (fix-9; bisect:
+the Cut came in with patch 3.3.8 94928b56, `bodies.is_shown` read the body's own eye; the
+invisible sketch is older than 3.3.7; Luca said it worked before). Lessons, his words "how can
+such a simple bug get through every test": (1) the suite tested each feature alone, not where two
+meet; (2) checks read properties, not what is drawn; (3) `harness.prepare()` switches new user
+defaults off, so the suite never ran like a new install: `FISSION180_USER_DEFAULTS=1` (regress)
+runs any scenario with them on; (4) nobody used the app for ten minutes before calling it ready.
+Builder "regress" compared twelve everyday scenarios (`regress_*`) on 3.3.10 and the candidate:
+one regression (full grid snap could put a shape's second click on its first point: a 5 mm circle
+made nothing), fixed. Do this comparison before every release from now on.
 Wave 7 progress (2026-11-11, orchestrator): merged into `develop`, each after unit + base:
 **cam** (b449d601: Manufacture workspace, `manufacture*.py`, 21 `Fission180_Cam*` commands on
 FreeCAD's CAM engine run headless, own height-field Simulate, 9 posts; AI tools not built:
