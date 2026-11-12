@@ -33,3 +33,15 @@ except Exception as _exc:
     import FreeCAD
 
     FreeCAD.Console.PrintWarning("[Fission 180] version on the splash: %s\n" % _exc)
+
+# TechDraw reads its settings from a background thread while it projects a drawing view, and
+# FreeCAD's settings are not thread-safe: the groups it reads are made now, in the main thread
+# (fission180/techdraw_threads.py; a crash in the tests, run #85).
+try:
+    from fission180 import techdraw_threads as _techdraw_threads
+
+    _techdraw_threads.prepare()
+except Exception as _exc:
+    import FreeCAD
+
+    FreeCAD.Console.PrintWarning("[Fission 180] TechDraw settings groups: %s\n" % _exc)

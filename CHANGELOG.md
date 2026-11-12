@@ -19,6 +19,10 @@ releases published under the old name (their tags are `sciforge-v...`).
   in all of those places when it starts, and the installer and a quick update (Update now)
   write it into Windows' list of installed apps. This was so in every patch release since
   0.1.0-beta.3.3.1; it showed now because the number jumped to 4.
+- **Fission 180 could crash the first time a drawing view was made** in a new install. FreeCAD's
+  drawing code reads its settings from a background thread and creates the ones that do not
+  exist yet there, which is not safe while anything else saves a setting. Fission 180 now
+  creates those settings when it starts, before any drawing can be made.
 
 ## 0.1.0-beta.4.0.1
 

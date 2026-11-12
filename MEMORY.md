@@ -21,6 +21,12 @@ the patch release's AppImage too). Not changeable without a full build: the Wind
 properties of Fission180.exe (version resource). [x] fix, unit 3769 OK [ ] "Fission 180 tests"
 green [ ] **Luca: release** (quick route). Lesson: after any release, start the published
 build and look at the splash, About and the installer's title before calling it done.
+Run #85 on 446b6c83: everything green (update script on Windows too) except one crash, then pass
+on retry, in book_drawings_animation: SIGSEGV in xerces from ParameterGrp::CreateElement called by
+TechDraw::DrawUtil::isCrazy in TechDraw's projection thread (the "debug" group never exists in a
+fresh profile; FreeCAD's settings are not thread-safe). Fixed in 4.0.2 too:
+`fission180/techdraw_threads.py`, called from `Init.py`, makes every group TechDraw's App code
+reads (unit test keeps the list in step with src/Mod/TechDraw/App).
 
 **2026-11-11: 0.1.0-beta.4.0.0, the book parity report (wave 7), on `develop`** (Luca: had Opus
 5.5 work through *Mastering Autodesk Fusion, 2nd ed.* in 3.3.9 with real input; the report is
