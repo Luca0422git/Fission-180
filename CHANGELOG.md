@@ -8,6 +8,18 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.0.2
+
+### Fixed
+
+- **The start-up picture, Help > About and the installer said 0.1.0-beta.3.3** in
+  0.1.0-beta.4.0.1, and Windows' list of installed apps did too. A patch release reuses the
+  program of the last full build (0.1.0-beta.3.3 here) and only replaces Fission 180's own
+  files, and the program had its version number built in. Fission 180 now puts its own number
+  in all of those places when it starts, and the installer and a quick update (Update now)
+  write it into Windows' list of installed apps. This was so in every patch release since
+  0.1.0-beta.3.3.1; it showed now because the number jumped to 4.
+
 ## 0.1.0-beta.4.0.1
 
 **The fourth beta: the Fusion tutorial book, replayed.** Fission 180 0.1.0-beta.3.3.9 was taken

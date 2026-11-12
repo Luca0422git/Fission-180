@@ -139,6 +139,12 @@ class BrandingFilesTest(unittest.TestCase):
         # the installer shows Fission 180's version, not FreeCAD's
         nsh = _read("package", "WindowsInstaller", "write_version_nsh.py")
         self.assertIn('ConfigGet("Fission180Version")', nsh)
+        # ... the module's VERSION first: a patch release's installer is made from an earlier
+        # release's program (0.1.0-beta.4.0.1's said 0.1.0-beta.3.3)
+        self.assertIn('"Mod", "Fission180", "VERSION"', nsh)
+        self.assertLess(nsh.index("_module_version() or"), nsh.index('ConfigGet("Fission180Version")'))
+        # and the splash and About take the module's version before the splash is drawn
+        self.assertIn("program_version.at_start()", _read("src", "Mod", "Fission180", "Init.py"))
         self.assertIn("APP_VERSION_DISPLAY", nsh)
         self.assertIn(
             '!define APP_VERSION "${APP_VERSION_DISPLAY}"',

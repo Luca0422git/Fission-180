@@ -4,6 +4,24 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-12: 0.1.0-beta.4.0.2, the version on the splash** (patch, Opus) Luca installed 4.0.1:
+the splash said 0.1.0-beta.3.3 (and, he said, the updater). Cause: the splash, Help > About and the
+installer read the number compiled into the program (`Config()["Fission180Version"]` /
+`"SplashInfoVersion"`, src/Main), and a patch release reuses the last full build's program
+(3.3), so every patch since 3.3.1 showed 3.3; nobody noticed until the jump to 4. Fix, no core
+change: `fission180/program_version.py`, called from `Init.py` before the splash is drawn, sets
+both from the module's VERSION and keeps the compiled one as `Fission180BuiltVersion`
+(`program_version.built_version`, used by `vex_placement_indicator` for core patch #18);
+`write_version_nsh.py` reads `Mod/Fission180/VERSION` first; `install_update.ps1`
+(`Update-AppsList`) writes the new number into Windows' installed-apps entry (DisplayVersion,
+DisplayName) after a quick update. Checked on the published 4.0.1 AppImage with the new module:
+splash picture before/after, About says "0.1.0-beta.4.0.2 (based on FreeCAD 1.1.4)", the
+installer's version.nsh, smoke/journey/restart all pass; the smoke test now checks it (it runs on
+the patch release's AppImage too). Not changeable without a full build: the Windows file
+properties of Fission180.exe (version resource). [x] fix, unit 3769 OK [ ] "Fission 180 tests"
+green [ ] **Luca: release** (quick route). Lesson: after any release, start the published
+build and look at the splash, About and the installer's title before calling it done.
+
 **2026-11-11: 0.1.0-beta.4.0.0, the book parity report (wave 7), on `develop`** (Luca: had Opus
 5.5 work through *Mastering Autodesk Fusion, 2nd ed.* in 3.3.9 with real input; the report is
 `docs/fission180/dev/research/book-parity-report.txt` (20 bugs, 123 friction notes, 44 fails);
@@ -19,8 +37,9 @@ animation, cam, hardware. Status: [x] briefs [x] builders done and merged (each 
 routine; plus follow-ups and fix-1..4) [x] a replay of every book project with real input (the
 acceptance test: replay-a..g, scenarios `replay_<nn>_*`, all PASS on the merged code; partly
 replayed: the Hot End about a third, the Carabiner up to its path, the Football's laces) [x]
-VERSION / `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [ ] "Fission
-180 tests" green [ ] **Luca: release**: numbered **0.1.0-beta.4.0.1** (Luca installed CI's
+VERSION / `_FALLBACK_VERSION` 0.1.0-beta.4.0.0, CHANGELOG, known issues, AI docs [x] "Fission
+180 tests" green (run #84 on aa89b7f6) [x] **Luca: release** (published 2026-11-12, patch release
+#12): numbered **0.1.0-beta.4.0.1** (Luca installed CI's
 quick-update artifact of 81f756ec, which already called itself 4.0.0, and Update now only offers a
 strictly newer version; 4.0.0 was never published). QUICK route (no compiled file changed since 3.3.10:
 `git diff 7813ef69..develop` touches only `src/Mod/Fission180`, `docs`, `tools`): Actions >
@@ -2129,6 +2148,15 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: book parity wave 7 finished, 0.1.0-beta.4.0.1 released, patch 4.0.2 (`develop`, 2026-11-12)
+
+Opus took over from Fable at the replay stage. Fix rounds fix-1..fix-10 and the "regress"
+builder brought GitHub's full run from 20 failing scenarios to none (run #84, aa89b7f6); Luca
+released 4.0.1 (patch release #12). He then found the splash still said 0.1.0-beta.3.3: fixed in
+4.0.2 (see the status entry at the top). Open: tests green on 4.0.2's commit, then Luca's
+release; the book re-run itself (Hot End, Carabiner path and Football laces only partly
+replayed).
 
 ### Session log: known issues night, patch 0.1.0-beta.3.3.9 (`develop`, 2026-11-10)
 

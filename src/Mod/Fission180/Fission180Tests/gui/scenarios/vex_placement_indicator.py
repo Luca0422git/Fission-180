@@ -19,11 +19,18 @@ PATCHED_FROM = "0.1.0-beta.3.1"
 s = {}
 
 
+def _built():
+    from fission180 import program_version
+
+    return program_version.built_version(App.ConfigGet)
+
+
 def patched():
-    """Whether this program has core patch #18 (its compiled version says so)."""
+    """Whether this program has core patch #18 (its compiled version says so: not the module's,
+    which Init.py puts on the splash, fission180/program_version.py)."""
     from fission180 import version_core
 
-    built = App.ConfigGet("Fission180Version") or ""
+    built = _built()
     if not version_core.canonical(built):
         return False
     return built == PATCHED_FROM or version_core.newer(built, PATCHED_FROM)
@@ -67,7 +74,7 @@ def setup():
     h.check(
         "the program",
         True,
-        {"Fission180Version": App.ConfigGet("Fission180Version"), "patched": patched()},
+        {"built": _built(), "patched": patched()},
     )
 
 

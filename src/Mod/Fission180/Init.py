@@ -21,3 +21,15 @@ except Exception as _exc:
     import FreeCAD
 
     FreeCAD.Console.PrintWarning("[Fission 180] interface size: %s\n" % _exc)
+
+# The version on the splash, in Help > About and in the Windows installer: this module's
+# (VERSION), not the one the program was compiled with, which a patch release does not change
+# (fission180/program_version.py). Before the splash is drawn, which is now.
+try:
+    from fission180 import program_version as _program_version
+
+    _program_version.at_start()
+except Exception as _exc:
+    import FreeCAD
+
+    FreeCAD.Console.PrintWarning("[Fission 180] version on the splash: %s\n" % _exc)

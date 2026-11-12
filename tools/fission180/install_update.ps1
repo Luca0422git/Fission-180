@@ -116,6 +116,42 @@ function Program-Name($folder) {
     return ""
 }
 
+function Update-AppsList($folder, $versionFile) {
+    # Windows' list of installed apps shows the version the installer wrote (DisplayName,
+    # DisplayVersion: package/WindowsInstaller/setup/configure.nsh). A quick update changes only
+    # Mod\Fission180, so it writes the module's new VERSION there too: after 0.1.0-beta.4.0.1 the
+    # list still said 0.1.0-beta.3.3. Only the entry whose uninstaller is in $folder; never
+    # stops the update (a portable build has no entry; a folder without rights is told).
+    try {
+        if (-not (Test-Path -LiteralPath $versionFile)) { return }
+        $version = ([string](Get-Content -LiteralPath $versionFile -TotalCount 1)).Trim()
+        if ($version -eq "") { return }
+        $inside = $folder.TrimEnd('\', '/') + "\"
+        foreach ($hive in @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall")) {
+            $keys = @(Get-ChildItem -Path $hive -ErrorAction SilentlyContinue |
+                Where-Object { $_.PSChildName -like "Fission180*" })
+            foreach ($key in $keys) {
+                $props = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction SilentlyContinue
+                if ($null -eq $props) { continue }
+                $uninstall = [string]$props.UninstallString
+                if ($uninstall.IndexOf($inside, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
+                $old = [string]$props.DisplayVersion
+                if ($old -eq $version) { continue }
+                $name = [string]$props.DisplayName
+                if ($old -ne "" -and $name.Contains($old)) { $name = $name.Replace($old, $version) }
+                Set-ItemProperty -LiteralPath $key.PSPath -Name "DisplayVersion" -Value $version -ErrorAction Stop
+                if ($name -ne "") {
+                    Set-ItemProperty -LiteralPath $key.PSPath -Name "DisplayName" -Value $name -ErrorAction Stop
+                }
+                Write-Host "[Fission 180] Windows' list of installed apps now says $version (was $old)"
+            }
+        }
+    } catch {
+        Write-Host "[Fission 180] could not put the new version in Windows' list of installed apps: $($_.Exception.Message)"
+    }
+}
+
 function Is-Admin {
     try {
         $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -369,6 +405,7 @@ try {
 
     $info = Join-Path $current "fission180\build_info.py"
     if (Test-Path $info) { Get-Content $info | Select-String "COMMIT|DATE" | ForEach-Object { Write-Host "[Fission 180] $_" } }
+    Update-AppsList $Target (Join-Path $current "VERSION")
     if ($Restart -and -not $Elevated) {
         try {
             Start-Program $Target $program

@@ -10,7 +10,18 @@ filepath=os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.nsh")
 v=FreeCAD.Version()
 # FISSION180: the installer shows Fission 180's own version (src/Mod/Fission180/VERSION, "0.1.0-beta"),
 # not FreeCAD's (core-patches.md #15). FreeCAD's numbers stay in APP_FREECAD_VERSION.
-sv=FreeCAD.ConfigGet("Fission180Version") or "{}.{}.{}".format(v[0], v[1], v[2])
+# FISSION180: the module's VERSION file first: a patch release's installer is made from an earlier
+# full release's program, compiled with that release's number (0.1.0-beta.4.0.1's installer said
+# 0.1.0-beta.3.3). Fission 180's Init.py puts the same number in Fission180Version
+# (fission180/program_version.py); the file is read here too in case the module did not start.
+def _module_version():
+    try:
+        path = os.path.join(FreeCAD.getHomePath(), "Mod", "Fission180", "VERSION")
+        with open(path, "r", encoding="utf-8") as handle:
+            return handle.readline().strip()
+    except Exception:
+        return ""
+sv=_module_version() or FreeCAD.ConfigGet("Fission180Version") or "{}.{}.{}".format(v[0], v[1], v[2])
 sv_numbers=(sv.split("-")[0].split(".") + ["0", "0", "0"])[:3]
 content=f'''\
 !define COPYRIGHT_YEAR {datetime.date.today().year}

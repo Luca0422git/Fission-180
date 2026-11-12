@@ -573,6 +573,19 @@ def step_started():
     area = Gui.getMainWindow().findChild(QtWidgets.QMdiArea)
     titles = [w.windowTitle() for w in area.subWindowList()] if area is not None else []
     check("No Start page", not any("Start" in t for t in titles), titles)
+    # The splash, Help > About and the installer show this module's VERSION, also on a patch
+    # release's program, which was compiled with an earlier number (0.1.0-beta.4.0.1's splash
+    # said 0.1.0-beta.3.3: fission180/program_version.py). Stock FreeCAD with the add-on has
+    # no compiled Fission 180 version and keeps FreeCAD's.
+    from fission180 import __version__, program_version
+
+    built = program_version.built_version(App.ConfigGet)
+    shown = {key: App.ConfigGet(key) for key in program_version.SHOWN_KEYS}
+    check(
+        "The splash and About show this version",
+        not built or all(value == __version__ for value in shown.values()),
+        {"version": __version__, "built": built, "shown": shown},
+    )
     general = App.ParamGet(start_in.GENERAL)
     check(
         "AutoloadModule is Fission 180",
