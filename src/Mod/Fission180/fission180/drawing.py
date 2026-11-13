@@ -1993,6 +1993,9 @@ def add_balloon(view, origin, position, text):
     identifier, flatpattern_drawing.py). For points on the sheet: add_balloon_at."""
     page = page_of(view)
     doc = view.Document
+    # (TechDraw touches the view a balloon is put on, and the next recompute worked out the
+    # view's lines again for nothing: 45 s for the parts list of a 1,000-face assembly)
+    waiting = "Touched" in getattr(view, "State", [])
     balloon = doc.addObject(BALLOON, "Balloon")
     balloon.SourceView = view
     x, y = view_position(view)
@@ -2005,6 +2008,11 @@ def add_balloon(view, origin, position, text):
     balloon.EndType = "Filled arrow"
     page.addView(balloon)
     _mark(balloon, "Balloon")
+    if not waiting and "Touched" in getattr(view, "State", []):
+        try:
+            view.purgeTouched()
+        except Exception:
+            pass
     return balloon
 
 
