@@ -400,6 +400,14 @@ class PictureHelpers(unittest.TestCase):
         wide = Image.new("RGB", (900, 120), (59, 68, 83))
         self.assertEqual(self.tp.dialog_picture(wide).size, (320, 200))
 
+    def test_with_dialog(self):
+        from PIL import Image
+
+        panel = Image.new("RGB", (300, 700), (59, 68, 83))
+        out = self.tp.with_dialog(self.shot((0.3, 0.3, 0.7, 0.7)), panel)
+        self.assertEqual(out.size, (320, 200))
+        self.assertEqual(out.getpixel((300, 100)), (59, 68, 83))  # the dialog on the right
+
     def test_picture_names(self):
         with self.assertRaises(ValueError):
             self.tp.picture("fillet")

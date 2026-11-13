@@ -368,6 +368,8 @@ class Hover(QtCore.QObject):
         return False
 
     def _menu_hover(self, menu, action):
+        if self.suppressed is not None and not self._is_suppressed(menu, action):
+            self.suppressed = None  # (another entry: the clicked one may show again later)
         found = getattr(menu, "_sf_tip_entries", {}).get(id(action)) if action else None
         if found is None:
             if self._is_target(menu):
