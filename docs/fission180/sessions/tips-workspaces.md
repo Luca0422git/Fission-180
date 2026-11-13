@@ -72,7 +72,11 @@ Every picture is made by a script in the real Fission 180 under Xvfb, with tips-
   2D Pocket: each shows its small tooltip, then the expanded one with its own picture drawn on
   the screen, its words and numbered steps. PASS, 58 checks.
 - Unit tests (`run_tests.sh --only unit`): 3813 tests, only the five other modules' coverage
-  tests fail (above). Headless runner: see the report.
+  tests fail (above). Headless runner (`--only headless`): all passed (555 tool calls, 197
+  documentation items, the MCP agent's 81 checks, rebuild 153 + 15, recognition 71 parts).
+  tips-ui's `tips_hover` with these modules loaded: PASS, 44 checks. No golden model run: no
+  geometry code was changed. The scenarios hover the ribbon and move into the 3D view without
+  clicking there, so the one-pixel-taller window check of gui-tests.md does not apply.
 
 ## FreeCAD and Fission 180 traps found on the way
 
