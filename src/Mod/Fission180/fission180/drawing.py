@@ -782,6 +782,29 @@ def automatic_plan(page, sources, orientation="Front"):
     )
 
 
+def add_automatic_views(page, sources, storyboard=""):
+    """Fusion's Automatic views: a base view (Front; a flat pattern from the top), two
+    projected views and an isometric one, laid out on the sheet at the scale at which the
+    block of four fits (automatic_plan). storyboard: every view shows its end (a drawing
+    made From Animation). Returns the four views; Fission180AutoFits on the page says
+    whether they fit. (Create Drawing's Automatic and the AI's create_drawing automatic.)"""
+    base = add_base_view(page, sources, 0.0, 0.0, "Front", scale=1.0)
+    if storyboard:
+        from . import drawing_exploded
+
+        drawing_exploded.add_exploded(base, storyboard)
+    # (the base view's own orientation: a flat pattern is drawn from the top)
+    plan = automatic_plan(page, list(base.Source), orientation_of(base))
+    set_scale(base, plan["scale"])
+    base.X, base.Y = plan["views"]["Base"]
+    views = [base]
+    for kind_name in core.AUTO_KINDS:
+        x, y = plan["views"][kind_name]
+        views.append(add_projected(base, kind_name, x, y))
+    _add(page, "App::PropertyBool", "Fission180AutoFits", bool(plan["fits"]))
+    return views
+
+
 def view_rect(view, margin=0.0):
     """(x0, y0, x1, y1) of what a view draws on the page (mm)."""
     x, y = view_position(view)
@@ -2669,8 +2692,18 @@ def export_dxf(page, path):
                 from . import drawing_annot
 
                 drawing_annot.to_dxf(dxf, obj)
-            elif kind(obj) == "PartsList":
-                layout, corner = table_layout_of(obj)
+            elif kind(obj) in ("PartsList", "BendTable"):
+                if kind(obj) == "PartsList":
+                    layout, corner = table_layout_of(obj)
+                else:  # a flat pattern's bend table (flatpattern_drawing.py; wave 8: it was
+                    # left out of the DXF, so of the AI's picture of the sheet too)
+                    from . import flatpattern_drawing
+
+                    layout = core.table_layout(table_rows(obj), columns=flatpattern_drawing.COLUMNS)
+                    corner = (
+                        _value(obj.X) - layout["width"] / 2.0,
+                        _value(obj.Y) + layout["height"] / 2.0,
+                    )
                 for x1, y1, x2, y2, _w in layout["lines"]:
                     dxf.line(
                         corner[0] + x1, corner[1] + y1, corner[0] + x2, corner[1] + y2, "TABLE"
