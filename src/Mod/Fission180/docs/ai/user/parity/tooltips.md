@@ -92,6 +92,28 @@ test follows the ribbon, so every one of them gets a tooltip):
 | manufacture | MILLING | 21 |
 | animation | ANIMATION | 10 |
 
+## Coverage: MESH, SHEET METAL, PLASTIC, SIMULATION, MANUFACTURE, ANIMATION (tips-workspaces)
+
+Every command of these tabs (113) has a complete entry and its picture (`test_tips`:
+`test_module_mesh`, `_sheet_metal`, `_plastic`, `_simulation`, `_manufacture`, `_animation`
+pass; the pictures together: `docs/fission180/dev/tips-workspaces-sheet.png`). The texts were
+written from each command's own dialog code (its labels, defaults and refusals); the pictures
+made in the real Fission 180 by `tools/fission180/tip_pictures_<module>.py` (shared helpers:
+`tip_pictures_workspaces.py`):
+
+| Module | Commands | What the picture shows | How it is made |
+|---|---|---|---|
+| mesh | 19: CREATE 2 (Insert Mesh is SOLID's), PREPARE 4, MODIFY 12, CONVERT 1 | The mesh body before and after the step: triangles where the tool is about them, painted or new faces in the selection blue, face groups in their colours; Direct Edit beside its dialog | Real MESH steps (`mesh.new_step`, computed as the dialogs do) on a mesh body as Insert Mesh makes it |
+| sheet_metal | 16: CREATE 6, MODIFY 8 (the repeated SOLID commands are SOLID's), FLAT PATTERN 2 | The part before and after (what the tool made or lifted in blue); Convert to Sheet Metal, Sheet Metal Rules and Export DXF: their dialogs | The golden models' step lists (`fission180/ai/ops`) |
+| plastic | 8 | Bosses, a snap-fit hook (the case see-through), a lip, a rest, a rule fillet before and after; Design Advice's colours beside its list; the two rule dialogs | The golden models' step lists; the commands' own dialogs |
+| simulation | 39: SETUP 16, RESULTS 23 (Manage Physical Materials and Measure are SOLID's) | An L bracket: the glyphs of constraints, loads, gravity, DOF View, local mesh and the mesh; the coloured result with its legend at each deformation scale, with mesh, ghost, loads, tags, the animation bar; slice, iso-surface and point probes beside their panels; the windows of the other commands | `fission180/simulation.py`'s study, solved through the Solve dialog's job (CalculiX); the RESULTS session's own options |
+| manufacture | 21: SETUP 1, 2D 10, 3D 4, DRILLING 1, ACTIONS 4, MANAGE 1 | The workspace as it shows the operation: stock, axes, the picks in blue, the toolpath; Generate before / after; the Simulate player on the cut stock; Post Process, Setup Sheet, Tool Library; 3D Contour's dialog | The CAM steps (`manufacture_ops`), toolpaths generated in the background as the app does |
+| animation | 10 | The storyboard at its start and its end (the moved components in blue); a callout; the timeline's View row; New Storyboard and Publish Video beside the model | The animation steps (`animation_ops`) in the ANIMATION workspace, the playhead moved |
+
+GUI check: `tipsws_hover` (real pointer: MESH > Remesh, SHEET METAL > Flange, PLASTIC > Boss,
+the Smooth entry of MESH > MODIFY's drop-down, MILLING > 2D Pocket in the MANUFACTURE
+workspace; each expanded card with its own words and its picture on the screen; 58 checks).
+
 ## Not built, and why
 
 - The pictures are still pictures, not Fusion's short tool clips (animations): a PNG per command
