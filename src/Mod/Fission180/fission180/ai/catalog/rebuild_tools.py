@@ -46,17 +46,16 @@ define(
     RIBBON,
     "Start rebuilding a part that has no timeline as real, editable timeline steps (Auto "
     "Timeline): an imported STEP body, any solid body, or a mesh body (made into a solid "
-    "first; an open or broken mesh, or one of more than 10,000 triangles, is refused). "
-    "Fission 180 freezes the part as the reference "
-    "(drawn faint and see-through; never a body or a step, so it stays the target whatever "
-    "you build), hides the original and makes a new empty body '<name> (rebuilt)' at its "
-    "place, active: build the rebuild there with the normal tools. Then: describe_reference "
+    "first; an open or broken mesh, or one of more than 10,000 triangles, is refused; for a "
+    "mesh ask the person first: a solid without a timeline is one convert_mesh call). "
+    "Fission 180 freezes the part as the reference (drawn faint; never a body or a step), "
+    "hides the original and makes a new empty body '<name> (rebuilt)' at its place, active: "
+    "build the rebuild there with the normal tools. Then: describe_reference "
     "(the part's features and a plan of tool calls), build the plan step by step, "
     "compare_to_reference after every feature and fix what its verdict says, finish_rebuild "
     "when it says done. The recipe: docs_read recipes/reverse-engineer.md. One undo step. "
     "body: the id of the body (or of a step in it, of the mesh body, or of the component "
-    "holding one body: what import_file answers); label: the reference's name (default "
-    "'<name> (reference)').",
+    "holding one body: what import_file answers).",
     schema(
         {
             "body": step_id(
@@ -82,14 +81,14 @@ define(
     "What the reference of a rebuild is made of, read by Fission 180 from its faces: summary "
     "(volume, area, size, counts, the kinds of faces), base (the base shape: an extrude with "
     "its plane, profile and distance, a revolve, a box...), features (holes, counterbores, "
-    "pockets, bosses, slots, fillets, chamfers, patterns, each with its numbers and the "
-    "faces it explains), plan (tool calls in Fusion's order: base shape, cuts and bosses, "
-    "holes, patterns, chamfers, fillets last; each step's args pass the tool's own check, so "
-    "send them as they are, adjusting ids the answers give), unrecognized (faces it could "
-    "not read, with selectors and why), confidence (0..1) and notes. Coordinates are the "
-    "rebuilt body's (the design's for a part at the origin). detail: plan (default: the "
-    "features and the plan), summary (the part's numbers only, quick) or full (also every "
-    "face of every feature, as selectors).",
+    "pockets, bosses, slots, fillets, chamfers, patterns, each with its numbers), plan "
+    "(tool calls in Fusion's order: base, cuts and bosses, holes, patterns, chamfers, fillets "
+    "last; send each step's args as they are, adjusting ids the answers give), unrecognized "
+    "(faces it could not read, why), confidence (0..1) and notes. Coordinates are the "
+    "rebuilt body's (the design's for a part at the origin). On a mesh it cannot fit "
+    "(domes, fillets, free-form areas) it says so first, with what the mesh is made of and "
+    "the two honest routes (convert_mesh, or the main shapes by hand); a pattern's copies are "
+    "named by id in the pattern. detail: plan | summary (numbers only, quick) | full.",
     schema(
         {
             "reference": REFERENCE_ARG,
