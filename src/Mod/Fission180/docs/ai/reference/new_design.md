@@ -47,9 +47,11 @@ New design 'Bracket' (id 'Bracket') with an empty body 'Body'; it is the active 
 ## See also
 
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
+- Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
 - Recipe: [a pair of meshing spur gears](fission180://docs/recipes/gear-pair.md)
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)

@@ -62,6 +62,7 @@ Done: AI: Fillet 5 mm. Its id is 'Fillet1'. Bodies now: Body1: 23785.4 mm3, 60 x
 ## See also
 
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
+- Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)

@@ -116,7 +116,9 @@ Done: AI: Extrude 5 mm. Its id is 'Extrude2'. Bodies now: Body1: 36446 mm3, 61.7
 ## See also
 
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
+- Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)

@@ -6,14 +6,14 @@ Fusion: SKETCH > CONSTRAINTS. Category: Sketch. Changes the design (one undo ste
 
 ## What it does
 
-Add a geometric constraint to a sketch, as Fusion's Constraints panel: coincident (two points, or a point on a curve), horizontal / vertical (a line, or two points), parallel, perpendicular, tangent, equal, collinear (two lines), concentric (two circles or arcs), midpoint (a point and a line or arc), symmetric (two points or curves and the line they mirror about, third), fix (lock a curve or point), point_on (a point on a curve), smooth (G2 where a spline meets a curve; tangent only when the solver cannot keep curvature). items are curves by index (get_sketch) with the point that matters. A constraint that conflicts with the sketch is not added: the answer names the constraints it fights with.
+Add a geometric constraint to a sketch, as Fusion's Constraints panel: coincident (two points, or a point on a curve), horizontal / vertical (a line, or two points), parallel, perpendicular, tangent, equal, collinear (two lines), concentric (two circles or arcs), midpoint (a point and a line or arc), symmetric (two points or curves and the line they mirror about, third), fix / unfix (lock or free a curve or point), point_on (a point on a curve), curvature (Fusion's Curvature: a spline and a line join with matching curvature, G2; with an arc or spline G1 and the answer says so; smooth: plain tangent). items are curves by index (get_sketch) with the point that matters. A constraint that conflicts with the sketch is not added: the answer names the constraints it fights with.
 
 ## Arguments
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
 | `sketch` (required) | string |  |  |  | the sketch |
-| `kind` (required) | `coincident` \| `horizontal` \| `vertical` \| `parallel` \| `perpendicular` \| `tangent` \| `equal` \| `symmetric` \| `concentric` \| `collinear` \| `midpoint` \| `fix` \| `point_on` \| `smooth` |  |  |  |  |
+| `kind` (required) | `coincident` \| `horizontal` \| `vertical` \| `parallel` \| `perpendicular` \| `tangent` \| `equal` \| `symmetric` \| `concentric` \| `collinear` \| `midpoint` \| `fix` \| `point_on` \| `smooth` \| `curvature` \| `unfix` |  |  |  |  |
 | `items` (required) | array of objects |  |  | at least 1 item(s), at most 3 item(s) | the curves / points it ties, in order |
 
 ## Answer

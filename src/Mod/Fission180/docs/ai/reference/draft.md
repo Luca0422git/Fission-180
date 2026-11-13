@@ -65,5 +65,6 @@ Done: AI: Draft 3 degrees. Its id is 'Draft1'. Bodies now: Body1: 23479.6 mm3, 6
 
 ## See also
 
+- Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `sf_draft_cylinder`, `sf_draft_edit_angle`, `sf_draft_ellipse_wall`, `sf_draft_ellipse_wall_edit`, `sf_draft_ellipse_wall_flip`, `sf_draft_flip`, `sf_draft_four_sides`, `sf_draft_front_face`, `sf_draft_spline_pocket`, `sf_draft_spline_side_corners`, `sf_draft_tangent_chain`, `sf_draft_then_shell` and 6 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

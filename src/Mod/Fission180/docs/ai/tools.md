@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
+Fission 180 offers 193 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
 
 ## All tools
 
@@ -34,6 +34,10 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`sketch_polygon`](fission180://docs/reference/sketch_polygon.md) | Polygon | Sketch | SKETCH > CREATE > Polygon > Circumscribed / Inscribed Polygon | changes the design (one undo step) | an open design |
 | [`sketch_trim`](fission180://docs/reference/sketch_trim.md) | Trim | Sketch | SKETCH > MODIFY > Trim (T) | changes the design (one undo step) | an open design |
 | [`sketch_text`](fission180://docs/reference/sketch_text.md) | Text | Sketch | SKETCH > CREATE > Text | changes the design (one undo step) | an open design |
+| [`sketch_draw`](fission180://docs/reference/sketch_draw.md) | Sketch tools | Sketch | SKETCH > CREATE (Midpoint Line, 3-Point Rectangle, 2-Point / 3-Point / 2-Tangent / 3-Tangent Circle, 3-Point / Tangent Arc, Edge Polygon, Slots, Ellipse, Conic Curve, Control / Fit Point Spline) | changes the design (one undo step) | an open design |
+| [`sketch_modify`](fission180://docs/reference/sketch_modify.md) | Sketch modify | Sketch | SKETCH > MODIFY (Fillet, Chamfer, Offset, Extend, Break) and FINISH SKETCH > Toggle Construction (X) | changes the design (one undo step) | an open design |
+| [`sketch_pattern`](fission180://docs/reference/sketch_pattern.md) | Sketch mirror / pattern / move | Sketch | SKETCH > CREATE > Mirror / Circular Pattern / Rectangular Pattern, MODIFY > Move/Copy | changes the design (one undo step) | an open design |
+| [`sketch_project`](fission180://docs/reference/sketch_project.md) | Project / Include | Sketch | SKETCH > CREATE > Project / Include (Project, Intersect, Include 3D Geometry, Project to Surface, Isoparametric Curve) | changes the design (one undo step) | an open design |
 | [`sweep`](fission180://docs/reference/sweep.md) | Sweep | Create (SOLID) | SOLID > CREATE > Sweep | changes the design (one undo step) | an open design |
 | [`loft`](fission180://docs/reference/loft.md) | Loft | Create (SOLID) | SOLID > CREATE > Loft | changes the design (one undo step) | an open design |
 | [`rib`](fission180://docs/reference/rib.md) | Rib | Create (SOLID) | SOLID > CREATE > Rib | changes the design (one undo step) | a solid body |
@@ -50,12 +54,12 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`mirror`](fission180://docs/reference/mirror.md) | Mirror | Create (SOLID) | SOLID > CREATE > Mirror | changes the design (one undo step) | a solid body |
 | [`pattern_components`](fission180://docs/reference/pattern_components.md) | Pattern components | Assemble | SOLID > CREATE > Pattern (Pattern Type: Components) | changes the design (one undo step) | an open design |
 | [`insert_hardware`](fission180://docs/reference/insert_hardware.md) | Insert hardware | Assemble | INSERT > Hardware (McMaster-Carr / fasteners in Fusion) | changes the design (one undo step) | a solid body |
-| [`press_pull`](fission180://docs/reference/press_pull.md) | Press pull | Modify | SOLID > MODIFY > Press Pull (Q) | changes the design (one undo step) | a solid body |
+| [`press_pull`](fission180://docs/reference/press_pull.md) | Press pull | Modify | SOLID > MODIFY > Press Pull (Q) / Offset Face | changes the design (one undo step) | a solid body |
 | [`fillet_sets`](fission180://docs/reference/fillet_sets.md) | Fillet / chamfer with sets | Modify | SOLID > MODIFY > Fillet / Chamfer (several selection sets, Chord Length, Variable) | changes the design (one undo step) | a solid body |
 | [`rule_fillet`](fission180://docs/reference/rule_fillet.md) | Rule fillet | Modify | SOLID > MODIFY > Fillet (Type: Rule Fillet) | changes the design (one undo step) | a solid body |
 | [`full_round_fillet`](fission180://docs/reference/full_round_fillet.md) | Full round fillet | Modify | SOLID > MODIFY > Fillet (Type: Full Round Fillet) | changes the design (one undo step) | a solid body |
 | [`draft`](fission180://docs/reference/draft.md) | Draft | Modify | SOLID > MODIFY > Draft | changes the design (one undo step) | a solid body |
-| [`scale`](fission180://docs/reference/scale.md) | Scale | Modify | SOLID > MODIFY > Scale | changes the design (one undo step) | a solid body |
+| [`scale`](fission180://docs/reference/scale.md) | Scale | Modify | SOLID > MODIFY > Scale | changes the design (one undo step) | an open design |
 | [`combine`](fission180://docs/reference/combine.md) | Combine | Modify | SOLID > MODIFY > Combine | changes the design (one undo step) | an open design |
 | [`split_body`](fission180://docs/reference/split_body.md) | Split body | Modify | SOLID > MODIFY > Split Body | changes the design (one undo step) | a solid body |
 | [`split_face`](fission180://docs/reference/split_face.md) | Split face | Modify | SOLID > MODIFY > Split Face | changes the design (one undo step) | a solid body |
@@ -68,7 +72,7 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`align`](fission180://docs/reference/align.md) | Align | Modify | SOLID > MODIFY > Align | changes the design (one undo step) | a solid body |
 | [`physical_material`](fission180://docs/reference/physical_material.md) | Physical material | Modify | SOLID > MODIFY > Physical Material | changes the design (one undo step) | an open design |
 | [`list_materials`](fission180://docs/reference/list_materials.md) | List materials | Modify | SOLID > MODIFY > Physical Material / Appearance (libraries) | read-only | nothing |
-| [`appearance`](fission180://docs/reference/appearance.md) | Appearance | Modify | SOLID > MODIFY > Appearance (A) | changes the design (one undo step) | an open design |
+| [`appearance`](fission180://docs/reference/appearance.md) | Appearance | Modify | SOLID > MODIFY > Appearance (A) / Texture Map Controls | changes the design (one undo step) | an open design |
 | [`capture_design_history`](fission180://docs/reference/capture_design_history.md) | Capture design history | Timeline (history) | the design's menu: Capture Design History / Do Not Capture Design History | changes the design (one undo step), destructive | an open design |
 | [`surface`](fission180://docs/reference/surface.md) | Surface | Surface | SURFACE > CREATE / MODIFY (Extrude, Revolve, Sweep, Loft, Patch, Ruled, Offset, Boundary Fill, Thicken, Trim, Untrim, Extend, Stitch, Unstitch, Reverse Normal) | changes the design (one undo step) | nothing |
 | [`surface_modify`](fission180://docs/reference/surface_modify.md) | Surface modify | Surface | SURFACE > MODIFY (Fillet, Chamfer, Press Pull, Delete, Merge on surface bodies) | changes the design (one undo step) | an open design |
@@ -180,6 +184,23 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`anim_callout`](fission180://docs/reference/anim_callout.md) | Create callout | Animation | ANIMATION > ANNOTATION > Create Callout | changes the design (one undo step) | an open design |
 | [`anim_storyboards`](fission180://docs/reference/anim_storyboards.md) | Storyboards and actions | Animation | ANIMATION > ANIMATION TIMELINE | read-only | an open design |
 | [`anim_publish_video`](fission180://docs/reference/anim_publish_video.md) | Publish video | Animation | ANIMATION > PUBLISH > Publish Video | writes files | an open design, the Fission 180 window |
+| [`as_built_joint`](fission180://docs/reference/as_built_joint.md) | As-built joint | Assemble | ASSEMBLE > As-built Joint | changes the design (one undo step) | an open design |
+| [`joint_origin`](fission180://docs/reference/joint_origin.md) | Joint origin | Assemble | SOLID > CREATE > Joint Origin (and ASSEMBLE > Joint Origin) | changes the design (one undo step) | an open design |
+| [`rigid_group`](fission180://docs/reference/rigid_group.md) | Rigid group | Assemble | ASSEMBLE > Rigid Group | changes the design (one undo step) | an open design |
+| [`motion_link`](fission180://docs/reference/motion_link.md) | Motion link | Assemble | ASSEMBLE > Motion Link | changes the design (one undo step) | an open design |
+| [`contact`](fission180://docs/reference/contact.md) | Contact sets | Assemble | ASSEMBLE > Enable Contact Sets / Enable All Contact / Disable Contact / New Contact Set | changes the design (one undo step) | an open design |
+| [`position`](fission180://docs/reference/position.md) | Capture / revert position | Assemble | ASSEMBLE > Capture Position / Revert Position | changes the design (one undo step) | an open design |
+| [`duplicate_with_joints`](fission180://docs/reference/duplicate_with_joints.md) | Duplicate with joints | Assemble | ASSEMBLE > Duplicate With Joints | changes the design (one undo step) | an open design |
+| [`motion_study`](fission180://docs/reference/motion_study.md) | Motion study | Assemble | ASSEMBLE > Motion Study | changes the design (one undo step) | an open design |
+| [`decal`](fission180://docs/reference/decal.md) | Decal | Import and export | INSERT > Decal | changes the design (one undo step) | an open design |
+| [`canvas`](fission180://docs/reference/canvas.md) | Canvas | Import and export | INSERT > Canvas | changes the design (one undo step) | an open design |
+| [`insert_svg`](fission180://docs/reference/insert_svg.md) | Insert SVG / DXF | Import and export | INSERT > Insert SVG (and Insert DXF with its placement) | changes the design (one undo step) | an open design |
+| [`derive`](fission180://docs/reference/derive.md) | Derive | Import and export | SOLID > CREATE > Derive / INSERT > Insert Derive | changes the design (one undo step) | an open design |
+| [`coordinate_system`](fission180://docs/reference/coordinate_system.md) | User coordinate system | Construct | SOLID > CONSTRUCT > User Coordinate System | changes the design (one undo step) | an open design |
+| [`base_feature`](fission180://docs/reference/base_feature.md) | Base feature | Timeline (history) | SOLID > CREATE > Create Base Feature / Finish Base Feature | changes the design (one undo step) | an open design |
+| [`compute_all`](fission180://docs/reference/compute_all.md) | Compute all | Timeline (history) | SOLID > MODIFY > Compute All (Ctrl+B) | changes the design (one undo step) | an open design |
+| [`analysis`](fission180://docs/reference/analysis.md) | Surface analysis | Inspect and measure | INSPECT > Draft / Minimum Radius / Curvature Map / Accessibility / Zebra / Environmental Map / Curvature Comb / Isocurve Analysis | read-only | an open design |
+| [`component_colors`](fission180://docs/reference/component_colors.md) | Component colors | Inspect and measure | INSPECT > Display Component Colors (Shift+N) / Component Color Swatch | changes the design (one undo step) | an open design |
 
 ## Help
 
@@ -213,6 +234,8 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`query_geometry`](fission180://docs/reference/query_geometry.md): List the faces, edges or corners (vertices) of a body or step that a selector picks, with facts about each: type (plane, cylinder.
 - [`check_design`](fission180://docs/reference/check_design.md): Check that the design is sound, before saving or exporting it: every body is one valid, closed solid (invalid or open shapes, bodies made of several pieces, empty bodies), timeline steps that failed or warn (with the reason), steps left after the history marker, suppressed steps, sketches with conflicting constraints, and bodies that overlap (Fusion's Interference; interference: false skips it, it takes longest).
 - [`diff_design`](fission180://docs/reference/diff_design.md): What changed in the design since: a snapshot id that inspect_design answered ("S3"), "last_change" (just before the latest change an AI made: what that change did), or a step id (the solid as it was right after that step, compared with now: what the later steps did).
+- [`analysis`](fission180://docs/reference/analysis.md): INSPECT's analyses as numbers (nothing is left in the design).
+- [`component_colors`](fission180://docs/reference/component_colors.md): Each component's colour for telling them apart (Fusion's Display Component Colors): on draws every component in its colour in the window (false: their own looks again); swatch shows the colour marks in the browser and timeline; cycle: components that take the next colour.
 
 ## Sketch
 
@@ -220,13 +243,17 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`create_curve_sketch`](fission180://docs/reference/create_curve_sketch.md): Create a sketch of open curves and points: the paths, rails, guide curves and rib / web curves that sweep, loft, pipe, rib, web, pattern_on_path and split_body use, and points for holes and lofts.
 - [`add_to_sketch`](fission180://docs/reference/add_to_sketch.md): Draw more in an existing sketch (Fusion: edit the sketch and draw): closed shapes (geometry, the same items as create_sketch, with their named dimensions) and open curves or points (curves, the same items as create_curve_sketch).
 - [`get_sketch`](fission180://docs/reference/get_sketch.md): Read a sketch: its plane and placement, every curve by index (type, points, radius, construction or not), every constraint by index (type, name, the curves it ties, its value for dimensions, driving or not), how many degrees of freedom are left (0: fully constrained, Fusion's padlock), the constraints that conflict or are redundant, and its closed areas (with a point inside each, for regions).
-- [`sketch_constraint`](fission180://docs/reference/sketch_constraint.md): Add a geometric constraint to a sketch, as Fusion's Constraints panel: coincident (two points, or a point on a curve), horizontal / vertical (a line, or two points), parallel, perpendicular, tangent, equal, collinear (two lines), concentric (two circles or arcs), midpoint (a point and a line or arc), symmetric (two points or curves and the line they mirror about, third), fix (lock a curve or point), point_on (a point on a curve), smooth (G2 where a spline meets a curve; tangent only when the solver cannot keep curvature).
+- [`sketch_constraint`](fission180://docs/reference/sketch_constraint.md): Add a geometric constraint to a sketch, as Fusion's Constraints panel: coincident (two points, or a point on a curve), horizontal / vertical (a line, or two points), parallel, perpendicular, tangent, equal, collinear (two lines), concentric (two circles or arcs), midpoint (a point and a line or arc), symmetric (two points or curves and the line they mirror about, third), fix / unfix (lock or free a curve or point), point_on (a point on a curve), curvature (Fusion's Curvature: a spline and a line join with matching curvature, G2; with an arc or spline G1 and the answer says so; smooth: plain tangent).
 - [`sketch_dimension`](fission180://docs/reference/sketch_dimension.md): Add a driving dimension to a sketch, like Fusion's Sketch Dimension: distance (between two points, a point and a line, or one line's length), distance_x / distance_y (horizontal / vertical), radius, diameter, angle (between two lines, or of one line to the x axis).
 - [`set_sketch_dimension`](fission180://docs/reference/set_sketch_dimension.md): Change a sketch dimension: by its name (rectangles made by create_sketch with a name have <name>.width, <name>.height, <name>.x, <name>.y; circles <name>.diameter, <name>.x, <name>.y) or by its index (get_sketch).
 - [`sketch_delete`](fission180://docs/reference/sketch_delete.md): Delete curves and / or constraints of a sketch by their indexes (get_sketch).
 - [`sketch_polygon`](fission180://docs/reference/sketch_polygon.md): Add a regular polygon to a sketch, Fusion's way: center and point, where point is the middle of an edge (circumscribed, default) or a corner (inscribed).
 - [`sketch_trim`](fission180://docs/reference/sketch_trim.md): Trim sketch curves, as clicking Trim at each point in turn: the curve nearest the point loses the piece between its neighbouring intersections.
 - [`sketch_text`](fission180://docs/reference/sketch_text.md): Write text in a sketch (Fusion's sketch Text): its letters become areas you can extrude (profile: the text's id) or emboss.
+- [`sketch_draw`](fission180://docs/reference/sketch_draw.md): The SKETCH tab's drawing tools beyond add_to_sketch's plain shapes, with the tools' own code and constraints (a slot stays a slot).
+- [`sketch_modify`](fission180://docs/reference/sketch_modify.md): The SKETCH tab's MODIFY tools by their own code: fillet / chamfer: points at corners (where two curves meet), radius (fillet) or distance (chamfer; distance2 or angle (degrees) for unequal sides), each a dimension; extend: points on curves near the end to grow until it meets another curve; break: points on the pieces to split at their nearest crossings (trim removes a piece: sketch_trim); offset: curves (a chain of indexes), distance (mm; + on the side the chain turns to, - the other side), both_sides; toggle_construction: curves become construction (or back).
+- [`sketch_pattern`](fission180://docs/reference/sketch_pattern.md): Repeat sketch curves with the SKETCH tab's own code; the copies stay tied to the originals (change one, they follow).
+- [`sketch_project`](fission180://docs/reference/sketch_project.md): Bring model geometry into a sketch; it follows the model.
 
 ## Create (SOLID)
 
@@ -312,6 +339,7 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`construct_plane`](fission180://docs/reference/construct_plane.md): Make a construction plane (Fusion's CONSTRUCT menu) the way its dialog does; it follows what it is built on when the part changes and other tools can use it (sketch on a plane with create_sketch on, pick it with {"construct": id}).
 - [`construct_axis`](fission180://docs/reference/construct_axis.md): Make a construction axis (Fusion's CONSTRUCT menu) the way its dialog does; it follows what it is built on when the part changes and other tools can use it (sketch on a plane with create_sketch on, pick it with {"construct": id}).
 - [`construct_point`](fission180://docs/reference/construct_point.md): Make a construction point (Fusion's CONSTRUCT menu) the way its dialog does; it follows what it is built on when the part changes and other tools can use it (sketch on a plane with create_sketch on, pick it with {"construct": id}).
+- [`coordinate_system`](fission180://docs/reference/coordinate_system.md): A user coordinate system (origin point and X / Y / Z axes) in the active body: a frame to sketch on (its XY plane), to measure from, or to attach things to.
 
 ## Assemble
 
@@ -325,6 +353,14 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`joint`](fission180://docs/reference/joint.md): Fusion's Joint: the first component moves so that its snap point meets the second's.
 - [`drive_joint`](fission180://docs/reference/drive_joint.md): Put a joint at an angle (degrees) and / or slide distance (mm), within its limits; what hangs on it follows.
 - [`ground`](fission180://docs/reference/ground.md): Ground a component (it never moves when joints solve) or unground it (ground: false).
+- [`as_built_joint`](fission180://docs/reference/as_built_joint.md): Join two components WHERE THEY STAND NOW (nothing moves), Fusion's As-built Joint: for parts already modelled in place.
+- [`joint_origin`](fission180://docs/reference/joint_origin.md): Put a joint origin on a component (Fusion's Joint Origin): a saved snap point with axes that moves with its geometry, for a joint where no edge or face gives the right point.
+- [`rigid_group`](fission180://docs/reference/rigid_group.md): Lock two or more components together where they stand (Fusion's Rigid Group): they move as one when joints or drags move any of them.
+- [`motion_link`](fission180://docs/reference/motion_link.md): Tie two joints' motions (Fusion's Motion Link): when the first moves values[0], the second moves values[1] (degrees for turning joints, mm for sliding ones): a gear pair [360, -720], a rack and pinion [360, 62.83].
+- [`contact`](fission180://docs/reference/contact.md): Fusion's contact: with contact on, components stop where they touch when a joint is driven or dragged.
+- [`position`](fission180://docs/reference/position.md): After components were moved by drive_joint or move_copy: capture keeps them where they are now (a Position step in the timeline, Fusion's Capture Position); revert puts them back where the last capture (or the joints) left them.
+- [`duplicate_with_joints`](fission180://docs/reference/duplicate_with_joints.md): Copy jointed components to new places, joined there (Fusion's Duplicate With Joints): a screw (and its nut) into more holes.
+- [`motion_study`](fission180://docs/reference/motion_study.md): Fusion's Motion Study: joints driven together over steps 0..100 by key values, kept in the design to play back (browser).
 
 ## Timeline (history)
 
@@ -338,6 +374,8 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`move_step`](fission180://docs/reference/move_step.md): Move a step before or after another one in the timeline.
 - [`rename`](fission180://docs/reference/rename.md): Rename a timeline step, a body, a component, a sketch or a drawing (what the timeline and browser show).
 - [`group_steps`](fission180://docs/reference/group_steps.md): Group neighbouring timeline steps under one name (Fusion's timeline groups), or ungroup (ungroup: true with the group's id).
+- [`base_feature`](fission180://docs/reference/base_feature.md): Fusion's base feature: start: the bodies made next (new_body first, or a tool with operation new_body) are NOT recorded step by step; finish: each becomes one base feature in the timeline (no parameters to edit later).
+- [`compute_all`](fission180://docs/reference/compute_all.md): Compute every parameter and step of the design again from the start (Fusion's Compute All): after a design was opened with stale steps, or to find the steps that fail.
 
 ## Parameters
 
@@ -350,6 +388,10 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 
 - [`export`](fission180://docs/reference/export.md): Export the design's bodies to a file: format step (.step / .stp), stl or 3mf (for 3D printing).
 - [`import_file`](fission180://docs/reference/import_file.md): Bring a file into the active design: STEP / IGES (one component with the file's structure, its bodies and colours), STL / OBJ / 3MF (a mesh body; unit: the file's unit), DXF (its curves into a new sketch on sketch_plane XY | XZ | YZ, ready to extrude), FCStd (another design's bodies as a component).
+- [`decal`](fission180://docs/reference/decal.md): Stick a picture on a face (Fusion's Decal): a label, a logo.
+- [`canvas`](fission180://docs/reference/canvas.md): Put a reference picture on a plane (Fusion's Canvas): a photo or drawing to sketch over.
+- [`insert_svg`](fission180://docs/reference/insert_svg.md): Bring the curves of an SVG (or DXF) file into a sketch (Fusion's Insert SVG / Insert DXF), ready to extrude, emboss or cut: logos, outlines from a drawing program.
+- [`derive`](fission180://docs/reference/derive.md): Fusion's Derive: copies of another design's bodies, sketches, construction planes, parameters or components that stay linked and update when that design is saved again (a part made from a master design).
 
 ## Drawings
 
