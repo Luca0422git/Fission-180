@@ -12006,7 +12006,7 @@
   },
   "note": "turn to the front view, a little closer, by 5 seconds",
   "answer": {
-   "text": "Done: a View action on 'Explode' from 0 to 5 s (action id 2); the storyboard is 5 s long.\n{\n \"storyboard\": \"Explode\",\n \"at\": 5.0,\n \"looks_from\": [0.0, -1.0, -1.27987e-12],\n \"up\": [0.0, -1.27987e-12, 1.0],\n \"looks_at\": [0.0, 0.0, 20.0],\n \"fits_box\": [-30.0, -30.0, 0.0, 30.0, 30.0, 40.0],\n \"camera\": {\n  \"type\": \"Orthographic\",\n  \"position\": [0.0, -187.61663, 20.0],\n  \"orientation\": [0.707106781187, 0.0, 0.0, 0.707106781187],\n  \"focal\": 187.61663,\n  \"height\": 68.7927645,\n  \"angle\": 0.7853981633974483\n },\n \"action\": {\"id\": 2, \"kind\": \"view\", \"what\": \"View\", \"start\": 0.0, \"end\": 5.0}\n}",
+   "text": "Done: a View action on 'Explode' from 0 to 5 s (action id 2); the storyboard is 5 s long.\n{\n \"storyboard\": \"Explode\",\n \"at\": 5.0,\n \"looks_from\": [0.0, -1.0, 0.0],\n \"up\": [0.0, 0.0, 1.0],\n \"looks_at\": [0.0, 0.0, 20.0],\n \"fits_box\": [-30.0, -30.0, 0.0, 30.0, 30.0, 40.0],\n \"camera\": {\n  \"type\": \"Orthographic\",\n  \"position\": [0.0, -187.61663, 20.0],\n  \"orientation\": [0.707106781187, 0.0, 0.0, 0.707106781187],\n  \"focal\": 187.61663,\n  \"height\": 68.7927645,\n  \"angle\": 0.7853981633974483\n },\n \"action\": {\"id\": 2, \"kind\": \"view\", \"what\": \"View\", \"start\": 0.0, \"end\": 5.0}\n}",
    "is_error": false
   }
  },

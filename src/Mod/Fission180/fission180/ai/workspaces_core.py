@@ -230,7 +230,8 @@ def camera_looks(camera):
     q = camera["orientation"]
     back = rotate(q, (0.0, 0.0, 1.0))
     up = rotate(q, (0.0, 1.0, 0.0))
-    return [sig(c, 6) for c in back], [sig(c, 6) for c in up]
+    # (to 6 decimals: a direction's rounding noise, 1e-17, is no part of it)
+    return [round(c, 6) + 0.0 for c in back], [round(c, 6) + 0.0 for c in up]
 
 
 # -- a milling simulation against the model (cam_simulate) ----------------------------------------
