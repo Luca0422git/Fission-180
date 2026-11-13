@@ -16,11 +16,11 @@ it needs to be able to make decisions on what tools to use in a responsible and 
   look for which tool, and the tools an AI needs first (plan_approach, ask_person, list_tools,
   get_help, inspect_design) are marked `_meta` `anthropic/alwaysLoad`.
 - **Claude Desktop may load every tool every turn** (a user report: about 75,000 tokens for 155
-  tools). `tools/list` is 344,333 characters for 195 tools after the merges (about 86,000
-  tokens at 4 characters a token): descriptions 123,800, schemas 178,900; 38 descriptions are
-  longer than ai-common's 900 characters (17,200 characters over; the longest: cam_edit 3,191,
-  cam_operation 2,785, measure 2,756, create_sketch 2,558, insert_hardware 2,115, flange
-  2,096). The first sixteen tools carried the whole selector help seven times (14,000
+  tools). `tools/list` is 381,254 characters for 216 tools with every builder's branch merged
+  (about 95,000 tokens at 4 characters a token): descriptions 134,600, schemas 200,500; 38
+  descriptions are longer than ai-common's 900 characters (17,200 characters over; the
+  longest: cam_edit 3,191, cam_operation 2,785, measure 2,756, create_sketch 2,558,
+  insert_hardware 2,115, flange 2,096). The first sixteen tools carried the whole selector help seven times (14,000
   characters): now a summary (9,400 characters saved); the rest is the other builders'.
 - **MCP elicitation** (the server asking the person through the AI app): Claude Code shows it
   (form and URL) in interactive terminal sessions and declares `elicitation: {form, url}` to
@@ -108,7 +108,7 @@ it needs to be able to make decisions on what tools to use in a responsible and 
 
 ## Known issues
 
-- Claude Desktop may still load all 195 tools' descriptions every turn (about 86,000 tokens);
+- Claude Desktop may still load all 216 tools' descriptions every turn (about 95,000 tokens);
   38 tool descriptions are longer than the 900-character budget (owned by the other builders).
 - plan_approach's cost table is partly guessed (marked in `approach_core.COSTS`); ai-speed's
   benchmark (`ai_speed_bench.py`) was not on its branch yet when this was written.

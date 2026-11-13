@@ -85,6 +85,11 @@ def enter(fp):
         for obj in doc.Objects:
             if obj is fp or obj.TypeId in ("App::Part", "App::Origin"):
                 continue
+            if obj.TypeId.startswith("TechDraw::"):
+                # (wave 8, ai-behaviour: a drawing page's Visibility is its tab: hiding and
+                # showing it again at Finish closed the drawing and brought it back in front
+                # of the 3D view, whose camera could then not be put back)
+                continue
             vobj = getattr(obj, "ViewObject", None)
             try:
                 if vobj is not None and vobj.Visibility:

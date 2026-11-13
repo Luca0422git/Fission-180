@@ -214,12 +214,17 @@ Fusion**: the decisions are Fission 180's rules, written down and tested.
   the workspaces' modules: about 0.17 s); through the real MCP server and the bridge with the
   window, on a design with a mesh, a box and a two-component assembly: 0.17 s the first time,
   0.11-0.13 s after (scenario `ai_plan_approach`).
-- `tools/list`: 309,368 characters for 175 tools (descriptions 104,000, schemas 164,000; 33
-  descriptions longer than 900 characters, 16,500 characters over), about 77,000 tokens at 4
-  characters a token, nearer 90,000 for JSON. In Claude Code (tool search on) only the names
-  and the instructions load at the start; Claude Desktop may load them all (report above).
+- `tools/list`: before wave 8 309,368 characters for 175 tools; with every builder's tools
+  merged here 381,254 characters for 216 tools (descriptions 134,600, schemas 200,500), about
+  95,000 tokens at 4 characters a token (more for JSON). 38 descriptions are longer than
+  ai-common's 900 characters (17,200 characters over; the longest cam_edit 3,191,
+  cam_operation 2,785, measure 2,756, create_sketch 2,558); none passes Claude Code's 4,096
+  (unit test). The first sixteen tools' selector arguments now carry a summary instead of the
+  whole selector help seven times (9,400 characters less). In Claude Code (tool search on)
+  only the names and the instructions load at the start; Claude Desktop may load them all
+  (report above).
 - The MCP instructions: 8,614 characters, of which the essentials are the first 3,187; the
-  chat panel's system prompt 7,214 characters plus the documentation index.
+  chat panel's system prompt 7,294 characters with the documentation index.
 
 ### Tests
 
