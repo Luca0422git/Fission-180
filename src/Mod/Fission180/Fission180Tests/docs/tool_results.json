@@ -7254,7 +7254,7 @@
   "args": {},
   "note": "solve it",
   "answer": {
-   "text": "Done: Study 1 - Static Stress solved (1137 nodes, 528 elements). Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2. Largest von Mises stress 163.2 MPa, largest displacement 0.212 mm. study_results has every number.",
+   "text": "Done: Study 1 - Static Stress solved (1137 nodes, 528 elements; took 0.2 s). Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2. Largest von Mises stress 163.2 MPa, largest displacement 0.212 mm. study_results has every number, study_probe the values at points, on faces and on a section.",
    "is_error": false
   }
  },
@@ -7353,7 +7353,7 @@
   },
   "note": "three results and the verdict",
   "answer": {
-   "text": "Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2.\n{\n \"study\": \"Study 1 - Static Stress\",\n \"id\": \"SimStudy\",\n \"solved\": true,\n \"out_of_date\": false,\n \"verdict\": \"Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2.\",\n \"safety\": {\n  \"lowest\": 1.2682905880492759,\n  \"at\": [\n   6.121,\n   26.1309,\n   10.0\n  ],\n  \"body\": \"Body1\",\n  \"target\": 2.0\n },\n \"results\": {\n  \"safety\": {\n   \"title\": \"Safety Factor\",\n   \"unit\": \"\",\n   \"min\": 1.2682905880492759,\n   \"min_at\": [\n    6.121,\n    26.1309,\n    10.0\n   ],\n   \"max\": 15.0,\n   \"max_at\": [\n    60.0,\n    0.0,\n    0.0\n   ]\n  },\n  \"von_mises\": {\n   \"title\": \"Stress: Von Mises\",\n   \"unit\": \"MPa\",\n   \"min\": 0.8704580045044562,\n   \"min_at\": [\n    0.0,\n    26.5958,\n    5.0118\n   ],\n   \"max\": 163.21180804343996,\n   \"max_at\": [\n    6.121,\n    26.1309,\n    10.0\n   ]\n  },\n  \"displacement\": {\n   \"title\": \"Displacement: Total\",\n   \"unit\": \"mm\",\n   \"min\": 0.0,\n   \"min_at\": [\n    0.0,\n    0.0,\n    0.0\n   ],\n   \"max\": 0.21201575620458465,\n   \"max_at\": [\n    60.0,\n    20.0,\n    0.0\n   ]\n  }\n },\n \"bodies\": {\n  \"Body1\": {\n   \"displacement_max\": 0.21201575620458465,\n   \"material\": \"Steel-Generic\",\n   \"name\": \"Body\",\n   \"safety_min\": 1.2682905880492759,\n   \"von_mises_max\": 163.21180804343996\n  }\n },\n \"reactions\": {\n  \"Fixed 1\": {\n   \"total\": 1999.9997520000024,\n   \"x\": -2.3900000201138027e-05,\n   \"y\": 0.00010369999988313339,\n   \"z\": 1999.9997519999997\n  }\n },\n \"mesh\": {\n  \"elements\": 528,\n  \"largest\": 13.167346157534286,\n  \"mesher\": \"gmsh\",\n  \"nodes\": 1137,\n  \"order\": \"parabolic\",\n  \"over_limit\": 0,\n  \"size\": 7.280109889280518,\n  \"smallest\": 4.296612122541806,\n  \"worst_aspect\": 5.295692544936329\n },\n \"safety_basis\": \"yield\",\n \"notes\": [],\n \"units\": \"mm, N, MPa\"\n}",
+   "text": "Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2.\n{\n \"study\": \"Study 1 - Static Stress\",\n \"id\": \"SimStudy\",\n \"solved\": true,\n \"out_of_date\": false,\n \"verdict\": \"Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2.\",\n \"safety\": {\n  \"lowest\": 1.2682905880492759,\n  \"at\": [\n   6.121,\n   26.1309,\n   10.0\n  ],\n  \"body\": \"Body1\",\n  \"target\": 2.0\n },\n \"results\": {\n  \"safety\": {\n   \"title\": \"Safety Factor\",\n   \"unit\": \"\",\n   \"min\": 1.2682905880492759,\n   \"min_at\": [\n    6.121,\n    26.1309,\n    10.0\n   ],\n   \"max\": 15.0,\n   \"max_at\": [\n    60.0,\n    0.0,\n    0.0\n   ]\n  },\n  \"von_mises\": {\n   \"title\": \"Stress: Von Mises\",\n   \"unit\": \"MPa\",\n   \"min\": 0.8704580045044562,\n   \"min_at\": [\n    0.0,\n    26.5958,\n    5.0118\n   ],\n   \"max\": 163.21180804343996,\n   \"max_at\": [\n    6.121,\n    26.1309,\n    10.0\n   ]\n  },\n  \"displacement\": {\n   \"title\": \"Displacement: Total\",\n   \"unit\": \"mm\",\n   \"min\": 0.0,\n   \"min_at\": [\n    0.0,\n    0.0,\n    0.0\n   ],\n   \"max\": 0.21201575620458465,\n   \"max_at\": [\n    60.0,\n    20.0,\n    0.0\n   ]\n  }\n },\n \"bodies\": {\n  \"Body1\": {\n   \"displacement_max\": 0.21201575620458465,\n   \"material\": \"Steel-Generic\",\n   \"name\": \"Body\",\n   \"safety_min\": 1.2682905880492759,\n   \"von_mises_max\": 163.21180804343996\n  }\n },\n \"reactions\": {\n  \"Fixed 1\": {\n   \"total\": 1999.9997520000024,\n   \"x\": -2.3900000201138027e-05,\n   \"y\": 0.00010369999988313339,\n   \"z\": 1999.9997519999997\n  }\n },\n \"mesh\": {\n  \"elements\": 528,\n  \"largest\": 13.167346157534286,\n  \"mesher\": \"gmsh\",\n  \"nodes\": 1137,\n  \"order\": \"parabolic\",\n  \"over_limit\": 0,\n  \"size\": 7.280109889280518,\n  \"smallest\": 4.296612122541806,\n  \"worst_aspect\": 5.295692544936329\n },\n \"safety_basis\": \"yield\",\n \"notes\": [],\n \"units\": \"mm, N, MPa\",\n \"solver\": {\n  \"Mesh\": {\n   \"Nodes\": \"1,137\",\n   \"Degrees of freedom\": \"3,411\",\n   \"Elements\": \"528\",\n   \"Element order\": \"Parabolic (10-node tetrahedra)\",\n   \"Element size\": \"7.28 mm\",\n   \"Smallest element edge\": \"4.297 mm\",\n   \"Largest element edge\": \"13.17 mm\",\n   \"Worst aspect ratio\": \"5.3\",\n   \"Elements over the aspect ratio limit\": \"0\",\n   \"Mesher\": \"Gmsh\"\n  }\n },\n \"solve_seconds\": 0.3\n}",
    "is_error": false
   }
  },
@@ -10256,7 +10256,7 @@
   "args": {},
   "note": "play the facing and the contour against the stock",
   "answer": {
-   "text": "Simulated Setup1: no rapid move into the stock, 1:51, 13811.1 mm3 of 73715.1 mm3 removed.\n{\n \"setup\": \"Setup1\",\n \"time_s\": 110.55,\n \"time\": \"1:51\",\n \"cut_length_mm\": 1826.85,\n \"rapid_length_mm\": 42.0,\n \"stock_volume_mm3\": 73715.09,\n \"removed_mm3\": 13811.09,\n \"left_mm3\": 59904.0,\n \"grid_cell_mm\": 0.3331,\n \"operations\": [\n  {\"name\": \"Face1\", \"id\": \"CamOp\", \"removed_mm3\": 6656.1},\n  {\"name\": \"2D Contour1\", \"id\": \"CamOp001\", \"removed_mm3\": 7155.0}\n ],\n \"collisions\": []\n}",
+   "text": "Simulated Setup1: no rapid move into the stock, 1:51, 13811.1 mm3 of 73715.1 mm3 removed. No gouge; up to 0 mm of stock is left on the part.\n{\n \"setup\": \"Setup1\",\n \"time_s\": 110.55,\n \"time\": \"1:51\",\n \"cut_length_mm\": 1826.85,\n \"rapid_length_mm\": 42.0,\n \"stock_volume_mm3\": 73715.09,\n \"removed_mm3\": 13811.09,\n \"left_mm3\": 59904.0,\n \"grid_cell_mm\": 0.3331,\n \"operations\": [\n  {\"name\": \"Face1\", \"id\": \"CamOp\", \"removed_mm3\": 6656.1},\n  {\"name\": \"2D Contour1\", \"id\": \"CamOp001\", \"removed_mm3\": 7155.0}\n ],\n \"collisions\": [],\n \"gouges\": {\"cells\": 0, \"area_mm2\": 0.0, \"deepest_mm\": 0.0, \"volume_mm3\": 0.0},\n \"stock_left_on_model\": {\"max_mm\": 0.0, \"mean_mm\": 0.0, \"volume_mm3\": 0.0, \"at\": [0.16653, 0.16653, -Infinity]},\n \"gouge_tolerance_mm\": 0.083267,\n \"seconds\": 0.2\n}",
    "is_error": false
   }
  },
@@ -11251,6 +11251,845 @@
   "note": "a small video of the explosion",
   "answer": {
    "text": "Published /home/me/fission180/explode.avi: 37 frames of 320 x 240 at 12 frames a second (Explode).\n{\n \"file\": \"/home/me/fission180/explode.avi\",\n \"format\": \"avi\",\n \"storyboards\": [\"Explode\"],\n \"frames\": 37,\n \"fps\": 12,\n \"width\": 320,\n \"height\": 240,\n \"length_s\": 3.083\n}",
+   "is_error": false
+  }
+ },
+ "study_probe#1": {
+  "setup": "sim_solved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_study",
+    "args": {}
+   },
+   {
+    "tool": "add_constraint",
+    "args": {
+     "kind": "fixed",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         -1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "tool": "add_load",
+    "args": {
+     "kind": "force",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ],
+     "magnitude": 2000,
+     "direction": "vector",
+     "vector": [
+      0,
+      0,
+      -1
+     ]
+    }
+   },
+   {
+    "tool": "solve_study",
+    "args": {}
+   }
+  ],
+  "args": {
+   "points": [
+    [
+     60,
+     20,
+     10
+    ],
+    [
+     30,
+     20,
+     10
+    ]
+   ],
+   "on": [
+    {
+     "face": {
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "count": 1
+     }
+    }
+   ],
+   "results": [
+    "displacement",
+    "von_mises"
+   ]
+  },
+  "note": "the free end and the middle of the top, and the whole top face",
+  "answer": {
+   "text": "Probes of Study 1 - Static Stress: 2 of 2 points on the part, 1 pick; units displacement mm, von_mises MPa.\n{\n \"study\": \"Study 1 - Static Stress\",\n \"id\": \"SimStudy\",\n \"out_of_date\": false,\n \"units\": {\"displacement\": \"mm\", \"von_mises\": \"MPa\"},\n \"points\": [\n  {\n   \"at\": [60.0, 20.0, 10.0],\n   \"inside\": true,\n   \"values\": {\"displacement\": 0.212, \"von_mises\": 13.553},\n   \"moved_mm\": [0.026119, 6.7126e-07, -0.21039]\n  },\n  {\n   \"at\": [30.0, 20.0, 10.0],\n   \"inside\": true,\n   \"values\": {\"displacement\": 0.069486, \"von_mises\": 87.301},\n   \"moved_mm\": [0.019185, -2.6795e-06, -0.066776]\n  }\n ],\n \"on\": [\n  {\n   \"pick\": \"Body1.Face6\",\n   \"nodes\": 307,\n   \"values\": {\n    \"displacement\": {\n     \"min\": 0.0,\n     \"min_at\": [0.0, 0.0, 10.0],\n     \"max\": 0.212,\n     \"max_at\": [60.0, 20.0, 10.0],\n     \"mean\": 0.083696\n    },\n    \"von_mises\": {\n     \"min\": 4.865,\n     \"min_at\": [60.0, 0.0, 10.0],\n     \"max\": 163.21,\n     \"max_at\": [6.121, 26.131, 10.0],\n     \"mean\": 84.876\n    }\n   }\n  }\n ]\n}",
+   "is_error": false
+  }
+ },
+ "study_report#1": {
+  "setup": "sim_solved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_study",
+    "args": {}
+   },
+   {
+    "tool": "add_constraint",
+    "args": {
+     "kind": "fixed",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         -1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "tool": "add_load",
+    "args": {
+     "kind": "force",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ],
+     "magnitude": 2000,
+     "direction": "vector",
+     "vector": [
+      0,
+      0,
+      -1
+     ]
+    }
+   },
+   {
+    "tool": "solve_study",
+    "args": {}
+   }
+  ],
+  "args": {
+   "path": "{tmp}/plate report.html",
+   "title": "Plate under 2 kN",
+   "target": 2
+  },
+  "note": "the study's report, judged against a safety factor of 2",
+  "answer": {
+   "text": "Written /home/me/fission180/plate report.html (5 kB): the report of Study 1 - Static Stress: setup (materials, constraints, loads, mesh), every result's minimum and maximum with where, per body, reaction forces, and the verdict against a safety factor target of 2 to 6.",
+   "is_error": false
+  }
+ },
+ "study_mesh#1": {
+  "setup": "sim_study",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_study",
+    "args": {}
+   }
+  ],
+  "args": {},
+  "note": "the mesh, without solving",
+  "answer": {
+   "text": "Done: Study 1 - Static Stress meshed (took 0.2 s): 1137 nodes, 528 elements, element edges 4.297 to 13.17 mm.\n{\n \"study\": \"Study 1 - Static Stress\",\n \"id\": \"SimStudy\",\n \"mesh\": {\n  \"elements\": 528,\n  \"largest\": 13.17,\n  \"mesher\": \"gmsh\",\n  \"nodes\": 1137,\n  \"order\": \"parabolic\",\n  \"over_limit\": 0,\n  \"sampled\": false,\n  \"size\": 7.28,\n  \"smallest\": 4.297,\n  \"worst_aspect\": 5.296\n },\n \"seconds\": 0.2,\n \"shown\": false\n}",
+   "is_error": false
+  }
+ },
+ "study_setup#1": {
+  "setup": "sim_ready",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_study",
+    "args": {}
+   },
+   {
+    "tool": "add_constraint",
+    "args": {
+     "kind": "fixed",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         -1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "tool": "add_load",
+    "args": {
+     "kind": "force",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ],
+     "magnitude": 2000,
+     "direction": "vector",
+     "vector": [
+      0,
+      0,
+      -1
+     ]
+    }
+   }
+  ],
+  "args": {},
+  "note": "everything the study holds",
+  "answer": {
+   "text": "Study 1 - Static Stress: 2 constraints and loads, 0 bonded contacts, every body is held.\n{\n \"study\": \"Study 1 - Static Stress\",\n \"id\": \"SimStudy\",\n \"solved\": false,\n \"out_of_date\": false,\n \"bodies\": [\"Body1\"],\n \"materials\": [\n  {\n   \"material\": \"Steel-Generic\",\n   \"from\": \"the body\",\n   \"youngs_mpa\": 200000.0,\n   \"poisson\": 0.30000001192092896,\n   \"density\": 7900.0,\n   \"yield_mpa\": 207.0,\n   \"ultimate_mpa\": 345.0,\n   \"filled_in\": [\"yield_mpa\", \"ultimate_mpa\"],\n   \"body\": \"Body1\",\n   \"id\": \"Body\"\n  }\n ],\n \"items\": [\n  {\n   \"id\": \"SimItem\",\n   \"label\": \"Fixed 1\",\n   \"category\": \"constraint\",\n   \"kind\": \"fixed\",\n   \"what\": \"Fixed\",\n   \"on\": \"Body1: 1 face\",\n   \"options\": {\"x\": true, \"y\": true, \"z\": true},\n   \"suppressed\": false,\n   \"status\": \"ok\"\n  },\n  {\n   \"id\": \"SimItem001\",\n   \"label\": \"Force 1\",\n   \"category\": \"load\",\n   \"kind\": \"force\",\n   \"what\": \"Force 2000 N\",\n   \"on\": \"Body1: 1 face\",\n   \"options\": {\n    \"direction\": \"vector\",\n    \"flip\": false,\n    \"magnitude\": 2000.0,\n    \"per_entity\": false,\n    \"vector\": [0.0, 0.0, -1.0]\n   },\n   \"suppressed\": false,\n   \"status\": \"ok\"\n  }\n ],\n \"gravity\": {\"on\": false, \"direction\": [0.0, 0.0, -1.0]},\n \"contact_tolerance_mm\": 0.1,\n \"contacts\": [],\n \"overlapping\": [],\n \"touching_only_at_edge_or_corner\": [],\n \"free_motions\": [],\n \"mesh\": {}\n}",
+   "is_error": false
+  }
+ },
+ "edit_study_item#1": {
+  "setup": "sim_ready",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_study",
+    "args": {}
+   },
+   {
+    "tool": "add_constraint",
+    "args": {
+     "kind": "fixed",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         -1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "tool": "add_load",
+    "args": {
+     "kind": "force",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ],
+     "magnitude": 2000,
+     "direction": "vector",
+     "vector": [
+      0,
+      0,
+      -1
+     ]
+    }
+   }
+  ],
+  "args": {
+   "item": "Force 1",
+   "magnitude": 1000
+  },
+  "note": "half the force",
+  "answer": {
+   "text": "Done: Force 1 is now Force 1000 N.\n{\n \"id\": \"SimItem001\",\n \"label\": \"Force 1\",\n \"category\": \"load\",\n \"kind\": \"force\",\n \"what\": \"Force 1000 N\",\n \"on\": \"Body1: 1 face\",\n \"options\": {\n  \"direction\": \"vector\",\n  \"flip\": false,\n  \"magnitude\": 1000.0,\n  \"per_entity\": false,\n  \"vector\": [0.0, 0.0, -1.0]\n },\n \"suppressed\": false\n}",
+   "is_error": false
+  }
+ },
+ "cam_setup_sheet#1": {
+  "setup": "cam_ops",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "box",
+     "plane": "XY",
+     "length": 100,
+     "width": 60,
+     "height": 10
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "cylinder",
+     "plane": "XY",
+     "x": 20,
+     "y": 30,
+     "diameter": 6,
+     "height": 10,
+     "operation": "cut"
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "cylinder",
+     "plane": "XY",
+     "x": 80,
+     "y": 30,
+     "diameter": 6,
+     "height": 10,
+     "operation": "cut"
+    }
+   },
+   {
+    "tool": "cam_setup",
+    "args": {
+     "stock": {
+      "mode": "relative",
+      "offset_mode": "sides_top_bottom",
+      "side": 2,
+      "top": 1
+     },
+     "wcs": {
+      "origin": "stock_point",
+      "box_point": [
+       -1,
+       -1,
+       1
+      ]
+     },
+     "post": {
+      "program": "1001",
+      "comment": "plate"
+     }
+    }
+   },
+   {
+    "tool": "cam_operation",
+    "args": {
+     "kind": "face",
+     "tool": {
+      "type": "flat",
+      "diameter": 10,
+      "number": 1
+     }
+    }
+   },
+   {
+    "tool": "cam_operation",
+    "args": {
+     "kind": "contour2d",
+     "faces": {
+      "normal": [
+       0,
+       0,
+       -1
+      ],
+      "count": 1
+     },
+     "tool": {
+      "library": "sample:mm",
+      "id": "sample-mm-flat-6"
+     },
+     "options": {
+      "linking": {
+       "lead_in": false,
+       "lead_out": false
+      }
+     }
+    }
+   }
+  ],
+  "args": {
+   "path": "{tmp}"
+  },
+  "note": "the setup sheet of the facing and the contour",
+  "answer": {
+   "text": "Written /home/me/fission180/Setup1 setup sheet.html: the setup sheet of Setup1, 2 operations, 2 tools, 1:51 of machining.\n{\n \"file\": \"/home/me/fission180/Setup1 setup sheet.html\",\n \"operations\": [\n  {\n   \"id\": \"CamOp\",\n   \"name\": \"Face1\",\n   \"kind\": \"face\",\n   \"title\": \"Face\",\n   \"tool\": \"#1 - 10 mm flat end mill\",\n   \"state\": \"valid\",\n   \"toolpath\": {\n    \"cut_length\": 1472.0,\n    \"rapid_length\": 16.0,\n    \"time_s\": 87.49,\n    \"min_cut_z\": -1.0,\n    \"bounds\": [5.0, 5.0, -1.0, 99.0, 59.0, 15.0]\n   }\n  },\n  {\n   \"id\": \"CamOp001\",\n   \"name\": \"2D Contour1\",\n   \"kind\": \"contour2d\",\n   \"title\": \"2D Contour\",\n   \"tool\": \"#6 - 6 mm flat end mill\",\n   \"state\": \"valid\",\n   \"toolpath\": {\n    \"cut_length\": 354.85,\n    \"rapid_length\": 26.0,\n    \"time_s\": 23.07,\n    \"min_cut_z\": -11.0,\n    \"bounds\": [-1.0, -1.0, -11.0, 105.0, 65.0, 15.0]\n   }\n  }\n ],\n \"tools\": [\"#1 - 10 mm flat end mill\", \"#6 - 6 mm flat end mill\"]\n}",
+   "is_error": false
+  }
+ },
+ "cam_tool_library#1": {
+  "setup": "none",
+  "setup_calls": [],
+  "args": {
+   "action": "add",
+   "tool": {
+    "type": "flat",
+    "diameter": 3.175,
+    "flutes": 1
+   }
+  },
+  "note": "a 1/8 in single-flute end mill in the Local library",
+  "answer": {
+   "text": "Done: #1 - 3.175 mm flat end mill added to local:Local.\n{\n \"library\": \"local:Local\",\n \"tool\": {\n  \"id\": \"573cda21-faaa-4802-9959-e99d6d8657c8\",\n  \"name\": \"3.175 mm flat end mill\",\n  \"number\": 1,\n  \"type\": \"flat\",\n  \"title\": \"Flat end mill\",\n  \"diameter\": 3.175,\n  \"flutes\": 1,\n  \"flute_length\": 9.525,\n  \"overall_length\": 38.0,\n  \"unit\": \"mm\",\n  \"cutting\": {\n   \"spindle_speed\": 20050.0,\n   \"cutting_feed\": 510.0,\n   \"leadin_feed\": 510.0,\n   \"plunge_feed\": 170.0,\n   \"ramp_feed\": 260.0,\n   \"stepdown\": 1.587,\n   \"stepover\": 1.27,\n   \"coolant\": \"disabled\"\n  }\n }\n}",
+   "is_error": false
+  }
+ },
+ "anim_view#1": {
+  "setup": "anim_exploded",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -30,
+        -30,
+        30,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Wheel"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "anim_storyboard",
+    "args": {
+     "name": "Explode"
+    }
+   },
+   {
+    "tool": "anim_explode",
+    "args": {
+     "at": 3
+    }
+   }
+  ],
+  "args": {
+   "at": 5,
+   "view": "front",
+   "zoom": 1.5
+  },
+  "note": "turn to the front view, a little closer, by 5 seconds",
+  "answer": {
+   "text": "Done: a View action on 'Explode' from 0 to 5 s (action id 2); the storyboard is 5 s long.\n{\n \"storyboard\": \"Explode\",\n \"at\": 5.0,\n \"looks_from\": [0.0, -1.0, -1.27987e-12],\n \"up\": [0.0, -1.27987e-12, 1.0],\n \"looks_at\": [0.0, 0.0, 20.0],\n \"fits_box\": [-30.0, -30.0, 0.0, 30.0, 30.0, 40.0],\n \"camera\": {\n  \"type\": \"Orthographic\",\n  \"position\": [0.0, -187.61663, 20.0],\n  \"orientation\": [0.707106781187, 0.0, 0.0, 0.707106781187],\n  \"focal\": 187.61663,\n  \"height\": 68.7927645,\n  \"angle\": 0.7853981633974483\n },\n \"action\": {\"id\": 2, \"kind\": \"view\", \"what\": \"View\", \"start\": 0.0, \"end\": 5.0}\n}",
+   "is_error": false
+  }
+ },
+ "anim_action#1": {
+  "setup": "anim_exploded",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -30,
+        -30,
+        30,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Wheel"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "anim_storyboard",
+    "args": {
+     "name": "Explode"
+    }
+   },
+   {
+    "tool": "anim_explode",
+    "args": {
+     "at": 3
+    }
+   }
+  ],
+  "args": {
+   "actions": [
+    1
+   ],
+   "start": 1,
+   "end": 4
+  },
+  "note": "the wheel's explosion from 1 s to 4 s",
+  "answer": {
+   "text": "Done: 1 1.0 to 4.0 s on 'Explode'; it is 4 s long now.\n{\n \"storyboard\": \"Explode\",\n \"actions\": [\n  {\n   \"id\": 1,\n   \"kind\": \"transform\",\n   \"what\": \"Move\",\n   \"component\": \"Wheel\",\n   \"component_id\": \"Component001\",\n   \"start\": 1.0,\n   \"end\": 4.0,\n   \"move\": [0.0, 0.0, 15.0],\n   \"frame\": \"the component's parent\"\n  }\n ]\n}",
+   "is_error": false
+  }
+ },
+ "print_part#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "path": "{tmp}"
+  },
+  "note": "the plate as a 3MF print file",
+  "answer": {
+   "text": "Saved /home/me/fission180/Body1.3mf (3MF, 12 triangles, in mm). Every body is watertight.\n{\n \"file\": \"/home/me/fission180/Body1.3mf\",\n \"format\": \"3MF\",\n \"unit\": \"Millimeter\",\n \"triangles\": 12,\n \"bodies\": [\"Body1\"],\n \"watertight\": {\"Body1\": true},\n \"bytes\": 1116,\n \"leaves_out\": [],\n \"seconds\": 0.0\n}",
+   "is_error": false
+  }
+ },
+ "export_everything#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "folder": "{tmp}/plate-export"
+  },
+  "note": "STEP, STL, 3MF, OBJ and a README in one folder",
+  "answer": {
+   "text": "Exported 5 files to /home/me/fission180/plate-export (3mf, obj, readme, step, stl); no picture (needs the window).\n{\n \"folder\": \"/home/me/fission180/plate-export\",\n \"files\": {\n  \"step\": {\"file\": \"/home/me/fission180/plate-export/Example.step\", \"bytes\": 6805},\n  \"stl\": {\"file\": \"/home/me/fission180/plate-export/Example.stl\", \"bytes\": 684},\n  \"3mf\": {\"file\": \"/home/me/fission180/plate-export/Example.3mf\", \"bytes\": 1116},\n  \"obj\": {\"file\": \"/home/me/fission180/plate-export/Example.obj\", \"bytes\": 873},\n  \"readme\": {\"file\": \"/home/me/fission180/plate-export/README.txt\", \"bytes\": 601}\n },\n \"bodies\": [\"Body1\"],\n \"leaves_out\": {\n  \"step\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"stl\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"3mf\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"obj\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"]\n },\n \"seconds\": 0.1\n}",
    "is_error": false
   }
  }

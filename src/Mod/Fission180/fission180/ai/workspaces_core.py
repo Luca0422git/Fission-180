@@ -19,6 +19,28 @@ class CoreError(ValueError):
     """Arguments that cannot work; the message says why in a sentence."""
 
 
+def has_progress():
+    """True when ai-speed's safe points (fission180/ai/progress.py) are there."""
+    try:
+        from . import progress  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def safe_point(what, done=None, total=None):
+    """A long AI call's safe point (ai-speed's progress.step): it says what the call is doing
+    ("AI: working on solve_study (12 s): meshing"), lets the window repaint and raises
+    progress.Stopped (a BaseException: let it go up) when the person pressed Stop. Does
+    nothing without progress.py, or outside an AI call. Returns whether it is there."""
+    try:
+        from . import progress
+    except ImportError:
+        return False
+    progress.step(what, done, total)
+    return True
+
+
 def _np():
     import numpy
 

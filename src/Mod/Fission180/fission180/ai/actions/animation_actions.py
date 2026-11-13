@@ -530,7 +530,7 @@ def anim_publish_video(ctx, args):
     try:
         checked = animation_video.check(doc, settings)
         frames = len(animation_video.frame_list(doc, checked["names"], checked["fps"]))
-        written = animation_video.publish(doc, settings)
+        written = _publish(doc, settings)
     except _core().AnimationError as exc:
         raise UserError("Not done: %s" % exc)
     data = {
@@ -555,6 +555,34 @@ def anim_publish_video(ctx, args):
             bridge_core.compact_json(data),
         )
     )
+
+
+def _publish(doc, settings):
+    """animation_video.publish, frame by frame with a safe point between the frames (wave 8:
+    the working line counts them and Stop ends the video, its half-written file removed)."""
+    from ... import animation_video
+    from .. import workspaces_core as wc
+
+    if not wc.has_progress():
+        return animation_video.publish(doc, settings)
+    job = animation_video.Job(
+        doc,
+        animation_video.check(doc, settings),
+        on_progress=lambda done, total: wc.safe_point("rendering frames", done, total),
+    )
+    if job.view is None:
+        job._end(error="no view", quiet=True)
+        raise _core().AnimationError("The design's 3D view is not open.")
+    try:
+        while not job.finished:
+            job._tick()
+    except BaseException:  # (Stopped: the video's file and its frames are taken away)
+        job.cancelled = True
+        job._end(error="stopped by the person", quiet=True)
+        raise
+    if job.error:
+        raise _core().AnimationError("The video could not be written: %s" % job.error)
+    return job.result
 
 
 # == wave 8, ai-workspaces: VIEW (a camera move) and the timeline's own edits ====================

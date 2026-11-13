@@ -184,6 +184,33 @@ class Stock(unittest.TestCase):
         )
 
 
+class RecordedAnswers(unittest.TestCase):
+    def test_times_and_random_ids_are_not_compared(self):
+        """How long a solve took and a new library tool's random id change at every run: the
+        reference pages' recorded answers leave them out (docs_runner.same_answer)."""
+        from Fission180Tests.headless import docs_runner
+
+        a = {
+            "text": 'Done: Beam solved (511 nodes; took 0.2 s).\n{"seconds": 0.3}',
+            "is_error": False,
+        }
+        b = {
+            "text": 'Done: Beam solved (511 nodes; took 12.5 s).\n{"seconds": 9.1}',
+            "is_error": False,
+        }
+        self.assertIsNone(docs_runner.same_answer(a, b))
+        self.assertTrue(docs_runner.same_answer(a, dict(b, text=b["text"].replace("511", "512"))))
+        ids = [
+            '{"id": "6a4bfebe-b6c1-4391-8a6d-e853df08ea65"}',
+            '{"id": "5f421fc1-bd63-4972-b152-8831b5c2d690"}',
+        ]
+        self.assertIsNone(
+            docs_runner.same_answer(
+                {"text": ids[0], "is_error": False}, {"text": ids[1], "is_error": False}
+            )
+        )
+
+
 class Catalogue(unittest.TestCase):
     def test_the_new_tools_are_in_the_catalogue(self):
         for name in NEW_TOOLS:

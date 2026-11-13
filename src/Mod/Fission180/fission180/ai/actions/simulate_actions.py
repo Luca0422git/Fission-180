@@ -387,6 +387,29 @@ def _window_alive():
     return idle
 
 
+def _wait(job, timeout, what):
+    """Run a solve / mesh job to its end. Between its turns: ai-speed's safe point when it is
+    there (the working line says the stage; Stop cancels the job, whose background programs
+    are killed, and goes up as progress.Stopped), else the window repaints (_window_alive)."""
+    from .. import workspaces_core as wc
+
+    alive = None if wc.has_progress() else _window_alive()
+
+    def idle():
+        if not wc.safe_point("%s: %s" % (what, str(job.message).lower())) and alive:
+            alive()
+
+    try:
+        return job.wait(timeout, idle=idle)
+    except BaseException:  # (Stopped by the person: the job must not go on in the background)
+        job.cancel()
+        try:
+            job.poll()
+        except Exception:
+            pass
+        raise
+
+
 @action("solve_study")
 def solve_study(ctx, args):
     sim = _sim()
@@ -396,9 +419,8 @@ def solve_study(ctx, args):
     import time
 
     start = time.time()
-    _progress(ctx, "solving %s" % study.Label)  # (wave 8: ai-speed's working display)
     job = sim.Job(study)
-    state = job.wait(timeout, idle=_window_alive())
+    state = _wait(job, timeout, "solving %s" % study.Label)  # (wave 8, ai-workspaces)
     if state != "done":
         raise UserError("Not solved (after %s s): %s" % (_seconds(start), job.message))
     summary = job.summary
@@ -407,14 +429,14 @@ def solve_study(ctx, args):
     vm = stats.get("von_mises", {})
     disp = stats.get("displacement", {})
     text = (
-        "Done: %s solved in %s s (%d nodes, %d elements). %s Largest von Mises stress %s MPa, "
-        "largest displacement %s mm. study_results has every number, study_probe the values "
-        "at points, on faces and on a section."
+        "Done: %s solved (%d nodes, %d elements; took %s s). %s Largest von Mises stress %s "
+        "MPa, largest displacement %s mm. study_results has every number, study_probe the "
+        "values at points, on faces and on a section."
         % (
             study.Label,
-            _seconds(start),
             summary["mesh"]["nodes"],
             summary["mesh"]["elements"],
+            _seconds(start),
             verdict,
             core.fmt(vm.get("max"), 4),
             core.fmt(disp.get("max"), 4),
@@ -478,12 +500,13 @@ def study_results(ctx, args):
         "notes": summary.get("notes", []),
         "units": "mm, N, MPa",
     }
-    # (wave 8, ai-workspaces: RESULTS > Solver Data and Convergence Plot as numbers)
+    # (wave 8, ai-workspaces: RESULTS > Solver Data and Convergence Plot as numbers; the
+    # Solve section's clock times are solve_seconds, the notes are notes)
     rcore = _results_core()
     out["solver"] = {
         section: {name.strip() or "message": value for name, value in rows}
         for section, rows in rcore.solver_rows(summary, sim.mesh_summary(study))
-        if section != "Messages"
+        if section not in ("Messages", "Solve")
     }
     if summary.get("seconds") is not None:
         out["solve_seconds"] = round(float(summary["seconds"]), 1)
@@ -848,9 +871,8 @@ def study_mesh(ctx, args):
     if not sim.study_bodies(study):
         raise UserError("%s has no solid body to mesh." % study.Label)
     start = time.time()
-    _progress(ctx, "meshing %s" % study.Label)
     job = sim.Job(study, mesh_only=True)
-    state = job.wait(float(args.get("timeout", 600)), idle=_window_alive())
+    state = _wait(job, float(args.get("timeout", 600)), "meshing %s" % study.Label)
     if state != "done":
         raise UserError("No mesh: %s" % job.message)
     info = _mesh_info(sim.mesh_summary(study) or job.summary or {})
@@ -862,7 +884,7 @@ def study_mesh(ctx, args):
 
         shown = bool(simulation_solve_dialog.show_mesh(study))
     data = {"study": study.Label, "id": study.Name, "mesh": info, "seconds": took, "shown": shown}
-    text = "Done: %s meshed in %s s: %s nodes, %s elements%s.%s" % (
+    text = "Done: %s meshed (took %s s): %s nodes, %s elements%s.%s" % (
         study.Label,
         took,
         info.get("nodes", "?"),
@@ -886,21 +908,10 @@ def _mesh_info(info):
 
     out = {}
     for key, value in (info or {}).items():
-        if key == "signature":
+        if key in ("signature", "made"):  # (a fingerprint and a clock time: nothing to read)
             continue
         out[key] = wc.sig(value, 4) if isinstance(value, float) else value
     return out
-
-
-def _progress(ctx, what):
-    """Tell the host a long step started (ai-speed's working display, when the host has one)."""
-    report = getattr(ctx.host, "progress", None)
-    if report is None:
-        return
-    try:
-        report(what)
-    except Exception:
-        pass
 
 
 def _item_row(item):

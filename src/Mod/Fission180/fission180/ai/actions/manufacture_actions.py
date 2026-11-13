@@ -510,6 +510,10 @@ def cam_generate(ctx, args):
         todo = [o for o in todo if cam.state(o, setup) != "valid"]
     if not cam.operations(setup):
         raise UserError("%s has no operation yet: call cam_operation first." % setup.Label)
+    from .. import workspaces_core as wc
+
+    # (wave 8: FreeCAD's CAM engine makes them in one run that cannot be split: said before it)
+    wc.safe_point("generating %d toolpath%s" % (len(todo), "" if len(todo) == 1 else "s"))
     errors = _generate(todo) if todo else {}
     rows = [_op_row(op, setup) for op in cam.operations(setup)]
     data = {"setup": setup.Label, "id": setup.Name, "generated": [o.Label for o in todo]}
@@ -548,7 +552,10 @@ def cam_simulate(ctx, args):
     per_op = []
     last = 0.0
     gouged = 0
+    from .. import workspaces_core as wc
+
     for at, item in enumerate(play.operations):
+        wc.safe_point("simulating %s" % item["label"], at, len(play.operations))
         while not play.done() and play.steps[play.at][0] <= at:
             play.step_moves(1)
         removed = play.stock.start_volume() - play.stock.volume()

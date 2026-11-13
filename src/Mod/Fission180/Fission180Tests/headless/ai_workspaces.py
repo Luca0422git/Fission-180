@@ -127,8 +127,8 @@ def _results_tip(force):
         if not _near(got, _tip(run, force), 0.05):
             return "tip %s, beam theory %s" % (got, _tip(run, force))
         solver = data.get("solver") or {}
-        if "Mesh" not in solver or "Solve" not in solver:
-            return "no Solver Data: %s" % solver
+        if solver.get("Mesh", {}).get("Nodes") is None or data.get("solve_seconds") is None:
+            return "no Solver Data: %s, %s s" % (solver, data.get("solve_seconds"))
         return None
 
     return check
@@ -209,9 +209,9 @@ SIM = [
         "contains": ["every body is held"],
         "check": _check(_setup_rows([("constraint", "fixed"), ("load", "force")])),
     },
-    {"tool": "study_mesh", "args": {}, "contains": ["meshed in"], "check": _check(_mesh_counts)},
-    {"tool": "study_mesh", "args": {"show": True}, "contains": ["meshed in"]},
-    {"tool": "solve_study", "args": {}, "contains": ["solved in", "study_probe"]},
+    {"tool": "study_mesh", "args": {}, "contains": ["meshed (took"], "check": _check(_mesh_counts)},
+    {"tool": "study_mesh", "args": {"show": True}, "contains": ["meshed (took"]},
+    {"tool": "solve_study", "args": {}, "contains": ["; took", "study_probe"]},
     {
         "tool": "study_probe",
         "args": {"points": [[L, 10, 5], [50, 10, 5]], "results": ["displacement", "von_mises"]},
@@ -289,7 +289,7 @@ SIM = [
         "expect": "error",
         "contains": ["no constraint, load or mesh control 'Nothing'"],
     },
-    {"tool": "solve_study", "args": {"study": "Beam 200 N"}, "contains": ["solved in"]},
+    {"tool": "solve_study", "args": {"study": "Beam 200 N"}, "contains": ["; took"]},
     {
         "tool": "study_results",
         "args": {"study": "Beam 200 N", "results": ["displacement"]},
