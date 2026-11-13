@@ -424,7 +424,7 @@ define(
     "face_count: before a slow convert); plane_cut (plane XY | XZ | YZ or a construction "
     "plane, moved distance mm, tilted angle_x / angle_y; trim removes the side its normal "
     "points to, XY +Z, XZ -Y, YZ +X, flip the other; split_body; split_faces; fill uniform "
-    "can be slow on a cut through many holes: minimal is quick); shell (thickness mm); "
+    "| minimal | no_fill closes the cut or not); shell (thickness mm); "
     "smooth (scans: it rounds a CAD part's edges); combine (tools; join | cut | intersect | "
     "merge; bodies sharing a flat face: exact up to 5,000 faces, else refused); separate; "
     "reverse_normal; erase_and_fill / delete_faces (faces); direct_edit (edits: delete, "
