@@ -203,7 +203,7 @@ Fusion**: the decisions are Fission 180's rules, written down and tested.
 | Plan a job | `plan_approach` (read-only, needs nothing open): the person's words and optionally what it is about (`target`, default the selection). It reads the design's facts cheaply (meshes and triangle counts, closed or not; bodies with their faces counted without building a face list, timeline or imported or converted mesh, sheet metal, thin plates; components, joints, studies, setups, storyboards, drawings, flat patterns, a rebuild going on, units, the workspace shown) and answers the goals, the route (tools in order with argument hints, where each is in the ribbon, the seconds it takes here), at most five questions with defaults (never the units or sizes the design has), the cost with `say_first` when it takes minutes, what to avoid, and notes (studies other than Static Stress, turning, photorealistic rendering, `.f3d` are not there). Rules: `fission180/ai/approach_core.py` (pure). |
 | Relic's requests | "make this mesh a solid": `inspect_mesh` -> `mesh_prepare` repair (only if open) -> `convert_mesh` prismatic -> `check_design`, the question "an editable timeline or a solid?", never facet copying. "make it editable": `inspect_mesh` -> (reduce above 10,000 triangles) -> `start_rebuild` on the mesh -> `describe_reference` -> `compare_to_reference` after each feature -> `finish_rebuild`, with the note to offer `convert_mesh` first and to say so plainly when no plan can be read. |
 | Ask the person | `ask_person`: answered by the MCP server itself. Where the AI app declared elicitation (form), the questions become the app's own form (`elicitation/create`, a flat object of text fields, choices as an enum, each default given); the answer, a decline or a cancel comes back in words; a tool call the app cancels stops waiting and cancels the form. Elsewhere (no elicitation, the chat panel, headless) it answers at once: ask in your reply. Never relied on. |
-| Show a workspace | `show_workspace` (needs the window; not an undo step): design (and its tab), simulation (and SETUP / RESULTS; refused without a study: create_study first, as Fusion opens New Study there), manufacture, animation, drawing (the newest or one named), flat_pattern. The workspace menu's own code (`enter_workspace` / `leave_workspace`, `drawing_ui.open_drawing`, `flatpattern_ui.enter`); refused while a command dialog is open. `inspect_design` and `get_design` say which workspace and tab are shown (`workspace`, null without the window). Every tool works from any workspace (a body made while SIMULATION shows). |
+| Show a workspace | `show_workspace` (needs the window; not an undo step): design (and its tab), simulation (and SETUP / RESULTS; refused without a study: create_study first, as Fusion opens New Study there; RESULTS refused before a solve), manufacture, animation, drawing (the newest or one named), flat_pattern (the design's other workspaces left first). The workspace menu's own code (`enter_workspace` / `leave_workspace`, `drawing_ui.open_drawing`, `flatpattern_ui.enter`); refused while a command dialog is open. `inspect_design` and `get_design` say which workspace and tab are shown (`workspace`, null without the window). Every tool works from any workspace (a body made while SIMULATION shows). |
 | Find a tool | `list_tools` with `goal` (plain words, best first, from a table of goals and the tools' own words), `workspace` or `category`; filtered rows carry the tool's workspace and its purpose (the first sentence of its description). `get_help` topics `approach`, `workspaces`, and `tools` grouped by workspace. |
 | The instructions | MCP `initialize` instructions start with "before you build" (plan_approach, one message of questions, never ask what you can measure, say when it takes minutes), "pick the cheapest tool", the workspaces and how to find tools, then the checking and selector essentials: 3,187 characters, inside Claude Code's 4,096 (unit test); the full rules follow for the apps that read them all. The chat panel's system prompt and the MCP prompts (`plan_job`, new; `model_part` starts with plan_approach) say the same. In Claude Code, `plan_approach`, `ask_person`, `list_tools`, `get_help` and `inspect_design` load upfront (`_meta` alwaysLoad). |
 | The same small step again and again | The MCP server and the chat panel watch the changing calls: eight in a row of at most two kinds of small step (a sketch and an extrude per copy) add a note to the answer naming the faster route (one sketch, a pattern, convert_mesh for a mesh); said again only after sixteen more. A sketch of 150 points or more gets the same note. |
@@ -228,7 +228,7 @@ Fusion**: the decisions are Fission 180's rules, written down and tested.
 
 ### Tests
 
-Unit: `test_ai_approach_core.py` (54 tests: 40 requests across every workspace, Relic's two,
+Unit: `test_ai_approach_core.py` (55 tests: 41 requests across every workspace, Relic's two,
 a sheet metal bracket from nothing / a sheet metal body / a flat plate, a study with and
 without its numbers and on a 3,000-face part, CNC, a lathe, print a part and a mesh, a part and
 an assembly drawing, an exploded video, an animation of bodies, a hinge, a plastic enclosure,
@@ -237,8 +237,10 @@ fix, inspect, render, odd input; the search by goal; the repetition guard; the f
 (`AskThroughTheApp`: the real server asks the app and gets the answer while it keeps reading).
 Headless runner: `Fission180Tests/headless/approach_tools.py` (20 calls). Docs: the handbook's
 new sections and troubleshooting's are run by the docs runner; reference examples for the
-three tools. Scenario `ai_plan_approach` (72 checks, through the real MCP server and the
-bridge; also passed with the 3D view 770 px tall).
+three tools. Scenario `ai_plan_approach` (81 checks, through the real MCP server and the
+bridge: plans, the selection, every workspace, a flat pattern, busy, the form, the guard; the
+72-check version also passed with the 3D view 770 px tall). Found on the way: Finish Flat
+Pattern brought a drawing's tab in front of the 3D view (fixed in `flatpattern_ui.enter`).
 
 ## Wave 8 coverage: ai-behaviour
 

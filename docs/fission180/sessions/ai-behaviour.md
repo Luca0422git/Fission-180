@@ -89,6 +89,12 @@ it needs to be able to make decisions on what tools to use in a responsible and 
   from the body = New Body): eight dots extruded in the air made eight bodies.
 - The docs runner and the headless runner read the JSON of an answer from its first `{`: a
   plan's sentence must not contain braces (the "Next:" line names the tool only).
+- A TechDraw page's `ViewObject.Visibility` is its tab: Create Flat Pattern hid every shown
+  object and showed them again at Finish, which closed a drawing's tab and opened it again in
+  front of the 3D view (and the camera could not be put back: "finish flat pattern:
+  setCamera"). `flatpattern_ui.enter` now leaves TechDraw objects alone; found by
+  ai_plan_approach (a drawing shown, then a flat pattern); flatpattern_drawing (42 checks) and
+  flatpattern_environment (27) still pass.
 
 ## Changelog lines
 
@@ -105,6 +111,7 @@ it needs to be able to make decisions on what tools to use in a responsible and 
 - An AI finds the right tool by what it does ("round the edges", "make it hollow") with
   list_tools.
 - Claude Code now reads Fission 180's whole "how to work" text (it used to cut it in half).
+- Finishing a flat pattern no longer brings an open drawing's tab in front of the 3D view.
 
 ## Known issues
 
