@@ -427,11 +427,74 @@ def _add_checked(ctx, sketch, constraints, title):
     return added
 
 
+def _tool_constraint(ctx, sketch, kind, items):
+    """Curvature and Fix/Unfix's unfix by the SKETCH tab's own tools
+    (sketch_constrain_tools.Curvature.constrain, Fix._unfix). Returns (constraints added,
+    the tool's note)."""
+    from ... import sketch_constrain_tools as tools
+
+    picks = [_ref(i) for i in items]
+    first = len(sketch.Constraints)
+    if kind == "unfix":
+        tool = _tool(tools.Fix, sketch)
+        item = picks[0]
+        if item[1] != 0 and sketch.Geometry[item[0]].TypeId == "Part::GeomPoint":
+            item = (item[0], 0)
+        if not tool.is_fixed(item):
+            raise UserError(
+                "Unfix: curve %d%s is not fixed."
+                % (item[0], "" if not item[1] else " point %s" % POS_NAMES.get(item[1]))
+            )
+        tools.Fix._unfix(tool, item)
+        return [], "freed"
+    tool = _tool(tools.Curvature, sketch)
+    kinds = [tool.kind_of(p) for p in picks]
+    if not any(k in tools.SPLINE for k in kinds) or any(p[1] for p in picks):
+        raise UserError(
+            "curvature takes a spline and the line, arc or spline it joins (whole curves)."
+        )
+    try:
+        note = tools.Curvature.constrain(tool, picks)
+    except ValueError as exc:
+        raise UserError("Curvature: %s." % exc)
+    added = list(range(first, len(sketch.Constraints)))
+    code = sketch.solve()
+    if code != 0:
+        for index in sorted(added, reverse=True):
+            sketch.delConstraint(index)
+        sketch.solve()
+        raise UserError("Curvature: not added, it does not fit the sketch's other constraints.")
+    return added, note or ""
+
+
 @action("sketch_constraint")
 def sketch_constraint(ctx, args):
     sketch = _sketch(ctx, args["sketch"])
     _check_items(sketch, args["items"])
     doc = sketch.Document
+    if args["kind"] in ("curvature", "unfix"):
+
+        def own():
+            added, note = _tool_constraint(ctx, sketch, args["kind"], args["items"])
+            doc.recompute()
+            return added, note
+
+        before = _broken(doc)
+        added, note = ctx.change(own)
+        return ctx.done(
+            "Done: %s%s%s."
+            % (
+                ctx.title,
+                (
+                    (", constraint %s of %s" % (_span(added), sketch.Name))
+                    if added
+                    else " in %s" % sketch.Name
+                ),
+                (" (%s)" % note.rstrip(".")) if note and note != "freed" else "",
+            ),
+            doc,
+            before,
+        )
 
     def work():
         added = _add_checked(
@@ -720,3 +783,746 @@ def sketch_text(ctx, args):
         doc,
         before,
     )
+
+
+# -- wave 8 (ai-design): the SKETCH tab's own tools ------------------------------------------------
+# Each tool of the SKETCH tab is a class of sketch_draw_tools.py, sketch_fillet_tool.py ...
+# whose build() turns the clicks and the typed values into curves and constraints (through
+# sketch_build.py, which runs headless too). The AI's call makes the tool object without its
+# window part (no __init__: no view, no panel, no value boxes on screen), gives it the clicks
+# and values build() reads, and calls build() and the tool's own way of adding the extra
+# constraints (sketch_explain.add_checked): the same shapes and ties as a person's clicks.
+class _Field:
+    def __init__(self, name, typed):
+        self.name = name
+        self.typed = typed
+        self.value = typed
+        self.anchor = None
+
+
+class _Boxes:
+    """The value boxes a drawing tool reads (sketch_draw.Boxes): the AI's values, as typed."""
+
+    def __init__(self, typed):
+        self.fields = [_Field(k, v) for k, v in typed.items() if v is not None]
+        self.typing = None
+
+    def field(self, name):
+        for f in self.fields:
+            if f.name == name:
+                return f
+        return None
+
+    def typed(self, name):
+        f = self.field(name)
+        return f.typed if f is not None else None
+
+
+def _tool(cls, sketch, **attrs):
+    tool = object.__new__(cls)
+    tool.sketch = sketch
+    tool.doc = sketch.Document
+    tool.snaps = []
+    tool.boxes = _Boxes({})
+    tool.picks = []
+    tool.step = 0
+    tool.session = None
+    tool.made = None
+    tool.note = ""
+    tool.active = False
+    for key, value in attrs.items():
+        setattr(tool, key, value)
+    return tool
+
+
+def _snap(point, key=None):
+    from ... import sketch_draw
+
+    return sketch_draw.Snap((float(point[0]), float(point[1])), key=key)
+
+
+def _xy2(p):
+    return (float(p[0]), float(p[1]))
+
+
+DRAW_CLASSES = {
+    "midpoint_line": "MidpointLine",
+    "rectangle_3point": "ThreePointRectangle",
+    "circle_2point": "TwoPointCircle",
+    "circle_2tangent": "TwoTangentCircle",
+    "circle_3tangent": "ThreeTangentCircle",
+    "tangent_arc": "TangentArc",
+    "edge_polygon": "EdgePolygon",
+    "slot_center_to_center": "CenterToCenterSlot",
+    "slot_overall": "OverallSlot",
+    "slot_center_point": "CenterPointSlot",
+    "arc_slot": "ThreePointArcSlot",
+    "conic": "ConicCurve",
+}
+DIRECTED = ("midpoint_line", "rectangle_3point", "edge_polygon") + tuple(
+    k for k in DRAW_CLASSES if k.startswith("slot_")
+)
+
+
+def _draw_with_tool(sketch, args, construction):
+    """build() of the SKETCH tool for the kind: (curves made before, the constraints kept)."""
+    from ... import sketch_draw_core as core
+    from ... import sketch_draw_tools as tools
+
+    kind = args["kind"]
+    cls = getattr(tools, DRAW_CLASSES[kind])
+    points = [_xy2(p) for p in args["points"]]
+    angle = math.radians(args["angle"]) if "angle" in args else None
+    typed = {
+        "length": args.get("length"),
+        "angle": angle,
+        "width": args.get("width"),
+        "diameter": args.get("diameter"),
+        "radius": args.get("radius"),
+        "sides": args.get("sides"),
+        "rho": args.get("rho"),
+    }
+    if kind in DIRECTED and (typed["length"] is not None or angle is not None):
+        # a typed length or angle moves the second click (the tool's adjust / end_from)
+        if kind == "midpoint_line":
+            ends = core.midpoint_line(points[0], points[1], typed["length"], angle)
+            if ends is None:
+                raise UserError("midpoint_line: the end is on the middle.")
+            points[1] = ends[1]
+        else:
+            moved = core.direction_point(points[0], points[1], typed["length"], angle)
+            if moved is None:
+                raise UserError("%s: the second point is on the first." % kind)
+            points[1] = moved
+    if kind == "circle_2point" and typed["diameter"] is not None:
+        # a typed diameter keeps the direction a -> b and moves b (the tool's adjust)
+        found = core.circle_2point(points[0], points[1], typed["diameter"])
+        if found is None:
+            raise UserError("circle_2point: the two points are one.")
+        centre = found[0]
+        points[1] = (2.0 * centre[0] - points[0][0], 2.0 * centre[1] - points[0][1])
+    if kind == "edge_polygon":
+        cls.sides = int(args["sides"])  # (the tool remembers the sides last used)
+    snaps = [_snap(p) for p in points]
+    picks = []
+    if kind in ("circle_2tangent", "circle_3tangent"):
+        picks = [int(g) for g in args["lines"]]
+        for g in picks:
+            if g >= 0 and sketch.Geometry[g].TypeId != "Part::GeomLineSegment":
+                raise UserError("%s: curve %d is not a line." % (kind, g))
+    if kind == "tangent_arc":
+        start = args["from"]
+        key = (int(start["curve"]), POS[start["point"]])
+        snaps = [_snap(_xy_of(sketch, key), key=key), _snap(points[0])]
+    if kind.startswith("slot_"):
+        snaps.append(_snap(points[1]))  # (the width click: the width is typed)
+    if kind == "arc_slot":  # [end, through, end] -> the tool's clicks: end, end, through, width
+        snaps = [_snap(points[0]), _snap(points[2]), _snap(points[1]), _snap(points[2])]
+    tool = _tool(cls, sketch, snaps=snaps, picks=picks, boxes=_Boxes(typed))
+    tool.step = len(snaps)
+    if kind == "tangent_arc" and tool._start(snaps[0]) is None:
+        raise UserError("tangent_arc: from must be the start or end of a line or arc.")
+    try:
+        found = {
+            "circle_2tangent": lambda: tool.circle(snaps[-1]),
+            "circle_3tangent": lambda: tool.circle(snaps[-1]),
+            "tangent_arc": lambda: tool.arc(snaps[-1]),
+            "arc_slot": lambda: tool.slot(snaps[-1]),
+        }.get(kind, lambda: True)()
+    except Exception:
+        found = None
+    if found is None:
+        raise UserError("%s: these points make no %s." % (kind, kind.replace("_", " ")))
+    try:
+        ours = cls.build(tool, construction) or []
+    except (ValueError, ZeroDivisionError, TypeError) as exc:
+        raise UserError("%s: %s." % (kind, exc))
+    return ours
+
+
+def _draw_own(sketch, args, construction):
+    """The SKETCH tab's FreeCAD tools (3-Point Circle, 3-Point Arc, Ellipse, the splines):
+    the geometry FreeCAD's own tools add."""
+    import Part
+
+    from ... import sketch_build as build
+    from ... import sketch_draw_core as core
+
+    kind = args["kind"]
+    pts = [_xy2(p) for p in args["points"]]
+    out = []
+    if kind == "circle_3point":
+        found = core.circle_3point(*pts)
+        if found is None:
+            raise UserError("circle_3point: the three points are in a line.")
+        made = build.add_circle(sketch, found[0], found[1], construction)
+        for p in pts:  # (FreeCAD's 3-point circle passes through its clicks)
+            out.append(_con("PointOnObject", _add_point(sketch, p), 1, made["circle"]))
+        return out
+    if kind == "arc_3point":
+        found = core.arc_through(pts[0], pts[1], pts[2])
+        if found is None:
+            raise UserError("arc_3point: the three points are in a line.")
+        centre, r, a1, a2 = found
+        index = sketch.addGeometry(build._arc(centre, r, a1, a2), construction)
+        if "radius" in args:
+            out.append(_con("Radius", index, float(args["radius"])))
+        return out
+    if kind == "ellipse":
+        centre, major, minor = (App.Vector(p[0], p[1], 0) for p in pts)
+        a = (major - centre).Length
+        u = major - centre
+        if a <= 1e-9:
+            raise UserError("ellipse: the major axis end is on the centre.")
+        u.normalize()
+        b = abs((minor - centre).dot(App.Vector(-u.y, u.x, 0)))
+        if b <= 1e-9 or b > a + 1e-9:
+            raise UserError(
+                "ellipse: the minor axis end must lie off the major axis, nearer than its end "
+                "(the minor radius is at most the major one)."
+            )
+        minor_end = centre + App.Vector(-u.y, u.x, 0) * b
+        index = sketch.addGeometry(Part.Ellipse(major, minor_end, centre), construction)
+        sketch.exposeInternalGeometry(index)  # (FreeCAD's ellipse tool shows its axes)
+        return out
+    vectors = [App.Vector(p[0], p[1], 0) for p in pts]
+    spline = Part.BSplineCurve()
+    if kind == "control_point_spline":
+        spline.buildFromPoles(vectors, False, min(3, len(vectors) - 1))
+    else:
+        spline.interpolate(vectors)
+    index = sketch.addGeometry(spline, construction)
+    sketch.exposeInternalGeometry(index)  # (the control points, as FreeCAD's spline tools)
+    return out
+
+
+def _add_point(sketch, p):
+    import Part
+
+    return sketch.addGeometry(Part.Point(App.Vector(p[0], p[1], 0)), True)
+
+
+def _xy_of(sketch, key):
+    p = _point(sketch, key)
+    return (p.x, p.y)
+
+
+@action("sketch_draw")
+def sketch_draw(ctx, args):
+    from ... import sketch_explain
+
+    sketch = _sketch(ctx, args["sketch"])
+    doc = sketch.Document
+    construction = bool(args.get("construction"))
+    if "lines" in args or "from" in args:
+        _check_items(
+            sketch,
+            [{"curve": g} for g in args.get("lines") or []]
+            + ([{"curve": args["from"]["curve"]}] if "from" in args else []),
+        )
+
+    def work():
+        first = len(sketch.Geometry)
+        kind = args["kind"]
+        if kind in DRAW_CLASSES:
+            ours = _draw_with_tool(sketch, args, construction)
+        else:
+            ours = _draw_own(sketch, args, construction)
+        kept = sketch_explain.add_checked(sketch, ours) if ours else []
+        sketch.solve()
+        doc.recompute()
+        if "Invalid" in list(sketch.State):
+            raise UserError("The sketch became invalid (conflicting constraints).")
+        return list(range(first, len(sketch.Geometry))), kept
+
+    before = _broken(doc)
+    added, kept = ctx.change(work)
+    return ctx.done(
+        "Done: %s. New curves %s in %s (%d constraint%s from the values given)."
+        % (ctx.title, _span(added), sketch.Name, len(kept), "" if len(kept) == 1 else "s"),
+        doc,
+        before,
+    )
+
+
+# -- MODIFY ---------------------------------------------------------------------------------------
+def _curves_at(sketch, point, kinds=("Part::GeomLineSegment", "Part::GeomArcOfCircle")):
+    found = []
+    for i, g in enumerate(sketch.Geometry):
+        if g.TypeId not in kinds or sketch.getConstruction(i):
+            continue
+        for end in (g.StartPoint, g.EndPoint):
+            if math.hypot(end.x - point[0], end.y - point[1]) <= 1e-6:
+                found.append(i)
+                break
+    return found
+
+
+def _corner(sketch, point, what):
+    found = _curves_at(sketch, point)
+    if len(found) != 2:
+        raise UserError(
+            "%s: %d lines or arcs end at [%g, %g] (a corner is where exactly two meet; "
+            "get_sketch gives their ends)." % (what, len(found), point[0], point[1])
+        )
+    return found
+
+
+def _curve_near(sketch, point, what):
+    import Part
+
+    vertex = Part.Vertex(App.Vector(point[0], point[1], 0))
+    best = None
+    for index, g in enumerate(sketch.Geometry):
+        if g.TypeId == "Part::GeomPoint":
+            continue
+        d = g.toShape().distToShape(vertex)[0]
+        if best is None or d < best[1]:
+            best = (index, d)
+    if best is None or best[1] > 1e-3:
+        raise UserError("%s: no curve passes through [%g, %g]." % (what, point[0], point[1]))
+    return best[0]
+
+
+def _fillet(sketch, args, construction):
+    from ... import sketch_fillet_tool as tools
+
+    corners = []
+    for p in args["points"]:
+        picks = _corner(sketch, p, "fillet")
+        refs = [tools.middle(sketch.Geometry[g]) for g in picks]
+        corners.append((picks, refs))
+    tool = _tool(tools.SketchFillet, sketch, corners=corners, _make_radius=float(args["radius"]))
+    try:
+        tools.SketchFillet.build(tool, construction)
+    except (RuntimeError, ValueError) as exc:
+        raise UserError("fillet: %s (a smaller radius may fit)." % exc)
+    made = tool.made or {}
+    return "fillet arcs %s, radius %g mm" % (made.get("arcs"), float(args["radius"]))
+
+
+def _chamfer(sketch, args, construction):
+    from ... import sketch_chamfer_tool as tools
+
+    words = []
+    kind = "equal"
+    if "distance2" in args:
+        kind = "two_distances"
+    elif "angle" in args:
+        kind = "distance_angle"
+    last = tools.SketchChamfer.kind
+    tools.SketchChamfer.kind = kind  # (the tool's type; put back after)
+    try:
+        for p in args["points"]:
+            picks = tuple(_corner(sketch, p, "chamfer"))
+            values = {
+                "distance": float(args["distance"]),
+                "distance2": float(args.get("distance2", args["distance"])),
+                "angle": float(args.get("angle", 45.0)),
+            }
+            tool = _tool(
+                tools.SketchChamfer,
+                sketch,
+                picks=picks,
+                keeps=(None, None),
+                values=values,
+                typed={k: True for k in values},
+                limits=None,
+            )
+            now = tool._compute()
+            if not now.get("ok"):
+                raise UserError(
+                    "chamfer at %s: %s" % (list(p), now.get("error") or "it does not fit")
+                )
+            tool._making = now
+            tools.SketchChamfer.build(tool, construction)
+            words.append("line %s" % (tool.made or {}).get("line"))
+            if tool.note:
+                words.append(tool.note)
+    except (RuntimeError, ValueError) as exc:
+        raise UserError("chamfer: %s." % exc)
+    finally:
+        tools.SketchChamfer.kind = last
+    return "chamfer %s" % "; ".join(str(w) for w in words)
+
+
+def _extend(sketch, args, construction):
+    from ... import sketch_build as build
+
+    done = []
+    for p in args["points"]:
+        geo = _curve_near(sketch, p, "extend")
+        plan = build.extend_plan(sketch, geo, _xy2(p))
+        if plan is None:
+            raise UserError(
+                "extend: curve %d does not meet another curve beyond its end near [%g, %g] "
+                "(only lines and arcs grow)." % (geo, p[0], p[1])
+            )
+        if not build.extend_curve(sketch, geo, plan):
+            raise UserError("extend: FreeCAD could not extend curve %d." % geo)
+        done.append("curve %d to [%.6g, %.6g]" % (geo, plan[1][0], plan[1][1]))
+    return "extended %s" % "; ".join(done)
+
+
+def _break(sketch, args, construction):
+    from ... import sketch_build as build
+
+    done = []
+    for p in args["points"]:
+        geo = _curve_near(sketch, p, "break")
+        cuts = build.break_curve(sketch, geo, _xy2(p))
+        if not cuts:
+            raise UserError(
+                "break: curve %d crosses no other curve near [%g, %g]: nothing to break at."
+                % (geo, p[0], p[1])
+            )
+        done.append("curve %d at %d point%s" % (geo, cuts, "" if cuts == 1 else "s"))
+    return "broke %s" % "; ".join(done)
+
+
+def _offset(sketch, args, construction):
+    from ... import sketch_offset_core
+    from ... import sketch_offset_tool as tools
+
+    d = float(args["distance"])
+    if abs(d) <= 1e-9:
+        raise UserError("offset: distance must not be 0.")
+    last = tools.SketchOffset.direction
+    tools.SketchOffset.direction = tools.SYMMETRIC if args.get("both_sides") else tools.ONE_SIDE
+    try:
+        tool = _tool(
+            tools.SketchOffset,
+            sketch,
+            curves=list(args["curves"]),
+            _model=None,
+            side=1 if d > 0 else -1,
+        )
+        try:
+            results = tools.SketchOffset.results(tool, abs(d))
+        except sketch_offset_core.OffsetError as exc:
+            raise UserError("offset: %s." % exc)
+        tool._pending = (abs(d), results)
+        tools.SketchOffset.build(tool, construction)
+    finally:
+        tools.SketchOffset.direction = last
+    made = tool.made or {}
+    return "offset curves %s" % made.get("curves")
+
+
+@action("sketch_modify")
+def sketch_modify(ctx, args):
+    sketch = _sketch(ctx, args["sketch"])
+    doc = sketch.Document
+    if args.get("curves"):
+        _check_items(sketch, [{"curve": g} for g in args["curves"]])
+    kind = args["kind"]
+
+    def work():
+        first = len(sketch.Geometry)
+        if kind == "toggle_construction":
+            for g in args["curves"]:
+                sketch.toggleConstruction(int(g))
+            words = "curves %s now %s" % (
+                args["curves"],
+                ", ".join(
+                    "construction" if sketch.getConstruction(int(g)) else "normal"
+                    for g in args["curves"]
+                ),
+            )
+        else:
+            words = {
+                "fillet": _fillet,
+                "chamfer": _chamfer,
+                "extend": _extend,
+                "break": _break,
+                "offset": _offset,
+            }[kind](sketch, args, False)
+        sketch.solve()
+        doc.recompute()
+        if "Invalid" in list(sketch.State):
+            raise UserError("The sketch became invalid (conflicting constraints).")
+        return words, list(range(first, len(sketch.Geometry)))
+
+    before = _broken(doc)
+    words, added = ctx.change(work)
+    return ctx.done(
+        "Done: %s: %s. New curves %s in %s." % (ctx.title, words, _span(added), sketch.Name),
+        doc,
+        before,
+    )
+
+
+# -- mirror, patterns, move ------------------------------------------------------------------------
+def _key(item):
+    return int(item["curve"]), POS[item["point"]]
+
+
+def _pattern(sketch, args):
+    from ... import sketch_pattern_core
+    from ... import sketch_pattern_tool as tools
+
+    kind = args["kind"]
+    curves = [int(g) for g in args["curves"]]
+    if kind == "rectangular":
+        cls = tools.SketchRectangularPattern
+        values = {
+            "distribution": args.get("distribution", "extent"),
+            "quantity": int(args["quantity"]),
+            "distance": float(args["distance"]),
+            "direction_type": "one",
+            "quantity2": int(args.get("quantity2", 1)),
+            "distance2": float(args.get("distance2", 20.0)),
+            "direction_type2": "one",
+        }
+        tool = _tool(
+            cls,
+            sketch,
+            objects=curves,
+            values=values,
+            directions={
+                tools.DIRECTION: int(args.get("direction", -1)),
+                tools.DIRECTION2: int(args.get("direction2", -2)),
+            },
+            suppressed=set(),
+        )
+    else:
+        key = _key(args["center"])
+        centre = (0.0, 0.0) if key in ((-1, 1), (-1, 0)) else _xy_of(sketch, key)
+
+        class _Circular(tools.SketchCircularPattern):
+            def center_point(self):
+                return centre
+
+        values = {
+            "circular_type": args.get("circular_type", "full"),
+            "quantity": int(args["quantity"]),
+            "angle": float(args.get("angle", 360.0)),
+        }
+        tool = _tool(_Circular, sketch, objects=curves, values=values, center=key, suppressed=set())
+    try:
+        tool.moves_now = sketch_pattern_core.unique_moves(type(tool).moves(tool))
+    except Exception as exc:
+        raise UserError("%s pattern: %s" % (kind, exc))
+    if not tool.moves_now:
+        raise UserError("%s pattern: these values make no copies." % kind)
+    tool.kind = cls.kind if kind == "rectangular" else "circular"
+    tool.title = "Rectangular Pattern" if kind == "rectangular" else "Circular Pattern"
+    shape = type(tool).build(tool, False) or []
+    return tool, shape
+
+
+@action("sketch_pattern")
+def sketch_pattern(ctx, args):
+    from ... import sketch_explain
+
+    sketch = _sketch(ctx, args["sketch"])
+    doc = sketch.Document
+    items = [{"curve": g} for g in args["curves"]]
+    if "line" in args:
+        items.append({"curve": args["line"]})
+    if "center" in args:
+        items.append(args["center"])
+    _check_items(sketch, items)
+    kind = args["kind"]
+
+    def work():
+        first = len(sketch.Geometry)
+        note = ""
+        if kind == "mirror":
+            from ... import sketch_mirror_tool as tools
+
+            if int(args["line"]) >= 0 and not sketch.Geometry[int(args["line"])].TypeId.endswith(
+                "LineSegment"
+            ):
+                raise UserError("mirror: curve %d is not a line." % args["line"])
+            tool = _tool(
+                tools.SketchMirror,
+                sketch,
+                mirror_line=int(args["line"]),
+                objects=[int(g) for g in args["curves"]],
+            )
+            ties = tools.SketchMirror.build(tool, False)
+            sketch_explain.add_checked(sketch, ties)
+        elif kind == "move_copy":
+            from ... import sketch_move_tool as tools
+
+            tool = _tool(tools.SketchMove, sketch)
+            ids = [int(g) for g in args["curves"]]
+            pivot = _xy2(args.get("about", (0.0, 0.0)))
+            mover = tools.SketchMove._copy if args.get("copy") else tools.SketchMove._move
+            try:
+                result = mover(
+                    tool,
+                    ids,
+                    pivot,
+                    float(args.get("dx", 0)),
+                    float(args.get("dy", 0)),
+                    float(args.get("rotate", 0)),
+                )
+            except RuntimeError as exc:
+                raise UserError("move_copy: %s." % exc)
+            if result.get("dropped"):
+                note = " Ties to curves that did not move were dropped: %s." % ", ".join(
+                    result["dropped"]
+                )
+        else:
+            tool, shape = _pattern(sketch, args)
+            if shape:
+                sketch_explain.add_checked(sketch, shape)
+        sketch.solve()
+        doc.recompute()
+        if "Invalid" in list(sketch.State):
+            raise UserError("The sketch became invalid (conflicting constraints).")
+        return list(range(first, len(sketch.Geometry))), note
+
+    before = _broken(doc)
+    added, note = ctx.change(work)
+    moved = " (moved: curves %s)" % args["curves"] if kind == "move_copy" and not added else ""
+    return ctx.done(
+        "Done: %s. New curves %s in %s%s.%s" % (ctx.title, _span(added), sketch.Name, moved, note),
+        doc,
+        before,
+    )
+
+
+# -- Project / Include ----------------------------------------------------------------------------
+def _model_picks(ctx, sketch, args, element_kinds=("edges", "faces"), faces_for_body=False):
+    """[(object, sub-element)] of the model the selectors pick (on body `of`, default the
+    sketch's own body: its last step's shape)."""
+    from ... import bodies
+    from ..ops import selectors
+
+    if args.get("of"):
+        body = ctx.body_of(args["of"])
+    else:
+        body = bodies.body_of(sketch) or ctx.host.find_body(sketch.Document)
+    if body is None:
+        raise UserError("There is no body to take geometry from: give of.")
+    source = body.Tip if getattr(body, "Tip", None) is not None else body
+    if source is sketch or source.Shape.isNull() or not source.Shape.Faces:
+        # (the sketch is the tip: the solid before it)
+        source = body
+    shape = source.Shape
+    out = []
+    for element in element_kinds:
+        if element not in args:
+            continue
+        try:
+            names = selectors.select(shape, args[element], element)
+        except (selectors.SelectionError, KeyError, ValueError) as exc:
+            raise UserError("The %s selector does not fit %s: %s." % (element, body.Label, exc))
+        if not names:
+            raise UserError("The %s selector picked nothing on %s." % (element, body.Label))
+        out += [(source, n) for n in names]
+    if args.get("body"):
+        if faces_for_body:
+            out += [(source, "Face%d" % (i + 1)) for i in range(len(shape.Faces))]
+        else:
+            out += [(source, "Edge%d" % (i + 1)) for i in range(len(shape.Edges))]
+    return out, body
+
+
+@action("sketch_project")
+def sketch_project(ctx, args):
+    from ... import sketch_external
+
+    sketch = _sketch(ctx, args["sketch"])
+    doc = sketch.Document
+    kind = args["kind"]
+
+    def work():
+        count = len(sketch.ExternalGeo)
+        made = None
+        if kind in ("project", "include_3d", "intersect"):
+            picks, _body = _model_picks(ctx, sketch, args, faces_for_body=kind == "intersect")
+            defining = kind != "include_3d"
+            failed = []
+            for obj, sub in picks:
+                try:
+                    if kind != "intersect" and sketch_external.needs_reference(sketch, obj):
+                        # (another body or component: Project's reference, wave 7)
+                        sketch_external.project_across(sketch, obj, sub, defining=defining)
+                    else:
+                        sketch.addExternal(obj.Name, sub, defining, kind == "intersect")
+                except Exception as exc:
+                    failed.append("%s (%s)" % (sub, exc))
+            if failed and (not args.get("body") or len(failed) == len(picks)):
+                # (a whole body: the faces the plane does not cut are passed over)
+                raise UserError("%s: could not come in: %s." % (kind, "; ".join(failed[:5])))
+            doc.recompute()
+            if len(sketch.ExternalGeo) <= count:
+                raise UserError(
+                    "%s: nothing came into %s (projected already?)." % (kind, sketch.Name)
+                )
+            return (
+                "%d curve%s"
+                % (
+                    len(sketch.ExternalGeo) - count,
+                    "" if len(sketch.ExternalGeo) - count == 1 else "s",
+                ),
+                None,
+            )
+        picks, _body = _model_picks(
+            ctx, sketch, {k: args[k] for k in ("faces", "of") if k in args}, ("faces",)
+        )
+        if kind == "project_to_surface":
+            from ... import sketch_project
+
+            subs = []
+            for g in args["curves"]:
+                name = sketch_project.sketch_edge_name(sketch, int(g))
+                if name is None:
+                    raise UserError("project_to_surface: curve %d is construction or a point." % g)
+                subs.append(name)
+            faces = {}
+            for obj, sub in picks:
+                faces.setdefault(obj, []).append(sub)
+            kind_name = sketch_project.TYPES[0 if args.get("along", "closest") == "closest" else 1]
+            try:
+                made = sketch_project.make(sketch, list(faces.items()), [(sketch, subs)], kind_name)
+            except ValueError as exc:
+                raise UserError("project_to_surface: %s." % exc)
+            return (
+                "%d 3D curve%s on the faces"
+                % (
+                    len(made.Shape.Edges),
+                    "" if len(made.Shape.Edges) == 1 else "s",
+                ),
+                made,
+            )
+        from ... import surface_core, surface_iso
+
+        if len(picks) != 1:
+            raise UserError("isoparametric takes one face (the selector picked %d)." % len(picks))
+        mode = "Distributed" if "count" in args else "Single"
+        face = picks[0][0].Shape.getElement(picks[0][1])
+        distance = 0.0
+        if mode == "Single":
+            lengths = surface_iso.lengths(face, args.get("direction", "U"))
+            distance = float(args.get("fraction", 0.5)) * (max(lengths) if lengths else 0.0)
+        try:
+            made = surface_iso.make(
+                sketch,
+                picks[0],
+                args.get("direction", "U"),
+                mode,
+                distance,
+                int(args.get("count", 3)),
+            )
+        except surface_core.SurfaceError as exc:
+            raise UserError("isoparametric: %s" % exc)
+        return (
+            "%d %s curve%s on %s"
+            % (
+                len(made.Shape.Edges),
+                args.get("direction", "U"),
+                "" if len(made.Shape.Edges) == 1 else "s",
+                picks[0][1],
+            ),
+            made,
+        )
+
+    before = _broken(doc)
+    words, made = ctx.change(work)
+    tail = " (id %r)" % made.Name if made is not None else ""
+    return ctx.done("Done: %s: %s into %s%s." % (ctx.title, words, sketch.Name, tail), doc, before)

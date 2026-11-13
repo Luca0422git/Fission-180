@@ -38,3 +38,7 @@ from . import animation_actions  # noqa: E402,F401  (the ANIMATION workspace, wa
 from . import approach_actions  # noqa: E402,F401  (plan_approach, ask_person, show_workspace)
 # wave 8, ai-workspaces
 from . import make_actions  # noqa: E402,F401  (UTILITIES > MAKE: 3D Print, Export Everything)
+# wave 8, ai-design: INSERT, CONSTRUCT's UCS, base features, Compute All, component colours
+# (design2_actions) and INSPECT's analyses with numbers (analysis_actions)
+from . import design2_actions  # noqa: E402,F401
+from . import analysis_actions  # noqa: E402,F401

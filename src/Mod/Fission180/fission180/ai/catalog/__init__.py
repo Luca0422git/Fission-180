@@ -51,6 +51,9 @@ from . import animation_tools  # noqa: F401  (the ANIMATION workspace, wave 7)
 
 # wave 8, ai-workspaces
 from . import make_tools  # noqa: F401,E402  (UTILITIES > MAKE: 3D Print, Export Everything)
+# wave 8, ai-design: the DESIGN workspace's commands that had no tool (ASSEMBLE, INSERT,
+# CONSTRUCT's User Coordinate System, base features, Compute All, INSPECT's analyses)
+from . import design2_tools  # noqa: F401,E402
 from .kit import (  # noqa: F401  (the shared texts, re-exported)
     BODY_PICK_HELP,
     CURVES_HELP,
