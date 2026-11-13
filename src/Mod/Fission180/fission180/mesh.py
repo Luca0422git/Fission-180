@@ -2187,6 +2187,66 @@ def section_polylines(mesh, origin, normal, tolerance):
     return lines
 
 
+# role -> (normal, x axis): FreeCAD's origin planes (the XZ plane faces -Y), as the Plane Cut
+# and Section Sketch dialogs draw them (mesh_cut_ui.ORIGIN_PLANES)
+ORIGIN_PLANES = {
+    "XY": ((0.0, 0.0, 1.0), (1.0, 0.0, 0.0)),
+    "XZ": ((0.0, -1.0, 0.0), (1.0, 0.0, 0.0)),
+    "YZ": ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
+}
+
+
+def origin_frame(role):
+    """The placement of an origin plane (XY, XZ, YZ) the cut dialogs use."""
+    normal, x_axis = ORIGIN_PLANES[role]
+    return frame_placement((0.0, 0.0, 0.0), normal, x_axis)
+
+
+def section_sketch(doc, body, body_obj, frame, reference=None):
+    """Create Mesh Section Sketch without the window (mesh_cut_ui.make_section_sketch runs it
+    for the dialog; the AI's mesh_section_sketch too): a sketch in `body` on the plane
+    `frame` (attached to the picked plane or face, else to the body's origin plane of the
+    same direction), holding the section of the mesh body `body_obj` as fixed lines."""
+    import FreeCAD as App
+
+    target = None
+    if reference is not None:
+        obj, subs = reference
+        sub = subs[0] if subs else ""
+        resolved = obj
+        short = sub
+        if sub and "." in sub:
+            try:
+                resolved = obj.getSubObject(sub.rsplit(".", 1)[0] + ".", retType=1) or obj
+            except Exception:
+                resolved = obj
+            short = sub.rsplit(".", 1)[1]
+        target = (resolved, short)
+    else:
+        normal = frame.Rotation.multVec(App.Vector(0, 0, 1))
+        for role in ORIGIN_PLANES:
+            if normal.isEqual(origin_frame(role).Rotation.multVec(App.Vector(0, 0, 1)), 1e-9):
+                for feature in body.Origin.OriginFeatures:
+                    if (getattr(feature, "Role", "") or feature.Name).startswith(role + "_Plane"):
+                        target = (feature, "")
+                break
+    sketch = body.newObject("Sketcher::SketchObject", "Sketch")
+    sketch.Label = "Mesh Section %s" % body_obj.Label
+    if target is not None:
+        sketch.AttachmentSupport = [target]
+        sketch.MapMode = "FlatFace"
+        doc.recompute()
+        attached = sketch.getGlobalPlacement()
+        sketch.AttachmentOffset = attached.inverse().multiply(frame)
+    else:
+        sketch.MapMode = "Deactivated"
+        sketch.Placement = body.getGlobalPlacement().inverse().multiply(frame)
+    doc.recompute()
+    section_into_sketch(sketch, global_mesh(body_obj))
+    doc.recompute()
+    return sketch
+
+
 def section_into_sketch(sketch, mesh, fixed=True):
     """Put the section of `mesh` by the sketch's plane into the sketch as lines (fixed, like
     an inserted drawing). Returns the number of lines."""

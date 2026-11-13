@@ -313,13 +313,99 @@ def mesh_bodies(doc):
 def solid_from_mesh(mesh, method="Prismatic", tolerance=None):
     """A solid from a watertight mesh. Faceted keeps one flat face per triangle; Prismatic
     merges the triangles that lie in one plane into one face (flat faces of a box or a
-    plate become single faces; round faces stay faceted: FreeCAD has no surface fitting)."""
-    import Part
+    plate become single faces; round faces stay faceted: FreeCAD has no surface fitting).
 
+    Built from the mesh's own edges (mesh_convert_core, wave 8: 76,000 triangles in about
+    11 s instead of 4 min 40 s of sewing); a mesh that way does not close into a solid of its
+    volume is sewn as before (_sewn_solid)."""
     if mesh is None or mesh.CountFacets == 0:
         raise InsertError("The mesh body has no triangles.")
     if tolerance is None:
         tolerance = max(1e-4, 1e-5 * mesh.BoundBox.DiagonalLength)
+    try:
+        solid = _solid_from_regions(mesh, method == "Prismatic", tolerance)
+    except Exception as exc:  # (never a wrong body: the old way instead, said in the log)
+        solid = None
+        log("Convert Mesh: built by sewing (%s)" % exc)
+    if solid is not None:
+        return solid
+    return _sewn_solid(mesh, method, tolerance)
+
+
+def _solid_from_regions(mesh, prismatic, tolerance):
+    """The solid of mesh_convert_core.faces: one OpenCASCADE vertex per mesh point and one
+    edge per outline edge, shared by the two faces on it, so the shell is closed as built.
+    Raises when it is not (the caller sews instead)."""
+    import FreeCAD as App
+    import Part
+
+    from . import mesh_convert_core
+
+    points_v, facets_t = mesh.Topology
+    points = [(p.x, p.y, p.z) for p in points_v]
+    facets = [tuple(f) for f in facets_t]
+    if not mesh_convert_core.closed_two_manifold(facets):
+        raise ValueError("the mesh is not a closed two-manifold")
+    found, _stats = mesh_convert_core.faces(points, facets, prismatic, tolerance)
+    vertices = {}
+    edges = {}
+
+    def vertex(i):
+        v = vertices.get(i)
+        if v is None:
+            v = vertices[i] = Part.Vertex(App.Vector(*points[i]))
+        return v
+
+    def edge(a, b):
+        """The edge from point a to point b: made once, run the other way by the other face."""
+        key = (a, b) if a < b else (b, a)
+        e = edges.get(key)
+        if e is None:
+            e = edges[key] = Part.Edge(vertex(key[0]), vertex(key[1]))
+        return e if a < b else e.reversed()
+
+    made = []
+    for loops, normal in found:
+        wires = [
+            Part.Wire([edge(a, b) for a, b in zip(loop, loop[1:] + loop[:1])]) for loop in loops
+        ]
+        if len(wires) == 1:
+            face = Part.Face(wires[0])
+            u0, u1, v0, v1 = face.ParameterRange
+            if face.normalAt((u0 + u1) / 2.0, (v0 + v1) / 2.0).dot(App.Vector(*normal)) < 0:
+                face.reverse()
+        else:
+            # one flat region: its outer loop and the holes in it, wound as seen from outside
+            # (outer counter-clockwise about the outward normal, holes clockwise), on a plane
+            # facing out: no search for which loop lies in which (a face maker's is slow)
+            plane = Part.Plane(App.Vector(*points[loops[0][0]]), App.Vector(*normal))
+            face = Part.Face(plane, wires[0])
+            face = face.cutHoles(wires[1:]) or face
+        made.append(face)
+    if all(len(loops) == 1 for loops, _normal in found):
+        shells = [Part.Shell(made)]
+    else:
+        # (Part.Shell takes minutes on a flat face with hundreds of holes: 90 s for a plate
+        # face with 601. Sewing faces that already share their edges only finds them shared:
+        # 5 s for the whole 94,000-triangle plate.)
+        joined = Part.Compound(made)
+        joined.sewShape()
+        shells = joined.Shells
+    if len(shells) != 1 or not shells[0].isClosed() or len(shells[0].Faces) != len(made):
+        raise ValueError("the faces do not close into one shell")
+    solid = Part.Solid(shells[0])
+    if solid.Volume < 0:
+        solid.reverse()
+    volume = abs(float(mesh.Volume))
+    if volume > 0 and abs(solid.Volume - volume) > 0.005 * volume + 1e-9:
+        raise ValueError("volume %.6g instead of the mesh's %.6g" % (solid.Volume, volume))
+    return solid
+
+
+def _sewn_solid(mesh, method, tolerance):
+    """The way before wave 8: a face per triangle, sewn, merged (Prismatic)."""
+    import Part
+
     shape = Part.Shape()
     shape.makeShapeFromMesh(mesh.Topology, tolerance, True)
     if shape.isNull() or not shape.Faces:
