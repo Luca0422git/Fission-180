@@ -147,6 +147,16 @@ def _plate_drawing(d, run):
     return None
 
 
+def _edges_of_one(name):
+    """get_drawing with view: that view's elements only."""
+
+    def check(d, run):
+        listed = [v["id"] for v in d["views"] if "elements" in v]
+        return None if listed == [name] else "elements listed for %s" % listed
+
+    return check
+
+
 def _ordinates(answer, run):
     from fission180 import drawing_annot
 
@@ -480,6 +490,11 @@ PART = [
         "args": {"edges": True},
         "contains": ['"orientation": "Top"', '"kind": "arc"'],
         "check": all_of(drawing_data(_plate_drawing), no_step),
+    },
+    {
+        "tool": "get_drawing",
+        "args": {"edges": True, "view": "ProjectedView001"},
+        "check": all_of(drawing_data(_edges_of_one("ProjectedView001")), no_step),
     },
     # -- DIMENSIONS
     {

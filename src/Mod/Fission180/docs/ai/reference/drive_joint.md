@@ -63,4 +63,5 @@ Done: Revolute 1 at angle 45 degrees, slide 0 mm. Bodies now: Body001: 36000 mm3
 
 ## See also
 
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

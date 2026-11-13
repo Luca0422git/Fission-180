@@ -6,7 +6,7 @@ Fusion: BROWSER > Drawings (and what the sheets show). Category: Drawings. Read-
 
 ## What it does
 
-Describe drawings so you can check your work without a picture: each drawing's sheets (size, standard, units, title block) and on each: views (id, kind, orientation, scale, place and size on the sheet, label, style, what they show: bodies, flat pattern, storyboard; section line and depth, break, breakout, rotation), dimensions (type, value, the text written, what they measure), annotations (leaders, symbols, ordinates: kind and text), balloons (number, component), tables (rows), centre marks, centre lines. edges true: each view's lines, circles and points (view's own mm) for picks. picture true: a PNG of one sheet (frame, title block, views, dimensions, text) drawn from its DXF.
+Describe drawings so you can check your work without a picture: each drawing's sheets (size, standard, units, title block) and on each: views (id, kind, orientation, scale, place and size on the sheet, label, style, what they show: bodies, flat pattern, storyboard; section line and depth, break, breakout, rotation), dimensions (type, value, the text written, what they measure), annotations (leaders, symbols, ordinates: kind and text), balloons (number, component), tables (rows), centre marks, centre lines. edges true: each view's lines, circles and points (view's own mm) for picks; with view, that view's only (a big assembly's edges run to 500 kB). picture true: a PNG of one sheet (frame, title block, views, dimensions, text) drawn from its DXF (about 15 s for an A2 sheet of a 1,000-face assembly).
 
 ## Arguments
 
@@ -14,6 +14,7 @@ Describe drawings so you can check your work without a picture: each drawing's s
 |---|---|---|---|---|---|
 | `drawing` | string |  |  |  | one drawing or sheet (default: all) |
 | `edges` | boolean |  | `false` |  | list each view's lines and circles |
+| `view` | string |  |  |  | edges: only this view's (and its drawing) |
 | `picture` | boolean |  |  |  | a PNG of the sheet (the drawing's first, or the given sheet) |
 | `width` | integer |  | `1200` | >= 200, <= 4000 | picture width in pixels |
 

@@ -32,6 +32,13 @@ releases published under the old name (their tags are `sciforge-v...`).
   keeps the connector of the version it was made with, also after an update. Installing the
   extension now removes the settings-file entry, and setting up through the settings file says
   to remove the extension.
+- **MANUFACTURE > 3D > Contour made no toolpath on a plain block**, and where it did make one
+  it was unsafe: the whole wall in one pass at the bottom, and up to 1 mm of material left on
+  the walls. FreeCAD's engine only looks for walls inside the stock's outline, so with a
+  little stock at the sides it found none. It now looks round the part, steps down the walls
+  as Multiple Depths says (5 passes on a 12 mm block with a 6 mm tool), and stays within
+  0.25 mm of the walls for a 6 mm tool (never cutting into them). 3D Contour toolpaths in
+  saved designs are marked as needing regenerating; the other operations' are not.
 - **MESH > Combine crashed Fission 180 when the two bodies share a flat face** (a box and a
   cylinder standing on one floor, a body stacked on another, a pocket flush with the top): the
   whole program closed and unsaved work was lost, and a design saved with such a step crashed

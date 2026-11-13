@@ -106,7 +106,7 @@ fingerprint of the model, the setup and the options.
 | 3D Adaptive Clearing | `Path.Op.Adaptive` with ModelAwareExperiment | FreeCAD marks it experimental |
 | 3D Pocket Clearing | `Path.Op.Pocket` | |
 | 3D Parallel | `Path.Op.Surface` (OpenCAMLib, in the AppImage as `opencamlib`) | |
-| 3D Contour | `Path.Op.Waterline` (OCL Dropcutter) | |
+| 3D Contour | `Path.Op.Waterline` (OCL Dropcutter, BoundBox Stock, LayerMode Multi-pass with Multiple Depths) | The engine scans 1.5 x the tool's diameter + 2 mm round the part where the stock is narrower (`waterline_margin`; for its computing only, the stock put back after); grid step = the tool's diameter / 24, 0.1 to 0.5 mm (`waterline_sample`): the passes stand at most that far outside the walls |
 | Thread, Scallop, Pencil, Spiral, Radial | none | Listed greyed with the reason |
 
 | Fusion option | FreeCAD property |
@@ -142,6 +142,17 @@ M2 / M30 is a note. Moves in machine coordinates (G28, G53) and incremental move
 not followed.
 
 ## What cannot be mapped, and known gaps
+
+- **3D Contour's accuracy**: FreeCAD's Waterline finds the walls on a grid of drop-cutter
+  points, so its passes stand up to one grid step (0.1 to 0.5 mm: the tool's diameter / 24)
+  outside the walls, never inside; Fusion's stay within the Tolerance. A finer grid costs
+  time (0.1 mm: 2.4 s on a 60 x 40 block, 7 s round a 40 mm boss). For exact straight walls,
+  finish with 2D Contour. Before 0.1.0-beta.4.0.3 it found no wall at all when the stock
+  stood less than about a tool's diameter + 1 mm off the part (FreeCAD scans only inside the
+  stock's outline), left up to 1 mm, and cut the whole wall in one pass at the bottom
+  (LayerMode was left at FreeCAD's Single-pass); such toolpaths in saved designs say they
+  need regenerating (`manufacture.KIND_VERSIONS`). FreeCAD 1.1.4's other algorithm,
+  Experimental, stops with a TypeError ("object of type 'Part.Compound' has no len()").
 
 - **Lead-ins with tabs**: FreeCAD's tabs find no contour in a path that already has lead-ins,
   and lead-ins put on a path with tabs retract at every tab. With tabs on, the leads are left

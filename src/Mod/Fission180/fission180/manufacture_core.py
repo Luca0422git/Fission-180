@@ -1628,16 +1628,42 @@ def engine_plan(kind, options, env):
                 {
                     "Algorithm": "OCL Dropcutter",
                     "BoundBox": "Stock",
+                    # (FreeCAD's default is one pass at the bottom: the whole wall at once)
+                    "LayerMode": "Multi-pass" if passes.get("multiple_depths") else "Single-pass",
                     "StepDown": max(0.1, stepdown(options)),
-                    "SampleInterval": max(0.2, min(1.0, d / 6.0)),
+                    "SampleInterval": waterline_sample(d),
                     "LinearDeflection": tol,
                     "CutMode": "Climb" if climb else "Conventional",
                 },
                 source,
             )
+            parts[-1]["scan_margin"] = waterline_margin(d)
     else:
         raise CamError("%s has no engine yet." % info["title"])
     return parts
+
+
+# 3D Contour (FreeCAD's Waterline with OpenCAMLib) finds the walls on a grid of drop-cutter
+# points inside the stock's outline (measured 2026-11-13, a 60 x 40 x 12 block):
+# - it finds no wall at all unless the tool can stand clear of the part all round, about one
+#   tool diameter plus 1 mm outside it (a 6 mm tool: nothing with 5 mm of stock at the sides,
+#   a full contour from 7 mm; 10 mm: from 11; 3 mm: from 4). Fusion's tool goes round the
+#   walls whatever the stock, so the engine scans that much further for its computing only;
+# - its passes stand up to one grid step off the walls, always outside (never a gouge): a
+#   1 mm grid left 0.99 mm, 0.25 mm left 0.24 (0.6 s), 0.1 mm left 0.09 (2.4 s; a round boss
+#   7 s). The tool's diameter / 24 (0.25 mm for a 6 mm tool), kept between 0.1 and 0.5 mm.
+WATERLINE_SAMPLE = (0.1, 0.5)
+
+
+def waterline_margin(diameter):
+    """How far beyond the part (mm) 3D Contour's engine looks for its walls."""
+    return 1.5 * float(diameter) + 2.0
+
+
+def waterline_sample(diameter):
+    """3D Contour's grid step (mm): its passes stand up to this far off the walls."""
+    lo, hi = WATERLINE_SAMPLE
+    return max(lo, min(hi, float(diameter) / 24.0))
 
 
 def tab_positions(length, positioning, distance, count):

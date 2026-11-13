@@ -143,4 +143,5 @@ Draft along [0, 0, 1]: 5 faces under 1 degree(s) (no draft), 0 between 1 and 3 d
 
 ## See also
 
+- Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

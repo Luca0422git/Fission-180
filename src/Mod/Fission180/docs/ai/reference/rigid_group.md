@@ -66,4 +66,5 @@ Done: rigid group 'Rigid Group 1' (id 'RigidGroup') locks Arm, Stop together whe
 
 ## See also
 
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

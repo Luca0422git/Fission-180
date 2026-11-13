@@ -72,6 +72,7 @@ Done: AI: Box. Its id is 'Primitive1'. Bodies now: Body1: 8000 mm3, 40 x 20 x 10
 
 ## See also
 
+- Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
-- Golden models built with its steps (read one with docs_read golden/<id>): `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere`, `pattern_circ_after_primitive_off_origin`, `plastic2_lip_round_rim`, `plastic2_lip_tip_radius`, `sf_box_basic`, `sf_box_param_driven` and 24 more
+- Golden models built with its steps (read one with docs_read golden/<id>): `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_contour3d`, `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere`, `direct_silhouette_edit_to_faces`, `direct_silhouette_faces_sphere`, `pattern_circ_after_primitive_off_origin`, `plastic2_lip_round_rim`, `plastic2_lip_tip_radius`, `sf_box_basic` and 25 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

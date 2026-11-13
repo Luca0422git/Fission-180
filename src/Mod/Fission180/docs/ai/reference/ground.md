@@ -62,4 +62,5 @@ Base is grounded.
 ## See also
 
 - Recipe: [a pair of meshing spur gears](fission180://docs/recipes/gear-pair.md)
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

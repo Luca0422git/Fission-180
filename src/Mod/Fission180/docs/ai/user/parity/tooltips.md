@@ -92,6 +92,28 @@ test follows the ribbon, so every one of them gets a tooltip):
 | manufacture | MILLING | 21 |
 | animation | ANIMATION | 10 |
 
+## Coverage: MESH, SHEET METAL, PLASTIC, SIMULATION, MANUFACTURE, ANIMATION (tips-workspaces)
+
+Every command of these tabs (113) has a complete entry and its picture (`test_tips`:
+`test_module_mesh`, `_sheet_metal`, `_plastic`, `_simulation`, `_manufacture`, `_animation`
+pass; the pictures together: `docs/fission180/dev/tips-workspaces-sheet.png`). The texts were
+written from each command's own dialog code (its labels, defaults and refusals); the pictures
+made in the real Fission 180 by `tools/fission180/tip_pictures_<module>.py` (shared helpers:
+`tip_pictures_workspaces.py`):
+
+| Module | Commands | What the picture shows | How it is made |
+|---|---|---|---|
+| mesh | 19: CREATE 2 (Insert Mesh is SOLID's), PREPARE 4, MODIFY 12, CONVERT 1 | The mesh body before and after the step: triangles where the tool is about them, painted or new faces in the selection blue, face groups in their colours; Direct Edit beside its dialog | Real MESH steps (`mesh.new_step`, computed as the dialogs do) on a mesh body as Insert Mesh makes it |
+| sheet_metal | 16: CREATE 6, MODIFY 8 (the repeated SOLID commands are SOLID's), FLAT PATTERN 2 | The part before and after (what the tool made or lifted in blue); Convert to Sheet Metal, Sheet Metal Rules and Export DXF: their dialogs | The golden models' step lists (`fission180/ai/ops`) |
+| plastic | 8 | Bosses, a snap-fit hook (the case see-through), a lip, a rest, a rule fillet before and after; Design Advice's colours beside its list; the two rule dialogs | The golden models' step lists; the commands' own dialogs |
+| simulation | 39: SETUP 16, RESULTS 23 (Manage Physical Materials and Measure are SOLID's) | An L bracket: the glyphs of constraints, loads, gravity, DOF View, local mesh and the mesh; the coloured result with its legend at each deformation scale, with mesh, ghost, loads, tags, the animation bar; slice, iso-surface and point probes beside their panels; the windows of the other commands | `fission180/simulation.py`'s study, solved through the Solve dialog's job (CalculiX); the RESULTS session's own options |
+| manufacture | 21: SETUP 1, 2D 10, 3D 4, DRILLING 1, ACTIONS 4, MANAGE 1 | The workspace as it shows the operation: stock, axes, the picks in blue, the toolpath; Generate before / after; the Simulate player on the cut stock; Post Process, Setup Sheet, Tool Library; 3D Contour's dialog | The CAM steps (`manufacture_ops`), toolpaths generated in the background as the app does |
+| animation | 10 | The storyboard at its start and its end (the moved components in blue); a callout; the timeline's View row; New Storyboard and Publish Video beside the model | The animation steps (`animation_ops`) in the ANIMATION workspace, the playhead moved |
+
+GUI check: `tipsws_hover` (real pointer: MESH > Remesh, SHEET METAL > Flange, PLASTIC > Boss,
+the Smooth entry of MESH > MODIFY's drop-down, MILLING > 2D Pocket in the MANUFACTURE
+workspace; each expanded card with its own words and its picture on the screen; 58 checks).
+
 ## Not built, and why
 
 - The pictures are still pictures, not Fusion's short tool clips (animations): a PNG per command
@@ -101,3 +123,21 @@ test follows the ribbon, so every one of them gets a tooltip):
 - Keyboard navigation in a drop-down (arrow keys) shows no tooltip: the pointer's entry does.
 - The marking menu's list and the navigation bar's menus use the same menu builder and so show
   the card too for commands that have something to say (no extra work, not asked for).
+
+## Coverage: SKETCH, DRAWING and UTILITIES (tips-sketch-drawing)
+
+Every command of the three tabs has a complete entry and its picture (`test_tips`:
+`test_module_sketch`, `_drawing`, `_utilities` pass; the pictures together:
+`docs/fission180/dev/tips-sketch-drawing-sheet.png`). The texts were written from each command's
+own code and its parity doc (Fission 180's steps and refusals), the pictures made in the real
+Fission 180 by `tools/fission180/tip_pictures_<module>.py`:
+
+| Module | Commands | What the picture shows | How it is made |
+|---|---|---|---|
+| sketch | 58: Line ... Sketch Dimension (CREATE 36), Fillet ... Move/Copy (MODIFY 8), the 12 constraints, Finish Sketch, Toggle Construction | The sketch before and after the tool, from the top: the tool's clicks numbered, what it is given or makes in the selection blue, construction dashed orange, projected purple, fixed green | Real sketch geometry in a new design (`tp.render`, the helpers' highlight), the open sketch's marks drawn over it with the render's own camera (`SPECS`: two lists of items per picture) |
+| drawing | 43: the 7 views, Edit View, Move, Rotate, Delete, the 4 geometry tools, the 11 dimension tools, Text, Leader, Bend Note, the 3 symbols, the 6 table tools; Title Block and the 4 exports | The sheet before and after (new ink in the selection blue, what a command picks or moves tinted before), framed where it changed; Title Block and the exports: their dialogs | A demo part's drawing built with the drawing modules' own functions, TechDraw's scene drawn at 8 px/mm and cropped (`tip_pictures_drawing.py`) |
+| utilities | 22: MAKE 3, ADD-INS 2, AI 8, FREECAD 1, UTILITY 8 | Each command's window as Fission 180 opens it; 3D Print, Export Everything and Compare with Reference beside the model | `dialog_picture` / `with_dialog`; a real rebuild of an imported STEP plate for the four rebuild commands, real AI calls through the bridge for AI Activity |
+
+GUI check: `tips_sketch_drawing_hover` (the expanded tooltips of SKETCH > Line, DRAWING > Base
+View and UTILITIES > 3D Print with the real pointer, each picture compared with its PNG on the
+screen).

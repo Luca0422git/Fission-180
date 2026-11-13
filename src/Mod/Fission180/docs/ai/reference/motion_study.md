@@ -95,4 +95,5 @@ Done: motion study 'Motion Study 1' (id 'MotionStudy') with 1 joint; the assembl
 
 ## See also
 
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

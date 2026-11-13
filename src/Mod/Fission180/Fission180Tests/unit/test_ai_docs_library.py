@@ -20,6 +20,7 @@ Plain Python, no FreeCAD.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -81,7 +82,9 @@ class Markdown(unittest.TestCase):
     def test_slug_like_github(self):
         self.assertEqual(docs_core.slug("Units and coordinates"), "units-and-coordinates")
         self.assertEqual(docs_core.slug("`extrude`: Extrude"), "extrude-extrude")
-        self.assertEqual(docs_core.slug("Fusion's ideas in Fission 180"), "fusions-ideas-in-fission-180")
+        self.assertEqual(
+            docs_core.slug("Fusion's ideas in Fission 180"), "fusions-ideas-in-fission-180"
+        )
         self.assertEqual(docs_core.slug("get_help"), "get_help")
 
     def test_sections_skip_code_and_keep_aliases(self):
@@ -362,7 +365,9 @@ class ToolExamples(unittest.TestCase):
         )
         drawn = {"text": 'Done.\n{"DrawnBy": "root", "sheet": "A3"}', "is_error": False}
         self.assertIsNone(  # nor the login name of the computer that ran the example
-            docs_runner.same_answer(drawn, dict(drawn, text=drawn["text"].replace("root", "runner")))
+            docs_runner.same_answer(
+                drawn, dict(drawn, text=drawn["text"].replace("root", "runner"))
+            )
         )
         self.assertTrue(
             docs_runner.same_answer(drawn, dict(drawn, text=drawn["text"].replace("A3", "A4")))
@@ -456,6 +461,27 @@ class Export(unittest.TestCase):
         self.assertNotIn("File: reference/extrude.md", compact)
         self.assertNotIn("File: user/known-issues.md", standard)
         self.assertIn("File: user/known-issues.md", full)
+
+    def test_compact_names_every_tool_in_one_line(self):
+        # (wave 8: 216 tools made tools.md 111 thousand characters and the compact file too
+        # big for the scenario ai_docs_gui's 300 thousand; the compact file keeps a line each)
+        compact = docs_core.export_text(compact=True, lib=LIB)
+        self.assertLess(len(compact), 300000)
+        with open(os.path.join(ROOT, "docs", "ai", "tools.md"), encoding="utf-8") as handle:
+            tools_md = handle.read()
+        names = set(re.findall(r"\[`([a-z_0-9]+)`\]\(fission180://docs/reference/", tools_md))
+        self.assertGreater(len(names), 100)
+        for name in names:
+            self.assertIn("[`%s`]" % name, compact, name)
+        self.assertNotIn("## All tools", docs_core.compact_tools(tools_md))
+        self.assertIn("## All tools", docs_core.export_text(lib=LIB))
+        line = (
+            "- [`x`](fission180://docs/reference/x.md): Make a thing out of two parts. Then more."
+        )
+        self.assertEqual(
+            docs_core.compact_tools(line),
+            "- [`x`](fission180://docs/reference/x.md): Make a thing out of two parts.",
+        )
 
     def test_command_line(self):
         cli = os.path.join(ROOT, "fission180", "ai", "cli.py")
