@@ -380,9 +380,11 @@ class AngleHandle(BoxCarrier):
     def dragging(self):
         return self._drag
 
-    def busy(self, seconds=0.6):
-        """True while dragging and just after: the click is the handle's, not a pick."""
-        return self._drag or time.time() - self._last_event < seconds
+    def busy(self, seconds=0.6, now=None):
+        """True while dragging and just after (at `now`, a click's time): the click is the
+        handle's, not a pick."""
+        now = time.time() if now is None else now
+        return self._drag or now - self._last_event < seconds
 
     def _poll(self):
         try:

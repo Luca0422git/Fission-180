@@ -20,6 +20,10 @@ Esc puts everything back; double-click the Move in the timeline to change it. Th
 manipulator is drawn over the part and grabbed even where the part is in front of it; it is
 watched with a Qt timer (FreeCAD's own mouse callbacks only record the mouse). The document
 side is move.py.
+
+While a handle is dragged only the picture moves (move_live.py, as in Fusion): the moved
+bodies are drawn where the handle puts them at the screen's frame rate, whatever their size;
+the steps are rebuilt once, when the handle is let go (and for a typed value, a pick, OK).
 """
 
 import math
@@ -29,7 +33,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import bodies, drag_guard, handle_look, handles3d, increments, move, move_face
-from . import profile_pick
+from . import move_live, profile_pick
 from . import protractor, taskui, ui_icon_path, warn
 from .bodies_panel import BodyPanel, edit as _edit, start as _start
 from .compat import QtCore, QtWidgets
@@ -97,6 +101,10 @@ class Triad(BoxCarrier):
         self._last_event = 0.0
         self._mark = None  # the snap angle a turn sits on (protractor)
         self._wheel = protractor.Wheel()  # shown while a turn handle is held
+        # mm per screen pixel, worked out once per look at the mouse or poll (the camera does
+        # not change within one): every part of every handle asked it again, 24 times a poll
+        self._mmpp = None
+        self._caching = False
         # on top of the part, like Fusion's manipulators (handle_look), drawn in pixels
         self.root = handle_look.top_root(coin)
         self.place = coin.SoTranslation()
@@ -126,7 +134,22 @@ class Triad(BoxCarrier):
     @property
     def size(self):
         """Centre to an arrow's tip (mm) at the triad's place in the view now."""
-        return handle_look.mm(self.view, self.center, handle_look.core.TRIAD_PX)
+        return self._mm(handle_look.core.TRIAD_PX)
+
+    def _mm(self, pixels):
+        """`pixels` on the screen in mm at the triad's centre."""
+        scale = self._mmpp
+        if scale is None:
+            scale = handle_look.mm_per_px(self.view, self.center)
+            if self._caching:
+                self._mmpp = scale
+        return handle_look.core.length_mm(scale, pixels)
+
+    def _fresh(self, caching):
+        """Start (True) or end (False) one look at the mouse or poll: the scale is worked
+        out again on its first use."""
+        self._mmpp = None
+        self._caching = caching
 
     def _arrow(self, coin, index):
         """Axis `index`'s arrow (pixels, from the centre), in its axis colour."""
@@ -211,14 +234,14 @@ class Triad(BoxCarrier):
         if kind == "move":
             tail = self.center + AXES[index] * (core.TRIAD_GAP * self.size)
             tip = self.tip(index)
-            width = handle_look.mm(self.view, self.center, core.half_width_px("arrow"))
+            width = self._mm(core.half_width_px("arrow"))
             return (tail + tip) * 0.5, tail, tip, width
         points = self.arc_points(index, 8)
         return (
             self.ball_point(index),
             self.center + points[0],
             self.center + points[-1],
-            handle_look.mm(self.view, self.center, core.half_width_px("disc")),
+            self._mm(core.half_width_px("disc")),
         )
 
     def box_avoid(self):
@@ -232,9 +255,7 @@ class Triad(BoxCarrier):
                 parts.append(self._part((kind, index)))
                 if kind == "turn":
                     ball = self.ball_point(index)
-                    radius = handle_look.mm(
-                        self.view, ball, handle_look.core.half_width_px("disc")
-                    )
+                    radius = self._mm(handle_look.core.half_width_px("disc"))
                     parts.append((ball, ball, ball, radius))
         return parts
 
@@ -265,6 +286,7 @@ class Triad(BoxCarrier):
 
     def set_center(self, center):
         self.center = App.Vector(center)
+        self._mmpp = None  # (a perspective view's scale depends on where the centre is)
         self.place.translation.setValue(self.center.x, self.center.y, self.center.z)
 
     def _paint(self):
@@ -341,6 +363,7 @@ class Triad(BoxCarrier):
         return self._drag_center if self._drag_center is not None else self.center
 
     def _button(self, info):
+        self._fresh(True)
         try:
             if info.get("Button") != "BUTTON1":
                 return
@@ -371,6 +394,8 @@ class Triad(BoxCarrier):
                 handles3d.stop_watching(self)
         except Exception as exc:
             warn("move handle: %s" % exc)
+        finally:
+            self._fresh(False)
 
     def _drag_done(self):
         self._drag_center = None
@@ -384,6 +409,7 @@ class Triad(BoxCarrier):
         return self._origin(), AXES[index], zero, handle_look.core.TRIAD_RING * self.size
 
     def _moved(self, info):
+        self._fresh(True)
         try:
             position = info["Position"]
             if not self._drag:
@@ -411,15 +437,20 @@ class Triad(BoxCarrier):
                     self._pending = (kind, index, delta)
         except Exception as exc:
             warn("move handle: %s" % exc)
+        finally:
+            self._fresh(False)
 
     def dragging(self):
         return bool(self._drag)
 
-    def busy(self, seconds=0.6):
-        """True while dragging and just after: the click is the handle's, not a pick."""
-        return bool(self._drag) or time.time() - self._last_event < seconds
+    def busy(self, seconds=0.6, now=None):
+        """True while dragging and just after (at `now`, a click's time): the click is the
+        handle's, not a pick."""
+        now = time.time() if now is None else now
+        return bool(self._drag) or now - self._last_event < seconds
 
     def _poll(self):
+        self._fresh(True)
         try:
             if Gui.ActiveDocument is None:
                 self._timer.stop()
@@ -449,6 +480,8 @@ class Triad(BoxCarrier):
                 self.follow_box()
         except Exception as exc:
             warn("move drag: %s" % exc)
+        finally:
+            self._fresh(False)
 
     def remove(self):
         try:
@@ -531,10 +564,15 @@ class MovePanel(BodyPanel):
         self._drag_start = None
         self.setting_pivot = False  # Set Pivot: the manipulator moves, the objects stay
         self._pivot_drag_start = None
+        # the picture moved while a handle is dragged (move_live), and the movement each
+        # step's shape has (from its last rebuild): what the picture moves on from
+        self.live = move_live.LiveMove()
+        self._built = {}
         super().__init__(doc, "Move" if feature is None else "Edit Move", feature is not None)
         self.target = self.steps[0] if self.steps else None
         self._show_options()
         if feature is not None:
+            self._note_built()  # an edited Move shows its steps as built: a drag moves on
             self.activate("objects")
             self._make_handles()
         else:
@@ -942,7 +980,8 @@ class MovePanel(BodyPanel):
 
     # -- clicks ----------------------------------------------------------------------------------------
     def picked(self, obj, short, point):
-        if self._handles_busy() or time.time() - self._overlay_time < OVERLAY_CLICK_S:
+        now = self.pick_time()
+        if self._handles_busy(now) or now - self._overlay_time < OVERLAY_CLICK_S:
             return
         if self.setting_pivot:
             self._pivot_picked(obj, short, point)
@@ -1241,10 +1280,17 @@ class MovePanel(BodyPanel):
             self._new_pivot()
         return App.Vector(*(self.options["pivot"] or (0, 0, 0)))
 
-    def _handles_busy(self):
+    def _handles_busy(self, now=None):
+        """A handle was in use at `now` (a click's time; default: now)."""
         for handle in (self.triad, self.turn_handle):
-            if handle is not None and handle.busy():
-                return True
+            if handle is None:
+                continue
+            try:
+                if handle.busy(now=now):
+                    return True
+            except TypeError:  # a handle whose busy() takes no time
+                if handle.busy():
+                    return True
         return False
 
     def _make_handles(self):
@@ -1376,7 +1422,7 @@ class MovePanel(BodyPanel):
         fields[index].set_value(self.options[key])
         if kind == "move" and self.triad is not None:
             self.triad.set_center(self._triad_center())
-        self.changed()
+        self._follow_drag()
 
     def _turned(self, value):
         if self._closed:
@@ -1384,15 +1430,59 @@ class MovePanel(BodyPanel):
         self.busy()
         self.options["angle"] = float(value)
         self.angle.set_value(value)
-        self.changed()
+        self._follow_drag()
 
     def _released(self):
         self._drag_start = None
         self._pivot_drag_start = None
         self.busy()
         self.changed()
+        if self.live.active():
+            self.settle_now()  # the real result at once, where the picture was let go
+
+    def _follow_drag(self):
+        """A handle moved: the bodies are drawn where it puts them (move_live: nothing is
+        rebuilt until it is let go). When the steps do not match the dialog's choices yet
+        (a pick or Create Copy waiting for its rebuild) or the faces move (they reshape the
+        body), the preview rebuilds as for a typed value."""
+        items = self._live_items()
+        if items is None:
+            self.changed()
+            return
+        try:
+            movement = move.transform(self.options)
+        except move.MoveError:
+            self.changed()
+            return
+        self.dirty = True  # OK (or the release) rebuilds the steps at this value
+        self.live.show(items, movement)
+
+    def _live_items(self):
+        """(shown object, movement its shape has now) for each body the dialog moves (its Tip;
+        for Create Copy the new body's), or None when the picture cannot simply be moved."""
+        if self._faces_mode() or self.setting_pivot or self._timer.isActive():
+            return None
+        steps = [s for s in self.steps if bodies.alive(s)]
+        if not steps or len(steps) != len(self.options.get("bodies") or []):
+            return None
+        items = []
+        for step in steps:
+            if move_face.is_move_face(step) or not move.is_move(step):
+                return None
+            copy = move.is_copy(step)
+            if copy != bool(self.options["copy"]):
+                return None
+            built = self._built.get(step.Name)
+            owner = move.copy_body(step) if copy else bodies.body_of(step)
+            shown = getattr(owner, "Tip", None) if owner is not None else None
+            if built is None or shown is None:
+                return None
+            items.append((shown, built))
+        return items
 
     def remove_handles(self, keep_picker=False):
+        if not keep_picker:
+            self.live.remove()  # the dialog closes: every view on its object again
         if not keep_picker and self.marks is not None:
             try:
                 self.marks.remove()
@@ -1461,7 +1551,23 @@ class MovePanel(BodyPanel):
             body = move.copy_body(step) if move.is_copy(step) else bodies.body_of(step)
             if body is not None:
                 bodies.show_tip(body)
+        self._note_built()
+        self.live.reset()  # the steps show the real result now
         self._place_handles()
+
+    def _note_built(self):
+        """Remember the movement each step's shape has now (a failed step shows its body
+        unmoved): the live picture of a drag moves on from it."""
+        built = {}
+        for step in self.steps:
+            if not bodies.alive(step) or not move.is_move(step):
+                continue
+            state = list(getattr(step, "State", []))
+            if "Touched" in state:
+                continue  # not built at its values yet: a drag rebuilds first
+            failed = "Invalid" in state or "Error" in state
+            built[step.Name] = App.Placement() if failed else App.Placement(step.Movement)
+        self._built = built
 
     def preview_steps(self):
         return [s for s in self.steps if bodies.alive(s)]

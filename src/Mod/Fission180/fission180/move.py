@@ -156,6 +156,31 @@ def _moved(shape, place):
     return out
 
 
+def frame_of(obj):
+    """The placement of the coordinates `obj` lives in (its body's or component's, in design
+    coordinates); identity at the top of the design."""
+    try:
+        parent = obj.getParentGeoFeatureGroup()
+    except Exception:
+        parent = None
+    return parent.getGlobalPlacement() if parent is not None else App.Placement()
+
+
+def local_movement(place, frame):
+    """`place` (design coordinates) as seen in coordinates whose placement is `frame`."""
+    return frame.inverse().multiply(place).multiply(frame)
+
+
+def moved_placement(base, movement, body):
+    """Where a Move step puts the solid of `base`: the base's own placement moved by
+    `movement` (design coordinates), in `body`'s coordinates. The step keeps the base's
+    solid as it is (the same OpenCASCADE shape, nothing copied) at this placement: the 3D
+    view keeps its tessellation and only moves it, and later steps build on it in the
+    body's coordinates (PartDesign takes the previous step's placement)."""
+    frame = body.getGlobalPlacement() if body is not None else App.Placement()
+    return local_movement(movement, frame).multiply(base.Shape.Placement)
+
+
 # -- the features -----------------------------------------------------------------------------------
 def _properties(obj, group):
     def add(kind, name, doc):
@@ -183,7 +208,17 @@ class MoveFeature:
         try:
             self._build(obj)
         except Exception:
-            bodies.pass_through(obj)  # shown as the body was before it, the step red
+            # shown as the body was before it, the step red (at the base's own placement:
+            # the step's placement holds the movement)
+            try:
+                base = obj.BaseFeature
+                if base is not None and not base.Shape.isNull():
+                    obj.Placement = base.Shape.Placement
+                else:
+                    obj.Placement = App.Placement()
+            except Exception:
+                pass
+            bodies.pass_through(obj)
             raise
 
     def _build(self, obj):
@@ -191,9 +226,13 @@ class MoveFeature:
         if base is None or base.Shape.isNull() or not base.Shape.Faces:
             # (a surface body moves too: Fusion's SURFACE > MODIFY > Move/Copy, surface-4)
             raise MoveError("There is nothing before this step to move.")
-        body = bodies.body_of(obj)
-        moved = _moved(bodies.global_shape(base), obj.Movement)
-        obj.Shape = bodies.to_local(moved, body)
+        # The base's solid itself at the moved placement (move-speed, 2026-11-13): before,
+        # it was copied four times and its copy tessellated again (1.5 s for a 600-face
+        # part); a placement costs nothing and the view only moves what it has drawn.
+        place = moved_placement(base, obj.Movement, bodies.body_of(obj))
+        obj.Shape = base.Shape  # (FreeCAD puts it at the step's placement while it builds)
+        if not obj.Placement.isSame(place, 1e-12):
+            obj.Placement = place
 
     def dumps(self):
         return None
@@ -224,11 +263,14 @@ class CopyFeature:
             return  # the original was deleted: the copy keeps its shape, as in Fusion
         if source.Shape.isNull() or not source.Shape.Faces:
             raise MoveError("The body it copies has nothing here.")
-        shape = _moved(bodies.global_shape(source), obj.Movement)
         # The new body takes this shape in its own coordinates: a body in a moved
-        # component would otherwise be moved twice (components-2).
+        # component would otherwise be moved twice (components-2). One transform from the
+        # source's coordinates to the new body's (before: four copies of the solid).
         body = copy_body(obj)
-        obj.Shape = bodies.to_local(shape, body) if body is not None else shape
+        target = body.getGlobalPlacement() if body is not None else App.Placement()
+        whole = target.inverse().multiply(obj.Movement).multiply(frame_of(source))
+        shape = source.Shape  # with its own placement
+        obj.Shape = shape.transformed(whole.toMatrix(), True)
 
     def dumps(self):
         return None

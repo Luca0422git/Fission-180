@@ -54,6 +54,12 @@ class BodyPanel(Panel):
         self._quiet = False
         self._syncing = False
         self._busy_until = 0.0  # a handle was just dragged: the click is not a pick
+        # when FreeCAD made the selection the dialog is about to take (the click itself):
+        # a click is judged by when it was made, not by when the dialog gets to it (after a
+        # long rebuild the release of a drag reached the dialog past its "just dragged"
+        # moment and was taken as a click on the body: move-speed)
+        self._picked_at = None
+        self._pick_time = None
         self.escape = preview.EscapeCancels(self)
         self.undo_guard = preview.UndoCancels(self)
         self.enter = preview.EnterFinishes(self)
@@ -158,6 +164,7 @@ class BodyPanel(Panel):
         class Observer:
             def addSelection(self, doc, obj, sub, pnt):
                 if not panel._syncing:
+                    panel._picked_at = time.time()
                     QtCore.QTimer.singleShot(30, panel._selection_changed)
 
         self.observer = Observer()
@@ -176,9 +183,14 @@ class BodyPanel(Panel):
         under it when the button comes up)."""
         self._busy_until = time.time() + seconds
 
+    def pick_time(self):
+        """When the click the dialog is taking now was made (time.time())."""
+        return self._pick_time if self._pick_time is not None else time.time()
+
     def _selection_changed(self):
         if self._closed:
             return
+        when, self._picked_at = self._picked_at, None
         try:
             entries = [e for e in bodies_gui.selection_entries() if e[0].Document is self.doc]
             if not entries:
@@ -188,9 +200,14 @@ class BodyPanel(Panel):
                 Gui.Selection.clearSelection()
             finally:
                 self._syncing = False
-            if time.time() < self._busy_until:
+            when = when if when is not None else time.time()
+            if when < self._busy_until:
                 return
-            self.take_picks_batch(entries)
+            self._pick_time = when
+            try:
+                self.take_picks_batch(entries)
+            finally:
+                self._pick_time = None
         except Exception as exc:
             warn("%s pick: %s" % (self.title, exc))
 

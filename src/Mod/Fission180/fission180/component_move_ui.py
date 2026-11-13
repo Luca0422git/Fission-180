@@ -16,9 +16,11 @@ The component itself moves (its Placement), with everything in it. Grounded comp
 the copies a pattern placed are refused with the reason. Live preview; OK / Enter keeps it
 as one undo step, Cancel / Esc puts everything back. The document side is
 component_move.py.
-"""
 
-import time
+While a handle is dragged only the picture moves (move_live.py, as for bodies): each
+component is drawn where the handle puts it by its view's transform, and its Placement is set
+(and the design recomputed) once, when the handle is let go. Create Copy rebuilds as before.
+"""
 
 import FreeCAD as App
 
@@ -119,7 +121,8 @@ class ComponentMovePanel(MovePanel):
 
     # -- clicks ------------------------------------------------------------------------------------
     def picked(self, obj, short, point):
-        if self._handles_busy() or time.time() - self._overlay_time < OVERLAY_CLICK_S:
+        now = self.pick_time()
+        if self._handles_busy(now) or now - self._overlay_time < OVERLAY_CLICK_S:
             return
         if self.setting_pivot:
             self._pivot_picked(obj, short, point)
@@ -315,7 +318,19 @@ class ComponentMovePanel(MovePanel):
             self._remove_copy(name)
 
     def after_recompute(self):
+        self.live.reset()  # the components stand where the preview put them now
         self._place_handles()
+
+    def _live_items(self):
+        """(component, the movement its Placement has now) for each component moved, or
+        None when the picture cannot simply be moved (Create Copy makes and places copies;
+        a rebuild is due)."""
+        if self.setting_pivot or self._timer.isActive() or self.options.get("copy"):
+            return None
+        parts = [p for p in self._moving() if components.alive(p)]
+        if not parts:
+            return None
+        return [(part, App.Placement(self._applied)) for part in parts]
 
     def preview_steps(self):
         return []
