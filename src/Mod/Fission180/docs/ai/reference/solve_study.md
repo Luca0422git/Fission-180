@@ -6,7 +6,7 @@ Fusion: SIMULATION > SETUP > SOLVE > Solve. Category: Simulation. Changes the de
 
 ## What it does
 
-Solve a study on this computer (Gmsh meshes it, CalculiX solves it; Fusion solves in Autodesk's cloud): seconds for a simple part, minutes for a fine mesh; Fission 180 waits until it is done (timeout, seconds: then it gives up). Answers the main numbers: the lowest safety factor and where, the largest von Mises stress and displacement, the mesh size; study_results has everything. A solve is not an undo step; the last results stay when it fails. study: the study's id or name (create_study answers it; default the newest study).
+Solve a study on this computer (Gmsh meshes it, CalculiX solves it; Fusion solves in Autodesk's cloud): 2 to 20 s for a simple part at the default mesh, minutes for a fine mesh, adaptive refinement or a part of thousands of faces (study_mesh first tells the node count: about 1 s per 10,000 nodes); Fission 180 waits until it is done (timeout, seconds: then it gives up) and says how long it took. Answers the main numbers: the lowest safety factor and where, the largest von Mises stress and displacement, the mesh size; study_results has everything. A solve is not an undo step; the last results stay when it fails. study: the study's id or name (create_study answers it; default the newest study).
 
 ## Arguments
 
@@ -49,7 +49,7 @@ The call:
 The answer:
 
 ```text
-Done: Study 1 - Static Stress solved (1137 nodes, 528 elements). Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2. Largest von Mises stress 163.2 MPa, largest displacement 0.212 mm. study_results has every number.
+Done: Study 1 - Static Stress solved (1137 nodes, 528 elements; took 0.2 s). Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2. Largest von Mises stress 163.2 MPa, largest displacement 0.212 mm. study_results has every number, study_probe the values at points, on faces and on a section.
 ```
 
 ## More argument examples

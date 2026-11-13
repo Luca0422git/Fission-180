@@ -80,4 +80,5 @@ Done: callout 'Wheel' on 'Explode' from 3 s on, following Wheel (action id 2).
 
 ## See also
 
+- Recipe: [an exploded-view video of an assembly (ANIMATION)](fission180://docs/recipes/exploded-view-video.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

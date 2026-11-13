@@ -86,5 +86,6 @@ Posted Setup1 to /home/me/fission180/plate.nc (Grbl, 103 lines, 2 operations): t
 
 ## See also
 
+- Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `cam_plate_face_contour_drill`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

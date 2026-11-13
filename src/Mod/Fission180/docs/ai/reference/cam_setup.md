@@ -75,5 +75,6 @@ Done: new setup 'Setup1' (id 'CamSetup'): stock 104 x 64 x 11 mm around a model 
 
 ## See also
 
+- Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `cam_block_side_setup`, `cam_plate_face_contour_drill`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

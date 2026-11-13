@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
+Fission 180 offers 184 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
 
 ## All tools
 
@@ -136,6 +136,12 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`solve_study`](fission180://docs/reference/solve_study.md) | Solve study | Simulation | SIMULATION > SETUP > SOLVE > Solve | changes the design (one undo step) | an open design |
 | [`study_results`](fission180://docs/reference/study_results.md) | Study results | Simulation | SIMULATION > RESULTS (legend, Show Min / Max, Reaction Force, Results Details) | read-only | an open design |
 | [`delete_study`](fission180://docs/reference/delete_study.md) | Delete study | Simulation | SIMULATION > browser > study > Delete | changes the design (one undo step), destructive | an open design |
+| [`study_probe`](fission180://docs/reference/study_probe.md) | Probe results | Simulation | SIMULATION > RESULTS > INSPECT > Surface Probes / Point Probes / Slice Plane | read-only | an open design |
+| [`study_report`](fission180://docs/reference/study_report.md) | Results report | Simulation | SIMULATION > RESULTS > RESULT TOOLS > Report | writes files | an open design |
+| [`study_mesh`](fission180://docs/reference/study_mesh.md) | Generate mesh | Simulation | SIMULATION > SETUP > SOLVE > Generate Mesh (and DISPLAY > Show Mesh) | changes the design (one undo step) | an open design |
+| [`study_setup`](fission180://docs/reference/study_setup.md) | Study setup | Simulation | SIMULATION > SETUP > Load Case Attributes / Contact Manager / Automatic Contacts / DOF View | read-only | an open design |
+| [`edit_study_item`](fission180://docs/reference/edit_study_item.md) | Edit constraint or load | Simulation | SIMULATION > browser > constraint / load / mesh control > Edit / Suppress / Delete | changes the design (one undo step) | an open design |
+| [`show_study_results`](fission180://docs/reference/show_study_results.md) | Show results | Simulation | SIMULATION > RESULTS (DEFORMATION, DISPLAY, Legend Min/Max, Slice Plane, Iso-surface, Animate, Compare, Finish Results) | read-only | an open design, the Fission 180 window |
 | [`start_rebuild`](fission180://docs/reference/start_rebuild.md) | Start rebuild | Rebuild with a timeline | Browser: right-click a body > Rebuild with Timeline (AI)... (beyond Fusion) | changes the design (one undo step) | an open design |
 | [`describe_reference`](fission180://docs/reference/describe_reference.md) | Describe reference | Rebuild with a timeline | Browser: right-click a body > Rebuild with Timeline (AI)... (beyond Fusion) | read-only | an open design, a rebuild going on (start_rebuild) |
 | [`compare_to_reference`](fission180://docs/reference/compare_to_reference.md) | Compare to reference | Rebuild with a timeline | Rebuild > Compare with Reference (beyond Fusion) | read-only | an open design, a rebuild going on (start_rebuild) |
@@ -171,6 +177,8 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`cam_post`](fission180://docs/reference/cam_post.md) | Post process | Manufacture | MANUFACTURE > MILLING > ACTIONS > Post Process | writes files | a solid body |
 | [`cam_setups`](fission180://docs/reference/cam_setups.md) | Setups and operations | Manufacture | MANUFACTURE > browser > Setups | read-only | an open design |
 | [`cam_tools`](fission180://docs/reference/cam_tools.md) | Tool library | Manufacture | MANUFACTURE > MILLING > MANAGE > Tool Library | read-only | nothing |
+| [`cam_setup_sheet`](fission180://docs/reference/cam_setup_sheet.md) | Setup sheet | Manufacture | MANUFACTURE > MILLING > ACTIONS > Setup Sheet | writes files | a solid body |
+| [`cam_tool_library`](fission180://docs/reference/cam_tool_library.md) | Change tool library | Manufacture | MANUFACTURE > MILLING > MANAGE > Tool Library (New Tool, Edit, Copy, Delete, New Library) | changes the design (one undo step), writes files, destructive | nothing |
 | [`anim_storyboard`](fission180://docs/reference/anim_storyboard.md) | Storyboard | Animation | ANIMATION > STORYBOARD > New Storyboard (and a storyboard tab's right-click menu) | changes the design (one undo step) | an open design |
 | [`anim_transform`](fission180://docs/reference/anim_transform.md) | Transform components | Animation | ANIMATION > TRANSFORM > Transform Components | changes the design (one undo step) | an open design |
 | [`anim_explode`](fission180://docs/reference/anim_explode.md) | Auto explode | Animation | ANIMATION > TRANSFORM > Auto Explode: One Level / All Levels | changes the design (one undo step) | an open design |
@@ -180,6 +188,10 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 | [`anim_callout`](fission180://docs/reference/anim_callout.md) | Create callout | Animation | ANIMATION > ANNOTATION > Create Callout | changes the design (one undo step) | an open design |
 | [`anim_storyboards`](fission180://docs/reference/anim_storyboards.md) | Storyboards and actions | Animation | ANIMATION > ANIMATION TIMELINE | read-only | an open design |
 | [`anim_publish_video`](fission180://docs/reference/anim_publish_video.md) | Publish video | Animation | ANIMATION > PUBLISH > Publish Video | writes files | an open design, the Fission 180 window |
+| [`anim_view`](fission180://docs/reference/anim_view.md) | View action | Animation | ANIMATION > VIEW > View | changes the design (one undo step) | an open design |
+| [`anim_action`](fission180://docs/reference/anim_action.md) | Edit animation actions | Animation | ANIMATION > ANIMATION TIMELINE > action > Edit Start/End, drag, Delete | changes the design (one undo step) | an open design |
+| [`print_part`](fission180://docs/reference/print_part.md) | 3D print | Import and export | UTILITIES > MAKE > 3D Print | writes files | an open design |
+| [`export_everything`](fission180://docs/reference/export_everything.md) | Export everything | Import and export | UTILITIES > MAKE > Export Everything | writes files | an open design |
 
 ## Help
 
@@ -350,6 +362,8 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 
 - [`export`](fission180://docs/reference/export.md): Export the design's bodies to a file: format step (.step / .stp), stl or 3mf (for 3D printing).
 - [`import_file`](fission180://docs/reference/import_file.md): Bring a file into the active design: STEP / IGES (one component with the file's structure, its bodies and colours), STL / OBJ / 3MF (a mesh body; unit: the file's unit), DXF (its curves into a new sketch on sketch_plane XY | XZ | YZ, ready to extrude), FCStd (another design's bodies as a component).
+- [`print_part`](fission180://docs/reference/print_part.md): Fusion's 3D Print: the bodies as one mesh file for 3D printing.
+- [`export_everything`](fission180://docs/reference/export_everything.md): Write the whole design in every open format at once (Fission 180's Export Everything): STEP (solids; a mesh body has none), STL, 3MF and OBJ of every shown body, a picture of the view (with the window) and a README saying what each file is, in folder (a full path; default: "<design>-export" beside the saved design file).
 
 ## Drawings
 
@@ -378,9 +392,15 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`set_study_material`](fission180://docs/reference/set_study_material.md): Choose the material a body is made of in one study only (Fusion's Study Materials; the design keeps its own): material is a key of the material library (steel, stainless, iron, aluminium, aluminium_6061, copper, titanium, abs, pla, pet, nylon, polycarbonate, acetal, acrylic, polypropylene, ptfe, peek, wood, glass) or same_as_model to go back to the body's physical material.
 - [`study_settings`](fission180://docs/reference/study_settings.md): Read or change a study's settings; with none given it answers them all.
 - [`precheck_study`](fission180://docs/reference/precheck_study.md): Check a study before solving it, like Fusion's Pre-check traffic light: ready (green), caution (yellow: it solves, but read the warnings) or cannot solve (red: what to fix), with every message as a sentence: missing constraints or loads, materials without the values a stress study needs, constraints or loads whose faces are gone, bodies that would fly away, bodies that overlap.
-- [`solve_study`](fission180://docs/reference/solve_study.md): Solve a study on this computer (Gmsh meshes it, CalculiX solves it; Fusion solves in Autodesk's cloud): seconds for a simple part, minutes for a fine mesh; Fission 180 waits until it is done (timeout, seconds: then it gives up).
-- [`study_results`](fission180://docs/reference/study_results.md): The results of a study's last solve as numbers: the minimum and maximum of every result (safety factor, von Mises, 1st / 3rd principal and the stress components in MPa, displacement in mm, strain) with where they are [x, y, z] mm, per body (material, largest stress and displacement, lowest safety factor), the reaction force at every constraint (N), the mesh, and the verdict in a sentence (lowest safety factor against target: "lowest safety factor 1.4 at (x, y, z) on Body1: below 2"; below 1 the part would bend for good).
+- [`solve_study`](fission180://docs/reference/solve_study.md): Solve a study on this computer (Gmsh meshes it, CalculiX solves it; Fusion solves in Autodesk's cloud): 2 to 20 s for a simple part at the default mesh, minutes for a fine mesh, adaptive refinement or a part of thousands of faces (study_mesh first tells the node count: about 1 s per 10,000 nodes); Fission 180 waits until it is done (timeout, seconds: then it gives up) and says how long it took.
+- [`study_results`](fission180://docs/reference/study_results.md): The results of a study's last solve as numbers: the minimum and maximum of every result (safety factor, von Mises, 1st / 3rd principal and the stress components in MPa, displacement in mm, strain) with where they are [x, y, z] mm, per body (material, largest stress and displacement, lowest safety factor), the reaction force at every constraint (N), the mesh, and the verdict in a sentence (lowest safety factor against target: "lowest safety factor 1.4 at (x, y, z) on Body1: below 2"; below 1 the part would bend for good), the Solver Data (time of each stage, mesh quality) and, after adaptive refinement, the Convergence Plot's numbers.
 - [`delete_study`](fission180://docs/reference/delete_study.md): Delete a study with its constraints, loads, mesh controls and results (one undo step).
+- [`study_probe`](fission180://docs/reference/study_probe.md): Read a solved study's results where you choose, as numbers (what Surface and Point Probes and a Slice Plane show a person): points [[x, y, z], ...] mm on or inside the part (each point's values, interpolated in its element, and how far it moves); on: picks (faces, edges, corners, whole bodies, like add_constraint's) with each one's minimum, maximum (with where) and mean; section: a plane through the part with the minimum and maximum on the cut.
+- [`study_report`](fission180://docs/reference/study_report.md): Write a solved study's report as one HTML file (Fusion's Report): the design, the study's materials, constraints, loads, contacts and mesh, every result's minimum and maximum with where, per body, the reaction forces and the verdict against the safety factor target (target, default 3; upper, default 6: above it the part is stronger than needed).
+- [`study_mesh`](fission180://docs/reference/study_mesh.md): Make a study's mesh now, without solving (Fusion's Generate Mesh): its nodes, elements, smallest and largest element edge (mm), worst aspect ratio and how long it took; no constraint or load needed.
+- [`study_setup`](fission180://docs/reference/study_setup.md): Read a study's whole setup (Fusion's Load Case Attributes, Contact Manager and DOF View): every constraint, load and mesh control (id, kind, values, what it is on, status ok / suppressed / lost its faces), each body's study material, gravity, the bonded contacts (bodies closer than the contact tolerance are glued), bodies that overlap or touch only along an edge or at a corner, how each piece could still move (free_motions: empty when everything is held), and the last mesh.
+- [`edit_study_item`](fission180://docs/reference/edit_study_item.md): Change a constraint, load or local mesh control of a study (what its browser row's Edit, Suppress and Delete do), one undo step.
+- [`show_study_results`](fission180://docs/reference/show_study_results.md): Show a solved study's results in the window the way the RESULTS tab does, so the person (and render / screenshot) sees them: the SIMULATION workspace opens on RESULTS.
 
 ## Manufacture
 
@@ -389,10 +409,12 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`cam_edit`](fission180://docs/reference/cam_edit.md): Change a setup or an operation (what a double-click on its browser row opens).
 - [`cam_delete`](fission180://docs/reference/cam_delete.md): Delete an operation, or a setup with all its operations (one undo step).
 - [`cam_generate`](fission180://docs/reference/cam_generate.md): Make the toolpaths that are missing or out of date (Fusion's Generate): after the design, a setup or an operation changed, cam_setups shows them as "stale" (needs regenerating).
-- [`cam_simulate`](fission180://docs/reference/cam_simulate.md): Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simulate, without the pictures): machining time (s), cutting and rapid distances (mm), the stock's volume before and the volume removed (mm3; the stock is a grid of columns, so volumes are within a few percent), and collisions: every rapid move that went into material, with its operation, G-code line, place [x, y, z] in setup coordinates and depth (mm).
+- [`cam_simulate`](fission180://docs/reference/cam_simulate.md): Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simulate, without the pictures): machining time (s), cutting and rapid distances (mm), the stock's volume before and the volume removed (mm3; the stock is a grid of columns, so volumes are within a few percent), collisions: every rapid move that went into material, with its operation, G-code line, place [x, y, z] in setup coordinates and depth (mm), and the stock compared with the model (Fusion's stock comparison): gouges (where the tool cut into the part: area, deepest, where, and which operation did it) and stock_left_on_model (the most and the mean left above the part: a finishing pass needed?).
 - [`cam_post`](fission180://docs/reference/cam_post.md): Write a setup's toolpaths as a G-code program for a controller (Fusion's Post Process) and check it.
 - [`cam_setups`](fission180://docs/reference/cam_setups.md): Read the MANUFACTURE browser: every setup (id, name, stock and model boxes in its own coordinates, where its origin is in the design, warnings) with its operations in machining order: id, name, kind, tool, state (valid | stale: needs regenerating | empty: no toolpath yet | error | suppressed), the reason of an error, and the toolpath's numbers (cut_length, rapid_length mm, time_s, min_cut_z, bounds).
 - [`cam_tools`](fission180://docs/reference/cam_tools.md): Read the Tool Library.
+- [`cam_setup_sheet`](fission180://docs/reference/cam_setup_sheet.md): Write a setup's Setup Sheet (Fusion's): one HTML page for the person at the machine with the program, the work coordinate system and its origin, the stock and model sizes, every tool (number, type, diameter, flute length, flutes) and every operation in machining order (strategy, tool, spindle speed, feeds, stepdown, stepover, lowest Z, cutting length and time).
+- [`cam_tool_library`](fission180://docs/reference/cam_tool_library.md): Change the Tool Library (Fusion's Tool Library dialog).
 
 ## Animation
 
@@ -405,6 +427,8 @@ Fission 180 offers 172 tools to AI apps (through MCP, the built-in chat panel an
 - [`anim_callout`](fission180://docs/reference/anim_callout.md): Pin a text to a point of the animation (Fusion's Create Callout): shown from `at` seconds on.
 - [`anim_storyboards`](fission180://docs/reference/anim_storyboards.md): Read the animations.
 - [`anim_publish_video`](fission180://docs/reference/anim_publish_video.md): Render storyboards to a video file, frame by frame from the 3D view (Fusion's Publish Video).
+- [`anim_view`](fission180://docs/reference/anim_view.md): Record a camera move on a storyboard (what Fusion's View records while a person orbits and zooms): the camera ends at `at` looking from view (iso, Fusion's Home: from the front, right and top; front, back, top, bottom, left, right) or from direction [x, y, z], with up the screen's up, and turns, pans and zooms smoothly from where it was.
+- [`anim_action`](fission180://docs/reference/anim_action.md): Change actions already on a storyboard, as the ANIMATION TIMELINE does with its bars: start / end (seconds; Edit Start/End: one action), shift (seconds, a drag: every action named moves, its length kept, never before 0) or delete true.
 
 ## Rebuild with a timeline
 
