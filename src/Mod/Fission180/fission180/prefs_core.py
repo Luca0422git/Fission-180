@@ -21,6 +21,8 @@ GENERAL = "User parameter:BaseApp/Preferences/General"
 MACRO = "User parameter:BaseApp/Preferences/Macro"
 ADDONS = "User parameter:BaseApp/Preferences/Addons"
 INFERENCE = "User parameter:BaseApp/Preferences/Mod/Fission180/SketchInference"
+# (wave 8, tips-ui) the ribbon's Fusion-style tooltips (tips_ui.py)
+TOOLTIPS = "User parameter:BaseApp/Preferences/Mod/Fission180/Tooltips"
 
 # (id, title, parent page id or None), in the order of Fusion's list on the left.
 PAGES = [
@@ -223,6 +225,34 @@ OPTIONS = [
         tip="The toolbar, panels, text and icons smaller (more room for the 3D view) or bigger, "
         "on top of the system's own display scaling. Shows when Fission 180 starts again.",
         restart=True,
+    ),
+    # (wave 8, tips-ui) Fusion's Preferences > General > Show Tooltips, with the expanded
+    # tooltip's delay (docs/fission180/parity/tooltips.md)
+    _option(
+        "expanded_tooltips",
+        "general",
+        "Show expanded tooltips",
+        "bool",
+        True,
+        (TOOLTIPS, "Bool", "Expanded"),
+        group="Tooltips",
+        tip="On: keep the pointer still on a ribbon command and its tooltip grows into a "
+        "picture, what it does and the steps to use it. Off: only its name, one line and "
+        "its key.",
+    ),
+    _option(
+        "expanded_tooltip_delay",
+        "general",
+        "Expanded tooltip delay",
+        "int",
+        1000,
+        (TOOLTIPS, "Int", "DelayMs"),
+        group="Tooltips",
+        minimum=200,
+        maximum=5000,
+        suffix=" ms",
+        tip="How long the pointer stays still on a command before its expanded tooltip "
+        "shows (1000 ms is one second).",
     ),
     _option(
         "mouse_preset",

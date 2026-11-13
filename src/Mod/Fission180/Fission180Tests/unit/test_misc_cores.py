@@ -363,6 +363,7 @@ class PrefsCore(unittest.TestCase):
                 "Language",
                 "Startup",
                 "Appearance",
+                "Tooltips",  # (wave 8, tips-ui: Show expanded tooltips and its delay)
                 "Navigation",
                 "Saving and Recovery",
                 "Updates",
@@ -370,6 +371,9 @@ class PrefsCore(unittest.TestCase):
             ],
         )
         self.assertEqual(prefs_core.option("orientation")["page"], "general")
+        self.assertIs(plan["expanded_tooltips"], True)
+        self.assertEqual(plan["expanded_tooltip_delay"], 1000)
+        self.assertEqual(prefs_core.normalise("expanded_tooltip_delay", 99999), 5000)
         self.assertEqual(prefs_core.languages(), ["English"])
         self.assertEqual(prefs_core.languages("Deutsch"), ["English", "Deutsch"])
         self.assertEqual(prefs_core.languages("English"), ["English"])

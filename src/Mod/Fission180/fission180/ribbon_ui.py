@@ -241,6 +241,7 @@ def build_menu(parent, entries, available, context=None):
         action.setProperty("fission180Icon", entry["icon"] or "")  # (redrawn for a new look)
         resolved = resolve(entry["command"], available)
         options.add(action, entry)
+        _fusion_tooltip(menu, action, entry)  # (wave 8, tips-ui: tips_ui.py)
         if resolved:
             action.triggered.connect(lambda _=False, r=resolved, e=entry: run(r, e["label"]))
             if entry.get("note"):
@@ -384,6 +385,7 @@ class GroupWidget(QtWidgets.QWidget):
             button.setEnabled(False)
             button.setToolTip(tip + "\n" + (entry.get("note") or "Not available in Fission 180 yet"))
         button.setObjectName("Fission180Big_" + entry["label"].replace(" ", "_"))
+        _fusion_tooltip(None, button, entry)  # (wave 8, tips-ui: tips_ui.py)
         # right-click: the command's options (Unpin from Toolbar, Change Keyboard Shortcut)
         button.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         button.customContextMenuRequested.connect(
@@ -405,6 +407,26 @@ def _safely(function, *args):
         function(*args)
     except Exception as exc:
         warn("ribbon: %s" % exc)
+
+
+def _fusion_tooltip(menu, widget, entry):
+    """(wave 8, tips-ui) Fusion's small and expanded tooltip on a ribbon button (menu None)
+    or a drop-down entry (widget: its QAction). Qt's own tooltip text set above stays: it is
+    what the small tooltip says, and what shows if tips_ui cannot."""
+    try:
+        from . import tips_ui
+
+        if menu is None:
+            tips_ui.watch_button(widget, entry)
+        else:
+            tips_ui.watch_action(menu, widget, entry)
+    except Exception as exc:
+        if not _TOOLTIP_FAILED:
+            _TOOLTIP_FAILED.append(exc)
+            warn("ribbon tooltips: %s" % exc)
+
+
+_TOOLTIP_FAILED = []
 
 
 def _separator():

@@ -224,6 +224,44 @@ def problems(ident, tip, check_picture=True):
     return out
 
 
+# -- where a tooltip goes (tips_ui.py; pure, unit tested) -----------------------------------------
+GAP = 4  # pixels between a tooltip and what it belongs to
+
+
+def place(anchor, size, screen, beside=False, gap=GAP):
+    """Where a tooltip of `size` (w, h) goes for `anchor` (x, y, w, h, screen pixels) inside
+    `screen` (the available area, x, y, w, h): under it, or above when there is no room
+    below (a ribbon button); beside=True: to its right, or its left when there is no room (a
+    drop-down menu's row, the anchor being the whole menu's width on that row, so the menu
+    stays uncovered). Always inside the screen. Returns (x, y)."""
+    ax, ay, aw, ah = anchor
+    w, h = size
+    sx, sy, sw, sh = screen
+    right, bottom = sx + sw, sy + sh
+    if beside:
+        x = ax + aw + gap
+        if x + w > right:
+            x = ax - gap - w
+        y = ay
+    else:
+        x = ax
+        y = ay + ah + gap
+        if y + h > bottom:
+            y = ay - gap - h
+    x = max(sx, min(x, right - w))
+    y = max(sy, min(y, bottom - h))
+    return (int(x), int(y))
+
+
+def numbered(steps):
+    """The steps as the expanded tooltip writes them: "1. Select ...", one per line."""
+    return "\n".join("%d. %s" % (i + 1, step) for i, step in enumerate(steps or []))
+
+
+def bulleted(hints):
+    return "\n".join("\u2022 %s" % hint for hint in hints or [])
+
+
 # -- loading -----------------------------------------------------------------------------------
 def _load():
     tips, errors, owners = {}, [], {}

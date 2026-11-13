@@ -200,6 +200,44 @@ class Loader(unittest.TestCase):
             tips.reload()
 
 
+class Placement(unittest.TestCase):
+    """Where the card goes (tips_ui uses tips.place) and how it writes steps and hints."""
+
+    SCREEN = (0, 0, 1920, 1200)
+
+    def test_under_a_ribbon_button(self):
+        self.assertEqual(tips.place((600, 80, 48, 48), (300, 60), self.SCREEN), (600, 132))
+
+    def test_above_when_no_room_below(self):
+        x, y = tips.place((600, 1150, 48, 48), (340, 400), self.SCREEN)
+        self.assertEqual(y, 1150 - 4 - 400)
+
+    def test_kept_inside_the_right_edge(self):
+        x, _y = tips.place((1880, 80, 48, 48), (340, 400), self.SCREEN)
+        self.assertEqual(x, 1920 - 340)
+
+    def test_beside_a_menu_then_left_of_it(self):
+        menu_row = (100, 300, 220, 24)
+        self.assertEqual(tips.place(menu_row, (340, 400), self.SCREEN, beside=True), (324, 300))
+        right_menu = (1700, 300, 200, 24)
+        x, _y = tips.place(right_menu, (340, 400), self.SCREEN, beside=True)
+        self.assertEqual(x, 1700 - 4 - 340)  # the menu stays uncovered
+
+    def test_beside_low_in_the_screen_moves_up(self):
+        _x, y = tips.place((100, 1100, 220, 24), (340, 400), self.SCREEN, beside=True)
+        self.assertEqual(y, 1200 - 400)
+
+    def test_a_second_screen(self):
+        screen = (1920, 0, 1280, 1024)
+        x, y = tips.place((3150, 80, 48, 48), (340, 400), screen)
+        self.assertEqual((x, y), (1920 + 1280 - 340, 132))
+
+    def test_numbered_steps_and_hints(self):
+        self.assertEqual(tips.numbered(["Pick.", "Drag."]), "1. Pick.\n2. Drag.")
+        self.assertEqual(tips.numbered([]), "")
+        self.assertEqual(tips.bulleted(["Hold Ctrl."]), "• Hold Ctrl.")
+
+
 class Coverage(unittest.TestCase):
     """Every ribbon command of a data module's tabs has a complete entry and its picture."""
 
