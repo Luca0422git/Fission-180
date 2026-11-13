@@ -27,8 +27,10 @@ candidate_bridge_files), looked up again on every call because Fission 180 may s
 
 import argparse
 import http.client
+import json
 import os
 import queue
+import secrets
 import socket
 import sys
 import threading
@@ -43,9 +45,18 @@ if sys.path and os.path.abspath(sys.path[0] or os.curdir) == _HERE:
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from fission180.ai import bridge_core, catalog, mcp_core, tools_core  # noqa: E402,F401
+from fission180.ai import bridge_core, catalog, mcp_core, progress, tools_core  # noqa: E402,F401
 
 TIMEOUT = 120.0  # seconds; one design step can take a while to compute
+# (wave 8, ai-speed) MCP progress notifications for a tools/call that asked for them (its
+# params._meta.progressToken): the first after PROGRESS_FIRST seconds, then every
+# PROGRESS_EVERY, with what Fission 180 says it is doing (the bridge's /status), until the
+# answer goes out. The MCP specification (basic/utilities/progress, 2025-03-26 and later):
+# progress must grow with every notification, total and message are optional, none after
+# the answer. What AI apps do with them differs (docs/fission180/parity/ai.md, wave 8).
+PROGRESS_FIRST = 1.0
+PROGRESS_EVERY = 2.0
+STATUS_TIMEOUT = 3.0  # seconds for /status and /stop (answered on the bridge's own thread)
 ENV_BRIDGE_FILE = "FISSION180_BRIDGE_FILE"
 RETRIES = 2  # a read-only tool whose reply was lost is asked again this many times
 RETRY_WAIT = 0.5  # seconds before asking again
@@ -151,20 +162,64 @@ class BridgeClient:
         # 127.0.0.1 must never go through a proxy set in the environment (HTTP_PROXY ...)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def call_tool(self, name, args):
+    def call_tool(self, name, args, call_id=None):
         try:
-            return self._call_honestly(name, args)
+            return self._call_honestly(name, args, call_id)
         except Exception as exc:
             log("[Fission 180] MCP: call %s failed: %s" % (name, exc))
             return bridge_core.error_result("Fission 180 could not run %s: %s" % (name, exc))
 
-    def _call_honestly(self, name, args):
+    def _bridge(self):
+        path = find_bridge_file(self.bridge_file)
+        info = bridge_core.read_bridge_file(path) if path else None
+        if info is None or not bridge_core.pid_alive(info["pid"]):
+            return None
+        return info
+
+    def _post(self, info, path, payload, timeout):
+        request = urllib.request.Request(
+            "http://127.0.0.1:%d%s" % (info["port"], path),
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", bridge_core.KEY_HEADER: info["key"]},
+            method="POST",
+        )
+        with self.opener.open(request, timeout=timeout) as response:
+            return response.read()
+
+    def status(self):
+        """What Fission 180 is working on now (bridge_core.status_answer), or None when it
+        cannot tell (not running, or a Fission 180 from before wave 8). Never raises."""
+        try:
+            info = self._bridge()
+            if info is None:
+                return None
+            return bridge_core.decode_status(
+                self._post(info, bridge_core.STATUS_PATH, {}, STATUS_TIMEOUT)
+            )
+        except Exception:
+            return None
+
+    def stop(self, call_id, reason="the AI app cancelled it"):
+        """Ask Fission 180 to stop the call `call_id` (bridge._stop says when it does). The
+        answer ({"stopped", "running"}) or None. Never raises."""
+        try:
+            info = self._bridge()
+            if info is None:
+                return None
+            body = self._post(
+                info, bridge_core.STOP_PATH, {"call_id": call_id, "reason": reason}, STATUS_TIMEOUT
+            )
+            return json.loads(body.decode("utf-8"))
+        except Exception:
+            return None
+
+    def _call_honestly(self, name, args, call_id=None):
         """A lost reply: read-only tools are asked again, changing tools never are."""
         read_only = catalog.is_read_only(name)
         attempt = 0
         while True:
             try:
-                return self._call(name, args)
+                return self._call(name, args, call_id)
             except _LostReply as lost:
                 # (not after a time-out: Fission 180 is busy, and asking again only queued
                 # more work behind the long call: Luca's Relic design, 2026-11-13)
@@ -187,14 +242,13 @@ class BridgeClient:
                     )
                 return bridge_core.error_result(MAYBE_APPLIED % (lost, name))
 
-    def _call(self, name, args):
-        path = find_bridge_file(self.bridge_file)
-        info = bridge_core.read_bridge_file(path) if path else None
-        if info is None or not bridge_core.pid_alive(info["pid"]):
+    def _call(self, name, args, call_id=None):
+        info = self._bridge()
+        if info is None:
             return bridge_core.error_result(bridge_core.NOT_RUNNING)
         request = urllib.request.Request(
             "http://127.0.0.1:%d%s" % (info["port"], bridge_core.CALL_PATH),
-            data=bridge_core.encode_request(name, args),
+            data=bridge_core.encode_request(name, args, call_id),
             headers={"Content-Type": "application/json", bridge_core.KEY_HEADER: info["key"]},
             method="POST",
         )
@@ -246,19 +300,108 @@ class BridgeClient:
         return answer
 
 
+def progress_token(message):
+    """The progressToken a request asked for (params._meta.progressToken: a string or an
+    integer), or None."""
+    params = message.get("params") if isinstance(message, dict) else None
+    meta = params.get("_meta") if isinstance(params, dict) else None
+    token = meta.get("progressToken") if isinstance(meta, dict) else None
+    if isinstance(token, bool) or not isinstance(token, (str, int)):
+        return None
+    return token
+
+
+def progress_message(name, seconds, status, call_id):
+    """The words of one progress notification for the call `call_id` (tool `name`) after
+    `seconds`, from Fission 180's /status answer (None: it cannot tell)."""
+    if status and status.get("working") and status.get("call_id") == call_id:
+        doing = progress.doing_words(status.get("what"), status.get("done"), status.get("total"))
+        head = "Fission 180 is %s %s (%s)" % (
+            "stopping" if status.get("stopping") else "working on",
+            name,
+            progress.seconds_words(seconds),
+        )
+        return head + (": " + doing if doing else "")
+    if status and status.get("working"):
+        return "Fission 180 is still busy with %s (%s); %s waits for it (%s)" % (
+            status.get("tool") or "another call",
+            progress.seconds_words(status.get("seconds") or 0),
+            name,
+            progress.seconds_words(seconds),
+        )
+    return "Fission 180: %s (%s)" % (name, progress.seconds_words(seconds))
+
+
+class _Progress(threading.Thread):
+    """Sends progress notifications for one tool call until finish() (never after it)."""
+
+    def __init__(self, server, active):
+        threading.Thread.__init__(self, name="fission180-mcp-progress", daemon=True)
+        self.server = server
+        self.active = active
+        self.gate = threading.Lock()
+        self.over = threading.Event()
+        self.began = time.monotonic()
+        self.sent = 0.0  # the progress value of the last notification (it must grow)
+        self.count = 0
+
+    def run(self):
+        wait = PROGRESS_FIRST
+        while not self.over.wait(wait):
+            wait = PROGRESS_EVERY
+            try:
+                status = self.server.status() if self.server.status is not None else None
+            except Exception:
+                status = None
+            seconds = time.monotonic() - self.began
+            text = progress_message(self.active["name"], seconds, status, self.active["call_id"])
+            with self.gate:
+                if self.over.is_set():
+                    return
+                self.sent = max(round(seconds, 1), round(self.sent + 0.1, 1))
+                self.count += 1
+                self.server.send(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "notifications/progress",
+                        "params": {
+                            "progressToken": self.active["token"],
+                            "progress": self.sent,
+                            "message": text,
+                        },
+                    }
+                )
+
+    def finish(self):
+        with self.gate:
+            self.over.set()
+
+
 class Server:
     """Reads MCP messages from stdin and writes answers to stdout. Tool calls run one at a
     time on a worker thread (Fission 180 does one step at a time anyway) so pings and
-    tools/list are answered while a step computes."""
+    tools/list are answered while a step computes.
 
-    def __init__(self, call_tool, stdin, stdout, version):
+    status() -> what Fission 180 is doing (BridgeClient.status) and stop(call_id, reason)
+    (BridgeClient.stop), when given: a tools/call that asked for progress gets notifications
+    while it runs, and one the AI app cancels while Fission 180 works on it is stopped there
+    when it changes nothing (bridge._stop). call_ids: call_tool takes call_id= (each call's
+    own id, which a stop names)."""
+
+    def __init__(self, call_tool, stdin, stdout, version, status=None, stop=None, call_ids=False):
         self.call_tool = call_tool
         self.stdin = stdin
         self.stdout = stdout
         self.version = version
+        self.status = status
+        self.stop = stop
+        self.call_ids = call_ids
         self.lock = threading.Lock()
         self.jobs = queue.Queue()
         self.cancelled = set()  # ids of tool calls the AI app cancelled (notifications/cancelled)
+        self.active = None  # the tools/call being worked on: {id, call_id, name, token, cancelled}
+        self.session = secrets.token_hex(4)  # (call ids unique across servers on one bridge)
+        self.inline_sent = 0.0  # headless: when the last progress notification went
         self.worker = threading.Thread(target=self._work, name="fission180-mcp-calls", daemon=True)
 
     def send(self, message):
@@ -287,18 +430,104 @@ class Server:
             if skip:  # (the AI app gave up on it: not sent to Fission 180, and not answered)
                 log("[Fission 180] MCP: call %s cancelled by the AI app, not run" % (ident,))
                 continue
-            self.answer(message)
+            self.tool_call(message)
+
+    def tool_call(self, message):
+        """One tools/call: answered (with progress notifications while it runs when it asked
+        for them), or not answered when the AI app cancelled it meanwhile (MCP: a cancelled
+        request gets no answer)."""
+        params = message.get("params") if isinstance(message.get("params"), dict) else {}
+        ident = message.get("id")
+        active = {
+            "id": ident,
+            "call_id": "%s-%s" % (self.session, ident),
+            "name": params.get("name") if isinstance(params.get("name"), str) else "the call",
+            "token": progress_token(message),
+            "cancelled": False,
+        }
+        with self.lock:
+            self.active = active
+        ticker = None
+        if active["token"] is not None and self.status is not None:
+            ticker = _Progress(self, active)
+            ticker.start()
+        call_id = active["call_id"]
+
+        def call(name, args):
+            if self.call_ids:
+                return self.call_tool(name, args, call_id=call_id)
+            return self.call_tool(name, args)
+
+        try:
+            reply = mcp_core.handle(message, call, self.version, log)
+        finally:
+            if ticker is not None:
+                ticker.finish()
+            with self.lock:
+                self.active = None
+                cancelled = active["cancelled"]
+                self.cancelled.discard(ident)
+        if cancelled:
+            log("[Fission 180] MCP: call %s was cancelled by the AI app: no answer" % (ident,))
+            return
+        self.send(reply)
 
     def cancel(self, message):
         """notifications/cancelled: a tool call still waiting here is not run (MCP: no answer
-        is sent for it). One already sent to Fission 180 cannot be called back."""
+        is sent for it). One Fission 180 is working on is asked to stop there (bridge._stop:
+        a call that changes nothing stops at its next safe point; a change is left to
+        finish, so its result is there when the AI looks) and gets no answer either."""
         params = message.get("params") if isinstance(message.get("params"), dict) else {}
         ident = params.get("requestId")
-        if ident is not None:
-            with self.lock:
-                if len(self.cancelled) > 1000:  # (ids of calls answered long ago)
-                    self.cancelled.clear()
-                self.cancelled.add(ident)
+        if ident is None:
+            return
+        with self.lock:
+            if len(self.cancelled) > 1000:  # (ids of calls answered long ago)
+                self.cancelled.clear()
+            self.cancelled.add(ident)
+            active = self.active if self.active is not None and self.active["id"] == ident else None
+            if active is not None:
+                active["cancelled"] = True
+        if active is not None and self.stop is not None:
+            reason = params.get("reason")
+            why = "the AI app cancelled it" + (
+                " (%s)" % reason if isinstance(reason, str) and reason else ""
+            )
+            threading.Thread(
+                target=self._stop_there, args=(active["call_id"], why), daemon=True
+            ).start()
+
+    def _stop_there(self, call_id, why):
+        try:
+            answer = self.stop(call_id, why)
+            log("[Fission 180] MCP: asked Fission 180 to stop %s: %s" % (call_id, answer))
+        except Exception as exc:
+            log("[Fission 180] MCP: could not ask Fission 180 to stop %s: %s" % (call_id, exc))
+
+    def inline_progress(self, call):
+        """Headless (the tools run on this thread): progress's pump sends the progress
+        notification the call in work asked for, at most every PROGRESS_EVERY seconds."""
+        active = self.active
+        if active is None or active["token"] is None:
+            return
+        now = time.monotonic()
+        seconds = now - call["started"]
+        if seconds < PROGRESS_FIRST or now - self.inline_sent < PROGRESS_EVERY:
+            return
+        self.inline_sent = now
+        status = bridge_core.status_answer(progress.current())
+        status["call_id"] = active["call_id"]
+        self.send(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/progress",
+                "params": {
+                    "progressToken": active["token"],
+                    "progress": round(seconds, 3),
+                    "message": progress_message(active["name"], seconds, status, active["call_id"]),
+                },
+            }
+        )
 
     def run_in_line(self):
         """Every message in turn on this thread (headless: FreeCAD runs the tools here, and
@@ -315,6 +544,8 @@ class Server:
                 message, error = mcp_core.parse_line(line)
                 if error is not None:
                     self.send(error)
+                elif isinstance(message, dict) and message.get("method") == "tools/call":
+                    self.tool_call(message)
                 elif message is not None:
                     self.answer(message)
             except Exception as exc:
@@ -338,7 +569,9 @@ class Server:
                     self.send(error)
                 elif isinstance(message, dict) and message.get("method") == "tools/call":
                     self.jobs.put(message)
-                elif isinstance(message, dict) and message.get("method") == "notifications/cancelled":
+                elif (
+                    isinstance(message, dict) and message.get("method") == "notifications/cancelled"
+                ):
                     self.cancel(message)
                 elif message is not None:
                     self.answer(message)
@@ -388,7 +621,15 @@ def main(argv=None, stdin=None, stdout=None):
     client = BridgeClient(options.bridge_file)
     log("[Fission 180] MCP server %s started" % _version())
     try:
-        Server(client.call_tool, stdin, stdout, _version()).run()
+        Server(
+            client.call_tool,
+            stdin,
+            stdout,
+            _version(),
+            status=client.status,
+            stop=client.stop,
+            call_ids=True,
+        ).run()
     except KeyboardInterrupt:
         pass
     except Exception as exc:
@@ -414,7 +655,9 @@ def _main_headless(options, stdin=None, stdout=None):
     client = headless.InProcessClient(headless.HeadlessHost(options.allow_overwrite))
     log("[Fission 180] MCP server %s started (headless: the tools run here)" % _version())
     try:
-        Server(client.call_tool, stdin, stdout, _version()).run_in_line()
+        server = Server(client.call_tool, stdin, stdout, _version())
+        progress.set_pump(server.inline_progress)  # (no window: only the notifications)
+        server.run_in_line()
     except KeyboardInterrupt:
         pass
     except Exception as exc:
