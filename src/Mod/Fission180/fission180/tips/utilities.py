@@ -253,7 +253,7 @@ TIPS = {
         "steps": [
             "Click Version History in a saved design.",
             "Pick a version in the list.",
-            "Click Open, Compare, Promote or the milestone button.",
+            "Click Open, Compare, Promote or Mark as Milestone.",
         ],
         "tips": [
             "Milestones only hides the everyday saves.",

@@ -811,7 +811,7 @@ TIPS = {
         "The sketch's closed shapes are then profiles for Extrude, Revolve and the other "
         "commands.",
         "steps": [
-            "Click Finish Sketch (or the green check, or right-click > Finish Sketch).",
+            "Click Finish Sketch (ribbon or SKETCH PALETTE), or right-click > Finish Sketch.",
             "Pick a profile and press E to extrude it.",
         ],
         "tips": [
