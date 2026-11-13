@@ -209,8 +209,7 @@ def decal_tool(ctx, args):
                 factor = float(args["width"]) / max(1e-9, float(made.BaseWidth))
                 options["scale_x"] = options["scale_y"] = factor
             if options:
-                decal.set_options(made, **options)
-            made.recompute()
+                decal.set_options(made, **options)  # (built again by the step's recompute)
         except decal.DecalError as exc:
             raise UserError(str(exc))
         if App.GuiUp:

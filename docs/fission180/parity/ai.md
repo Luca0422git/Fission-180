@@ -171,3 +171,325 @@ the top face without flip, a shell thicker than the part) answered "Done" with n
 Tests: `test_ai_docs_library.py`, `test_ai_docs_contract.py` (unit); the docs runner
 (`run_tests.sh --only headless / base`); scenario `ai_docs_gui` (the reference examples that
 need the window, the docs tools through the bridge, Save AI handbook... with a real click).
+
+
+## Wave 8 coverage: design (builder ai-design, 2026-11-13)
+
+Luca (2026-11-13): "Claude needs access to ALL the tools, and it should be able to work
+efficiently, not stupidly." Every command of the DESIGN workspace's SOLID, SURFACE and SKETCH
+groups (CREATE, MODIFY, CONSTRUCT, INSPECT, INSERT, ASSEMBLE) now reaches an AI tool that
+runs the code its dialog runs; the table at the end lists each command and its tool. Fusion
+has no connector for outside AI apps at all (its own assistant is Autodesk's): **beyond
+Fusion**. The behaviour each tool copies is the Fission 180 dialog's, itself specified (with
+sources) in the area's parity doc: joints.md (as-built joints, joint origins, rigid groups,
+motion links, contact sets, motion studies, positions), vex-assembly.md (Duplicate With
+Joints), insert.md (Decal, Canvas, Insert SVG), derive in misc.md, direct.md (base features),
+inspect.md / surface.md (the analyses), sketch.md (the SKETCH tools).
+
+### What an AI is told, and what Fusion does (sources)
+
+| Behaviour | Fission 180 for an AI | Source |
+|---|---|---|
+| As-built Joint joins two components where they stand; Joint moves the first onto the second | as_built_joint (nothing moves) / joint (the first moves); their descriptions send the AI to the other | Autodesk help "As-built Joint" / "Joint" |
+| Rigid Group locks components together; one group instead of a rigid joint per pair | rigid_group | Autodesk help "Rigid Group" |
+| Motion Link ties two joints' motions by two values (a gear pair, rack and pinion, a screw with Link with Same Joint) | motion_link, values [first, second], the same joint twice for a screw | Autodesk help "Motion Link" |
+| Contact: Enable Contact Sets / Enable All Contact / Disable Contact, New Contact Set; parts stop where they touch | contact (mode, new_set); drive_joint now stops at the touch, as the Drive Joints dialog does (it went through before) | Autodesk help "Contact Sets"; Forum (all-contact slow on big assemblies) |
+| Capture Position / Revert Position after components were moved | position (capture / revert) | Autodesk help "Capture Position" |
+| Motion Study: joint values at steps 0..100, played back | motion_study answers where things stand at the steps asked, then puts the assembly back | Autodesk help "Motion Study" |
+| Duplicate With Joints copies a jointed part into more places | duplicate_with_joints, one place per copy | Autodesk help "Duplicate With Joints" |
+| Decal: a picture on faces, follows them, no geometry | decal, sized by width; refuses a point off the face | Autodesk help "Decal" |
+| Canvas: a reference image on a plane, calibrated | canvas, sized by width (the real size: calibration's result) | Autodesk help "Canvas", "Calibrate" |
+| Insert SVG: curves into a sketch, centred, Z angle clockwise | insert_svg (SVG and DXF); its angle counter-clockwise for both (the dialog's Z Angle turns an SVG clockwise) | Autodesk help "Insert SVG" |
+| Derive / Insert Derive: linked copies of another design's bodies, sketches, planes, parameters | derive (source: Insert Derive; into: Derive); list: true shows what there is | Autodesk help "Derive" |
+| Base feature: direct edits inside a parametric design | base_feature start / finish; the bodies made in between become base features | Autodesk help "Base Feature" |
+| Compute All recomputes the design, lists failures | compute_all | Autodesk help "Compute All" |
+| INSPECT analyses colour the model | analysis answers numbers (draft classes per face, the tightest inner round, curvature, reach, crease / G1 edges, combs, isocurves) with refs; nothing is left in the design | Autodesk help "Draft Analysis", "Zebra Analysis", "Minimum Radius Analysis", ...; the numbers are Fission 180's (beyond Fusion) |
+| Display Component Colors / Component Color Swatch / Cycle Component Color | component_colors (on, swatch, cycle); always answers each component's colour | Autodesk help "Display Component Colors" |
+| User Coordinate System | coordinate_system (origin, axes, or attached to a face / plane / corner) | Autodesk help "User Coordinate System" (Guess: attachment modes are FreeCAD's) |
+| Offset Face | press_pull offset_face: true (the same move, an Offset Face step) | Autodesk help "Offset Face" |
+| Texture Map Controls | appearance texture_map | Autodesk help "Texture Map Controls" |
+| SKETCH tools | sketch_draw / sketch_modify / sketch_pattern / sketch_project, each kind the tool's own build() | Autodesk help per tool (sketch.md) |
+
+### How the tools run the dialogs' code
+
+- ASSEMBLE: joints.py's create_as_built_joint, create_joint_origin, create_rigid_group,
+  create_motion_link, set_contact_mode / create_contact_set, capture_position /
+  revert_position, create_motion_study + study_pose (the dialog's playback),
+  duplicate_joints.duplicate, each followed by what the dialog's OK does (solve, limits,
+  rest value, baseline).
+- INSERT: decal.make + set_options, insert.make_canvas + set_canvas_options, insert.read_curves
+  / transformed_geometry / new_sketch / add_geometry, derive.read_source + derive.derive;
+  in the window the decal's and canvas's view providers are attached as the dialogs do.
+- SKETCH: each tool class of sketch_draw_tools.py, sketch_fillet_tool.py,
+  sketch_chamfer_tool.py, sketch_offset_tool.py, sketch_mirror_tool.py,
+  sketch_pattern_tool.py, sketch_move_tool.py is made without its window part (no
+  `__init__`: no view, no panel) with the clicks and values its build() reads, and build()
+  runs; values given become dimensions as typed values do. Extend / Break run
+  sketch_build.extend_curve / break_curve; Project / Include / Intersect sketch.addExternal or
+  sketch_external.project_across (another body); Project to Surface sketch_project.make;
+  Isoparametric Curve surface_iso.make; Curvature and Unfix the constraint tools' own
+  constrain / _unfix.
+- INSPECT: the analysis dialogs' formulas (analysis_core.draft_angle / draft_class,
+  concave_radius, reachable_points; surface_analysis's face normals and curvatures signed as
+  face_mesh signs them) on a 6 x 6 grid of each curved face's parameters (a flat face: its
+  normal); accessibility's obstacles meshed in one go (MeshPart) and each group of points
+  tested only against the triangles in its column.
+
+### Measured (seconds, this sandbox, 4 CPUs shared with five builders)
+
+| Tool | Case | Seconds |
+|---|---|---|
+| analysis draft | a plate with 750 countersunk holes: 1,506 faces, 3,762 edges | 2.6 - 3.0 |
+| analysis minimum_radius | the same | 1.4 - 2.3 |
+| analysis curvature_map | the same | 1.3 - 1.9 |
+| analysis zebra / environment_map | the same (one point per edge above 1,000 edges) | 4.0 |
+| analysis accessibility | the same, 6,000 points against a 1/400 mesh | 12.4 - 13.7 |
+| analysis curvature_comb | the same, 750 circular edges | 1.4 - 1.7 |
+| analysis isocurve | the same, 25 faces | 1.5 - 2.1 |
+| analysis draft, picture: true | the same; the picture is render's (software) | 24.6 - 30.8 |
+| analysis (each kind) | the test parts (a box, a plate with a hole) | 0.01 - 1.3 |
+| as_built_joint, rigid_group, motion_link, contact, position, joint_origin | the 6-component arm assembly | 0.01 - 0.34 each |
+| duplicate_with_joints, motion_study (3 steps) | the same | 0.05, 0.04 |
+| decal | a 30 mm label on a face with 64 holes (the decal is meshed over the whole face, twice: on its making and with its size, as in the dialog) | 12.9 (6 per build) |
+| decal, canvas, insert_svg (5 curves), derive, coordinate_system, compute_all | small designs | 0.02 - 0.22 |
+| compute_all, canvas, coordinate_system | a plate with 100 holes | 0.42, 0.02, 0.05 |
+| sketch_project (project) | its top face: 104 curves | 0.12 |
+| sketch_pattern (rectangular 10 x 10), sketch_modify (offset) | a circle | 0.70, 0.48 |
+| insert_svg | a DXF of 101 curves | 0.88 |
+| derive | the 100-hole plate's body | 0.19 |
+| sketch_draw / modify / pattern / project | each kind on small sketches | 0.01 - 0.2 |
+
+### Tests
+
+- Headless: `Fission180Tests/headless/design_tools.py` (ASSEMBLY, INSERT, ANALYSIS, SKETCH blocks;
+  run by runner.py after the other sessions): every new tool and kind, the refusals in words,
+  and checks on the model with numbers computed by hand (joint values, slider travel 1 mm for
+  10 degrees, the arm stopped by contact between -15 and -5 degrees, the canvas 100 x 50 mm,
+  the decal 30 x 15 mm, the SVG's 2 closed areas, the derived 24000 mm3 body, draft classes
+  1 / 1 / 4 / 0 on a box, the 4 mm hole as the tightest round, 1600 / 4926 mm2 reached, 8 G1
+  edges on a rounded block, the incircle of a triangle, a slot's arcs...).
+- GUI, through the real MCP server and the AI bridge like an AI app (`ai_design_steps.py`):
+  `ai_design_assembly` (64 checks), `ai_design_insert` (48), `ai_design_analysis` (48),
+  `ai_design_sketch` (70).
+- Unit: `test_ai_catalog.DesignWorkspace` (every ribbon command of the area has a coverage row
+  naming real tools; the SKETCH kinds are the tools' classes; the analysis kinds the dialogs').
+- Documentation: a reference example per new tool (recorded), recipes
+  `recipes/hinged-assembly.md` and `recipes/check-before-making.md` run by the docs runner.
+
+### Every command of the area -> its tool
+
+The same rows are `COVERAGE` in `fission180/ai/catalog/design2_tools.py` (checked against
+`ribbon_config.py` by `test_ai_catalog`).
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| SOLID > CREATE > Create Sketch | create_sketch / create_curve_sketch |
+| SOLID > CREATE > Derive | derive (into: new or a saved design) |
+| SOLID > CREATE > Extrude | extrude |
+| SOLID > CREATE > Revolve | revolve |
+| SOLID > CREATE > Sweep | sweep |
+| SOLID > CREATE > Loft | loft |
+| SOLID > CREATE > Rib | rib |
+| SOLID > CREATE > Web | web |
+| SOLID > CREATE > Emboss | emboss |
+| SOLID > CREATE > Text | create_sketch (face) + sketch_text |
+| SOLID > CREATE > Hole | hole |
+| SOLID > CREATE > Thread | thread |
+| SOLID > CREATE > Box | primitive (box) |
+| SOLID > CREATE > Cylinder | primitive (cylinder) |
+| SOLID > CREATE > Sphere | primitive (sphere) |
+| SOLID > CREATE > Torus | primitive (torus) |
+| SOLID > CREATE > Coil | coil |
+| SOLID > CREATE > Gear | gear |
+| SOLID > CREATE > Pipe | pipe |
+| SOLID > CREATE > Thicken | surface (thicken) |
+| SOLID > CREATE > Boundary Fill | surface (boundary_fill) |
+| SOLID > CREATE > Create Base Feature | base_feature (start) |
+| SOLID > CREATE > Finish Base Feature | base_feature (finish) |
+| SOLID > CREATE > Joint Origin | joint_origin |
+| SOLID > CREATE > Rectangular Pattern | rectangular_pattern |
+| SOLID > CREATE > Circular Pattern | circular_pattern |
+| SOLID > CREATE > Pattern on Path | pattern_on_path |
+| SOLID > CREATE > Mirror | mirror |
+| SOLID > MODIFY > Press Pull | press_pull |
+| SOLID > MODIFY > Fillet | fillet / fillet_sets / rule_fillet / full_round_fillet |
+| SOLID > MODIFY > Chamfer | chamfer / fillet_sets (chamfer) |
+| SOLID > MODIFY > Shell | shell |
+| SOLID > MODIFY > Draft | draft |
+| SOLID > MODIFY > Offset Face | press_pull (offset_face) |
+| SOLID > MODIFY > Delete | delete_face / delete_bodies / delete_step |
+| SOLID > MODIFY > Remove | remove_bodies |
+| SOLID > MODIFY > Texture Map Controls | appearance (texture_map) |
+| SOLID > MODIFY > Replace Face | replace_face |
+| SOLID > MODIFY > Split Face | split_face |
+| SOLID > MODIFY > Split Body | split_body |
+| SOLID > MODIFY > Silhouette Split | silhouette_split |
+| SOLID > MODIFY > Scale | scale |
+| SOLID > MODIFY > Combine | combine |
+| SOLID > MODIFY > Move/Copy | move_copy |
+| SOLID > MODIFY > Align | align |
+| SOLID > MODIFY > Physical Material | physical_material |
+| SOLID > MODIFY > Appearance | appearance |
+| SOLID > MODIFY > Manage Materials | list_materials (reading the libraries); physical_material / appearance assign from them; no tool for the person's favourites and own looks (their settings, not the design) |
+| SOLID > MODIFY > Change Parameters | set_parameter / list_parameters / set_model_parameter / delete_parameter |
+| SOLID > MODIFY > Compute All | compute_all |
+| SOLID > CONSTRUCT > User Coordinate System | coordinate_system |
+| SOLID > CONSTRUCT > Offset Plane | construct_plane (OffsetPlane) |
+| SOLID > CONSTRUCT > Plane at Angle | construct_plane (PlaneAtAngle) |
+| SOLID > CONSTRUCT > Tangent Plane | construct_plane (TangentPlane) |
+| SOLID > CONSTRUCT > Midplane | construct_plane (Midplane) |
+| SOLID > CONSTRUCT > Plane Tangent to Face at Point | construct_plane (PlaneAtPoint) |
+| SOLID > CONSTRUCT > Plane Through Two Edges | construct_plane (PlaneTwoEdges) |
+| SOLID > CONSTRUCT > Plane Through Three Points | construct_plane (PlaneThreePoints) |
+| SOLID > CONSTRUCT > Plane Along Path | construct_plane (PlaneAlongPath) |
+| SOLID > CONSTRUCT > Axis Through Cylinder/Cone/Torus | construct_axis (AxisCylinder) |
+| SOLID > CONSTRUCT > Axis Perpendicular to Face at Point | construct_axis (AxisNormal) |
+| SOLID > CONSTRUCT > Axis Through Two Planes | construct_axis (AxisTwoPlanes) |
+| SOLID > CONSTRUCT > Axis Through Two Points | construct_axis (AxisTwoPoints) |
+| SOLID > CONSTRUCT > Axis Through Edge | construct_axis (AxisEdge) |
+| SOLID > CONSTRUCT > Point at Vertex | construct_point (PointVertex) |
+| SOLID > CONSTRUCT > Point Through Two Edges | construct_point (PointTwoEdges) |
+| SOLID > CONSTRUCT > Point Through Three Planes | construct_point (PointThreePlanes) |
+| SOLID > CONSTRUCT > Point at Center of Circle/Sphere/Torus | construct_point (PointCenter) |
+| SOLID > CONSTRUCT > Point at Edge and Plane | construct_point (PointEdgePlane) |
+| SOLID > CONSTRUCT > Point Along Path | construct_point (PointAlongPath) |
+| SOLID > INSPECT > Measure | measure / query_geometry |
+| SOLID > INSPECT > Interference | interference |
+| SOLID > INSPECT > Curvature Comb Analysis | analysis (curvature_comb) |
+| SOLID > INSPECT > Zebra Analysis | analysis (zebra) |
+| SOLID > INSPECT > Draft Analysis | analysis (draft) |
+| SOLID > INSPECT > Curvature Map Analysis | analysis (curvature_map) |
+| SOLID > INSPECT > Isocurve Analysis | analysis (isocurve) |
+| SOLID > INSPECT > Accessibility Analysis | analysis (accessibility) |
+| SOLID > INSPECT > Minimum Radius Analysis | analysis (minimum_radius) |
+| SOLID > INSPECT > Environmental Map Analysis | analysis (environment_map) |
+| SOLID > INSPECT > Section Analysis | section_analysis |
+| SOLID > INSPECT > Center of Mass | center_of_mass |
+| SOLID > INSPECT > Display Component Colors | component_colors (on) |
+| SOLID > INSPECT > Component Color Swatch | component_colors (swatch) |
+| SOLID > INSPECT > Properties | physical_properties |
+| SOLID > INSERT > Decal | decal |
+| SOLID > INSERT > Canvas | canvas |
+| SOLID > INSERT > Insert SVG | insert_svg |
+| SOLID > INSERT > Insert DXF | import_file (.dxf) / insert_svg (.dxf, placed) |
+| SOLID > INSERT > Insert Mesh | import_file (.stl / .obj / .3mf) |
+| SOLID > INSERT > Insert Component | import_file (.FCStd: a linked component) |
+| SOLID > INSERT > Insert Derive | derive (source) |
+| SOLID > INSERT > Insert STEP | import_file (.step / .iges) |
+| SOLID > INSERT > Hardware... | insert_hardware |
+| SOLID > INSERT > Insert Catalogue Part... | no tool: it opens a supplier's website in the person's browser; the STEP file they download comes in with import_file |
+| SOLID > ASSEMBLE > New Component | new_component |
+| SOLID > ASSEMBLE > Joint | joint |
+| SOLID > ASSEMBLE > As-built Joint | as_built_joint |
+| SOLID > ASSEMBLE > Joint Origin | joint_origin |
+| SOLID > ASSEMBLE > Rigid Group | rigid_group |
+| SOLID > ASSEMBLE > Duplicate With Joints | duplicate_with_joints |
+| SOLID > ASSEMBLE > Drive Joints | drive_joint |
+| SOLID > ASSEMBLE > Motion Link | motion_link |
+| SOLID > ASSEMBLE > Enable Contact Sets | contact (mode sets) |
+| SOLID > ASSEMBLE > Enable All Contact | contact (mode all) |
+| SOLID > ASSEMBLE > Disable Contact | contact (mode off) |
+| SOLID > ASSEMBLE > New Contact Set | contact (new_set) |
+| SOLID > ASSEMBLE > Motion Study | motion_study |
+| SOLID > ASSEMBLE > Capture Position | position (capture) |
+| SOLID > ASSEMBLE > Revert Position | position (revert) |
+| SURFACE > CREATE > New Component | new_component |
+| SURFACE > CREATE > Create Sketch | create_sketch / create_curve_sketch |
+| SURFACE > CREATE > Create Base Feature | base_feature (start) |
+| SURFACE > CREATE > Derive | derive |
+| SURFACE > CREATE > Extrude | surface (extrude) |
+| SURFACE > CREATE > Revolve | surface (revolve) |
+| SURFACE > CREATE > Sweep | surface (sweep) |
+| SURFACE > CREATE > Loft | surface (loft) |
+| SURFACE > CREATE > Patch | surface (patch) |
+| SURFACE > CREATE > Ruled | surface (ruled) |
+| SURFACE > CREATE > Offset | surface (offset) |
+| SURFACE > CREATE > Thicken | surface (thicken) |
+| SURFACE > CREATE > Boundary Fill | surface (boundary_fill) |
+| SURFACE > CREATE > Rectangular Pattern | rectangular_pattern |
+| SURFACE > CREATE > Circular Pattern | circular_pattern |
+| SURFACE > CREATE > Pattern on Path | pattern_on_path |
+| SURFACE > CREATE > Mirror | mirror |
+| SURFACE > MODIFY > Replace Face | replace_face |
+| SURFACE > MODIFY > Split Face | split_face |
+| SURFACE > MODIFY > Split Body | split_body |
+| SURFACE > MODIFY > Silhouette Split | silhouette_split |
+| SURFACE > MODIFY > Scale | scale |
+| SURFACE > MODIFY > Combine | combine |
+| SURFACE > MODIFY > Move/Copy | move_copy |
+| SURFACE > MODIFY > Align | align |
+| SURFACE > MODIFY > Physical Material | physical_material |
+| SURFACE > MODIFY > Appearance | appearance |
+| SURFACE > MODIFY > Manage Materials | list_materials (reading the libraries); physical_material / appearance assign from them; no tool for the person's favourites and own looks (their settings, not the design) |
+| SURFACE > MODIFY > Change Parameters | set_parameter / list_parameters / set_model_parameter / delete_parameter |
+| SURFACE > MODIFY > Compute All | compute_all |
+| SURFACE > MODIFY > Press Pull | surface_modify (press_pull) |
+| SURFACE > MODIFY > Fillet | surface_modify (fillet) |
+| SURFACE > MODIFY > Chamfer | surface_modify (chamfer) |
+| SURFACE > MODIFY > Trim | surface (trim) |
+| SURFACE > MODIFY > Untrim | surface (untrim) |
+| SURFACE > MODIFY > Extend | surface (extend) |
+| SURFACE > MODIFY > Stitch | surface (stitch) |
+| SURFACE > MODIFY > Unstitch | surface (unstitch) |
+| SURFACE > MODIFY > Reverse Normal | surface (reverse_normal) |
+| SURFACE > MODIFY > Merge | surface_modify (merge) |
+| SURFACE > MODIFY > Delete | surface_modify (delete_face) / delete_bodies |
+| SKETCH > CREATE > Line | add_to_sketch (curves: line) / create_curve_sketch |
+| SKETCH > CREATE > Midpoint Line | sketch_draw (midpoint_line) |
+| SKETCH > CREATE > 2-Point Rectangle | create_sketch / add_to_sketch (rect) |
+| SKETCH > CREATE > 3-Point Rectangle | sketch_draw (rectangle_3point) |
+| SKETCH > CREATE > Center Rectangle | create_sketch / add_to_sketch (center_rect) |
+| SKETCH > CREATE > Center Diameter Circle | create_sketch / add_to_sketch (circle) |
+| SKETCH > CREATE > 2-Point Circle | sketch_draw (circle_2point) |
+| SKETCH > CREATE > 3-Point Circle | sketch_draw (circle_3point) |
+| SKETCH > CREATE > 2-Tangent Circle | sketch_draw (circle_2tangent) |
+| SKETCH > CREATE > 3-Tangent Circle | sketch_draw (circle_3tangent) |
+| SKETCH > CREATE > 3-Point Arc | sketch_draw (arc_3point) |
+| SKETCH > CREATE > Center Point Arc | add_to_sketch (curves: arc) |
+| SKETCH > CREATE > Tangent Arc | sketch_draw (tangent_arc) |
+| SKETCH > CREATE > Circumscribed Polygon | sketch_polygon |
+| SKETCH > CREATE > Inscribed Polygon | sketch_polygon (circumscribed: false) |
+| SKETCH > CREATE > Edge Polygon | sketch_draw (edge_polygon) |
+| SKETCH > CREATE > Ellipse | sketch_draw (ellipse) / add_to_sketch (ellipse) |
+| SKETCH > CREATE > Center to Center Slot | sketch_draw (slot_center_to_center) |
+| SKETCH > CREATE > Overall Slot | sketch_draw (slot_overall) |
+| SKETCH > CREATE > Center Point Slot | sketch_draw (slot_center_point) |
+| SKETCH > CREATE > Three Point Arc Slot | sketch_draw (arc_slot) |
+| SKETCH > CREATE > Center Point Arc Slot | sketch_draw (arc_slot_center_point) |
+| SKETCH > CREATE > Fit Point Spline | sketch_draw (fit_point_spline) |
+| SKETCH > CREATE > Control Point Spline | sketch_draw (control_point_spline) |
+| SKETCH > CREATE > Conic Curve | sketch_draw (conic) |
+| SKETCH > CREATE > Point | add_to_sketch (curves: point) |
+| SKETCH > CREATE > Text | sketch_text |
+| SKETCH > CREATE > Mirror | sketch_pattern (mirror) |
+| SKETCH > CREATE > Circular Pattern | sketch_pattern (circular) |
+| SKETCH > CREATE > Rectangular Pattern | sketch_pattern (rectangular) |
+| SKETCH > CREATE > Project | sketch_project (project) |
+| SKETCH > CREATE > Intersect | sketch_project (intersect) |
+| SKETCH > CREATE > Include 3D Geometry | sketch_project (include_3d) |
+| SKETCH > CREATE > Project to Surface | sketch_project (project_to_surface) |
+| SKETCH > CREATE > Isoparametric Curve | sketch_project (isoparametric) |
+| SKETCH > CREATE > Sketch Dimension | sketch_dimension |
+| SKETCH > MODIFY > Fillet | sketch_modify (fillet) |
+| SKETCH > MODIFY > Chamfer | sketch_modify (chamfer) |
+| SKETCH > MODIFY > Offset | sketch_modify (offset) |
+| SKETCH > MODIFY > Trim | sketch_trim |
+| SKETCH > MODIFY > Extend | sketch_modify (extend) |
+| SKETCH > MODIFY > Break | sketch_modify (break) |
+| SKETCH > MODIFY > Sketch Scale | scale (sketch) |
+| SKETCH > MODIFY > Move/Copy | sketch_pattern (move_copy) |
+| SKETCH > MODIFY > Change Parameters | set_parameter / set_sketch_dimension |
+| SKETCH > CONSTRAINTS > Coincident | sketch_constraint (coincident) |
+| SKETCH > CONSTRAINTS > Collinear | sketch_constraint (collinear) |
+| SKETCH > CONSTRAINTS > Concentric | sketch_constraint (concentric) |
+| SKETCH > CONSTRAINTS > Midpoint | sketch_constraint (midpoint) |
+| SKETCH > CONSTRAINTS > Fix/Unfix | sketch_constraint (fix / unfix) |
+| SKETCH > CONSTRAINTS > Parallel | sketch_constraint (parallel) |
+| SKETCH > CONSTRAINTS > Perpendicular | sketch_constraint (perpendicular) |
+| SKETCH > CONSTRAINTS > Horizontal/Vertical | sketch_constraint (horizontal / vertical) |
+| SKETCH > CONSTRAINTS > Tangent | sketch_constraint (tangent) |
+| SKETCH > CONSTRAINTS > Curvature | sketch_constraint (curvature) |
+| SKETCH > CONSTRAINTS > Equal | sketch_constraint (equal) |
+| SKETCH > CONSTRAINTS > Symmetry | sketch_constraint (symmetric) |
+| SKETCH > FINISH SKETCH > Finish Sketch | no tool: the AI's sketch tools never leave a sketch open (each call draws and closes) |
+| SKETCH > FINISH SKETCH > Toggle Construction | sketch_modify (toggle_construction) |
