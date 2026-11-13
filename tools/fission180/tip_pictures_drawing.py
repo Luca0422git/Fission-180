@@ -23,7 +23,6 @@ import tip_pictures as tp
 
 V = App.Vector
 BASE = (130.0, 200.0)  # where the plate's base view stands (its middle)
-PLATE_REGION = (BASE[0] - 46, BASE[1] - 36, BASE[0] + 46, BASE[1] + 36)
 
 
 # ---------------------------------------------------------------------------------- designs
@@ -437,7 +436,7 @@ def p_center_mark_pattern(c):
 def p_edge_extension(c):
     view = c.base()
     corner = c.at(view, 40.0, 25.0)
-    c.region = (corner[0] - 20, corner[1] - 20, corner[0] + 6, corner[1] + 6)
+    c.region = (corner[0] - 14, corner[1] - 14, corner[0] + 4, corner[1] + 4)
     yield
     from fission180 import drawing
 
@@ -474,7 +473,6 @@ p_diameter_dimension = _dim("Diameter", lambda c, v: [c.circle(v, HOLE1, R)], (-
 
 
 def p_angular_dimension(c):
-    c.sources = c.sources  # the wedge: its bottom edge and its slanted end
     view = c.base()
     yield
     from fission180 import drawing
@@ -793,7 +791,7 @@ PICTURES = {
 
 # ---------------------------------------------------------------------------------- the sheet
 SELECT_BLUE = (59, 91, 219)  # Fission 180's selection colour (sketch_mode.SELECT)
-RES = 6.0  # pixels per millimetre of the whole-sheet grabs (cropped and scaled down later)
+RES = 8.0  # pixels per millimetre of the whole-sheet grabs (cropped and scaled down later)
 MARGIN = 6.0  # millimetres of paper round what a picture shows
 
 
@@ -938,36 +936,22 @@ def crop(image, page, region, size):
 
 
 def tint_new(base, other):
-    """`base` with the ink it has and `other` has not drawn in SELECT_BLUE: anti-aliased, and a
-    thin new line (a centre line, a cosmetic line of 0.13 mm) widened by a pixel so that it
-    reads at the picture's size, as the helpers draw highlighted edges thicker."""
+    """`base` with the ink it has and `other` has not drawn in SELECT_BLUE, anti-aliased (each
+    pixel as far towards the blue as it is inked: letters keep their shape at this size; a
+    widened stroke turned small text into blobs)."""
     from PySide import QtGui
 
     w, h = base.width(), base.height()
     grey_a, line_a = _grey(base, w, h)
     grey_b, line_b = _grey(other, w, h)
-    new = [0.0] * (w * h)
+    out = QtGui.QImage(base)
     for y in range(h):
         ra, rb = y * line_a, y * line_b
         for x in range(w):
             gain = (grey_b[rb + x] - grey_a[ra + x]) / 255.0  # darker now: new ink
-            if gain > 0.08:
-                new[y * w + x] = gain
-    out = QtGui.QImage(base)
-    for y in range(h):
-        for x in range(w):
-            centre = new[y * w + x]
-            near = 0.0
-            for dy in (-1, 0, 1):
-                yy = y + dy
-                if 0 <= yy < h:
-                    for dx in (-1, 0, 1):
-                        xx = x + dx
-                        if 0 <= xx < w and new[yy * w + xx] > near:
-                            near = new[yy * w + xx]
-            k = min(1.0, max(centre * 2.2, near * 0.9))
-            if k <= 0.0:
+            if gain <= 0.08:
                 continue
+            k = min(1.0, gain * 1.3)
             old = QtGui.QColor(base.pixel(x, y))
             r = old.red() + (SELECT_BLUE[0] - old.red()) * k
             g = old.green() + (SELECT_BLUE[1] - old.green()) * k

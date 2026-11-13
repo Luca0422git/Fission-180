@@ -454,11 +454,6 @@ def _unit(x, y):
     return (x / n, y / n)
 
 
-# a plain block outline used by several pictures (a 36 x 24 rectangle)
-W, H = 18.0, 12.0
-BLOCK = [(-W, -H), (W, -H), (W, H), (-W, H)]
-
-
 def _line():
     pts = [(-16, -12), (14, -12), (14, 2), (2, 12), (-16, 12)]
     before = [("K", p, str(i + 1)) for i, p in enumerate(pts)]

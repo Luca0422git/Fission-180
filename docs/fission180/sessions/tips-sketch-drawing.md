@@ -35,9 +35,9 @@ pictures and the scripts that make them.
      command's result, made with the drawing modules' own functions (the same code as the
      dialogs: `drawing.add_*`, `drawing_annot.add_annotation`, `drawing_tools.*`,
      `drawing_breakout`, `drawing_exploded`, `flatpattern_drawing`). The whole sheet is drawn
-     from TechDraw's scene at 6 px/mm, cropped where it changed (the frame and the title block
-     left out), scaled down; ink that is new is tinted the selection blue (thin new lines a
-     pixel wider), ink a command moves or deletes is tinted in the before panel. White paper on
+     from TechDraw's scene at 8 px/mm, cropped where it changed (the frame and the title block
+     left out), scaled down; ink that is new is tinted the selection blue (each pixel as far as
+     it is inked), ink a command moves or deletes is tinted in the before panel. White paper on
      the view's dark grey, the helpers' arrow and captions. Title Block and the four exports
      are their dialogs.
    - UTILITIES (`tools/fission180/tip_pictures_utilities.py`): the commands' own windows as
@@ -58,8 +58,8 @@ pictures and the scripts that make them.
 
 - Making the pictures (make_tip_pictures.sh, sandbox, 4 CPUs shared with nine builders):
   SKETCH 58 in about 4.5 min (4.3 to 4.7 s each: two sketches, eight renders), DRAWING 43 in
-  2.3 min (2.0 to 5.9 s each; a sheet grab at 6 px/mm and the tint in pure Python are about
-  0.3 s of that), UTILITIES 22 in about 1 min (1.2 to 5.7 s; Compare with Reference is the
+  2.3 min (2.0 to 5.9 s each; the sheet grabs and the tint in pure Python are about 0.3 s of
+  that), UTILITIES 22 in about 1 min (1.2 to 5.7 s; Compare with Reference is the
   slowest: a real STEP import, a rebuild started, two AI tool calls, a compare).
 - The pictures are 1.3 MB together (SKETCH 0.44 MB, DRAWING 0.30 MB, UTILITIES 0.52 MB); the
   largest is Finish Rebuild's window, 44 KB (the helpers' encoder reduced its colours), the
@@ -98,8 +98,9 @@ pictures and the scripts that make them.
 - The Recover Documents picture is the real window with two demo entries (a crash cannot be
   made on purpose in the run); the paths shown in Save As, Diagnostics and Report a Problem are
   the sandbox's (`/root/...`).
-- Edge Extension's lines are 0.13 mm on paper: even widened by a pixel they are faint at
-  320 x 200.
+- Edge Extension's lines are 0.13 mm on paper: the picture looks closer at the corner (18 mm
+  of paper), and they are still light. Widening thin new ink by a pixel was tried and dropped:
+  small text (a dimension's value, a parts list) turned into blobs.
 
 ## Changelog lines
 
