@@ -8,20 +8,9 @@ name in Fission180Tests/golden/models), then rendered before and after the tool 
 made in the selection blue (docs/fission180/dev/tip-pictures.md)."""
 
 import tip_pictures as tp
+import tip_pictures_workspaces as ws
 
-
-def builder():
-    """Fission 180's design-step builder on the demo design's body."""
-    from fission180.ai.ops import core
-
-    return core.Builder.attach(tp.doc(), tp.body())
-
-
-def build(b, *steps):
-    for step in steps:
-        b.run(step)
-    tp.recompute()
-    return b
+builder, build = ws.builder, ws.build
 
 
 def shown(b):
@@ -78,17 +67,7 @@ def edges_in(obj, xmin, xmax, ymin, ymax):
     return out
 
 
-def trim_panel(image):
-    """A task panel grab without the empty rows under its last box."""
-    pixels = image.load()
-    back = pixels[image.width - 2, image.height - 2]
-    bottom = image.height
-    while bottom > 40:
-        row = [pixels[x, bottom - 1] for x in range(0, image.width, 3)]
-        if any(sum(abs(a - b) for a, b in zip(p, back)) > 24 for p in row):
-            break
-        bottom -= 1
-    return image.crop((0, 0, image.width, min(image.height, bottom + 8)))
+trim_panel = ws.trim_panel
 
 
 def plate(b, x1=50, y1=30, sketch="s1", flange="f1"):
@@ -173,10 +152,7 @@ def _edges(obj):
     return ["Edge%d" % (i + 1) for i in range(len(obj.Shape.Edges))]
 
 
-def _body_of(feature):
-    from fission180 import bodies
-
-    return bodies.body_of(feature) or feature
+_body_of = ws.body_of
 
 
 @tp.picture("sm_bend.png")
@@ -691,12 +667,8 @@ def rules():
 
 def _rules_dialog():
     from fission180 import sheetmetal_rules_ui
-    from fission180.compat import QtWidgets
 
-    for widget in QtWidgets.QApplication.topLevelWidgets():
-        if isinstance(widget, sheetmetal_rules_ui.RulesDialog) and widget.isVisible():
-            return widget
-    return None
+    return ws.find_top_level(sheetmetal_rules_ui.RulesDialog)
 
 
 # -- FLAT PATTERN ------------------------------------------------------------------------------
