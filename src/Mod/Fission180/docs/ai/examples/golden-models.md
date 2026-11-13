@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180's golden models are 654 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
+Fission 180's golden models are 655 small designs, each a list of design steps with the measurements the finished part must have (volume, area, faces, bounding box), worked out by hand where possible (`expect.source: analytic`, the formula in `expect.note`). The tests rebuild every one in real FreeCAD. They prove what each feature does and show which options exist. Their steps are Fission 180's design-step language (what the AI tools build), not tool calls: the table at the end gives the tools that build each op. Read one with docs_read `golden/<id>` (or the resource fission180://examples/golden/<id>); examples_search finds them by words, op, tool or tag. Models marked (known gap) document something Fission 180 does not do yet.
 
 ## By feature
 
@@ -743,6 +743,12 @@ Each model is listed under its first tag; its other tags follow it.
 - `inspect_com_materials`: Center of Mass of a steel and an aluminium box (mass-weighted) [center-of-mass, material]
 - `inspect_measure_section`: Box with a round boss: Measure distances / angles and Section Analysis cuts [measure, section]
 
+### manufacture (3)
+
+- `cam_block_contour3d`: Manufacture: 3D Contour round a plain 60 x 40 x 12 block with only 2 mm of stock at its sides (it made no toolpath before 0.1.0-beta.4.0.3), with a flat and a ball 6 mm tool [cam]
+- `cam_block_side_setup`: Manufacture: a block machined from its side (Z axis picked on a side face, X on an edge), Face and 2D Contour, then the stock changed: needs regenerating [cam]
+- `cam_plate_face_contour_drill`: Manufacture: a setup on a 100 x 60 x 10 plate with two 6 mm holes, then Face, 2D Contour and Drill, posted to Grbl [cam]
+
 ### animation (2)
 
 - `anim_auto_explode_one_level`: Animation: Auto Explode: One Level of a base with a lid and two side pins: the placements at the start, half way and the end; a second explode of two of them; the design never moves [explode, components]
@@ -757,11 +763,6 @@ Each model is listed under its first tag; its other tags follow it.
 
 - `export_report_design`: Export report: what STEP, IGES, STL, 3MF and OBJ leave out of a design with components, a hidden body and a material [export-report, components]
 - `export_report_sketch_dxf`: Export report: what Save As DXF leaves out of a sketch (dimensions, constraints, construction, points, reference curves, its place in 3D) [export-report, dxf, sketch]
-
-### manufacture (2)
-
-- `cam_block_side_setup`: Manufacture: a block machined from its side (Z axis picked on a side face, X on an edge), Face and 2D Contour, then the stock changed: needs regenerating [cam]
-- `cam_plate_face_contour_drill`: Manufacture: a setup on a 100 x 60 x 10 plate with two 6 mm holes, then Face, 2D Contour and Drill, posted to Grbl [cam]
 
 ### picks (2)
 
@@ -822,11 +823,11 @@ Each model is listed under its first tag; its other tags follow it.
 | `body_material` | `physical_material` | 2 | `export_report_design`, `inspect_com_materials` |
 | `body_tool_edit` | `edit_step` | 4 | `bodies_combine_edit_operation`, `bodies_move_edit`, `bodies_move_two_bodies`, `bodies_split_edit_tool` |
 | `cam_edit` | `cam_edit` | 1 | `cam_block_side_setup` |
-| `cam_expect` | (a test helper) | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_expect` | (a test helper) | 3 | `cam_block_contour3d`, `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `cam_generate` | `cam_generate` | 1 | `cam_block_side_setup` |
-| `cam_operation` | `cam_operation` | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_operation` | `cam_operation` | 3 | `cam_block_contour3d`, `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `cam_post` | `cam_post` | 1 | `cam_plate_face_contour_drill` |
-| `cam_setup` | `cam_setup` | 2 | `cam_block_side_setup`, `cam_plate_face_contour_drill` |
+| `cam_setup` | `cam_setup` | 3 | `cam_block_contour3d`, `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `chamfer` | (a test helper) | 2 | `chamfer_one_edge`, `chamfer_top_edges` |
 | `check` | (a test helper) | 89 | `blend_edit_keeps_later_chamfer`, `blend_fillet_edit_radius`, `blend_insert_chamfer_before_fillet`, `bodies_combine_edit_operation`, `bodies_combine_follows_tool` |
 | `circular_pattern` | `circular_pattern` | 4 | `pattern_circ_after_primitive_off_origin`, `pattern_circ_faces_bolt_circle`, `pattern_circ_suppressed_bodies`, `pattern_circ_symmetric_holes` |
@@ -909,7 +910,7 @@ Each model is listed under its first tag; its other tags follow it.
 | `sf_path_sketch` | (a test helper) | 9 | `sf_join_away_new_body`, `sf_pipe_hollow_half`, `sf_pipe_old_upgraded`, `sf_pipe_param_driven`, `sf_pipe_ring_hollow` |
 | `sf_pipe` | `pipe` | 14 | `sf_join_away_new_body`, `sf_pipe_corner_hollow_cut`, `sf_pipe_corner_intersect`, `sf_pipe_corner_mitre_join`, `sf_pipe_edge_auto_join` |
 | `sf_plastic_rule` | `plastic_rule` | 2 | `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss` |
-| `sf_primitive` | `primitive` | 36 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_side_setup`, `cam_plate_face_contour_drill`, `direct_silhouette_body_sphere` |
+| `sf_primitive` | `primitive` | 37 | `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`, `cam_block_contour3d`, `cam_block_side_setup`, `cam_plate_face_contour_drill` |
 | `sf_primitive_edit` | `edit_step` | 3 | `sf_box_pocket_edit_join`, `sf_coil_edit_turns`, `sf_pipe_triangle_edit` |
 | `sf_refold` | `refold` | 1 | `sm_flat_unfold_cut_refold` |
 | `sf_rest` | `rest` | 3 | `plastic_rest_closed_box`, `plastic_rest_cut`, `plastic_rest_cylinder` |

@@ -1245,17 +1245,24 @@ def fingerprint(op, setup=None):
     setup = setup or setup_of(op)
     data = bodies.load_meta(op, OP_PROP)
     refs = [[o.Name, s] for o, s in op_picks(op)]
-    return core.digest(
-        [
-            setup_signature(setup) if setup is not None else "",
-            data,
-            refs,
-            "engine-%d" % ENGINE_VERSION,
-        ]
-    )
+    parts = [
+        setup_signature(setup) if setup is not None else "",
+        data,
+        refs,
+        "engine-%d" % ENGINE_VERSION,
+    ]
+    kind = data.get("kind") if isinstance(data, dict) else None
+    if kind in KIND_VERSIONS:
+        parts.append("%s-%d" % (kind, KIND_VERSIONS[kind]))
+    return core.digest(parts)
 
 
 ENGINE_VERSION = 2
+# Operations whose engine changed on its own: their saved toolpaths need regenerating, the
+# others' do not (a new ENGINE_VERSION would make every toolpath stale). contour3d 2:
+# 0.1.0-beta.4.0.3, the scan round the part, a finer grid and every depth (manufacture_core
+# waterline_margin / waterline_sample; before: none on a tight stock, the whole wall at once).
+KIND_VERSIONS = {"contour3d": 2}
 
 
 def result(op):

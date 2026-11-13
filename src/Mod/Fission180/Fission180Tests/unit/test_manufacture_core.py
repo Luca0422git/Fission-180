@@ -412,6 +412,33 @@ class FieldsThatReachTheToolpath(unittest.TestCase):
         self.assertEqual(core.op_options("adaptive2d")["passes"]["tolerance"], 0.1)
         self.assertEqual(core.op_options("adaptive3d")["passes"]["tolerance"], 0.1)
 
+    def test_3d_contour_scans_round_the_part_and_steps_down(self):
+        # (0.1.0-beta.4.0.3) FreeCAD's Waterline found no wall on a block with 2 mm of stock
+        # at its sides, its grid left up to 1 mm on the walls, and it cut the whole wall in
+        # one pass at the bottom: the engine now scans further out, finer, at every depth
+        self.assertEqual(core.waterline_margin(6), 11.0)
+        self.assertGreater(core.waterline_margin(10), 10 + 1)  # (measured: from 11 mm)
+        self.assertEqual(core.waterline_sample(6), 0.25)
+        self.assertEqual(core.waterline_sample(1), 0.1)  # never finer: the time
+        self.assertEqual(core.waterline_sample(20), 0.5)
+        for tool in ("flat", "ball", "bull"):
+            options = self.options("contour3d", tool)
+            part = core.engine_plan("contour3d", options, self.env())[0]
+            d = options["tool"]["diameter"]
+            self.assertEqual(part["scan_margin"], core.waterline_margin(d), tool)
+            self.assertEqual(part["props"]["SampleInterval"], core.waterline_sample(d), tool)
+            self.assertEqual(part["props"]["LayerMode"], "Multi-pass", tool)
+            self.assertEqual(part["props"]["Algorithm"], "OCL Dropcutter")
+            self.assertEqual(part["props"]["BoundBox"], "Stock")
+        single = self.options("contour3d", passes={"multiple_depths": False})
+        props = core.engine_plan("contour3d", single, self.env())[0]["props"]
+        self.assertEqual(props["LayerMode"], "Single-pass")
+        # only 3D Contour's engine scans wider
+        for kind in ("parallel", "pocket3d"):
+            info = core.OPERATIONS[kind]
+            plan = core.engine_plan(kind, self.options(kind, info["tools"][0]), self.env())
+            self.assertNotIn("scan_margin", plan[0], kind)
+
     def test_a_tolerance_or_feed_out_of_range_is_refused(self):
         picks = {"faces": 1}
         wide = self.options("contour2d", passes={"tolerance": 5.0})

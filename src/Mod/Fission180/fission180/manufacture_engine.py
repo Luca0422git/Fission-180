@@ -29,6 +29,14 @@ import FreeCAD as App
 VERSION = 2
 
 
+def _log(text):
+    """A line of the engine's own log (the child's output, kept with the job's files)."""
+    try:
+        sys.stderr.write("[Fission 180] manufacture engine: %s\n" % text)
+    except Exception:
+        pass
+
+
 class _Capture:
     """What FreeCAD's CAM prints while an operation computes (its errors and warnings go to
     the console): kept as text for the operation, not shown as errors of Fission 180."""
@@ -337,18 +345,71 @@ class Engine:
             op.Locations = [App.Vector(float(x), float(y), 0.0) for x, y in part["locations"]]
         for name, value in (part.get("props") or {}).items():
             _set(op, name, value)
-        self.doc.recompute()
-        final = op
-        before_leads = None
-        for spec in part.get("dressups") or []:
-            if spec.get("lead_feed") is not None:
-                before_leads = final.Path.toGCode()  # (to tell the lead-ins from the contour)
-            final = self._dressup(spec, final)
+        put_back = self._wide_scan(op, controller, part.get("scan_margin"))
+        try:
             self.doc.recompute()
-        state = list(getattr(final, "State", []))
-        if "Invalid" in state or "Invalid" in list(getattr(op, "State", [])):
-            raise ValueError("FreeCAD's CAM could not compute it")
-        return final.Path, before_leads
+            final = op
+            before_leads = None
+            for spec in part.get("dressups") or []:
+                if spec.get("lead_feed") is not None:
+                    before_leads = final.Path.toGCode()  # (to tell the lead-ins from the contour)
+                final = self._dressup(spec, final)
+                self.doc.recompute()
+            state = list(getattr(final, "State", []))
+            if "Invalid" in state or "Invalid" in list(getattr(op, "State", [])):
+                raise ValueError("FreeCAD's CAM could not compute it")
+            path = final.Path
+        finally:
+            if put_back is not None:
+                self._put_back(put_back)
+        return path, before_leads
+
+    def _wide_scan(self, op, controller, margin):
+        """3D Contour (FreeCAD's Waterline with OpenCAMLib) looks for the part's walls only
+        inside the stock's outline, and finds none unless the tool can stand clear of the
+        part all round: a block with 2 mm of stock at its sides gave no toolpath at all
+        (manufacture_core.waterline_margin). For its computing only, the job's stock is a box
+        `margin` wider than the part where the real one is narrower (the same heights); the
+        real one is put back (_put_back) before anything else is computed. The passes still
+        follow the walls: a wider outline only lets the scan see round them. Returns what
+        _put_back needs, or None when nothing was changed."""
+        if not margin or getattr(op, "Algorithm", "") != "OCL Dropcutter":
+            return None
+        if getattr(op, "BoundBox", "") != "Stock" or self.job.Stock is None:
+            return None
+        import Path.Main.Stock as PathStock
+
+        stock = self.job.Stock
+        box = stock.Shape.BoundBox
+        part = None
+        for clone in self.job.Model.Group:
+            if part is None:
+                part = App.BoundBox(clone.Shape.BoundBox)
+            else:
+                part.add(clone.Shape.BoundBox)
+        if part is None or not part.isValid():
+            return None
+        margin = float(margin)
+        lo = (min(box.XMin, part.XMin - margin), min(box.YMin, part.YMin - margin))
+        hi = (max(box.XMax, part.XMax + margin), max(box.YMax, part.YMax + margin))
+        if lo == (box.XMin, box.YMin) and hi == (box.XMax, box.YMax):
+            return None
+        wide = PathStock.CreateBox(
+            self.job,
+            App.Vector(hi[0] - lo[0], hi[1] - lo[1], box.ZLength),
+            App.Placement(App.Vector(lo[0], lo[1], box.ZMin), App.Rotation()),
+        )
+        self.job.Stock = wide
+        _log("3D Contour: scanned %.1f mm round the part (the stock is narrower there)" % margin)
+        return stock, wide
+
+    def _put_back(self, swapped):
+        stock, wide = swapped
+        self.job.Stock = stock
+        try:
+            self.doc.removeObject(wide.Name)
+        except Exception:
+            pass
 
     def _tolerance(self, value):
         """The operation's Tolerance: the accuracy of the curves Path.Area makes (its

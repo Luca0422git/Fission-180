@@ -1,0 +1,127 @@
+{
+  "id": "cam_block_contour3d",
+  "title": "Manufacture: 3D Contour round a plain 60 x 40 x 12 block with only 2 mm of stock at its sides (it made no toolpath before 0.1.0-beta.4.0.3), with a flat and a ball 6 mm tool",
+  "tags": [
+    "manufacture",
+    "cam"
+  ],
+  "steps": [
+    {
+      "op": "sf_primitive",
+      "id": "b1",
+      "kind": "box",
+      "plane": "XY",
+      "x": 0,
+      "y": 0,
+      "length": 60,
+      "width": 40,
+      "height": 12,
+      "operation": "new_body"
+    },
+    {
+      "op": "cam_setup",
+      "id": "s1",
+      "stock": {
+        "mode": "relative",
+        "offset_mode": "sides_top_bottom",
+        "side": 2,
+        "top": 1,
+        "bottom": 0
+      }
+    },
+    {
+      "op": "cam_expect",
+      "target": "s1",
+      "stock": [
+        -32,
+        -22,
+        -13,
+        32,
+        22,
+        0
+      ],
+      "model": [
+        -30,
+        -20,
+        -13,
+        30,
+        20,
+        -1
+      ],
+      "comment": "the setup's origin at the stock's top centre: the block from X -30 to 30, Y -20 to 20, Z -13 to -1; 2 mm of stock at the sides, less than the 6 mm tool's radius plus room for FreeCAD's scan (manufacture_core.waterline_margin)"
+    },
+    {
+      "op": "cam_operation",
+      "id": "flat",
+      "setup": "s1",
+      "kind": "contour3d",
+      "tool": {
+        "type": "flat",
+        "diameter": 6,
+        "number": 1
+      }
+    },
+    {
+      "op": "cam_expect",
+      "target": "flat",
+      "state": "valid",
+      "bounds": [
+        -33.241,
+        -23.24,
+        -13,
+        33.241,
+        23.01,
+        15
+      ],
+      "min_z": -13,
+      "cut_length": 1173.361,
+      "tol": 0.02,
+      "rel_tol": 0.01,
+      "comment": "the tool's centre goes round the walls 3 mm (its radius) out, plus up to one grid step (manufacture_core.waterline_sample: 6 / 24 = 0.25 mm), never in; five passes stepping down half the tool's diameter (Z -3, -6, -9, -12 and the bottom, -13): a lap of about 2 x (66.5 + 46.5) = 226 mm plus the corners, x 5 = 1173 mm. Before the fix: no toolpath at all, and with a wider stock one pass at the bottom only"
+    },
+    {
+      "op": "cam_operation",
+      "id": "ball",
+      "setup": "s1",
+      "kind": "contour3d",
+      "tool": {
+        "type": "ball",
+        "diameter": 6,
+        "number": 2
+      }
+    },
+    {
+      "op": "cam_expect",
+      "target": "ball",
+      "state": "valid",
+      "bounds": [
+        -33.241,
+        -23.24,
+        -13,
+        33.241,
+        23.01,
+        15
+      ],
+      "min_z": -13,
+      "cut_length": 1172.154,
+      "tol": 0.02,
+      "rel_tol": 0.01,
+      "comment": "the same walls with a ball end: its centre stays 3 mm from the block (checked move by move: nearest 3.0009 mm)"
+    }
+  ],
+  "expect": {
+    "volume": 28800,
+    "bbox": [
+      0,
+      0,
+      0,
+      60,
+      40,
+      12
+    ],
+    "abs_tol": 0.001,
+    "solids": 1,
+    "source": "analytic",
+    "note": "The design is not changed by the setup or its operations: 60 x 40 x 12 = 28,800 mm3. The toolpaths' numbers are in the cam_expect steps, in the setup's own coordinates."
+  }
+}

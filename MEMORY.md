@@ -4,6 +4,25 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-13: MANUFACTURE > 3D Contour, no toolpath on a block** (in 0.1.0-beta.4.0.3, Opus; found
+by builder tips-workspaces, task card) FreeCAD's Waterline (OCL Dropcutter) scans a drop-cutter
+grid only inside the stock's outline (BoundBox Stock) and extracts walls from high/low points:
+with 2 mm of stock at the sides every point is "high", no wall. Measured (direct Waterline,
+60 x 40 x 12 block): complete from about the tool's diameter + 1 mm of room (3 mm tool: 4, 6:
+7, 10: 11, 12: <14); the passes stand up to one SampleInterval outside the walls (1.0 -> 0.99
+mm, 0.25 -> 0.24 in 0.6 s, 0.1 -> 0.09 in 2.4 s, a 40 mm boss 7 s); Fission 180 also never set
+LayerMode, so FreeCAD's Single-pass cut the whole wall at the bottom; Algorithm Experimental is
+broken in 1.1.4 (TypeError, Part.Compound has no len()). Fix: `manufacture_core.waterline_margin`
+(1.5 d + 2) travels in the part as `scan_margin`; `manufacture_engine._wide_scan` swaps in a
+wider box stock (same heights) for that op's recompute only and `_put_back` restores it in a
+finally; `waterline_sample` d/24 in 0.1..0.5; LayerMode from Multiple Depths;
+`manufacture.KIND_VERSIONS` {"contour3d": 2} makes only old 3D Contour toolpaths stale.
+Checked move by move: no gouge (flat: centre >= 3 mm from the block; ball, exact sphere test:
+nearest 3.0009), farthest 0.35 mm off; ball, 10 mm and 3 mm tools, a boss. Tests: golden
+`cam_block_contour3d` (flat + ball, bounds, depths, cut length), unit
+`test_3d_contour_scans_round_the_part_and_steps_down`. Spec: parity/manufacture.md mapping row and
+gap. [x] fix [ ] CI green [ ] release with 4.0.3 (Luca).
+
 **2026-11-13: MESH > Combine crashing on touching bodies** (in 0.1.0-beta.4.0.3, Opus; found by
 builder tips-workspaces making pictures, task card "Stop MESH > Combine crashing on coplanar
 faces") A box and a cylinder standing on one floor, Combine Join: SIGSEGV (MeshCore
