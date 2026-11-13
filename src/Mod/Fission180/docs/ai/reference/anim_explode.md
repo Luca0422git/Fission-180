@@ -97,5 +97,6 @@ Done: 1 component exploded on 'Storyboard1', 1 action ending at 3 s. The storybo
 
 ## See also
 
+- Recipe: [an exploded-view video of an assembly (ANIMATION)](fission180://docs/recipes/exploded-view-video.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `anim_auto_explode_one_level`, `anim_sequential_transform_reverse`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -2082,6 +2082,11 @@ def main():
         run_session(
             run, workspace_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
         )
+        # --- wave 8, ai-workspaces --- (SIMULATION, MANUFACTURE, ANIMATION, SHEET METAL and
+        # UTILITIES > MAKE: ai_workspaces.py)
+        from Fission180Tests.headless import ai_workspaces
+
+        run_session(run, ai_workspaces.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)

@@ -20,6 +20,8 @@ CAM_TOOLS = (
     "cam_post",
     "cam_setups",
     "cam_tools",
+    "cam_setup_sheet",  # (wave 8, ai-workspaces)
+    "cam_tool_library",
 )
 ANIM_TOOLS = (
     "anim_storyboard",
@@ -31,6 +33,8 @@ ANIM_TOOLS = (
     "anim_callout",
     "anim_storyboards",
     "anim_publish_video",
+    "anim_view",  # (wave 8, ai-workspaces)
+    "anim_action",
 )
 
 

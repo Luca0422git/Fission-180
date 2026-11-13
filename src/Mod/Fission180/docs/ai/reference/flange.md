@@ -96,5 +96,6 @@ Done: AI: Flange (edge). Its id is 'Flange2'. Bodies now: Body1: 3645.43 mm3, 50
 
 ## See also
 
+- Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `sheetmetal_base_flange_join`, `sheetmetal_base_flange_new_component`, `sheetmetal_base_flange_rect`, `sheetmetal_base_flange_side2_rule`, `sheetmetal_contour_flange_l`, `sheetmetal_contour_flange_on_edge`, `sheetmetal_contour_flange_two_sides`, `sheetmetal_edge_flange_adjacent_later`, `sheetmetal_edge_flange_angle_edit`, `sheetmetal_edge_flange_bend_positions`, `sheetmetal_edge_flange_inner_corner`, `sheetmetal_edge_flange_l_bracket` and 60 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

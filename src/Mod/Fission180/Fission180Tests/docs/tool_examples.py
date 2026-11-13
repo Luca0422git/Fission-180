@@ -1526,3 +1526,78 @@ EXAMPLES += [
         "note": "a small video of the explosion",
     },
 ]
+
+# -- wave 8, ai-workspaces: SIMULATION, MANUFACTURE, ANIMATION and UTILITIES > MAKE -------------
+EXAMPLES += [
+    {
+        "tool": "study_probe",
+        "setup": "sim_solved",
+        "args": {
+            "points": [[60, 20, 10], [30, 20, 10]],
+            "on": [{"face": {"normal": [0, 0, 1], "count": 1}}],
+            "results": ["displacement", "von_mises"],
+        },
+        "note": "the free end and the middle of the top, and the whole top face",
+    },
+    {
+        "tool": "study_report",
+        "setup": "sim_solved",
+        "args": {"path": "{tmp}/plate report.html", "title": "Plate under 2 kN", "target": 2},
+        "note": "the study's report, judged against a safety factor of 2",
+    },
+    {"tool": "study_mesh", "setup": "sim_study", "args": {}, "note": "the mesh, without solving"},
+    {"tool": "study_setup", "setup": "sim_ready", "args": {}, "note": "everything the study holds"},
+    {
+        "tool": "edit_study_item",
+        "setup": "sim_ready",
+        "args": {"item": "Force 1", "magnitude": 1000},
+        "note": "half the force",
+    },
+    {
+        "tool": "show_study_results",
+        "setup": "sim_solved",
+        "gui": True,
+        "args": {"result": "von_mises", "deformation": "adjusted_2", "min_max": True},
+        "note": "the stress in the window, the bend drawn twice as big",
+    },
+    {
+        "tool": "cam_setup_sheet",
+        "setup": "cam_ops",
+        "args": {"path": "{tmp}"},
+        "note": "the setup sheet of the facing and the contour",
+    },
+    {
+        "tool": "cam_tool_library",
+        "setup": "none",
+        # (its number given: the Local library is the computer's, other tools may be in it)
+        "args": {
+            "action": "add",
+            "tool": {"type": "flat", "diameter": 3.175, "flutes": 1, "number": 12},
+        },
+        "note": "a 1/8 in single-flute end mill in the Local library, tool 12",
+    },
+    {
+        "tool": "anim_view",
+        "setup": "anim_exploded",
+        "args": {"at": 5, "view": "front", "zoom": 1.5},
+        "note": "turn to the front view, a little closer, by 5 seconds",
+    },
+    {
+        "tool": "anim_action",
+        "setup": "anim_exploded",
+        "args": {"actions": [1], "start": 1, "end": 4},
+        "note": "the wheel's explosion from 1 s to 4 s",
+    },
+    {
+        "tool": "print_part",
+        "setup": "plate",
+        "args": {"path": "{tmp}"},
+        "note": "the plate as a 3MF print file",
+    },
+    {
+        "tool": "export_everything",
+        "setup": "plate",
+        "args": {"folder": "{tmp}/plate-export"},
+        "note": "STEP, STL, 3MF, OBJ and a README in one folder",
+    },
+]

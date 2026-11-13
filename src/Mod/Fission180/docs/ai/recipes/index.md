@@ -20,7 +20,11 @@ calls, change the sizes, and check with the same tools.
 | [Lofted handle](fission180://docs/recipes/lofted-handle.md) | loft through three profiles, ellipses, checking the size, diff of a cut |
 | [Curved panel from a surface patch](fission180://docs/recipes/surface-patch.md) | 3D boundary curves, surface patch, thicken, surface bodies |
 | [Parametric mounting plate](fission180://docs/recipes/parametric-plate.md) | user parameters, sketch dimensions and model parameters with expressions, a pattern that follows, change and verify |
-| [Is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md) | a simulation study: fixed holes, a force, pre-check, solve, safety factor and reactions, thicken and solve again |
+| [Is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md) | a simulation study: fixed holes, a force, pre-check, mesh, solve, safety factor and reactions, probes at points / faces / a section, a report, thicken and solve again |
+| [Mill a pocketed plate (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md) | CNC milling: setup and origin, a tool of the person's library, facing, pocket, contour with tabs, drilling, Simulate (collisions, gouges, stock left), G-code checked, setup sheet |
+| [An exploded-view video (ANIMATION)](fission180://docs/recipes/exploded-view-video.md) | a storyboard: Home view, Auto Explode all levels with trails, a camera move, a callout, the timeline adjusted, Publish Video |
+| [A laser-cut sheet metal bracket (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md) | a rule, base and edge flanges, holes, the flat pattern and its DXF for a laser cutter, another sheet thickness |
+| [A plastic enclosure (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md) | a plastic rule, box and lid, lip and groove, bosses, a snap fit, Design Advice, a 3D print file, Export Everything |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about

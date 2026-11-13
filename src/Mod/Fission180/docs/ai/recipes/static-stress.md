@@ -60,9 +60,16 @@ is missing, like Fusion's Pre-check light: ready, caution or cannot solve.
     "magnitude": 1000, "direction": "vector", "vector": [0, 1, 0]},
    "expect": {"contains": ["Force 1000 N"]}},
   {"tool": "precheck_study", "args": {},
-   "expect": {"json": {"verdict": "ready", "constraints": ["Fixed 1"], "loads": ["Force 1"]}}}
+   "expect": {"json": {"verdict": "ready", "constraints": ["Fixed 1"], "loads": ["Force 1"]}}},
+  {"tool": "study_setup", "args": {},
+   "expect": {"contains": ["every body is held"], "json": {"free_motions.#": 0, "items.#": 2}}}
 ]
 ```
+
+[study_setup](fission180://docs/reference/study_setup.md) reads the whole setup back (Fusion's
+Load Case Attributes, Contact Manager and DOF View): every constraint and load, the study
+material, the bonded contacts and how each piece could still move. An empty `free_motions`
+means the part is held: it cannot fly away when it solves.
 
 ## 3. Solve and read the results
 
@@ -81,8 +88,14 @@ right at the edge of a fixed face is higher than in reality and grows as the mes
 (Fusion's results do the same). Judge a design by the stress a little away from such edges,
 or hold the part the way it really is held.
 
+[study_mesh](fission180://docs/reference/study_mesh.md) makes the mesh first, without solving,
+so you know how big the solve will be (about a second per 10,000 nodes): a few thousand nodes
+here.
+
 ```json fission180-calls
 [
+  {"tool": "study_mesh", "args": {},
+   "expect": {"contains": ["Bracket 1 kN meshed (took"]}},
   {"tool": "solve_study", "args": {},
    "expect": {"contains": ["Bracket 1 kN solved", "Lowest safety factor"]}},
   {"tool": "study_results", "args": {"target": 2},
@@ -91,6 +104,34 @@ or hold the part the way it really is held.
      "results.displacement.max": [1.0, 0.1]}}}
 ]
 ```
+
+## 3b. Look closer: probes and a report
+
+study_results names the extremes. [study_probe](fission180://docs/reference/study_probe.md)
+reads the results where you choose, as Fusion's Point and Surface Probes and a Slice Plane show
+them: at points (the middle of the upright's top edge moves about 1 mm), over picked faces
+(each one's minimum, maximum with where, and mean) and on a section (here a cut through the
+middle of the base's thickness, 2.5 mm up, well away from the edges of the fixed holes where the
+stress is highest). [study_report](fission180://docs/reference/study_report.md) writes all of it
+as one HTML file for the person.
+
+```json fission180-calls
+[
+  {"tool": "study_probe", "args": {"points": [[30, 2.5, 40]], "results": ["displacement", "von_mises"]},
+   "expect": {"json": {"points.0.inside": true, "points.0.values.displacement": [1.0, 0.12]}}},
+  {"tool": "study_probe", "args": {"on": [{"face": {"normal": [0, 0, 1], "at": {"axis": "z", "value": "max"}, "count": 1}}],
+     "results": ["displacement"]},
+   "expect": {"json": {"on.0.values.displacement.max": [1.0, 0.12]}}},
+  {"tool": "study_probe", "args": {"section": {"axis": "z", "offset": 2.5}, "results": ["von_mises"]},
+   "expect": {"contains": ["a section of"]}},
+  {"tool": "study_report", "args": {"path": "{tmp}/bracket report.html", "target": 2},
+   "expect": {"contains": ["Written", "bracket report.html"]}}
+]
+```
+
+With the Fission 180 window, [show_study_results](fission180://docs/reference/show_study_results.md)
+shows the same results to the person (the RESULTS tab: the result, the deformation scale, a
+slice, an iso-surface, Animate), and `study_report` with `pictures: true` adds pictures of them.
 
 ## 4. Make the plate thicker and solve again
 
@@ -132,3 +173,8 @@ the upright moves about a third as much.
   "material": "steel"}` (the design keeps aluminium).
 - **Symmetry**: half a symmetric part with a `frictionless` constraint on the cut face gives
   the same results with half the mesh.
+- **Try another load or material side by side**: `create_study {"copy_of": "Bracket 1 kN",
+  "label": "Bracket 2 kN"}` copies the study with its constraints and loads (Clone Study);
+  `edit_study_item {"item": "Force 2", "magnitude": 2000}` changes the copy's force (a
+  constraint, load or mesh control can also be suppressed or deleted); solve the copy and
+  compare the two studies' numbers.
