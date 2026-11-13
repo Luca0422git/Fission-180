@@ -136,8 +136,9 @@ define(
     "Inspect mesh",
     "mesh",
     "MESH > PREPARE > Repair (its analysis), Properties of a mesh body",
-    "Read a mesh body (an STL / OBJ / 3MF from import_file, a tessellated body or a MESH step) "
-    "before changing it: triangles, size, closed or what is wrong (holes, flipped faces, "
+    "Read a mesh body before changing it (an STL / OBJ / 3MF from import_file, a "
+    "tessellated body or a MESH step). It answers triangles, size, closed or what is wrong "
+    "(holes, flipped faces, "
     "edges with more than two faces, separate shells), volume, face groups, the shapes it is "
     "made of (overview: its big flat faces, and its small round or free-form details grouped, "
     "with a grid or ring of equal ones found: what to rebuild as features) and advice: the "
@@ -171,8 +172,8 @@ define(
     "Convert mesh",
     "mesh",
     "MESH > CONVERT > Convert Mesh",
-    "Make a solid body from a closed mesh body, as MESH > Convert Mesh does: a new body whose "
-    "first step builds the solid, so fillet, chamfer, hole, press_pull, combine work on it. "
+    "Make a solid body from a closed mesh body (MESH > Convert Mesh). A new body whose first "
+    "step builds the solid, so fillet, chamfer, hole, press_pull, combine work on it. "
     "method prismatic (default): triangles in one plane become one flat face, round or "
     "free-form areas stay many small flat faces (Fission 180 fits no cylinders: use the "
     "rebuild route for true round holes); faceted: one face per triangle. operation "
@@ -537,8 +538,8 @@ define(
     "Tessellate",
     "mesh",
     "MESH > CREATE > Tessellate",
-    "Make a mesh body from a solid body, as MESH > Tessellate does (one undo step): each face "
-    "of the solid becomes a face group. refinement low | medium (default) | high | custom "
+    "Make a mesh body from a solid body (MESH > Tessellate). One undo step; each face of the "
+    "solid becomes a face group. refinement low | medium (default) | high | custom "
     "(surface_deviation mm, normal_deviation degrees); max_edge_length (mm) splits longer "
     "edges. The solid body is used up (hidden: the mesh body takes its place, as in Fusion; "
     "undo brings it back). Use it to reach the MESH tools from a design (shell, remesh for "
@@ -573,8 +574,8 @@ define(
     "Mesh section sketch",
     "mesh",
     "MESH > CREATE > Create Mesh Section Sketch",
-    "Make a sketch of where a plane cuts a mesh body, as Create Mesh Section Sketch does: "
-    "fixed lines in a new sketch of the active body (made if there is none), on plane XY | "
+    "Make a sketch of where a plane cuts a mesh body (Create Mesh Section Sketch). Fixed "
+    "lines in a new sketch of the active body (made if there is none), on plane XY | "
     "XZ | YZ (or a construction plane's id) moved distance mm along its normal. Use it to "
     "trace a mesh's outline for a rebuild by hand: then redraw the outline with add_to_sketch "
     "lines, arcs and circles (a few clean curves, never the section's hundreds of segments) "

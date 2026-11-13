@@ -85,15 +85,10 @@ Fission 180's tests; `expect` is what the answer must contain.
 - **Meshes.** A mesh becomes the reference as flat facets: sizes come out rounded (a 5.98 mm
   hole of 32 facets is "about 6"), match stays a little under 1 where round faces are
   facets, and faces are matched within the mesh's tolerance. Build round holes, not polygons.
-  start_rebuild on a mesh says what it is made of (its big flat faces, its round or
-  free-form details grouped, a grid of equal ones). describe_reference reads plates, blocks,
-  round holes, pockets and bosses along X, Y or Z from the facets, and folds a pattern's
-  copies into the pattern. Domes, fillets and free-form areas it cannot fit: then its answer
-  starts "No plan could be read from this mesh", says what the mesh is made of and gives
-  the two honest routes: undo and `convert_mesh` (a solid now), or the main shapes by hand
-  (the base, each detail once, the pattern it names). Ask the person which. Never copy
-  facets: a sketch of 60 or more straight lines or 30 or more steps in a mesh's rebuild makes
-  compare_to_reference warn ("Careful: this looks like copying the mesh's facets").
+  Domes, fillets and free-form areas describe_reference cannot fit: it then says "No plan
+  could be read from this mesh", what the mesh is made of, and the two honest routes (ask
+  the person which): undo and `convert_mesh`, or the main shapes by hand with the pattern it
+  names. Copying facets makes compare_to_reference warn.
 - **When a step fails,** read the sentence (the usual causes are in
   [troubleshooting](fission180://docs/troubleshooting.md#rebuilding-a-part-auto-timeline)),
   fix the arguments, call it again; `undo` takes back a step that came out wrong. The

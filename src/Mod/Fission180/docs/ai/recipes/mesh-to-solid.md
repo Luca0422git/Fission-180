@@ -2,12 +2,11 @@
 
 Tags: mesh, stl, obj, 3mf, scan, convert, convert-mesh, repair, reduce, rebuild, dots, pattern, inspect_mesh, convert_mesh, mesh_prepare, mesh_modify, mesh_section_sketch, start_rebuild, describe_reference
 
-A mesh body is triangles only: no faces, no edges to fillet, no timeline. Fission 180 gives
-three honest ways to a solid, and the person decides which, because they give different
-things. Never rebuild a mesh by copying its triangles: a round hole of 40 triangles is one
-hole, a dome of 100 triangles is one revolve or sphere, eighty equal dots are one dot and a
-pattern. Every call below was run by Fission 180's tests; `expect` is what the answer must
-contain.
+A mesh body is triangles only: no faces, no edges to fillet, no timeline. The person
+decides the route, because the routes give different things. Never rebuild a mesh by
+copying its triangles: a round hole of 40 triangles is one hole, a dome is one sphere,
+eighty equal dots are one dot and a pattern. Every call below was run by Fission 180's
+tests; `expect` is what the answer must contain.
 
 ## First: look, then ask
 
@@ -44,8 +43,8 @@ Then ask the person, before building (most answers change the route):
 
 ## What it costs
 
-Measured in Fission 180's build sandbox (4 shared CPUs, the window waits meanwhile; a
-person's PC is usually faster). A plate with a grid of round holes, as STL:
+Measured on a plate with a grid of round holes, as STL (the window waits meanwhile; a
+person's PC is usually faster than the build sandbox):
 
 | Tool | 900 triangles | 9,000 | 48,000 | 94,000 |
 |---|---|---|---|---|
@@ -210,43 +209,14 @@ When stitch_and_remove leaves it open: repair_type wrap, then kind make_closed (
 closed surface from voxels: always closed, but sharp edges come out softened; density up to
 256 keeps more).
 
-## 6. A big mesh: reduce first
-
-```json fission180-calls
-[
-  {"tool": "new_design", "args": {"name": "Big"}},
-  {"tool": "import_file", "args": {"path": "{tmp}/dots.stl", "label": "Dense"}},
-  {"tool": "mesh_modify", "args": {"kind": "reduce", "target": "face_count",
-    "face_count": 3000}, "expect": {"contains": ["AI: Reduce", "closed (watertight)"]}},
-  {"tool": "inspect_mesh", "args": {}, "expect": {"json": {"closed": true}}}
-]
-```
-
-Reduce moves the surface a little (the answer gives the new volume): round details lose
-facets first. Check with inspect_mesh, then convert.
-
 ## Faces of a mesh, and other MESH tools
 
-- **Naming faces:** a mesh's faces are triangles, named by where they are: `{"points":
-  [[x, y, z]]}` (the triangle at a point of the surface), `{"ray": {"from": [x, y, z],
-  "direction": [x, y, z]}}` (the first triangle along it, like a click), `{"box": [x0, y0,
-  z0, x1, y1, z1]}` (every triangle whose centre is inside), `{"groups": [n]}` (face groups:
-  `mesh_prepare` kind generate_face_groups makes them, `inspect_mesh` detail groups lists
-  them), with `"facing": {"normal": [x, y, z], "within": degrees}` to keep only triangles
-  facing one way. Never by a triangle's number.
+- **Naming faces:** by `points` on the surface, a `ray` (like a click), a `box` or face
+  `groups`, optionally `facing` one way (the tools' `faces` argument); never by number.
+- **A big mesh:** `mesh_modify` kind reduce, target face_count (the answer gives the new
+  volume: round details lose facets first), inspect_mesh again, then convert.
 - **An outline to rebuild from:** `mesh_section_sketch` at a height gives the section as
   fixed segments (one per facet): redraw it with a few lines, arcs and circles in a new
   sketch, and extrude that.
-- **For printing:** `mesh_modify` kind shell (hollow), plane_cut (a flat bottom), combine
-  (join two meshes), `export` STL / 3MF.
-- **From a solid to a mesh:** `tessellate` (the solid is used up, as in Fusion), or `export`
-  STL without changing the design.
-
-## Habits
-
-- Inspect first, ask second, build third.
-- A solid now: one convert_mesh call. Not a hundred features.
-- A timeline: the main shapes, each detail once, patterns for repeats, sizes as parameters,
-  compare_to_reference after each step. compare_to_reference warns when a rebuild of a mesh
-  copies its facets (a sketch of 60 or more straight lines, 30 or more steps): stop then.
-- When something is refused, the sentence says what to call instead: read it.
+- **Copying facets:** compare_to_reference warns when a rebuild of a mesh copies them (a
+  sketch of 60 or more straight lines, 30 or more steps): stop and rebuild the main shapes.

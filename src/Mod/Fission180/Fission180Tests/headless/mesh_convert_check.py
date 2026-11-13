@@ -73,7 +73,9 @@ def prismatic_and_faceted_as_sewn():
 
 
 @case
-def an_open_mesh_is_refused_in_words():
+def an_open_mesh_is_left_to_the_sewing():
+    """The shared-edge build refuses a mesh that is not closed (Convert Mesh then sews it, as
+    before wave 8: the dialog's own warning says to repair; convert_mesh refuses it first)."""
     import Mesh
 
     from fission180 import insert
@@ -82,11 +84,11 @@ def an_open_mesh_is_refused_in_words():
     points, facets = mesh.Topology
     broken = Mesh.Mesh([[points[i] for i in f] for f in list(facets)[1:]])
     try:
-        insert.solid_from_mesh(broken, "Prismatic")
-        _bad("an open mesh became a solid")
-    except insert.InsertError as exc:
-        if "Repair" not in str(exc):
-            _bad("the refusal does not say to repair: %s" % exc)
+        insert._solid_from_regions(broken, True, 1e-4)
+        _bad("an open mesh was built from its edges")
+    except ValueError as exc:
+        if "closed" not in str(exc):
+            _bad("the reason does not say closed: %s" % exc)
 
 
 @case
