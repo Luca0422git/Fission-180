@@ -87,7 +87,7 @@ measurements: `docs/fission180/parity/ai.md`, section "Wave 8 coverage: mesh".
   the dialog calls it).
 - **Docs**: `docs/ai/recipes/mesh-to-solid.md` (look, ask, which route, costs, the dot plate
   converted and filleted, the dome plate rebuilt by hand with a pattern, the repair route, a
-  big mesh reduced; 46 tool calls run by the docs runner), the mesh parts of
+  big mesh reduced; 42 tool calls run by the docs runner), the mesh parts of
   `reverse-engineer.md`, a row in `recipes/index.md`; the six tools' reference examples.
 - **Tests**: `Fission180Tests/unit/test_mesh_ai.py` (32: faces, outlines, points dropped,
   regions that do not drift, advice, estimates, overview with grids / rings / through holes,
@@ -95,7 +95,8 @@ measurements: `docs/fission180/parity/ai.md`, section "Wave 8 coverage: mesh".
   `headless/mesh_convert_check.py` (the new conversion is the sewn one; a cut through 80 holes
   closed and quick); `headless/mesh_tools.py` (67 calls in the headless runner; also the speed
   measurement `measure_speed`); GUI scenarios `ai_mesh_relic` and `ai_mesh_repair` through the
-  real MCP server and the bridge.
+  real MCP server and the bridge (45 and 41 checks); the twelve older scenarios on the code
+  changed pass.
 
 ## Measurements
 

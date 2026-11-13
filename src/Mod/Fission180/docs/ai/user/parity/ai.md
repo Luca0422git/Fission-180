@@ -995,9 +995,13 @@ volumes).
 Unit `test_mesh_ai.py` (32), `test_mesh_convert_freecad.py` (`headless/mesh_convert_check.py`:
 the new conversion is the sewn one, a cut through 80 holes closed and quick); the headless
 runner's block `headless/mesh_tools.py` (67 calls: every tool and kind, the repair route,
-the rebuild of both stand-ins, the refusals); scenarios `ai_mesh_relic` and `ai_mesh_repair`
-through the real MCP server and the bridge; recipe `recipes/mesh-to-solid.md` (46 calls run
-by the documentation runner); the six tools' reference examples.
+the rebuild of both stand-ins, the refusals); scenarios `ai_mesh_relic` (45 checks) and
+`ai_mesh_repair` (41 checks) through the real MCP server and the bridge; recipe
+`recipes/mesh-to-solid.md` (42 calls run by the documentation runner); the six tools'
+reference examples. The older scenarios on the code changed (Convert Mesh, Plane Cut,
+Section Sketch, the rebuild of a mesh) pass: ai_plan_approach, insert_mesh, insert_reopen,
+journey_rebuild_mesh, mesh_erase_section, mesh_plane_cut, mesh_print, mesh_repair,
+mesh_tessellate_groups, rebuild_chat, rebuild_mesh_reopen, rebuild_start.
 
 ### Still open
 
