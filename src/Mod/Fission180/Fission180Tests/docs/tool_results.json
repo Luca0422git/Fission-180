@@ -11417,5 +11417,49 @@
    "text": "The tools for 'make it hollow', best first: shell. Every tool works from any workspace.\n{\n \"tools\": [\n  {\n   \"name\": \"shell\",\n   \"title\": \"Shell\",\n   \"category\": \"modify\",\n   \"ribbon\": \"SOLID > MODIFY > Shell\",\n   \"read_only\": false,\n   \"workspace\": \"design\",\n   \"purpose\": \"Hollow the current body out with a wall thickness (Fission 180's Shell).\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 1\n}",
    "is_error": false
   }
+ },
+ "show_workspace#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "workspace": "design",
+   "tab": "mesh"
+  },
+  "note": "the MESH tab of the DESIGN workspace (needs the Fission 180 window)",
+  "answer": {
+   "text": "The window shows DESIGN (MESH tab) now (it showed DESIGN (SOLID tab)). Every tool works from any workspace: this only changes what the person sees.\n{\n \"workspace\": {\"workspace\": \"design\", \"tab\": \"mesh\"},\n \"was\": {\"workspace\": \"design\", \"tab\": \"solid\"}\n}",
+   "is_error": false
+  }
  }
 }
