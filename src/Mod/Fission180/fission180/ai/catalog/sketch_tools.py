@@ -489,6 +489,7 @@ DRAW_POINTS = {  # kind -> (fewest points, most points, what they are)
     "slot_overall": (2, 2, "[end, end] with width"),
     "slot_center_point": (2, 2, "[middle, an end centre] with width"),
     "arc_slot": (3, 3, "[end centre, a point on the centre arc, end centre] with width"),
+    "arc_slot_center_point": (3, 3, "[arc centre, start end centre, end direction] with width"),
     "conic": (3, 3, "[start, end, apex] with rho"),
     "ellipse": (3, 3, "[centre, major axis end, minor axis end]"),
     "control_point_spline": (3, 64, "the control points"),
@@ -509,6 +510,7 @@ DRAW_TITLES = {  # the SKETCH tab's names (the undo / timeline titles)
     "slot_overall": "Overall Slot",
     "slot_center_point": "Center Point Slot",
     "arc_slot": "Three Point Arc Slot",
+    "arc_slot_center_point": "Center Point Arc Slot",
     "conic": "Conic Curve",
     "ellipse": "Ellipse",
     "control_point_spline": "Control Point Spline",
@@ -536,7 +538,7 @@ def _extra_draw(args, problems):
         problems.append('tangent_arc needs from: {"curve": index, "point": "start" | "end"}')
     if kind == "edge_polygon" and "sides" not in args:
         problems.append("edge_polygon needs sides")
-    if (kind.startswith("slot_") or kind == "arc_slot") and "width" not in args:
+    if (kind.startswith("slot_") or kind.startswith("arc_slot")) and "width" not in args:
         problems.append("%s needs width (mm)" % kind)
 
 
@@ -553,7 +555,8 @@ define(
     "circle_2point [a, b]; circle_3point 3 points; circle_2tangent / circle_3tangent: lines "
     "(indexes) + [a point near it]; arc_3point [start, on it, end]; tangent_arc: from "
     "{curve, point} + [end]; edge_polygon [p1, p2, side] + sides; slot_* [first, second] + "
-    "width; arc_slot [end, on the centre arc, end] + width; conic [start, end, apex] + rho "
+    "width; arc_slot [end, on the centre arc, end] / arc_slot_center_point [centre, start, end "
+    "direction] + width; conic [start, end, apex] + rho "
     "(0..1; 0.5 a parabola); ellipse [centre, major end, minor end]; control_point_spline / "
     "fit_point_spline: the points. length, angle (degrees), width, diameter, radius become "
     "dimensions, as typed in the tool. Answers the new curve indexes.",
@@ -610,6 +613,27 @@ define(
 )
 
 MODIFY_KINDS = ("fillet", "chamfer", "extend", "break", "offset", "toggle_construction")
+KIND_TITLES = {  # the SKETCH tab's names of sketch_modify / sketch_pattern / sketch_project
+    "fillet": "Sketch Fillet",
+    "chamfer": "Sketch Chamfer",
+    "extend": "Extend",
+    "break": "Break",
+    "offset": "Sketch Offset",
+    "toggle_construction": "Toggle Construction",
+    "mirror": "Sketch Mirror",
+    "rectangular": "Sketch Rectangular Pattern",
+    "circular": "Sketch Circular Pattern",
+    "move_copy": "Sketch Move/Copy",
+    "project": "Project",
+    "include_3d": "Include 3D Geometry",
+    "intersect": "Intersect",
+    "project_to_surface": "Project to Surface",
+    "isoparametric": "Isoparametric Curve",
+}
+
+
+def _kind_title(a):
+    return "AI: %s" % KIND_TITLES.get(a.get("kind"), "Sketch")
 
 
 def _extra_modify(args, problems):
@@ -658,7 +682,7 @@ define(
     ),
     extra=_extra_modify,
     own_id=False,
-    title_fn=lambda a: "AI: Sketch %s" % str(a.get("kind", "")).replace("_", " "),
+    title_fn=_kind_title,
     examples=[
         example(
             {"sketch": "Sketch1", "kind": "fillet", "points": [[0, 0]], "radius": 3},
@@ -733,7 +757,7 @@ define(
     ),
     extra=_extra_pattern,
     own_id=False,
-    title_fn=lambda a: "AI: Sketch %s" % str(a.get("kind", "")).replace("_", " "),
+    title_fn=_kind_title,
     examples=[
         example(
             {"sketch": "Sketch1", "kind": "mirror", "curves": [0, 1], "line": -2},
@@ -798,7 +822,7 @@ define(
     ),
     extra=_extra_project,
     own_id=False,
-    title_fn=lambda a: "AI: Sketch %s" % str(a.get("kind", "")).replace("_", " "),
+    title_fn=_kind_title,
     examples=[
         example(
             {

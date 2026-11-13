@@ -279,11 +279,13 @@ def _parts(ctx, idents, what):
     return found
 
 
+def _xyz(v):
+    """[x, y, z] rounded to a micrometre (no -6.7e-16 for a zero)."""
+    return "[%s]" % ", ".join("%.6g" % (round(c, 6) + 0.0) for c in (v.x, v.y, v.z))
+
+
 def _where(parts):
-    return "; ".join(
-        "%s at [%.6g, %.6g, %.6g]" % ((p.Label,) + tuple(p.getGlobalPlacement().Base))
-        for p in parts
-    )
+    return "; ".join("%s at %s" % (p.Label, _xyz(p.getGlobalPlacement().Base)) for p in parts)
 
 
 def _joint_error(fn):
@@ -586,8 +588,7 @@ def duplicate_with_joints(ctx, args):
     for copies in made:
         rows.append(
             ", ".join(
-                "%s (id %s) at [%.6g, %.6g, %.6g]"
-                % ((c.Label, c.Name) + tuple(c.getGlobalPlacement().Base))
+                "%s (id %s) at %s" % (c.Label, c.Name, _xyz(c.getGlobalPlacement().Base))
                 for c in copies
             )
         )

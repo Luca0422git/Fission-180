@@ -420,6 +420,11 @@ def run_examples(record=False, text_filter="", gui=False, path=RESULTS):
         start = time.time()
         reset()
         session = Session(gui=gui)
+        # (wave 8, ai-design) "files": {name in {tmp}: a file of Fission180Tests/fixtures}, for
+        # the tools that read a file no tool writes (a picture for decal / canvas)
+        for name, fixture in ex.get("files", {}).items():
+            shutil.copy(os.path.join(os.path.dirname(DOCS_TESTS), "fixtures", fixture),
+                        os.path.join(session.folder, name))  # fmt: skip
         problems = []
         spec = spec_of(ex, tool_examples.SETUPS)
         try:

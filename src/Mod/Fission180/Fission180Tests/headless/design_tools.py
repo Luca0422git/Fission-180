@@ -687,7 +687,7 @@ ANALYSIS = [
     {
         "tool": "analysis",
         "args": {"kind": "draft", "direction": "Z", "draft_min": 1},
-        "contains": ["4 faces under 1 degrees"],
+        "contains": ["4 faces under 1 degree(s)"],
         "check": _analysis(_draft_box),
     },
     {
@@ -1095,6 +1095,17 @@ SKETCH = [
             "width": 4,
         },
         "check": _arcs("k1", 2, 2),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "arc_slot_center_point",
+            "points": [[300, -80], [310, -80], [300, -70]],
+            "width": 3,
+        },
+        "contains": ["Center Point Arc Slot"],
+        "check": _arcs("k1", 2, 1.5),
     },
     {
         "tool": "sketch_draw",

@@ -52,7 +52,9 @@ def nothing_left_and_picture():
     h.check(
         "... from the window, in orange", "window renderer" in answer["text"], answer["text"][-400:]
     )
-    h.check("... with the numbers: faces under 1 degree", "faces under 1 degrees" in answer["text"])
+    h.check(
+        "... with the numbers: faces under 1 degree", "faces under 1 degree(s)" in answer["text"]
+    )
     h.check("an analysis is no Undo step", list(doc.UndoNames) == before, doc.UndoNames[:3])
     h.shot("ai-design-analysis")
 

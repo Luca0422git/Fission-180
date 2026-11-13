@@ -873,6 +873,7 @@ DRAW_CLASSES = {
     "slot_overall": "OverallSlot",
     "slot_center_point": "CenterPointSlot",
     "arc_slot": "ThreePointArcSlot",
+    "arc_slot_center_point": "ThreePointArcSlot",
     "conic": "ConicCurve",
 }
 DIRECTED = ("midpoint_line", "rectangle_3point", "edge_polygon") + tuple(
@@ -934,6 +935,20 @@ def _draw_with_tool(sketch, args, construction):
         snaps.append(_snap(points[1]))  # (the width click: the width is typed)
     if kind == "arc_slot":  # [end, through, end] -> the tool's clicks: end, end, through, width
         snaps = [_snap(points[0]), _snap(points[2]), _snap(points[1]), _snap(points[2])]
+    if kind == "arc_slot_center_point":
+        # FreeCAD's Center Point Arc Slot (centre, start, end direction), counter-clockwise, as
+        # the three point arc slot's clicks: start, end, the arc's middle
+        c, a, d = points
+        r = math.hypot(a[0] - c[0], a[1] - c[1])
+        a1 = math.atan2(a[1] - c[1], a[0] - c[0])
+        a2 = math.atan2(d[1] - c[1], d[0] - c[0])
+        while a2 <= a1 + 1e-9:
+            a2 += 2.0 * math.pi
+        if r <= 1e-9 or a2 - a1 >= 2.0 * math.pi - 1e-6:
+            raise UserError("arc_slot_center_point: the start is on the centre, or no arc.")
+        end = (c[0] + r * math.cos(a2), c[1] + r * math.sin(a2))
+        middle = (c[0] + r * math.cos(0.5 * (a1 + a2)), c[1] + r * math.sin(0.5 * (a1 + a2)))
+        snaps = [_snap(a), _snap(end), _snap(middle), _snap(end)]
     tool = _tool(cls, sketch, snaps=snaps, picks=picks, boxes=_Boxes(typed))
     tool.step = len(snaps)
     if kind == "tangent_arc" and tool._start(snaps[0]) is None:
@@ -944,6 +959,7 @@ def _draw_with_tool(sketch, args, construction):
             "circle_3tangent": lambda: tool.circle(snaps[-1]),
             "tangent_arc": lambda: tool.arc(snaps[-1]),
             "arc_slot": lambda: tool.slot(snaps[-1]),
+            "arc_slot_center_point": lambda: tool.slot(snaps[-1]),
         }.get(kind, lambda: True)()
     except Exception:
         found = None
