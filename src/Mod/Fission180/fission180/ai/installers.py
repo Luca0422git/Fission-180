@@ -48,6 +48,7 @@ _SERVER_MODULES = (
     "docs_core.py",
     "bridge_core.py",
     "fission180_mcp.py",
+    "approach_core.py",  # (wave 8, ai-behaviour: the catalogue and mcp_core plan with it)
 )
 _DOCS = ("docs", "ai")  # the documents for AI models (resources fission180://docs/...)
 _GOLDEN = ("Fission180Tests", "golden", "models")  # examples (fission180://examples/golden/...)

@@ -26,9 +26,11 @@ Checked against the MCP specification's text on GitHub
 The tools part did not change between the versions below, so one answer fits them all.
 """
 
+import itertools
 import json
+import threading
 
-from . import catalog, docs_core, mcp_resources, tools_core
+from . import approach_core, catalog, docs_core, mcp_resources, tools_core
 
 PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 LATEST = PROTOCOL_VERSIONS[0]
@@ -41,8 +43,121 @@ INTERNAL_ERROR = -32603
 
 # What every AI app reads first (MCP "instructions"): what Fission 180 is, the workflow and the
 # shared rules the tools' descriptions refer to (selectors, picks, sketch planes, curves). From
-# the catalogue, like the tools.
+# the catalogue, like the tools. (wave 8: the essentials, plan_approach first, fit in the first
+# 4,000 characters, where Claude Code cuts a server's instructions.)
 INSTRUCTIONS = catalog.INSTRUCTIONS
+
+# -- the session with the AI app (wave 8, ai-behaviour) -----------------------------------------
+# One server process serves one AI app: what it said it can do at initialize, the way to send it
+# a request of ours (MCP elicitation: ask_person's form), the answers we wait for, and the
+# watch on its changing calls (the same small step again and again: approach_core.RepeatWatch).
+ASK_TIMEOUT = 600.0  # seconds the person has to fill in ask_person's form
+SESSION = {"client": {}, "elicitation": False, "sender": None, "cancelled": None}
+_PENDING = {}  # our request id -> {"event", "answer"}
+_LOCK = threading.Lock()
+_IDS = itertools.count(1)
+WATCH = approach_core.RepeatWatch()
+# The tools this server answers itself, so they work while Fission 180 is closed.
+LOCAL_TOOLS = tuple(docs_core.TOOLS) + ("ask_person",)
+
+
+def set_sender(send, cancelled=None):
+    """How this server sends a message to the AI app (fission180_mcp.Server.send), and the
+    ids of the calls the AI app cancelled (a set the server keeps). Only a server that reads
+    the AI app's messages while a tool call runs (on another thread) can ask the person
+    through the app: the headless server, which runs each call on its reading thread, never
+    sets one."""
+    SESSION["sender"] = send
+    SESSION["cancelled"] = cancelled
+
+
+def reset_session():
+    """Forget the AI app (tests; a new initialize)."""
+    SESSION.update(client={}, elicitation=False)
+    WATCH.__init__()
+
+
+def _client_elicits(capabilities):
+    """Whether the AI app can show a form (MCP elicitation, form mode): it declared
+    "elicitation" at initialize, as {} (form, MCP 2025-06-18) or with "form" (2025-11-25)."""
+    found = (capabilities or {}).get("elicitation") if isinstance(capabilities, dict) else None
+    if not isinstance(found, dict):
+        return False
+    return not found or "form" in found
+
+
+def _deliver(message):
+    """An answer of the AI app to a request of ours: hand it to the call waiting for it."""
+    with _LOCK:
+        waiting = _PENDING.get(message.get("id"))
+    if waiting is None:
+        return False
+    waiting["answer"] = message
+    waiting["event"].set()
+    return True
+
+
+def request_client(method, params, timeout=ASK_TIMEOUT, call_id=None, poll=0.25):
+    """Send the AI app a request and wait for its answer: the response message, or None (no
+    way to send, no answer in time, or the AI app cancelled the tool call `call_id` meanwhile:
+    our request is then cancelled too). Called from the thread that runs a tool call."""
+    send = SESSION.get("sender")
+    if send is None:
+        return None
+    ident = "fission180-%d" % next(_IDS)
+    waiting = {"event": threading.Event(), "answer": None}
+    with _LOCK:
+        _PENDING[ident] = waiting
+    left = float(timeout)
+    try:
+        send({"jsonrpc": "2.0", "id": ident, "method": method, "params": params})
+        while not waiting["event"].wait(min(poll, max(left, 0.0))):
+            left -= poll
+            cancelled = SESSION.get("cancelled")
+            gone = call_id is not None and cancelled is not None and call_id in cancelled
+            if gone or left <= 0:
+                send(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "notifications/cancelled",
+                        "params": {
+                            "requestId": ident,
+                            "reason": "the tool call was cancelled" if gone else "no answer",
+                        },
+                    }
+                )
+                return None
+        return waiting["answer"]
+    finally:
+        with _LOCK:
+            _PENDING.pop(ident, None)
+
+
+def ask_person(args, call_id=None):
+    """ask_person, answered here: the AI app's own form where it can show one (MCP
+    elicitation), else the sentence that says to ask in the reply. (text, is_error)"""
+    questions = [q for q in args.get("questions") or [] if isinstance(q, dict)]
+    if not SESSION.get("elicitation") or SESSION.get("sender") is None:
+        return approach_core.NO_FORM_TEXT, False
+    schema, order = approach_core.form_schema(questions)
+    message = str(args.get("message") or "Fission 180 asks before it starts:")
+    answer = request_client(
+        "elicitation/create", {"message": message, "requestedSchema": schema}, call_id=call_id
+    )
+    if answer is None:
+        return (
+            "The AI app showed no answer in time (or could not show the questions): ask them "
+            "in your reply instead.",
+            False,
+        )
+    if "error" in answer:
+        detail = (answer.get("error") or {}).get("message", "")
+        return (
+            "The AI app could not show the questions (%s): ask them in your reply instead."
+            % (detail or "no reason given"),
+            False,
+        )
+    return approach_core.answers_text(questions, order, answer.get("result") or {})
 
 
 def error_response(request_id, code, message):
@@ -123,8 +238,11 @@ def _handle(message, call_tool, version, log):
     method = message.get("method")
     is_notification = "id" not in message
     if method is None:
-        if is_notification or "result" in message or "error" in message:
-            return None  # a response to something we never ask: ignore it
+        if "result" in message or "error" in message:
+            _deliver(message)  # (an answer to ask_person's form; others: nothing we asked)
+            return None
+        if is_notification:
+            return None
         return error_response(message.get("id"), INVALID_REQUEST, "Invalid Request: no method")
     if is_notification:
         return None  # notifications/initialized, notifications/cancelled, ...: no reply
@@ -149,6 +267,14 @@ def _handle(message, call_tool, version, log):
             return error_response(
                 request_id, INVALID_PARAMS, "Invalid params: protocolVersion is missing"
             )
+        reset_session()
+        capabilities = params.get("capabilities")
+        SESSION["client"] = (
+            params.get("clientInfo") if isinstance(params.get("clientInfo"), dict) else {}
+        )
+        SESSION["elicitation"] = _client_elicits(capabilities)
+        if log and SESSION["elicitation"]:
+            log("[Fission 180] MCP: the AI app can show questions (elicitation)")
         return _result(
             request_id,
             {
@@ -158,7 +284,11 @@ def _handle(message, call_tool, version, log):
                     "resources": {"subscribe": False, "listChanged": False},
                     "prompts": {"listChanged": False},
                 },
-                "serverInfo": {"name": "fission180", "title": "Fission 180", "version": str(version)},
+                "serverInfo": {
+                    "name": "fission180",
+                    "title": "Fission 180",
+                    "version": str(version),
+                },
                 "instructions": INSTRUCTIONS,
             },
         )
@@ -193,6 +323,9 @@ def _call(request_id, params, call_tool, log):
     if name in docs_core.TOOLS:  # the documentation is read here: works with Fission 180 closed
         text, is_error = docs_core.tool_answer(name, args)
         return _result(request_id, tool_result(text, is_error=is_error))
+    if name == "ask_person":  # (wave 8: the AI app's own form, asked from here)
+        text, is_error = ask_person(args, request_id)
+        return _result(request_id, tool_result(text, is_error=is_error))
     try:
         answer = call_tool(name, args)
     except Exception as exc:
@@ -205,11 +338,13 @@ def _call(request_id, params, call_tool, log):
         return _result(
             request_id, tool_result("Fission 180 gave no answer for %s." % name, is_error=True)
         )
+    text = answer.get("text", "")
+    entry = tools_core.tool(name)
+    if entry["changes_design"] and isinstance(text, str):  # (wave 8: the facet-copying guard)
+        text += WATCH.note(name, args, True, not answer.get("is_error", False))
     return _result(
         request_id,
-        tool_result(
-            answer.get("text", ""), answer.get("image_png_base64"), answer.get("is_error", False)
-        ),
+        tool_result(text, answer.get("image_png_base64"), answer.get("is_error", False)),
     )
 
 

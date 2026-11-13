@@ -36,6 +36,9 @@ def get_design(ctx, args):
         "active_body": active.Name if active is not None else None,
         "bodies": [],
     }
+    from .approach_actions import shown_workspace  # (wave 8, ai-behaviour: what the window shows)
+
+    info["workspace"] = shown_workspace(ctx.host, doc)  # (None: no window)
     for body in bodies.solid_bodies(doc):
         shape = body.Shape
         row = {
@@ -387,5 +390,7 @@ def get_help(ctx, args):
 
 @action("list_tools")
 def list_tools(ctx, args):
-    rows = catalog.tool_list(state(ctx.host), args.get("category"))
-    return json_result({"tools": rows, "count": len(rows)})
+    rows = catalog.tool_list(  # (wave 8, ai-behaviour: by workspace and by goal too)
+        state(ctx.host), args.get("category"), args.get("workspace"), args.get("goal")
+    )
+    return json_result({"tools": rows, "count": len(rows)}, catalog.tool_list_words(args, rows))

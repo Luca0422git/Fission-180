@@ -164,7 +164,9 @@ def _from_tool(uri, tool, args, call_tool, template=False):
         answer = call_tool(tool, args)
     except Exception as exc:
         raise ResourceError(
-            INTERNAL_ERROR, "Fission 180 could not answer: %s" % exc, {"uri": uri, "reason": str(exc)}
+            INTERNAL_ERROR,
+            "Fission 180 could not answer: %s" % exc,
+            {"uri": uri, "reason": str(exc)},
         )
     text = (answer or {}).get("text", "") if isinstance(answer, dict) else str(answer)
     if not isinstance(answer, dict) or answer.get("is_error"):
@@ -237,7 +239,7 @@ def help_topics():
 
 # -- the lists --------------------------------------------------------------------------------
 def _size(root, **kind):
-    """ About how big a single-file export is, in tokens (an AI app's context is counted in
+    """About how big a single-file export is, in tokens (an AI app's context is counted in
     them), for its resource description."""
     try:
         text = docs_core.export_text(lib=docs_core.library(root or docs_root()), **kind)
@@ -304,8 +306,7 @@ def resources(root=None):
             "name": "handbook-compact",
             "title": "Fission 180 for AI models, compact (one file)",
             "description": "The handbook, the guides, the recipes and the list of tools in one "
-            "Markdown file (without the reference page of every tool)."
-            + _size(root, compact=True),
+            "Markdown file (without the reference page of every tool)." + _size(root, compact=True),
             "mimeType": "text/markdown",
         }
     )
@@ -406,6 +407,45 @@ _CHECK = (
 )
 
 PROMPTS = (
+    {  # (wave 8, ai-behaviour: any job, planned first)
+        "name": "plan_job",
+        "title": "Plan and do a job",
+        "description": "Any job in Fission 180 (turn a mesh into a solid, make a part "
+        "editable, check its strength, mill it, laser cut it, print it, draw it, animate it): "
+        "planned first, the right questions asked, then done with the cheapest tools.",
+        "arguments": [
+            {"name": "request", "description": "what you want, in your words", "required": True},
+            {
+                "name": "about",
+                "description": "the body, mesh, component or drawing it is about",
+                "required": False,
+            },
+        ],
+        "tools": [
+            "plan_approach",
+            "ask_person",
+            "inspect_design",
+            "show_workspace",
+            "check_design",
+            "diff_design",
+        ],
+        "text": (
+            "The person wants this done in Fission 180: {request}{about}\n\n"
+            "1. Call plan_approach with these words{about_arg}. Read its route (the tools in "
+            "order), its questions and its cost; inspect_design gives the numbers it does "
+            "not.\n"
+            "2. Ask its open questions in ONE message, each with its default (ask_person shows "
+            "them as a form where this app can; otherwise ask in your reply), and wait. Do "
+            "not ask what you can measure or read in the design.\n"
+            "3. If a step takes minutes, say so before it starts.\n"
+            "4. Follow the route with the cheapest tools: one call for a whole mesh, a pattern "
+            "for repeats, never one feature per facet. show_workspace lets the person see the "
+            "workspace you work in (every tool works from any workspace).\n"
+            "5. After each change read the numbers in the answer (diff_design since "
+            "last_change when in doubt); at the end call check_design and say what was made, "
+            "with its sizes."
+        ),
+    },
     {
         "name": "model_part",
         "title": "Model a part from a description",
@@ -421,6 +461,7 @@ PROMPTS = (
             },
         ],
         "tools": [
+            "plan_approach",
             "examples_search",
             "docs_search",
             "inspect_design",
@@ -438,6 +479,9 @@ PROMPTS = (
         "text": (
             "Model this part in Fission 180: {description}\n\n"
             "Work like a careful CAD designer:\n"
+            "0. Call plan_approach with the description: it answers the route, the questions "
+            "to ask first and what is slow. Ask its open questions in one message (with their "
+            "defaults) and wait for the answer; never ask what you can measure.\n"
             "1. Call inspect_design to see what is open; call new_design when you need an "
             "empty design. Look for a tested recipe of a similar part with examples_search, "
             "and search the documentation with docs_search when unsure how a tool behaves.\n"
@@ -628,6 +672,9 @@ def get_prompt(name, arguments=None):
             else "Ask the person whether and where to save it (save_as)."
         ),
         "step": (" (%s)" % values["step"]) if values.get("step") else "",
+        "about": (" (about %s)" % values["about"]) if values.get("about") else "",
+        "about_arg": (' and target "%s"' % values["about"]) if values.get("about") else "",
+        "request": values.get("request", ""),
         "format": values.get("format") or "3mf",
         "path": (", path %s" % values["path"]) if values.get("path") else "",
         "sizes": (": %s" % values["sizes"]) if values.get("sizes") else "",

@@ -321,6 +321,8 @@ class Server:
                 log("[Fission 180] MCP: could not handle a message: %s" % exc)
 
     def run(self):
+        # wave 8, ai-behaviour: a call on the worker may ask the AI app (ask_person's form)
+        mcp_core.set_sender(self.send, self.cancelled)
         self.worker.start()
         while True:
             try:

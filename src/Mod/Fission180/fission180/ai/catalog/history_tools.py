@@ -16,6 +16,7 @@ from .kit import (
     step_ids,
     string,
 )
+from . import registry
 from .registry import define, example
 
 # -- TIMELINE -----------------------------------------------------------------------------------
@@ -793,6 +794,8 @@ define(
 # -- HELP ---------------------------------------------------------------------------------------
 HELP_TOPICS = (
     "overview",
+    "approach",  # (wave 8, ai-behaviour: before you build, the cheapest tool)
+    "workspaces",  # (wave 8, ai-behaviour)
     "selectors",
     "picks",
     "body_picks",
@@ -811,7 +814,9 @@ define(
     "Get help",
     "help",
     "(Fission 180's documentation for AI models)",
-    "Read Fission 180's rules for AI tools: overview, selectors (how to pick faces and edges), "
+    "Read Fission 180's rules for AI tools: overview, approach (before you build: plan, ask, "
+    "pick the cheapest tool), workspaces (where every workspace's tools are), selectors (how "
+    "to pick faces and edges), "
     "picks (planes, axes, faces, edges, corners), body_picks, sketches (planes and "
     "coordinates), geometry (sketch shapes), curves (paths and rails), steps (ids), "
     "expressions (parameters in fields), workflow (how to build and check a part), checking "
@@ -828,39 +833,27 @@ define(
     "List tools",
     "help",
     "(Fission 180's command list)",
-    "List every tool by category with its Fusion command, whether it changes the design, "
-    "and whether it can run right now (and why not: no design open, no solid yet, needs the "
-    "Fission 180 window...). category: only that category.",
+    "Find tools: by goal in plain words (goal \"round the edges\", \"make it hollow\", \"turn a "
+    "mesh into a solid\": the best tools first), by workspace (design, simulation, "
+    "manufacture, animation, drawing; any: help, files, the view) or by category; each with its "
+    "purpose, its Fusion command, whether it changes the design and whether it can run now "
+    "(and why not). Every tool works from any workspace. Without arguments: every tool, by "
+    "category (no purposes: filter for those).",
     schema(
         {
-            "category": enum(
-                [
-                    c
-                    for c in (
-                        "help",
-                        "document",
-                        "inspect",
-                        "sketch",
-                        "create",
-                        "modify",
-                        "surface",
-                        "construct",
-                        "assemble",
-                        "timeline",
-                        "parameters",
-                        "import_export",
-                        "drawing",
-                        "view",
-                        "simulate",
-                        "rebuild",
-                        "sheet_metal",
-                        "plastic",
-                    )
-                ]
-            )
+            # (wave 8, ai-behaviour: every category of the catalogue, also those added later)
+            "category": enum(list(registry.CATEGORY_KEYS)),
+            "workspace": enum(
+                ["design", "simulation", "manufacture", "animation", "drawing", "any"],
+                "the workspace whose tools to list",
+            ),
+            "goal": string("what you want to do, in plain words"),
         }
     ),
     changes=False,
     needs=(),
-    examples=[example({"category": "modify"}, "the Modify tools and which can run now")],
+    examples=[
+        example({"goal": "make it hollow"}, "the tools that hollow a part, best first"),
+        example({"category": "modify"}, "the Modify tools and which can run now"),
+    ],
 )

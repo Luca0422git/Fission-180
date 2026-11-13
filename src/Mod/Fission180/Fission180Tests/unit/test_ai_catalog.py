@@ -547,10 +547,9 @@ class Lists(unittest.TestCase):
             self.assertIn("arguments are not right", text)
             self.assertIn("colour is not a known argument", text)
         # Bad calls never reach Fission 180; the documentation tools are answered by the MCP
-        # server itself (docs_core), so they never reach it either.
-        from fission180.ai import docs_core
-
-        self.assertEqual(calls, [n for n in catalog.TOOL_NAMES if n not in docs_core.TOOLS])
+        # server itself (docs_core), so they never reach it either; nor does ask_person (the
+        # AI app's own form, wave 8: mcp_core.LOCAL_TOOLS).
+        self.assertEqual(calls, [n for n in catalog.TOOL_NAMES if n not in mcp_core.LOCAL_TOOLS])
         self.assertEqual(request({"name": "nope", "arguments": {}})["error"]["code"], -32602)
         self.assertEqual(request({"name": "extrude", "arguments": [1]})["error"]["code"], -32602)
 
