@@ -156,6 +156,11 @@ class Relic(unittest.TestCase):
         ):
             self.assertEqual(goals(plan(words, RELIC_FACTS, RELIC)), ["mesh_to_solid"], words)
 
+    def test_a_mesh_in_the_design_needs_no_naming(self):
+        r = plan("make this a solid", RELIC_FACTS)  # (nothing selected, the mesh not named)
+        self.assertEqual(goals(r), ["mesh_to_solid"])
+        self.assertEqual(r["route"][0]["args"], {"body": "Mesh"})
+
     def test_the_answer_is_fast(self):
         start = time.time()
         for _ in range(50):

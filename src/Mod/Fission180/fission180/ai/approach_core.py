@@ -1425,8 +1425,9 @@ def _detect(text, facts, target):
     )
     if fix and not editable:
         add("fix", "repair words")
+    # (a design with a mesh in it: "make this a solid" is about the mesh, even unnamed)
     if (
-        mesh_talk
+        (mesh_talk or (meshes and solid_words and kind not in ("solid", "component")))
         and (solid_words or kind == "mesh" and not editable)
         and not has(text, "print*", "export*")
         and not fix
