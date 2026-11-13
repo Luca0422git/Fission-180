@@ -253,6 +253,19 @@ def _available():
     return _AVAILABLE["names"]
 
 
+_WATCHED = {
+    QtCore.QEvent.Enter,
+    QtCore.QEvent.Leave,
+    QtCore.QEvent.MouseMove,
+    QtCore.QEvent.MouseButtonPress,
+    QtCore.QEvent.MouseButtonRelease,
+    QtCore.QEvent.MouseButtonDblClick,
+    QtCore.QEvent.ContextMenu,
+    QtCore.QEvent.Hide,
+    QtCore.QEvent.ToolTip,
+}
+
+
 class Hover(QtCore.QObject):
     """Watches the ribbon's buttons and drop-down menus and shows the card for the command
     under the pointer."""
@@ -270,6 +283,7 @@ class Hover(QtCore.QObject):
         self.keys = _Keys(self)
         self.keys_watched = False
         self.began_at = 0.0
+        self.show_seconds = {}  # mode -> how long the last card of that kind took to show
         self.timer = QtCore.QTimer(self)
         self.timer.setInterval(POLL_MS)
         self.timer.timeout.connect(self._tick)
@@ -293,6 +307,8 @@ class Hover(QtCore.QObject):
     # events
     def eventFilter(self, obj, event):
         try:
+            if event.type() not in _WATCHED:  # (paints and the rest: at once)
+                return False
             if isinstance(obj, QtWidgets.QMenu):
                 return self._menu_event(obj, event)
             if isinstance(obj, QtWidgets.QAbstractButton):
@@ -464,6 +480,7 @@ class Hover(QtCore.QObject):
             self.end()
 
     def _show(self, anchor, expanded, info=None):
+        started = time.perf_counter()
         info = info or info_for(self.entry)
         if not expanded and self.action is not None and not (info["summary"] or info["note"]):
             # a menu row already says its name and key: nothing to add
@@ -473,6 +490,7 @@ class Hover(QtCore.QObject):
         self.card.fill(info, expanded)
         self.card.show_at(anchor, self.beside)
         self._watch_keys(True)
+        self.show_seconds[self.card.mode] = time.perf_counter() - started  # (the GUI test reads it)
 
 
 class _Keys(QtCore.QObject):

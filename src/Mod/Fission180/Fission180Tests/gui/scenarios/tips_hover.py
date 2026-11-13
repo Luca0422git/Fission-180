@@ -260,6 +260,13 @@ def t2_expanded():
     rect = c.frameGeometry()
     h.check("T2 inside the screen", inside_screen(rect), rect)
     h.wait_for(lambda: picture_on_screen(c.picture), "the picture to show on the screen")
+    took = tips_ui().hover().show_seconds
+    print("[Fission 180] tips_hover: the cards took %s s to build and show" % took, flush=True)
+    h.speed_check(
+        "T2 cheap: the small card in under 0.1 s, the expanded one (its picture read) under 0.25 s",
+        took.get("small", 1) < 0.1 * h.SLOWDOWN and took.get("expanded", 1) < 0.25 * h.SLOWDOWN,
+        took,
+    )
     h.check(
         "T2 still the main window's focus",
         QtWidgets.QApplication.activeWindow() is Gui.getMainWindow(),
