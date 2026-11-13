@@ -30,26 +30,26 @@ A plain sentence, then JSON with: `library`, `tool`. The example below shows a r
 - Arguments of the wrong type, out of their limits or not in the table are refused the same way, each problem in a sentence ("radius must be a number above 0").
 - When it cannot be done the answer says why in a sentence (isError true) and nothing changes.
 
-## Example 1: a 1/8 in single-flute end mill in the Local library
+## Example 1: a 1/8 in single-flute end mill in the Local library, tool 12
 
 Starting from Fission 180 with no design open.
 
 The call:
 
 ```json
-{"tool": "cam_tool_library", "args": {"action": "add", "tool": {"type": "flat", "diameter": 3.175, "flutes": 1}}}
+{"tool": "cam_tool_library", "args": {"action": "add", "tool": {"type": "flat", "diameter": 3.175, "flutes": 1, "number": 12}}}
 ```
 
 The answer:
 
 ```text
-Done: #1 - 3.175 mm flat end mill added to local:Local.
+Done: #12 - 3.175 mm flat end mill added to local:Local.
 {
  "library": "local:Local",
  "tool": {
-  "id": "573cda21-faaa-4802-9959-e99d6d8657c8",
+  "id": "22784663-93f3-40e2-89a4-3a37fb6f4b6e",
   "name": "3.175 mm flat end mill",
-  "number": 1,
+  "number": 12,
   "type": "flat",
   "title": "Flat end mill",
   "diameter": 3.175,

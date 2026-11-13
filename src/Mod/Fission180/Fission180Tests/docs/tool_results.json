@@ -11910,12 +11910,13 @@
    "tool": {
     "type": "flat",
     "diameter": 3.175,
-    "flutes": 1
+    "flutes": 1,
+    "number": 12
    }
   },
-  "note": "a 1/8 in single-flute end mill in the Local library",
+  "note": "a 1/8 in single-flute end mill in the Local library, tool 12",
   "answer": {
-   "text": "Done: #1 - 3.175 mm flat end mill added to local:Local.\n{\n \"library\": \"local:Local\",\n \"tool\": {\n  \"id\": \"573cda21-faaa-4802-9959-e99d6d8657c8\",\n  \"name\": \"3.175 mm flat end mill\",\n  \"number\": 1,\n  \"type\": \"flat\",\n  \"title\": \"Flat end mill\",\n  \"diameter\": 3.175,\n  \"flutes\": 1,\n  \"flute_length\": 9.525,\n  \"overall_length\": 38.0,\n  \"unit\": \"mm\",\n  \"cutting\": {\n   \"spindle_speed\": 20050.0,\n   \"cutting_feed\": 510.0,\n   \"leadin_feed\": 510.0,\n   \"plunge_feed\": 170.0,\n   \"ramp_feed\": 260.0,\n   \"stepdown\": 1.587,\n   \"stepover\": 1.27,\n   \"coolant\": \"disabled\"\n  }\n }\n}",
+   "text": "Done: #12 - 3.175 mm flat end mill added to local:Local.\n{\n \"library\": \"local:Local\",\n \"tool\": {\n  \"id\": \"22784663-93f3-40e2-89a4-3a37fb6f4b6e\",\n  \"name\": \"3.175 mm flat end mill\",\n  \"number\": 12,\n  \"type\": \"flat\",\n  \"title\": \"Flat end mill\",\n  \"diameter\": 3.175,\n  \"flutes\": 1,\n  \"flute_length\": 9.525,\n  \"overall_length\": 38.0,\n  \"unit\": \"mm\",\n  \"cutting\": {\n   \"spindle_speed\": 20050.0,\n   \"cutting_feed\": 510.0,\n   \"leadin_feed\": 510.0,\n   \"plunge_feed\": 170.0,\n   \"ramp_feed\": 260.0,\n   \"stepdown\": 1.587,\n   \"stepover\": 1.27,\n   \"coolant\": \"disabled\"\n  }\n }\n}",
    "is_error": false
   }
  },

@@ -473,7 +473,8 @@ CAM = [
     {
         "tool": "cam_tools",
         "args": {"library": "local:Local", "type": "ball"},
-        "check": _check(lambda d, r: None if len(d["tools"]) == 1 else d),
+        # (the Local library is the computer's: other tools may be in it already)
+        "check": _check(lambda d, r: None if any(t["diameter"] == 4.0 for t in d["tools"]) else d),
     },
     {
         "tool": "cam_tool_library",

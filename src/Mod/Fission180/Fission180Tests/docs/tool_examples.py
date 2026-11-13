@@ -1569,8 +1569,12 @@ EXAMPLES += [
     {
         "tool": "cam_tool_library",
         "setup": "none",
-        "args": {"action": "add", "tool": {"type": "flat", "diameter": 3.175, "flutes": 1}},
-        "note": "a 1/8 in single-flute end mill in the Local library",
+        # (its number given: the Local library is the computer's, other tools may be in it)
+        "args": {
+            "action": "add",
+            "tool": {"type": "flat", "diameter": 3.175, "flutes": 1, "number": 12},
+        },
+        "note": "a 1/8 in single-flute end mill in the Local library, tool 12",
     },
     {
         "tool": "anim_view",
