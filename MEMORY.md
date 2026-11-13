@@ -4,6 +4,26 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-13: 0.1.0-beta.4.0.3, AI calls freezing Fission 180** (patch, Opus) Luca: with Claude
+building through MCP, Fission 180 froze for 10+ minutes, came back laggy, froze again; Claude
+listed two connections ("Fission 180" extension, "fission180" settings-file entry). He sent the
+design (Relic.FCStd: a rebuild of an 8,486-triangle mesh, reference 3,209 faces). Measured with
+the window up (throwaway timing scenario): describe_reference 220 s (one OpenCASCADE
+`defeaturing` of 74 "chamfer" facets: 207 s, then no plan anyway), compare_to_reference 13 s,
+check_design 10 s, inspect_design 7 s; every call runs on the GUI thread (bridge.py `_pump`), so
+the window is frozen meanwhile. Fixes: `recognize.DEFEATURE_MAX_FACES` 1500 (`_too_big_to_defeature`,
+one note; describe 222 s -> 15 s; recognize bench 71/71 still pass); bridge drops a queued call
+whose waiter gave up (job state queued/running/done/dropped under a lock; `bridge_core.dropped_text`)
+and answers at once when the running call is past `BUSY_AFTER` 20 s (`busy_text`); the MCP server
+does not retry a read-only call after a time-out (`_LostReply.timed_out`) and skips calls the AI
+app cancelled (`notifications/cancelled`); "Install as Claude extension" removes the settings-file
+entry, the settings-file route says to remove the extension (`installers.ONE_CLAUDE_CONNECTION`).
+Tests: scenario `ai_bridge_busy`, unit `BusyFission180` / `BusyTexts` (test_ai_mcp_server). Still
+open: any call of many seconds still freezes the window (FreeCAD work must stay on the GUI
+thread; a progress/repaint or worker-process design is the next step), and compare /
+check / inspect on 3,000-face parts take 7-13 s each. [x] fix, unit 3776 OK [ ] "Fission 180
+tests" green [ ] **Luca: release** (quick route).
+
 **2026-11-12: 0.1.0-beta.4.0.2, the version on the splash** (patch, Opus) Luca installed 4.0.1:
 the splash said 0.1.0-beta.3.3 (and, he said, the updater). Cause: the splash, Help > About and the
 installer read the number compiled into the program (`Config()["Fission180Version"]` /
@@ -18,8 +38,8 @@ DisplayName) after a quick update. Checked on the published 4.0.1 AppImage with 
 splash picture before/after, About says "0.1.0-beta.4.0.2 (based on FreeCAD 1.1.4)", the
 installer's version.nsh, smoke/journey/restart all pass; the smoke test now checks it (it runs on
 the patch release's AppImage too). Not changeable without a full build: the Windows file
-properties of Fission180.exe (version resource). [x] fix, unit 3769 OK [ ] "Fission 180 tests"
-green [ ] **Luca: release** (quick route). Lesson: after any release, start the published
+properties of Fission180.exe (version resource). [x] fix, unit 3769 OK [x] "Fission 180 tests"
+green (run #86, d1167e50) [x] **Luca: release** (published 2026-11-12). Lesson: after any release, start the published
 build and look at the splash, About and the installer's title before calling it done.
 Run #85 on 446b6c83: everything green (update script on Windows too) except one crash, then pass
 on retry, in book_drawings_animation: SIGSEGV in xerces from ParameterGrp::CreateElement called by

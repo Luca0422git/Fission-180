@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -306,6 +307,108 @@ class HonestRetries(unittest.TestCase):
         bridge_core.write_bridge_file(self.bridge_file, bridge_core.bridge_info(1, "k"))
         answer = client.call_tool("extrude", {"profile": "s", "distance": 1})
         self.assertEqual(answer["text"], bridge_core.NOT_RUNNING)  # refused: never sent
+
+
+class SlowBridge:
+    """A bridge that answers every call after `delay` seconds (Fission 180 busy with a long
+    call, like describe_reference on Luca's 3,209-face Relic: 220 s)."""
+
+    def __init__(self, key, delay):
+        self.key = key
+        self.delay = delay
+        self.calls = []
+        owner = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                tool, args = bridge_core.decode_request(self.rfile.read(length))
+                owner.calls.append(tool)
+                time.sleep(owner.delay)
+                body = bridge_core.encode_result(bridge_core.result("answered %s" % tool))
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except OSError:
+                    pass
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+class BusyFission180(unittest.TestCase):
+    """While Fission 180 works on a long call, the connector does not pile more work behind
+    it: a read-only call that timed out is not asked again, and a call the AI app cancelled
+    before it was sent is never sent (Luca's Relic design froze Fission 180 for ten minutes, then
+    again for the calls queued behind, 2026-11-13)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.bridge_file = bridge_core.bridge_path(self.tmp.name)
+
+    def bridge(self, delay):
+        key = bridge_core.make_key()
+        bridge = SlowBridge(key, delay)
+        self.addCleanup(bridge.close)
+        bridge_core.write_bridge_file(self.bridge_file, bridge_core.bridge_info(bridge.port, key))
+        return bridge
+
+    def test_a_timed_out_read_only_call_is_not_asked_again(self):
+        bridge = self.bridge(delay=2.0)
+        client = fission180_mcp.BridgeClient(self.bridge_file, timeout=0.5, retry_wait=0.01)
+        answer = client.call_tool("get_design", {})
+        self.assertTrue(answer["is_error"])
+        self.assertIn("not asked again", answer["text"])
+        self.assertEqual(bridge.calls, ["get_design"])
+
+    def test_a_cancelled_call_is_never_sent(self):
+        bridge = self.bridge(delay=1.5)
+        mcp = McpProcess(self.bridge_file)
+        self.addCleanup(mcp.close)
+        mcp.request(
+            "initialize",
+            {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "t"}},
+        )
+        mcp.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        call = {"name": "get_timeline", "arguments": {}}
+        mcp.send({"jsonrpc": "2.0", "id": 101, "method": "tools/call", "params": call})
+        mcp.send({"jsonrpc": "2.0", "id": 102, "method": "tools/call", "params": call})
+        mcp.send(
+            {"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 102}}
+        )
+        mcp.send({"jsonrpc": "2.0", "id": 103, "method": "tools/call", "params": call})
+        first, second = mcp.receive(), mcp.receive()
+        self.assertEqual([first["id"], second["id"]], [101, 103])  # (no answer for 102)
+        self.assertEqual(bridge.calls, ["get_timeline", "get_timeline"])
+
+
+class BusyTexts(unittest.TestCase):
+    def test_durations(self):
+        self.assertEqual(bridge_core.duration_words(4.4), "4 s")
+        self.assertEqual(bridge_core.duration_words(220), "3 min 40 s")
+        self.assertEqual(bridge_core.duration_words(120), "2 min")
+
+    def test_busy_and_dropped(self):
+        text = bridge_core.busy_text("inspect_design", "describe_reference", 95)
+        self.assertIn("describe_reference (for 1 min 35 s)", text)
+        self.assertIn("inspect_design was not run and nothing was changed", text)
+        text = bridge_core.dropped_text("extrude", "describe_reference", 130)
+        self.assertIn("busy with describe_reference for 2 min 10 s", text)
+        self.assertIn("it is not run later either", text)
+        self.assertIn("Fission 180 was busy, so", bridge_core.dropped_text("save", "", 0))
 
 
 class BridgeFileLocation(unittest.TestCase):

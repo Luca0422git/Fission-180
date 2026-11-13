@@ -203,10 +203,21 @@ def is_configured(path, server_name=SERVER_NAME):
     return isinstance(servers, dict) and server_name in servers
 
 
+ONE_CLAUDE_CONNECTION = (
+    " If Claude Desktop also lists Fission 180 as an extension (Settings > Extensions), remove "
+    "that one: two connections to the same Fission 180 send it the same work twice, and an "
+    "extension keeps the connector of the Fission 180 it was made with, also after an update."
+)
+
+
 def add_to_claude_desktop(command, args, path=None, now=None):
     path = path or claude_desktop_config_path()
     text = add_to_json_config(path, command, args, now=now)
-    return text + " Quit Claude Desktop completely (also from the tray) and start it again."
+    return (
+        text
+        + " Quit Claude Desktop completely (also from the tray) and start it again."
+        + ONE_CLAUDE_CONNECTION
+    )
 
 
 def remove_from_claude_desktop(path=None, now=None):

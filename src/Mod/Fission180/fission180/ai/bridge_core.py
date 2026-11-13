@@ -46,6 +46,43 @@ class BridgeError(ValueError):
     """A request or answer that is not in the bridge's format (the message says why)."""
 
 
+BUSY_AFTER = 20.0  # seconds a call may run before new calls are told at once that it is busy
+
+
+def duration_words(seconds):
+    """'40 s', '3 min 40 s'."""
+    seconds = max(0, int(round(seconds)))
+    if seconds < 60:
+        return "%d s" % seconds
+    minutes, rest = divmod(seconds, 60)
+    return "%d min %d s" % (minutes, rest) if rest else "%d min" % minutes
+
+
+def busy_text(tool, current, seconds):
+    """A new call while `current` has run for `seconds`: it is not run (Fission 180 works on one
+    call at a time on its window's thread, which does not respond until that call is done).
+    Waiting here and asking again only queued more work behind the long one (Luca's Relic
+    design, 2026-11-13: ten minutes frozen, then laggy and frozen again)."""
+    return (
+        "Not done: Fission 180 is still working on %s (for %s); its window does not respond "
+        "until that is finished, so %s was not run and nothing was changed. Wait a minute, then "
+        "try again; asking again at once only adds to the wait." % (current, duration_words(seconds), tool)
+    )
+
+
+def dropped_text(tool, current, seconds):
+    """A call that waited its whole time in the queue (behind `current`) and was then dropped,
+    not run later when nobody waits for its answer."""
+    if current:
+        why = "Fission 180 was busy with %s for %s" % (current, duration_words(seconds))
+    else:
+        why = "Fission 180 was busy"
+    return (
+        "Not done: %s, so %s was not run (it is not run later either) and nothing was changed. "
+        "Wait until Fission 180 responds again, then try again." % (why, tool)
+    )
+
+
 def bridge_path(user_data_dir):
     """<user data>/Fission180/ai/bridge.json."""
     return os.path.join(user_data_dir, *FOLDER, BRIDGE_FILE)

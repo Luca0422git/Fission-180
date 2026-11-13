@@ -45,6 +45,7 @@ _state = {
     "jobs": queue.Queue(),
     "consent": None,  # None: not asked this session; True / False: the person's answer
     "running": False,  # a call is being worked on (the questions open nested event loops)
+    "current": None,  # (tool, time.time() it started) of the call being worked on
     "activity": [],  # (time, tool, text, is_error)
     "last_used": None,
     "listeners": [],  # functions called after every call (the activity panel, Home)
@@ -120,9 +121,43 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             except bridge_core.BridgeError as exc:
                 self._send(400, bridge_core.error_result(str(exc)))
                 return
-            job = {"tool": tool, "args": args, "done": threading.Event(), "answer": None}
+            current = _state["current"]
+            if current is not None and time.time() - current[1] > bridge_core.BUSY_AFTER:
+                # (one call at a time on the window's thread: a long one is not queued behind)
+                self._send(
+                    200,
+                    bridge_core.error_result(
+                        bridge_core.busy_text(tool, current[0], time.time() - current[1])
+                    ),
+                )
+                return
+            job = {
+                "tool": tool,
+                "args": args,
+                "done": threading.Event(),
+                "answer": None,
+                "state": "queued",  # -> running -> done, or -> dropped (nobody waits any more)
+                "lock": threading.Lock(),
+            }
             _state["jobs"].put(job)
             if not job["done"].wait(WAIT):
+                with job["lock"]:
+                    dropped = job["state"] == "queued"
+                    if dropped:
+                        job["state"] = "dropped"
+                if dropped:  # (never started: it is not run later, when nobody waits for it)
+                    current = _state["current"]  # (no log here: not the window's thread)
+                    self._send(
+                        200,
+                        bridge_core.error_result(
+                            bridge_core.dropped_text(
+                                tool,
+                                current[0] if current else "",
+                                time.time() - current[1] if current else 0,
+                            )
+                        ),
+                    )
+                    return
                 job["late"] = True
                 text = (
                     "Fission 180 is still working on %s (or waiting for the person to answer a "
@@ -209,11 +244,21 @@ def _pump():
     """Takes the waiting calls one by one (on Fission 180's own thread)."""
     if _state["running"]:
         return  # (a question of this call is open: its own event loop calls the timer)
-    try:
-        job = _state["jobs"].get_nowait()
-    except queue.Empty:
-        return
+    while True:
+        try:
+            job = _state["jobs"].get_nowait()
+        except queue.Empty:
+            return
+        lock = job.get("lock")
+        if lock is None:
+            break
+        with lock:
+            if job.get("state", "queued") == "queued":
+                job["state"] = "running"
+                break
+        log("AI bridge: %s not run: the AI app stopped waiting for it" % job["tool"])
     _state["running"] = True
+    _state["current"] = (job["tool"], time.time())
     try:
         answer = call(job["tool"], job["args"])
     except Exception as exc:
@@ -221,6 +266,8 @@ def _pump():
         answer = bridge_core.error_result("Fission 180 could not do %s: %s" % (job["tool"], exc))
     finally:
         _state["running"] = False
+        _state["current"] = None
+    job["state"] = "done"
     _answer(job, answer)
 
 

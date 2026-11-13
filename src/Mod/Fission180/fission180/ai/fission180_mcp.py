@@ -57,7 +57,12 @@ MAYBE_APPLIED = (
 
 
 class _LostReply(Exception):
-    """The request reached Fission 180 (or may have) but its answer never came back."""
+    """The request reached Fission 180 (or may have) but its answer never came back.
+    timed_out: no answer in time (Fission 180 busy), which asking again does not help."""
+
+    def __init__(self, text, timed_out=False):
+        Exception.__init__(self, text)
+        self.timed_out = timed_out
 
 
 def log(text):
@@ -161,11 +166,20 @@ class BridgeClient:
             try:
                 return self._call(name, args)
             except _LostReply as lost:
-                if read_only and attempt < self.retries:
+                # (not after a time-out: Fission 180 is busy, and asking again only queued
+                # more work behind the long call: Luca's Relic design, 2026-11-13)
+                if read_only and attempt < self.retries and not lost.timed_out:
                     attempt += 1
                     log("[Fission 180] MCP: %s: reply lost (%s), asking again" % (name, lost))
                     time.sleep(self.retry_wait)
                     continue
+                if read_only and lost.timed_out:
+                    return bridge_core.error_result(
+                        "Fission 180 did not answer %s (%s): it is busy with a long call (or a "
+                        "question waits for the person in Fission 180). It was not asked again, "
+                        "which would only add to the wait: wait until Fission 180 responds, then "
+                        "try again." % (name, lost)
+                    )
                 if read_only:
                     return bridge_core.error_result(
                         "Fission 180 did not answer %s (%s), also when asked again. Check that "
@@ -203,11 +217,13 @@ class BridgeClient:
             answer["is_error"] = True
             return answer
         except (socket.timeout, TimeoutError):
-            raise _LostReply("no answer within %d seconds; it may still be working" % self.timeout)
+            raise _LostReply(
+                "no answer within %d seconds; it may still be working" % self.timeout, True
+            )
         except urllib.error.URLError as exc:
             reason = exc.reason
             if isinstance(reason, (socket.timeout, TimeoutError)):
-                raise _LostReply("no answer within %d seconds" % self.timeout)
+                raise _LostReply("no answer within %d seconds" % self.timeout, True)
             if isinstance(reason, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
                 raise _LostReply("the connection broke")
             return bridge_core.error_result(bridge_core.NOT_RUNNING)  # refused: never sent
@@ -242,6 +258,7 @@ class Server:
         self.version = version
         self.lock = threading.Lock()
         self.jobs = queue.Queue()
+        self.cancelled = set()  # ids of tool calls the AI app cancelled (notifications/cancelled)
         self.worker = threading.Thread(target=self._work, name="fission180-mcp-calls", daemon=True)
 
     def send(self, message):
@@ -263,7 +280,25 @@ class Server:
             message = self.jobs.get()
             if message is None:
                 return
+            with self.lock:
+                ident = message.get("id")
+                skip = ident in self.cancelled
+                self.cancelled.discard(ident)
+            if skip:  # (the AI app gave up on it: not sent to Fission 180, and not answered)
+                log("[Fission 180] MCP: call %s cancelled by the AI app, not run" % (ident,))
+                continue
             self.answer(message)
+
+    def cancel(self, message):
+        """notifications/cancelled: a tool call still waiting here is not run (MCP: no answer
+        is sent for it). One already sent to Fission 180 cannot be called back."""
+        params = message.get("params") if isinstance(message.get("params"), dict) else {}
+        ident = params.get("requestId")
+        if ident is not None:
+            with self.lock:
+                if len(self.cancelled) > 1000:  # (ids of calls answered long ago)
+                    self.cancelled.clear()
+                self.cancelled.add(ident)
 
     def run_in_line(self):
         """Every message in turn on this thread (headless: FreeCAD runs the tools here, and
@@ -301,6 +336,8 @@ class Server:
                     self.send(error)
                 elif isinstance(message, dict) and message.get("method") == "tools/call":
                     self.jobs.put(message)
+                elif isinstance(message, dict) and message.get("method") == "notifications/cancelled":
+                    self.cancel(message)
                 elif message is not None:
                     self.answer(message)
             except Exception as exc:

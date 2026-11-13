@@ -8,6 +8,31 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.0.3
+
+### Fixed
+
+- **An AI app could freeze Fission 180 for many minutes, and then again.** Fission 180 does one
+  AI request at a time, on the same part of the program that draws its window, so the window
+  does not respond while a request runs. Three things made that much worse, and are fixed:
+  - **Reading a big original for Auto Timeline took minutes.** On a part made from a mesh (3,209
+    faces), "describe the original" spent 3 min 40 s trying to take 74 tiny flat faces off,
+    which cannot be interrupted, and then found no plan anyway. Parts with more than 1,500
+    faces are not taken apart that way any more (the notes say so): the same request now takes
+    15 seconds.
+  - **Requests the AI app had given up on still ran later**, one after the other, so Fission 180
+    came back and froze again. A request that waited its whole time is now answered "not done"
+    and is never run later, and while a request has been running for more than 20 seconds a
+    new one is answered at once that Fission 180 is busy, instead of being added to the line.
+  - **The AI connector asked again** when Fission 180 did not answer in time, adding more work
+    behind the long request; and requests the AI app cancelled were still sent. Neither happens
+    now.
+- **Claude Desktop could be connected to Fission 180 twice** (an extension "Fission 180" and a
+  settings-file entry "fission180"), which sends Fission 180 the same work twice; the extension
+  keeps the connector of the version it was made with, also after an update. Installing the
+  extension now removes the settings-file entry, and setting up through the settings file says
+  to remove the extension.
+
 ## 0.1.0-beta.4.0.2
 
 ### Fixed

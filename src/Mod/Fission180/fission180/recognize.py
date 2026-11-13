@@ -92,6 +92,10 @@ class RecognizeError(ValueError):
 
 LIN = 1e-6  # mm: two B-rep values this close are the same
 DEFEATURE_BUDGET = 15.0  # seconds of defeaturing tries before the rest is left in the base
+# Faces beyond which OpenCASCADE's defeaturing is not tried at all: one call cannot be stopped,
+# and on a 3,209-face part made from a mesh (Luca's Relic, 2026-11-13) taking off 74 small
+# faces took 207 s, with Fission 180's window frozen, for a reading that found no base anyway.
+DEFEATURE_MAX_FACES = 1500
 DESCRIBE_BUDGET = 30.0  # seconds: past this, optional work (more readings, edges) is skipped
 MAX_SLABS = 60  # levels along one axis beyond which that axis is not read (a free-form part)
 MAX_PIECES = 400  # bosses + cuts beyond which a reading is dropped (it is not the part's)
@@ -1481,6 +1485,8 @@ class _Reader:
         faces = [i for g in groups for i in g["_faces"]]
         if not faces:
             return shape
+        if self._too_big_to_defeature(shape):
+            return None
         key = (id(shape), tuple(sorted(set(faces))))
         cache = self.__dict__.setdefault("_defeatured", {})
         if key in cache:
@@ -1500,6 +1506,27 @@ class _Reader:
             out = None
         cache[key] = out
         return out
+
+    def _too_big_to_defeature(self, shape):
+        """The part has too many faces for OpenCASCADE's defeaturing (DEFEATURE_MAX_FACES): said
+        once in the notes; its holes, chamfers and fillets then stay in the base."""
+        counts = self.__dict__.setdefault("_face_counts", {})  # (len(Faces) of 3,000: 0.1 s)
+        count = counts.get(id(shape))
+        if count is None:
+            try:
+                count = counts[id(shape)] = len(shape.Faces)
+            except Exception:
+                return False
+        if count <= DEFEATURE_MAX_FACES:
+            return False
+        if not self.__dict__.get("_said_too_big"):
+            self._said_too_big = True
+            self.notes.append(
+                "The part has %d faces: taking features off a part this size (OpenCASCADE's "
+                "defeaturing) can take many minutes and cannot be stopped, so its holes, "
+                "chamfers and fillets are not taken off the base shape here." % count
+            )
+        return True
 
     def _untangled(self, holes):
         """The holes but those whose faces meet many other faces (a bore crossed by a ring of
@@ -1541,6 +1568,8 @@ class _Reader:
         accepted = list(start)
         rejected = []
         began = time.time()
+        if self._too_big_to_defeature(self.shape if shape is None else shape):
+            return [], list(groups)
 
         def attempt(candidates):
             if not candidates:

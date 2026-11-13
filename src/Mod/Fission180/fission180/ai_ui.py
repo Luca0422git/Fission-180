@@ -319,10 +319,20 @@ class AddAIDialog(QtWidgets.QDialog):
             if not bridge.allowed():
                 bridge.set_allowed(True)
                 self.allow.setChecked(True)
-            self.text.setPlainText(
+            text = (
                 "The extension file is %s. It opens in Claude Desktop now: click Install there."
                 % path
             )
+            if configured().get("claude"):
+                # (one connection only: Luca had both, "Fission 180" and "fission180", and the
+                # extension's stopped answering, 2026-11-13)
+                removed = installers.remove_from_claude_desktop()
+                log("AI: extension chosen, settings-file entry removed")
+                text += (
+                    " Fission 180 was also set up in Claude Desktop's settings file; that entry "
+                    "is removed so Claude has one connection to Fission 180. " + removed
+                )
+            self.text.setPlainText(text)
             _open_file(path)
         except Exception as exc:
             warn("AI: extension: %s" % exc)
