@@ -231,7 +231,13 @@ GOALS = (
      ("create_study", "add_constraint", "add_load", "solve_study", "study_results")),
     ("CNC, milling, machining, toolpaths, G-code, post process",
      ("cam_setup", "cam_operation", "cam_generate", "cam_simulate", "cam_post")),
-    ("3D print, slicer, STL or 3MF for the printer", ("export", "check_design")),
+    ("3D print, slicer, STL or 3MF for the printer", ("print_part", "export", "check_design")),
+    ("export everything, every format at once", ("export_everything",)),
+    ("stress at a point, probe the results, results report, show the results",
+     ("study_probe", "study_report", "show_study_results")),
+    ("setup sheet for the machinist, tool library", ("cam_setup_sheet", "cam_tool_library")),
+    ("title block, balloons, renumber, drawing sheet", ("edit_title_block", "edit_balloons",
+                                                        "drawing_sheet")),
     ("technical drawing, 2D drawing, dimensions on paper, PDF, title block, parts list",
      ("create_drawing", "add_drawing_view", "add_drawing_dimension", "export_drawing")),
     ("animation, exploded view, assembly instructions video, storyboard",
@@ -558,8 +564,11 @@ def _answered(qid, text, facts):
 
 
 # -- route steps ------------------------------------------------------------------------------
-def _step(tool, why, args=None, when=None, kind=None):
+def _step(tool, why, args=None, when=None, kind=None, alt=None):
+    """One step of a route; alt: (tool, args) used instead where `tool` is not there."""
     out = {"tool": tool, "why": why}
+    if alt:
+        out["alt"] = alt
     if args:
         out["args"] = dict(args)
     if when:
@@ -937,6 +946,11 @@ def _route_strength(text, facts, target):
         _step("precheck_study", "everything the solve needs, before the long part"),
         _step("solve_study", "mesh and solve (CalculiX); the window waits meanwhile"),
         _step("study_results", "safety factor, stress and displacement with where they are"),
+        _step(
+            "study_probe",
+            "the numbers at the places that matter (a hole's edge, a face)",
+            when="when the person asks about a place",
+        ),
     ]
     if facts and facts.get("gui"):  # (right after the study exists: SIMULATION needs one)
         steps.insert(
@@ -946,6 +960,12 @@ def _route_strength(text, facts, target):
                 "the person sees the study as you build it",
                 {"workspace": "simulation"},
             ),
+        )
+        steps.append(
+            _step(
+                "show_study_results",
+                "the results in the window, as the RESULTS tab shows them",
+            )
         )
     return {
         "goal": "find out whether it is strong enough (Static Stress)",
@@ -976,6 +996,11 @@ def _route_cnc(text, facts, target):
         _step("cam_generate", "the toolpaths"),
         _step("cam_simulate", "the cut checked: collisions and what stock is left"),
         _step("cam_post", "the G-code for the machine's controller"),
+        _step(
+            "cam_setup_sheet",
+            "the setup sheet for whoever runs the machine",
+            when="when the person wants it",
+        ),
     ]
     if facts and facts.get("gui"):
         steps.insert(
@@ -1120,7 +1145,11 @@ def _route_print(text, facts, target):
                 when="only when inspect_mesh says it is open or broken",
             ),
             _step(
-                "export", "the mesh prints as it is: no need to make it a solid", {"format": "3mf"}
+                "print_part",
+                "the mesh prints as it is: no need to make it a solid (send_to slicer, or a "
+                "3MF file)",
+                {"bodies": [mesh.get("id")]} if mesh.get("id") else None,
+                alt=("export", {"format": "3mf"}),
             ),
         ]
         size = {"triangles": mesh.get("triangles") or 0}
@@ -1128,7 +1157,12 @@ def _route_print(text, facts, target):
         steps = [
             _step("check_design", "every body one valid, closed solid; no overlaps"),
             _step("physical_properties", "size and mass in the print material"),
-            _step("export", "the file for the slicer", {"format": "3mf"}),
+            _step(
+                "print_part",
+                "UTILITIES > MAKE > 3D Print: to the person's slicer (send_to slicer) or a 3MF "
+                "file; it says whether every body is watertight",
+                alt=("export", {"format": "3mf"}),
+            ),
         ]
         size = {"faces": (solid or {}).get("faces") or 0}
     return {
@@ -1162,6 +1196,11 @@ def _route_drawing(text, facts, target):
         _step(
             "add_drawing_annotation",
             "centre marks on holes, notes" + (", parts list and balloons" if assembly else ""),
+        ),
+        _step(
+            "edit_title_block",
+            "the title block's fields (name, material, drawn by)",
+            when="when the person says what goes in it",
         ),
         _step("get_drawing", "every view, dimension and table, to check without a picture"),
         _step("export_drawing", "the PDF (or DXF)", {"format": "pdf"}),
@@ -1674,6 +1713,9 @@ def plan(request, facts=None, target=None, tools=None):
         )
         for step in part["steps"]:
             tool = step["tool"]
+            if tools is not None and tool not in tools and step.get("alt"):
+                step = dict(step, tool=step["alt"][0], args=step["alt"][1])
+                tool = step["tool"]
             if tools is not None and tool not in tools:
                 missing.append(tool)
                 continue

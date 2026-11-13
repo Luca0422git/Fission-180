@@ -350,7 +350,9 @@ class Workspaces(unittest.TestCase):
         r = plan("make it on my CNC", PLATE_FACTS)
         self.assertEqual(goals(r), ["cnc"])
         self.assertEqual(route(r)[0], "show_workspace")
-        self.assertEqual(route(r)[-1], "cam_post")
+        self.assertLess(route(r).index("cam_generate"), route(r).index("cam_post"))
+        sheet = [s for s in r["route"] if s["tool"] == "cam_setup_sheet"]
+        self.assertTrue(sheet and sheet[0]["when"])  # (only when the person wants it)
         self.assertIn("machine", asked(r))
         self.assertIn("stock", asked(r))
         haas = plan(
@@ -365,11 +367,16 @@ class Workspaces(unittest.TestCase):
     def test_print_a_part_and_print_a_mesh(self):
         r = plan("3D print this", PLATE_FACTS)
         self.assertEqual(goals(r), ["print"])
-        self.assertEqual(route(r)[-1], "export")
+        self.assertEqual(route(r)[-1], "print_part")  # (UTILITIES > MAKE > 3D Print)
         self.assertIn("printer", asked(r))
+        bare = {k: v for k, v in TOOLS.items() if k != "print_part"}
+        older = plan("3D print this", PLATE_FACTS, tools=bare)
+        self.assertEqual(older["route"][-1]["tool"], "export")  # (where there is no 3D Print)
+        self.assertEqual(older["route"][-1]["args"], {"format": "3mf"})
         mesh = plan("print the mesh on my Prusa", RELIC_FACTS, RELIC)
         self.assertEqual(goals(mesh), ["print"])
         self.assertNotIn("convert_mesh", route(mesh))  # (a mesh prints as it is)
+        self.assertEqual(mesh["route"][-1]["args"], {"bodies": ["Mesh"]})
         self.assertEqual(asked(mesh), [])
 
     def test_a_drawing(self):
