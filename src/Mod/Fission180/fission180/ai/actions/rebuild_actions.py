@@ -206,6 +206,8 @@ def describe_reference(ctx, args):
         data = _without_face_lists(data)
     # (wave 8) never thousands of facets listed one by one: a list an AI then copied
     data = _short_unrecognized(data, UNRECOGNIZED_FACES.get(detail, 8))
+    if detail == "plan":
+        data = _patterns_folded(data)
     target = rebuild.target_of(ref)
     head = {
         "reference": ref.Name,
@@ -222,11 +224,14 @@ def describe_reference(ctx, args):
     head.pop("timing", None)  # (in the log: an answer is the same every time it is asked)
     head.pop("timing_detail", None)
     plan = data.get("plan") or []
-    words = "%s, read from its %d faces: %d feature%s, a plan of %d step%s" % (
+    copies = data.get("pattern_copies_not_listed") or 0
+    count = len(data.get("features") or []) + copies
+    words = "%s, read from its %d faces: %d feature%s%s, a plan of %d step%s" % (
         ref.SourceLabel,
         (data.get("summary") or {}).get("faces", 0),
-        len(data.get("features") or []),
-        "" if len(data.get("features") or []) == 1 else "s",
+        count,
+        "" if count == 1 else "s",
+        (" (%d of them pattern copies, named by id in their pattern)" % copies) if copies else "",
         len(plan),
         "" if len(plan) == 1 else "s",
     )
@@ -248,6 +253,26 @@ def describe_reference(ctx, args):
 
 
 UNRECOGNIZED_FACES = {"plan": 8, "summary": 8, "full": 200}  # face selectors per group
+
+
+def _patterns_folded(data):
+    """The answer with the copies of each pattern left out of features (the pattern keeps
+    their ids, its first one is listed): eighty equal holes are one hole and one pattern, and
+    were eighty entries an AI read one by one (wave 8, the Relic stand-in: 81 features)."""
+    features = data.get("features")
+    if not isinstance(features, list):
+        return data
+    copies = set()
+    for feature in features:
+        if isinstance(feature, dict) and feature.get("kind") == "pattern":
+            members = feature.get("features") or []
+            copies.update(m for m in members if m != feature.get("of"))
+    if not copies:
+        return data
+    out = dict(data)
+    out["features"] = [f for f in features if not (isinstance(f, dict) and f.get("id") in copies)]
+    out["pattern_copies_not_listed"] = len(copies)
+    return out
 
 
 def _short_unrecognized(data, cap):

@@ -34,6 +34,7 @@ call). [Before you build](fission180://docs/handbook.md#before-you-build) has th
 | [An assembly drawing with an exploded view](fission180://docs/recipes/assembly-drawing.md) | components, a storyboard, an exploded view, a parts list with balloons, Renumber and Align Balloons, the parts list as CSV |
 | [A sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) | the flat pattern drawn with its size, a bend table, bend notes, the folded part beside it, CSV and DXF |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
+| [A mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md) | inspect_mesh first, the questions to ask, convert_mesh for a solid now, repair and reduce first, the main shapes by hand when describe_reference reads no plan (domes), what each costs on 1,000 to 94,000 triangles |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about
 450 small designs with measured results) by words, tool or op, and

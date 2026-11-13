@@ -522,6 +522,97 @@ SESSION = [
 ]
 
 
+# -- speed: every mesh tool on three sizes (docs/fission180/parity/ai.md, "Wave 8 coverage:
+# mesh") ------------------------------------------------------------------------------------
+SIZES = {
+    # name: (plate size, grid of holes, deflection): about 1,000 / 9,000 / 50,000 / 94,000
+    # triangles
+    "1k": ((80.0, 60.0, 5.0), (4, 3), (0.05, 0.8)),
+    "9k": (PLATE, GRID, DEFLECTION["holes"]),
+    "50k": ((150.0, 100.0, 5.0), (25, 17), (0.02, 0.5)),
+    "100k": ((150.0, 100.0, 5.0), (30, 20), (0.01, 0.4)),
+}
+SPEED_CALLS = [
+    # (tool, args, undo after it)
+    ("inspect_mesh", {}, False),
+    ("inspect_mesh", {"detail": "groups"}, False),
+    ("convert_mesh", {"allow_slow": True}, True),
+    ("convert_mesh", {"method": "faceted", "allow_slow": True}, True),
+    ("mesh_prepare", {"kind": "repair"}, True),
+    ("mesh_prepare", {"kind": "generate_face_groups"}, True),
+    (
+        "mesh_prepare",
+        {"kind": "create_face_group", "faces": {"box": [0, 0, 4.9, 200, 200, 5.1]}},
+        True,
+    ),
+    ("mesh_prepare", {"kind": "make_closed"}, True),
+    ("mesh_modify", {"kind": "remesh"}, True),
+    ("mesh_modify", {"kind": "reduce", "target": "proportion", "proportion": 50}, True),
+    ("mesh_modify", {"kind": "plane_cut", "plane": "XY", "distance": 4, "fill": "minimal"}, True),
+    ("mesh_modify", {"kind": "plane_cut", "plane": "YZ", "distance": 10, "fill": "uniform"}, True),
+    ("mesh_modify", {"kind": "shell", "thickness": 0.5}, True),
+    ("mesh_modify", {"kind": "smooth"}, True),
+    ("mesh_modify", {"kind": "reverse_normal"}, True),
+    ("mesh_modify", {"kind": "erase_and_fill", "faces": {"points": [[1, 1, 5]]}}, True),
+    ("mesh_modify", {"kind": "delete_faces", "faces": {"box": [0, 0, 4.9, 20, 20, 5.1]}}, True),
+    (
+        "mesh_modify",
+        {
+            "kind": "direct_edit",
+            "edits": [
+                {"op": "move", "faces": {"points": [[1, 1, 5]]}, "direction": "z", "distance": 1}
+            ],
+        },
+        True,
+    ),
+    ("mesh_section_sketch", {"plane": "XY", "distance": 2.5}, True),
+    ("start_rebuild", {"body": "Plate"}, False),
+    ("describe_reference", {}, False),
+]
+
+
+def measure_speed(folder, sizes=("1k", "9k", "50k"), skip=()):
+    """Every mesh tool once on each size of the Relic stand-in (holes), each change undone
+    after: [(size, triangles, tool, kind, seconds, ok, first words)]. The rebuild calls only
+    up to start_rebuild's 10,000 triangles. `skip`: (size, tool, kind) left out."""
+    import time
+
+    from fission180.ai import headless
+
+    host = headless.HeadlessHost(allow_overwrite=True)
+    rows = []
+    for size in sizes:
+        plate, grid, deflection = SIZES[size]
+        path = os.path.join(folder, "speed-%s.stl" % size)
+        triangles = write_stl(path, "holes", deflection, size=plate, grid=grid)
+        headless.call("new_design", {"name": "Speed %s" % size}, host)
+        headless.call("import_file", {"path": path, "label": "Plate"}, host)
+        for tool, args, undo in SPEED_CALLS:
+            kind = args.get("kind") or args.get("method") or args.get("detail") or ""
+            if (size, tool, kind) in skip or (
+                tool in ("start_rebuild", "describe_reference") and triangles > 10000
+            ):
+                continue
+            began = time.perf_counter()
+            answer = headless.call(tool, args, host)
+            seconds = time.perf_counter() - began
+            rows.append(
+                (
+                    size,
+                    triangles,
+                    tool,
+                    kind,
+                    round(seconds, 2),
+                    not answer["is_error"],
+                    answer["text"][:160].replace("\n", " "),
+                )
+            )
+            print("[Fission 180] mesh speed %s %d %s %s %.2f s %s" % rows[-1][:6], flush=True)
+            if undo and not answer["is_error"]:
+                headless.call("undo", {}, host)
+    return rows
+
+
 class AppLabels:
     """Fission 180's own document setting for the session: labels may repeat (theme.py sets it
     in the app; a mesh step carries its body's name, a piece "<name> (2)"). Headless FreeCAD

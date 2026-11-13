@@ -418,18 +418,17 @@ define(
     "mesh",
     "MESH > MODIFY > Remesh, Reduce, Plane Cut, Shell, Smooth, Combine, Separate, Reverse "
     "Normal, Direct Edit, Erase and Fill, Delete Faces",
-    "Change a mesh body as a MODIFY dialog does (one undo step, one timeline step; the "
-    "body keeps its name). kind remesh (even or adaptive faces, density 0..1); reduce "
-    "(fewer faces: target tolerance mm | proportion % kept | face_count); plane_cut (plane "
-    "XY | XZ | YZ or a construction plane, distance along its normal, angle_x / angle_y; "
-    "cut_type trim removes the side the normal points to (XY: +Z, XZ: -Y, YZ: +X; flip the "
-    "other) | split_body | split_faces; fill closes the cut); shell (hollow, thickness mm); "
-    "smooth (smoothness 0..1); combine (tools: other mesh bodies; join | cut | intersect | "
-    "merge); separate (shells or face groups into bodies); reverse_normal; erase_and_fill / "
-    "delete_faces (faces taken away, the gap filled or left open); direct_edit (edits on "
-    "picked faces: delete, erase_fill, group, reverse, move, smooth). groups / faces limit "
-    "smooth, reverse_normal, separate to those faces. Answers triangles, closed or not, "
-    "seconds.",
+    "Change a mesh body as a MODIFY dialog does (one undo and timeline step; the body keeps "
+    "its name). kind remesh (density 0..1); reduce (target tolerance mm | proportion % kept | "
+    "face_count: before a slow convert); plane_cut (plane XY | XZ | YZ or a construction "
+    "plane, moved distance mm, tilted angle_x / angle_y; trim removes the side its normal "
+    "points to, XY +Z, XZ -Y, YZ +X, flip the other; split_body; split_faces; fill uniform "
+    "can be slow on a cut through many holes: minimal is quick); shell (thickness mm); "
+    "smooth (scans: it rounds a CAD part's edges); combine (tools; join | cut | intersect | "
+    "merge; bodies sharing a flat face: exact up to 5,000 faces, else refused); separate; "
+    "reverse_normal; erase_and_fill / delete_faces (faces); direct_edit (edits: delete, "
+    "erase_fill, group, reverse, move, smooth). groups / faces limit smooth, reverse_normal, "
+    "separate. Answers triangles, closed or not, time.",
     schema(
         {
             "kind": enum(MODIFY_KINDS),
@@ -541,8 +540,9 @@ define(
     "Make a mesh body from a solid body, as MESH > Tessellate does (one undo step): each face "
     "of the solid becomes a face group. refinement low | medium (default) | high | custom "
     "(surface_deviation mm, normal_deviation degrees); max_edge_length (mm) splits longer "
-    "edges. The solid body stays. Use it to reach the MESH tools from a design (shell, smooth, "
-    "remesh for printing) or to test a mesh workflow; to export an STL, export does it.",
+    "edges. The solid body is used up (hidden: the mesh body takes its place, as in Fusion; "
+    "undo brings it back). Use it to reach the MESH tools from a design (shell, remesh for "
+    "printing); to export an STL, export does it without changing the design.",
     schema(
         {
             "body": string("the solid body (or a step in it)"),

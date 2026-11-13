@@ -17,8 +17,14 @@ Fission 180's tests; `expect` is what the answer must contain.
   you a message naming the body; the rebuild is already started).
 - The part is a body without a timeline (an imported STEP body shows one "Insert STEP" step)
   or a mesh body. A mesh must be watertight (start_rebuild refuses one with holes and says
-  so); simple parts work best: plates, brackets, blocks with holes, pockets and bosses,
-  turned parts, fillets and chamfers.
+  so: `mesh_prepare` kind repair first) and of at most 10,000 triangles (`mesh_modify` kind
+  reduce first); simple parts work best: plates, brackets, blocks with holes, pockets and
+  bosses, turned parts, fillets and chamfers.
+- **A mesh: ask first.** Most people with an STL want a solid they can cut, fillet or print,
+  and `convert_mesh` makes that in one call, in seconds. Rebuild only when they want an
+  editable timeline (sizes to change later). Read
+  [a mesh into a solid](fission180://docs/recipes/mesh-to-solid.md) for the choice, the
+  questions and what each route costs.
 
 ## The loop
 
@@ -79,6 +85,15 @@ Fission 180's tests; `expect` is what the answer must contain.
 - **Meshes.** A mesh becomes the reference as flat facets: sizes come out rounded (a 5.98 mm
   hole of 32 facets is "about 6"), match stays a little under 1 where round faces are
   facets, and faces are matched within the mesh's tolerance. Build round holes, not polygons.
+  start_rebuild on a mesh says what it is made of (its big flat faces, its round or
+  free-form details grouped, a grid of equal ones). describe_reference reads plates, blocks,
+  round holes, pockets and bosses along X, Y or Z from the facets, and folds a pattern's
+  copies into the pattern. Domes, fillets and free-form areas it cannot fit: then its answer
+  starts "No plan could be read from this mesh", says what the mesh is made of and gives
+  the two honest routes: undo and `convert_mesh` (a solid now), or the main shapes by hand
+  (the base, each detail once, the pattern it names). Ask the person which. Never copy
+  facets: a sketch of 60 or more straight lines or 30 or more steps in a mesh's rebuild makes
+  compare_to_reference warn ("Careful: this looks like copying the mesh's facets").
 - **When a step fails,** read the sentence (the usual causes are in
   [troubleshooting](fission180://docs/troubleshooting.md#rebuilding-a-part-auto-timeline)),
   fix the arguments, call it again; `undo` takes back a step that came out wrong. The
@@ -207,8 +222,9 @@ its corners are still rounded: the rebuild is a part a person can change.
   (hidden, renamed `<name> (original)`).
 - **Several rebuilds in one design:** each call takes `reference` (the reference's id, or the
   original's or the rebuilt body's); without it the tools use the rebuild of the active body.
-- **A mesh body** (from `import_file` of an STL): `start_rebuild` with the mesh body's id;
-  the rest is the same.
+- **A mesh body** (from `import_file` of an STL): `inspect_mesh` first, then `start_rebuild`
+  with the mesh body's id; the rest is the same. When describe_reference reads no plan, see
+  [a mesh into a solid](fission180://docs/recipes/mesh-to-solid.md), section 4.
 - **A person rebuilding by hand** uses the same pieces in the window: UTILITIES > AI >
   Compare with Reference (the numbers, missing material red and extra green in the 3D view)
   and Finish Rebuild.
