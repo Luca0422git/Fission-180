@@ -1020,12 +1020,12 @@ def motion_study():
 
 
 def moved_parts():
-    """Two jointed components, the pin then dragged away (a position not captured yet: what
-    a drag does, joints.remember_places first)."""
+    """Two components, the pin then dragged away (a position not captured yet: what a drag
+    does, joints.remember_places first)."""
     import FreeCAD as App
     from fission180 import joints
 
-    b, base, pin = two_parts(joined=True)
+    b, base, pin = two_parts()  # (no joint: a rigid one would put the pin back)
     joints.remember_places(tp.doc(), [pin])
     place = pin.Placement
     place.Base = place.Base + App.Vector(25, 0, 0)
@@ -1165,30 +1165,17 @@ def component_colors():
 
 @picture("solid_component_swatch.png")
 def component_swatch():
-    """The browser's component rows with their colour marks (and the timeline's steps)."""
-    from PySide import QtCore, QtWidgets
-
+    """The browser's component rows with their colour marks: the window's left column, from
+    the Base component's row down to the Pin's (the browser's rows read through Qt are not
+    where it draws them: its tree is drawn by a delegate in a dock)."""
     two_parts(joined=True)
     tp.run_command("Fission180_ComponentColorSwatch")
     tp.wait(600)
-    main = tp._gui().getMainWindow()
-    shot = tp.grab(main)
-    top = None
-    for tree in main.findChildren(QtWidgets.QTreeWidget):
-        if tree.mapTo(main, tree.rect().topLeft()).x() > 300:  # (the browser, at the left)
-            continue
-        for label in ("Base", "Pin"):
-            found = tree.findItems(label, QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive)
-            for item in found:
-                rect = tree.visualItemRect(item)
-                if rect.height() <= 0:
-                    continue
-                y = tree.viewport().mapTo(main, rect.topLeft()).y()
-                top = y if top is None else min(top, y)
+    shot = tp.grab(tp._gui().getMainWindow())
     tp.run_command("Fission180_ComponentColorSwatch")
-    if top is None:
-        raise RuntimeError("the browser's component rows were not found")
-    return tp.dialog_picture(shot, area=(0, max(0, top - 30), 300, 190), scale=1.0)
+    # rows of 26 px from the design's row at y 178: Document Settings, Units, Named Views,
+    # Joints, Rigid 1, then Base (y 334) ... Pin (y 490)
+    return tp.dialog_picture(shot, area=(0, 322, 300, 190), scale=1.0)
 
 
 @picture("solid_properties.png")

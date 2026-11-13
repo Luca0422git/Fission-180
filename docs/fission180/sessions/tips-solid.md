@@ -45,8 +45,9 @@ tabs' texts and made their pictures.
 | Menu | Enable Contact Sets / All Contact / Disable Contact, Capture / Revert Position, Component Drag | the ribbon menu with the entry lit (on / off choices without a dialog) |
 | Selection | SELECT's 17 | a part with what the selection takes in the blue; Window / Freeform / Paint / Select Through draw the box, the loop or the stroke in the accent blue |
 
-Measured: about 4 to 5 s a before / after picture, 2 to 3 s a dialog, on this sandbox with
-ten builders sharing four CPUs (the whole SOLID set about 30 minutes, SURFACE 70 s).
+Measured (the runner's report, this sandbox with ten builders sharing four CPUs): the 127
+SOLID pictures in 467 s (3.7 s each: a before / after about 4 to 5 s, a dialog 2 to 3 s),
+the 14 SURFACE ones in 66 s.
 
 ## Fusion's tooltips (sources)
 
