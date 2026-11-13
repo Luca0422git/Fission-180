@@ -193,7 +193,13 @@ def shape_facts(shape):
                 _KEPT.insert(0, _KEPT.pop(i))
             return facts
     facts = {}
-    _KEPT.insert(0, (shape, facts))
+    try:  # (a wrapper of its own over the same OpenCASCADE shape: a caller that moves its
+        import Part  # shape afterwards in place, transformShape, does not move the key)
+
+        key = Part.Shape(shape)
+    except Exception:
+        key = shape
+    _KEPT.insert(0, (key, facts))
     del _KEPT[KEEP:]
     return facts
 
