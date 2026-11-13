@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fission 180 offers 216 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
+Fission 180 offers 222 tools to AI apps (through MCP, the built-in chat panel and the command line), listed here in the order tools/list gives them. All lengths are in millimetres (mm) and all angles in degrees. Every tool that changes the design is one undo step named "AI: ..."; errors come back as plain sentences. Each tool has a reference page (reference/<tool>.md: every argument, the answer, the errors and a complete example with its real answer); the resource fission180://tools has every schema as JSON.
 
 ## All tools
 
@@ -224,6 +224,12 @@ Fission 180 offers 216 tools to AI apps (through MCP, the built-in chat panel an
 | [`compute_all`](fission180://docs/reference/compute_all.md) | Compute all | Timeline (history) | SOLID > MODIFY > Compute All (Ctrl+B) | changes the design (one undo step) | an open design |
 | [`analysis`](fission180://docs/reference/analysis.md) | Surface analysis | Inspect and measure | INSPECT > Draft / Minimum Radius / Curvature Map / Accessibility / Zebra / Environmental Map / Curvature Comb / Isocurve Analysis | read-only | an open design |
 | [`component_colors`](fission180://docs/reference/component_colors.md) | Component colors | Inspect and measure | INSPECT > Display Component Colors (Shift+N) / Component Color Swatch | changes the design (one undo step) | an open design |
+| [`inspect_mesh`](fission180://docs/reference/inspect_mesh.md) | Inspect mesh | Mesh | MESH > PREPARE > Repair (its analysis), Properties of a mesh body | read-only | an open design |
+| [`convert_mesh`](fission180://docs/reference/convert_mesh.md) | Convert mesh | Mesh | MESH > CONVERT > Convert Mesh | changes the design (one undo step) | an open design |
+| [`mesh_prepare`](fission180://docs/reference/mesh_prepare.md) | Prepare mesh | Mesh | MESH > PREPARE > Repair, Generate Face Groups, Create Face Group, Combine Face Groups; MESH > MODIFY > Make Closed Mesh | changes the design (one undo step) | an open design |
+| [`mesh_modify`](fission180://docs/reference/mesh_modify.md) | Modify mesh | Mesh | MESH > MODIFY > Remesh, Reduce, Plane Cut, Shell, Smooth, Combine, Separate, Reverse Normal, Direct Edit, Erase and Fill, Delete Faces | changes the design (one undo step) | an open design |
+| [`tessellate`](fission180://docs/reference/tessellate.md) | Tessellate | Mesh | MESH > CREATE > Tessellate | changes the design (one undo step) | an open design |
+| [`mesh_section_sketch`](fission180://docs/reference/mesh_section_sketch.md) | Mesh section sketch | Mesh | MESH > CREATE > Create Mesh Section Sketch | changes the design (one undo step) | an open design |
 
 ## Help
 
@@ -358,6 +364,15 @@ Fission 180 offers 216 tools to AI apps (through MCP, the built-in chat panel an
 - [`snap_fit`](fission180://docs/reference/snap_fit.md): Fusion's Snap Fit: a cantilever hook at each point between two bodies (a lid and its box) and the part it catches on the other body.
 - [`lip`](fission180://docs/reference/lip.md): Fusion's Lip (Lip, Groove or Lip And Groove): a lip on the rim of one half of a plastic part and the matching groove in the other half, so the two locate and seal.
 - [`design_advice`](fission180://docs/reference/design_advice.md): Fusion's Design Advice, read only: check plastic bodies for moulding problems against their plastic rule and say where: walls too thin or too thick (thickness), thickness that varies too much (variation), faces with too little draft for the pull direction (draft), knife edges (knife) and undercuts (undercut).
+
+## Mesh
+
+- [`inspect_mesh`](fission180://docs/reference/inspect_mesh.md): Read a mesh body before changing it (an STL / OBJ / 3MF from import_file, a tessellated body or a MESH step).
+- [`convert_mesh`](fission180://docs/reference/convert_mesh.md): Make a solid body from a closed mesh body (MESH > Convert Mesh).
+- [`mesh_prepare`](fission180://docs/reference/mesh_prepare.md): Get a mesh body ready, as the PREPARE dialogs do (one undo step, a step in the timeline).
+- [`mesh_modify`](fission180://docs/reference/mesh_modify.md): Change a mesh body as a MODIFY dialog does (one undo and timeline step; the body keeps its name).
+- [`tessellate`](fission180://docs/reference/tessellate.md): Make a mesh body from a solid body (MESH > Tessellate).
+- [`mesh_section_sketch`](fission180://docs/reference/mesh_section_sketch.md): Make a sketch of where a plane cuts a mesh body (Create Mesh Section Sketch).
 
 ## Construct
 
@@ -496,8 +511,8 @@ Fission 180 offers 216 tools to AI apps (through MCP, the built-in chat panel an
 
 ## Rebuild with a timeline
 
-- [`start_rebuild`](fission180://docs/reference/start_rebuild.md): Start rebuilding a part that has no timeline as real, editable timeline steps (Auto Timeline): an imported STEP body, any solid body, or a mesh body (made into a solid first; an open or broken mesh, or one of more than 10,000 triangles, is refused).
-- [`describe_reference`](fission180://docs/reference/describe_reference.md): What the reference of a rebuild is made of, read by Fission 180 from its faces: summary (volume, area, size, counts, the kinds of faces), base (the base shape: an extrude with its plane, profile and distance, a revolve, a box...), features (holes, counterbores, pockets, bosses, slots, fillets, chamfers, patterns, each with its numbers and the faces it explains), plan (tool calls in Fusion's order: base shape, cuts and bosses, holes, patterns, chamfers, fillets last; each step's args pass the tool's own check, so send them as they are, adjusting ids the answers give), unrecognized (faces it could not read, with selectors and why), confidence (0..1) and notes.
+- [`start_rebuild`](fission180://docs/reference/start_rebuild.md): Start rebuilding a part that has no timeline as real, editable timeline steps (Auto Timeline): an imported STEP body, any solid body, or a mesh body (made into a solid first; an open or broken mesh, or one of more than 10,000 triangles, is refused; for a mesh ask the person first: a solid without a timeline is one convert_mesh call).
+- [`describe_reference`](fission180://docs/reference/describe_reference.md): What the reference of a rebuild is made of, read by Fission 180 from its faces: summary (volume, area, size, counts, the kinds of faces), base (the base shape: an extrude with its plane, profile and distance, a revolve, a box...), features (holes, counterbores, pockets, bosses, slots, fillets, chamfers, patterns, each with its numbers), plan (tool calls in Fusion's order: base, cuts and bosses, holes, patterns, chamfers, fillets last; send each step's args as they are, adjusting ids the answers give), unrecognized (faces it could not read, why), confidence (0..1) and notes.
 - [`compare_to_reference`](fission180://docs/reference/compare_to_reference.md): How far the rebuilt body is from the reference, to call after every feature: match (common volume / union volume; 1 is identical), volume (reference, rebuilt, common, missing, extra in mm3), missing (material of the original the rebuild lacks) and extra (material the rebuild has and the original does not: a hole not cut yet is extra material shaped like a cylinder), each region with its volume, centre, box, kind, what it looks like ('a round hole about 6 mm across, 10 deep', 'a rounded edge, radius about 2', 'a block 10 x 5 x 3') and, when Fission 180 is sure, fix: the tool call that makes it (a Single Hole, a fillet of exactly those edges); groups (equal regions together, with one fix for all of them); faces (how many of the original's faces the rebuild matches by geometry, and the unmatched ones of each side with a description and a selector); deviation (how far the surfaces are apart, max and mean, mm); size_notes; done (match >= 0.999, every face of the original matched and none of the rebuild left over); and verdict: what to do next, in words.
 - [`finish_rebuild`](fission180://docs/reference/finish_rebuild.md): Finish a rebuild: the rebuilt body takes the original's name (unless it was given one of its own meanwhile), component and place, with its timeline; the original (the featureless body or the mesh body) is deleted, or kept hidden as '<name> (original)' with keep_original: true; the reference is removed (keep_reference: true keeps it, hidden).
 

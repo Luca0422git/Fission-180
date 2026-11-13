@@ -12,7 +12,7 @@ Find tools: by goal in plain words (goal "round the edges", "make it hollow", "t
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `category` | `help` \| `document` \| `inspect` \| `sketch` \| `create` \| `modify` \| `surface` \| `sheet_metal` \| `plastic` \| `construct` \| `assemble` \| `timeline` \| `parameters` \| `import_export` \| `drawing` \| `view` \| `simulate` \| `manufacture` \| `animation` \| `rebuild` |  |  |  |  |
+| `category` | `help` \| `document` \| `inspect` \| `sketch` \| `create` \| `modify` \| `surface` \| `sheet_metal` \| `plastic` \| `mesh` \| `construct` \| `assemble` \| `timeline` \| `parameters` \| `import_export` \| `drawing` \| `view` \| `simulate` \| `manufacture` \| `animation` \| `rebuild` |  |  |  |  |
 | `workspace` | `design` \| `simulation` \| `manufacture` \| `animation` \| `drawing` \| `any` |  |  |  | the workspace whose tools to list |
 | `goal` | string |  |  |  | what you want to do, in plain words |
 

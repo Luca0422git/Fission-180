@@ -122,6 +122,7 @@ Done: AI: Hole 5.5 mm. Its id is 'Hole1'. Bodies now: Body1: 23461.1 mm3, 60 x 4
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
 - Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)

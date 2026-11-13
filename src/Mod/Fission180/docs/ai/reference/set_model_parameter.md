@@ -60,6 +60,7 @@ Done: Extrude1 Distance = 12.0. Bodies now: Body1: 28800 mm3, 60 x 40 x 12 mm.
 
 ## See also
 
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

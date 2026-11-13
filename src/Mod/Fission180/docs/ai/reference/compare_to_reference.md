@@ -139,5 +139,6 @@ Match 0.9791 (1 is identical); 6 of 7 faces of the original matched. Next: A rou
 
 ## See also
 
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)
