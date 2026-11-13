@@ -139,7 +139,7 @@ x / y axes; on a face that faces +Z (a top face) they are the design's X and Y, 
 | Selection (clicking faces / edges) | selectors: objects that describe the geometry ([selectors.md](fission180://docs/selectors.md)) |
 | INSPECT (Measure, Interference, Section Analysis, Center of Mass) | `measure`, `interference`, `section_analysis`, `center_of_mass`, `physical_properties`; plus `inspect_design`, `query_geometry`, `check_design`, `diff_design` for an AI |
 | Physical Material, Appearance | `physical_material` (density, mass), `appearance` (colour), `list_materials` |
-| Drawings | `create_drawing`, `add_drawing_view`, `add_drawing_dimension`, `add_drawing_annotation`, `get_drawing`, `export_drawing` |
+| Drawings (the DRAWING workspace, every command) | `create_drawing`, `add_drawing_view` (base, projected, section, detail, break, breakout, exploded), `edit_drawing_view`, `modify_drawing` (move, rotate, delete), `edit_title_block`, `drawing_sheet`, `add_drawing_dimension` (every kind, ordinate, baseline, chain, arc length), `edit_drawing_dimension`, `add_drawing_annotation` (text, leader, bend note, parts list, bend table, balloon), `add_drawing_geometry`, `add_drawing_symbol`, `edit_balloons`, `get_drawing` (everything back, and a picture), `export_drawing` (PDF, DXF, DWG, CSV); recipes [part drawing](fission180://docs/recipes/part-drawing.md), [assembly drawing](fission180://docs/recipes/assembly-drawing.md), [sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) |
 | File > Export / Insert | `export` (STEP, IGES, STL, 3MF, OBJ, BREP, DXF), `import_file`, `save`, `save_as`, `open_design` |
 
 <a id="timeline-and-history-marker"></a>

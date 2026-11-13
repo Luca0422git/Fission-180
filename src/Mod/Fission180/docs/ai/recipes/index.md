@@ -21,6 +21,9 @@ calls, change the sizes, and check with the same tools.
 | [Curved panel from a surface patch](fission180://docs/recipes/surface-patch.md) | 3D boundary curves, surface patch, thicken, surface bodies |
 | [Parametric mounting plate](fission180://docs/recipes/parametric-plate.md) | user parameters, sketch dimensions and model parameters with expressions, a pattern that follows, change and verify |
 | [Is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md) | a simulation study: fixed holes, a force, pre-check, solve, safety factor and reactions, thicken and solve again |
+| [A fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md) | drawing views, every dimension kind (sizes, ordinates, baseline), a fit and tolerances, centre marks, datum and position tolerance, section and detail, title block, checking with get_drawing and its picture, DXF |
+| [An assembly drawing with an exploded view](fission180://docs/recipes/assembly-drawing.md) | components, a storyboard, an exploded view, a parts list with balloons, Renumber and Align Balloons, the parts list as CSV |
+| [A sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) | the flat pattern drawn with its size, a bend table, bend notes, the folded part beside it, CSV and DXF |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about

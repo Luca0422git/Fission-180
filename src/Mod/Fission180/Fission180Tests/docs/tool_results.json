@@ -6164,7 +6164,7 @@
   },
   "note": "an isometric view projected from the base view",
   "answer": {
-   "text": "Done: projected view 'Isometric (top right) View' (id 'ProjectedView002') on Example Drawing.",
+   "text": "Done: projected view: ProjectedView 'Isometric (top right) View' (id 'ProjectedView002') at [114.29, 137.51], 141.4 x 98 mm on the sheet, scale 2:1 on Example Drawing.",
    "is_error": false
   }
  },
@@ -6250,7 +6250,7 @@
   },
   "note": "the length of the line nearest to (0, 5) in the base view",
   "answer": {
-   "text": "Done: DistanceX dimension 'Dimension' on Base View: 60.",
+   "text": "Done: dimension on Base View: DistanceX 'Dimension': 60 (written '60'); it measures line (-30, 5)-(30, 5).",
    "is_error": false
   }
  },
@@ -6332,7 +6332,7 @@
   },
   "note": "a note on the sheet",
   "answer": {
-   "text": "Done: text on Example Drawing (id 'Text').",
+   "text": "Done: text 'Text' on Example Drawing at [20, 40].",
    "is_error": false
   }
  },
@@ -6407,7 +6407,7 @@
   "args": {},
   "note": "the sheet and its views",
   "answer": {
-   "text": "{\n \"drawings\": [\n  {\n   \"id\": \"Drawing\",\n   \"label\": \"Example Drawing\",\n   \"standard\": \"ISO\",\n   \"sheet\": \"A3\",\n   \"units\": \"mm\",\n   \"sheet_size_mm\": [\n    420.0,\n    297.0\n   ],\n   \"title_block\": {\n    \"ApprovedBy\": \"\",\n    \"CheckedBy\": \"\",\n    \"Date\": \"2026-11-11\",\n    \"Description\": \"\",\n    \"DrawnBy\": \"root\",\n    \"Material\": \"Steel\",\n    \"PartNumber\": \"Example\",\n    \"Revision\": \"\",\n    \"Scale\": \"\",\n    \"Sheet\": \"1 / 1\",\n    \"Size\": \"A3\",\n    \"Title\": \"Example\",\n    \"Units\": \"mm\"\n   },\n   \"views\": [\n    {\n     \"id\": \"BaseView\",\n     \"label\": \"Base View\",\n     \"kind\": \"BaseView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"at\": [\n      134.4,\n      172.26\n     ],\n     \"half_size_mm\": [\n      60.0,\n      10.0\n     ]\n    },\n    {\n     \"id\": \"ProjectedView\",\n     \"label\": \"Top View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"at\": [\n      134.4,\n      77.22\n     ],\n     \"half_size_mm\": [\n      60.0,\n      40.0\n     ],\n     \"parent\": \"BaseView\"\n    },\n    {\n     \"id\": \"ProjectedView001\",\n     \"label\": \"Right View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"at\": [\n      0.0,\n      172.26\n     ],\n     \"half_size_mm\": [\n      40.0,\n      10.0\n     ],\n     \"parent\": \"BaseView\"\n    }\n   ],\n   \"annotations\": []\n  }\n ]\n}",
+   "text": "{\n \"drawings\": [\n  {\n   \"id\": \"Drawing\",\n   \"label\": \"Example Drawing\",\n   \"sheet_name\": \"Sheet 1\",\n   \"standard\": \"ISO\",\n   \"sheet\": \"A3\",\n   \"units\": \"mm\",\n   \"sheet_size_mm\": [420.0, 297.0],\n   \"title_block\": {\n    \"ApprovedBy\": \"\",\n    \"CheckedBy\": \"\",\n    \"Date\": \"2026-11-13\",\n    \"Description\": \"\",\n    \"DrawnBy\": \"root\",\n    \"Material\": \"Steel\",\n    \"PartNumber\": \"Example\",\n    \"Revision\": \"\",\n    \"Scale\": \"2:1\",\n    \"Sheet\": \"1 / 1\",\n    \"Size\": \"A3\",\n    \"Title\": \"Example\",\n    \"Units\": \"mm\"\n   },\n   \"views\": [\n    {\n     \"id\": \"BaseView\",\n     \"label\": \"Base View\",\n     \"kind\": \"BaseView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"scale_text\": \"2:1\",\n     \"at\": [265.0, 216.5],\n     \"half_size_mm\": [60.0, 10.0],\n     \"style\": \"Visible and Hidden Edges\",\n     \"shows\": [\"Body\"]\n    },\n    {\n     \"id\": \"ProjectedView\",\n     \"label\": \"Top View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"scale_text\": \"2:1\",\n     \"at\": [265.0, 146.5],\n     \"half_size_mm\": [60.0, 40.0],\n     \"style\": \"Visible and Hidden Edges\",\n     \"parent\": \"BaseView\",\n     \"direction\": \"Top\",\n     \"shows\": [\"Body\"]\n    },\n    {\n     \"id\": \"ProjectedView001\",\n     \"label\": \"Right View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"scale_text\": \"2:1\",\n     \"at\": [145.0, 216.5],\n     \"half_size_mm\": [40.0, 10.0],\n     \"style\": \"Visible and Hidden Edges\",\n     \"parent\": \"BaseView\",\n     \"direction\": \"Right\",\n     \"shows\": [\"Body\"]\n    }\n   ],\n   \"annotations\": [],\n   \"sheets\": [{\"id\": \"Drawing\", \"name\": \"Sheet 1\"}]\n  }\n ]\n}",
    "is_error": false
   }
  },
@@ -11251,6 +11251,680 @@
   "note": "a small video of the explosion",
   "answer": {
    "text": "Published /home/me/fission180/explode.avi: 37 frames of 320 x 240 at 12 frames a second (Explode).\n{\n \"file\": \"/home/me/fission180/explode.avi\",\n \"format\": \"avi\",\n \"storyboards\": [\"Explode\"],\n \"frames\": 37,\n \"fps\": 12,\n \"width\": 320,\n \"height\": 240,\n \"length_s\": 3.083\n}",
+   "is_error": false
+  }
+ },
+ "edit_drawing_view#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "view": "BaseView",
+   "scale": 1,
+   "style": "Visible Edges"
+  },
+  "note": "the base view at 1:1 without hidden edges (its projected views follow)",
+  "answer": {
+   "text": "Done: BaseView 'Base View' (id 'BaseView') at [265, 216.5], 60 x 10 mm on the sheet, scale 1:1.",
+   "is_error": false
+  }
+ },
+ "modify_drawing#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "move",
+   "items": [
+    "BaseView"
+   ],
+   "by": [
+    -10,
+    5
+   ]
+  },
+  "note": "the base view 10 mm left and 5 mm up; its projected views stay lined up",
+  "answer": {
+   "text": "Done: BaseView at [255, 221.5], turned 0°.",
+   "is_error": false
+  }
+ },
+ "edit_title_block#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "values": {
+    "Description": "Plate with a hole",
+    "Revision": "A"
+   }
+  },
+  "note": "a description and a revision in the title block",
+  "answer": {
+   "text": "Done: title block of Example Drawing: Description 'Plate with a hole', Revision 'A'.",
+   "is_error": false
+  }
+ },
+ "drawing_sheet#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "action": "add"
+  },
+  "note": "a second sheet",
+  "answer": {
+   "text": "Done: sheet 'Sheet 2' (id 'Drawing001') added. Sheets: 1. Sheet 1 (id 'Drawing'); 2. Sheet 2 (id 'Drawing001').",
+   "is_error": false
+  }
+ },
+ "edit_drawing_dimension#1": {
+  "setup": "drawing_dims",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   },
+   {
+    "tool": "add_drawing_dimension",
+    "args": {
+     "view": "ProjectedView",
+     "picks": [
+      {
+       "kind": "circle",
+       "radius": 4
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "dimensions": [
+    "Dimension"
+   ],
+   "tolerance": "fit",
+   "fit": "H7"
+  },
+  "note": "the hole's diameter with its ISO fit class",
+  "answer": {
+   "text": "Done: Diameter 'Dimension': 8 (written '⌀8 H7').",
+   "is_error": false
+  }
+ },
+ "add_drawing_geometry#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "center_mark",
+   "view": "ProjectedView",
+   "picks": [
+    {
+     "kind": "circle",
+     "radius": 4
+    }
+   ]
+  },
+  "note": "a centre mark on the hole, seen from above",
+  "answer": {
+   "text": "Done: 1 centre marks on Top View: circle R4 at (0, 0).",
+   "is_error": false
+  }
+ },
+ "add_drawing_symbol#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "datum_identifier",
+   "view": "BaseView",
+   "pick": {
+    "kind": "line",
+    "near": [
+     0,
+     -5
+    ]
+   }
+  },
+  "note": "datum A on the plate's bottom edge",
+  "answer": {
+   "text": "Done: datum identifier 'Annotation' on Base View (line (-30, -5)-(30, -5)): A.",
+   "is_error": false
+  }
+ },
+ "edit_balloons#1": {
+  "setup": "drawing_parts",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -30,
+        -30,
+        30,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Wheel"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front"
+    }
+   },
+   {
+    "tool": "add_drawing_annotation",
+    "args": {
+     "kind": "parts_list",
+     "view": "BaseView"
+    }
+   }
+  ],
+  "args": {
+   "kind": "renumber",
+   "balloon": "2",
+   "to": 1
+  },
+  "note": "the wheel becomes item 1 (the base takes 2)",
+  "answer": {
+   "text": "Done: item 2 is now 1. Parts list: 1 Wheel, 2 Base.",
    "is_error": false
   }
  }
