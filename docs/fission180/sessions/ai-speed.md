@@ -10,7 +10,58 @@ for and answered "busy" after 20 s.
 
 ## What was built
 
-(filled in below as the work goes)
+1. **A benchmark**, `Fission180Tests/headless/ai_speed_bench.py` (`run_tests.sh --only speed`,
+   not in base; about 15 minutes before the fixes, a few now). Three designs made through the AI
+   tools: *relic* (a plate 100 x 80 x 4 with 88 chamfered 12-sided dots, tessellated to 6,348
+   triangles, written to STL, inserted, `start_rebuild`: the reference is the solid sewn from the
+   mesh, 3,146 faces; then the plate and the 88 dots built in the rebuilt body, as an AI half way
+   through the plan), *brep* (a plate 320 x 200 x 12, 320 holes chamfered on top and filleted
+   below, 192 bosses filleted at the foot and chamfered on top: 1,734 faces, 2,054 after the
+   edit), *assembly* (a grounded base and 100 linked pins in a 10 x 10 pattern, 20 of them
+   jointed). Every read-only tool that applies is called cold (the kept numbers emptied: the
+   first call after a change) and warm, then the common changing tools; seconds go to
+   `ai-speed-report.md` / `.json`, the slowest named. `FISSION180_SPEED_PROFILE` writes cProfile
+   listings, `FISSION180_SPEED_KEEP` saves the designs.
+2. **The slow ones made fast** (causes found with cProfile; nothing answers less):
+   - `geometry_facts.shape_facts`: every read-only tool measured the same unchanged body again
+     (inspect_design, check_design, get_design, physical_properties, every change's answer and
+     its "did anything change" test). Volume, area, counts (`countSubElements`: no Python object
+     per face), validity, centre, closedness, the exact box and the selector index are kept per
+     shape (found again by `isSame`, 16 kept, newest first). A body in a moved component is
+     measured on its own shape and its numbers placed (a moved copy was new at every call).
+   - `geometry_facts.tight_box` was `optimalBoundingBox`: 6 s on the brep plate (13 s at 2,054
+     faces; 11 s of it the 512 fillet tori). Now planes, cylinders and cones are measured by
+     their edges (their extremes lie there: linear along the generator), lines by their ends,
+     circles analytically, spheres and tori by their critical points (both partial derivatives
+     zero, kept when on the face), anything else by `optimalBoundingBox` alone: 1 s, and the
+     same box to 1e-7 mm on random patches (the mesh-free copy's `BoundBox` is not: 4.5 mm off on
+     a torus patch).
+   - `ops/core.draw` (create_sketch, add_to_sketch): FreeCAD solves the whole sketch after every
+     constraint added alone (`SketchObjectPy::addConstraint`, single constraint path), so a
+     sketch of 320 circles took **216 s**; the circles' dimensions now go in one
+     `addConstraint([...])` before the next item (same constraint numbers): 1.7 s.
+   - `sketch_area_fill.missing_areas`: every area tested against every face exactly (140,000
+     `isInside` calls, 2 s per compute of a 320-circle sketch, run at every recompute); a box
+     test first.
+   - `recognize_mesh` (ai-mesh's file, smallest change): `solid.Faces` was made again for every
+     round group (`_split_group`, `_fit`): 15 s of describe_reference on the relic.
+   - `geometry_facts._Index.candidates` (the stable refs of query_geometry, describe and compare):
+     a mesh-made part has a normal of its own for nearly every face, so each ref tried every face
+     (2.6 million tests, 5 s); grids of normals, directions and radii find the candidates.
+   - `recognize_core` vector helpers written out for 3D tuples (1.6 million calls per describe).
+3. **The window stays alive** (below): `progress.py`, `alive.py`, the working line with Stop over
+   the 3D view and on the AI panel's Activity tab.
+4. **The connector's side**: `/status` and `/stop` on the bridge's own thread; call ids; MCP
+   `notifications/progress` every 2 s for a call that asked (with the working line's words; none
+   after the answer); `notifications/cancelled` passed on: a read-only call stops at its next safe
+   point, a change finishes (its result is there when the AI looks: stopping it would make the AI
+   do it all again), and no answer is sent (MCP). A read-only call whose waiter gave up (115 s) is
+   stopped too. The headless MCP server sends progress from the pump.
+
+What AI apps do with progress (parity/ai.md has the sources): Claude Desktop reportedly cancels
+stdio tool calls at about 60 s whatever the server sends; Claude Code honours MCP_TOOL_TIMEOUT
+and its progress keepalive is reported unreliable; the MCP TypeScript SDK made
+`resetTimeoutOnProgress` true by default. Nothing could be tried on a real install here.
 
 ## The window stays alive: how, and every re-entrancy risk checked
 

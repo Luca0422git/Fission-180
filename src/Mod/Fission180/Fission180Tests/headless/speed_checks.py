@@ -148,6 +148,49 @@ def _stopped_change(answer, run):
     return None
 
 
+def _flat_faces_agree(answer, run):
+    """compare's Python test of a point on a flat face (rebuild._polygon_distance: straight
+    edges and whole circles) says what OpenCASCADE's isInside(p, tol, True) says, for points
+    on, near and off a plate with round and square holes and a slanted facet."""
+    import random
+
+    import FreeCAD as App
+    import Part
+
+    from fission180 import rebuild
+
+    V = App.Vector
+    plate = Part.makeBox(60, 40, 5)
+    for x, y in ((12, 10), (30, 20), (48, 30)):
+        plate = plate.cut(Part.makeCylinder(4, 5, V(x, y, 0)))
+    plate = plate.cut(Part.makeBox(6, 6, 5, V(40, 5, 0)))
+    tri = Part.Face(Part.makePolygon([V(0, 0, 0), V(9, 1, 3), V(2, 8, 6), V(0, 0, 0)]))
+    faces = [f for f in plate.Faces if type(f.Surface).__name__ == "Plane"] + [tri]
+    rng = random.Random(5)
+    tol = 0.01
+    disagree = []
+    tested = 0
+    for i, face in enumerate(faces):
+        row = rebuild._FaceRow(i, face)
+        if row.polygon() is None:
+            continue
+        box = face.BoundBox
+        for _k in range(150):
+            p = V(rng.uniform(box.XMin - 1, box.XMax + 1), rng.uniform(box.YMin - 1, box.YMax + 1),
+                  rng.uniform(box.ZMin - 1, box.ZMax + 1))  # fmt: skip
+            if rng.random() < 0.5:  # (most points on the plane: the hard cases)
+                p = p - row.key[0] * (row.key[0].dot(p) - row.key[1])
+                p = p + row.key[0] * rng.choice((0.0, 0.004, -0.009, 0.02))
+            mine = rebuild._polygon_distance(row.polygon(), p) <= tol
+            theirs = bool(face.isInside(p, tol, True))
+            tested += 1
+            if mine != theirs:
+                disagree.append((i, [round(c, 4) for c in p], mine, theirs))
+    if tested < 1000:
+        return "only %d points tested" % tested
+    return "disagree at %s" % disagree[:5] if disagree else None
+
+
 SESSION = [
     # -- wave 8, ai-speed ------------------------------------------------------------------------
     {"tool": "new_design", "args": {"name": "Speed"}},
@@ -187,4 +230,5 @@ SESSION = [
     {"tool": "inspect_design", "args": {"snapshot": False}, "check": _boxes_agree},
     {"tool": "get_help", "args": {"topic": "checking"}, "check": _stopped_read_only},
     {"tool": "get_help", "args": {"topic": "checking"}, "check": _stopped_change},
+    {"tool": "get_help", "args": {"topic": "checking"}, "check": _flat_faces_agree},
 ]
