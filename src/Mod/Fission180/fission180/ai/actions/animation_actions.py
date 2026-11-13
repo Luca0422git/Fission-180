@@ -555,3 +555,168 @@ def anim_publish_video(ctx, args):
             bridge_core.compact_json(data),
         )
     )
+
+
+# == wave 8, ai-workspaces: VIEW (a camera move) and the timeline's own edits ====================
+def _boxes_at(doc, board, t, chosen=None):
+    """The box (design coordinates) of the components shown at time t of a storyboard (or of
+    `chosen`), as the storyboard places them."""
+    animation = _animation()
+    local = animation.placements_of(doc, board, t)
+    world = animation.global_of(doc, local)
+    hidden = animation.hidden_of(doc, board, t)
+    if chosen:
+        comps = chosen
+    else:
+        comps = [c for c in animation.children(doc, None) if c.Name not in hidden]
+    boxes = []
+    for comp in comps:
+        inner = animation.local_box(doc, comp, local)
+        if inner is not None:
+            boxes.append(animation.moved_box(inner, world[comp.Name]))
+    if not boxes:
+        raise UserError("Nothing to look at: the components are empty or hidden at %g s." % t)
+    return _core().box_union(boxes)
+
+
+def _window_camera(doc):
+    """The window's camera as a storyboard keeps it (None without the window)."""
+    try:
+        from ... import animation_view
+
+        view = animation_view.view_of(doc)
+        return animation_view.camera_of(view) if view is not None else None
+    except Exception:
+        return None
+
+
+@action("anim_view")
+def anim_view(ctx, args):
+    from .. import workspaces_core as wc
+
+    animation = _animation()
+    core = _core()
+    doc = ctx.need_doc()
+    _need_components(doc)
+    name = _board_name(ctx, args.get("storyboard"))
+    at = float(args["at"])
+    chosen = _components(ctx, args.get("of")) if args.get("of") else None
+    title = ctx.title
+    found = {}
+
+    def run(data):
+        board = animation._board(data, name)  # (the recording functions' own rule)
+        box = _boxes_at(doc, board, at, chosen)
+        try:
+            camera = wc.camera_for(
+                box,
+                args.get("view", "iso"),
+                args.get("direction"),
+                args.get("up"),
+                float(args.get("zoom", 1.0)),
+                bool(args.get("perspective", False)),
+            )
+        except wc.CoreError as exc:
+            raise core.AnimationError(str(exc))
+        before = None
+        if board["start"].get("camera") is None and not core.in_scratch(at):
+            before = _window_camera(doc) or wc.camera_for(
+                _boxes_at(doc, board, 0.0), "iso", perspective=bool(args.get("perspective"))
+            )
+        found["box"] = box
+        found["camera"] = camera
+        return core.record_view(board, camera, at, before=before)
+
+    act = _run(animation.change, doc, title, run)
+    looks, up = wc.camera_looks(found["camera"])
+    data = {
+        "storyboard": name,
+        "at": _r(at),
+        "looks_from": looks,
+        "up": up,
+        "looks_at": [_r(c) for c in core.box_centre(found["box"])],
+        "fits_box": [_r(c) for c in found["box"]],
+        "camera": found["camera"],
+    }
+    if act is not None:
+        data["action"] = _action_row(doc, act)
+    if core.in_scratch(at):
+        text = "Done: %r starts with this view (the scratch zone: no action)." % name
+    else:
+        text = (
+            "Done: a View action on %r from %g to %g s (action id %s); the storyboard is %g s long."
+            % (
+                name,
+                act["start"],
+                at,
+                act["id"],
+                animation.duration(doc, name),
+            )
+        )
+    return json_result(data, text, compact=True)
+
+
+@action("anim_action")
+def anim_action(ctx, args):
+    animation = _animation()
+    core = _core()
+    doc = ctx.need_doc()
+    name = _board_name(ctx, args.get("storyboard"), must_exist=True)
+    board = animation.storyboard(doc, name)
+    ids = []
+    for ident in args["actions"]:
+        if int(ident) not in ids:
+            ids.append(int(ident))
+    known = {a["id"]: a for a in board["actions"]}
+    missing = [i for i in ids if i not in known]
+    if missing:
+        raise UserError(
+            "%r has no action %s: anim_storyboards with storyboard %r lists them (ids %s)."
+            % (
+                name,
+                ", ".join(str(i) for i in missing),
+                name,
+                ", ".join(str(i) for i in sorted(known)) or "none",
+            )
+        )
+    if args.get("delete"):
+
+        def drop(data):
+            return core.delete_actions(animation._board(data, name), ids)
+
+        count = _run(animation.change, doc, ctx.title, drop)
+        return json_result(
+            _summary(doc),
+            "Done: %d action%s deleted from %r; it is %g s long now."
+            % (count, "" if count == 1 else "s", name, animation.duration(doc, name)),
+            compact=True,
+        )
+    if len(ids) != 1 and ("start" in args or "end" in args):
+        raise UserError("start / end change one action: give one id (or shift for several).")
+
+    def edit(data):
+        target = animation._board(data, name)
+        made = []
+        for ident in ids:
+            act = core.action(target, ident)
+            if "shift" in args:
+                core.move_action(target, ident, float(act["start"]) + float(args["shift"]))
+            if "start" in args or "end" in args:
+                start = float(args.get("start", act["start"]))
+                end = args.get("end", act.get("end"))
+                core.set_span(target, ident, start, end)
+            made.append(core.action(target, ident))
+        return made
+
+    made = _run(animation.change, doc, ctx.title, edit)
+    rows = [_action_row(doc, a) for a in made]
+    return json_result(
+        {"storyboard": name, "actions": rows},
+        "Done: %s on %r; it is %g s long now."
+        % (
+            ", ".join("%s %s to %s s" % (r["id"], r["start"], r["end"]) for r in rows),
+            name,
+            animation.duration(doc, name),
+        ),
+        compact=True,
+    )

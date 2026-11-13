@@ -121,22 +121,28 @@ define(
     "for the study only with set_study_material) and the bodies as they are now; bodies "
     "that touch (or are closer than 0.1 mm) are glued. bodies: the bodies it simulates "
     "(default: every solid body of the design, shown or hidden; not the tools a Combine "
-    "used up). Answers the study's id. Linear static only: small deflections, materials "
-    "that stay elastic and isotropic (3D-printed parts are not); results are a guide.",
+    "used up). copy_of: a study to copy (the browser's Clone Study: its bodies, settings, "
+    "materials, constraints, loads and mesh controls, no results), to try another material "
+    "or load side by side. Answers the study's id. Linear static only: small deflections, "
+    "materials that stay elastic and isotropic (3D-printed parts are not); results are a "
+    "guide.",
     schema(
         {
             "label": string('its name (default "Study N - Static Stress")'),
             "bodies": step_ids(
                 "the bodies to simulate (default: every solid body, shown or hidden)"
             ),
+            "copy_of": string("a study (id or name) to copy instead of starting empty"),
         }
     ),
     needs=("solid",),
     id_base="Study",
-    title_fn=lambda a: "AI: New Static Stress study",
+    title_fn=lambda a: "AI: %s"
+    % ("Clone study" if a.get("copy_of") else "New Static Stress study"),
     examples=[
         example({}, "a study of every body"),
         example({"label": "Bracket load", "bodies": ["Body"]}, "a study of one body"),
+        example({"copy_of": "Study 1 - Static Stress", "label": "In steel"}, "a copy to change"),
     ],
 )
 
@@ -434,8 +440,10 @@ define(
     "simulate",
     "SIMULATION > SETUP > SOLVE > Solve",
     "Solve a study on this computer (Gmsh meshes it, CalculiX solves it; Fusion solves in "
-    "Autodesk's cloud): seconds for a simple part, minutes for a fine mesh; Fission 180 waits "
-    "until it is done (timeout, seconds: then it gives up). Answers the main numbers: the "
+    "Autodesk's cloud): 2 to 20 s for a simple part at the default mesh, minutes for a fine "
+    "mesh, adaptive refinement or a part of thousands of faces (study_mesh first tells the "
+    "node count: about 1 s per 10,000 nodes); Fission 180 waits until it is done (timeout, "
+    "seconds: then it gives up) and says how long it took. Answers the main numbers: the "
     "lowest safety factor and where, the largest von Mises stress and displacement, the mesh "
     "size; study_results has everything. A solve is not an undo step; the last results stay "
     "when it fails. " + STUDY_HELP,
@@ -460,9 +468,11 @@ define(
     "largest stress and displacement, lowest safety factor), the reaction force at every "
     "constraint (N), the mesh, and the verdict in a sentence (lowest safety factor against "
     'target: "lowest safety factor 1.4 at (x, y, z) on Body1: below 2"; below 1 the part '
-    "would bend for good). out_of_date: the design or the study changed since the solve. "
-    "results: only these result keys. Without a study and with several studies it lists "
-    "them. " + STUDY_HELP,
+    "would bend for good), the Solver Data (time of each stage, mesh quality) and, after "
+    "adaptive refinement, the Convergence Plot's numbers. out_of_date: the design or the "
+    "study changed since the solve. results: only these result keys. Without a study and "
+    "with several studies it lists them. study_probe reads values at points, on faces and on "
+    "a section. " + STUDY_HELP,
     schema(
         {
             "study": _study(),
@@ -489,4 +499,309 @@ define(
     id_base="DeleteStudy",
     title_fn=lambda a: "AI: Delete study",
     examples=[example({"study": "Study 1 - Static Stress"}, "delete that study")],
+)
+
+
+# == wave 8, ai-workspaces: the rest of SETUP and RESULTS ========================================
+# Fusion's RESULTS commands that measure (Surface / Point Probes, Slice Plane, Show Min/Max,
+# Report) and display (deformation scale, Show Mesh, Undeformed Model, Loads and Constraints,
+# Legend Min/Max, Slice Plane, Iso-surface, Animate, Compare, Finish Results), and SETUP's
+# Generate Mesh / Show Mesh, Load Case Attributes, Automatic Contacts / Contact Manager, DOF
+# View and the browser's Edit / Suppress / Delete of an item. The actions are the wave 8 block
+# of fission180/ai/actions/simulate_actions.py.
+EXTRA_RESULT_KEYS = ("strain_1", "strain_3", "exx", "eyy", "ezz")
+PROBE_KEYS = RESULT_KEYS + EXTRA_RESULT_KEYS
+DEFORMATIONS = ("undeformed", "actual", "adjusted_half", "adjusted", "adjusted_2", "adjusted_5")
+
+
+def _section():
+    return free_object(
+        'a plane: {"axis": "x" | "y" | "z"} or {"normal": [x, y, z]}, with "offset" (mm '
+        'along it from the origin) or "point" [x, y, z]; neither: through the middle'
+    )
+
+
+def _extra_probe(args, problems):
+    _extra_picks(args, problems, bodies_too=True)
+    if not any(k in args for k in ("points", "on", "section")):
+        problems.append("give points, on (picks) or section: where to read the results")
+    spec = args.get("section")
+    if isinstance(spec, dict):
+        if "axis" in spec and spec["axis"] not in ("x", "y", "z"):
+            problems.append("section.axis must be x, y or z")
+        for key in spec:
+            if key not in ("axis", "normal", "offset", "point"):
+                problems.append("section takes axis or normal, offset or point (not %s)" % key)
+
+
+define(
+    "study_probe",
+    "Probe results",
+    "simulate",
+    "SIMULATION > RESULTS > INSPECT > Surface Probes / Point Probes / Slice Plane",
+    "Read a solved study's results where you choose, as numbers (what Surface and Point "
+    "Probes and a Slice Plane show a person): points [[x, y, z], ...] mm on or inside the "
+    "part (each point's values, interpolated in its element, and how far it moves); on: "
+    "picks (faces, edges, corners, whole bodies, like add_constraint's) with each one's "
+    "minimum, maximum (with where) and mean; section: a plane through the part with the "
+    "minimum and maximum on the cut. results: which (default safety, von_mises, "
+    "displacement; also principal_1 / 3, the stress components, dx / dy / dz, strain and "
+    "its components). Use it to check a spot the extremes of study_results do not name "
+    "(the stress away from a fixed hole's edge, the deflection at a tip). Under 1 s on a "
+    "mesh of 100,000 nodes. Changes nothing. " + STUDY_HELP,
+    schema(
+        {
+            "study": _study(),
+            "points": array(kit.point3("a point"), "points on or in the part (mm)", 1, 50),
+            "on": _picks("faces, edges, corners or bodies to read the results over"),
+            "section": _section(),
+            "results": array(enum(PROBE_KEYS), "the results to read", 1),
+        }
+    ),
+    extra=_extra_probe,
+    changes=False,
+    examples=[
+        example(
+            {"points": [[100, 10, 10], [50, 10, 5]], "results": ["displacement", "von_mises"]},
+            "the deflection at the free end's top and the stress half way along",
+        ),
+        example(
+            {"on": [{"face": {"normal": [0, 0, 1], "count": 1}}]},
+            "safety factor, stress and displacement over the top face",
+        ),
+        example({"section": {"axis": "x", "offset": 25}}, "the numbers on a cut at x = 25 mm"),
+    ],
+)
+
+define(
+    "study_report",
+    "Results report",
+    "simulate",
+    "SIMULATION > RESULTS > RESULT TOOLS > Report",
+    "Write a solved study's report as one HTML file (Fusion's Report): the design, the "
+    "study's materials, constraints, loads, contacts and mesh, every result's minimum and "
+    "maximum with where, per body, the reaction forces and the verdict against the safety "
+    "factor target (target, default 3; upper, default 6: above it the part is stronger than "
+    "needed). path: a full path (.html added; a folder: named after the design and the "
+    "study). title, author and the cover's summary / project / approver / revision; "
+    "more_studies: more solved studies in the same report. pictures true (needs the window): "
+    "the results are shown in the SIMULATION workspace and pictured, as a person's Report "
+    "does. A file that exists is not replaced unless the person agrees. " + STUDY_HELP,
+    schema(
+        {
+            "study": _study(),
+            "path": string("the HTML file to write, or its folder (a full path)"),
+            "title": string("the report's title (default: the study's name)"),
+            "author": string("who made it"),
+            "summary": string("a paragraph for the cover"),
+            "project": string("the project"),
+            "approver": string("who approves it"),
+            "revision": string("its revision"),
+            "target": positive("the safety factor the part should reach", default=3.0),
+            "upper": positive("above this the part is stronger than needed", default=6.0),
+            "more_studies": step_ids("more solved studies in the same report"),
+            "pictures": boolean("pictures of the results (needs the window)", default=False),
+        },
+        ["path"],
+    ),
+    changes=False,
+    writes_files=True,
+    confirm_overwrite=True,
+    title_fn=lambda a: "AI: Results report",
+    examples=[
+        example({"path": "~/reports/bracket.html", "target": 2}, "the newest study's report"),
+    ],
+)
+
+define(
+    "study_mesh",
+    "Generate mesh",
+    "simulate",
+    "SIMULATION > SETUP > SOLVE > Generate Mesh (and DISPLAY > Show Mesh)",
+    "Make a study's mesh now, without solving (Fusion's Generate Mesh): its nodes, elements, "
+    "smallest and largest element edge (mm), worst aspect ratio and how long it took; no "
+    "constraint or load needed. Use it before a long solve to see how big it will be (a "
+    "solve takes about 1 s per 10,000 nodes) and after study_settings / local_mesh_control "
+    "to check the mesh got finer where it matters. show true: the mesh is drawn on the model "
+    "in the window (Show Mesh). Seconds; tens of seconds for thousands of faces. Not an undo "
+    "step. " + STUDY_HELP,
+    schema(
+        {
+            "study": _study(),
+            "show": boolean("draw the mesh on the model (the window)", default=False),
+            "timeout": positive("give up after this many seconds", default=600, maximum=7200),
+        }
+    ),
+    title_fn=lambda a: "AI: Generate mesh",
+    examples=[example({}, "mesh the newest study"), example({"show": True}, "and show it")],
+)
+
+define(
+    "study_setup",
+    "Study setup",
+    "simulate",
+    "SIMULATION > SETUP > Load Case Attributes / Contact Manager / Automatic Contacts / DOF View",
+    "Read a study's whole setup (Fusion's Load Case Attributes, Contact Manager and DOF "
+    "View): every constraint, load and mesh control (id, kind, values, what it is on, status "
+    "ok / suppressed / lost its faces), each body's study material, gravity, the bonded "
+    "contacts (bodies closer than the contact tolerance are glued), bodies that overlap or "
+    "touch only along an edge or at a corner, how each piece could still move (free_motions: "
+    "empty when everything is held), and the last mesh. contact_tolerance (mm): the contacts "
+    "as Automatic Contacts' Generate would find them with that tolerance, with their gaps "
+    "(study_settings contact_tolerance keeps it). Changes nothing. " + STUDY_HELP,
+    schema(
+        {
+            "study": _study(),
+            "contact_tolerance": number(
+                "try another contact tolerance (mm)", minimum=0, maximum=10
+            ),
+        }
+    ),
+    changes=False,
+    examples=[
+        example({}, "everything the newest study is set up with"),
+        example({"contact_tolerance": 0.5}, "which bodies a 0.5 mm tolerance would glue"),
+    ],
+)
+
+
+def _extra_edit_item(args, problems):
+    _extra_picks(args, problems, bodies_too=True)
+    if args.get("delete") and len(set(args) - {"study", "item", "delete"}):
+        problems.append("delete takes nothing else (it deletes the item)")
+
+
+define(
+    "edit_study_item",
+    "Edit constraint or load",
+    "simulate",
+    "SIMULATION > browser > constraint / load / mesh control > Edit / Suppress / Delete",
+    "Change a constraint, load or local mesh control of a study (what its browser row's "
+    "Edit, Suppress and Delete do), one undo step. item: its id or label (study_setup lists "
+    "them). on: picks again (they replace the old ones); magnitude, direction, vector, "
+    "point, flip, per_entity (loads), x / y / z, radial / axial / tangential (constraints), "
+    "size (mesh controls): only what changes, with add_constraint's and add_load's meanings "
+    "and units; suppressed true leaves it out of the solve (false brings it back); label; "
+    "delete true removes it. A study solved before shows out of date: solve it again. "
+    + PICKS_HELP,
+    schema(
+        {
+            "study": string("the study the item is in (default: any)"),
+            "item": string("the constraint's, load's or mesh control's id or label"),
+            "on": _picks("where it acts now"),
+            "magnitude": number("a load's size: N, MPa or N mm"),
+            "direction": enum(("normal", "vector"), "a force / moment's direction"),
+            "vector": dict(kit.vector3("a load's direction [x, y, z]")),
+            "point": dict(kit.point3("a remote force's point (mm)")),
+            "flip": boolean("reverse a load"),
+            "per_entity": boolean("each pick gets the whole force / moment"),
+            "x": {
+                "type": ["boolean", "number", "null"],
+                "description": "fixed: held; displacement: mm",
+            },
+            "y": {
+                "type": ["boolean", "number", "null"],
+                "description": "fixed: held; displacement: mm",
+            },
+            "z": {
+                "type": ["boolean", "number", "null"],
+                "description": "fixed: held; displacement: mm",
+            },
+            "radial": boolean("pin: keeps the hole's size and place"),
+            "axial": boolean("pin: no sliding along it"),
+            "tangential": boolean("pin: no turning about it"),
+            "size": positive("a local mesh control's element size (mm)"),
+            "suppressed": boolean("leave it out of the solve (true) or bring it back"),
+            "label": string("its new name"),
+            "delete": boolean("delete it", default=False),
+        },
+        ["item"],
+    ),
+    extra=_extra_edit_item,
+    own_id=False,
+    title_fn=lambda a: "AI: %s %s" % ("Delete" if a.get("delete") else "Edit", a.get("item", "")),
+    examples=[
+        example({"item": "Force 1", "magnitude": 500}, "the force halved to 500 N"),
+        example({"item": "Fixed 1", "suppressed": True}, "solve without that constraint"),
+        example({"item": "Pressure 1", "delete": True}, "delete the pressure"),
+    ],
+)
+
+
+def _extra_show(args, problems):
+    if args.get("finish") and len(set(args) - {"finish"}):
+        problems.append("finish takes nothing else (it ends the results display)")
+    if "compare" in args and len(set(args) - {"compare", "study"}):
+        problems.append("compare takes only study and compare (the studies shown side by side)")
+    spec = args.get("slice")
+    if isinstance(spec, dict):
+        for key in spec:
+            if key not in ("axis", "normal", "offset", "point", "flip", "style"):
+                problems.append("slice takes axis or normal, offset or point, flip, style")
+        if spec.get("style") not in (None, "clip", "slice"):
+            problems.append("slice.style must be clip (cut away one side) or slice (the cut alone)")
+    span = args.get("legend_range")
+    if isinstance(span, list) and len(span) == 2 and all(kit.is_type(v, "number") for v in span):
+        if span[0] >= span[1]:
+            problems.append("legend_range is [min, max] with min below max")
+
+
+define(
+    "show_study_results",
+    "Show results",
+    "simulate",
+    "SIMULATION > RESULTS (DEFORMATION, DISPLAY, Legend Min/Max, Slice Plane, Iso-surface, "
+    "Animate, Compare, Finish Results)",
+    "Show a solved study's results in the window the way the RESULTS tab does, so the "
+    "person (and render / screenshot) sees them: the SIMULATION workspace opens on RESULTS. "
+    "result: the legend's result (safety, von_mises, displacement...); deformation "
+    "undeformed | actual | adjusted_half | adjusted (Fusion's default: the largest movement "
+    "drawn at 5 % of the model) | adjusted_2 | adjusted_5; mesh, undeformed_model (a ghost of "
+    "the unloaded part), loads (loads and constraints drawn), min_max (the tags): true / "
+    "false; legend_range [min, max] or null (not for safety); slice {axis | normal, offset | "
+    "point, flip, style clip | slice} or null; iso_surface: a value, true (half way) or "
+    "null; animate true / false (the bending plays); compare: studies shown side by side on "
+    "one scale; finish true: Finish Results. Needs the window; study_probe has the numbers "
+    "without it. " + STUDY_HELP,
+    schema(
+        {
+            "study": _study(),
+            "result": enum(PROBE_KEYS, "the result the legend shows"),
+            "deformation": enum(DEFORMATIONS, "how much the bend is drawn"),
+            "mesh": boolean("the element edges drawn"),
+            "undeformed_model": boolean("the unloaded part drawn as a ghost"),
+            "loads": boolean("the loads and constraints drawn"),
+            "min_max": boolean("the min / max tags"),
+            "legend_range": {
+                "type": ["array", "null"],
+                "items": {"type": "number"},
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "[min, max] of the colours in the result's unit, null: its own",
+            },
+            "slice": {
+                "type": ["object", "null"],
+                "description": "the slice plane (see the description), null: none",
+            },
+            "iso_surface": {
+                "type": ["number", "boolean", "null"],
+                "description": "the iso-surface's value (true: half way, null / false: none)",
+            },
+            "animate": boolean("play the bending"),
+            "compare": step_ids("other studies to show side by side"),
+            "finish": boolean("Finish Results: back to SETUP", default=False),
+        }
+    ),
+    extra=_extra_show,
+    changes=False,
+    needs=("design", "gui"),
+    title_fn=lambda a: "AI: Show results",
+    examples=[
+        example(
+            {"result": "von_mises", "deformation": "adjusted_2", "min_max": True},
+            "the stress, the bend drawn twice as big, with min / max tags",
+        ),
+        example({"slice": {"axis": "y"}}, "cut through the middle across Y"),
+        example({"finish": True}, "back to the SETUP tab"),
+    ],
 )
