@@ -4,6 +4,41 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-13: wave 8 merged: an AI that can use all of Fission 180, and Fusion-style tooltips**
+(Opus, merger; ten builders in worktrees, briefs `docs/fission180/dev/briefs/ai-*.md`, `tips.md`;
+session logs `docs/fission180/sessions/<builder>.md`) Luca: Claude refused Relic's mesh, then
+copied polygons; "needs access to ALL the tools", "ask the right questions", "simulate,
+manufacture, animate and draw"; and "when you hover over a tool ... a picture. EVERY tool".
+Merged in this order: tips-ui, tips-solid, ai-workspaces, ai-behaviour (it had merged early
+copies of ai-speed / ai-design / ai-drawing), ai-drawing, tips-sketch-drawing, tips-workspaces,
+ai-design, ai-mesh, ai-speed. Conflicts were only `parity/ai.md` sections (both kept), the
+headless `runner.py` blocks (both kept), `tool_results.json` list_tools#1 (recorded again on the
+merged code) and generated docs (made again). Integration fixes: `ai_bridge_busy`'s fake
+`executor.run` takes ai-speed's call id; the compact AI handbook keeps one line per tool
+(`docs_core.compact_tools`) and its bound is 360 thousand characters (wave 8 doubled the
+tools: 299,755). Result on develop (fce6aaa2 + docs): 222 AI tools; every ribbon command (377,
+not the brief's 337: SOLID 127, SKETCH 58) has a tooltip with a 320 x 200 picture
+(`fission180/tips/*.py`, `icons/tips/*.png`, made by `tools/fission180/tip_pictures_<module>.py`;
+test_tips is the yardstick); `plan_approach`, `ask_person` (MCP elicitation: Claude Code
+terminal only), `show_workspace`; long calls repaint with Stop (`ai/progress.py`). Tests: base
+all passed (unit 4,022+, golden 653 + 2 xfail, headless 1,027 calls / 222 tools, docs 257
+items, sim, smoke, journey, restart), 30 integration scenarios PASS. No file outside
+`src/Mod/Fission180`, docs and tools changed: a patch release can ship it. Follow-ups the
+builders found (not done): get_sketch recomputes and turns areas on (33 s second call; use
+`verify_actions.closed_areas`); design_advice 35-44 s on a 1,700-face plate; rebuild.py still
+refuses meshes over 10,000 triangles though Convert Mesh now does 50,000 in about 11 s;
+headless.py could apply DuplicateLabels ("Relic001"); 38 tool descriptions over 900
+characters (cam_edit 3,191, cam_operation 2,785, measure 2,756, create_sketch 2,558);
+`approach_core.COSTS` guesses Convert Mesh 0.7 s per 1,000 triangles (measured 0.2-0.3);
+CHAT_ORDER could list inspect_mesh, convert_mesh, analysis, sketch_draw; troubleshooting needs a
+"Stopped after..." entry; the Compute All tooltip picture shows "BRep_API: command not done";
+the 3D Contour tooltip picture shows a round part (made before the fix); tip scripts call
+private helpers of `tools/fission180/tip_pictures.py`. Builder move-speed (Luca: Move far too
+slow on Relic, choppy on basic shapes) is still working (`briefs/move-speed.md`).
+Version: still 0.1.0-beta.4.0.3 locally (CHANGELOG section holds the 4.0.3 fixes and wave 8);
+Luca chooses the number. [x] merged [x] base + scenarios [ ] Move speed [ ] CI green
+[ ] Luca: push / release.
+
 **2026-11-13: MANUFACTURE > 3D Contour, no toolpath on a block** (in 0.1.0-beta.4.0.3, Opus; found
 by builder tips-workspaces, task card) FreeCAD's Waterline (OCL Dropcutter) scans a drop-cutter
 grid only inside the stock's outline (BoundBox Stock) and extracts walls from high/low points:

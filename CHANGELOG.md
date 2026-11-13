@@ -10,6 +10,56 @@ releases published under the old name (their tags are `sciforge-v...`).
 
 ## 0.1.0-beta.4.0.3
 
+### New
+
+- **Tooltips like Fusion's on every tool.** Rest the mouse on any ribbon button or drop-down
+  entry (all 377 commands, in every tab and workspace): a small tooltip says at once what it is,
+  in one line, with its shortcut. Keep the mouse still about a second and it grows into a card:
+  a picture of the tool at work (a small part before and after, with what you click and what
+  changes in blue, or the tool's own window), a few sentences on what it does and when to use
+  it, numbered steps, and a hint or two. Move away, click or press Esc to close it.
+  Preferences > General > Tooltips switches the big cards off or changes their delay.
+- **An AI can use all of Fission 180.** Every command that changes or measures a design now has
+  an AI tool, in every workspace:
+  - DESIGN: every sketch tool (slots, conics, tangent circles, splines, fillet, offset, break,
+    patterns, projecting the model), assembly tools (as-built joints, joint origins, rigid
+    groups, motion links, contact sets, motion studies, positions), decals, canvases, SVG,
+    Derive, the inspection analyses with numbers (draft, minimum radius, curvature,
+    accessibility...);
+  - MESH: inspect, repair, reduce, remesh, cut, shell, smooth, combine, separate, edit faces,
+    tessellate, section sketch, and Convert Mesh in one call;
+  - SIMULATION: results at points, over faces and on a cut, the report, the mesh, the setup read
+    back, loads changed or deleted, studies copied, results shown in the window;
+  - MANUFACTURE: the Setup Sheet, your tool library, a simulation that finds where a tool cuts
+    into the part;
+  - ANIMATION: camera moves, timeline actions;
+  - DRAWING: break, breakout and exploded views, the title block, sheets, every dimension kind,
+    symbols, balloons, bend tables, DWG and CSV; the AI reads a drawing back to check it;
+  - SHEET METAL, PLASTIC, UTILITIES > MAKE (3D print, Export Everything).
+- **An AI plans before it builds, and asks first.** For any job of more than one step it now
+  reads your design and plans the quickest route (one Convert Mesh call for a mesh, never
+  copying triangles), says how long the slow steps will take, and asks you its questions in
+  one message, each with a sensible default. It can switch the window to the workspace it works
+  in so you can follow along, and it is warned when it starts repeating the same small step.
+- **On a mesh it cannot read as features** (like Relic), the AI now says so plainly, says what
+  the mesh is made of ("80 equal round bumps in a 10 x 8 grid") and offers the two honest
+  routes: a solid now with Convert Mesh, or the main shapes rebuilt by hand with a pattern.
+- **The window stays alive while an AI works.** A line shows "AI: working on <tool> (12 s)" with
+  a Stop button; Stop ends the call at its next safe point and takes back what it had half
+  made. Clicks elsewhere and autosave wait until the call is over, so nothing changes under the
+  AI. AI apps that ask for progress get it.
+
+### Faster
+
+- AI questions on big designs: about a second instead of 5 to 50 (get_design on a 1,700-face
+  plate 10 s -> 1.2 s; the same question again under 0.1 s); an AI sketch of 320 circles 50 s ->
+  0.6 s; reading Relic-like rebuilds several times faster.
+- **Convert Mesh**: 9,000 triangles 5.9 s -> 1.8 s, about 76,000 from 4 min 40 s to about 20 s,
+  by hand too.
+- **MESH > Plane Cut** through a part with hundreds of holes: from minutes to seconds.
+- **Drawings** of big designs: section views about 8 times quicker; moving a view 92 s -> 1.3 s;
+  balloons no longer redraw their view.
+
 ### Fixed
 
 - **An AI app could freeze Fission 180 for many minutes, and then again.** Fission 180 does one
@@ -48,6 +98,9 @@ releases published under the old name (their tags are `sciforge-v...`).
   cases tried (10 shapes x Join, Cut, Intersect) give the right body. Bodies over 5,000 faces
   that share a flat face are refused in plain words (move one slightly, Reduce, or Merge),
   because the exact way would take too long there.
+- Finishing a flat pattern no longer brings an open drawing's tab in front of the 3D view.
+- With contact sets on, an AI turning a joint stops where the parts touch, as Drive Joints does.
+- A flat pattern's bend table is now in the drawing's DXF, and bend labels no longer overlap.
 
 ## 0.1.0-beta.4.0.2
 

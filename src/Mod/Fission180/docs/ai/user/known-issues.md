@@ -68,6 +68,22 @@ time you start it, but treat that as a safety net, not a plan.
   show again. *Workaround:* hide the planes (the Construction folder's eye) while you click
   behind them; right-click the triangle in the browser > Hide.
 
+- **Convert Mesh (Prismatic) merges flat faces only**: round areas (holes, bosses, domes) stay
+  made of many small flat faces; Fusion fits cylinders there. The result is a correct solid,
+  just heavier. *Workaround:* for an editable part, rebuild the main shapes with sketches and
+  features (an AI can do it: ask it to "rebuild this with a timeline").
+- **Some AI checks on very big designs still take 5 to 20 seconds** (checking a 1,700-face
+  part, comparing a Relic-sized rebuild). The window keeps drawing and shows the AI's working
+  line with Stop, but during one single geometry calculation inside it Windows may briefly
+  call the window "Not responding". It comes back on its own.
+- **Claude Desktop may give up on a call after about a minute** (reported by other users of
+  Claude Desktop; not something Fission 180 controls). Fission 180 then tells the AI honestly
+  what was done or not done; ask the AI to carry on.
+- **A decal on a face with hundreds of holes takes minutes** (the face is meshed twice), by
+  hand and for an AI.
+- **Tooltip pictures look a little soft** when Windows' display scaling is above 100 %
+  (they are drawn at 320 x 200 and enlarged).
+
 ## Not built (yet)
 
 - **Not all of Fusion's features.** Fission 180 covers the Design workspace: sketches, solid and
