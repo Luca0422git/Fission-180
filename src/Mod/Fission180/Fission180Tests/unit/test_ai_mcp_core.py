@@ -331,6 +331,12 @@ class Instructions(unittest.TestCase):
         self.assertEqual(answer["result"]["instructions"], mcp_core.INSTRUCTIONS)
         mcp_core.reset_session()
 
+    def test_no_description_is_cut_in_claude_code(self):
+        # (an upfront tool's description is cut there after 4,096 characters too; ai-common.md
+        # asks for about 900: the longer ones are listed in docs/fission180/parity/ai.md)
+        for item in tools_core.mcp_tools():
+            self.assertLessEqual(len(item["description"]), 4096, item["name"])
+
     def test_a_few_tools_load_upfront(self):
         listed = {t["name"]: t for t in tools_core.mcp_tools()}
         upfront = [n for n, t in listed.items() if t.get("_meta", {}).get("anthropic/alwaysLoad")]
