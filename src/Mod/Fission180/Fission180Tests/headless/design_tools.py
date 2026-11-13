@@ -784,7 +784,542 @@ ANALYSIS = [
     },
 ]
 
-SESSION = ASSEMBLY + INSERT + ANALYSIS
+
+# -- the SKETCH tab's tools ---------------------------------------------------------------------
+def _sketch_obj(run, name):
+    return run.obj(name)
+
+
+def _geo(name, index, kind=None, check=None):
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        if sketch is None or index >= len(sketch.Geometry):
+            return "%s has no curve %d" % (name, index)
+        g = sketch.Geometry[index]
+        if kind and g.TypeId != kind:
+            return "curve %d is %s, expected %s" % (index, g.TypeId, kind)
+        return check(g) if check else None
+
+    return fn
+
+
+def _close(a, b, tol=1e-4):
+    return abs(a - b) <= tol
+
+
+def _length(expected):
+    return lambda g: None if _close(g.length(), expected) else "length %s" % g.length()
+
+
+def _circle(cx, cy, r):
+    def fn(g):
+        if _close(g.Center.x, cx) and _close(g.Center.y, cy) and _close(g.Radius, r):
+            return None
+        return "circle at (%s, %s) r %s" % (g.Center.x, g.Center.y, g.Radius)
+
+    return fn
+
+
+def _new_curves(name, count):
+    """The sketch has at least `count` curves of its own (not counting construction)."""
+
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        made = [i for i in range(len(sketch.Geometry)) if not sketch.getConstruction(i)]
+        if len(made) < count:
+            return "%s has %d curves, expected at least %d" % (name, len(made), count)
+        if "Invalid" in list(sketch.State) or sketch.solve() != 0:
+            return "%s does not solve" % name
+        return None
+
+    return fn
+
+
+def _solves(name):
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        code = sketch.solve()
+        if code != 0 or "Invalid" in list(sketch.State):
+            return "%s does not solve (%s)" % (name, code)
+        return None
+
+    return fn
+
+
+def _arcs(name, count, radius):
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        found = [
+            g
+            for g in sketch.Geometry
+            if g.TypeId == "Part::GeomArcOfCircle" and _close(g.Radius, radius)
+        ]
+        if len(found) < count:
+            return "%d arcs of radius %g in %s, expected %d" % (len(found), radius, name, count)
+        return None
+
+    return fn
+
+
+def _circles_at(name, centres, radius):
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        have = [
+            (round(g.Center.x, 4), round(g.Center.y, 4))
+            for g in sketch.Geometry
+            if g.TypeId == "Part::GeomCircle" and _close(g.Radius, radius)
+        ]
+        missing = [c for c in centres if (round(c[0], 4), round(c[1], 4)) not in have]
+        return "circles missing at %s (have %s)" % (missing, have) if missing else None
+
+    return fn
+
+
+def _all(*checks):
+    def fn(answer, run):
+        for check in checks:
+            problem = check(answer, run)
+            if problem:
+                return problem
+        return None
+
+    return fn
+
+
+def _external(name, low):
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        # (ExternalGeo starts with the two axes)
+        got = len(sketch.ExternalGeo) - 2
+        return None if got >= low else "%s has %d projected curves, expected %d" % (name, got, low)
+
+    return fn
+
+
+def _g2(name):
+    def fn(answer, run):
+        sketch = _sketch_obj(run, name)
+        kinds = [(c.Type, c.First, c.Second) for c in sketch.Constraints]
+        if not any(t == "Tangent" for t, _a, _b in kinds):
+            return "no tangent join: %s" % kinds
+        if not any(t == "PointOnObject" for t, _a, _b in kinds):
+            return "no pole on the line (G2): %s" % kinds
+        return None
+
+    return fn
+
+
+SKETCH = [
+    {"tool": "new_design", "args": {"name": "Sketch AI"}},
+    {
+        "tool": "create_curve_sketch",
+        "save": "k1",
+        "args": {
+            "plane": "XY",
+            "curves": [
+                {"line": [200, 0, 260, 0]},
+                {"line": [260, 0, 200, 60]},
+                {"line": [200, 60, 200, 0]},
+                {"line": [300, 0, 320, 0]},
+            ],
+        },
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "midpoint_line",
+            "points": [[0, 0], [10, 0]],
+            "length": 30,
+        },
+        "contains": ["New curves 4"],
+        "check": _geo("k1", 4, "Part::GeomLineSegment", _length(30)),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "rectangle_3point",
+            "points": [[0, 10], [20, 10], [5, 25]],
+        },
+        "check": _geo("k1", 6, "Part::GeomLineSegment", _length(20)),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "circle_2point",
+            "points": [[50, 0], [60, 0]],
+            "diameter": 12,
+        },
+        "check": _geo("k1", 10, "Part::GeomCircle", _circle(56, 0, 6)),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {"sketch": "$k1", "kind": "circle_3point", "points": [[80, 0], [90, 10], [100, 0]]},
+        "check": _geo("k1", 11, "Part::GeomCircle", _circle(90, 0, 10)),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "circle_2tangent",
+            "lines": [-1, -2],
+            "points": [[-5, -5]],
+            "radius": 3,
+        },
+        "check": _circles_at("k1", [(-3, -3)], 3),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "circle_3tangent",
+            "lines": [0, 1, 2],
+            "points": [[215, 15]],
+        },
+        # (the triangle's incircle: r = (60 + 60 - 60 sqrt 2) / 2)
+        "check": _circles_at("k1", [(200 + 17.5736, 17.5736)], 17.573593),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {"sketch": "$k1", "kind": "arc_3point", "points": [[0, -20], [10, -10], [20, -20]]},
+        "check": _arcs("k1", 1, 10),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "tangent_arc",
+            "from": {"curve": 3, "point": "end"},
+            "points": [[330, 10]],
+        },
+        "check": _solves("k1"),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "edge_polygon",
+            "points": [[100, 20], [110, 20], [105, 30]],
+            "sides": 6,
+        },
+        "check": _solves("k1"),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "slot_center_to_center",
+            "points": [[0, -50], [30, -50]],
+            "width": 8,
+        },
+        "check": _arcs("k1", 2, 4),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "slot_overall",
+            "points": [[50, -50], [90, -50]],
+            "width": 8,
+        },
+        "check": _arcs("k1", 4, 4),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "slot_center_point",
+            "points": [[120, -50], [135, -50]],
+            "width": 6,
+        },
+        "check": _arcs("k1", 2, 3),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "arc_slot",
+            "points": [[0, -80], [20, -70], [40, -80]],
+            "width": 4,
+        },
+        "check": _arcs("k1", 2, 2),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "conic",
+            "points": [[60, -80], [100, -80], [80, -60]],
+            "rho": 0.5,
+        },
+        "check": _solves("k1"),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "ellipse",
+            "points": [[150, -80], [170, -80], [150, -72]],
+        },
+        "check": _solves("k1"),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "control_point_spline",
+            "points": [[320, 0], [330, 0], [340, 5], [350, 10]],
+        },
+        "check": _solves("k1"),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k1",
+            "kind": "fit_point_spline",
+            "points": [[200, -100], [220, -90], [240, -100]],
+        },
+        "check": _new_curves("k1", 30),
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {"sketch": "$k1", "kind": "circle_3point", "points": [[0, 0], [1, 1], [2, 2]]},
+        "expect": "error",
+        "contains": ["in a line"],
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {"sketch": "$k1", "kind": "conic", "points": [[0, 0], [1, 1]]},
+        "expect": "error",
+        "contains": ["conic takes 3 points"],
+    },
+    {"tool": "get_sketch", "args": {"sketch": "$k1"}, "contains": ["BSplineCurve"]},
+    {
+        "tool": "scale",
+        "args": {"sketch": "$k1", "factor": 2},
+        "check": _solves("k1"),
+    },
+    # -- MODIFY on a plain rectangle of lines ----------
+    {
+        "tool": "create_sketch",
+        "save": "k2",
+        "args": {"plane": "XY", "offset": 50, "geometry": [{"rect": [0, 0, 40, 20]}]},
+    },
+    {
+        "tool": "add_to_sketch",
+        "args": {
+            "sketch": "$k2",
+            "curves": [
+                {"line": [20, -10, 20, 10]},
+                {"line": [50, 0, 50, 30]},
+                {"line": [44, 25, 47, 25]},
+            ],
+        },
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k2", "kind": "fillet", "points": [[0, 0]], "radius": 3},
+        "check": _arcs("k2", 1, 3),
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k2", "kind": "chamfer", "points": [[40, 20]], "distance": 2},
+        "check": _solves("k2"),
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k2", "kind": "fillet", "points": [[5, 5]], "radius": 3},
+        "expect": "error",
+        "contains": ["a corner is where exactly two meet"],
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k2", "kind": "break", "points": [[20, -5]]},
+        "contains": ["at 1 point"],
+        "check": _solves("k2"),
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k2", "kind": "extend", "points": [[46.9, 25]]},
+        "contains": ["[50, 25]"],
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k2", "kind": "toggle_construction", "curves": [5]},
+        "contains": ["construction"],
+    },
+    {
+        "tool": "create_sketch",
+        "save": "k3",
+        "args": {"plane": "XY", "offset": 100, "geometry": [{"rect": [0, 0, 40, 20]}]},
+    },
+    {
+        "tool": "sketch_modify",
+        "args": {"sketch": "$k3", "kind": "offset", "curves": [0, 1, 2, 3], "distance": 2},
+        "check": _new_curves("k3", 8),
+    },
+    # -- mirror, patterns, move ----------
+    {
+        "tool": "create_curve_sketch",
+        "save": "k4",
+        "args": {"plane": "XY", "offset": 150, "curves": [{"circle": [10, 0, 2]}]},
+    },
+    {
+        "tool": "sketch_pattern",
+        "args": {"sketch": "$k4", "kind": "mirror", "curves": [0], "line": -2},
+        "check": _circles_at("k4", [(-10, 0)], 2),
+    },
+    {
+        "tool": "sketch_pattern",
+        "args": {
+            "sketch": "$k4",
+            "kind": "rectangular",
+            "curves": [0],
+            "quantity": 3,
+            "distance": 20,
+            "direction": -2,
+        },
+        "check": _circles_at("k4", [(10, 10), (10, 20)], 2),
+    },
+    {
+        "tool": "sketch_pattern",
+        "args": {
+            "sketch": "$k4",
+            "kind": "circular",
+            "curves": [0],
+            "center": {"curve": -1, "point": "start"},
+            "quantity": 4,
+        },
+        "check": _circles_at("k4", [(0, 10), (0, -10)], 2),
+    },
+    {
+        "tool": "sketch_pattern",
+        "args": {
+            "sketch": "$k4",
+            "kind": "move_copy",
+            "curves": [0],
+            "dx": 5,
+            "dy": 50,
+            "copy": True,
+        },
+        "check": _circles_at("k4", [(15, 50)], 2),
+    },
+    # -- Curvature and Unfix ----------
+    {
+        "tool": "create_curve_sketch",
+        "save": "k7",
+        "args": {"plane": "XY", "offset": 200, "curves": [{"line": [0, 0, 20, 0]}]},
+    },
+    {
+        "tool": "sketch_draw",
+        "args": {
+            "sketch": "$k7",
+            "kind": "control_point_spline",
+            "points": [[20, 0], [30, 2], [40, 8], [50, 20]],
+        },
+        "contains": ["New curves 1"],
+    },
+    {
+        "tool": "sketch_constraint",
+        "args": {"sketch": "$k7", "kind": "curvature", "items": [{"curve": 0}, {"curve": 1}]},
+        "check": _g2("k7"),
+    },
+    {
+        "tool": "sketch_constraint",
+        "args": {"sketch": "$k4", "kind": "fix", "items": [{"curve": 0}]},
+    },
+    {
+        "tool": "sketch_constraint",
+        "args": {"sketch": "$k4", "kind": "unfix", "items": [{"curve": 0}]},
+        "contains": ["Unfix"],
+    },
+    {
+        "tool": "sketch_constraint",
+        "args": {"sketch": "$k4", "kind": "unfix", "items": [{"curve": 0}]},
+        "expect": "error",
+        "contains": ["not fixed"],
+    },
+    # -- Project / Include ----------
+    {
+        "tool": "primitive",
+        "save": "box",
+        "args": {"kind": "box", "length": 20, "width": 20, "height": 10},
+    },
+    {
+        "tool": "create_curve_sketch",
+        "save": "k5",
+        "args": {"plane": "XY", "offset": 30, "curves": [{"circle": [10, 10, 3]}]},
+    },
+    {
+        "tool": "sketch_project",
+        "args": {"sketch": "$k5", "kind": "project", "faces": {"normal": [0, 0, 1], "count": 1}},
+        "contains": ["4 curves"],
+        "check": _external("k5", 4),
+    },
+    {
+        "tool": "sketch_project",
+        "args": {
+            "sketch": "$k5",
+            "kind": "include_3d",
+            "edges": {"type": "line", "parallel": [0, 0, 1], "count": 4},
+        },
+        "contains": ["4 curves"],
+    },
+    {
+        "tool": "sketch_project",
+        "args": {
+            "sketch": "$k5",
+            "kind": "project_to_surface",
+            "faces": {"normal": [0, 0, 1], "count": 1},
+            "curves": [0],
+        },
+        "contains": ["3D curve"],
+    },
+    {
+        "tool": "create_curve_sketch",
+        "save": "k6",
+        "args": {"plane": "YZ", "offset": 10, "curves": [{"point": [0, 0]}]},
+    },
+    {
+        "tool": "sketch_project",
+        "args": {"sketch": "$k6", "kind": "intersect", "body": True},
+        "check": _external("k6", 1),
+    },
+    {
+        "tool": "primitive",
+        "save": "cyl",
+        "args": {
+            "kind": "cylinder",
+            "diameter": 10,
+            "height": 20,
+            "x": 60,
+            "operation": "new_body",
+        },
+    },
+    {
+        "tool": "sketch_project",
+        "args": {
+            "sketch": "$k6",
+            "kind": "isoparametric",
+            "of": "$cyl",
+            "faces": {"type": "cylinder", "count": 1},
+            "direction": "V",
+            "count": 3,
+        },
+        "contains": ["V curve"],
+    },
+    {
+        "tool": "sketch_project",
+        "args": {"sketch": "$k6", "kind": "project"},
+        "expect": "error",
+        "contains": ["needs edges, faces or body"],
+    },
+]
+
+
+SESSION = ASSEMBLY + INSERT + ANALYSIS + SKETCH
 
 
 def main():

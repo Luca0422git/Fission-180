@@ -383,7 +383,7 @@ define(
     ops=["sf_scale", "sf_scale_bodies", "sf_scale_sketch"],
     steps=_steps_scale,
     extra=_extra_scale,
-    needs=("solid",),
+    needs=("design",),  # (wave 8: a sketch scales without a solid; bodies say why)
     id_base="Scale",
     title_fn=lambda a: "AI: Scale",
     examples=[
