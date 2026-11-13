@@ -1959,9 +1959,11 @@ def _dimension_row(dim):
         view = dim.References2D[0][0]
         entry["view"] = view.Name
         measures = []
-        for _v, sub in dim.References2D:
-            info = drawing.edge_info(view, sub)
-            measures.append(aicore.element_text(info) if info else sub)
+        for _v, subs in dim.References2D:
+            # (one name, or a list of them: FreeCAD gives either, the window a list)
+            for sub in [subs] if isinstance(subs, str) else list(subs):
+                info = drawing.edge_info(view, sub)
+                measures.append(aicore.element_text(info) if info else sub)
         entry["measures"] = measures
         entry["at"] = [aicore.r(v, 2) for v in _item_place(dim)]
     except Exception:
