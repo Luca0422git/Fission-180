@@ -106,7 +106,7 @@ The answer:
    "ribbon": "Selection filters + INSPECT > Measure (on what a selector picks)",
    "read_only": true,
    "available": false,
-... (23 more lines)
+... (41 more lines)
 ```
 
 ## More argument examples
