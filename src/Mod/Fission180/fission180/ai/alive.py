@@ -116,11 +116,21 @@ def stats():
 
 # -- the filter ----------------------------------------------------------------------------------
 class _Filter(QtCore.QObject):
-    """On the application while a call runs; acts only while a pump lets the window live."""
+    """On the application while a call runs. It acts while a pump lets the window live, and
+    whenever else Qt handles events in the middle of the call (FreeCAD's own recompute lets
+    the window handle what is waiting every 0.1 s between steps: Base::SequencerBar), except
+    while a question box is open (its own loop: the person answers it, the tests' timers click
+    it)."""
 
     def eventFilter(self, obj, event):
         if not _state["pumping"]:
-            return False
+            if _state["call"] is None:
+                return False
+            try:
+                if QtWidgets.QApplication.activeModalWidget() is not None:
+                    return False
+            except Exception:
+                return False
         try:
             return _decide(obj, event)
         except Exception:

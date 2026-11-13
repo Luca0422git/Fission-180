@@ -21,14 +21,59 @@ Needs FreeCAD (Part shapes); no Qt.
 
 import math
 
+from . import progress
 from .ops import selectors
 
 
 def tight_box(shape):
-    """The shape's bounding box measured on its real geometry. FreeCAD's BoundBox is quick but
-    loose on free-form (B-spline) faces: it encloses their control points, so a loft 24 mm
-    wide was reported as 29.8 mm. optimalBoundingBox measures the faces themselves; the loose
-    box is the fallback."""
+    """The shape's bounding box measured on its real geometry (a copy: callers may change it).
+    FreeCAD's BoundBox is quick but loose on free-form (B-spline) faces: it encloses their
+    control points, so a loft 24 mm wide was reported as 29.8 mm; and in the window, where
+    the faces carry their display mesh, it is that mesh's box grown by its deflection.
+    optimalBoundingBox measures every face and is exact, but took 6 s on a plate of 1,700
+    faces (wave 8, ai-speed): see _exact_box. Kept for the same shape (shape_facts)."""
+    facts = shape_facts(shape)
+    box = facts.get("tight_box")
+    if box is None:
+        box = facts["tight_box"] = _exact_box(shape)
+    import FreeCAD as App
+
+    return App.BoundBox(box)
+
+
+# Surfaces and curves whose box OpenCASCADE works out exactly from their geometry (BndLib):
+# a shape made only of them gets its exact box from its edges and these surfaces, without
+# optimalBoundingBox's search over every face (_exact_box).
+_RULED = ("Plane", "Cylinder", "Cone")  # (their extremes lie on their edges)
+_EXACT_CURVES = ("Line", "LineSegment", "Circle")
+
+
+def _exact_box(shape):
+    """The exact box of a shape, the quick way where the geometry allows it:
+    * the extremes of a flat face, and of a cylinder or cone face (straight along its axis,
+      so linear there), lie on its edges, and the box of straight lines and circles is exact
+      (the edges' points: vertices and circle extremes, worked out here);
+    * every other face (sphere, torus, free-form) and every other edge is measured with
+      optimalBoundingBox, alone.
+    The shape's tolerance is not added (optimalBoundingBox's useShapeTolerance False: a solid
+    sewn from a mesh has tolerances of a micrometre or more). Falls back to optimalBoundingBox
+    of the whole shape, then to the quick box."""
+    import FreeCAD as App
+
+    try:
+        box = App.BoundBox()
+        for face in shape.Faces:
+            kind = type(face.Surface).__name__
+            if kind not in _RULED:
+                box.add(face.optimalBoundingBox(False, False))
+        for edge in shape.Edges:
+            _add_edge(box, edge)
+        for vertex in shape.Vertexes:
+            box.add(vertex.Point)
+        if box.isValid():
+            return box
+    except Exception:
+        pass
     try:
         box = shape.optimalBoundingBox(False, False)
         if box.isValid():
@@ -36,6 +81,179 @@ def tight_box(shape):
     except Exception:
         pass
     return shape.BoundBox
+
+
+def _add_edge(box, edge):
+    """The edge's exact box into `box`: a line by its ends (the vertices do that), a circle
+    or arc by its extremes along x, y and z, any other curve by optimalBoundingBox."""
+    curve = edge.Curve
+    kind = type(curve).__name__
+    if kind in ("Line", "LineSegment"):
+        return
+    if kind != "Circle":
+        box.add(edge.optimalBoundingBox(False, False))
+        return
+    import FreeCAD as App
+
+    c, r = curve.Center, curve.Radius
+    x, y = curve.XAxis, curve.YAxis
+    t0, t1 = edge.FirstParameter, edge.LastParameter
+    full = (t1 - t0) >= 2.0 * math.pi - 1e-12
+    for i, (xi, yi) in enumerate(((x.x, y.x), (x.y, y.y), (x.z, y.z))):
+        amp = math.hypot(xi, yi)
+        if amp <= 1e-15:
+            continue
+        phase = math.atan2(yi, xi)
+        for angle in (phase, phase + math.pi):  # (where coordinate i is at its max / min)
+            if not full:
+                k = math.ceil((t0 - angle) / (2.0 * math.pi))
+                angle += k * 2.0 * math.pi
+                if angle > t1:
+                    continue
+            p = c + x * (r * math.cos(angle)) + y * (r * math.sin(angle))
+            box.add(App.Vector(p))
+
+
+# -- facts of whole shapes, kept for the same shape --------------------------------------------
+# Every AI tool that reads the design measures the same unchanged bodies again: inspect_design,
+# check_design, get_design, physical_properties, the answer of every change (executor.summary)
+# and its "did anything change" test (shape_signature). The numbers are kept per shape, found
+# again by isSame (the same OpenCASCADE shape at the same place: a body's Shape is that until
+# the body changes), the newest first; the shapes are kept with them, so a freed shape's address
+# is never taken for another.
+KEEP = 16
+_KEPT = []  # [(shape, {facts})]
+
+
+def shape_facts(shape):
+    """The dict of facts kept for this very shape (filled by the functions below)."""
+    for i, (kept, facts) in enumerate(_KEPT):
+        try:
+            same = kept.isSame(shape)
+        except Exception:
+            same = False
+        if same:
+            if i:
+                _KEPT.insert(0, _KEPT.pop(i))
+            return facts
+    facts = {}
+    _KEPT.insert(0, (shape, facts))
+    del _KEPT[KEEP:]
+    return facts
+
+
+def forget():
+    """Drop every kept fact (the speed benchmark's cold calls)."""
+    del _KEPT[:]
+
+
+def _kept(shape, key, work):
+    facts = shape_facts(shape)
+    if key not in facts:
+        facts[key] = work()
+    return facts[key]
+
+
+def solid_volume(shape):
+    """The volume of the shape's solids (a surface body has none: 0)."""
+    return _kept(shape, "solid_volume", lambda: sum(s.Volume for s in shape.Solids))
+
+
+def volume(shape):
+    """shape.Volume, kept."""
+    return _kept(shape, "volume", lambda: shape.Volume)
+
+
+def area(shape):
+    return _kept(shape, "area", lambda: shape.Area)
+
+
+def counts(shape):
+    """{solids, shells, faces, edges, vertices}, counted without making a Python object of
+    each (shape.Faces took 0.1 s on 3,000 faces)."""
+
+    def work():
+        out = {}
+        for key, name in (
+            ("solids", "Solid"),
+            ("shells", "Shell"),
+            ("faces", "Face"),
+            ("edges", "Edge"),
+            ("vertices", "Vertex"),
+        ):
+            try:
+                out[key] = int(shape.countSubElements(name))
+            except Exception:
+                out[key] = len(getattr(shape, {"Vertex": "Vertexes"}.get(name, name + "s")))
+        return out
+
+    return dict(_kept(shape, "counts", work))
+
+
+def is_valid(shape):
+    """shape.isValid() (OpenCASCADE's full check: 5 s on a plate of 1,700 faces), kept."""
+
+    def work():
+        try:
+            return bool(shape.isValid())
+        except Exception:
+            return False
+
+    return _kept(shape, "valid", work)
+
+
+def centre_of_mass(shape):
+    """The volume centroid of the shape's solids (analysis.center_of_mass), or None."""
+
+    def work():
+        try:
+            from .. import analysis
+
+            centre, _volume = analysis.center_of_mass([shape])
+            return centre
+        except Exception:
+            try:
+                return shape.CenterOfMass
+            except Exception:
+                return None
+
+    found = _kept(shape, "centre", work)
+    if found is None:
+        return None
+    import FreeCAD as App
+
+    return App.Vector(found)
+
+
+def placed_box(shape, place=None):
+    """tight_box of the shape moved by `place` (a component's placement; None: where it is).
+    A move without a turn shifts the kept box; a turned one is measured on the moved shape
+    once and kept with the shape for that placement."""
+    import FreeCAD as App
+
+    if place is None or place.isIdentity():
+        return tight_box(shape)
+    if place.Rotation.Angle < 1e-12:
+        box = tight_box(shape)
+        box.move(place.Base)
+        return box
+    key = ("box at", tuple(round(v, 12) for v in place.toMatrix().A))
+    facts = shape_facts(shape)
+    if key not in facts:
+        moved = shape.copy()
+        moved.transformShape(place.toMatrix(), True)
+        facts[key] = _exact_box(moved)
+    return App.BoundBox(facts[key])
+
+
+def is_closed(shape):
+    def work():
+        try:
+            return all(s.isClosed() for s in shape.Shells)
+        except Exception:
+            return None
+
+    return _kept(shape, "closed", work)
 
 
 TOL = 1e-4  # the selectors' "at" tolerance (selectors.select keeps |c - target| < 1e-4)
@@ -91,7 +309,7 @@ def face_facts(face):
             out["axis"] = _xyz(surface.Axis)
     except Exception:
         pass
-    out["bbox_mm"] = _bbox(tight_box(face))
+    out["bbox_mm"] = _bbox(_exact_box(face))  # (not kept: the bodies' facts are)
     out["edges"] = len(face.Edges)
     return out
 
@@ -152,7 +370,9 @@ class _Index:
         self.center = []
         self._seen = {}
         classify = selectors.face_type if element == "faces" else selectors.edge_type
-        for _name, sub in self.items:
+        count = len(self.items)
+        for k, (_name, sub) in enumerate(self.items):
+            progress.step("reading the %s" % element, k, count)
             kind = classify(sub)
             self.kind.append(kind)
             normal = direction = radius = None
@@ -191,8 +411,66 @@ class _Index:
         )
         found = self._seen.get(key)
         if found is None:
-            found = self._seen[key] = [j for j in range(len(self.items)) if self.matches(j, spec)]
+            found = self._seen[key] = [j for j in self._pool(spec) if self.matches(j, spec)]
         return found
+
+    # (wave 8, ai-speed) the elements a selector can pick, found through grids of their normals,
+    # directions and radii instead of trying every element: a part made from a mesh has a
+    # normal of its own for nearly every face, so each ref tried all 3,000 faces (2.6 million
+    # tests, 5 s for describe_reference's refs). matches() still decides: these are only the
+    # elements that can pass it, in their order.
+    _CELL = 2e-3  # (dot > 1 - 1e-6 keeps unit vectors under 1.42e-3 apart: the next cell at most)
+    _RADIUS_CELL = 1e-5  # (radii within 1e-6)
+
+    def _pool(self, spec):
+        try:
+            if "normal" in spec:
+                return self._near("normal", selectors._unit(spec["normal"]), False)
+            if "parallel" in spec:
+                return self._near("direction", selectors._unit(spec["parallel"]), True)
+            if "radius" in spec:
+                return self._near_radius(float(spec["radius"]))
+            if "type" in spec:
+                return self._grid("kind").get(spec["type"], [])
+        except Exception:
+            pass  # (matches() says what is wrong with the selector)
+        return range(len(self.items))
+
+    def _grid(self, attr):
+        grids = self.__dict__.setdefault("_grids", {})
+        grid = grids.get(attr)
+        if grid is None:
+            grid = grids[attr] = {}
+            for j, value in enumerate(getattr(self, attr)):
+                if value is None:
+                    continue
+                if attr in ("normal", "direction"):
+                    cell = tuple(int(math.floor(c / self._CELL)) for c in value)
+                elif attr == "radius":
+                    cell = int(math.floor(value / self._RADIUS_CELL))
+                else:
+                    cell = value
+                grid.setdefault(cell, []).append(j)
+        return grid
+
+    def _near(self, attr, unit, both_ways):
+        grid = self._grid(attr)
+        found = set()
+        for vector in (unit, tuple(-c for c in unit)) if both_ways else (unit,):
+            cx, cy, cz = (int(math.floor(c / self._CELL)) for c in vector)
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        found.update(grid.get((cx + dx, cy + dy, cz + dz), ()))
+        return sorted(found)
+
+    def _near_radius(self, radius):
+        grid = self._grid("radius")
+        cell = int(math.floor(radius / self._RADIUS_CELL))
+        found = []
+        for k in (cell - 1, cell, cell + 1):
+            found.extend(grid.get(k, ()))
+        return sorted(found)
 
     def select(self, spec):
         """The indexes a selector made of type / normal / parallel / radius / at / count picks,
@@ -283,16 +561,25 @@ def _unique(index, i):
     return spec
 
 
+def index_of(shape, element):
+    """The _Index of the shape's faces or edges, kept with the shape (wave 8, ai-speed: an AI
+    asks query_geometry again and again of a body that did not change; measuring every face
+    took 0.3 s on 1,700 faces each time)."""
+    return _kept(shape, ("index", element), lambda: _Index(shape, element))
+
+
 def stable_refs(shape, element, wanted=None, verify=True):
     """{name: selector or None} for the faces / edges (wanted: only these names). Vertices
     have no selector: a corner is picked by its point ({"vertex": [x, y, z]})."""
     if element == "vertices":
         return {name: None for name, _v in elements(shape, element)}
-    index = _Index(shape, element)
+    index = index_of(shape, element)
     out = {}
+    count = len(index.items)
     for i, (name, _sub) in enumerate(index.items):
         if wanted is not None and name not in wanted:
             continue
+        progress.step("making a selector for each of the %s" % element, i, count)
         spec = _unique(index, i)
         if spec is not None and verify:
             try:

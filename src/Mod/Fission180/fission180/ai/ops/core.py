@@ -723,8 +723,17 @@ def draw(sketch, geometry, first_index=0):
     """Add create_sketch geometry items (rect, center_rect, circle, polyline, polygon, slot,
     line, ellipse, spline_loop, segments) to a sketch, with Fusion-style named dimensions.
     Used by the "sketch" step and by the AI tool that draws in an existing sketch."""
+    # (wave 8, ai-speed) the circles' dimensions are added together, before the next item
+    # (so every constraint keeps its number): FreeCAD solves the whole sketch after each
+    # constraint added alone, and a sketch of 320 circles took 216 s to draw (0.2 s a solve);
+    # the circles are drawn where their dimensions put them, so nothing moves without it
+    pending = []
     for i, item in enumerate(geometry):
         name = item.get("name", "g%d" % (i + first_index))
+        if "circle" in item:
+            pending += _circle_constraints(sketch, name, *item["circle"])
+            continue
+        _add_named(sketch, pending)
         if "rect" in item:
             x0, y0, x1, y1 = item["rect"]
             _rect(sketch, name, min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
@@ -763,6 +772,28 @@ def draw(sketch, geometry, first_index=0):
         elif "segments" in item:  # a closed chain of lines, arcs and open splines
             for segment in item["segments"]:
                 sketch.addGeometry(_segment(segment))
+    _add_named(sketch, pending)
+
+
+def _add_named(sketch, pending):
+    """Add [(constraint, name)] in one go (one solve at the next recompute), then name them;
+    empties the list."""
+    if not pending:
+        return
+    indexes = sketch.addConstraint([c for c, _name in pending])
+    for index, (_c, name) in zip(indexes, pending):
+        sketch.renameConstraint(index, name)
+    del pending[:]
+
+
+def _circle_constraints(sketch, name, cx, cy, r):
+    """The circle drawn, its dimensions as _circle gives them, not added yet."""
+    g = sketch.addGeometry(Part.Circle(_v(cx, cy), App.Vector(0, 0, 1), r))
+    return [
+        (Sketcher.Constraint("Diameter", g, 2.0 * r), name + ".diameter"),
+        (Sketcher.Constraint("DistanceX", -1, 1, g, 3, cx), name + ".x"),
+        (Sketcher.Constraint("DistanceY", -1, 1, g, 3, cy), name + ".y"),
+    ]
 
 
 def _v(x, y):
