@@ -417,14 +417,14 @@ define(
     "animation",
     "ANIMATION > VIEW > View",
     "Record a camera move on a storyboard (what Fusion's View records while a person orbits "
-    "and zooms): the camera ends at `at` looking from view (iso, Fusion's Home: from the "
-    "front, right and top; front, back, top, bottom, left, right) or from direction [x, y, z], "
-    "with up the screen's up, and turns, pans and zooms smoothly from where it was. It fits "
-    "the components shown at that time (of: fit these instead); zoom 2 is twice as close; "
-    "perspective true for a perspective camera (orthographic by default). at 0: the "
-    "storyboard just starts with this view. A storyboard without a view yet starts from the "
-    "window's (iso without the window). Publish Video follows these views. Answers the "
-    "action and the camera. " + BOARD_HELP + BASICS,
+    "and zooms): the camera ends at `at` looking from view (iso: Fusion's Home, from the "
+    "front, right and top) or from direction [x, y, z] (up: the screen's up), turning, panning "
+    "and zooming smoothly from where it was. It fits the components shown then (of: these "
+    "instead); zoom 2 is twice as close; perspective true (orthographic by default). at 0: "
+    "the storyboard starts with this view; one without a view yet starts from the window's "
+    "(iso without it). Publish Video follows these views. Answers the action and the camera. "
+    + BOARD_HELP
+    + BASICS,
     schema(
         {
             "storyboard": _board(),

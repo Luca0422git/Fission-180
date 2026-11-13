@@ -670,6 +670,8 @@ def _element_nodes(data, body, sub):
     if sub.startswith("Vertex"):
         node, _gap = _nearest_surface(data, tuple(element.Point))
         return np.asarray([node] if node is not None else [], dtype=np.int64)
+    if sub.startswith("Face"):
+        return _face_nodes(element, nodes, pts, near, tol)
     keep = []
     for k in near.tolist():
         try:
@@ -677,6 +679,41 @@ def _element_nodes(data, body, sub):
                 keep.append(int(nodes[k]))
         except Exception:
             continue
+    return np.asarray(keep, dtype=np.int64)
+
+
+def _face_nodes(face, nodes, pts, near, tol):
+    """The surface nodes (of `near`) on a face: projected onto its surface, close to it and
+    inside its outline (holes left out). Its surface's own projection and domain test, a few
+    hundredths of a millisecond a node (a distance to the face took a millisecond)."""
+    import numpy as np
+
+    import FreeCAD as App
+    import Part
+
+    surface = face.Surface
+    try:  # (a round face's angle may be given a turn away from the face's own range)
+        period = surface.UPeriod() if surface.isUPeriodic() else None
+    except Exception:
+        period = None
+    shifts = (0.0, period, -period) if period else (0.0,)
+    keep = []
+    for k in near.tolist():
+        p = App.Vector(*pts[k])
+        try:
+            u, v = surface.parameter(p)
+            if surface.value(u, v).distanceToPoint(p) > tol:
+                continue
+            if any(face.isPartOfDomain(u + s, v) for s in shifts):
+                keep.append(int(nodes[k]))
+            elif face.distToShape(Part.Vertex(p))[0] <= tol:
+                keep.append(int(nodes[k]))  # (on the face's outline: a hole's rim, an edge)
+        except Exception:  # (a surface that cannot project: the slow, sure way)
+            try:
+                if face.distToShape(Part.Vertex(p))[0] <= tol:
+                    keep.append(int(nodes[k]))
+            except Exception:
+                continue
     return np.asarray(keep, dtype=np.int64)
 
 
@@ -1163,6 +1200,11 @@ def show_study_results(ctx, args):
     rcore = _results_core()
     from ... import simulation_results_ui as results_ui
 
+    # (read only for the design, so the bridge lets it through while the person works; but
+    # opening the RESULTS tab would finish the person's open dialog or sketch: refused instead)
+    busy = ctx.host.busy()
+    if busy:
+        raise UserError(busy)
     if args.get("finish"):
         results_ui.finish_compare()
         results_ui.finish()

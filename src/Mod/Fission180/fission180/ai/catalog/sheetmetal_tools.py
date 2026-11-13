@@ -143,20 +143,16 @@ define(
     "Sheet metal rule",
     "sheet_metal",
     "SHEET METAL > MODIFY > Sheet Metal Rules",
-    "Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): the "
-    "thickness, bend radius, K factor, miter / rip / seam gap and the reliefs that every "
-    "flange, bend and flat pattern of a body following it uses. rule: its name. from: start "
-    "it from another rule (a library rule or one of the design's); without from the design's "
-    "rule of that name is changed (or a new one made with Steel (mm)'s values). set: {field: "
-    "value}: thickness, bend_radius, k_factor (0..1), miter_gap, bend_relief_shape / width / "
-    "depth / remnant, corner_relief_2bend_shape / placement / size, corner_relief_3bend_shape "
-    "/ radius, units (a new rule only); lengths are numbers in the rule's units or text in "
-    'Thickness ("Thickness * 2"). active: true makes it the rule new flanges start with. '
-    "bodies: sheet metal bodies that follow this rule from now on (they rebuild with it). "
-    "delete: true removes the design rule (refused while a body follows it, for the active "
-    "rule and for the last one). Editing a rule that bodies follow rebuilds them. "
-    + RULES_HELP
-    + " Answers the rule's values and the design's rules.",
+    "Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): thickness, "
+    "bend radius, K factor, gaps and reliefs of every flange, bend and flat pattern of a body "
+    "following it. rule: its name. from: start from another rule (library or design); "
+    "without it the design's rule of that name changes (or one is made from Steel (mm)). set: "
+    "{field: value} (the fields of the set argument; lengths in the rule's units or text in "
+    'Thickness, "Thickness * 2"). active: the rule new flanges start with. bodies: sheet '
+    "metal bodies that follow it from now on (they rebuild). delete: removes the design rule "
+    "(refused while a body follows it, for the active rule and the last one). Bodies "
+    "following an edited rule rebuild. " + RULES_HELP + " Answers the rule's values and the "
+    "design's rules.",
     schema(
         {
             "rule": string("the rule's name"),

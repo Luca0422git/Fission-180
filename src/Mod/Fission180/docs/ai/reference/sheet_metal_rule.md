@@ -7,7 +7,7 @@ It builds the design step(s) `sf_sheet_rule` (the golden models' step language).
 
 ## What it does
 
-Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): the thickness, bend radius, K factor, miter / rip / seam gap and the reliefs that every flange, bend and flat pattern of a body following it uses. rule: its name. from: start it from another rule (a library rule or one of the design's); without from the design's rule of that name is changed (or a new one made with Steel (mm)'s values). set: {field: value}: thickness, bend_radius, k_factor (0..1), miter_gap, bend_relief_shape / width / depth / remnant, corner_relief_2bend_shape / placement / size, corner_relief_3bend_shape / radius, units (a new rule only); lengths are numbers in the rule's units or text in Thickness ("Thickness * 2"). active: true makes it the rule new flanges start with. Editing a rule that bodies follow rebuilds them. Fission 180's library rules: Steel (mm), Stainless Steel (mm), Aluminum (mm), Copper (mm), Steel (in), Stainless Steel (in), Aluminum (in), Copper (in) (Steel (mm): 1 mm thick, Aluminum (mm): 1.5 mm; bend radius = Thickness, K factor 0.44), plus the design's own (sheet_metal_rule makes them). Answers the rule's values and the design's rules.
+Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): the thickness, bend radius, K factor, miter / rip / seam gap and the reliefs that every flange, bend and flat pattern of a body following it uses. rule: its name. from: start it from another rule (a library rule or one of the design's); without from the design's rule of that name is changed (or a new one made with Steel (mm)'s values). set: {field: value}: thickness, bend_radius, k_factor (0..1), miter_gap, bend_relief_shape / width / depth / remnant, corner_relief_2bend_shape / placement / size, corner_relief_3bend_shape / radius, units (a new rule only); lengths are numbers in the rule's units or text in Thickness ("Thickness * 2"). active: true makes it the rule new flanges start with. bodies: sheet metal bodies that follow this rule from now on (they rebuild with it). delete: true removes the design rule (refused while a body follows it, for the active rule and for the last one). Editing a rule that bodies follow rebuilds them. Fission 180's library rules: Steel (mm), Stainless Steel (mm), Aluminum (mm), Copper (mm), Steel (in), Stainless Steel (in), Aluminum (in), Copper (in) (Steel (mm): 1 mm thick, Aluminum (mm): 1.5 mm; bend radius = Thickness, K factor 0.44), plus the design's own (sheet_metal_rule makes them). Answers the rule's values and the design's rules.
 
 ## Arguments
 
@@ -31,6 +31,8 @@ Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): th
 | `set.corner_relief_3bend_shape` | `no_replacement` \| `intersection` \| `full_round` \| `round_with_radius` |  |  |  |  |
 | `set.corner_relief_3bend_radius` | number or string |  |  |  | a number in the rule's units, or an expression in Thickness |
 | `active` | boolean |  | `false` |  | make it the active rule |
+| `bodies` | array of strings |  |  | at least 1 item(s) | sheet metal bodies that take this rule |
+| `delete` | boolean |  | `false` |  | delete this design rule |
 
 ## Answer
 
@@ -102,8 +104,13 @@ Done: AI: Sheet metal rule Steel 0.5. No solid body yet.
 
 - a 0.5 mm steel rule, active for the next flanges:
   `{"rule": "Steel 0.5", "from": "Steel (mm)", "set": {"thickness": 0.5, "bend_radius": "Thickness"}, "active": true}`
+- the tray made of 1.5 mm aluminium instead (wave 8):
+  `{"rule": "Aluminum (mm)", "bodies": ["Flange1"]}`
+- a rule no body uses any more, deleted:
+  `{"rule": "Steel 0.5", "delete": true}`
 
 ## See also
 
+- Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `sheetmetal_base_flange_side2_rule`, `sheetmetal_rule_edit_recomputes`, `sm_flat_k_factor`, `sm_flat_moved_body`, `sm_flat_thickness_change`, `sm_flat_thickness_follow`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

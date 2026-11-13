@@ -196,8 +196,14 @@ def print_part(ctx, args):
 
 
 def _watertight(export, body, level):
+    """A mesh body: its triangles close (no open edge); a solid: its shells are closed, so
+    its triangles close too (without meshing it a second time: a part of 2,000 faces took 6 s
+    more, and isValid another second)."""
     try:
-        return bool(export.body_mesh(body, level=level).isSolid())
+        if export.is_mesh_body(body):
+            return bool(body.Mesh.isSolid())
+        shape = export.shape_of(body)
+        return bool(shape.Solids) and all(s.isClosed() for s in shape.Solids)
     except Exception:
         return False
 

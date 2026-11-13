@@ -30,17 +30,15 @@ define(
     "import_export",
     "UTILITIES > MAKE > 3D Print",
     "Fusion's 3D Print: the bodies as one mesh file for 3D printing. send_to file (default: "
-    "save it at path, a full path or a folder; unit Millimeter by default) | slicer (open it "
-    "in the person's slicer: the one picked in Preferences > 3D Print, else the first found "
-    "on this computer) | prusaslicer | bambustudio | orcaslicer | cura (that slicer, when "
-    "installed). The person is asked before a slicer starts; it needs the window. bodies: "
-    "step ids (default: every shown body with a solid, and the mesh bodies). format 3MF "
-    "(default: names and unit kept) | STL (Binary) | STL (ASCII) | OBJ; refinement Low | "
-    "Medium (default) | High: how finely curved faces are cut into triangles. Answers the "
-    "file, the triangles, whether each body is watertight (open edges make a slicer "
-    "complain: check_design / mesh repair first) and what the file leaves out. Seconds. "
-    "A file that exists is not replaced unless the person agrees. export writes other "
-    "formats (STEP...).",
+    "save it at path, a full path or a folder, in unit) | slicer (the person's slicer: the one "
+    "picked in Preferences > 3D Print, else the first found on this computer) | prusaslicer | "
+    "bambustudio | orcaslicer | cura (that one, when installed); a slicer needs the window and "
+    "the person is asked first. bodies: default every shown body and mesh body. format 3MF "
+    "(names and unit kept) | STL | OBJ; refinement: how finely curved faces become triangles. "
+    "Answers the file, the triangles, whether each body is watertight (open edges make a "
+    "slicer complain) and what the file leaves out. About 10 s for a part of 1,500 faces, "
+    "twice that at High. A file that exists is not replaced unless the person agrees. export "
+    "writes other formats (STEP...).",
     schema(
         {
             "send_to": enum(("file", "slicer") + SLICER_IDS, "where it goes", default="file"),
@@ -80,7 +78,7 @@ define(
     'path; default: "<design>-export" beside the saved design file). Use it to hand a '
     "design to someone with another program, or to keep a copy any CAD can open; export "
     "writes one file of one format. Answers every file with its size and what each format "
-    "leaves out (timeline, parameters, colours...). Seconds; tens of seconds for big parts. "
+    "leaves out (timeline, parameters, colours...). About 25 s for a part of 1,500 faces. "
     "Files that exist are not replaced unless the person agrees.",
     schema({"folder": string("the folder to write into (a full path; made when missing)")}),
     changes=False,

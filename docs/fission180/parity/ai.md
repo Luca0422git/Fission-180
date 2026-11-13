@@ -265,3 +265,179 @@ Pattern brought a drawing's tab in front of the 3D view (fixed in `flatpattern_u
 | UTILITIES > UTILITY > Save As | `save_as` |
 | UTILITIES > UTILITY > Version History | open: no tool lists or restores a design's versions yet (`save` makes a version) |
 | UTILITIES > UTILITY > Command Search | no tool: `list_tools` with `goal` is the AI's search |
+
+## Wave 8 coverage: workspaces (SIMULATION, MANUFACTURE, ANIMATION, SHEET METAL, PLASTIC, UTILITIES > MAKE)
+
+Builder ai-workspaces, 2026-11-13 (brief `docs/fission180/dev/briefs/ai-workspaces.md`). Luca:
+"I want it to be able to simulate, manufacture, animate and draw." Every command of these tabs
+that changes or measures something is reachable by a tool or a `kind`, through the workspaces'
+own code; the display-only ones the AI also reaches (so the person sees what it looks at).
+Session log: `docs/fission180/sessions/ai-workspaces.md`.
+
+### Fusion's behaviour copied (sources)
+
+| What | Fusion | Fission 180's AI tool | Source |
+|---|---|---|---|
+| Surface Probes | values on the outer surface where clicked; any number; follow the result shown | `study_probe on`: over picked faces / edges / corners / bodies, min / max (with where) / mean | Autodesk ([surface probes](https://help.autodesk.com/cloudhelp/ENU/Fusion-Simulate/files/SIM-SURFACE-PROBE-CONCEPT.htm)) |
+| Point Probes | like surface probes, but can be moved inside the part | `study_probe points`: interpolated in the element the point is in | Autodesk ([point probes](https://help.autodesk.com/cloudhelp/ENU/Fusion-Simulate/files/SIM-POINT-PROBE-CONCEPT.htm)) |
+| Slice Plane | cuts the model and hides what is in front, to see inside | `study_probe section` (the numbers on the cut), `show_study_results slice` (the display) | Autodesk ([inspect tools](https://help.autodesk.com/cloudhelp/ENU/Fusion-Simulate/files/SIM-RESULT-INSPECT-CONCEPT.htm)) |
+| Results inspect menu | Surface Probes, Point Probes, Reaction Force, Slice Plane under INSPECT | study_probe, study_results reactions | Autodesk ([results tools course](https://autodesk.com/learn/ondemand/course/fusion360-simulation-applications-for-static-stress-analysis-professional/unit/W2TZxQi5gihEssk3isY3V)) |
+| Stock comparison | Simulate's stock colorization "comparison": red where too much was removed (gouge), blue where stock is left | `cam_simulate` gouges (area, deepest, where, operation) and stock_left_on_model | Forum ([stock comparison](https://forums.autodesk.com/t5/fusion-manufacture-forum/how-to-use-cam-stock-simulation-comparison/td-p/8729081), [gouges](https://forums.autodesk.com/t5/fusion-manufacture-forum/simulation-not-showing-gouges/td-p/12550018)) |
+| Collisions | red marks on the simulation timeline; Stop on collision | `cam_simulate` collisions (rapid moves into material; holder not checked) | Autodesk course ([simulate toolpaths](https://autodesk.com/learn/ondemand/course/fusion360-cam-2.5-axis-milling-cert-prep/unit/6Fkkn1acs0ElISWkLycZR)) |
+| Setup Sheet | a page of the setup's tools and operations for the machinist | `cam_setup_sheet` (Fission 180's own sheet, setup_sheet_html) | Guess (no official page found; Fission 180's MANUFACTURE parity doc) |
+| Auto Explode: All Levels | explodes every level down to the leaf parts; a selected assembly's subassemblies too | `anim_explode levels all` | Autodesk ([all levels](https://help.autodesk.com/cloudhelp/ENU/Fusion-Animate/files/ANI-EXPLODE-ALL-LEVELS.htm), [transform](https://help.autodesk.com/cloudhelp/ENU/Fusion-Animate/files/ANI-TRANSFORM.htm)) |
+| Storyboard, scratch zone | a clean storyboard; actions are put at the playhead out of the scratch zone; reversing an explode gives an assembly | `at` (0 = scratch zone), anim_storyboard reverse | Autodesk ([explode activity](https://help.autodesk.com/cloudhelp/ENU/Fusion-Animate/files/GUID-CCBE4164-214A-4931-B7FB-DA4DC1F3B40B.htm), [animation deep-dive](https://www.autodesk.com/products/fusion-360/blog/fusion-360-animation-deep-dive/)) |
+| VIEW | with View on, orbit / pan / zoom past the scratch zone is recorded as a View action | `anim_view`: a View action from a standard view or a direction, fitted, by numbers | Guess (Fission 180's ANIMATION parity doc; the camera row) |
+| 3D Print | the bodies as a mesh to a print utility or a file | `print_part` (a slicer found on this computer, asked first; or a file) | Fission 180's insert-export parity doc |
+
+### SIMULATION: SETUP tab
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| STUDY > New Simulation Study | `create_study` (`copy_of`: the browser's Clone Study) |
+| SIMPLIFY > Simplify | no tool: greyed in Fission 180 (not built; a study uses the design as it is) |
+| MATERIALS > Study Materials | `set_study_material` (and `study_setup` reads them) |
+| MATERIALS > Manage Physical Materials | SOLID's Manage Materials: ai-design's `list_materials` / `physical_material` |
+| CONSTRAINTS > Structural Constraints | `add_constraint` (fixed, pin, frictionless, displacement) |
+| LOADS > Structural Loads | `add_load` (force, pressure, moment, bearing, remote_force) |
+| LOADS > Toggle Gravity On/Off | `study_settings` (gravity, gravity_direction) |
+| LOADS > Linear / Angular Global Load, Point Mass (Auto / Manual) | no tool: greyed in Fission 180 (not built) |
+| CONTACTS > Automatic Contacts | `study_setup` (contact_tolerance: Generate's list with gaps) + `study_settings` contact_tolerance (OK keeps it) |
+| CONTACTS > Manual Contacts, Bolt Connector, Rigid Body Connector | no tool: greyed in Fission 180 (not built) |
+| CONTACTS > Contact Manager | `study_setup` (contacts, overlapping, touching only at an edge or corner) |
+| DISPLAY > DOF View | `study_setup` (free_motions: how each piece could still move) |
+| DISPLAY > Show Mesh | `study_mesh` (show) |
+| MANAGE > Settings | `study_settings` |
+| MANAGE > Local Mesh Control | `local_mesh_control`; changed / suppressed / deleted with `edit_study_item` |
+| MANAGE > Load Case Attributes | `study_setup` (items: kind, values, what it is on, status) |
+| SOLVE > Pre-check | `precheck_study` |
+| SOLVE > Solve | `solve_study` (waits; says how long it took; Stop cancels it with ai-speed's safe points) |
+| SOLVE > Generate Mesh | `study_mesh` |
+| SOLVE > Job Status | no tool: the AI's solve and mesh wait for their job and answer its outcome and time; `study_results` says whether a study is solved and out of date |
+| browser: study > Delete | `delete_study` |
+| browser: constraint / load / mesh control > Edit, Suppress, Delete | `edit_study_item` |
+
+### SIMULATION: RESULTS tab
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| RESULT TOOLS > Animate | `show_study_results` animate |
+| RESULT TOOLS > Results Details | `study_results` (verdict, per body, extremes) |
+| RESULT TOOLS > Convergence Plot | `study_results` convergence (after adaptive refinement) |
+| RESULT TOOLS > Legend Min/Max | `show_study_results` legend_range |
+| RESULT TOOLS > Compare | `show_study_results` compare |
+| RESULT TOOLS > Report | `study_report` (pictures with the window) |
+| DEFORMATION > Undeformed, Actual, Adjusted x 0.5, Adjusted, Adjusted x 2, Adjusted x 5 | `show_study_results` deformation |
+| DISPLAY > Show Mesh, Undeformed Model, Loads and Constraints | `show_study_results` mesh, undeformed_model, loads |
+| INSPECT > Surface Probes | `study_probe` on |
+| INSPECT > Show Min/Max | `study_results` (min / max with where), `show_study_results` min_max |
+| INSPECT > Reaction Force | `study_results` reactions |
+| INSPECT > Slice Plane | `study_probe` section (numbers), `show_study_results` slice (display) |
+| INSPECT > Point Probes | `study_probe` points |
+| INSPECT > Iso-surface | `show_study_results` iso_surface |
+| INSPECT > Solver Data | `study_results` solver, solve_seconds |
+| INSPECT > Measure | `measure` |
+| FINISH RESULTS > Finish Results | `show_study_results` finish |
+
+### MANUFACTURE: MILLING tab
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| SETUP > New Setup | `cam_setup` (stock relative / fixed / solid / preceding; WCS orientation model / z_x / z_y / x_y, origin stock_point / model_point / model_origin / selected; post program, comment, wcs_offset G54-G59) |
+| 2D > 2D Adaptive Clearing, 2D Pocket, Face, 2D Contour, Slot, Trace, Bore, Circular, Engrave, 2D Chamfer | `cam_operation` kind adaptive2d, pocket2d, face, contour2d, slot, trace, bore, circular, engrave, chamfer2d |
+| 2D > Thread | no tool: greyed in Fission 180 (thread milling not built) |
+| 3D > Adaptive Clearing, Pocket Clearing, Parallel, Contour | `cam_operation` kind adaptive3d, pocket3d, parallel, contour3d |
+| 3D > Scallop, Pencil, Spiral, Radial | no tool: greyed (FreeCAD's CAM engine has no such strategy) |
+| DRILLING > Drill | `cam_operation` kind drill |
+| ACTIONS > Generate | `cam_generate` |
+| ACTIONS > Simulate | `cam_simulate` (collisions, gouges, stock left on the part, per operation) |
+| ACTIONS > Post Process | `cam_post` (grbl, linuxcnc, mach3_mach4, fanuc, marlin, centroid, smoothie, rrf, refactored_masso_g3; checked) |
+| ACTIONS > Setup Sheet | `cam_setup_sheet` |
+| MANAGE > Tool Library | `cam_tools` (read), `cam_tool_library` (add, edit, delete, copy, new_library, delete_library) |
+| browser: setup / operation > Edit, Suppress, Delete; Setups | `cam_edit`, `cam_delete`, `cam_setups` |
+
+### ANIMATION
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| STORYBOARD > New Storyboard (and a storyboard tab's Duplicate, Reverse, Rename, Delete) | `anim_storyboard` action new, duplicate, reverse, rename, delete, activate |
+| TRANSFORM > Transform Components | `anim_transform` |
+| TRANSFORM > Restore Home | `anim_restore_home` |
+| TRANSFORM > Auto Explode: One Level / All Levels | `anim_explode` levels one / all |
+| TRANSFORM > Manual Explode | `anim_manual_explode` |
+| TRANSFORM > Show/Hide | `anim_show_hide` |
+| ANNOTATION > Create Callout | `anim_callout` |
+| VIEW > View | `anim_view` |
+| PUBLISH > Publish Video | `anim_publish_video` (frame by frame with safe points) |
+| ANIMATION TIMELINE: Edit Start/End, drag a bar, Delete; reading | `anim_action`; `anim_storyboards` |
+
+### SHEET METAL and FLAT PATTERN
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| CREATE > Flange | `flange` (kind base, contour, edge) |
+| CREATE > Lofted Flange, Bend, Hem, Join by Bend | `lofted_flange`, `bend`, `hem`, `join_by_bend` |
+| CREATE > Create Flat Pattern | `flat_pattern` |
+| CREATE > New Component, Create Sketch, Extrude, Hole, Pattern, Mirror, Derive | the SOLID tools (`new_component`, `create_sketch`, `extrude`, `hole`, `pattern`..., `mirror`; Derive: ai-design) |
+| MODIFY > Fillet, Chamfer | `sheet_metal_fillet`, `sheet_metal_chamfer` |
+| MODIFY > Unfold, Refold, Rip, Corner Closure, Convert to Sheet Metal | `unfold`, `refold`, `rip`, `corner_closure`, `convert_to_sheet_metal` |
+| MODIFY > Sheet Metal Rules | `sheet_metal_rule` (new from a rule, edit, active; wave 8: `bodies` swaps a body's rule, `delete` removes a design rule). The person's own library rules on this computer: no tool (an AI does not change the person's library) |
+| MODIFY > Press Pull, Combine, Replace Face, Split Face, Split Body, Move/Copy, Align, Delete, Physical Material, Appearance, Manage Materials, Change Parameters, Compute All | the SOLID tools of the same names (ai-design) |
+| FLAT PATTERN > Export DXF | `export_flat_pattern` |
+| FLAT PATTERN > Finish Flat Pattern | no tool: it leaves a display mode (the AI reads the flat pattern from flat_pattern / export_flat_pattern; ai-behaviour's workspace tool shows workspaces) |
+
+### PLASTIC
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| SETUP > Assign Plastic Rule, Manage Plastic Rules | `plastic_rule` (rule; set edits the design's copy) |
+| CREATE > Boss, Snap Fit, Lip, Rest | `boss` (and `boss_fastener`), `snap_fit`, `lip`, `rest` |
+| CREATE > Extrude, Revolve, Sweep, Loft, Rib, Web, Emboss, Hole, Thread, Thicken, Mirror, Pattern | the SOLID tools |
+| MODIFY > Rule Fillet | `rule_fillet` with the plastic rule's nominal_radius as radius (plastic_rule answers it) |
+| MODIFY > Fillet, Chamfer, Shell, Draft, Scale, Combine, Offset Face, ... | the SOLID tools |
+| INSPECT > Design Advice | `design_advice` |
+
+### UTILITIES > MAKE
+
+| Ribbon command | Tool |
+|---|---|
+| 3D Print | `print_part` (send_to file, slicer, prusaslicer, bambustudio, orcaslicer, cura; format, unit, refinement) |
+| Export | `export` |
+| Export Everything | `export_everything` |
+
+### Tools added or changed, measured
+
+Measured headless (FreeCAD 1.1.4, 4 shared CPUs under the load of ten builders): a 200 x 40 x 20
+beam with 10 holes at mesh size 2.5 % (16,729 nodes; 23,152 with two fillets), six touching
+boxes, a 200 x 150 x 12 plate with a pocket and 48 holes (four operations), 20 components, a
+210 x 110 plate with 200 filleted holes (about 1,400 faces, 270,000 triangles).
+
+| Tool | What | Seconds (big case) |
+|---|---|---|
+| `study_probe` | points / faces / section numbers | 10 points 0.45; 13 faces 2.1 (the exact distance per node took 12); a section 0.02 |
+| `study_report` | the HTML report (pictures with the window) | 0.02 (0.8 with pictures, bracket) |
+| `study_mesh` | Generate Mesh (+ Show Mesh) | 1.9 (16,729 nodes) |
+| `study_setup` | Load Case Attributes, contacts, DOF View | 0.06; 0.13 with six bodies and a contact tolerance |
+| `edit_study_item` | Edit / Suppress / Delete an item | 0.01 |
+| `show_study_results` | the RESULTS display (window) | under 0.3 a call (bracket, 2,438 nodes) |
+| `create_study` copy_of | Clone Study | 0.01 |
+| `study_results` (+ Solver Data, convergence) | | 0.05 |
+| `solve_study` (now says how long) | | 9.3 (16,729 nodes) |
+| `cam_simulate` (+ gouges, stock left) | | 4.0 (4 operations, 48 holes) |
+| `cam_setup_sheet` | Setup Sheet | 0.5 |
+| `cam_tool_library` | Tool Library changes | 0.03 |
+| `anim_view` | View action | 0.03 (20 components) |
+| `anim_action` | timeline edits | 0.02 |
+| `anim_publish_video` (safe points) | | about 1 (49 frames, 320 x 240) |
+| `print_part` | 3D Print | 11 (Medium), 21 (High): the dialog's meshing and writing |
+| `export_everything` | Export Everything | 23 to 29 |
+| `sheet_metal_rule` bodies / delete | | 0.2 |
+
+Tests: headless `Fission180Tests/headless/ai_workspaces.py` (105 calls, run by `runner.py`);
+unit `test_ai_workspaces_core.py` (18); GUI scenarios through the real MCP server and the
+bridge: `ai_workspace_simulate` (66 checks), `ai_workspace_manufacture` (45),
+`ai_workspace_animation` (39), `ai_workspace_sheetmetal` (33), `ai_workspace_plastic` (36);
+the reference examples of every new tool (`tool_examples.py`, `show_study_results` with the
+window in `ai_docs_gui`); recipes `static-stress.md` (extended), `mill-pocketed-plate.md`,
+`exploded-view-video.md`, `laser-cut-bracket.md`, `plastic-enclosure.md`, every call run by the
+documentation runner.

@@ -88,9 +88,13 @@ Done: AI: Sketch on face. Its id is 'Sketch2'. Bodies now: Body1: 24000 mm3, 60 
 
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
+- Recipe: [an exploded-view video of an assembly (ANIMATION)](fission180://docs/recipes/exploded-view-video.md)
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
+- Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
+- Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
+- Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
 - Recipe: [stepped shaft with a keyway](fission180://docs/recipes/shaft-with-keyway.md)

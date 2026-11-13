@@ -468,11 +468,10 @@ define(
     "largest stress and displacement, lowest safety factor), the reaction force at every "
     "constraint (N), the mesh, and the verdict in a sentence (lowest safety factor against "
     'target: "lowest safety factor 1.4 at (x, y, z) on Body1: below 2"; below 1 the part '
-    "would bend for good), the Solver Data (time of each stage, mesh quality) and, after "
-    "adaptive refinement, the Convergence Plot's numbers. out_of_date: the design or the "
-    "study changed since the solve. results: only these result keys. Without a study and "
-    "with several studies it lists them. study_probe reads values at points, on faces and on "
-    "a section. " + STUDY_HELP,
+    "would bend for good), Solver Data (mesh quality, how long the solve took) and, after "
+    "adaptive refinement, the Convergence Plot's numbers. out_of_date: changed since the "
+    "solve. results: only these keys. With several studies and none given it lists them. "
+    "study_probe reads values at points, on faces and on a section. " + STUDY_HELP,
     schema(
         {
             "study": _study(),
@@ -752,18 +751,15 @@ define(
     "simulate",
     "SIMULATION > RESULTS (DEFORMATION, DISPLAY, Legend Min/Max, Slice Plane, Iso-surface, "
     "Animate, Compare, Finish Results)",
-    "Show a solved study's results in the window the way the RESULTS tab does, so the "
-    "person (and render / screenshot) sees them: the SIMULATION workspace opens on RESULTS. "
-    "result: the legend's result (safety, von_mises, displacement...); deformation "
-    "undeformed | actual | adjusted_half | adjusted (Fusion's default: the largest movement "
-    "drawn at 5 % of the model) | adjusted_2 | adjusted_5; mesh, undeformed_model (a ghost of "
-    "the unloaded part), loads (loads and constraints drawn), min_max (the tags): true / "
-    "false; legend_range [min, max] or null (not for safety); slice {axis | normal, offset | "
-    "point, flip, style clip | slice} or null; iso_surface: a value, true (half way) or "
-    "null; animate true / false (the bending plays); compare: studies shown side by side on "
-    "one scale; view: a standard view (iso, front, top...), the part fitted (it is fitted "
-    "anyway when this call opens the results); finish true: Finish Results. Needs the window; "
-    "study_probe has the numbers without it. " + STUDY_HELP,
+    "Show a solved study's results in the window as the RESULTS tab does, so the person (and "
+    "render / screenshot) sees them; the part is fitted when this opens them. result: the "
+    "legend's result; deformation (adjusted: Fusion's default, the largest movement drawn at "
+    "5 % of the model); mesh, undeformed_model (a ghost), loads, min_max: true / false; "
+    "legend_range [min, max] or null (not for safety); slice {axis | normal, offset | point, "
+    "flip, style clip | slice} or null; iso_surface: a value, true (half way) or null; animate "
+    "true / false; compare: studies side by side on one scale; view: a standard view, fitted; "
+    "finish true: Finish Results. Needs the window and refuses while the person has a dialog "
+    "open; study_probe has the numbers without it. " + STUDY_HELP,
     schema(
         {
             "study": _study(),
