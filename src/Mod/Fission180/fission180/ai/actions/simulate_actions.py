@@ -856,6 +856,32 @@ def _show_results(study):
     return session
 
 
+_VIEW_CALLS = {
+    "iso": "viewIsometric",
+    "front": "viewFront",
+    "back": "viewRear",
+    "top": "viewTop",
+    "bottom": "viewBottom",
+    "left": "viewLeft",
+    "right": "viewRight",
+}
+
+
+def _look(ctx, view=None):
+    """The window's camera at a standard view (or as it is), the whole part fitted in."""
+    gui_view = ctx.host.view(ctx.doc)
+    if gui_view is None:
+        return
+    try:
+        if view:
+            getattr(gui_view, _VIEW_CALLS[view])()
+        gui_view.fitAll()
+    except Exception as exc:
+        from ... import warn
+
+        warn("show_study_results: the view could not be fitted: %s" % exc)
+
+
 def _seconds(start):
     import time
 
@@ -1157,7 +1183,11 @@ def show_study_results(ctx, args):
         )
     if results_ui.compare_on():
         results_ui.finish_compare()
+    before = results_ui.current()
+    opened = before is None or before.study is not study or not before.active
     session = _show_results(study)
+    if opened or args.get("view"):
+        _look(ctx, args.get("view"))  # (the person sees the whole part, as the AI does)
     if "result" in args:
         if args["result"] not in rcore.result_keys():
             raise UserError(

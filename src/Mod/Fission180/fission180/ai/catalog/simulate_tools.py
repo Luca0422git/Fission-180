@@ -761,8 +761,9 @@ define(
     "false; legend_range [min, max] or null (not for safety); slice {axis | normal, offset | "
     "point, flip, style clip | slice} or null; iso_surface: a value, true (half way) or "
     "null; animate true / false (the bending plays); compare: studies shown side by side on "
-    "one scale; finish true: Finish Results. Needs the window; study_probe has the numbers "
-    "without it. " + STUDY_HELP,
+    "one scale; view: a standard view (iso, front, top...), the part fitted (it is fitted "
+    "anyway when this call opens the results); finish true: Finish Results. Needs the window; "
+    "study_probe has the numbers without it. " + STUDY_HELP,
     schema(
         {
             "study": _study(),
@@ -789,6 +790,10 @@ define(
             },
             "animate": boolean("play the bending"),
             "compare": step_ids("other studies to show side by side"),
+            "view": enum(
+                ("iso", "front", "back", "top", "bottom", "left", "right"),
+                "look from this standard view, the part fitted",
+            ),
             "finish": boolean("Finish Results: back to SETUP", default=False),
         }
     ),
