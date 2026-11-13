@@ -67,7 +67,7 @@ without a picture, and a picture of the sheet).
   `drawing_depth._Near` (a grid of lines: 3.4 s -> 0.4 s for the plate's section, the same
   lines switched off, checked point by point); `drawing.set_place` (a moved view is not drawn
   again).
-- Tests: `Fission180Tests/headless/drawing_tools.py` (123 calls), `test_ai_drawing_tools.py`
+- Tests: `Fission180Tests/headless/drawing_tools.py` (124 calls), `test_ai_drawing_tools.py`
   (19), scenarios `ai_drawing_part` (67 checks), `ai_drawing_assembly` (45),
   `ai_drawing_sheetmetal` (33), reference examples, three recipes.
 

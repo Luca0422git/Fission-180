@@ -171,3 +171,132 @@ the top face without flip, a shell thicker than the part) answered "Done" with n
 Tests: `test_ai_docs_library.py`, `test_ai_docs_contract.py` (unit); the docs runner
 (`run_tests.sh --only headless / base`); scenario `ai_docs_gui` (the reference examples that
 need the window, the docs tools through the bridge, Save AI handbook... with a real click).
+
+## Wave 8 coverage: drawing
+
+Builder ai-drawing (2026-11-13; brief `docs/fission180/dev/briefs/ai-drawing.md`). Every
+command of the DRAWING tab (`ribbon_config.DRAWING_*`), File > New Drawing and the sheet bar
+reach an AI tool that runs the code its dialog runs (`fission180/ai/actions/drawing_actions.py`
+on `drawing.py`, `drawing_annot.py`, `drawing_tools.py`, `drawing_sheets.py`,
+`drawing_breakout.py`, `drawing_exploded.py`, `drawing_export.py`, `flatpattern_drawing.py`);
+the six tools of before keep their names and argument shapes (`catalog/drawing_tools.py`, moved
+from `history_tools.py`). An AI checks a drawing without a picture: `get_drawing` lists every
+sheet, view (scale, place, size, what it shows, section line and depth, break, breakout,
+storyboard), dimension (type, value, the text written, what it measures), annotation, balloon,
+table row and centre mark; with `picture` it returns a PNG of the sheet drawn from its DXF, with
+or without the window (`fission180/ai/drawing_picture.py`: Fission 180's own stroke font).
+
+### Behaviour (what Fusion does; drawing commands themselves: `drawings.md`)
+
+| # | Fusion | Source |
+|---|---|---|
+| 1 | The commands, their options and clicks are the DRAWING workspace's (drawings.md rows 1-28 and its Part 3) | Autodesk, Forum (see drawings.md) |
+| 2 | Fusion's own API reaches drawings only partly and in preview (creating a drawing, some views; no sheets, few annotations): a script cannot make a full drawing | Autodesk: Fusion API "DrawingDimensions Object Preview", "CreateDrawingInput Object Preview", "Views Object Preview"; Forum: "API Drawing Sheet Implementation" (many requests to expand the Drawing API, a slow process) |
+| 3 | Fusion's Drawing Automation (Auto Dimensions, automated views, Autodesk Assistant) makes views and dimensions by itself; Automation Preferences set the views' style and automated centre marks | Autodesk blog "AI drawing automation in Autodesk Fusion", "From 3D Model to Manufacturing Drawing: Automate Documentation with Autodesk Assistant"; Autodesk "Automation preferences reference" (DWG-REF-AUTO-PREFERENCES) |
+| 4 | An outside AI app driving every drawing command | none: beyond Fusion (Fusion's assistant is Autodesk's own) |
+| 5 | Where a person drops a view, the paper is free; projected views sit beside their parent on its axes, a section beside its cut line | Guess (what every Fusion tutorial shows; drawings.md rows 8, 10) |
+
+### Ribbon command -> tool (kind)
+
+| Ribbon | Command | Tool (kind / arguments) |
+|---|---|---|
+| File | New Drawing > From Design | `create_drawing` (bodies, contents full_assembly / visible_only, flat_pattern, standard, sheet, units, title_block, automatic or base_view + projected) |
+| File | New Drawing > From Animation | `create_drawing` storyboard (with automatic: every view exploded) |
+| CREATE | Base View | `add_drawing_view` base (orientation, scale, style, bodies / flat_pattern) |
+| CREATE | Projected View | `add_drawing_view` projected (parent, direction) |
+| CREATE | Section View | `add_drawing_view` section (parent, line of 2+ points: straight, half, offset, aligned; side; depth_mode / depth) |
+| CREATE | Detail View | `add_drawing_view` detail (parent, center, radius, scale) |
+| CREATE | Break View | `add_drawing_view` break (parent, start, end, gap) |
+| CREATE | Breakout Section View | `add_drawing_view` breakout (parent, boundary, depth / through_all) |
+| CREATE | Exploded View | `add_drawing_view` exploded (storyboard, default the front one) |
+| MODIFY | Edit View (double-click a view) | `edit_drawing_view` (orientation, style, tangent_edges, scale, label / show_label, center_marks, storyboard / Model, section depth_mode / depth / hatch, a break's gap, a breakout's depth / through_all / remove_breakout) |
+| MODIFY | Title Block (double-click it) | `edit_title_block` values |
+| MODIFY | Move | `modify_drawing` move (items, by or to) |
+| MODIFY | Rotate | `modify_drawing` rotate (items, angle) |
+| MODIFY | Delete (and the browser's Delete of a drawing) | `modify_drawing` delete (items; a drawing's id: the whole drawing) |
+| GEOMETRY | Centerline | `add_drawing_geometry` centerline |
+| GEOMETRY | Center Mark | `add_drawing_geometry` center_mark (picks, or every circle); also `add_drawing_annotation` center_marks (kept) |
+| GEOMETRY | Center Mark Pattern | `add_drawing_geometry` center_mark_pattern |
+| GEOMETRY | Edge Extension | `add_drawing_geometry` edge_extension |
+| DIMENSIONS | Dimension | `add_drawing_dimension` (no type: inferred from the picks) |
+| DIMENSIONS | Linear / Aligned / Angular / Radius / Diameter Dimension | `add_drawing_dimension` type linear / aligned / angular / radius / diameter |
+| DIMENSIONS | Arc Length Dimension | `add_drawing_dimension` type arc_length |
+| DIMENSIONS | Ordinate Dimension | `add_drawing_dimension` type ordinate (origin, picks, axis x / y / both, at) |
+| DIMENSIONS | Baseline / Chain Dimension | `add_drawing_dimension` type baseline / chain (from, picks) |
+| DIMENSIONS | Edit Dimension (double-click a dimension) | `edit_drawing_dimension` (override, prefix, suffix, precision, tolerance, upper, lower, fit, fit_member, fit_display, tol_precision, basic, reference, at) |
+| TEXT | Text | `add_drawing_annotation` text |
+| TEXT | Leader | `add_drawing_annotation` leader |
+| TEXT | Bend Note | `add_drawing_annotation` bend_note |
+| SYMBOLS | Surface Texture / Feature Control Frame / Datum Identifier | `add_drawing_symbol` surface_texture / feature_control_frame / datum_identifier |
+| TABLES | Table, Parts List | `add_drawing_annotation` parts_list |
+| TABLES | Bend Table | `add_drawing_annotation` bend_table |
+| TABLES | Balloon | `add_drawing_annotation` balloon (view, component) |
+| TABLES | Renumber / Align Balloons | `edit_balloons` renumber / align |
+| EXPORT | Export PDF / DXF / DWG / CSV | `export_drawing` format pdf / dxf / dwg / csv (sheets all / current, table) |
+| Sheet bar | +, New Sheet, Rename, Move Left / Right (drag), Delete Sheet | `drawing_sheet` add / rename / move / delete |
+| Browser | Drawings: Rename | `rename` (existing tool) |
+| Browser | Drawings: Open Drawing (its tab) | no tool: showing a tab changes nothing (a view helper); `get_drawing` picture shows the sheet |
+| Sheet | Dragging a view, a dimension's text or a symbol | `modify_drawing` move |
+
+No command of the DRAWING tab is without a tool.
+
+### Tools (seconds measured headless on 4 CPUs shared by six builders)
+
+The big case: an assembly of 15 plates 104 x 104 x 10 with 64 holes each (1,050 faces),
+exploded by a storyboard, on an A2 sheet. TechDraw's hidden-line removal is the cost of every
+view; with the window it runs in TechDraw's threads and the tools wait for it with the window
+drawing meanwhile (`_idle`), so the next call finds the view's lines.
+
+| Tool | What | Plate (s) | Big case (s) |
+|---|---|---|---|
+| `create_drawing` | a drawing, its views laid out by their parts' sizes (each view drawn once) at the largest scale that fits, or Fusion's automatic block | 0.1 | 19 (base + 2 projected), 41 - 65 (automatic, 4 views) |
+| `add_drawing_view` | base / projected / section / detail / break / breakout / exploded; placed on free paper, beside its parent or along its cut line on the side with room; says when it overlaps or reaches off the sheet | 0.05 - 0.4 | detail 4 - 6, section 30, exploded 30 - 52, breakout 72 - 78 |
+| `edit_drawing_view` | Edit View | 0.2 | 40 - 65 (a new scale: the view and its projected views drawn again) |
+| `modify_drawing` | Move, Rotate, Delete | 0.03 | move 1.3 (was 92) |
+| `edit_title_block` | Title Block | 0.01 | - |
+| `drawing_sheet` | the sheet bar | 0.03 | - |
+| `add_drawing_dimension` | every kind; the text placed outside the view, stacked, when no `at` | 0.01 | 1.4 - 1.9; 18 ordinates 1.6 - 2.8 |
+| `edit_drawing_dimension` | Edit Dimension | 0.01 | - |
+| `add_drawing_annotation` | text, leader, bend note, parts list, bend table, balloon, centre marks | 0.01 - 0.15 | parts list of 15 components 45 (each balloon drew its view again; fixed: 0.7 for 5 components) |
+| `add_drawing_geometry` | centre marks, centre lines, patterns, edge extensions | 0.05 | 64 centre marks 3 - 5 |
+| `add_drawing_symbol` | surface texture, feature control frame, datum | 0.01 | - |
+| `edit_balloons` | Renumber, Align Balloons | 0.01 | - |
+| `get_drawing` | everything back; `edges` (one `view`'s); `picture` | 0.01; picture 0.4 | 0.1; edges 2.2 - 2.6 (510 kB: give `view`); picture 12 - 15 (A2, 1200 px) |
+| `export_drawing` | PDF (window), DXF, DWG (with a converter), CSV | 0.1 | DXF 7.6 - 11; CSV 0.01 |
+
+Found on the way and fixed: a section view took 3 s on a plate with two holes and more than
+10 minutes on the big case (the window stopped all that time; a person's Section View pays it
+after OK too): `drawing_depth._covered` measured each point against the whole compound of
+lines with `distToShape` (20 ms a point); the lines are now sorted into a grid and a point is
+measured to the few near it, straight ones by plain sums (`drawing_depth._Near`, the same lines
+switched off): 0.4 s, 30 s on the big case. Setting a view's X or Y made TechDraw work out its
+lines again at the next recompute: a Move of the big case's base view took 92 s (its projected
+views follow it), the AI's layout drew each view twice; `drawing.set_place` moves a view and
+marks it up to date (Move, `keep_aligned`, the AI): 1.3 s. A balloon touched its view the same
+way: the parts list of the big case took 45 s. A flat pattern's bend table was not in the DXF (nor in the picture);
+two bends with their middles one above the other (a tray's front and back) put their
+identifiers on one another; a projected view of a first-angle drawing could be placed off
+the sheet (fixed fractions of the sheet), a section on its parent (a cut line's normal was
+not the default side); Create Drawing's Automatic and the AI share `drawing.add_automatic_views`.
+
+### Proofs
+
+- Headless runner block `Fission180Tests/headless/drawing_tools.py` (124 calls: a part, an
+  assembly with a storyboard, a sheet metal tray; every tool and kind, each answer checked on
+  the drawing, each change one undo step named "AI: ...", the refusals in words).
+- GUI scenarios through the real MCP server and the bridge (`Fission180Tests/gui/ai_drawing_steps.py`):
+  `ai_drawing_part` (67 checks), `ai_drawing_assembly` (45), `ai_drawing_sheetmetal` (33),
+  checked with `get_drawing`, never with pixels.
+- Unit tests `test_ai_drawing_tools.py` (19: the rules, the lists against the drawing code's,
+  the placements, the picture); reference examples of every new tool
+  (`Fission180Tests/docs/tool_examples.py`); recipes `part-drawing.md`, `assembly-drawing.md`,
+  `sheet-metal-drawing.md`, every call run by the docs runner.
+
+### Not built (and why)
+
+| Fusion | Why |
+|---|---|
+| Drawing Automation's Auto Dimensions (Fusion dimensions a view by itself) | Not a command of Fission 180's ribbon; the AI dimensions with `add_drawing_dimension` from `get_drawing`'s elements (recipe part-drawing.md) |
+| Opening a drawing's tab from the AI | A view helper: nothing changes; the person opens it in the browser, the AI looks with `get_drawing` picture |
+| Sheet size per sheet, templates | Not built in the drawing workspace either (drawings.md, Known gaps) |
+| The picture's text in the sheet's own font, every character | The picture uses Fission 180's stroke font (capitals, digits, the drawing symbols; other characters as a box): it is for checking, the PDF is the drawing |
