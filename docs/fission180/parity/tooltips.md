@@ -99,3 +99,21 @@ test follows the ribbon, so every one of them gets a tooltip):
 - Keyboard navigation in a drop-down (arrow keys) shows no tooltip: the pointer's entry does.
 - The marking menu's list and the navigation bar's menus use the same menu builder and so show
   the card too for commands that have something to say (no extra work, not asked for).
+
+## Coverage: SKETCH, DRAWING and UTILITIES (tips-sketch-drawing)
+
+Every command of the three tabs has a complete entry and its picture (`test_tips`:
+`test_module_sketch`, `_drawing`, `_utilities` pass; the pictures together:
+`docs/fission180/dev/tips-sketch-drawing-sheet.png`). The texts were written from each command's
+own code and its parity doc (Fission 180's steps and refusals), the pictures made in the real
+Fission 180 by `tools/fission180/tip_pictures_<module>.py`:
+
+| Module | Commands | What the picture shows | How it is made |
+|---|---|---|---|
+| sketch | 58: Line ... Sketch Dimension (CREATE 36), Fillet ... Move/Copy (MODIFY 8), the 12 constraints, Finish Sketch, Toggle Construction | The sketch before and after the tool, from the top: the tool's clicks numbered, what it is given or makes in the selection blue, construction dashed orange, projected purple, fixed green | Real sketch geometry in a new design (`tp.render`, the helpers' highlight), the open sketch's marks drawn over it with the render's own camera (`SPECS`: two lists of items per picture) |
+| drawing | 43: the 7 views, Edit View, Move, Rotate, Delete, the 4 geometry tools, the 11 dimension tools, Text, Leader, Bend Note, the 3 symbols, the 6 table tools; Title Block and the 4 exports | The sheet before and after (new ink in the selection blue, what a command picks or moves tinted before), framed where it changed; Title Block and the exports: their dialogs | A demo part's drawing built with the drawing modules' own functions, TechDraw's scene drawn at 6 px/mm and cropped (`tip_pictures_drawing.py`) |
+| utilities | 22: MAKE 3, ADD-INS 2, AI 8, FREECAD 1, UTILITY 8 | Each command's window as Fission 180 opens it; 3D Print, Export Everything and Compare with Reference beside the model | `dialog_picture` / `with_dialog`; a real rebuild of an imported STEP plate for the four rebuild commands, real AI calls through the bridge for AI Activity |
+
+GUI check: `tips_sketch_drawing_hover` (the expanded tooltips of SKETCH > Line, DRAWING > Base
+View and UTILITIES > 3D Print with the real pointer, each picture compared with its PNG on the
+screen).
