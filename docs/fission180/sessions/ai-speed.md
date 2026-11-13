@@ -126,7 +126,124 @@ stops it:
 
 ## Measurements
 
-(the benchmark's before / after table: below)
+`run_tests.sh --only speed`, headless, this sandbox (4 CPUs shared with five other builders:
+the same call varies by up to a factor of 2 from run to run). *Before*: the code of
+0.1.0-beta.4.0.3 (`1c535a88`, a plain copy, `git archive`) with the same benchmark; *after*:
+this branch. Cold = the kept numbers emptied first (the first call after a change). Calls under
+0.3 s in both are left out. Whole run: 817 s before, 525 s after.
+
+**relic** (bodies 1, faces 182, objects 24, reference_faces 3146, components 0, built_s 12.6)
+
+| call | before cold s | after cold s | before warm s | after warm s |
+|---|---:|---:|---:|---:|
+| get_design | 0.46 | 0.44 | 0.04 | 0.01 |
+| render (software) | 0.34 | 0.24 | 0.21 | 0.20 |
+| design_advice | 1.40 | 1.42 | 1.32 | 1.56 |
+| describe_reference (summary) | 8.92 | 1.08 | 9.35 | 1.14 |
+| describe_reference (plan) | 26.48 | 14.93 | 26.18 | 13.90 |
+| compare_to_reference | 33.73 | 22.43 | 36.25 | 20.55 |
+| compare_to_reference (full) | 38.13 | 23.06 | 34.53 | 20.50 |
+| get_sketch | 0.62 | 0.55 | 0.00 | 0.00 |
+
+| change | before s | after s |
+|---|---:|---:|
+| start_rebuild | 2.86 | 2.93 |
+| create_sketch (rebuild: 88 dots) | 0.42 | 0.03 |
+| extrude (rebuild: 88 dots) | 0.80 | 0.78 |
+| edit_step (rebuild plate) | 0.34 | 0.39 |
+
+**brep** (bodies 1, faces 1734, objects 19, components 0, built_s 163.7)
+
+| call | before cold s | after cold s | before warm s | after warm s |
+|---|---:|---:|---:|---:|
+| get_design | 9.99 | 3.90 | 5.07 | 0.09 |
+| inspect_design | 9.18 | 5.45 | 5.33 | 0.07 |
+| inspect_design (full) | 9.51 | 5.56 | 5.77 | 0.07 |
+| query_geometry (60 faces) | 0.41 | 0.45 | 0.45 | 0.15 |
+| query_geometry (circle edges) | 0.42 | 0.36 | 0.44 | 0.13 |
+| query_geometry (bottom face) | 0.53 | 0.47 | 0.49 | 0.14 |
+| check_design | 9.49 | 5.46 | 5.65 | 0.05 |
+| check_design (no interference) | 9.76 | 5.55 | 5.56 | 0.06 |
+| physical_properties | 7.82 | 5.10 | 7.55 | 0.00 |
+| center_of_mass | 0.47 | 0.51 | 0.46 | 0.69 |
+| section_analysis | 1.32 | 1.62 | 1.57 | 1.75 |
+| diff_design (last_change) | 9.62 | 1.69 | 5.17 | 0.02 |
+| render (software) | 5.03 | 4.66 | 4.86 | 4.43 |
+| design_advice | 44.05 | 40.70 | 42.91 | 39.88 |
+| get_sketch | 38.08 | 34.70 | 0.00 | 0.00 |
+| inspect_design (after changes) | 7.13 | 3.14 | 5.60 | 0.06 |
+
+| change | before s | after s |
+|---|---:|---:|
+| create_sketch (320 circles) | 50.14 | 0.62 |
+| hole (320 holes) | 6.55 | 6.00 |
+| create_sketch (192 circles) | 5.30 | 0.26 |
+| extrude (192 bosses) | 4.50 | 4.24 |
+| chamfer (320 hole tops) | 76.72 | 75.90 |
+| fillet (320 hole bottoms) | 28.53 | 26.62 |
+| fillet (192 boss feet) | 45.61 | 40.51 |
+| chamfer (192 boss tops) | 14.40 | 9.52 |
+| create_sketch (small) | 5.02 | 0.86 |
+| extrude (small block) | 5.62 | 0.41 |
+| undo | 4.56 | 0.02 |
+| redo | 4.81 | 0.44 |
+| set_parameter | 4.55 | 0.03 |
+| fillet (a plate corner) | 5.64 | 0.13 |
+| edit_step (plate 12 -> 13: all recomputed) | 34.51 | 27.94 |
+
+**assembly** (bodies 101, faces 306, objects 2061, components 101, built_s 4.3)
+
+| call | before cold s | after cold s | before warm s | after warm s |
+|---|---:|---:|---:|---:|
+| get_design | 0.42 | 0.43 | 0.42 | 0.45 |
+| check_design | 0.84 | 0.83 | 0.89 | 0.84 |
+| check_design (no interference) | 0.30 | 0.27 | 0.30 | 0.25 |
+| section_analysis | 0.45 | 0.42 | 0.36 | 0.40 |
+| render (software) | 0.40 | 0.52 | 0.43 | 0.46 |
+| design_advice | 4.30 | 5.03 | 5.02 | 5.21 |
+| interference | 0.48 | 0.64 | 0.43 | 0.65 |
+| get_sketch | 0.23 | 0.32 | 0.01 | 0.02 |
+
+| change | before s | after s |
+|---|---:|---:|
+| pattern_components (100 pins) | 1.40 | 1.12 |
+| create_sketch (small) | 0.30 | 0.44 |
+| extrude (small block) | 0.43 | 0.55 |
+| undo | 0.29 | 0.38 |
+| redo | 0.28 | 0.33 |
+| drive_joint | 0.28 | 0.42 |
+
+
+Over the 2 s target after (cold): brep inspect_design / check_design about 5 s and get_design
+4 s in the benchmark (2.7 s / 0.6 s in a profile run on a quieter machine: of it OpenCASCADE's
+isValid 2-4 s, see the traps; the exact box 0.3-1 s, the volume / area / centre integrations
+0.5-1.5 s); warm (nothing changed) every one of them is under 0.1 s now. relic
+compare_to_reference 22 s: OpenCASCADE's General Fuse of the reference (3,146 faces) with the
+half-built rebuild (182 faces) is 10-15 s of it, one call; its own Python went from 12 s to 5 s
+(profile). describe_reference (plan) 26 -> 15 s, (summary) 9 -> 1 s. Luca's numbers on his Relic
+(with the window, before 4.0.3's defeaturing skip): describe 220 s, compare 13 s, check 10 s,
+inspect 7 s.
+
+Changing calls on the brep plate: every one paid about 5 s for its answer (the exact box with
+optimalBoundingBox and a second volume integration): create_sketch 5.0 -> 0.9 s, extrude
+5.6 -> 0.4, undo 4.6 -> 0.02, set_parameter 4.6 -> 0.03, a corner fillet 5.6 -> 0.1. The long
+fillets and chamfers of hundreds of edges (27-77 s) and edit_step's recompute of the whole
+timeline (28-35 s) are OpenCASCADE / FreeCAD recomputes: unchanged.
+
+After the table was made, a profile of the brep's cold get_design showed 2.8 s of it turning a
+sketch's areas on to count them (headless, sketches are made without FreeCAD's areas): that
+changed the sketch, so the next recompute computed everything after it again. The read-only
+tools now count areas without changing anything (`verify_actions.closed_areas`); brep alone
+again: get_design cold 3.9 -> 1.2 s, inspect_design 4.9 s, check_design 5.3-5.5 s (isValid 3.8 s
+of it in this run).
+
+Not mine, measured on the way (for their owners): design_advice (PLASTIC, ai-workspaces) 35-44 s
+on the brep plate, 5 s on the assembly; get_sketch (ai-design, `sketch_actions.get_sketch`)
+recomputes the design (`doc.recompute()`), solves the sketch and turns its areas on
+(`extrude.regions`): headless the second get_sketch of the plate's first sketch took 33 s (the
+first had changed the sketch, so everything after it was computed again); counting areas with
+`verify_actions.closed_areas` and dropping the recompute would end it; render with the
+software renderer 4-5 s (MeshPart meshing; the window's renderer is the default in the app).
 
 ## Changelog lines
 
