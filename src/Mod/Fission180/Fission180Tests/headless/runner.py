@@ -2107,6 +2107,10 @@ def main():
         from Fission180Tests.headless import mesh_tools
 
         mesh_tools.run_in(run, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
+        # wave 8, ai-speed: the kept numbers, the exact box, stopped calls (speed_checks.py)
+        from Fission180Tests.headless import speed_checks
+
+        run_session(run, speed_checks.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)

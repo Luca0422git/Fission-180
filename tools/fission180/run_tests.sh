@@ -12,7 +12,7 @@
 #                           own cases, Fission180Tests/headless/sim_accuracy_qa.py)
 #
 #   tools/fission180/run_tests.sh [--freecad DIR] [--out DIR]
-#                               [--only unit|golden|headless|sim|recognize|gui|gui-base|scenarios|base]
+#                               [--only unit|golden|headless|sim|recognize|speed|gui|gui-base|scenarios|base]
 #                               [--scenario NAME[,NAME...]]   (files of Fission180Tests/gui/
 #                                                   scenarios, each in a fresh profile)
 #                               [--shard K/N]       (every N-th scenario, from the K-th)
@@ -24,7 +24,9 @@
 #            bin/Fission180Cmd (bin/FreeCADCmd for a build before the branding pass)
 # --out      where reports and the screenshot go (default .fission180-cache/test-output)
 # --only     base = everything but the scenarios (unit, golden, headless, sim, smoke, journey);
-#            gui-base = the smoke test, the journey and the restart only
+#            gui-base = the smoke test, the journey and the restart only;
+#            speed = the AI tools timed on three big designs (not in base: about 15 minutes;
+#            FISSION180_SPEED_DESIGNS=relic,brep,assembly picks some)
 # --shard    splits the scenarios over N runs (CI runs them side by side): 1/4 runs the
 #            1st, 5th, 9th... scenario in name order, 2/4 the 2nd, 6th... (N runs cover all)
 # --repeat   runs each scenario N times in a row (a fresh profile each time) and prints how
@@ -252,6 +254,28 @@ except Exception as exc:
     print("no recognize report: %s" % exc); sys.exit(1)
 sys.exit(0 if report.get("passed") else 1)
 EOF4
+}
+
+# The AI tools timed on big designs (wave 8, ai-speed: Fission180Tests/headless/ai_speed_bench.py).
+# The report (ai-speed-report.md / .json) names the slowest calls; only an unexpected answer
+# fails it, never a slow machine.
+run_speed() {
+    echo "== [Fission 180] AI tools on big designs (headless, timed)"
+    need_freecad speed || return
+    FISSION180_SPEED_OUT="${OUT}" timeout 3600 "${FC_CMD[@]}" -c \
+        "from Fission180Tests.headless import ai_speed_bench; ai_speed_bench.main()" \
+        > "${OUT}/speed.log" 2>&1
+    grep -aoE "\[Fission 180\] speed (slowest|summary).*" "${OUT}/speed.log"
+    python3 - "${OUT}/ai-speed-report.json" <<'EOF5' || FAILED+=("speed")
+import json, sys
+try:
+    report = json.load(open(sys.argv[1]))
+except Exception as exc:
+    print("no speed report: %s" % exc); sys.exit(1)
+for row in report.get("problems", []):
+    print("unexpected: %s %s: %s" % (row.get("design"), row.get("label"), row.get("answer", row.get("why", ""))[:300]))
+sys.exit(0 if report.get("passed") else 1)
+EOF5
 }
 
 # The Static Stress engine against hand calculations (beta 3, sim-core): every case at the
@@ -488,12 +512,13 @@ case "${ONLY}" in
     headless) run_headless ;;
     sim) run_sim ;;
     recognize) run_recognize ;;
+    speed) run_speed ;;
     gui) run_gui ;;
     gui-base) run_gui_base ;;
     scenarios) run_scenarios ;;
     base) run_unit; run_golden; run_headless; run_sim; run_gui_base ;;
     "") run_unit; run_golden; run_headless; run_sim; run_gui ;;
-    *) echo "--only must be unit, golden, headless, sim, recognize, gui, gui-base, scenarios or base" >&2; exit 2 ;;
+    *) echo "--only must be unit, golden, headless, sim, recognize, speed, gui, gui-base, scenarios or base" >&2; exit 2 ;;
 esac
 
 echo "== [Fission 180] reports in ${OUT}"

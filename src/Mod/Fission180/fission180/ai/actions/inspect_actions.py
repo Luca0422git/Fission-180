@@ -22,7 +22,7 @@ def _bbox(box):
 
 @action("get_design")
 def get_design(ctx, args):
-    from ... import bodies, extrude, parameters
+    from ... import bodies, parameters
 
     doc = ctx.doc
     if doc is None:
@@ -110,7 +110,9 @@ def get_design(ctx, args):
     for obj in doc.Objects:
         if obj.TypeId == "Sketcher::SketchObject":
             try:
-                areas = len(extrude.regions(obj))
+                from .verify_actions import closed_areas  # (wave 8: without changing it)
+
+                areas = closed_areas(obj)
             except Exception:
                 areas = None
             info["sketches"].append({"id": obj.Name, "label": obj.Label, "closed_areas": areas})

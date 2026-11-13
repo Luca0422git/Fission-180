@@ -391,7 +391,7 @@ def build_assembly(bench, pins=100, joined=20):
             (
                 "joint",
                 {"type": "revolute", "first": first, "second": {"component": "Base", "face": TOP,
-                 "point": [0, 0, 5], "snap": "point"}},
+                 "snap": "centre"}, "offset": [-100.0, -100.0, 0]},
                 "joint (revolute, the first pin)",
                 "ok",
                 "j1",
@@ -505,8 +505,10 @@ def changing_calls(design, bench):
         calls += [
             (
                 "fillet",
-                {"edges": {"type": "line", "parallel": [0, 0, 1], "count": 4}, "radius": 3},
-                "fillet (4 plate corners)",
+                {"edges": {"type": "line", "parallel": [0, 0, 1], "count": 1,
+                           "at": [{"axis": "x", "value": "min"}, {"axis": "y", "value": "min"}]},
+                 "radius": 3},
+                "fillet (a plate corner)",
             ),
             ("edit_step", {"step": bench.ids.get("e1", "Extrude1"), "set": {"distance": 13}},
              "edit_step (plate 12 -> 13: all recomputed)"),

@@ -64,8 +64,11 @@ def _exact_box(shape):
         box = App.BoundBox()
         for face in shape.Faces:
             kind = type(face.Surface).__name__
-            if kind not in _RULED:
-                box.add(face.optimalBoundingBox(False, False))
+            if kind in _RULED:
+                continue
+            if kind in ("Sphere", "Toroid") and _add_round(box, face, kind):
+                continue
+            box.add(face.optimalBoundingBox(False, False))
         for edge in shape.Edges:
             _add_edge(box, edge)
         for vertex in shape.Vertexes:
@@ -81,6 +84,59 @@ def _exact_box(shape):
     except Exception:
         pass
     return shape.BoundBox
+
+
+def _add_round(box, face, kind):
+    """A sphere's or torus's face: its extremes inside the face (its edges give those on its
+    boundary) into `box`. Inside, an extreme of x, y or z is where both partial derivatives
+    are 0: on a sphere the points centre +- radius along the axis; on a torus, written
+    C + (R + r cos v)(cos u X + sin u Y) + r sin v Z, for coordinate i at u = phi or phi + pi
+    (tan phi = Y_i / X_i) and v = atan2(Z_i, a) or that + pi (a = X_i cos u + Y_i sin u).
+    Each point counts when it lies on the face (isPartOfDomain). False when the face cannot
+    be read so (a torus whose tube passes its axis): measured otherwise. 512 fillet tori
+    took optimalBoundingBox 11 s."""
+    import FreeCAD as App
+
+    surface = face.Surface
+    u0, u1, v0, v1 = face.ParameterRange
+    points = []
+    if kind == "Sphere":
+        c, r = surface.Center, surface.Radius
+        for axis in (App.Vector(1, 0, 0), App.Vector(0, 1, 0), App.Vector(0, 0, 1)):
+            for sign in (1.0, -1.0):
+                points.append(surface.parameter(c + axis * (sign * r)))
+    else:
+        big, small = surface.MajorRadius, surface.MinorRadius
+        if big <= small + 1e-9:
+            return False
+        c = surface.Center
+        x = (surface.value(0.0, 0.0) - c) * (1.0 / (big + small))
+        y = (surface.value(0.5 * math.pi, 0.0) - c) * (1.0 / (big + small))
+        z = (surface.value(0.0, 0.5 * math.pi) - c - x * big) * (1.0 / small)
+        for xi, yi, zi in ((x.x, y.x, z.x), (x.y, y.y, z.y), (x.z, y.z, z.z)):
+            phase = math.atan2(yi, xi)
+            for u in (phase, phase + math.pi):
+                a = xi * math.cos(u) + yi * math.sin(u)
+                v = math.atan2(zi, a)
+                points += [(u, v), (u, v + math.pi)]
+    for u, v in points:
+        u = _in_range(u, u0, u1)
+        v = _in_range(v, v0, v1)
+        if u is None or v is None:
+            continue
+        try:
+            if face.isPartOfDomain(u, v):
+                box.add(surface.value(u, v))
+        except Exception:
+            return False
+    return True
+
+
+def _in_range(t, lo, hi, period=2.0 * math.pi):
+    """t moved by whole turns into [lo, hi] (a little slack), or None."""
+    slack = 1e-9
+    t += math.ceil((lo - slack - t) / period) * period
+    return t if t <= hi + slack else None
 
 
 def _add_edge(box, edge):
@@ -137,7 +193,13 @@ def shape_facts(shape):
                 _KEPT.insert(0, _KEPT.pop(i))
             return facts
     facts = {}
-    _KEPT.insert(0, (shape, facts))
+    try:  # (a wrapper of its own over the same OpenCASCADE shape: a caller that moves its
+        import Part  # shape afterwards in place, transformShape, does not move the key)
+
+        key = Part.Shape(shape)
+    except Exception:
+        key = shape
+    _KEPT.insert(0, (key, facts))
     del _KEPT[KEEP:]
     return facts
 
@@ -154,8 +216,18 @@ def _kept(shape, key, work):
     return facts[key]
 
 
+def _one_solid(shape):
+    try:
+        return shape.ShapeType == "Solid"
+    except Exception:
+        return False
+
+
 def solid_volume(shape):
-    """The volume of the shape's solids (a surface body has none: 0)."""
+    """The volume of the shape's solids (a surface body has none: 0). A solid's is its
+    volume (one integration over its faces, not two)."""
+    if _one_solid(shape):
+        return volume(shape)
     return _kept(shape, "solid_volume", lambda: sum(s.Volume for s in shape.Solids))
 
 
@@ -207,6 +279,8 @@ def centre_of_mass(shape):
 
     def work():
         try:
+            if _one_solid(shape) and volume(shape) > 0:
+                return shape.CenterOfMass  # (analysis.center_of_mass's answer for one solid)
             from .. import analysis
 
             centre, _volume = analysis.center_of_mass([shape])

@@ -247,9 +247,20 @@ def _freedom(sketch):
     return out
 
 
-def _sketches(doc):
-    from ... import extrude
+def closed_areas(sketch):
+    """How many closed areas a sketch has, without changing it. FreeCAD's areas
+    (InternalShape) when the sketch makes them; otherwise Fission 180's own reading of its
+    curves (sketch_regions: what Extrude adds to FreeCAD's areas when it turns them on).
+    Turning them on (extrude.regions) to count them changed the sketch: everything after it
+    was computed again at the next recompute, 35 s for the benchmark's plate (wave 8)."""
+    from ... import extrude, sketch_regions
 
+    if getattr(sketch, "MakeInternals", True):
+        return len(extrude.regions(sketch))
+    return len(sketch_regions.regions(sketch_regions.sketch_edges(sketch)))
+
+
+def _sketches(doc):
     rows = []
     for obj in doc.Objects:
         if obj.TypeId != "Sketcher::SketchObject":
@@ -257,7 +268,7 @@ def _sketches(doc):
         progress.step("reading sketch %s" % obj.Label)
         row = {"id": obj.Name, "label": obj.Label, "curves": len(obj.Geometry)}
         try:
-            row["closed_areas"] = len(extrude.regions(obj))
+            row["closed_areas"] = closed_areas(obj)
         except Exception:
             row["closed_areas"] = None
         row.update(_freedom(obj))

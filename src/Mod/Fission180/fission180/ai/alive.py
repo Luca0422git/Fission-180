@@ -36,6 +36,7 @@ modal question of the call is open (its own loop; no step() is called meanwhile)
 bridge's pump and the chat's are timers (postponed) and refuse a second call anyway.
 """
 
+import os
 import time
 
 import FreeCAD as App
@@ -51,6 +52,7 @@ PANEL_STOP_NAME = "Fission180AIActivityStop"
 PUMP_MS = 50  # at most this long in one look at the window
 REFUSED_SHOW_S = 2.5  # how long the line says a click was refused
 TEST_TICK = None  # tests: function(call) run at every pump, while input is filtered
+TRACE = bool(os.environ.get("FISSION180_ALIVE_TRACE"))  # log every input event's fate
 
 _state = {
     "installed": False,
@@ -132,7 +134,18 @@ class _Filter(QtCore.QObject):
             except Exception:
                 return False
         try:
-            return _decide(obj, event)
+            dropped = _decide(obj, event)
+            if TRACE and event.type() in _input_types():
+                log(
+                    "AI alive: %s %s to %s %r"
+                    % (
+                        "dropped" if dropped else "passed",
+                        event.type(),
+                        type(obj).__name__,
+                        obj.objectName() if hasattr(obj, "objectName") else "",
+                    )
+                )
+            return dropped
         except Exception:
             return False  # (never let a filter error drop or break an event)
 

@@ -920,6 +920,7 @@ def _pieces(a, b, rows=None, volumes=None):
     scale = max(1.0, v_a, v_b)
     rows_a, rows_b = rows if rows is not None else (_face_rows(a), _face_rows(b))
     on = 1e-6 * max(1.0, a.BoundBox.DiagonalLength)
+    index_a, index_b = _BoxIndex(rows_a, on), _BoxIndex(rows_b, on)  # (wave 8: numpy)
     for fuzzy in (0.0, 1e-5 * max(1.0, a.BoundBox.DiagonalLength)):
         try:
             result, _map = a.generalFuse([b], fuzzy) if fuzzy else a.generalFuse([b])
@@ -940,8 +941,8 @@ def _pieces(a, b, rows=None, volumes=None):
                 continue
             # every piece lies in A or in B: when it is not in one, it is in the other
             points = _PiecePoints(piece)
-            in_a = _membership(points, rows_a, on)
-            in_b = _membership(points, rows_b, on)
+            in_a = _membership(points, rows_a, on, index_a)
+            in_b = _membership(points, rows_b, on, index_b)
             if in_a is False and in_b is None:
                 in_b = True
             elif in_b is False and in_a is None:
@@ -1027,17 +1028,18 @@ def _is_flat(face):
         return False
 
 
-def _membership(points, rows, tol):
+def _membership(points, rows, tol, index=None):
     """True / False: the piece lies inside / outside the solid these face rows belong to, read
     from a face of the piece that lies on one of the solid's faces (the piece's outward normal
     agrees with the solid's there: inside); None when no face of the piece lies on them.
-    points: the piece's _PiecePoints."""
+    points: the piece's _PiecePoints. index: the rows' _BoxIndex with tol (the rows whose box
+    holds the point, in their order, found with numpy instead of a test of every row)."""
     for i in range(len(points)):
         found = points.point(i)
         if found is None:
             continue
         p, n = found
-        for row in rows:
+        for row in index.at(p) if index is not None else rows:
             box = row.box
             if not (
                 box.XMin - tol <= p.x <= box.XMax + tol
@@ -1672,6 +1674,7 @@ class _FaceRow:
         "grid",
         "full",
         "range",
+        "poly",
     )
 
     def __init__(self, index, face, grid=5, area=None):
@@ -1686,6 +1689,7 @@ class _FaceRow:
         self.matched = False
         self.samples = None
         self.grid = grid
+        self.poly = False  # (worked out when first asked: polygon())
         surface = face.Surface
         self.full = False  # a plane / cylinder face that is its whole parameter rectangle
         self.range = None
@@ -1737,6 +1741,20 @@ class _FaceRow:
         except Exception:
             self.key = None
 
+    def polygon(self):
+        """(origin, u, v, normal, loops) of a flat face whose loops are straight edges or one
+        whole circle (a mesh's facets, a prism's faces, a plate's face with round holes), in
+        the face's own plane: a loop is [(x, y), ...] or ("circle", cx, cy, r); None for any
+        other face. Worked out once (wave 8, ai-speed: _on_face measures it in Python)."""
+        if self.poly is False:
+            self.poly = None
+            try:
+                if self.kind == "plane" and self.key is not None:
+                    self.poly = _flat_loops(self.face, self.key[0])
+            except Exception:
+                self.poly = None
+        return self.poly
+
     def points(self):
         if self.samples is None:
             found = [p for p, _n in _face_points(self.face, self.grid, self.full)]
@@ -1781,7 +1799,79 @@ def _on_face(row, p, tol):
             return _on_full(row, p, tol)
         except Exception:
             pass
+    poly = row.polygon()
+    if poly is not None:
+        return _polygon_distance(poly, p) <= tol
     return row.face.isInside(p, tol, True)
+
+
+def _flat_loops(face, normal):
+    """_FaceRow.polygon's data, or None."""
+    origin = face.Vertexes[0].Point if face.Vertexes else face.CenterOfMass
+    u = None
+    loops = []
+    for wire in face.Wires:
+        edges = wire.Edges
+        kinds = [type(e.Curve).__name__ for e in edges]
+        if len(edges) == 1 and kinds[0] == "Circle" and edges[0].isClosed():
+            loops.append(("circle", edges[0].Curve.Center, edges[0].Curve.Radius))
+            continue
+        if any(k not in ("Line", "LineSegment") for k in kinds):
+            return None
+        points = [x.Point for x in wire.OrderedVertexes]
+        if len(points) < 3:
+            return None
+        if u is None:
+            u = points[1] - points[0]
+            u = u - normal * u.dot(normal)
+        loops.append(points)
+    if not loops:
+        return None
+    if u is None or u.Length < 1e-12:
+        u = normal.cross(App.Vector(1, 0, 0) if abs(normal.x) < 0.9 else App.Vector(0, 1, 0))
+    u.normalize()
+    v = normal.cross(u)
+    flat = []
+    for loop in loops:
+        if isinstance(loop, tuple):
+            d = loop[1] - origin
+            flat.append(("circle", d.dot(u), d.dot(v), loop[2]))
+        else:
+            flat.append([((q - origin).dot(u), (q - origin).dot(v)) for q in loop])
+    return (origin, u, v, normal, flat)
+
+
+def _polygon_distance(poly, p):
+    """The distance from p to a flat face bounded by straight edges (FreeCAD's isInside with a
+    tolerance is this distance against the tolerance: BRepExtrema_DistShapeShape): its height
+    over the plane and, when its foot is outside the face, the distance to the nearest edge.
+    The face's loops count even-odd (a hole is outside). 0.6 ms a call with OpenCASCADE, 9,000
+    calls in a compare of a half-built Relic."""
+    origin, u, v, normal, loops = poly
+    d = p - origin
+    x, y, h = d.dot(u), d.dot(v), d.dot(normal)
+    inside = False
+    best = float("inf")
+    for loop in loops:
+        if isinstance(loop, tuple):  # (a whole circle: inside it flips, its edge is near)
+            gap = math.hypot(x - loop[1], y - loop[2]) - loop[3]
+            if gap < 0:
+                inside = not inside
+            best = min(best, gap * gap)
+            continue
+        x1, y1 = loop[-1]
+        for x2, y2 in loop:
+            if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+                inside = not inside
+            dx, dy = x2 - x1, y2 - y1
+            length = dx * dx + dy * dy
+            t = ((x - x1) * dx + (y - y1) * dy) / length if length > 0 else 0.0
+            t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else t
+            ex, ey = x1 + t * dx - x, y1 + t * dy - y
+            best = min(best, ex * ex + ey * ey)
+            x1, y1 = x2, y2
+    across = 0.0 if inside else math.sqrt(best)
+    return math.hypot(h, across)
 
 
 def _face_rows(shape):
@@ -1938,7 +2028,7 @@ def _match_faces(reference, rebuilt, tol, mesh, opts, rows=None):
             for n, row in enumerate(mine):
                 progress.step("matching the faces", n, len(mine))
                 same = [o for o in near(row) if _same_surface(row, o, tol)]
-                row.matched = _covered(row, same, tol) or _near_surfaces(row, theirs, tol)
+                row.matched = _covered(row, same, tol) or _near_surfaces(row, theirs, tol, near)
     else:
         for mine, theirs in ((rows_a, rows_b), (rows_b, rows_a)):
             near = _BoxIndex(theirs, tol)
@@ -1986,6 +2076,15 @@ class _BoxIndex:
         )
         return [self.rows[int(i)] for i in np.nonzero(fits)[0]]
 
+    def at(self, p):
+        """The rows whose boxes, grown by tol, hold the point p (in their order)."""
+        if not self.rows:
+            return []
+        np, t = self.np, self.tol
+        q = np.array([p.x, p.y, p.z])
+        fits = np.all(self.lo - t <= q, axis=1) & np.all(self.hi + t >= q, axis=1)
+        return [self.rows[int(i)] for i in np.nonzero(fits)[0]]
+
 
 def _twin(row, others, tol):
     """A face of the other part of the same kind, area and box: the same face (a free-form
@@ -2000,10 +2099,14 @@ def _twin(row, others, tol):
     return False
 
 
-def _near_surfaces(row, others, tol):
+def _near_surfaces(row, others, tol, index=None):
     """Every sample point of the face lies within tol of a face of the other part (its
-    surface, inside its boundary): a mesh's facets against round faces and the other way."""
-    near = [o for o in others if _boxes_near(row.box, o.box, tol)]
+    surface, inside its boundary): a mesh's facets against round faces and the other way.
+    index: the other part's _BoxIndex (the same rows, found with numpy: a box test of every
+    pair was a million calls in a half-built Relic)."""
+    near = (
+        index(row) if index is not None else [o for o in others if _boxes_near(row.box, o.box, tol)]
+    )
     if not near:
         return False
     for p in row.points():
