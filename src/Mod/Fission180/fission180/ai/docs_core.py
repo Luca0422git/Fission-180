@@ -1028,6 +1028,8 @@ def export_text(full=False, lib=None, compact=False):
 
     chosen = [d for d in lib.docs if wanted(d)]
     what = "the handbook, the guides, the recipes and the list of tools"
+    if compact:
+        what = "the handbook, the guides, the recipes and the list of tools (one line each)"
     if not compact:
         what = "the handbook, the guides, the recipes, the reference page of every tool"
     if full:
@@ -1048,8 +1050,47 @@ def export_text(full=False, lib=None, compact=False):
         out.append("- File: %s (%s)" % (doc.rel, doc.title))
     for doc in chosen:
         text = doc.text.rstrip("\n")
+        if compact and doc.rel == "tools.md":
+            text = compact_tools(text)
         out += ["", "---", "", "File: %s" % doc.rel, "", text]
     return "\n".join(out).rstrip() + "\n"
+
+
+def compact_tools(text):
+    """tools.md for the compact file: without the table of every tool (the lists by category
+    below it name each tool again), and each tool's line cut to its first sentence (the whole
+    description is on its reference page and in tools/list). Wave 8 brought it from 60 to 111
+    thousand characters, the compact file past 300 thousand (about 84 thousand tokens)."""
+    out = []
+    skipping = False
+    for line in text.split("\n"):
+        if line.startswith("## "):
+            skipping = line.strip() == "## All tools"
+            if skipping:
+                out.append(
+                    "(The table of every tool is left out of this compact file: the lists "
+                    "below name every tool, by category.)"
+                )
+                continue
+        if skipping:
+            continue
+        if line.startswith("- [`") and "): " in line:
+            head, _sep, rest = line.partition("): ")
+            out.append(head + "): " + _first_sentence(rest))
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def _first_sentence(text, longest=240):
+    """The first sentence of a tool's description (a full stop followed by a space, after a
+    few words: "e.g. " and "mm. " inside a sentence are rare there), at most `longest`
+    characters, cut at a word."""
+    end = text.find(". ", 20)
+    sentence = text if end < 0 else text[: end + 1]
+    if len(sentence) > longest:
+        sentence = sentence[:longest].rsplit(" ", 1)[0] + "..."
+    return sentence
 
 
 # -- the tools ------------------------------------------------------------------------------------
