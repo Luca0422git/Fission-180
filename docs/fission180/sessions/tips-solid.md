@@ -64,6 +64,9 @@ tips-solid-sheet.png` (for the merger; scaled to 60 %).
 - tips-ui's `tips_hover` with these texts and pictures under its Fillet and Thicken (no
   stand-in data any more): PASS, 44 checks.
 - `make_tip_pictures.sh solid`: 127 made, 0 failed; `surface`: 14 made, 0 failed.
+- `run_tests.sh --only headless` (nothing of it changed here): all passed (555 tool calls,
+  197 documentation items, the MCP agent's 81 checks, Auto Timeline 153 + 15 checks, 71
+  recognised parts).
 
 ## Fusion's tooltips (sources)
 
