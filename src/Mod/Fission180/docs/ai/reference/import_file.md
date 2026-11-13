@@ -62,5 +62,6 @@ Inserted part.step: part.step: 1 component, 1 body. Its id is 'Component'. Bodie
 
 ## See also
 
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -54,6 +54,9 @@ from . import make_tools  # noqa: F401,E402  (UTILITIES > MAKE: 3D Print, Export
 # wave 8, ai-design: the DESIGN workspace's commands that had no tool (ASSEMBLE, INSERT,
 # CONSTRUCT's User Coordinate System, base features, Compute All, INSPECT's analyses)
 from . import design2_tools  # noqa: F401,E402
+# wave 8, ai-mesh: the MESH tab (inspect_mesh, convert_mesh, mesh_prepare, mesh_modify,
+# tessellate, mesh_section_sketch); its own category "mesh" is entered by the module
+from . import mesh_tools  # noqa: F401,E402
 from .kit import (  # noqa: F401  (the shared texts, re-exported)
     BODY_PICK_HELP,
     CURVES_HELP,

@@ -125,14 +125,17 @@ def handbook_saved():
         with open(big, encoding="utf-8") as handle:
             big_text = handle.read()
     # review 2026-10-22: the file a person loads is the compact one (about 45 thousand
-    # tokens); the one with every tool's page (about 170 thousand) is offered next to it
+    # tokens then); the one with every tool's page (about 170 thousand) is offered next to it.
+    # Wave 8 (2026-11-13) doubled the tools (222) and added recipes: 300 thousand characters
+    # with one line per tool (docs_core.compact_tools), so the bound is 360 thousand (about
+    # 90 thousand tokens), still under a quarter of the big file
     h.check(
         "the handbook file is the compact one",
         text.startswith("# " + docs_core.EXPORT_TITLE)
         and "File: handbook.md" in text
         and "File: recipes/bracket.md" in text
         and "File: reference/extrude.md" not in text
-        and len(text) < 300000,
+        and len(text) < 360000,
         (path, len(text)),
     )
     h.check(

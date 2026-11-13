@@ -42,3 +42,5 @@ from . import make_actions  # noqa: E402,F401  (UTILITIES > MAKE: 3D Print, Expo
 # (design2_actions) and INSPECT's analyses with numbers (analysis_actions)
 from . import design2_actions  # noqa: E402,F401
 from . import analysis_actions  # noqa: E402,F401
+# wave 8, ai-mesh: the MESH tab
+from . import mesh_actions  # noqa: E402,F401

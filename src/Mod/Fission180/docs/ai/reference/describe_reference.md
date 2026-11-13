@@ -6,7 +6,7 @@ Fusion: Browser: right-click a body > Rebuild with Timeline (AI)... (beyond Fusi
 
 ## What it does
 
-What the reference of a rebuild is made of, read by Fission 180 from its faces: summary (volume, area, size, counts, the kinds of faces), base (the base shape: an extrude with its plane, profile and distance, a revolve, a box...), features (holes, counterbores, pockets, bosses, slots, fillets, chamfers, patterns, each with its numbers and the faces it explains), plan (tool calls in Fusion's order: base shape, cuts and bosses, holes, patterns, chamfers, fillets last; each step's args pass the tool's own check, so send them as they are, adjusting ids the answers give), unrecognized (faces it could not read, with selectors and why), confidence (0..1) and notes. Coordinates are the rebuilt body's (the design's for a part at the origin). detail: plan (default: the features and the plan), summary (the part's numbers only, quick) or full (also every face of every feature, as selectors).
+What the reference of a rebuild is made of, read by Fission 180 from its faces: summary (volume, area, size, counts, the kinds of faces), base (the base shape: an extrude with its plane, profile and distance, a revolve, a box...), features (holes, counterbores, pockets, bosses, slots, fillets, chamfers, patterns, each with its numbers), plan (tool calls in Fusion's order: base, cuts and bosses, holes, patterns, chamfers, fillets last; send each step's args as they are, adjusting ids the answers give), unrecognized (faces it could not read, why), confidence (0..1) and notes. Coordinates are the rebuilt body's (the design's for a part at the origin). On a mesh it cannot fit (domes, fillets, free-form areas) it says so first, with what the mesh is made of and the two honest routes (convert_mesh, or the main shapes by hand); a pattern's copies are named by id in the pattern. detail: plan | summary (numbers only, quick) | full.
 
 ## Arguments
 
@@ -138,5 +138,6 @@ Body001, read from its 7 faces: 1 feature, a plan of 4 steps. Build the plan in 
 
 ## See also
 
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

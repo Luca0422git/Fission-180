@@ -673,6 +673,13 @@ def _join_halves(kept, other, size):
     return from_topology(points, welded), groups
 
 
+CAP_TRIANGLES = 1500  # about how many triangles a Uniform fill of a cut may add (_cap)
+# a Uniform fill of a cut with more loops or corners than this is not left to FreeCAD's face
+# mesher (minutes for a cut through a plate of holes): _triangulate_region
+MESHER_LOOPS = 6
+MESHER_CORNERS = 120
+
+
 def _cap(mesh, origin, normal, fill):
     """Close the open edges a cut left on the plane (origin, normal: pointing out of `mesh`):
     Minimal uses only the cut's own points, Uniform adds even triangles inside. Islands and
@@ -703,6 +710,13 @@ def _cap(mesh, origin, normal, fill):
             edge_len.append(core.length(core.sub(points[a], points[b])))
     edge_len.sort()
     spacing = edge_len[len(edge_len) // 2] if edge_len else size / 20.0
+    # (wave 8, ai-mesh) a cut across a finely split face (edges of a few hundredths of a mm
+    # where it crosses a fan of triangles) asked for a Uniform fill of 33,000 triangles: 60 s
+    # for a 60 x 5 mm cut. The fill's own triangles are kept to about CAP_TRIANGLES.
+    xs = [p[0] for poly in flat for p in poly]
+    ys = [p[1] for poly in flat for p in poly]
+    box_area = (max(xs) - min(xs)) * (max(ys) - min(ys)) if xs else 0.0
+    spacing = max(spacing, math.sqrt(box_area / (0.4330127018922193 * CAP_TRIANGLES)))
     new_facets = []
     for outer, holes in regions:
         try:
@@ -787,19 +801,61 @@ def _triangulate_region(polys, fill, spacing):
     import MeshPart
     import Part
 
-    wires = []
-    for poly in polys:
-        pts = [App.Vector(x, y, 0.0) for x, y in poly]
-        wires.append(Part.makePolygon(pts + [pts[0]]))
-    face = Part.makeFace(wires, "Part::FaceMakerBullseye")
+    face = _region_face(polys)
+    if face is None:
+        wires = []
+        for poly in polys:
+            pts = [App.Vector(x, y, 0.0) for x, y in poly]
+            wires.append(Part.makePolygon(pts + [pts[0]]))
+        face = Part.makeFace(wires, "Part::FaceMakerBullseye")
     if face.isNull() or not face.Faces:
         raise MeshError("The cut could not be made into a face.")
-    if fill == "Uniform":
+    corners = sum(len(poly) for poly in polys)
+    if fill == "Uniform" and len(polys) <= MESHER_LOOPS and corners <= MESHER_CORNERS:
         cap = MeshPart.meshFromShape(Shape=face, MaxLength=float(spacing))
         pts, tris = cap.Topology
         return [(p.x, p.y) for p in pts], [tuple(t) for t in tris]
     pts, tris = face.tessellate(1e9)
-    return [(p.x, p.y) for p in pts], [tuple(t) for t in tris]
+    flat = [(p.x, p.y) for p in pts]
+    tris = [tuple(t) for t in tris]
+    if fill == "Uniform":
+        # (wave 8, ai-mesh) a cut through many holes: FreeCAD's face mesher took minutes
+        # (a plate of 80 holes); the fewest triangles, their long edges split at the middle
+        # until none is longer than the spacing, is the same fill in a second
+        points, tris, _done = core.split_long_edges(
+            [(x, y, 0.0) for x, y in flat], tris, float(spacing), max_facets=2 * CAP_TRIANGLES
+        )
+        flat = [(p[0], p[1]) for p in points]
+    return flat, tris
+
+
+def _region_face(polys):
+    """The flat face of one region of a cut (outer loop first, then its holes, in the XY
+    plane) made directly: the outer loop counter-clockwise, the holes clockwise, cut out of
+    it. None when that does not give the region's area (the caller's face maker then finds
+    which loop lies in which). (wave 8, ai-mesh: FreeCAD's Bullseye face maker took 150 s for
+    a cut through a plate of 425 holes; this, a fraction of a second.)"""
+    import FreeCAD as App
+    import Part
+
+    try:
+        wires = []
+        expected = 0.0
+        for k, poly in enumerate(polys):
+            area = core.signed_area_2d(poly)
+            pts = [App.Vector(x, y, 0.0) for x, y in poly]
+            if (k == 0) != (area > 0):
+                pts.reverse()
+            wires.append(Part.makePolygon(pts + [pts[0]]))
+            expected += abs(area) if k == 0 else -abs(area)
+        face = Part.Face(Part.Plane(), wires[0])
+        if len(wires) > 1:
+            face.cutHoles(wires[1:])
+        if face.isNull() or abs(face.Area - expected) > 1e-6 * max(abs(expected), 1.0):
+            return None
+        return face
+    except Exception:
+        return None
 
 
 def separate_mesh(mesh, separate_type="Mesh Shells", groups=None, selected=None):
@@ -2311,6 +2367,66 @@ def section_polylines(mesh, origin, normal, tolerance):
             if len(simple) >= 2:
                 lines.append(simple)
     return lines
+
+
+# role -> (normal, x axis): FreeCAD's origin planes (the XZ plane faces -Y), as the Plane Cut
+# and Section Sketch dialogs draw them (mesh_cut_ui.ORIGIN_PLANES)
+ORIGIN_PLANES = {
+    "XY": ((0.0, 0.0, 1.0), (1.0, 0.0, 0.0)),
+    "XZ": ((0.0, -1.0, 0.0), (1.0, 0.0, 0.0)),
+    "YZ": ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
+}
+
+
+def origin_frame(role):
+    """The placement of an origin plane (XY, XZ, YZ) the cut dialogs use."""
+    normal, x_axis = ORIGIN_PLANES[role]
+    return frame_placement((0.0, 0.0, 0.0), normal, x_axis)
+
+
+def section_sketch(doc, body, body_obj, frame, reference=None):
+    """Create Mesh Section Sketch without the window (mesh_cut_ui.make_section_sketch runs it
+    for the dialog; the AI's mesh_section_sketch too): a sketch in `body` on the plane
+    `frame` (attached to the picked plane or face, else to the body's origin plane of the
+    same direction), holding the section of the mesh body `body_obj` as fixed lines."""
+    import FreeCAD as App
+
+    target = None
+    if reference is not None:
+        obj, subs = reference
+        sub = subs[0] if subs else ""
+        resolved = obj
+        short = sub
+        if sub and "." in sub:
+            try:
+                resolved = obj.getSubObject(sub.rsplit(".", 1)[0] + ".", retType=1) or obj
+            except Exception:
+                resolved = obj
+            short = sub.rsplit(".", 1)[1]
+        target = (resolved, short)
+    else:
+        normal = frame.Rotation.multVec(App.Vector(0, 0, 1))
+        for role in ORIGIN_PLANES:
+            if normal.isEqual(origin_frame(role).Rotation.multVec(App.Vector(0, 0, 1)), 1e-9):
+                for feature in body.Origin.OriginFeatures:
+                    if (getattr(feature, "Role", "") or feature.Name).startswith(role + "_Plane"):
+                        target = (feature, "")
+                break
+    sketch = body.newObject("Sketcher::SketchObject", "Sketch")
+    sketch.Label = "Mesh Section %s" % body_obj.Label
+    if target is not None:
+        sketch.AttachmentSupport = [target]
+        sketch.MapMode = "FlatFace"
+        doc.recompute()
+        attached = sketch.getGlobalPlacement()
+        sketch.AttachmentOffset = attached.inverse().multiply(frame)
+    else:
+        sketch.MapMode = "Deactivated"
+        sketch.Placement = body.getGlobalPlacement().inverse().multiply(frame)
+    doc.recompute()
+    section_into_sketch(sketch, global_mesh(body_obj))
+    doc.recompute()
+    return sketch
 
 
 def section_into_sketch(sketch, mesh, fixed=True):

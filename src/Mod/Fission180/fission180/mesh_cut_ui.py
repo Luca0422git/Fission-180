@@ -777,53 +777,12 @@ class SectionOverlay:
 def make_section_sketch(doc, body_obj, frame, reference):
     """The sketch of Create Mesh Section Sketch, in the active body (made if there is none),
     on the plane `frame` (its own attachment: the picked plane or face, else the body's
-    origin plane of the same direction), holding the section lines fixed."""
-    from . import sketch_ui
-
+    origin plane of the same direction), holding the section lines fixed (mesh.section_sketch:
+    the same code as the AI's mesh_section_sketch)."""
     body = commands.find_body() or commands.ensure_body()
     if body is None:
         raise core.MeshError("A sketch needs a body to belong to, and none could be made.")
-    target = None
-    offset = App.Placement()
-    if reference is not None:
-        obj, subs = reference
-        sub = subs[0] if subs else ""
-        resolved = obj
-        short = sub
-        if sub and "." in sub:
-            try:
-                resolved = obj.getSubObject(sub.rsplit(".", 1)[0] + ".", retType=1) or obj
-            except Exception:
-                resolved = obj
-            short = sub.rsplit(".", 1)[1]
-        target = (resolved, short)
-    else:
-        roles = {"XY": "XY_Plane", "XZ": "XZ_Plane", "YZ": "YZ_Plane"}
-        for role, name in roles.items():
-            if frame.Rotation.multVec(V(0, 0, 1)).isEqual(
-                origin_frame(role).Rotation.multVec(V(0, 0, 1)), 1e-9
-            ):
-                planes = sketch_ui.origin_planes(body)
-                plane = planes.get(name) if isinstance(planes, dict) else None
-                if plane is not None:
-                    target = (plane, "")
-                break
-    sketch = body.newObject("Sketcher::SketchObject", "Sketch")
-    sketch.Label = "Mesh Section %s" % body_obj.Label
-    if target is not None:
-        sketch.AttachmentSupport = [target]
-        sketch.MapMode = "FlatFace"
-        doc.recompute()
-        attached = sketch.getGlobalPlacement()
-        offset = attached.inverse().multiply(frame)
-        sketch.AttachmentOffset = offset
-    else:
-        sketch.MapMode = "Deactivated"
-        sketch.Placement = body.getGlobalPlacement().inverse().multiply(frame)
-    doc.recompute()
-    mesh.section_into_sketch(sketch, mesh.global_mesh(body_obj))
-    doc.recompute()
-    return sketch
+    return mesh.section_sketch(doc, body, body_obj, frame, reference)
 
 
 # ============================================================================ commands

@@ -59,6 +59,7 @@ Done: AI: Parameter thickness = 12. Bodies now: Body1: 24000 mm3, 60 x 40 x 10 m
 
 ## See also
 
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `book_pattern_bodies_follow_quantity`, `export_report_design`, `param_driven_box`, `pattern_quantity_parameter`, `pattern_symmetric_parameter`, `sf_box_param_driven`, `sf_coil_param_driven`, `sf_coil_taper_height_pitch_param`, `sf_coil_taper_param_driven`, `sf_coil_taper_rev_pitch_param`, `sf_pipe_param_driven`, `sf_sweep_distance_parameter` and 2 more

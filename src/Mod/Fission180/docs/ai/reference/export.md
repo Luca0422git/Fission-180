@@ -101,5 +101,6 @@ Not kept in this file:
 ## See also
 
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

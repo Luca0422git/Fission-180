@@ -95,6 +95,7 @@ Done: AI: Sketch on face. Its id is 'Sketch2'. Bodies now: Body1: 24000 mm3, 60 
 - Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
 - Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)

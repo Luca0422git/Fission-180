@@ -463,10 +463,12 @@ class Export(unittest.TestCase):
         self.assertIn("File: user/known-issues.md", full)
 
     def test_compact_names_every_tool_in_one_line(self):
-        # (wave 8: 216 tools made tools.md 111 thousand characters and the compact file too
-        # big for the scenario ai_docs_gui's 300 thousand; the compact file keeps a line each)
+        # (wave 8: 216 tools made tools.md 111 thousand characters and the compact file 336
+        # thousand; it keeps a line per tool. The bound, as in the scenario ai_docs_gui: 360
+        # thousand characters, about 90 thousand tokens, under a quarter of the big file)
         compact = docs_core.export_text(compact=True, lib=LIB)
-        self.assertLess(len(compact), 300000)
+        self.assertLess(len(compact), 360000)
+        self.assertLess(len(compact), len(docs_core.export_text(lib=LIB)) / 4)
         with open(os.path.join(ROOT, "docs", "ai", "tools.md"), encoding="utf-8") as handle:
             tools_md = handle.read()
         names = set(re.findall(r"\[`([a-z_0-9]+)`\]\(fission180://docs/reference/", tools_md))

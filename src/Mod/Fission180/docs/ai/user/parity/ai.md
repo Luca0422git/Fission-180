@@ -894,3 +894,120 @@ The same rows are `COVERAGE` in `fission180/ai/catalog/design2_tools.py` (checke
 | SKETCH > CONSTRAINTS > Symmetry | sketch_constraint (symmetric) |
 | SKETCH > FINISH SKETCH > Finish Sketch | no tool: the AI's sketch tools never leave a sketch open (each call draws and closes) |
 | SKETCH > FINISH SKETCH > Toggle Construction | sketch_modify (toggle_construction) |
+
+## Wave 8 coverage: mesh
+
+Builder ai-mesh, 2026-11-13 (brief `docs/fission180/dev/briefs/ai-mesh.md`). Luca gave Claude a
+mesh body "Relic" (an STL of 8,486 triangles, a plate with a field of small round dots); it
+refused to make it a solid, then copied polygons as sketch features, while MESH > Convert
+Mesh did it by hand in seconds. Now every MESH tab command is reachable by a tool, with the
+code its dialog runs; the rebuild of a mesh says plainly when it reads no plan and gives the
+two honest routes. Session log: `docs/fission180/sessions/ai-mesh.md`.
+
+### Fusion's behaviour copied (sources)
+
+| What | Fusion | Fission 180's AI tool | Source |
+|---|---|---|---|
+| Convert Mesh methods | Faceted: one face per mesh face; Prismatic: for parts made with solid tools, face groups used to infer prismatic features; Organic: scans, a Fusion extension | `convert_mesh` method faceted / prismatic (flat faces merged; round areas stay facets: no surface fitting); organic refused by the schema (it does not exist here) | Autodesk ([Convert Mesh](https://help.autodesk.com/cloudhelp/ENU/Fusion-Mesh/files/MESH-CONVERT-TO-SOLID.htm), [convert a mesh to a solid](https://www.autodesk.com/products/fusion-360/blog/convert-mesh-to-solid-surface-body-fusion-360/)) |
+| Operation Parametric / Base Feature | the converted body follows the mesh, or is made once | `operation` parametric / base_feature | Autodesk ([Convert Mesh](https://help.autodesk.com/cloudhelp/ENU/Fusion-Mesh/files/MESH-CONVERT-TO-SOLID.htm)) |
+| Face groups before Prismatic | Generate Face Groups, Combine Face Groups and Direct Edit align groups to features; a failed conversion says to | `mesh_prepare` generate / create / combine face groups, `mesh_modify` direct_edit | Autodesk ([Mastering Mesh Conversion](https://www.autodesk.com/products/fusion-360/blog/generate-face-groups-fusion/), [Generate Face Groups](https://help.autodesk.com/cloudhelp/ENU/Fusion-Mesh/files/MESH-GENERATE-FACE-GROUPS.htm)) |
+| Prismatic on organic shapes | does not work; repair a broken mesh first | inspect_mesh's advice: repair first; for domes / free-form, convert keeps facets and the rebuild says it reads no plan | Forum ([cannot convert](https://forums.autodesk.com/t5/fusion-design-validate-document/quot-cannot-convert-mesh-body-to-solid-or-surface-body-quot/m-p/10460309), [difficulty converting](https://forums.autodesk.com/t5/fusion-design-validate-document/difficulty-converting-mesh-to-solid-body/m-p/13239464/highlight/true)) |
+| Big meshes | Convert warns above about 10,000 faces (slow) | `convert_mesh` says its time and refuses over about a minute unless `allow_slow`, with the reduce call that fits | Guess (Fission 180's insert parity doc: `insert.FACET_WARNING`) |
+| The MESH tab's dialogs | Repair, Remesh, Reduce, Plane Cut, Shell, Smooth, Combine, Separate, Reverse Normal, Direct Edit, Erase and Fill, Delete Faces, Make Closed Mesh, face groups, Tessellate, Section Sketch | one step each, the dialog's values | `docs/fission180/parity/mesh.md` (its sources) |
+| An AI connector | Fusion has none for outside AI apps | beyond Fusion | - |
+
+### The MESH tab
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| CREATE > Insert Mesh | `import_file` (STL / OBJ / 3MF, unit) |
+| CREATE > Tessellate | `tessellate` (refinement low / medium / high / custom, max_edge_length) |
+| CREATE > Create Mesh Section Sketch | `mesh_section_sketch` (plane XY / XZ / YZ or a construction plane, distance) |
+| PREPARE > Create Face Group | `mesh_prepare` kind create_face_group (faces) |
+| PREPARE > Generate Face Groups | `mesh_prepare` kind generate_face_groups (method fast / accurate, angle, min_size, tolerance) |
+| PREPARE > Combine Face Groups | `mesh_prepare` kind combine_face_groups (groups, or faces in them) |
+| PREPARE > Repair | `mesh_prepare` kind repair (repair_type close_holes / stitch_and_remove / wrap / rebuild, rebuild_type, density, offset); its analysis: `inspect_mesh` |
+| MODIFY > Remesh | `mesh_modify` kind remesh |
+| MODIFY > Reduce | `mesh_modify` kind reduce (target tolerance / proportion / face_count) |
+| MODIFY > Plane Cut | `mesh_modify` kind plane_cut (trim / split_body / split_faces, fill, flip, distance, angle_x, angle_y) |
+| MODIFY > Shell | `mesh_modify` kind shell |
+| MODIFY > Smooth | `mesh_modify` kind smooth (groups / faces) |
+| MODIFY > Combine | `mesh_modify` kind combine (tools, join / cut / intersect / merge, keep_tools) |
+| MODIFY > Separate | `mesh_modify` kind separate (mesh_shells / all_face_groups / select_face_groups, keep_body) |
+| MODIFY > Reverse Normal | `mesh_modify` kind reverse_normal (groups / faces) |
+| MODIFY > Direct Edit | `mesh_modify` kind direct_edit (edits: delete, erase_fill, group, reverse, move, smooth) |
+| MODIFY > Erase and Fill | `mesh_modify` kind erase_and_fill (faces, fill, density) |
+| MODIFY > Delete Faces | `mesh_modify` kind delete_faces (faces) |
+| MODIFY > Make Closed Mesh | `mesh_prepare` kind make_closed |
+| CONVERT > Convert Mesh | `convert_mesh` (method, operation, allow_slow) |
+| Browser: Rebuild with Timeline (AI)... on a mesh | `start_rebuild`, `describe_reference`, `compare_to_reference`, `finish_rebuild` (rebuild_tools, mesh-aware since wave 8) |
+
+Faces of a mesh are named by face group, points on its surface, a ray or a box (with an
+optional facing filter), never by a triangle's number; they are kept as the dialogs keep a
+click (the picked triangles' centres, or their face groups). The tools' answers carry the
+triangles, size, closed or what is wrong, volume and, on a last line, the time ("Took about
+2 s.").
+
+### Speed
+
+Every mesh tool on the Relic stand-in (a plate with a grid of 3 mm holes, as STL; the
+sandbox's 4 CPUs shared by ten builders, so a person's PC is usually faster;
+`Fission180Tests/headless/mesh_tools.py` `measure_speed`), seconds per call, each change
+undone after it:
+
+| Call | 876 triangles | 8,972 triangles | 47,612 triangles | 93,612 triangles |
+|---|---|---|---|---|
+| inspect_mesh | 0.01 | 0.17 | 0.84 | 2.26 |
+| inspect_mesh groups | 0.01 | 0.14 | 1.02 | 2.69 |
+| convert_mesh | 0.17 | 1.83 | 11 | 27 |
+| convert_mesh faceted | 0.47 | 5.44 | 28 | 66 |
+| mesh_prepare repair | 0.02 | 0.35 | 2.24 | 4.18 |
+| mesh_prepare generate_face_groups | 0.01 | 0.12 | 0.68 | 1.12 |
+| mesh_prepare create_face_group | 0.02 | 0.11 | 0.72 | 1.12 |
+| mesh_prepare make_closed | 1.36 | 1.89 | 2.48 | 2.54 |
+| mesh_modify remesh | 0.13 | 0.04 | 0.18 | 0.24 |
+| mesh_modify reduce | 0.00 | 0.05 | 0.36 | 0.45 |
+| mesh_modify plane_cut XY through the holes, fill minimal | 0.03 | 0.46 | 5.24 | 14 |
+| mesh_modify plane_cut YZ, fill uniform | 0.44 | 0.10 | 1.98 | 0.55 |
+| mesh_modify shell | 0.02 | 0.19 | 1.35 | 1.38 (refused) |
+| mesh_modify smooth | 0.00 | 0.06 | 0.37 | 0.75 |
+| mesh_modify reverse_normal | 0.00 | 0.05 | 0.29 | 0.59 |
+| mesh_modify erase_and_fill | 0.02 | 0.20 | 1.40 | 3.08 |
+| mesh_modify delete_faces | 0.01 | 0.09 | 0.64 | 1.40 |
+| mesh_modify direct_edit | 0.01 | 0.11 | 0.81 | 1.55 |
+| mesh_section_sketch | 0.00 | 0.02 | 0.15 | 0.25 |
+| start_rebuild | 0.13 | 2.10 | - | - |
+| describe_reference | 0.27 | 3.69 | - | - |
+
+"(refused)": a 0.5 mm shell does not fit there (its inside wall would cross itself): the
+refusal in words, in about a second.
+
+Before wave 8 Convert Mesh sewed one face per triangle: 9,000 triangles 5.9 s, 76,000
+4 min 40 s; Plane Cut through 425 holes 152 s (Minimal) and minutes (Uniform). A fillet of
+four edges of the converted 9,000-triangle plate (2,326 faces): 11 to 15 s (OpenCASCADE).
+describe_reference on the dome plate (8,812 triangles, no plan): 56 s and 1.47 million
+characters before, 11 s and about 6,000 characters now; compare_to_reference of a
+facet-copying rebuild against it: 336 s before, under a second now (the warning and the
+volumes).
+
+### Tests
+
+Unit `test_mesh_ai.py` (32), `test_mesh_convert_freecad.py` (`headless/mesh_convert_check.py`:
+the new conversion is the sewn one, a cut through 80 holes closed and quick); the headless
+runner's block `headless/mesh_tools.py` (67 calls: every tool and kind, the repair route,
+the rebuild of both stand-ins, the refusals); scenarios `ai_mesh_relic` (45 checks) and
+`ai_mesh_repair` (41 checks) through the real MCP server and the bridge; recipe
+`recipes/mesh-to-solid.md` (42 calls run by the documentation runner); the six tools'
+reference examples. The older scenarios on the code changed (Convert Mesh, Plane Cut,
+Section Sketch, the rebuild of a mesh) pass: ai_plan_approach, insert_mesh, insert_reopen,
+journey_rebuild_mesh, mesh_erase_section, mesh_plane_cut, mesh_print, mesh_repair,
+mesh_tessellate_groups, rebuild_chat, rebuild_mesh_reopen, rebuild_start.
+
+### Still open
+
+- Fusion's Prismatic fits cylinders, cones and spheres to face groups; Fission 180's merges flat
+  faces only (round areas stay facets): true round holes need the rebuild route.
+- `edit_step` does not change a MESH step's values (undo and call again; the timeline's
+  double-click opens its dialog).
+- start_rebuild's 10,000-triangle limit for a mesh (rebuild.py) and its words date from the
+  sewing conversion; 50,000 triangles now convert in about 11 s.

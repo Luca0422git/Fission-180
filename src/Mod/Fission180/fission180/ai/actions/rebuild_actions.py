@@ -116,6 +116,7 @@ def start_rebuild(ctx, args):
         ctx.host.set_active_body(target)
     shape = rebuild.reference_shape(ref)
     note = rebuild.NOTES.get(ref.Name) or ""
+    mesh_words = _mesh_start_words(ref) if getattr(ref, "SourceKind", "") == "mesh" else ""
     text = (
         "Done: %s. %s is the reference now (id %r: frozen, drawn faint; %d faces, %s mm3, %s%s). "
         "The new empty body %r is active: build the rebuild there. Its id is %r. Next: "
@@ -134,7 +135,60 @@ def start_rebuild(ctx, args):
             target.Name if target is not None else "?",
         )
     )
+    if mesh_words:
+        text += " " + mesh_words
     return ctx.done(text, doc)
+
+
+def _core():
+    from ... import mesh_ai_core
+
+    return mesh_ai_core
+
+
+def _mesh_start_words(ref):
+    """What start_rebuild adds for a mesh (wave 8, ai-mesh): what the mesh is made of, what
+    describe_reference can read of it, and the quick route when a timeline is not needed."""
+    shapes = _mesh_overview(ref)
+    text = (
+        "It is a mesh: describe_reference reads plates, blocks, round holes, pockets and "
+        "bosses along X, Y or Z from its facets; domes, fillets and free-form areas it cannot "
+        "fit, and then it says so."
+    )
+    if shapes is not None:
+        text = "What the mesh is made of: %s %s" % (shapes["words"], text)
+    return text + (
+        " If the person only needs a solid to cut, fillet or print (no editable sizes), "
+        "convert_mesh is the quick route: undo this, then convert_mesh (ask them which they "
+        "want)."
+    )
+
+
+def _mesh_overview(ref):
+    """mesh_ai_core.overview of a rebuild's mesh, in the rebuilt body's frame (None when the
+    mesh is gone or cannot be read)."""
+    from ... import insert, mesh, mesh_ai_core
+
+    rebuild = _rebuild()
+    source = rebuild.source_of(ref)
+    if source is None or not insert.is_mesh_body(source):
+        return None
+    try:
+        m = insert.kernel_copy(source)
+        place = rebuild.frame(ref)
+        try:
+            whole = place.inverse().multiply(source.getGlobalPlacement())
+        except Exception:
+            whole = place.inverse().multiply(source.Placement)
+        if not whole.isIdentity():
+            m.transform(whole.toMatrix())
+        points, facets = mesh.topology(m)
+        return mesh_ai_core.overview(points, facets)
+    except Exception as exc:
+        from ... import warn
+
+        warn("AI rebuild: no overview of the mesh (%s)" % exc)
+        return None
 
 
 @action("describe_reference")
@@ -156,6 +210,10 @@ def describe_reference(ctx, args):
         raise UserError(str(exc))
     if detail == "plan":
         data = _without_face_lists(data)
+    # (wave 8) never thousands of facets listed one by one: a list an AI then copied
+    data = _core().short_unrecognized(data, UNRECOGNIZED_FACES.get(detail, 8))
+    if detail == "plan":
+        data = _core().patterns_folded(data)
     target = rebuild.target_of(ref)
     head = {
         "reference": ref.Name,
@@ -172,11 +230,14 @@ def describe_reference(ctx, args):
     head.pop("timing", None)  # (in the log: an answer is the same every time it is asked)
     head.pop("timing_detail", None)
     plan = data.get("plan") or []
-    words = "%s, read from its %d faces: %d feature%s, a plan of %d step%s" % (
+    copies = data.get("pattern_copies_not_listed") or 0
+    count = len(data.get("features") or []) + copies
+    words = "%s, read from its %d faces: %d feature%s%s, a plan of %d step%s" % (
         ref.SourceLabel,
         (data.get("summary") or {}).get("faces", 0),
-        len(data.get("features") or []),
-        "" if len(data.get("features") or []) == 1 else "s",
+        count,
+        "" if count == 1 else "s",
+        (" (%d of them pattern copies, named by id in their pattern)" % copies) if copies else "",
         len(plan),
         "" if len(plan) == 1 else "s",
     )
@@ -189,7 +250,62 @@ def describe_reference(ctx, args):
         ". Build the plan in the active body %r, compare_to_reference after each "
         "feature." % (target.Label if target is not None else "?")
     )
+    if getattr(ref, "SourceKind", "") == "mesh" and _core().no_plan(data):
+        shapes = data.get("mesh_overview") or _mesh_overview(ref)
+        if shapes is not None and "mesh_overview" not in head:
+            head["mesh_overview"] = shapes
+        words = _honest_routes(ref, data, shapes, target)
     return json_result(head, text=words, compact=True)
+
+
+UNRECOGNIZED_FACES = {"plan": 8, "summary": 8, "full": 200}  # face selectors per group
+
+
+def _honest_routes(ref, data, shapes, target):
+    """The words describe_reference leads with when it cannot read a plan from a mesh (wave 8,
+    ai-mesh; Luca's Relic: an empty plan and a list of 7,606 facets made an AI first give up,
+    then copy the facets one by one): said plainly, with the two honest routes."""
+    from ... import insert, mesh_ai_core
+
+    rebuild = _rebuild()
+    source = rebuild.source_of(ref)
+    mesh_there = source is not None and insert.is_mesh_body(source)
+    triangles = source.Mesh.CountFacets if mesh_there else 0
+    seconds = mesh_ai_core.seconds_words(mesh_ai_core.estimate_seconds(triangles))
+    base = (data.get("base") or {}).get("kind", "none")
+    confidence = _num(data.get("confidence") or 0)
+    if data.get("plan") and base != "none":
+        text = (
+            "Only part of this mesh could be read (confidence %s): the plan in the answer "
+            "covers what was read (%d steps); the rest, its round or free-form areas, are "
+            "small flat facets Fission 180 does not fit to features. "
+            % (confidence, len(data["plan"]))
+        )
+    else:
+        text = (
+            "No plan could be read from this mesh (base %s, confidence %s): its round or "
+            "free-form areas are small flat facets, which Fission 180 does not fit to "
+            "features. " % (base, confidence)
+        )
+    if shapes is not None:
+        text += "What it is made of: %s " % shapes["words"]
+    text += (
+        "Two honest routes; ask the person which they want before building: (1) a solid "
+        "now, without a timeline: undo (takes back start_rebuild), then convert_mesh on %s "
+        "(%s; flat faces merged, round areas stay facets; fillet, hole, cut work on it); "
+        "(2) an editable timeline: rebuild the main shapes by hand in %r: the base first%s, "
+        "then each kind of detail once (a hole for a round recess, an extrude for a round "
+        "boss, a revolve for a dome)%s, compare_to_reference after each. Never one feature "
+        "per facet, never sketches traced off facets (docs_read recipes/mesh-to-solid.md)."
+        % (
+            source.Label if source is not None else "the mesh body",
+            seconds,
+            target.Label if target is not None else "the rebuilt body",
+            _core().base_hint(shapes),
+            _core().pattern_hint(shapes),
+        )
+    )
+    return text
 
 
 def _without_face_lists(data):
@@ -217,12 +333,86 @@ def compare_to_reference(ctx, args):
     target = ctx.body_of(args["body"]) if args.get("body") else None
     regions, faces = LIMITS[args.get("detail", "summary")]
     options = {"regions": regions, "faces": faces, "show": bool(args.get("show", True))}
+    careful = _facet_copying(ref, target) if getattr(ref, "SourceKind", "") == "mesh" else ""
+    if careful and len(rebuild.reference_shape(ref).Faces) > BIG_REFERENCE:
+        # (wave 8) a rebuild traced off a big mesh's facets against those facets: the
+        # comparison took 336 s (a 120-line prism against a 7,606-face dome plate), the window
+        # frozen; the warning is what matters, the volumes are enough beside it
+        data = _volumes_only(ref, target, careful)
+        return json_result(data, text=data["verdict"], compact=True)
     try:
         data = rebuild.compare(ref, target, options)
     except rebuild.RebuildError as exc:
         raise UserError(str(exc))
     data.pop("seconds", None)  # (in the log: an answer is the same every time it is asked)
+    if careful:
+        data["facet_copying"] = True
+        data["verdict"] = careful + " " + data["verdict"]
     return json_result(data, text=data["verdict"], compact=True)
+
+
+BIG_REFERENCE = 1500  # faces: a reference this big is not compared with a facet-copying rebuild
+
+
+def _volumes_only(ref, target, careful):
+    """The answer of compare_to_reference while the rebuild of a big mesh copies its facets:
+    the warning and the two volumes, no comparison (it would take minutes)."""
+    from ... import bodies
+
+    rebuild = _rebuild()
+    body = target or rebuild.target_of(ref)
+    body = body if body is None or bodies.is_body(body) else (bodies.body_of(body) or body)
+    shape = rebuild.reference_shape(ref)
+    rebuilt = 0.0
+    try:
+        if body is not None and bodies.has_solid(body):
+            rebuilt = body.Shape.Volume
+    except Exception:
+        rebuilt = 0.0
+    return {
+        "reference": ref.Name,
+        "rebuilt": body.Name if body is not None else None,
+        "facet_copying": True,
+        "compared": False,
+        "volume": {
+            "reference": round(sum(s.Volume for s in shape.Solids), 6),
+            "rebuilt": round(rebuilt, 6),
+        },
+        "done": False,
+        "verdict": careful
+        + " Not compared face by face while the rebuild copies facets (against %d faces it "
+        "takes minutes): undo those steps, then compare_to_reference again." % len(shape.Faces),
+    }
+
+
+def _facet_copying(ref, target=None):
+    """mesh_ai_core.facet_copying's words for the rebuild of a mesh (wave 8): its sketches'
+    straight lines and its number of steps, read from the rebuilt body ("" when fine)."""
+    from ... import bodies, mesh_ai_core, timeline_ops
+
+    rebuild = _rebuild()
+    body = target or rebuild.target_of(ref)
+    if body is None:
+        return ""
+    body = body if bodies.is_body(body) else (bodies.body_of(body) or body)
+    try:
+        sketches = []
+        for obj in getattr(body, "Group", []) or []:
+            if obj.TypeId != "Sketcher::SketchObject":
+                continue
+            lines = sum(
+                1
+                for g in obj.GeometryFacadeList
+                if g.Geometry.TypeId == "Part::GeomLineSegment" and not g.Construction
+            )
+            sketches.append((obj.Label, lines))
+        steps = [i for i in timeline_ops.timeline(body.Document).items if i.body == body.Name]
+        return mesh_ai_core.facet_copying(sketches, len(steps))
+    except Exception as exc:
+        from ... import warn
+
+        warn("AI rebuild: facet copying not checked (%s)" % exc)
+        return ""
 
 
 @action("finish_rebuild")

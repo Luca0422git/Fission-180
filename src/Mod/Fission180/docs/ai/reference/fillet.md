@@ -65,6 +65,7 @@ Done: AI: Fillet 5 mm. Its id is 'Fillet1'. Bodies now: Body1: 23785.4 mm3, 60 x
 - Recipe: [check a part before it is made (draft, inner rounds, reach, smoothness)](fission180://docs/recipes/check-before-making.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
 - Recipe: [flange with a bolt circle](fission180://docs/recipes/flange-bolt-pattern.md)
+- Recipe: [a mesh (STL, OBJ, 3MF, a scan) into a solid](fission180://docs/recipes/mesh-to-solid.md)
 - Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
