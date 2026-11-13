@@ -186,6 +186,11 @@ time you start it, but treat that as a safety net, not a plan.
   save) and tell us which backup program you use.
 - **Sketch Rotate still snaps with Ctrl** the way FreeCAD does; hold Ctrl as you would in
   FreeCAD. Fusion's "Pin to Shortcuts" is not built.
+- **MESH > Combine on big bodies** (more than 5,000 faces in all) that share a flat face is
+  refused, and FreeCAD's mesh booleans sometimes give a body with holes on big round bodies
+  (two crossing spheres of 10,000 faces each), so Combine refuses those too.
+  *Workaround:* MESH > Reduce both bodies first, move one body slightly so the faces no longer
+  line up, or use Merge (which keeps both bodies as they are).
 - **Updating by "Update now"** is the part least tested on other people's computers. If an
   update fails, Fission 180 keeps a backup of your previous version
   (see [quick-update.md](quick-update.md)) and the manual way (download the new installer)

@@ -32,6 +32,15 @@ releases published under the old name (their tags are `sciforge-v...`).
   keeps the connector of the version it was made with, also after an update. Installing the
   extension now removes the settings-file entry, and setting up through the settings file says
   to remove the extension.
+- **MESH > Combine crashed Fission 180 when the two bodies share a flat face** (a box and a
+  cylinder standing on one floor, a body stacked on another, a pocket flush with the top): the
+  whole program closed and unsaved work was lost, and a design saved with such a step crashed
+  again when opened. FreeCAD's mesh booleans also gave wrong answers whenever bodies touched
+  (a cone resting on a box: "Join gave nothing"; two identical boxes: Intersect of nothing).
+  Combine now notices bodies that touch and combines them the exact way instead: all 30 such
+  cases tried (10 shapes x Join, Cut, Intersect) give the right body. Bodies over 5,000 faces
+  that share a flat face are refused in plain words (move one slightly, Reduce, or Merge),
+  because the exact way would take too long there.
 
 ## 0.1.0-beta.4.0.2
 

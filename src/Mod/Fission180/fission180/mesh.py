@@ -878,10 +878,22 @@ def combine_meshes(target, tools, operation="Join"):
 
 
 BOOLEAN_TRIES = 6  # facet orders tried before a Combine gives up (_boolean)
+# Touching bodies are combined as solids (OpenCASCADE, exact) instead: 1.2 s for 1,850 faces
+# in all, 21 s for 18,000 (FreeCAD's mesh booleans: 0.3 s; measured 2026-11-13). Above this
+# the window would freeze too long (Windows calls it "Not responding" after 5 s), so Combine
+# says what to do instead.
+EXACT_MAX_FACETS = 5000
 
 
 def _boolean(target, tool, operation):
     """Join / Cut / Intersect of two closed meshes, as a closed mesh.
+
+    Bodies with faces in one plane that overlap (mesh_core.touching "plane") never reach
+    FreeCAD's mesh booleans, which crash the whole program on them (a segfault in MeshCore's
+    Delaunay step: a box and a cylinder standing on one floor): they are combined as exact
+    solids (_exact_boolean), or refused when too big for that. Bodies where a corner or an
+    edge of one lies on the other's face ("touch": wrong bodies, no crash seen) are combined
+    as exact solids when small enough, else by the mesh booleans, checked as below.
 
     FreeCAD's mesh booleans (MeshCore) depend on the order of the facets: the same two boxes
     with their facets in another order gave an open, wrong result about once in a hundred
@@ -889,7 +901,14 @@ def _boolean(target, tool, operation):
     mesh_separate_combine D; checked with 300 shuffles in freecadcmd). The order changes
     from run to run (the pieces of Separate, an STL file). So a result that is not closed is
     computed again with the facets in other orders (deterministic ones) and, for Join and
-    Intersect, the operands swapped; still not closed: said, never a wrong body."""
+    Intersect, the operands swapped; still not closed: combined as exact solids when the
+    bodies are small enough, else said, never a wrong body."""
+    contact = _contact(target, tool)
+    small = target.CountFacets + tool.CountFacets <= EXACT_MAX_FACETS
+    if contact == "plane" or (contact and small):
+        # (faces in one plane crash MeshCore; a corner on a face gives wrong bodies but has
+        # not crashed it, so big touching bodies still try it below, checked as always)
+        return _exact_boolean(target, tool, operation, core.contact_words(contact))
     err = None
     for attempt in range(BOOLEAN_TRIES):
         a, b = (
@@ -909,19 +928,126 @@ def _boolean(target, tool, operation):
         except Exception as exc:
             err = exc
             continue
-        if result.CountFacets == 0 or result.isSolid():
+        # (a Join of two closed bodies is never empty: nothing back is a failure too)
+        if (result.CountFacets == 0 and operation != "Join") or (
+            result.CountFacets and result.isSolid()
+        ):
             if attempt:
                 log(
                     "mesh %s: computed again with the faces in another order (%d)"
                     % (operation, attempt)
                 )
             return result
+    if small:
+        try:
+            return _exact_boolean(
+                target, tool, operation, "FreeCAD's mesh booleans gave a body with holes"
+            )
+        except MeshError as exc:
+            warn("mesh %s: the exact way failed too (%s)" % (operation, exc))
     if err is not None:
         raise MeshError("The bodies could not be combined (%s)." % err)
+    if contact:
+        raise MeshError(
+            "%s: %s, and FreeCAD's mesh booleans gave a body with holes. Move one body "
+            "slightly, Reduce both bodies (the exact way takes %d faces at most), or use "
+            "Merge." % (operation, core.contact_words(contact), EXACT_MAX_FACETS)
+        )
     raise MeshError(
         "%s gave a body with holes (FreeCAD's mesh booleans fail on some shapes): try "
         "Repair on both bodies, or Merge." % operation
     )
+
+
+def _contact(target, tool):
+    """How target and tool touch (mesh_core.touching: "plane", "touch") or None. Bodies
+    whose bounding boxes do not meet are not looked at."""
+    import FreeCAD as App
+
+    box_a, box_b = target.BoundBox, tool.BoundBox
+    both = App.BoundBox(box_a)
+    both.add(box_b)
+    farthest = max(
+        abs(both.XMin),
+        abs(both.YMin),
+        abs(both.ZMin),
+        abs(both.XMax),
+        abs(both.YMax),
+        abs(both.ZMax),
+    )
+    tolerance = core.contact_tolerance(both.DiagonalLength, farthest)
+    grown = App.BoundBox(box_a)
+    grown.enlarge(tolerance)
+    if not grown.intersect(box_b):
+        return None
+    points_a, facets_a = topology(target)
+    points_b, facets_b = topology(tool)
+    return core.touching(points_a, facets_a, points_b, facets_b, tolerance)
+
+
+def _mesh_solid(mesh):
+    """A closed mesh as a solid of flat triangles (one face per facet), for _exact_boolean."""
+    import Part
+
+    tolerance = max(1e-4, 1e-5 * mesh.BoundBox.DiagonalLength)
+    shape = Part.Shape()
+    shape.makeShapeFromMesh(mesh.Topology, tolerance, True)
+    solid = Part.makeSolid(shape)
+    if solid.isNull() or not solid.Solids:
+        raise MeshError("A body does not close into a solid: Repair it first, or use Merge.")
+    if solid.Volume < 0:
+        solid.reverse()
+    return solid
+
+
+def _exact_boolean(target, tool, operation, why):
+    """Join / Cut / Intersect computed on solids made of the meshes' triangles (OpenCASCADE:
+    exact, and it does not crash on touching faces), then turned back into triangles. The
+    faces keep their triangles; only the ones the other body cuts are split."""
+    import time
+
+    count = target.CountFacets + tool.CountFacets
+    if count > EXACT_MAX_FACETS:
+        raise MeshError(
+            "%s: %s, which FreeCAD's mesh booleans cannot combine safely, and at %d faces "
+            "the exact way would take too long. Move one body slightly so the faces no longer "
+            "line up, Reduce both bodies, or use Merge." % (operation, why, count)
+        )
+    start = time.time()
+    try:
+        first, second = _mesh_solid(target), _mesh_solid(tool)
+        if operation == "Join":
+            shape = first.fuse(second)
+        elif operation == "Cut":
+            shape = first.cut(second)
+        else:
+            shape = first.common(second)
+    except MeshError:
+        raise
+    except Exception as exc:
+        raise MeshError(
+            "%s: %s, and the bodies could not be combined as solids either (%s). Move one "
+            "body slightly, or use Merge." % (operation, why, exc)
+        )
+    if shape.isNull() or not shape.Faces:
+        result = from_topology([], [])
+    else:
+        import Mesh
+
+        points, triangles = shape.tessellate(max(1e-3, 1e-4 * shape.BoundBox.DiagonalLength))
+        # (as triangles, not as a topology: a topology loses the facets at an edge that two
+        # bodies only touch along, a box resting on its edge)
+        result = Mesh.Mesh([[points[i] for i in t] for t in triangles])
+        if not result.isSolid():
+            raise MeshError(
+                "%s: %s, and combining them as solids gave a body with holes. Move one body "
+                "slightly, or use Merge." % (operation, why)
+            )
+    log(
+        "mesh %s: %s; combined as exact solids instead of with FreeCAD's mesh booleans "
+        "(%d faces, %.1f s)" % (operation, why, result.CountFacets, time.time() - start)
+    )
+    return result
 
 
 def _reordered(mesh, k):
