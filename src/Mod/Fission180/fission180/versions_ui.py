@@ -1587,6 +1587,10 @@ class Recovery:
 
             if Gui.Control.activeDialog() and not sketch_mode.sketch_edited_anywhere():
                 return True
+            from .ai import progress  # (wave 8, ai-speed: nor in the middle of an AI call)
+
+            if progress.working():
+                return True
             for name in App.listDocuments():
                 if App.getDocument(name).Recomputing:
                     return True

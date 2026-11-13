@@ -91,6 +91,7 @@ Design check: OK, 0 problems, 0 warnings.
 
 ## See also
 
+- Recipe: [an assembly drawing with an exploded view, balloons and a parts list](fission180://docs/recipes/assembly-drawing.md)
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
 - Recipe: [an exploded-view video of an assembly (ANIMATION)](fission180://docs/recipes/exploded-view-video.md)
@@ -100,11 +101,13 @@ Design check: OK, 0 problems, 0 warnings.
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
 - Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
+- Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)
 - Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
 - Recipe: [stepped shaft with a keyway](fission180://docs/recipes/shaft-with-keyway.md)
 - Recipe: [sheet-like U bracket (thin extrude with bends)](fission180://docs/recipes/sheet-like-part.md)
+- Recipe: [a sheet metal drawing with the flat pattern, a bend table and bend notes](fission180://docs/recipes/sheet-metal-drawing.md)
 - Recipe: [cantilever snap-fit hook](fission180://docs/recipes/snap-fit.md)
 - Recipe: [is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md)
 - Recipe: [curved panel from a surface patch](fission180://docs/recipes/surface-patch.md)

@@ -14,7 +14,7 @@ No arguments.
 
 ## Answer
 
-A plain sentence, then JSON with: `design`, `id`, `file`, `units`, `active_body`, `bodies`, `history_marker`, `timeline`, `parameters`, `sketches`. The example below shows a real one.
+A plain sentence, then JSON with: `design`, `id`, `file`, `units`, `active_body`, `bodies`, `workspace`, `history_marker`, `timeline`, `parameters`, `sketches`. The example below shows a real one.
 
 ## Errors
 
@@ -69,6 +69,7 @@ The answer:
    "mass_g": 189.6
   }
  ],
+ "workspace": null,
  "history_marker": 2,
  "timeline": [
   {

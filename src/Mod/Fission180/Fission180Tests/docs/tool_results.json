@@ -36,7 +36,7 @@
   "args": {},
   "note": "the plate as JSON",
   "answer": {
-   "text": "{\n \"design\": \"Example\",\n \"id\": \"Example\",\n \"file\": null,\n \"units\": \"mm\",\n \"active_body\": \"Body\",\n \"bodies\": [\n  {\n   \"id\": \"Body\",\n   \"label\": \"Body1\",\n   \"volume_mm3\": 24000.0,\n   \"area_mm2\": 6800.0,\n   \"bbox_mm\": [\n    0.0,\n    0.0,\n    0.0,\n    60.0,\n    40.0,\n    10.0\n   ],\n   \"solids\": 1,\n   \"faces\": 6,\n   \"tip\": \"Extrude1\",\n   \"material\": \"Steel (default)\",\n   \"mass_g\": 189.6\n  }\n ],\n \"history_marker\": 2,\n \"timeline\": [\n  {\n   \"id\": \"Sketch1\",\n   \"label\": \"Sketch1\",\n   \"type\": \"Sketcher::SketchObject\",\n   \"name\": \"Sketch 1\",\n   \"state\": \"done\"\n  },\n  {\n   \"id\": \"Extrude1\",\n   \"label\": \"Extrude1\",\n   \"type\": \"PartDesign::Pad\",\n   \"name\": \"Extrude 1\",\n   \"state\": \"done\"\n  }\n ],\n \"parameters\": [],\n \"sketches\": [\n  {\n   \"id\": \"Sketch1\",\n   \"label\": \"Sketch1\",\n   \"closed_areas\": 1\n  }\n ]\n}",
+   "text": "{\n \"design\": \"Example\",\n \"id\": \"Example\",\n \"file\": null,\n \"units\": \"mm\",\n \"active_body\": \"Body\",\n \"bodies\": [\n  {\n   \"id\": \"Body\",\n   \"label\": \"Body1\",\n   \"volume_mm3\": 24000.0,\n   \"area_mm2\": 6800.0,\n   \"bbox_mm\": [\n    0.0,\n    0.0,\n    0.0,\n    60.0,\n    40.0,\n    10.0\n   ],\n   \"solids\": 1,\n   \"faces\": 6,\n   \"tip\": \"Extrude1\",\n   \"material\": \"Steel (default)\",\n   \"mass_g\": 189.6\n  }\n ],\n \"workspace\": null,\n \"history_marker\": 2,\n \"timeline\": [\n  {\n   \"id\": \"Sketch1\",\n   \"label\": \"Sketch1\",\n   \"type\": \"Sketcher::SketchObject\",\n   \"name\": \"Sketch 1\",\n   \"state\": \"done\"\n  },\n  {\n   \"id\": \"Extrude1\",\n   \"label\": \"Extrude1\",\n   \"type\": \"PartDesign::Pad\",\n   \"name\": \"Extrude 1\",\n   \"state\": \"done\"\n  }\n ],\n \"parameters\": [],\n \"sketches\": [\n  {\n   \"id\": \"Sketch1\",\n   \"label\": \"Sketch1\",\n   \"closed_areas\": 1\n  }\n ]\n}",
    "is_error": false
   }
  },
@@ -535,7 +535,7 @@
   "args": {},
   "note": "everything at once",
   "answer": {
-   "text": "Example: 1 body, 4 steps. Snapshot S1.\n{\n \"design\": \"Example\",\n \"id\": \"Example\",\n \"file\": null,\n \"units\": \"mm, mm2, mm3, g, degrees\",\n \"active_body\": \"Body\",\n \"bodies\": [\n  {\n   \"id\": \"Body\",\n   \"label\": \"Body1\",\n   \"shown\": true,\n   \"solids\": 1,\n   \"shells\": 1,\n   \"faces\": 7,\n   \"edges\": 15,\n   \"vertices\": 10,\n   \"solid\": true,\n   \"volume_mm3\": 23497.345175,\n   \"area_mm2\": 6950.796447,\n   \"bbox_mm\": {\"min\": [0.0, 0.0, 0.0], \"max\": [60.0, 40.0, 10.0], \"size\": [60.0, 40.0, 10.0]},\n   \"valid\": true,\n   \"center_of_mass_mm\": [30.0, 20.0, 5.0],\n   \"closed\": true,\n   \"tip\": \"Hole1\",\n   \"material\": \"Steel (default)\",\n   \"mass_g\": 185.629027\n  }\n ],\n \"timeline\": [\n  {\n   \"index\": 0,\n   \"id\": \"Sketch1\",\n   \"name\": \"Sketch 1\",\n   \"kind\": \"sketch\",\n   \"type\": \"Sketcher::SketchObject\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"base.width\": 60.0, \"base.height\": 40.0, \"base.x\": 0.0, \"base.y\": 0.0}\n  },\n  {\n   \"index\": 1,\n   \"id\": \"Extrude1\",\n   \"name\": \"Extrude 1\",\n   \"kind\": \"extrude\",\n   \"type\": \"PartDesign::Pad\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"Distance\": 10.0, \"Taper\": 0.0}\n  },\n  {\n   \"index\": 2,\n   \"id\": \"Sketch2\",\n   \"name\": \"Sketch 2\",\n   \"kind\": \"sketch\",\n   \"type\": \"Sketcher::SketchObject\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"g0.diameter\": 8.0, \"g0.x\": 30.0, \"g0.y\": 20.0}\n  },\n  {\n   \"index\": 3,\n   \"id\": \"Hole1\",\n   \"name\": \"Hole 1\",\n   \"kind\": \"hole\",\n   \"type\": \"PartDesign::Hole\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"Diameter\": 8.0}\n  }\n ],\n \"history_marker\": {\"after_step\": \"Hole1\", \"slot\": 4, \"at_end\": true},\n \"parameters\": [],\n \"sketches\": [\n  {\n   \"id\": \"Sketch1\",\n   \"label\": \"Sketch1\",\n   \"curves\": 4,\n   \"closed_areas\": 1,\n   \"fully_constrained\": true,\n   \"degrees_of_freedom\": 0\n  },\n  {\n   \"id\": \"Sketch2\",\n   \"label\": \"Sketch2\",\n   \"curves\": 1,\n   \"closed_areas\": 1,\n   \"fully_constrained\": true,\n   \"degrees_of_freedom\": 0\n  }\n ],\n \"selection\": [],\n \"summary\": {\n  \"bodies\": 1,\n  \"solid_bodies\": 1,\n  \"steps\": 4,\n  \"failed_steps\": [],\n  \"invalid_bodies\": [],\n  \"total_volume_mm3\": 23497.345175\n },\n \"snapshot\": \"S1\"\n}",
+   "text": "Example: 1 body, 4 steps. Snapshot S1.\n{\n \"design\": \"Example\",\n \"id\": \"Example\",\n \"file\": null,\n \"units\": \"mm, mm2, mm3, g, degrees\",\n \"active_body\": \"Body\",\n \"bodies\": [\n  {\n   \"id\": \"Body\",\n   \"label\": \"Body1\",\n   \"shown\": true,\n   \"solids\": 1,\n   \"shells\": 1,\n   \"faces\": 7,\n   \"edges\": 15,\n   \"vertices\": 10,\n   \"solid\": true,\n   \"volume_mm3\": 23497.345175,\n   \"area_mm2\": 6950.796447,\n   \"bbox_mm\": {\"min\": [0.0, 0.0, 0.0], \"max\": [60.0, 40.0, 10.0], \"size\": [60.0, 40.0, 10.0]},\n   \"valid\": true,\n   \"center_of_mass_mm\": [30.0, 20.0, 5.0],\n   \"closed\": true,\n   \"tip\": \"Hole1\",\n   \"material\": \"Steel (default)\",\n   \"mass_g\": 185.629027\n  }\n ],\n \"timeline\": [\n  {\n   \"index\": 0,\n   \"id\": \"Sketch1\",\n   \"name\": \"Sketch 1\",\n   \"kind\": \"sketch\",\n   \"type\": \"Sketcher::SketchObject\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"base.width\": 60.0, \"base.height\": 40.0, \"base.x\": 0.0, \"base.y\": 0.0}\n  },\n  {\n   \"index\": 1,\n   \"id\": \"Extrude1\",\n   \"name\": \"Extrude 1\",\n   \"kind\": \"extrude\",\n   \"type\": \"PartDesign::Pad\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"Distance\": 10.0, \"Taper\": 0.0}\n  },\n  {\n   \"index\": 2,\n   \"id\": \"Sketch2\",\n   \"name\": \"Sketch 2\",\n   \"kind\": \"sketch\",\n   \"type\": \"Sketcher::SketchObject\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"g0.diameter\": 8.0, \"g0.x\": 30.0, \"g0.y\": 20.0}\n  },\n  {\n   \"index\": 3,\n   \"id\": \"Hole1\",\n   \"name\": \"Hole 1\",\n   \"kind\": \"hole\",\n   \"type\": \"PartDesign::Hole\",\n   \"body\": \"Body\",\n   \"state\": \"done\",\n   \"status\": \"ok\",\n   \"values\": {\"Diameter\": 8.0}\n  }\n ],\n \"history_marker\": {\"after_step\": \"Hole1\", \"slot\": 4, \"at_end\": true},\n \"parameters\": [],\n \"sketches\": [\n  {\n   \"id\": \"Sketch1\",\n   \"label\": \"Sketch1\",\n   \"curves\": 4,\n   \"closed_areas\": 1,\n   \"fully_constrained\": true,\n   \"degrees_of_freedom\": 0\n  },\n  {\n   \"id\": \"Sketch2\",\n   \"label\": \"Sketch2\",\n   \"curves\": 1,\n   \"closed_areas\": 1,\n   \"fully_constrained\": true,\n   \"degrees_of_freedom\": 0\n  }\n ],\n \"workspace\": null,\n \"selection\": [],\n \"summary\": {\n  \"bodies\": 1,\n  \"solid_bodies\": 1,\n  \"steps\": 4,\n  \"failed_steps\": [],\n  \"invalid_bodies\": [],\n  \"total_volume_mm3\": 23497.345175\n },\n \"snapshot\": \"S1\"\n}",
    "is_error": false
   }
  },
@@ -6164,7 +6164,7 @@
   },
   "note": "an isometric view projected from the base view",
   "answer": {
-   "text": "Done: projected view 'Isometric (top right) View' (id 'ProjectedView002') on Example Drawing.",
+   "text": "Done: projected view: ProjectedView 'Isometric (top right) View' (id 'ProjectedView002') at [114.29, 137.51], 141.4 x 98 mm on the sheet, scale 2:1 on Example Drawing.",
    "is_error": false
   }
  },
@@ -6250,7 +6250,7 @@
   },
   "note": "the length of the line nearest to (0, 5) in the base view",
   "answer": {
-   "text": "Done: DistanceX dimension 'Dimension' on Base View: 60.",
+   "text": "Done: dimension on Base View: DistanceX 'Dimension': 60 (written '60'); it measures line (-30, 5)-(30, 5).",
    "is_error": false
   }
  },
@@ -6332,7 +6332,7 @@
   },
   "note": "a note on the sheet",
   "answer": {
-   "text": "Done: text on Example Drawing (id 'Text').",
+   "text": "Done: text 'Text' on Example Drawing at [20, 40].",
    "is_error": false
   }
  },
@@ -6407,7 +6407,7 @@
   "args": {},
   "note": "the sheet and its views",
   "answer": {
-   "text": "{\n \"drawings\": [\n  {\n   \"id\": \"Drawing\",\n   \"label\": \"Example Drawing\",\n   \"standard\": \"ISO\",\n   \"sheet\": \"A3\",\n   \"units\": \"mm\",\n   \"sheet_size_mm\": [\n    420.0,\n    297.0\n   ],\n   \"title_block\": {\n    \"ApprovedBy\": \"\",\n    \"CheckedBy\": \"\",\n    \"Date\": \"2026-11-11\",\n    \"Description\": \"\",\n    \"DrawnBy\": \"root\",\n    \"Material\": \"Steel\",\n    \"PartNumber\": \"Example\",\n    \"Revision\": \"\",\n    \"Scale\": \"\",\n    \"Sheet\": \"1 / 1\",\n    \"Size\": \"A3\",\n    \"Title\": \"Example\",\n    \"Units\": \"mm\"\n   },\n   \"views\": [\n    {\n     \"id\": \"BaseView\",\n     \"label\": \"Base View\",\n     \"kind\": \"BaseView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"at\": [\n      134.4,\n      172.26\n     ],\n     \"half_size_mm\": [\n      60.0,\n      10.0\n     ]\n    },\n    {\n     \"id\": \"ProjectedView\",\n     \"label\": \"Top View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"at\": [\n      134.4,\n      77.22\n     ],\n     \"half_size_mm\": [\n      60.0,\n      40.0\n     ],\n     \"parent\": \"BaseView\"\n    },\n    {\n     \"id\": \"ProjectedView001\",\n     \"label\": \"Right View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"at\": [\n      0.0,\n      172.26\n     ],\n     \"half_size_mm\": [\n      40.0,\n      10.0\n     ],\n     \"parent\": \"BaseView\"\n    }\n   ],\n   \"annotations\": []\n  }\n ]\n}",
+   "text": "{\n \"drawings\": [\n  {\n   \"id\": \"Drawing\",\n   \"label\": \"Example Drawing\",\n   \"sheet_name\": \"Sheet 1\",\n   \"standard\": \"ISO\",\n   \"sheet\": \"A3\",\n   \"units\": \"mm\",\n   \"sheet_size_mm\": [420.0, 297.0],\n   \"title_block\": {\n    \"ApprovedBy\": \"\",\n    \"CheckedBy\": \"\",\n    \"Date\": \"2026-11-13\",\n    \"Description\": \"\",\n    \"DrawnBy\": \"root\",\n    \"Material\": \"Steel\",\n    \"PartNumber\": \"Example\",\n    \"Revision\": \"\",\n    \"Scale\": \"2:1\",\n    \"Sheet\": \"1 / 1\",\n    \"Size\": \"A3\",\n    \"Title\": \"Example\",\n    \"Units\": \"mm\"\n   },\n   \"views\": [\n    {\n     \"id\": \"BaseView\",\n     \"label\": \"Base View\",\n     \"kind\": \"BaseView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"scale_text\": \"2:1\",\n     \"at\": [265.0, 216.5],\n     \"half_size_mm\": [60.0, 10.0],\n     \"style\": \"Visible and Hidden Edges\",\n     \"shows\": [\"Body\"]\n    },\n    {\n     \"id\": \"ProjectedView\",\n     \"label\": \"Top View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"scale_text\": \"2:1\",\n     \"at\": [265.0, 146.5],\n     \"half_size_mm\": [60.0, 40.0],\n     \"style\": \"Visible and Hidden Edges\",\n     \"parent\": \"BaseView\",\n     \"direction\": \"Top\",\n     \"shows\": [\"Body\"]\n    },\n    {\n     \"id\": \"ProjectedView001\",\n     \"label\": \"Right View\",\n     \"kind\": \"ProjectedView\",\n     \"orientation\": \"Front\",\n     \"scale\": 2.0,\n     \"scale_text\": \"2:1\",\n     \"at\": [145.0, 216.5],\n     \"half_size_mm\": [40.0, 10.0],\n     \"style\": \"Visible and Hidden Edges\",\n     \"parent\": \"BaseView\",\n     \"direction\": \"Right\",\n     \"shows\": [\"Body\"]\n    }\n   ],\n   \"annotations\": [],\n   \"sheets\": [{\"id\": \"Drawing\", \"name\": \"Sheet 1\"}]\n  }\n ]\n}",
    "is_error": false
   }
  },
@@ -6682,7 +6682,7 @@
   },
   "note": "by category",
   "answer": {
-   "text": "{\n \"tools\": [\n  {\n   \"name\": \"get_design\",\n   \"title\": \"Get design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER (the design's bodies, sketches, parameters) and TIMELINE\",\n   \"read_only\": true,\n   \"available\": true\n  },\n  {\n   \"name\": \"measure\",\n   \"title\": \"Measure\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Measure\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"physical_properties\",\n   \"title\": \"Physical properties\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER > a body > Properties (INSPECT)\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"center_of_mass\",\n   \"title\": \"Center of mass\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Center of Mass\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"interference\",\n   \"title\": \"Interference\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"section_analysis\",\n   \"title\": \"Section analysis\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Section Analysis\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"inspect_design\",\n   \"title\": \"Inspect design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER + TIMELINE + Properties (everything at once)\",\n   \"read_only\": true,\n   \"available\": true\n  },\n  {\n   \"name\": \"query_geometry\",\n   \"title\": \"Query geometry\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"Selection filters + INSPECT > Measure (on what a selector picks)\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"check_design\",\n   \"title\": \"Check design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference + the timeline's warnings\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"diff_design\",\n   \"title\": \"Diff design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"TIMELINE (compare before and after)\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 10\n}",
+   "text": "12 tools of category inspect. Every tool works from any workspace.\n{\n \"tools\": [\n  {\n   \"name\": \"get_design\",\n   \"title\": \"Get design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER (the design's bodies, sketches, parameters) and TIMELINE\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Describe the open Fission 180 design\",\n   \"available\": true\n  },\n  {\n   \"name\": \"measure\",\n   \"title\": \"Measure\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Measure\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Measure between two picks a and b of the current body or the origin\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"physical_properties\",\n   \"title\": \"Physical properties\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER > a body > Properties (INSPECT)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Physical properties of bodies, as Fusion's Properties\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"center_of_mass\",\n   \"title\": \"Center of mass\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Center of Mass\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"The centre of mass of bodies together (Fusion's Center of Mass), weighted by their materials.\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"interference\",\n   \"title\": \"Interference\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Find where bodies overlap (Fusion's Interference)\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"section_analysis\",\n   \"title\": \"Section analysis\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Section Analysis\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Cut the design with a plane to look inside (Fusion's Section Analysis)\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"inspect_design\",\n   \"title\": \"Inspect design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER + TIMELINE + Properties (everything at once)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Read the whole design as numbers, to check work before trusting a picture\",\n   \"available\": true\n  },\n  {\n   \"name\": \"query_geometry\",\n   \"title\": \"Query geometry\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"Selection filters + INSPECT > Measure (on what a selector picks)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"List the faces, edges or corners (vertices) of a body or step that a selector picks, with facts about each\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"check_design\",\n   \"title\": \"Check design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference + the timeline's warnings\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Check that the design is sound, before saving or exporting it\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"diff_design\",\n   \"title\": \"Diff design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"TIMELINE (compare before and after)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"What changed in the design since\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"analysis\",\n   \"title\": \"Surface analysis\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Draft / Minimum Radius / Curvature Map / Accessibility / Zebra / Environmental Map / Curvature Comb / Isocurve Analysis\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"INSPECT's analyses as numbers (nothing is left in the design).\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"component_colors\",\n   \"title\": \"Component colors\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Display Component Colors (Shift+N) / Component Color Swatch\",\n   \"read_only\": false,\n   \"workspace\": \"design\",\n   \"purpose\": \"Each component's colour for telling them apart (Fusion's Display Component Colors)\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 12\n}",
    "is_error": false
   }
  },
@@ -11254,6 +11254,214 @@
    "is_error": false
   }
  },
+ "plan_approach#1": {
+  "setup": "plate_mesh",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Relic"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {
+   "request": "make this mesh a solid",
+   "target": "MeshBody"
+  },
+  "note": "the route, the questions and the cost for a mesh",
+  "answer": {
+   "text": "Plan: turn the mesh into a solid (mesh 'plate': 208 triangles).\nRoute: check_design; under a second in all.\nAsk the person first, in one message (2 questions, with the defaults): (1) Do you need an editable timeline (steps you can change later, many calls and much slower), or is a solid you can cut, fillet, measure and print enough? (2) Keep the original (hidden in the design) or replace it?\nNext: check_design.\n{\n \"request\": \"make this mesh a solid\",\n \"goals\": [{\"id\": \"mesh_to_solid\", \"goal\": \"turn the mesh into a solid\"}],\n \"workspaces\": [{\"workspace\": \"design\", \"title\": \"DESIGN\", \"tab\": \"mesh\"}],\n \"route\": [\n  {\n   \"step\": 1,\n   \"tool\": \"check_design\",\n   \"why\": \"one valid, closed solid\",\n   \"where\": \"INSPECT > Interference + the timeline's warnings\",\n   \"seconds\": 0.2,\n   \"for\": \"mesh_to_solid\"\n  }\n ],\n \"ask_first\": [\n  {\n   \"id\": \"editable\",\n   \"question\": \"Do you need an editable timeline (steps you can change later, many calls and much slower), or is a solid you can cut, fillet, measure and print enough?\",\n   \"default\": \"a solid now; a timeline can still be made from it later\"\n  },\n  {\n   \"id\": \"keep_original\",\n   \"question\": \"Keep the original (hidden in the design) or replace it?\",\n   \"default\": \"keep it, hidden\"\n  }\n ],\n \"cost\": {\"seconds\": 0.2, \"about\": \"under a second\", \"slow_steps\": []},\n \"avoid\": [\n  \"Never copy a mesh facet by facet (or triangle by triangle) into sketches and features: thousands of calls for a worse result. convert_mesh makes the solid in one call.\"\n ],\n \"notes\": [\n  \"Not in this Fission 180's tools (left out of the route): inspect_mesh, mesh_prepare, convert_mesh. The person can use the ribbon command instead; tell them which.\"\n ],\n \"about\": {\"id\": \"MeshBody\", \"label\": \"plate\", \"kind\": \"mesh\", \"triangles\": 208, \"closed\": true},\n \"next\": {\"tool\": \"check_design\", \"args\": {}},\n \"design\": {\n  \"open\": true,\n  \"name\": \"Relic\",\n  \"units\": \"mm\",\n  \"workspace\": null,\n  \"meshes\": [{\"id\": \"MeshBody\", \"label\": \"plate\", \"triangles\": 208, \"closed\": true}],\n  \"solids\": []\n }\n}",
+   "is_error": false
+  }
+ },
+ "plan_approach#2": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "request": "will this plate break if I stand on it?"
+  },
+  "note": "a Static Stress study, planned",
+  "answer": {
+   "text": "Plan: find out whether it is strong enough (Static Stress).\nRoute: create_study -> set_study_material -> add_constraint -> add_load -> precheck_study -> solve_study -> study_results -> study_probe (if needed); about 9 s in all.\nAsk the person first, in one message (4 questions, with the defaults): (1) Which material? (2) Where is it held or bolted down (which faces or holes do not move)? (3) What load must it carry: how much (N, or a mass in kg), where and in which direction? (4) What safety factor is enough?\nNext: create_study.\n{\n \"request\": \"will this plate break if I stand on it?\",\n \"goals\": [{\"id\": \"strength\", \"goal\": \"find out whether it is strong enough (Static Stress)\"}],\n \"workspaces\": [{\"workspace\": \"simulation\", \"title\": \"SIMULATION\", \"tab\": null}],\n \"route\": [\n  {\n   \"step\": 1,\n   \"tool\": \"create_study\",\n   \"why\": \"a Static Stress study of the design\",\n   \"where\": \"SIMULATION > SETUP > STUDY > New Simulation Study (Static Stress)\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 2,\n   \"tool\": \"set_study_material\",\n   \"why\": \"the material the part is made of (its stiffness and yield strength set the safety factor)\",\n   \"where\": \"SIMULATION > SETUP > MATERIALS > Study Materials\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 3,\n   \"tool\": \"add_constraint\",\n   \"why\": \"fixed where it is held or bolted\",\n   \"args\": {\"kind\": \"fixed\"},\n   \"where\": \"SIMULATION > SETUP > CONSTRAINTS > Structural Constraints\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 4,\n   \"tool\": \"add_load\",\n   \"why\": \"the force or pressure, where and in which direction\",\n   \"where\": \"SIMULATION > SETUP > LOADS > Structural Loads\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 5,\n   \"tool\": \"precheck_study\",\n   \"why\": \"everything the solve needs, before the long part\",\n   \"where\": \"SIMULATION > SETUP > SOLVE > Pre-check\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 6,\n   \"tool\": \"solve_study\",\n   \"why\": \"mesh and solve (CalculiX); the window waits meanwhile\",\n   \"where\": \"SIMULATION > SETUP > SOLVE > Solve\",\n   \"seconds\": 6.8,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 7,\n   \"tool\": \"study_results\",\n   \"why\": \"safety factor, stress and displacement with where they are\",\n   \"where\": \"SIMULATION > RESULTS (legend, Show Min / Max, Reaction Force, Results Details)\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 8,\n   \"tool\": \"study_probe\",\n   \"why\": \"the numbers at the places that matter (a hole's edge, a face)\",\n   \"when\": \"when the person asks about a place\",\n   \"where\": \"SIMULATION > RESULTS > INSPECT > Surface Probes / Point Probes / Slice Plane\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  }\n ],\n \"ask_first\": [\n  {\"id\": \"material\", \"question\": \"Which material?\", \"default\": \"aluminium 6061\"},\n  {\n   \"id\": \"fixed_where\",\n   \"question\": \"Where is it held or bolted down (which faces or holes do not move)?\",\n   \"default\": \"the mounting holes or the face it is bolted to\"\n  },\n  {\n   \"id\": \"load\",\n   \"question\": \"What load must it carry: how much (N, or a mass in kg), where and in which direction?\"\n  },\n  {\"id\": \"safety\", \"question\": \"What safety factor is enough?\", \"default\": \"2\"}\n ],\n \"cost\": {\n  \"seconds\": 8.6,\n  \"about\": \"about 9 s\",\n  \"slow_steps\": [{\"tool\": \"solve_study\", \"seconds\": 6.8, \"about\": \"about 7 s\"}]\n },\n \"avoid\": [\n  \"Every tool works from any workspace: do not switch workspaces to use a tool (show_workspace only shows the person where you work).\"\n ],\n \"notes\": [\n  \"Fission 180 has Static Stress studies (linear, small deformation): no modal, thermal, buckling or drop tests.\"\n ],\n \"next\": {\"tool\": \"create_study\", \"args\": {}},\n \"design\": {\n  \"open\": true,\n  \"name\": \"Example\",\n  \"units\": \"mm\",\n  \"workspace\": null,\n  \"meshes\": [],\n  \"solids\": [\n   {\n    \"id\": \"Body\",\n    \"label\": \"Body1\",\n    \"faces\": 6,\n    \"steps\": 1,\n    \"base\": \"features\",\n    \"sheet_metal\": false,\n    \"thin\": false\n   }\n  ]\n }\n}",
+   "is_error": false
+  }
+ },
+ "ask_person#1": {
+  "setup": "none",
+  "setup_calls": [],
+  "args": {
+   "message": "Before I convert the mesh:",
+   "questions": [
+    {
+     "question": "A solid you can cut and print, or an editable timeline?",
+     "choices": [
+      "a solid",
+      "an editable timeline"
+     ],
+     "default": "a solid"
+    }
+   ]
+  },
+  "note": "where the app cannot show a form, the answer says to ask in the reply",
+  "answer": {
+   "text": "This AI app cannot show questions from Fission 180 itself (MCP elicitation is off or not supported here): ask the questions in your reply, all in one message with their defaults, and wait for the answer.",
+   "is_error": false
+  }
+ },
+ "list_tools#2": {
+  "setup": "none",
+  "setup_calls": [],
+  "args": {
+   "goal": "make it hollow"
+  },
+  "note": "the tools for a goal in plain words, best first",
+  "answer": {
+   "text": "The tools for 'make it hollow', best first: shell. Every tool works from any workspace.\n{\n \"tools\": [\n  {\n   \"name\": \"shell\",\n   \"title\": \"Shell\",\n   \"category\": \"modify\",\n   \"ribbon\": \"SOLID > MODIFY > Shell\",\n   \"read_only\": false,\n   \"workspace\": \"design\",\n   \"purpose\": \"Hollow the current body out with a wall thickness (Fission 180's Shell).\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 1\n}",
+   "is_error": false
+  }
+ },
+ "show_workspace#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "workspace": "design",
+   "tab": "mesh"
+  },
+  "note": "the MESH tab of the DESIGN workspace (needs the Fission 180 window)",
+  "answer": {
+   "text": "The window shows DESIGN (MESH tab) now (it showed DESIGN (SOLID tab)). Every tool works from any workspace: this only changes what the person sees.\n{\n \"workspace\": {\"workspace\": \"design\", \"tab\": \"mesh\"},\n \"was\": {\"workspace\": \"design\", \"tab\": \"solid\"}\n}",
+   "is_error": false
+  }
+ },
  "study_probe#1": {
   "setup": "sim_solved",
   "setup_calls": [
@@ -12187,6 +12395,2811 @@
   "note": "STEP, STL, 3MF, OBJ and a README in one folder",
   "answer": {
    "text": "Exported 5 files to /home/me/fission180/plate-export (3mf, obj, readme, step, stl); no picture (needs the window).\n{\n \"folder\": \"/home/me/fission180/plate-export\",\n \"files\": {\n  \"step\": {\"file\": \"/home/me/fission180/plate-export/Example.step\", \"bytes\": 6805},\n  \"stl\": {\"file\": \"/home/me/fission180/plate-export/Example.stl\", \"bytes\": 684},\n  \"3mf\": {\"file\": \"/home/me/fission180/plate-export/Example.3mf\", \"bytes\": 1116},\n  \"obj\": {\"file\": \"/home/me/fission180/plate-export/Example.obj\", \"bytes\": 873},\n  \"readme\": {\"file\": \"/home/me/fission180/plate-export/README.txt\", \"bytes\": 601}\n },\n \"bodies\": [\"Body1\"],\n \"leaves_out\": {\n  \"step\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"stl\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"3mf\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"obj\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"]\n },\n \"seconds\": 0.1\n}",
+   "is_error": false
+  }
+ },
+ "edit_drawing_view#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "view": "BaseView",
+   "scale": 1,
+   "style": "Visible Edges"
+  },
+  "note": "the base view at 1:1 without hidden edges (its projected views follow)",
+  "answer": {
+   "text": "Done: BaseView 'Base View' (id 'BaseView') at [265, 216.5], 60 x 10 mm on the sheet, scale 1:1.",
+   "is_error": false
+  }
+ },
+ "modify_drawing#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "move",
+   "items": [
+    "BaseView"
+   ],
+   "by": [
+    -10,
+    5
+   ]
+  },
+  "note": "the base view 10 mm left and 5 mm up; its projected views stay lined up",
+  "answer": {
+   "text": "Done: BaseView at [255, 221.5], turned 0°.",
+   "is_error": false
+  }
+ },
+ "edit_title_block#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "values": {
+    "Description": "Plate with a hole",
+    "Revision": "A"
+   }
+  },
+  "note": "a description and a revision in the title block",
+  "answer": {
+   "text": "Done: title block of Example Drawing: Description 'Plate with a hole', Revision 'A'.",
+   "is_error": false
+  }
+ },
+ "drawing_sheet#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "action": "add"
+  },
+  "note": "a second sheet",
+  "answer": {
+   "text": "Done: sheet 'Sheet 2' (id 'Drawing001') added. Sheets: 1. Sheet 1 (id 'Drawing'); 2. Sheet 2 (id 'Drawing001').",
+   "is_error": false
+  }
+ },
+ "edit_drawing_dimension#1": {
+  "setup": "drawing_dims",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   },
+   {
+    "tool": "add_drawing_dimension",
+    "args": {
+     "view": "ProjectedView",
+     "picks": [
+      {
+       "kind": "circle",
+       "radius": 4
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "dimensions": [
+    "Dimension"
+   ],
+   "tolerance": "fit",
+   "fit": "H7"
+  },
+  "note": "the hole's diameter with its ISO fit class",
+  "answer": {
+   "text": "Done: Diameter 'Dimension': 8 (written '⌀8 H7').",
+   "is_error": false
+  }
+ },
+ "add_drawing_geometry#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "center_mark",
+   "view": "ProjectedView",
+   "picks": [
+    {
+     "kind": "circle",
+     "radius": 4
+    }
+   ]
+  },
+  "note": "a centre mark on the hole, seen from above",
+  "answer": {
+   "text": "Done: 1 centre marks on Top View: circle R4 at (0, 0).",
+   "is_error": false
+  }
+ },
+ "add_drawing_symbol#1": {
+  "setup": "drawing",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front",
+     "projected": [
+      "Top",
+      "Right"
+     ]
+    }
+   }
+  ],
+  "args": {
+   "kind": "datum_identifier",
+   "view": "BaseView",
+   "pick": {
+    "kind": "line",
+    "near": [
+     0,
+     -5
+    ]
+   }
+  },
+  "note": "datum A on the plate's bottom edge",
+  "answer": {
+   "text": "Done: datum identifier 'Annotation' on Base View (line (-30, -5)-(30, -5)): A.",
+   "is_error": false
+  }
+ },
+ "edit_balloons#1": {
+  "setup": "drawing_parts",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -30,
+        -30,
+        30,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Wheel"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "create_drawing",
+    "args": {
+     "base_view": "Front"
+    }
+   },
+   {
+    "tool": "add_drawing_annotation",
+    "args": {
+     "kind": "parts_list",
+     "view": "BaseView"
+    }
+   }
+  ],
+  "args": {
+   "kind": "renumber",
+   "balloon": "2",
+   "to": 1
+  },
+  "note": "the wheel becomes item 1 (the base takes 2)",
+  "answer": {
+   "text": "Done: item 2 is now 1. Parts list: 1 Wheel, 2 Base.",
+   "is_error": false
+  }
+ },
+ "as_built_joint#1": {
+  "setup": "asm_arm",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   }
+  ],
+  "args": {
+   "type": "revolute",
+   "components": [
+    "Arm",
+    "Base"
+   ],
+   "position": {
+    "component": "Arm",
+    "edge": {
+     "type": "circle",
+     "radius": 3,
+     "at": {
+      "axis": "z",
+      "value": "max"
+     },
+     "count": 1
+    },
+    "snap": "circle"
+   }
+  },
+  "note": "the arm turns on the base about its round hole, where it stands",
+  "answer": {
+   "text": "Done: as-built revolute joint between Arm and Base, where they stand. Its id is 'Joint'. Its origin is at [0, 0, 15]. It holds. Next: drive_joint Joint to move it. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "joint_origin#1": {
+  "setup": "asm_arm",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   }
+  ],
+  "args": {
+   "at": {
+    "component": "Stop",
+    "face": {
+     "normal": [
+      0,
+      0,
+      1
+     ],
+     "at": {
+      "axis": "z",
+      "value": "max"
+     },
+     "count": 1
+    }
+   },
+   "offset": [
+    0,
+    0,
+    5
+   ]
+  },
+  "note": "a joint origin 5 mm above the middle of the stop's top face",
+  "answer": {
+   "text": "Done: joint origin 'Joint Origin 1' on Stop at [25, -15, 20], its Z along [0, 0, 1]. Its id is 'JointOrigin'; use it in joint or as_built_joint as {\"component\": \"Component002\", \"joint_origin\": \"JointOrigin\"}. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "rigid_group#1": {
+  "setup": "asm_hinged",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "components": [
+    "Arm",
+    "Stop"
+   ]
+  },
+  "note": "the stop now turns with the arm",
+  "answer": {
+   "text": "Done: rigid group 'Rigid Group 1' (id 'RigidGroup') locks Arm, Stop together where they stand; they now move as one. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "motion_link#1": {
+  "setup": "asm_slider",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Slide"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        60,
+        -30,
+        70,
+        -20
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch4",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "slider",
+     "components": [
+      "Slide",
+      "Base"
+     ],
+     "position": {
+      "component": "Slide",
+      "edge": {
+       "type": "line",
+       "parallel": [
+        1,
+        0,
+        0
+       ],
+       "at": [
+        {
+         "axis": "y",
+         "value": "min"
+        },
+        {
+         "axis": "z",
+         "value": "max"
+        }
+       ],
+       "count": 1
+      },
+      "snap": "midpoint"
+     }
+    }
+   }
+  ],
+  "args": {
+   "joints": [
+    "Joint",
+    "Joint001"
+   ],
+   "values": [
+    360,
+    36
+   ]
+  },
+  "note": "a turn of the arm slides the block 36 mm",
+  "answer": {
+   "text": "Done: motion link 'Motion Link 1' (id 'MotionLink'): when Revolute 1 moves 1 degree (angle), Slider 1 moves 0.1 mm (slide). Next: drive_joint Joint and check that Joint001 follows. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm; Body004: 1000 mm3, 10 x 10 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "contact#1": {
+  "setup": "asm_hinged",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "mode": "sets",
+   "new_set": [
+    "Arm",
+    "Stop"
+   ]
+  },
+  "note": "the arm stops where it hits the stop",
+  "answer": {
+   "text": "Done: contact is on for contact sets (the components of a set stop where they touch). New contact set 'Contact Set 1' (id 'ContactSet'). Contact sets: Contact Set 1 (id ContactSet): Arm, Stop. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "position#1": {
+  "setup": "asm_moved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   },
+   {
+    "tool": "drive_joint",
+    "args": {
+     "joint": "Joint",
+     "angle": 20
+    }
+   }
+  ],
+  "args": {
+   "action": "capture"
+  },
+  "note": "keep the arm turned 20 degrees as the assembly's position",
+  "answer": {
+   "text": "Done: captured the positions as 'Position 1' (id 'Position') in the timeline. Components: Base at [0, 0, 0]; Arm at [0, 0, 0]; Stop at [0, 0, 0]. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "duplicate_with_joints#1": {
+  "setup": "asm_pin",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Pin"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch4",
+     "distance": 8
+    }
+   },
+   {
+    "tool": "joint",
+    "args": {
+     "type": "rigid",
+     "first": {
+      "component": "Pin",
+      "face": {
+       "normal": [
+        0,
+        0,
+        -1
+       ],
+       "count": 1
+      },
+      "snap": "centre"
+     },
+     "second": {
+      "component": "Base",
+      "edge": {
+       "type": "circle",
+       "at": [
+        {
+         "axis": "x",
+         "value": 80
+        },
+        {
+         "axis": "y",
+         "value": 30
+        },
+        {
+         "axis": "z",
+         "value": "max"
+        }
+       ],
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "components": [
+    "Pin"
+   ],
+   "at": [
+    {
+     "component": "Base",
+     "edge": {
+      "type": "circle",
+      "at": [
+       {
+        "axis": "x",
+        "value": 80
+       },
+       {
+        "axis": "y",
+        "value": -30
+       },
+       {
+        "axis": "z",
+        "value": "max"
+       }
+      ],
+      "count": 1
+     },
+     "snap": "circle"
+    }
+   ]
+  },
+  "note": "a second pin in the other hole, joined like the first",
+  "answer": {
+   "text": "Done: 1 duplicate of Pin joined like Rigid 1: Pin:2 (id Component004) at [0, -60, 0]. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm; Body004: 100.531 mm3, 4 x 4 x 8 mm; Body005: 100.531 mm3, 4 x 4 x 8 mm.",
+   "is_error": false
+  }
+ },
+ "motion_study#1": {
+  "setup": "asm_hinged",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "joints": [
+    "Joint"
+   ],
+   "keys": [
+    {
+     "joint": "Joint",
+     "step": 0,
+     "value": 0
+    },
+    {
+     "joint": "Joint",
+     "step": 100,
+     "value": 90
+    }
+   ],
+   "report": [
+    0,
+    50,
+    100
+   ]
+  },
+  "note": "the arm swung from 0 to 90 degrees, where things stand half way",
+  "answer": {
+   "text": "Done: motion study 'Motion Study 1' (id 'MotionStudy') with 1 joint; the assembly is back as it was.\n{\n \"study\": \"MotionStudy\",\n \"label\": \"Motion Study 1\",\n \"mode\": \"once\",\n \"note\": \"joints: [angle (degrees), slide (mm)] at each step; components: where each one's origin stands (mm)\",\n \"at_steps\": [\n  {\n   \"step\": 0.0,\n   \"joints\": {\"Joint\": [0.0, 0.0]},\n   \"components\": {\"Base\": [0.0, 0.0, 0.0], \"Arm\": [0.0, 0.0, 0.0], \"Stop\": [0.0, 0.0, 0.0]},\n   \"solved\": true\n  },\n  {\n   \"step\": 50.0,\n   \"joints\": {\"Joint\": [45.0, 0.0]},\n   \"components\": {\"Base\": [0.0, 0.0, 0.0], \"Arm\": [0.0, 0.0, 0.0], \"Stop\": [0.0, 0.0, 0.0]},\n   \"solved\": true\n  },\n  {\n   \"step\": 100.0,\n   \"joints\": {\"Joint\": [90.0, 0.0]},\n   \"components\": {\"Base\": [0.0, 0.0, 0.0], \"Arm\": [0.0, 0.0, 0.0], \"Stop\": [0.0, 0.0, 0.0]},\n   \"solved\": true\n  }\n ]\n}",
+   "is_error": false
+  }
+ },
+ "component_colors#1": {
+  "setup": "components",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -30,
+        -30,
+        30,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Wheel"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   }
+  ],
+  "args": {},
+  "note": "each component's colour",
+  "answer": {
+   "text": "Display Component Colors is off in the window; each component's colour:\n{\n \"display_component_colors\": \"off\",\n \"swatch\": false,\n \"colors\": [\n  {\"component\": \"(the design)\", \"color\": \"#5c9eeb\"},\n  {\"component\": \"Base\", \"id\": \"Component\", \"color\": \"#f29e40\"},\n  {\"component\": \"Wheel\", \"id\": \"Component001\", \"color\": \"#6bc773\"}\n ]\n}",
+   "is_error": false
+  }
+ },
+ "decal#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "image": "{tmp}/label.png",
+   "face": {
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "max"
+    },
+    "count": 1
+   },
+   "width": 30
+  },
+  "note": "an 80 x 40 pixel label, 30 mm wide, on the plate's top",
+  "answer": {
+   "text": "Done: decal 'label' (id 'Decal'), 80 x 40 pixels, 30 x 15 mm on the flat face Face6 of Body1, its middle at [30, 20, 10]; it covers 450 mm2. Only the look changed (no geometry). Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "canvas#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "image": "{tmp}/photo.png",
+   "plane": "XZ",
+   "width": 100,
+   "opacity": 40
+  },
+  "note": "a reference picture 100 mm wide on the XZ plane",
+  "answer": {
+   "text": "Done: canvas 'photo' (id 'Canvas'), 80 x 40 pixels shown 100 x 50 mm on XZ-plane, centred at [0, 0, 0], facing [0, -1, 0], 40 % opaque. It is not part of the model; sketch over it with create_sketch on the same plane.",
+   "is_error": false
+  }
+ },
+ "insert_svg#1": {
+  "setup": "empty",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   }
+  ],
+  "args": {
+   "path": "{tmp}/logo.svg",
+   "plane": "XY",
+   "name": "Logo"
+  },
+  "note": "an SVG's rectangle and circle in a new sketch on XY",
+  "answer": {
+   "text": "Done: 5 curves of logo.svg in the sketch 'Logo' (id 'Sketch'), fixed in place, 30 x 20 mm (sketch x -15 .. 15, y -10 .. 10); 2 closed areas. Next: extrude with profile Sketch (or emboss). No solid body yet.",
+   "is_error": false
+  }
+ },
+ "derive#1": {
+  "setup": "master_saved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "set_parameter",
+    "args": {
+     "name": "width",
+     "value": 40
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "box",
+     "length": 40,
+     "width": 30,
+     "height": 20
+    }
+   },
+   {
+    "tool": "rename",
+    "args": {
+     "target": "Body1",
+     "name": "Housing"
+    }
+   },
+   {
+    "tool": "save_as",
+    "args": {
+     "path": "{tmp}/master.FCStd"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Child"
+    }
+   },
+   {
+    "tool": "save_as",
+    "args": {
+     "path": "{tmp}/child.FCStd"
+    }
+   }
+  ],
+  "args": {
+   "source": "{tmp}/master.FCStd",
+   "items": [
+    "Housing",
+    "width"
+   ]
+  },
+  "note": "the master's body and parameter into the child design, linked",
+  "answer": {
+   "text": "Done: derived 1 body and 1 parameter from master into child as 'Derive' (id 'Derive'), linked: it updates when master is saved again. Made: Housing (id Body001, 24000 mm3); width. Bodies now: Housing: 24000 mm3, 40 x 30 x 20 mm.",
+   "is_error": false
+  }
+ },
+ "coordinate_system#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "origin": [
+    60,
+    0,
+    0
+   ],
+   "z_axis": [
+    1,
+    0,
+    0
+   ],
+   "name": "End frame"
+  },
+  "note": "a frame on the plate's end whose Z points along X",
+  "answer": {
+   "text": "Done: user coordinate system 'End frame' (id 'CoordinateSystem') in Body1: origin [60, 0, 0], X [0, 1, 0], Y [0, 0, 1], Z [1, 0, 0]. Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "base_feature#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "action": "start"
+  },
+  "note": "direct edits from here on",
+  "answer": {
+   "text": "Done: a base feature is open. What the next tools make goes into one base feature per body, not step by step; base_feature finish ends it.",
+   "is_error": false
+  }
+ },
+ "compute_all#1": {
+  "setup": "plate_hole",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   }
+  ],
+  "args": {},
+  "note": "everything computed again",
+  "answer": {
+   "text": "Compute All: 4 steps in 0.0 s, all computed. Bodies now: Body1: 23497.3 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "analysis#1": {
+  "setup": "plate_hole",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   }
+  ],
+  "args": {
+   "kind": "draft",
+   "direction": "Z",
+   "draft_min": 1
+  },
+  "note": "the faces without draft for a mould opening along Z",
+  "answer": {
+   "text": "Draft along [0, 0, 1]: 5 faces under 1 degree(s) (no draft), 0 between 1 and 3 degrees. Next: draft with those faces (refs) and the pull direction.\n{\n \"pull\": [0.0, 0.0, 1.0],\n \"draft_min_deg\": 1.0,\n \"draft_ok_deg\": 3.0,\n \"classes\": {\n  \"along\": \"draft >= draft_ok along the pull (green)\",\n  \"against\": \"draft >= draft_ok against the pull: the other mould half (blue)\",\n  \"under_min\": \"|draft| < draft_min: no draft, will not release (red)\",\n  \"between\": \"draft_min <= |draft| < draft_ok (yellow)\"\n },\n \"bodies\": [\n  {\n   \"body\": \"Body\",\n   \"label\": \"Body1\",\n   \"faces_by_worst_class\": {\"along\": 1, \"against\": 1, \"under_min\": 5, \"between\": 0},\n   \"area_mm2_by_class\": {\"along\": 2349.735, \"against\": 2349.735, \"under_min\": 2251.327, \"between\": 0.0},\n   \"flagged_faces\": [\n    {\n     \"face\": \"Face1\",\n     \"type\": \"plane\",\n     \"area_mm2\": 600.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [0.0, -1.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face6\",\n     \"type\": \"plane\",\n     \"area_mm2\": 600.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [0.0, 1.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face2\",\n     \"type\": \"plane\",\n     \"area_mm2\": 400.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [-1.0, 0.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face3\",\n     \"type\": \"plane\",\n     \"area_mm2\": 400.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [1.0, 0.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face7\",\n     \"type\": \"cylinder\",\n     \"area_mm2\": 251.327,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"cylinder\", \"radius\": 4.0, \"count\": 1, \"body\": \"Body\"}\n    }\n   ],\n   \"more\": 0\n  }\n ],\n \"kind\": \"draft\",\n \"seconds\": 0.015\n}",
+   "is_error": false
+  }
+ },
+ "sketch_draw#1": {
+  "setup": "sketch",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch1",
+   "kind": "conic",
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     40,
+     0
+    ],
+    [
+     20,
+     30
+    ]
+   ],
+   "rho": 0.4
+  },
+  "note": "a conic curve from (0, 0) to (40, 0) pulled towards (20, 30)",
+  "answer": {
+   "text": "Done: AI: Conic Curve. New curves 4 to 11 in Sketch1 (0 constraints from the values given). No solid body yet.",
+   "is_error": false
+  }
+ },
+ "sketch_modify#1": {
+  "setup": "sketch",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch1",
+   "kind": "fillet",
+   "points": [
+    [
+     0,
+     0
+    ]
+   ],
+   "radius": 5
+  },
+  "note": "a 5 mm round at the rectangle's corner",
+  "answer": {
+   "text": "Done: AI: Sketch Fillet: fillet arcs [4], radius 5 mm. New curves 4 to 5 in Sketch1. No solid body yet.",
+   "is_error": false
+  }
+ },
+ "sketch_pattern#1": {
+  "setup": "sketch_circle",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_curve_sketch",
+    "args": {
+     "plane": "XY",
+     "curves": [
+      {
+       "circle": [
+        10,
+        0,
+        2
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch1",
+   "kind": "circular",
+   "curves": [
+    0
+   ],
+   "center": {
+    "curve": -1,
+    "point": "start"
+   },
+   "quantity": 6
+  },
+  "note": "six circles round the origin",
+  "answer": {
+   "text": "Done: AI: Sketch Circular Pattern. New curves 1 to 11 in Sketch1. No solid body yet.",
+   "is_error": false
+  }
+ },
+ "sketch_project#1": {
+  "setup": "plate_sketch_above",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_curve_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "curves": [
+      {
+       "point": [
+        0,
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch2",
+   "kind": "project",
+   "faces": {
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "max"
+    },
+    "count": 1
+   }
+  },
+  "note": "the plate's top outline into the sketch above it",
+  "answer": {
+   "text": "Done: AI: Project: 4 curves into Sketch2. Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.",
    "is_error": false
   }
  }

@@ -20,6 +20,7 @@ The tools themselves are listed in the catalogue (fission180/ai/catalog). Safety
 
 import base64
 import http.server
+import json
 import os
 import queue
 import tempfile
@@ -31,7 +32,7 @@ import FreeCADGui as Gui
 
 from .. import commands, log, warn
 from ..compat import QtCore, QtWidgets
-from . import bridge_core, catalog, executor
+from . import bridge_core, catalog, executor, progress
 
 OPTION = ("User parameter:BaseApp/Preferences/Mod/Fission180/AI", "AllowControl")
 WAIT = 115.0  # seconds a call waits for Fission 180 (the MCP server waits 120)
@@ -45,7 +46,9 @@ _state = {
     "jobs": queue.Queue(),
     "consent": None,  # None: not asked this session; True / False: the person's answer
     "running": False,  # a call is being worked on (the questions open nested event loops)
-    "current": None,  # (tool, time.time() it started) of the call being worked on
+    "current": None,  # (tool, time.time() it started, call_id) of the call being worked on
+    "queued": {},  # call_id -> job while it waits (a /stop of a call not started yet drops it)
+    "serial": 0,
     "activity": [],  # (time, tool, text, is_error)
     "last_used": None,
     "listeners": [],  # functions called after every call (the activity panel, Home)
@@ -116,35 +119,58 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if status != 200:
                 self._send(status, bridge_core.error_result(reason))
                 return
+            path = self.path.split("?", 1)[0]
+            body = self.rfile.read(length)
+            if path == bridge_core.STATUS_PATH:
+                self._send_json(200, _status())  # (this thread: never behind the call)
+                return
+            if path == bridge_core.STOP_PATH:
+                try:
+                    call_id, why = bridge_core.decode_stop(body)
+                except bridge_core.BridgeError as exc:
+                    self._send(400, bridge_core.error_result(str(exc)))
+                    return
+                self._send_json(200, _stop(call_id, why))
+                return
             try:
-                tool, args = bridge_core.decode_request(self.rfile.read(length))
+                tool, args, call_id = bridge_core.decode_call(body)
             except bridge_core.BridgeError as exc:
                 self._send(400, bridge_core.error_result(str(exc)))
                 return
             current = _state["current"]
             if current is not None and time.time() - current[1] > bridge_core.BUSY_AFTER:
                 # (one call at a time on the window's thread: a long one is not queued behind)
+                live = progress.current() or {}
+                doing = progress.doing_words(live.get("what"), live.get("done"), live.get("total"))
                 self._send(
                     200,
                     bridge_core.error_result(
-                        bridge_core.busy_text(tool, current[0], time.time() - current[1])
+                        bridge_core.busy_text(tool, current[0], time.time() - current[1], doing)
                     ),
                 )
                 return
+            with _LOCK:
+                _state["serial"] += 1
+                call_id = call_id or "bridge-%d" % _state["serial"]
             job = {
                 "tool": tool,
                 "args": args,
+                "call_id": call_id,
                 "done": threading.Event(),
                 "answer": None,
                 "state": "queued",  # -> running -> done, or -> dropped (nobody waits any more)
                 "lock": threading.Lock(),
             }
+            with _LOCK:
+                _state["queued"][call_id] = job
             _state["jobs"].put(job)
             if not job["done"].wait(WAIT):
                 with job["lock"]:
                     dropped = job["state"] == "queued"
                     if dropped:
                         job["state"] = "dropped"
+                with _LOCK:
+                    _state["queued"].pop(call_id, None)
                 if dropped:  # (never started: it is not run later, when nobody waits for it)
                     current = _state["current"]  # (no log here: not the window's thread)
                     self._send(
@@ -163,7 +189,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     "Fission 180 is still working on %s (or waiting for the person to answer a "
                     "question in Fission 180). Check Fission 180 before trying again." % tool
                 )
-                if not catalog.is_read_only(tool):  # (honest: it may still happen)
+                if catalog.is_read_only(tool):
+                    # (its answer is lost: working on only keeps the window busy for nothing)
+                    if progress.request_stop(
+                        "nobody waits for its answer any more", call_id, only_read_only=True
+                    ):
+                        text += " It stops at its next safe point: nobody waits for it."
+                else:  # (honest: it may still happen)
                     text += (
                         " The change may or may not be applied when it finishes: inspect the "
                         "design (get_design, get_timeline) before repeating it."
@@ -173,6 +205,44 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._send(200, job["answer"])
         except Exception:
             pass  # (the connection went away: nothing to answer)
+
+    def _send_json(self, status, data):
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+_LOCK = threading.Lock()
+
+
+def _status():
+    """The /status answer: what the call running now is doing (the bridge's own thread)."""
+    live = progress.current()
+    return bridge_core.status_answer(live, progress.line(live))
+
+
+def _stop(call_id, why):
+    """The AI app cancelled the call `call_id` (fission180_mcp.py: notifications/cancelled).
+    Not started yet: it is not run. Running and read-only: it stops at its next safe point.
+    Running and changing the design: it is left to finish (stopping it would only make the AI
+    start it all again, and its result is there when the AI looks; the person can press Stop).
+    The bridge's own thread."""
+    with _LOCK:
+        job = _state["queued"].pop(call_id, None)
+    if job is not None:
+        with job["lock"]:
+            if job["state"] == "queued":
+                job["state"] = "dropped"
+                _answer(job, bridge_core.error_result("Not done: %s before it started." % why))
+                return {"stopped": True, "running": False}
+    live = progress.current()
+    if live is None or live.get("call_id") != call_id:
+        return {"stopped": False, "running": False}
+    stopped = progress.request_stop(why, call_id, only_read_only=True)
+    return {"stopped": bool(stopped), "running": True, "read_only": bool(live.get("read_only"))}
 
 
 def _ignore_broken_pipes():
@@ -257,11 +327,13 @@ def _pump():
                 job["state"] = "running"
                 break
         log("AI bridge: %s not run: the AI app stopped waiting for it" % job["tool"])
+    with _LOCK:
+        _state["queued"].pop(job.get("call_id"), None)
     _state["running"] = True
-    _state["current"] = (job["tool"], time.time())
+    _state["current"] = (job["tool"], time.time(), job.get("call_id"))
     try:
-        answer = call(job["tool"], job["args"])
-    except Exception as exc:
+        answer = call(job["tool"], job["args"], call_id=job.get("call_id"))
+    except BaseException as exc:  # (never one up into Qt's timer; executor.run answers a stop)
         warn("AI bridge: %s: %s" % (job["tool"], exc))
         answer = bridge_core.error_result("Fission 180 could not do %s: %s" % (job["tool"], exc))
     finally:
@@ -303,9 +375,21 @@ def _busy():
     return ""
 
 
-def call(tool, args, from_chat=False):
+def call(tool, args, from_chat=False, call_id=None):
     """One tool call: a result dict (bridge_core.result). from_chat: from Fission 180's own chat
-    panel, where the person is the one asking (no "Allow this AI app?" question)."""
+    panel, where the person is the one asking (no "Allow this AI app?" question). call_id: the
+    AI app's id for it (a cancel names it). A call that comes while another one runs (from a
+    question box's own loop) is refused: one call at a time."""
+    if progress.working():
+        live = progress.current() or {}
+        return bridge_core.error_result(
+            bridge_core.busy_text(
+                tool,
+                live.get("tool", "another call"),
+                live.get("seconds", 0),
+                progress.doing_words(live.get("what"), live.get("done"), live.get("total")),
+            )
+        )
     problems = catalog.validate(tool, args)
     if problems:
         return bridge_core.error_result("Not done: " + "; ".join(problems) + ".")
@@ -329,7 +413,7 @@ def call(tool, args, from_chat=False):
         reason = _busy()
         if reason:
             return _record(tool, bridge_core.error_result(reason))
-    answer = executor.run(tool, args, host())
+    answer = executor.run(tool, args, host(), call_id)
     return _record(tool, answer)
 
 

@@ -13,7 +13,7 @@ the design with either, or with the solid as it was after a step."""
 import base64
 import time
 
-from .. import bridge_core, geometry_facts
+from .. import bridge_core, geometry_facts, progress
 from ..executor import UserError, json_result
 from . import action
 
@@ -40,26 +40,16 @@ def _bbox(box):
 
 
 def _shape_counts(shape):
-    return {
-        "solids": len(shape.Solids),
-        "shells": len(shape.Shells),
-        "faces": len(shape.Faces),
-        "edges": len(shape.Edges),
-        "vertices": len(shape.Vertexes),
-    }
+    return geometry_facts.counts(shape)
 
 
-def _centre(shape):
-    from ... import analysis
-
-    try:
-        centre, _volume = analysis.center_of_mass([shape])
-        return [_r(v) for v in centre]
-    except Exception:
-        try:
-            return [_r(v) for v in shape.CenterOfMass]
-        except Exception:
-            return None
+def _centre(shape, place=None):
+    centre = geometry_facts.centre_of_mass(shape)
+    if centre is None:
+        return None
+    if place is not None:
+        centre = place.multVec(centre)
+    return [_r(v) for v in centre]
 
 
 def _chosen(ctx, args, doc):
@@ -81,39 +71,47 @@ def _global(body):
         return None
 
 
-def _numbers(shape, row):
-    """Put the shape's counts, volume, area and size in row; False when it is empty."""
+def _placed(body):
+    """(the body's own solid, the placement of the component it sits in or None): what
+    _global would give, without the moved copy (wave 8, ai-speed: the numbers of the body's own
+    solid are kept between calls, geometry_facts.shape_facts; a moved copy is new each time).
+    (None, None) when it has no shape."""
+    try:
+        shape = body.Shape
+        if shape.isNull():
+            return None, None
+        parent = body.getParentGeoFeatureGroup()
+        place = parent.getGlobalPlacement() if parent is not None else None
+        return shape, (None if place is None or place.isIdentity() else place)
+    except Exception:
+        return None, None
+
+
+def _numbers(shape, row, place=None):
+    """Put the shape's counts, volume, area and size in row; False when it is empty. place:
+    where the shape is (the component's placement: the size is measured there)."""
     if shape is None or shape.isNull():
         row.update(solid=False, empty=True)
         return False
     row.update(_shape_counts(shape))
-    row["solid"] = bool(shape.Solids)
+    row["solid"] = row["solids"] > 0
     # a surface body has no volume (FreeCAD's Volume of a lone face is meaningless)
-    row["volume_mm3"] = _r(sum(s.Volume for s in shape.Solids)) if shape.Solids else 0.0
-    row["area_mm2"] = _r(shape.Area)
-    row["bbox_mm"] = _bbox(geometry_facts.tight_box(shape))
+    row["volume_mm3"] = _r(geometry_facts.solid_volume(shape)) if row["solid"] else 0.0
+    row["area_mm2"] = _r(geometry_facts.area(shape))
+    row["bbox_mm"] = _bbox(geometry_facts.placed_box(shape, place))
     return True
 
 
-_VALID = []  # [(shape, valid)]: the latest answers (the shapes kept, so none is reused)
+def forget_caches():
+    """Empty what the read-only tools keep for an unchanged design (the speed benchmark's
+    "cold" calls: the first call after a change)."""
+    geometry_facts.forget()
 
 
 def _valid(shape):
-    """shape.isValid(), remembered for the same solid (a part of 800 faces took 3 s to
-    check, and inspect_design and check_design both ask while nothing changed)."""
-    for kept, valid in _VALID:
-        try:
-            if kept.isSame(shape):
-                return valid
-        except Exception:
-            pass
-    try:
-        valid = bool(shape.isValid())
-    except Exception:
-        valid = False
-    _VALID.insert(0, (shape, valid))
-    del _VALID[8:]
-    return valid
+    """shape.isValid(), kept for the same solid (a part of 1,700 faces took 5 s to check, and
+    inspect_design, check_design and physical_properties all ask while nothing changed)."""
+    return geometry_facts.is_valid(shape)
 
 
 def body_row(body, full=True):
@@ -125,16 +123,17 @@ def body_row(body, full=True):
         row["shown"] = bool(bodies.is_shown(body))
     except Exception:
         pass
-    shape = _global(body)
-    if not _numbers(shape, row) or not full:
+    shape, place = _placed(body)
+    progress.step("measuring %s" % body.Label)
+    if not _numbers(shape, row, place) or not full:
         return row
+    progress.step("checking that %s is a valid solid (OpenCASCADE)" % body.Label)
     row["valid"] = _valid(shape)
-    if shape.Solids:
-        row["center_of_mass_mm"] = _centre(shape)
-        try:
-            row["closed"] = all(s.isClosed() for s in shape.Shells)
-        except Exception:
-            pass
+    if row["solid"]:
+        row["center_of_mass_mm"] = _centre(shape, place)
+        closed = geometry_facts.is_closed(shape)
+        if closed is not None:
+            row["closed"] = closed
     try:
         tip = getattr(body, "Tip", None)
         row["tip"] = tip.Name if tip is not None else None
@@ -145,8 +144,8 @@ def body_row(body, full=True):
 
         label, rho = material.effective(body)
         row["material"] = label
-        if rho and shape.Solids:
-            row["mass_g"] = _r(shape.Volume * rho * 1000.0)
+        if rho and row["solid"]:
+            row["mass_g"] = _r(geometry_facts.volume(shape) * rho * 1000.0)
     except Exception:
         pass
     try:
@@ -255,6 +254,7 @@ def _sketches(doc):
     for obj in doc.Objects:
         if obj.TypeId != "Sketcher::SketchObject":
             continue
+        progress.step("reading sketch %s" % obj.Label)
         row = {"id": obj.Name, "label": obj.Label, "curves": len(obj.Geometry)}
         try:
             row["closed_areas"] = len(extrude.regions(obj))
@@ -335,7 +335,7 @@ def record(doc):
     for body in bodies.list_bodies(doc):
         # the numbers are worked out when a diff needs them (measured): the executor takes
         # a record before every change, and measuring a part of 800 faces took 0.4 s
-        out["bodies"][body.Name] = {"id": body.Name, "label": body.Label, "_shape": _global(body)}
+        out["bodies"][body.Name] = {"id": body.Name, "label": body.Label, "_shape": _placed(body)}
     try:
         values = _values_of(doc)
         for item in timeline_ops.timeline(doc).items:
@@ -384,7 +384,8 @@ def measured(rec):
     """The record with its bodies' numbers worked out (once: kept in the record)."""
     for row in rec["bodies"].values():
         if "_shape" in row:
-            _numbers(row.pop("_shape"), row)
+            shape, place = row.pop("_shape")
+            _numbers(shape, row, place)
     return rec
 
 
@@ -449,6 +450,9 @@ def inspect_design(ctx, args):
     info["parameters"] = _parameters(doc)
     info["sketches"] = _sketches(doc)
     _assembly(doc, info)
+    from .approach_actions import shown_workspace  # (wave 8, ai-behaviour: what the window shows)
+
+    info["workspace"] = shown_workspace(ctx.host, doc)  # (None: no window)
     try:
         info["selection"] = ctx.host.selection(doc)
     except Exception:
@@ -684,6 +688,7 @@ def check_design(ctx, args):
             )
             solid = [b for b in solid if b.Name not in rebuilt]
         if len(solid) >= 2:
+            progress.step("looking for bodies that overlap (%d bodies)" % len(solid))
             try:
                 pairs = analysis.interference([(b.Label, bodies.global_shape(b)) for b in solid])
                 overlap = [{"body1": a, "body2": b, "volume_mm3": _r(v)} for a, b, v, _s in pairs]
@@ -832,6 +837,7 @@ def scene(ctx, doc, marked, edges=True):
     shown = [b for b in bodies.list_bodies(doc) if bodies.is_shown(b)]
     source = marked.get("source")
     for n, body in enumerate(shown):
+        progress.step("drawing %s" % body.Label, n, len(shown))
         try:
             if body.Shape.isNull() or not body.Shape.Faces:
                 continue

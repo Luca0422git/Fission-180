@@ -131,7 +131,7 @@ def _vec(t):
 def strips(solid):
     """The round regions of a faceted solid: [{"faces": [indexes], "axis", "center" (a point
     of the axis), "radius", "rms", "concave", "full", "t0", "t1"}] (cylinders only)."""
-    faces = solid.Faces
+    faces = _faces(solid)
     normals = []
     for f in faces:
         u0, u1, v0, v1 = f.ParameterRange
@@ -194,7 +194,7 @@ def _split_group(solid, group, soft):
     """The round strips of a group of faces met at small angles: a big flat face that runs
     on smoothly from a strip (the side of a plate after its rounded corner) is no part of
     it; without such faces the group falls apart into its strips."""
-    faces = solid.Faces
+    faces = _faces(solid)
     areas = sorted(faces[i].Area for i in group)
     typical = areas[len(areas) // 2]
     small = {i for i in group if faces[i].Area <= 4.0 * typical}
@@ -218,8 +218,21 @@ def _split_group(solid, group, soft):
     return parts
 
 
+_FACES = {}  # (wave 8, ai-speed) "solid": (the solid, its faces)
+
+
+def _faces(solid):
+    """solid.Faces, made once for the solid strips() works on: _split_group and _fit asked
+    for every face of the part for each group (0.05 s each on 3,000 faces, 15 s in all on a
+    Relic-like plate of 88 dots)."""
+    kept = _FACES.get("solid")
+    if kept is None or kept[0] is not solid:
+        kept = _FACES["solid"] = (solid, solid.Faces)
+    return kept[1]
+
+
 def _fit(solid, group, axis, normals):
-    faces = solid.Faces
+    faces = _faces(solid)
     pts = []
     for i in group:
         for v in faces[i].Vertexes:

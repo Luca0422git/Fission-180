@@ -27,6 +27,7 @@ from . import drawing_core as core
 TYPE = "BendTable"
 NOTE_TYPE = "BendNote"
 NOTE_SIZE = 3.5  # mm on the paper, like the drawing's other text
+IDENTIFIER_GAP = 10.0  # mm on the paper at least between two bend identifiers
 COLUMNS = (
     ("Item", "BEND ID", 16.0),
     ("Direction", "DIRECTION", 22.0),
@@ -125,10 +126,18 @@ def add_bend_table(page, view, top_left):
     drawing._add(table, "App::PropertyString", "Fission180Rows", json.dumps(rows))
     balloons = []
     # each identifier just above the flat, over its bend (offsets in the view's own units)
-    top = _half_height(view, fp) + 12.0 / (drawing.scale_of(view) or 1.0)
+    scale = drawing.scale_of(view) or 1.0
+    top = _half_height(view, fp) + 12.0 / scale
     _x, y = drawing.view_position(view)
+    taken = []
     for row, anchor in zip(rows, bend_anchors(view, fp)):
-        spot = (anchor[0], y + top)
+        # (wave 8: two bends with their middles one above the other, a tray's front and
+        # back, put their identifiers on one another: the next one moves aside)
+        sx = anchor[0]
+        while any(abs(sx - other) < IDENTIFIER_GAP / scale for other in taken):
+            sx += IDENTIFIER_GAP / scale
+        taken.append(sx)
+        spot = (sx, y + top)
         balloons.append(drawing.add_balloon(view, anchor, spot, row["Item"]))
     return table, balloons
 
@@ -283,9 +292,10 @@ def _refresh_table(page):
             continue
         ox, oy = anchor[0] - x, anchor[1] - y
         if abs(balloon.OriginX.Value - ox) > 1e-6 or abs(balloon.OriginY.Value - oy) > 1e-6:
+            aside = balloon.X.Value - balloon.OriginX.Value  # (moved aside: add_bend_table)
             balloon.OriginX = ox
             balloon.OriginY = oy
-            balloon.X = ox
+            balloon.X = ox + aside
             changed = True
     return changed
 

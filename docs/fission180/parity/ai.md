@@ -172,6 +172,100 @@ Tests: `test_ai_docs_library.py`, `test_ai_docs_contract.py` (unit); the docs ru
 (`run_tests.sh --only headless / base`); scenario `ai_docs_gui` (the reference examples that
 need the window, the docs tools through the bridge, Save AI handbook... with a real click).
 
+## Wave 8: how the AI decides, asks and works (builder ai-behaviour, 2026-11-13)
+
+Luca (2026-11-13), after Claude first refused to turn an 8,486-triangle mesh ("Relic") into a
+solid and then copied every polygon as features, while MESH > Convert Mesh did it in seconds:
+"it needs to be able to ask the right questions before starting, and it needs to be able to
+make decisions on what tools to use in a responsible and efficient way." Fusion's own AI
+(Autodesk Assistant) is Autodesk's and works inside Fusion; this connector is **beyond
+Fusion**: the decisions are Fission 180's rules, written down and tested.
+
+### Behaviour spec and sources (checked 2026-11-13)
+
+| What | Source | Kind |
+|---|---|---|
+| Autodesk Assistant in Fusion is a panel docked at the right; it answers questions about the design (volume, area), finds and highlights geometry, does batch actions, and in MANUFACTURE creates setups and toolpaths from words | autodesk.com Fusion blog, "April 2026 product update" and "March 2026 product update" (read through search excerpts) | Autodesk |
+| Autodesk tells people to prompt the assistant with "ask me follow-up questions if anything is ambiguous": asking first is advice, not a built-in step | autodesk.com Fusion blog, "Autodesk Assistant in Fusion: a step-by-step guide" | Autodesk |
+| Fusion has an MCP server of its own ("Fusion MCP") for AI apps working in Fusion locally | monoist.itmedia.co.jp, 2026-06-04 | Press |
+| Picking SIMULATION without a study opens New Study | docs/fission180/parity/simulation.md | Autodesk |
+| Claude Code cuts a server's instructions and an upfront tool's description after 4,096 characters; tool search is on by default (only the tool names and the instructions load at the start); `_meta` `anthropic/alwaysLoad` loads a tool upfront | code.claude.com/docs/en/mcp, "Tool search for MCP server authors", "Mark a tool to load upfront" | Anthropic docs |
+| Claude Code shows MCP elicitation (form and URL) in interactive terminal sessions, declares `elicitation: {form, url}` to stdio servers (v2.1.287+), and cancels it in non-interactive sessions | code.claude.com/docs/en/mcp, "Respond to MCP elicitation requests", "Elicitation modes Claude Code declares" | Anthropic docs |
+| Claude Desktop (chat): no official word on elicitation; a feature request was closed in April 2026 without a note; Cowork and the Code tab were reported to cancel elicitation at once (Aug-Sep 2026) | claudeissues.com #41110, #56243, #88901 (user reports) | Forum |
+| Claude Desktop has "Tool access: Load tools when needed"; one report said it loaded about 75,000 tokens of tools for 155 tools anyway | claudeissues.com #41472, #25892 (user reports) | Forum |
+| Gemini CLI's MCP client declares only `roots` (no elicitation) | github.com/google-gemini/gemini-cli, packages/core/src/tools/mcp-client.ts on main, read 2026-11-13 | Source |
+| The plan-first protocol, the questions with defaults, the cost estimate, the repetition note | Fission 180's own rules (Luca's request) | Guess (ours) |
+
+### What Fission 180 does
+
+| What | Fission 180 |
+|---|---|
+| Plan a job | `plan_approach` (read-only, needs nothing open): the person's words and optionally what it is about (`target`, default the selection). It reads the design's facts cheaply (meshes and triangle counts, closed or not; bodies with their faces counted without building a face list, timeline or imported or converted mesh, sheet metal, thin plates; components, joints, studies, setups, storyboards, drawings, flat patterns, a rebuild going on, units, the workspace shown) and answers the goals, the route (tools in order with argument hints, where each is in the ribbon, the seconds it takes here), at most five questions with defaults (never the units or sizes the design has), the cost with `say_first` when it takes minutes, what to avoid, and notes (studies other than Static Stress, turning, photorealistic rendering, `.f3d` are not there). Rules: `fission180/ai/approach_core.py` (pure). |
+| Relic's requests | "make this mesh a solid": `inspect_mesh` -> `mesh_prepare` repair (only if open) -> `convert_mesh` prismatic -> `check_design`, the question "an editable timeline or a solid?", never facet copying. "make it editable": `inspect_mesh` -> (reduce above 10,000 triangles) -> `start_rebuild` on the mesh -> `describe_reference` -> `compare_to_reference` after each feature -> `finish_rebuild`, with the note to offer `convert_mesh` first and to say so plainly when no plan can be read. |
+| Ask the person | `ask_person`: answered by the MCP server itself. Where the AI app declared elicitation (form), the questions become the app's own form (`elicitation/create`, a flat object of text fields, choices as an enum, each default given); the answer, a decline or a cancel comes back in words; a tool call the app cancels stops waiting and cancels the form. Elsewhere (no elicitation, the chat panel, headless) it answers at once: ask in your reply. Never relied on. |
+| Show a workspace | `show_workspace` (needs the window; not an undo step): design (and its tab), simulation (and SETUP / RESULTS; refused without a study: create_study first, as Fusion opens New Study there; RESULTS refused before a solve), manufacture, animation, drawing (the newest or one named), flat_pattern (the design's other workspaces left first). The workspace menu's own code (`enter_workspace` / `leave_workspace`, `drawing_ui.open_drawing`, `flatpattern_ui.enter`); refused while a command dialog is open. `inspect_design` and `get_design` say which workspace and tab are shown (`workspace`, null without the window). Every tool works from any workspace (a body made while SIMULATION shows). |
+| Find a tool | `list_tools` with `goal` (plain words, best first, from a table of goals and the tools' own words), `workspace` or `category`; filtered rows carry the tool's workspace and its purpose (the first sentence of its description). `get_help` topics `approach`, `workspaces`, and `tools` grouped by workspace. |
+| The instructions | MCP `initialize` instructions start with "before you build" (plan_approach, one message of questions, never ask what you can measure, say when it takes minutes), "pick the cheapest tool", the workspaces and how to find tools, then the checking and selector essentials: 3,187 characters, inside Claude Code's 4,096 (unit test); the full rules follow for the apps that read them all. The chat panel's system prompt and the MCP prompts (`plan_job`, new; `model_part` starts with plan_approach) say the same. In Claude Code, `plan_approach`, `ask_person`, `list_tools`, `get_help` and `inspect_design` load upfront (`_meta` alwaysLoad). |
+| The same small step again and again | The MCP server and the chat panel watch the changing calls: eight in a row of at most two kinds of small step (a sketch and an extrude per copy) add a note to the answer naming the faster route (one sketch, a pattern, convert_mesh for a mesh); said again only after sixteen more. A sketch of 150 points or more gets the same note. |
+
+### Measured
+
+- `plan_approach`: 1-35 ms headless on the runner's parts (the first call of a session loads
+  the workspaces' modules: about 0.17 s); through the real MCP server and the bridge with the
+  window, on a design with a mesh, a box and a two-component assembly: 0.17 s the first time,
+  0.11-0.13 s after (scenario `ai_plan_approach`).
+- `tools/list`: before wave 8 309,368 characters for 175 tools; with every builder's tools
+  merged here 381,254 characters for 216 tools (descriptions 134,600, schemas 200,500), about
+  95,000 tokens at 4 characters a token (more for JSON). 38 descriptions are longer than
+  ai-common's 900 characters (17,200 characters over; the longest cam_edit 3,191,
+  cam_operation 2,785, measure 2,756, create_sketch 2,558); none passes Claude Code's 4,096
+  (unit test). The first sixteen tools' selector arguments now carry a summary instead of the
+  whole selector help seven times (9,400 characters less). In Claude Code (tool search on)
+  only the names and the instructions load at the start; Claude Desktop may load them all
+  (report above).
+- The MCP instructions: 8,614 characters, of which the essentials are the first 3,187; the
+  chat panel's system prompt 7,294 characters with the documentation index.
+
+### Tests
+
+Unit: `test_ai_approach_core.py` (55 tests: 41 requests across every workspace, Relic's two,
+a sheet metal bracket from nothing / a sheet metal body / a flat plate, a study with and
+without its numbers and on a 3,000-face part, CNC, a lathe, print a part and a mesh, a part and
+an assembly drawing, an exploded video, an animation of bodies, a hinge, a plastic enclosure,
+fix, inspect, render, odd input; the search by goal; the repetition guard; the form),
+`test_ai_mcp_core.py` (`AskPerson`, `Guard`, `Instructions`), `test_ai_mcp_server.py`
+(`AskThroughTheApp`: the real server asks the app and gets the answer while it keeps reading).
+Headless runner: `Fission180Tests/headless/approach_tools.py` (20 calls). Docs: the handbook's
+new sections and troubleshooting's are run by the docs runner; reference examples for the
+three tools. Scenario `ai_plan_approach` (81 checks, through the real MCP server and the
+bridge: plans, the selection, every workspace, a flat pattern, busy, the form, the guard; the
+72-check version also passed with the 3D view 770 px tall). Found on the way: Finish Flat
+Pattern brought a drawing's tab in front of the 3D view (fixed in `flatpattern_ui.enter`).
+
+## Wave 8 coverage: ai-behaviour
+
+| Ribbon command | Tool (kind) |
+|---|---|
+| Workspace menu > Design | `show_workspace` workspace `design` |
+| Workspace menu > Simulation | `show_workspace` `simulation` (a study first: `create_study`) |
+| Workspace menu > Manufacture | `show_workspace` `manufacture` |
+| Workspace menu > Animation | `show_workspace` `animation` |
+| Workspace menu > Drawing (a drawing; From Design) | `show_workspace` `drawing` (`drawing`); `create_drawing` makes one |
+| The DESIGN tabs SOLID, SURFACE, MESH, SHEET METAL, PLASTIC, UTILITIES | `show_workspace` `design`, `tab` |
+| The SIMULATION tabs SETUP, RESULTS | `show_workspace` `simulation`, `tab` `setup` / `results` |
+| The FLAT PATTERN tab (a flat pattern open) | `show_workspace` `flat_pattern` (`flat_pattern` makes one) |
+| UTILITIES > AI > AI (the panel), Add an AI App, AI Chat, AI Activity | no tool: the person's own controls of AI apps (an AI must not switch itself on or add apps) |
+| UTILITIES > AI > Rebuild with Timeline (AI)... | `start_rebuild` |
+| UTILITIES > AI > Compare with Reference | `compare_to_reference` |
+| UTILITIES > AI > Finish Rebuild | `finish_rebuild` |
+| UTILITIES > AI > Stop Rebuild... | `delete_step` of the reference (the handbook says so) |
+| UTILITIES > ADD-INS > Scripts and Add-Ins, Add-on Manager | no tool: there is no tool that runs code (an AI app must not run scripts) |
+| UTILITIES > FREECAD > FreeCAD Tools | no tool: FreeCAD's own workbenches are outside Fission 180's behaviour |
+| UTILITIES > UTILITY > Preferences, Project and Recovery Settings, Recover Documents, Fission 180 Diagnostics, Report a Problem | no tool: the person's own settings and reports |
+| UTILITIES > UTILITY > Save As | `save_as` |
+| UTILITIES > UTILITY > Version History | open: no tool lists or restores a design's versions yet (`save` makes a version) |
+| UTILITIES > UTILITY > Command Search | no tool: `list_tools` with `goal` is the AI's search |
+
 ## Wave 8 coverage: workspaces (SIMULATION, MANUFACTURE, ANIMATION, SHEET METAL, PLASTIC, UTILITIES > MAKE)
 
 Builder ai-workspaces, 2026-11-13 (brief `docs/fission180/dev/briefs/ai-workspaces.md`). Luca:

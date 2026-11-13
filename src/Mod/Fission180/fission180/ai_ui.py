@@ -392,13 +392,35 @@ class ActivityPanel(QtWidgets.QWidget):
         self.undo_button.setObjectName("Fission180AIUndo")
         self.undo_button.clicked.connect(undo_last)
         row.addWidget(self.undo_button)
+        # (wave 8, ai-speed) the call running now can be stopped here too (ai/alive.py)
+        self.stop_button = QtWidgets.QPushButton("Stop")
+        self.stop_button.setObjectName("Fission180AIActivityStop")
+        self.stop_button.setToolTip("Stop the AI's call at its next safe point")
+        self.stop_button.setEnabled(False)
+        self.stop_button.clicked.connect(self._stop)
+        row.addWidget(self.stop_button)
         row.addStretch(1)
         column.addLayout(row)
+        self.working = ""
         self.refresh()
+
+    def _stop(self, *_args):
+        from .ai import alive
+
+        alive.press_stop()
+
+    def show_working(self, text, can_stop):
+        """The working line of the AI call running now ("" once it is over)."""
+        try:
+            self.working = text or ""
+            self.stop_button.setEnabled(bool(text) and bool(can_stop))
+            self.state.setText(self.working or "What the AIs did here, newest first:")
+        except RuntimeError:
+            pass
 
     def refresh(self):
         try:
-            self.state.setText("What the AIs did here, newest first:")
+            self.state.setText(self.working or "What the AIs did here, newest first:")
             self.list.clear()
             for stamp, tool, text, is_error in reversed(bridge.activity()):
                 short = " ".join(text.split())  # one line each (get_design answers pages)
@@ -477,6 +499,12 @@ def stop():
 
 def enable():
     bridge.add_listener(_after_call)
+    try:  # (wave 8, ai-speed) long AI calls keep the window alive, with Stop
+        from .ai import alive
+
+        alive.install()
+    except Exception as exc:
+        warn("AI: %s" % exc)
     bridge.apply()
 
 

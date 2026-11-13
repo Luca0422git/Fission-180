@@ -2082,11 +2082,26 @@ def main():
         run_session(
             run, workspace_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
         )
+        # wave 8, ai-behaviour: plan_approach, ask_person, show_workspace (approach_tools.py)
+        from Fission180Tests.headless import approach_tools
+
+        run_session(
+            run, approach_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
+        )
         # --- wave 8, ai-workspaces --- (SIMULATION, MANUFACTURE, ANIMATION, SHEET METAL and
         # UTILITIES > MAKE: ai_workspaces.py)
         from Fission180Tests.headless import ai_workspaces
 
         run_session(run, ai_workspaces.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
+        # wave 8, ai-drawing: every DRAWING tool and kind (drawing_tools.py)
+        from Fission180Tests.headless import drawing_tools
+
+        run_session(run, drawing_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
+        # wave 8, ai-design: the DESIGN workspace's new tools (design_tools.py)
+        from Fission180Tests.headless import design_tools
+
+        design_tools.prepare(run.folder)
+        run_session(run, design_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)

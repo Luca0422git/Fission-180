@@ -2,19 +2,21 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fusion: DRAWING > EXPORT > Output PDF / Output DXF. Category: Drawings. Writes files. Needs a drawing.
+Fusion: DRAWING > EXPORT > Export PDF / DXF / DWG / CSV. Category: Drawings. Writes files. Needs a drawing.
 
 ## What it does
 
-Export a drawing: format pdf (every sheet in one PDF; needs the Fission 180 window) or dxf (the sheet: frame, views on their own layers, dimensions, text). Replacing an existing file must be confirmed by the person in Fission 180. The answer lists what the file does not keep ("Not kept in this file:": other sheets, dimensions written as plain lines and text, hatching as lines, the font...), as the drawing's Export message does.
+Export a drawing: pdf (sheets all: every sheet in one PDF, or current: the given sheet; needs the Fission 180 window), dxf (the sheet: frame, views on their own layers, dimensions, text; sheets all: one file per sheet, "name - Sheet 2.dxf"), dwg (each sheet's DXF turned into DWG by a converter on this computer: LibreDWG, the ODA File Converter or QCAD; without one it is refused: export dxf) or csv (a table as a spreadsheet file: table its id, default the parts list, else the bend table). Replacing a file must be confirmed by the person. The answer lists what the file does not keep ("Not kept in this file:"), as the drawing's Export message does.
 
 ## Arguments
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `drawing` | string |  |  |  | the drawing (default: the newest) |
-| `format` (required) | `pdf` \| `dxf` |  |  |  |  |
+| `drawing` | string |  |  |  | the drawing or sheet (default: the newest drawing) |
+| `format` (required) | `pdf` \| `dxf` \| `dwg` \| `csv` |  |  |  |  |
 | `path` (required) | string |  |  |  | full path |
+| `sheets` | `all` \| `current` |  |  |  | pdf: all; dxf / dwg: current (the given sheet) |
+| `table` | string |  |  |  | csv: the table (default: the parts list) |
 
 ## Answer
 
@@ -60,7 +62,12 @@ Not kept in this file:
 
 - a PDF of the drawing:
   `{"format": "pdf", "path": "/home/me/bracket.pdf"}`
+- the parts list for a spreadsheet:
+  `{"format": "csv", "path": "/home/me/parts.csv"}`
 
 ## See also
 
+- Recipe: [an assembly drawing with an exploded view, balloons and a parts list](fission180://docs/recipes/assembly-drawing.md)
+- Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)
+- Recipe: [a sheet metal drawing with the flat pattern, a bend table and bend notes](fission180://docs/recipes/sheet-metal-drawing.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

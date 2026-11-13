@@ -136,10 +136,13 @@ def move_to(doc, start, dx, dy):
             view = obj.SourceView
             s = (drawing.scale_of(view) or 1.0) if view is not None else 1.0
             mx, my = dx / s, dy / s
-        if abs(drawing._value(obj.X) - (was["X"] + mx)) > 1e-9:
-            obj.X = was["X"] + mx
-        if abs(drawing._value(obj.Y) - (was["Y"] + my)) > 1e-9:
-            obj.Y = was["Y"] + my
+        if drawing.is_view(obj):  # (wave 8: without TechDraw drawing it again)
+            drawing.set_place(obj, was["X"] + mx, was["Y"] + my)
+        else:
+            if abs(drawing._value(obj.X) - (was["X"] + mx)) > 1e-9:
+                obj.X = was["X"] + mx
+            if abs(drawing._value(obj.Y) - (was["Y"] + my)) > 1e-9:
+                obj.Y = was["Y"] + my
         if "corner" in was:
             obj.Fission180Corner = [was["corner"][0] + dx, was["corner"][1] + dy]
 

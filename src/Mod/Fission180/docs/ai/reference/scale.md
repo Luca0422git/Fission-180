@@ -2,7 +2,7 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fusion: SOLID > MODIFY > Scale. Category: Modify. Changes the design (one undo step). Its undo step is named like "AI: Scale". Needs a solid body.
+Fusion: SOLID > MODIFY > Scale. Category: Modify. Changes the design (one undo step). Its undo step is named like "AI: Scale". Needs an open design.
 It builds the design step(s) `sf_scale`, `sf_scale_bodies`, `sf_scale_sketch` (the golden models' step language).
 
 ## What it does
@@ -25,7 +25,7 @@ On success: `Done: <undo title>. Its id is '<id>'. Bodies now: <each solid body'
 
 ## Errors
 
-- Without a solid body: `The design has no solid body yet: make one first (create_sketch + extrude, or primitive).`
+- Without an open design: `No design is open: call new_design or open_design first (or create_sketch, which starts a new design).`
 - Called without arguments, the arguments are refused before anything runs: `Not done: give factor (uniform) or factors [x, y, z], one of them.`
 - Arguments of the wrong type, out of their limits or not in the table are refused the same way, each problem in a sentence ("radius must be a number above 0").
 - When Fission 180 cannot build the step (a selector that picks another number of elements than `count`, a size that does not fit, an id that does not exist), the answer is `Not done (<undo title>): <reason>` and nothing changes; [troubleshooting](fission180://docs/troubleshooting.md) lists the usual causes.

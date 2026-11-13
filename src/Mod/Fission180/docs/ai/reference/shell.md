@@ -13,7 +13,7 @@ Hollow the current body out with a wall thickness (Fission 180's Shell). faces: 
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `faces` | object |  |  |  | The faces to remove. (rules: [selectors](fission180://docs/tools.md#help-selectors)) |
+| `faces` | object |  |  |  | The faces to remove. A selector picks faces or edges by their geometry, never by names like "Edge7": type, normal [x, y, z], parallel [x, y, z], along [x, y, z], radius, on_faces / not_on_faces (a face selector), at {"axis": "x"\|"y"\|"z", "value": "max"\|"min"\|mm} (or a list), all, any_of [selectors], count (always give it: the tool refuses a different number). Example: the 4 top edges of a box {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4}. The full rules: the server's instructions (Selectors) or get_help topic selectors. |
 | `thickness` | number | mm |  | > 0 |  |
 | `direction` | `inside` \| `outside` \| `both` |  | `"inside"` |  |  |
 | `body` | boolean |  |  |  | hollow the whole body, closed (no face removed) |
