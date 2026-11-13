@@ -38,7 +38,8 @@ define(
     "(default: names and unit kept) | STL (Binary) | STL (ASCII) | OBJ; refinement Low | "
     "Medium (default) | High: how finely curved faces are cut into triangles. Answers the "
     "file, the triangles, whether each body is watertight (open edges make a slicer "
-    "complain: check_design / mesh repair first) and what the file leaves out. Seconds. "
+    "complain: check_design / mesh repair first) and what the file leaves out. About 10 s for "
+    "a part of 1,500 faces (270,000 triangles), twice that at High. "
     "A file that exists is not replaced unless the person agrees. export writes other "
     "formats (STEP...).",
     schema(
@@ -80,7 +81,7 @@ define(
     'path; default: "<design>-export" beside the saved design file). Use it to hand a '
     "design to someone with another program, or to keep a copy any CAD can open; export "
     "writes one file of one format. Answers every file with its size and what each format "
-    "leaves out (timeline, parameters, colours...). Seconds; tens of seconds for big parts. "
+    "leaves out (timeline, parameters, colours...). About 25 s for a part of 1,500 faces. "
     "Files that exist are not replaced unless the person agrees.",
     schema({"folder": string("the folder to write into (a full path; made when missing)")}),
     changes=False,
