@@ -11695,6 +11695,102 @@
    "is_error": false
   }
  },
+ "show_study_results#1": {
+  "setup": "sim_solved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_study",
+    "args": {}
+   },
+   {
+    "tool": "add_constraint",
+    "args": {
+     "kind": "fixed",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         -1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "tool": "add_load",
+    "args": {
+     "kind": "force",
+     "on": [
+      {
+       "face": {
+        "normal": [
+         1,
+         0,
+         0
+        ],
+        "count": 1
+       }
+      }
+     ],
+     "magnitude": 2000,
+     "direction": "vector",
+     "vector": [
+      0,
+      0,
+      -1
+     ]
+    }
+   },
+   {
+    "tool": "solve_study",
+    "args": {}
+   }
+  ],
+  "args": {
+   "result": "von_mises",
+   "deformation": "adjusted_2",
+   "min_max": true
+  },
+  "note": "the stress in the window, the bend drawn twice as big",
+  "answer": {
+   "text": "Done: Study 1 - Static Stress shows Stress: Von Mises (MPa) in the window, Adjusted x 2. render or screenshot shows it; study_probe reads the numbers.\n{\n \"study\": \"Study 1 - Static Stress\",\n \"result\": \"von_mises\",\n \"unit\": \"MPa\",\n \"legend\": [0.87046, 163.21],\n \"deformation\": \"adjusted_2\",\n \"drawn_times_true_size\": 34.338,\n \"mesh\": false,\n \"undeformed_model\": false,\n \"loads\": false,\n \"min_max\": true,\n \"slice\": null,\n \"iso_surface\": null,\n \"animate\": false\n}",
+   "is_error": false
+  }
+ },
  "cam_setup_sheet#1": {
   "setup": "cam_ops",
   "setup_calls": [
