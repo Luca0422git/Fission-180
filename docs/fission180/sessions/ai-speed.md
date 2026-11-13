@@ -91,10 +91,68 @@ stops it:
 | The AI app's socket notifier work (none in the bridge: it is a Python thread) | `ExcludeSocketNotifiers`: left for after the call |
 | Windows marks the window "Not responding" after 5 s without looking at its messages | every pump looks at them (`processEvents` peeks the message queue); one long OpenCASCADE call cannot be split, so a single boolean or validity check of many seconds still freezes it |
 
+## FreeCAD / Qt / OpenCASCADE traps found
+
+- **Qt 6.8 (PySide6 6.8.3) posts `QTimer.singleShot(0, fn)` as a MetaCall event** to the thread
+  object, not as a timer: an event filter can only drop it (lost), not postpone it.
+  `singleShot(5, fn)` is a Timer event (re-sent at its next interval when dropped). Hence
+  `alive._defer_zero`.
+- **QTest straight to a widget skips the window stage**: `QTest.mouseClick(widget)` calls
+  `QApplication::notify(widget, ...)`, and for a spontaneous press notify gives the widget the
+  keyboard focus *before* any event filter runs (`giveFocusAccordingToFocusPolicy`): a dropped
+  click on the hidden clear button of Home's search field still brought the Home tab to the
+  front. Real input reaches the window (QWidgetWindow) first, where the filter drops it; a
+  test of input filtering must click the window (`QTest.mouseClick(window.windowHandle(), ...)`).
+- **FreeCAD's recompute already handles events** every 0.1 s between steps when
+  `CanAbortRecompute` is on (the default): `Base::SequencerBar::setValue` calls
+  `qApp->processEvents()`, with its own filter that drops clicks (beep) but lets timers run.
+- **Sketcher solves the whole sketch after every constraint added alone from Python**
+  (`SketchObjectPy::addConstraint` with one constraint calls `solve()`; a list does not): 0.2 s a
+  solve on a sketch of 320 circles, 960 constraints, 216 s.
+- **`optimalBoundingBox` costs about 3 ms a face** (20 ms a torus face); `BoundBox` uses the
+  display mesh when the faces have one (the window) and adds no tolerance (`SetGap(0)`); the
+  box of a mesh-free copy is exact for planes, cylinders, cones and spheres but not for tori
+  (4.5 mm off on a torus patch).
+- **`isValid()` is quadratic in a face's inner wires** (BRepCheck_Face::IntersectWires): the
+  brep plate's top face with 321 wires took 2.4 s of its 4 s; it is one OpenCASCADE call, kept
+  per shape, never split.
+- `shape.Faces` makes a Python object per face (0.05 s on 3,000 faces): asked once per group
+  in a loop it was 15 s; `countSubElements("Face")` counts without them.
+- `face.isInside(p, tol, True)` is `BRepExtrema_DistShapeShape(vertex, face) <= tol`: 0.6 ms a
+  call; for a flat face with straight edges and whole circles the same distance is a few
+  microseconds in Python.
+- Python's `Part.Shape(shape)` shares the OpenCASCADE shape (isSame, instant); `.copy()` is a
+  deep copy (0.2 s on 1,700 faces).
+
 ## Measurements
 
-(filled in below)
+(the benchmark's before / after table: below)
 
 ## Changelog lines
 
+- While an AI app works in Fission 180, the window keeps repainting and shows what the AI is
+  doing ("AI: working on compare_to_reference (12 s): comparing faces"), with a Stop button.
+- Stop ends the AI's call at its next safe point and takes back what it had half made; the AI is
+  told it was stopped and that nothing changed.
+- During an AI call, clicks and keys elsewhere are ignored (the line says why), so nothing you
+  click can change the design under the AI; autosave waits until the call is over.
+- AI apps that ask for progress get it while Fission 180 works on a long call, and a call the AI
+  app cancels stops in Fission 180 when it only reads the design.
+- The AI's checking tools (inspect_design, check_design, get_design, physical_properties) are
+  many times faster on big parts: their numbers are kept until the part changes, and the size
+  of a part is measured the quick way, exactly.
+- An AI sketch with many circles is drawn in seconds instead of minutes (320 circles: 216 s ->
+  2 s).
+- describe_reference and compare_to_reference on a mesh rebuild like Relic are much faster.
+
 ## Known issues
+
+- One long OpenCASCADE step cannot be split, so the window still waits for it: a validity check
+  of a part with faces of hundreds of holes (2-4 s), the General Fuse of compare_to_reference on
+  a half-built Relic-like part (10-15 s), a fillet or chamfer of hundreds of edges (40-130 s), an
+  edit early in a long timeline (50 s). On Windows the window can show "Not responding" during
+  such a step if it lasts over 5 s; it comes back by itself.
+- Claude Desktop reportedly cancels a tool call after about 60 s whatever the server sends;
+  Fission 180 then stops a read-only call and lets a change finish (not tried on a real install).
+- The chat panel and other AI apps wait while a call runs (one call at a time, as before);
+  a second AI app's call is answered at once that Fission 180 is busy.

@@ -278,6 +278,7 @@ def turned_frame(shape):
     from .ai.ops import selectors
 
     dirs = []  # [direction, area]
+    near = _DirectionGrid()  # (wave 8, ai-speed: a mesh-made part has a direction per facet)
     for face in shape.Faces:
         kind = _face_kind(face)
         try:
@@ -290,11 +291,12 @@ def turned_frame(shape):
             d = core.canonical_direction(d)
         except Exception:
             continue
-        for item in dirs:
-            if core.parallel(item[0], d, 1e-6):
-                item[1] += face.Area
+        for k in near.candidates(d):  # (the first one parallel, as trying them all in order)
+            if core.parallel(dirs[k][0], d, 1e-6):
+                dirs[k][1] += face.Area
                 break
         else:
+            near.add(d, len(dirs))
             dirs.append([d, face.Area])
     if not dirs:
         return None
@@ -312,6 +314,36 @@ def turned_frame(shape):
     if all(abs(rot[i][j] - (1.0 if i == j else 0.0)) < 1e-9 for i in range(3) for j in range(3)):
         return None
     return rot
+
+
+class _DirectionGrid:
+    """Directions (unit 3-tuples) kept in cells of a grid, so the ones that can be parallel to
+    a direction within 1e-6 (core.parallel) are found without trying every one: candidates()
+    gives a superset, in the order they were added. Both senses are looked up (a canonical
+    direction may flip near a sign change). 3,000 faces of a mesh-made part with a direction
+    each made 3 million parallel tests in turned_frame."""
+
+    CELL = 1e-4  # (parallel within 1e-6 keeps unit vectors under 2e-6 apart: the next cell)
+
+    def __init__(self):
+        self.cells = {}
+
+    def _key(self, d):
+        n = math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
+        return tuple(int(math.floor(c / n / self.CELL)) for c in d)
+
+    def add(self, d, index):
+        self.cells.setdefault(self._key(d), []).append(index)
+
+    def candidates(self, d):
+        found = set()
+        for vector in (d, (-d[0], -d[1], -d[2])):
+            cx, cy, cz = self._key(vector)
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        found.update(self.cells.get((cx + dx, cy + dy, cz + dz), ()))
+        return sorted(found)
 
 
 def _describe_turned(shape, options, rot, started):
