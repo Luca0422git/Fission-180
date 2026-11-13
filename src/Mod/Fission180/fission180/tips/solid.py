@@ -897,7 +897,7 @@ TIPS = {
             "Click OK.",
         ],
         "tips": [
-            "Ground one component first so it stays put.",
+            "Component 1 is the one that moves: click the loose part first.",
             "As-built Joint joins parts where they already stand.",
         ],
         "picture": "solid_joint.png",
