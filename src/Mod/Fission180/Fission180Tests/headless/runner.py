@@ -2082,6 +2082,10 @@ def main():
         run_session(
             run, workspace_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
         )
+        # wave 8, ai-drawing: every DRAWING tool and kind (drawing_tools.py)
+        from Fission180Tests.headless import drawing_tools
+
+        run_session(run, drawing_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)

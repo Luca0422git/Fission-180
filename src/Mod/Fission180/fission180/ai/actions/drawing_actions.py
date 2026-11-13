@@ -28,6 +28,7 @@ from ..executor import UserError, json_result
 from . import action
 
 KIND_NAMES = {"projected": "ProjectedView", "base": "BaseView"}
+SYMBOL_REACH = 12.0  # mm on the sheet from its edge a symbol placed by default stands
 IDLE_TIMEOUT_S = 180.0  # TechDraw drawing a big assembly's views
 
 
@@ -44,7 +45,7 @@ def _page(ctx, ident=None):
     doc = ctx.need_doc()
     if ident:
         obj = ctx.resolve(ident, "drawing")
-        page = obj if drawing.is_page(obj) else drawing.page_of(obj)
+        page = obj if drawing.is_page(obj) else _sheet_of_item(obj)
         if page is None:
             raise UserError("%r is not a drawing or a view of one." % ident)
         return page
@@ -52,6 +53,22 @@ def _page(ctx, ident=None):
     if not found:
         raise UserError("The design has no drawing yet: call create_drawing first.")
     return found[-1]
+
+
+def _sheet_of_item(obj):
+    """The sheet a view, dimension, balloon, note, symbol or table stands on, or None (a
+    body that a drawing shows is no item of it: drawing.page_of finds the drawing through
+    its list of sources)."""
+    from ... import drawing
+
+    if drawing.is_page(obj):
+        return obj
+    page = drawing.page_of(obj)
+    if page is None:
+        return None
+    if drawing.is_view(obj) or obj.Name in [v.Name for v in getattr(page, "Views", [])]:
+        return page
+    return None
 
 
 def _view(ctx, ident):
@@ -776,9 +793,10 @@ def modify_drawing(ctx, args):
         pages = [o for o in items if drawing.is_page(o)]
         rest = [o for o in items if not drawing.is_page(o)]
         for obj in rest:
-            if drawing.page_of(obj) is None:
+            if _sheet_of_item(obj) is None:
                 raise UserError(
-                    "%r is not on a drawing: delete_step deletes design steps." % obj.Name
+                    "%r is not on a drawing: delete_step deletes design steps, "
+                    "modify_drawing only what is on a drawing's sheet." % obj.Name
                 )
         sheets = []
         for page in pages:
@@ -947,10 +965,22 @@ def drawing_sheet(ctx, args):
 
 
 # -- dimensions ------------------------------------------------------------------------------------
-def view_elements(view, limit=3000):
-    """[info] of every element of a view (drawing.edge_info: lines, circles, arcs)."""
+def _edge_counts(view):
+    """(visible, hidden) model edges of a view: TechDraw numbers the visible ones first,
+    then the hidden ones, then its cosmetic lines (centre marks, centre lines...)."""
+    try:
+        return len(view.getVisibleEdges()), len(view.getHiddenEdges())
+    except Exception:
+        return None, None
+
+
+def view_elements(view, limit=3000, cosmetic=False):
+    """[info] of every element of a view (drawing.edge_info: lines, circles, arcs), each
+    marked "hidden" when it is a hidden edge; the cosmetic lines Fission 180 draws on a view
+    (centre marks and lines, edge extensions) only with cosmetic (marked so)."""
     from ... import drawing
 
+    visible, hidden = _edge_counts(view)
     found = []
     misses = 0
     for i in range(limit):
@@ -961,6 +991,13 @@ def view_elements(view, limit=3000):
                 break
             continue
         misses = 0
+        if visible is not None and i >= visible:
+            if i >= visible + hidden:
+                if not cosmetic:
+                    continue
+                info["cosmetic"] = True
+            else:
+                info["hidden"] = True
         found.append(info)
     return found
 
@@ -1014,8 +1051,13 @@ def _find(view, elements, pick, index, what="picks[%d]"):
         raise UserError(
             "%s: the view has no such element (get_drawing with edges true " "lists them)." % label
         )
-    if "near" in pick:
-        return min(candidates, key=lambda e: _distance(e, pick["near"]))
+    if "near" in pick:  # (a visible edge before the hidden one drawn on it)
+        return min(
+            candidates, key=lambda e: (round(_distance(e, pick["near"]), 6), bool(e.get("hidden")))
+        )
+    shown = [e for e in candidates if not e.get("hidden")]
+    if len(shown) == 1:
+        return shown[0]
     if len(candidates) > 1:
         raise UserError(
             "%s: %d elements match: give near [x, y] (get_drawing with "
@@ -1685,7 +1727,12 @@ def add_drawing_symbol(ctx, args):
     if view is not None:
         info = _find(view, view_elements(view), args["pick"], 0, "pick")
         anchor = _anchor_of(view, info)
-    at = tuple(args["at"])
+    if "at" in args:
+        at = tuple(args["at"])
+    else:  # (beside the edge, away from the view's middle, like a person puts it)
+        at = aicore.outward(
+            drawing.view_rect(view), drawing_annot.page_point(view, anchor), SYMBOL_REACH
+        )
     base = drawing.view_position(view) if view is not None else (0.0, 0.0)
     data = {
         "kind": {

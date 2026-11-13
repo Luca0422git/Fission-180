@@ -745,8 +745,8 @@ def _extra_symbol(args, problems):
         problems.append("give view and pick together (or neither, for a frame alone)")
     if "pick" in args:
         _check_element(args["pick"], "pick", problems)
-    if "at" not in args:
-        problems.append("at is needed: %s" % SHEET_MM)
+    if "at" not in args and "view" not in args:
+        problems.append("a frame alone needs at: %s" % SHEET_MM)
     fields = {
         "surface_texture": ("texture", "value", "lay", "all_around"),
         "feature_control_frame": (
@@ -785,7 +785,8 @@ define(
     "drawing",
     "DRAWING > SYMBOLS > Surface Texture, Feature Control Frame, Datum Identifier",
     "A symbol on a view's edge (pick: {kind, near} in the view's own mm), placed at [x, y] on "
-    "the sheet (on the edge, or away with a leader): surface_texture (texture basic | "
+    "the sheet (on the edge, or away with a leader; default 12 mm out from the edge): "
+    "surface_texture (texture basic | "
     'removal | no_removal, value "Ra 3.2", lay, all_around), feature_control_frame (GD&T: '
     "characteristic position, flatness, perpendicularity..., tolerance mm, diameter_zone, "
     'material M | L, datums ["A", "B"], second_row for a composite frame; without view and '
@@ -794,9 +795,10 @@ define(
     schema(
         {
             "kind": enum(SYMBOL_KINDS),
+            "drawing": step_id("a frame alone: the drawing or sheet (default: the newest)"),
             "view": step_id("the view"),
             "pick": _element("the edge it stands on"),
-            "at": kit.numbers(2, SHEET_MM),
+            "at": kit.numbers(2, "%s (default: 12 mm out from the edge)" % SHEET_MM),
             "texture": enum(TEXTURES, "the symbol", default="removal"),
             "value": string('roughness, e.g. "Ra 3.2"'),
             "lay": enum(LAYS, "lay direction symbol"),
