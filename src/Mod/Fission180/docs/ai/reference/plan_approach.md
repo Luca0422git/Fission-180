@@ -52,9 +52,9 @@ The answer:
 
 ```text
 Plan: turn the mesh into a solid (mesh 'plate': 208 triangles).
-Route: check_design; under a second in all.
+Route: inspect_mesh -> mesh_prepare (if needed) -> convert_mesh -> check_design; under a second in all.
 Ask the person first, in one message (2 questions, with the defaults): (1) Do you need an editable timeline (steps you can change later, many calls and much slower), or is a solid you can cut, fillet, measure and print enough? (2) Keep the original (hidden in the design) or replace it?
-Next: check_design.
+Next: inspect_mesh (its arguments: next.args).
 {
  "request": "make this mesh a solid",
  "goals": [{"id": "mesh_to_solid", "goal": "turn the mesh into a solid"}],
@@ -62,6 +62,34 @@ Next: check_design.
  "route": [
   {
    "step": 1,
+   "tool": "inspect_mesh",
+   "why": "how many triangles, closed or open, flipped or loose triangles: what to repair first",
+   "args": {"body": "MeshBody"},
+   "where": "MESH > PREPARE > Repair (its analysis), Properties of a mesh body",
+   "seconds": 0.1,
+   "for": "mesh_to_solid"
+  },
+  {
+   "step": 2,
+   "tool": "mesh_prepare",
+   "why": "repair: close holes, turn flipped triangles, drop loose pieces",
+   "args": {"body": "MeshBody", "kind": "repair"},
+   "when": "only when inspect_mesh says it is open or broken",
+   "where": "MESH > PREPARE > Repair, Generate Face Groups, Create Face Group, Combine Face Groups; MESH > MODIFY > Make Closed Mesh",
+   "seconds": 0.3,
+   "for": "mesh_to_solid"
+  },
+  {
+   "step": 3,
+   "tool": "convert_mesh",
+   "why": "one call: the closed mesh becomes a solid body (prismatic merges the triangles that lie in one plane into single faces; faceted keeps one face per triangle)",
+   "args": {"body": "MeshBody", "method": "prismatic"},
+   "where": "MESH > CONVERT > Convert Mesh",
+   "seconds": 0.6,
+   "for": "mesh_to_solid"
+  },
+  {
+   "step": 4,
    "tool": "check_design",
    "why": "one valid, closed solid",
    "where": "INSPECT > Interference + the timeline's warnings",
@@ -81,24 +109,19 @@ Next: check_design.
    "default": "keep it, hidden"
   }
  ],
- "cost": {"seconds": 0.2, "about": "under a second", "slow_steps": []},
+ "cost": {"seconds": 0.9, "about": "under a second", "slow_steps": []},
  "avoid": [
   "Never copy a mesh facet by facet (or triangle by triangle) into sketches and features: thousands of calls for a worse result. convert_mesh makes the solid in one call."
  ],
- "notes": [
-  "Not in this Fission 180's tools (left out of the route): inspect_mesh, mesh_prepare, convert_mesh. The person can use the ribbon command instead; tell them which."
- ],
+ "notes": [],
  "about": {"id": "MeshBody", "label": "plate", "kind": "mesh", "triangles": 208, "closed": true},
- "next": {"tool": "check_design", "args": {}},
+ "next": {"tool": "inspect_mesh", "args": {"body": "MeshBody"}},
  "design": {
   "open": true,
   "name": "Relic",
   "units": "mm",
   "workspace": null,
-  "meshes": [{"id": "MeshBody", "label": "plate", "triangles": 208, "closed": true}],
-  "solids": []
- }
-}
+... (4 more lines)
 ```
 
 ## Example 2: a Static Stress study, planned
