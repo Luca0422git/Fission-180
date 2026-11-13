@@ -101,6 +101,9 @@ releases published under the old name (their tags are `sciforge-v...`).
 - Finishing a flat pattern no longer brings an open drawing's tab in front of the 3D view.
 - With contact sets on, an AI turning a joint stops where the parts touch, as Drive Joints does.
 - A flat pattern's bend table is now in the drawing's DXF, and bend labels no longer overlap.
+- A step the geometry kernel refuses now says why in plain words in the timeline's tool tip and
+  in Compute All ("could not round these edges at this size... try a smaller size"), not
+  "BRep_API: command not done".
 
 ## 0.1.0-beta.4.0.2
 

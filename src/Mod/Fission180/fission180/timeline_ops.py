@@ -779,6 +779,9 @@ def _friendly(obj, text):
         return "The result would be separate pieces; a body must stay one solid."
     if not text or text in ("Valid", "Touched"):
         return "This step could not be computed."
+    kernel = core.kernel_reason(text, getattr(obj, "TypeId", ""), getattr(obj, "Label", ""))
+    if kernel:
+        return kernel
     return text
 
 

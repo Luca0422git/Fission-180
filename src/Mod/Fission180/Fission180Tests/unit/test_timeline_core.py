@@ -730,5 +730,29 @@ class GroupMoveTests(unittest.TestCase):
         self.assertEqual(set(plan.keys), {"b1", "b2"})  # only the group's steps re-ranked
 
 
+class KernelReasonTests(unittest.TestCase):
+    # (2026-11-13) Compute All and the timeline's tool tip passed on "BRep_API: command not
+    # done"; the tooltip picture of Compute All showed it
+    def test_a_fillet_too_big(self):
+        said = core.kernel_reason("BRep_API: command not done", "PartDesign::Fillet", "Fillet1")
+        self.assertIn("smaller size", said)
+        self.assertNotIn("BRep", said)
+        said = core.kernel_reason("Exception: StdFail_NotDone", "Part::FeaturePython", "Chamfer2")
+        self.assertIn("round these edges", said)
+
+    def test_other_steps(self):
+        said = core.kernel_reason("BRepAlgoAPI_Fuse failed", "PartDesign::Pad", "Extrude3")
+        self.assertIn("could not build this step", said)
+        self.assertIn(
+            "change",
+            core.kernel_reason("Standard_ConstructionError", "PartDesign::Pocket", "Pocket"),
+        )
+
+    def test_not_a_kernel_failure(self):
+        self.assertIsNone(core.kernel_reason("Some edges no longer exist", "PartDesign::Fillet"))
+        self.assertIsNone(core.kernel_reason(""))
+        self.assertIsNone(core.kernel_reason(None))
+
+
 if __name__ == "__main__":
     unittest.main()

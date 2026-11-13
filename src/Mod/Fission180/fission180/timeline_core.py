@@ -1094,3 +1094,40 @@ def rebased(old_timeline, plan):
     before = previous(old_timeline.names(), by_name)
     after = previous(plan.order, by_name)
     return {n: after[n] for n in after if after[n] != before.get(n)}
+
+
+# The geometry kernel's (OpenCASCADE's) own failure messages, which FreeCAD passes on as a
+# step's reason: a person who sees "BRep_API: command not done" in the timeline's tool tip or
+# in Compute All's list learns nothing. Matched in lower case.
+KERNEL_FAILURES = (
+    "command not done",
+    "stdfail_notdone",
+    "brepalgoapi",
+    "brepfilletapi",
+    "standard_constructionerror",
+    "standard_failure",
+    "standard_domainerror",
+    "standard_nullobject",
+    "gp_vectorwithnullmagnitude",
+    "occ error",
+)
+
+
+def kernel_reason(text, type_id="", label=""):
+    """A plain sentence for a step the geometry kernel refused (one of KERNEL_FAILURES in
+    FreeCAD's reason), or None when the reason is not one of those. For a fillet or a chamfer
+    the usual cause is a size too big for its edges."""
+    low = (text or "").lower()
+    if not any(failure in low for failure in KERNEL_FAILURES):
+        return None
+    what = "%s %s" % (type_id or "", label or "")
+    if re.search(r"fillet|chamfer|blend|round", what, re.IGNORECASE):
+        return (
+            "The geometry kernel could not round these edges at this size: it is usually "
+            "too big for one of the edges or faces next to them. Edit it: try a smaller size "
+            "or fewer edges."
+        )
+    return (
+        "The geometry kernel could not build this step with these values. Edit it and change "
+        "a size, or check the sketch or faces it uses."
+    )
