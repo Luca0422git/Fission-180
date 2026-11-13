@@ -452,6 +452,10 @@ def show_workspace(ctx, args):
                 "This design has no study yet: create_study makes one (Fusion opens New Study "
                 "when the workspace is picked without one); then show_workspace simulation."
             )
+        if tab == "results" and not any(simulation.summary(st) for st in simulation.studies(doc)):
+            raise UserError(
+                "No study has results yet: solve_study first (RESULTS shows a solved study)."
+            )
         tab_id = {"setup": "sim_setup", "results": "sim_results"}.get(tab)
         if not simulation_ui.enter_workspace(tab_id):
             raise UserError("Fission 180 could not show SIMULATION (a dialog is open?).")
@@ -490,6 +494,11 @@ def show_workspace(ctx, args):
             raise UserError(
                 "This design has no flat pattern yet: flat_pattern makes one of a sheet metal "
                 "body."
+            )
+        if not _leave_all(doc):  # (a flat pattern is shown in DESIGN, as in Fusion)
+            raise UserError(
+                "Fission 180 could not leave %s: a dialog of it is open. Finish it first."
+                % workspace_words(before)
             )
         if not flatpattern_ui.enter(fp):
             raise UserError("Fission 180 could not open the flat pattern (a dialog is open?).")

@@ -18,6 +18,8 @@ Path 5, show_workspace: SIMULATION refused without a study, shown after create_s
   ribbon says SIMULATION, inspect_design says so); a body made while SIMULATION shows (every
   tool works from any workspace); DESIGN's MESH tab, MANUFACTURE, ANIMATION, a drawing; back
   to DESIGN.
+Path 5b, RESULTS before a solve and a flat pattern that is not there are refused; a 2 mm plate
+  made sheet metal and laid flat: FLAT PATTERN shown, then DESIGN again.
 Path 6, a command dialog open (F, Fillet): show_workspace is refused as busy and the dialog
   stays; Esc closes it.
 Path 7, ask_person: the AI app shows the form (MCP elicitation) and the person's answer comes
@@ -509,6 +511,49 @@ def in_design():
     h.shot("plan-approach-design")
 
 
+def flat_pattern():
+    from fission180 import flatpattern_ui
+
+    results = call("show_workspace", {"workspace": "simulation", "tab": "results"})
+    h.check(
+        "RESULTS before a solve is refused, with what to do",
+        results["error"] and "solve_study" in results["text"],
+        results["text"],
+    )
+    none = call("show_workspace", {"workspace": "flat_pattern"})
+    h.check(
+        "a flat pattern that is not there is refused",
+        none["error"] and "flat_pattern makes one" in none["text"],
+        none["text"],
+    )
+    top = {"type": "plane", "normal": [0, 0, 1], "at": {"axis": "z", "value": "max"}, "count": 1}
+    ok(
+        "a 2 mm plate",
+        call(
+            "primitive",
+            {
+                "kind": "box",
+                "plane": "XY",
+                "x": -150,
+                "length": 50,
+                "width": 30,
+                "height": 2,
+                "operation": "new_body",
+            },
+        ),
+    )
+    ok("... made sheet metal", call("convert_to_sheet_metal", {"face": top}))
+    ok("... its flat pattern", call("flat_pattern", {"face": top}))
+    ok("the flat pattern shown", call("show_workspace", {"workspace": "flat_pattern"}))
+    h.check(
+        "... the FLAT PATTERN tab is in front",
+        flatpattern_ui.active() is not None and ribbon().current_tab() == "flat_pattern",
+        ribbon().current_tab(),
+    )
+    ok("back to DESIGN", call("show_workspace", {"workspace": "design"}))
+    h.check("... the flat pattern is closed", flatpattern_ui.active() is None)
+
+
 # -- Path 6 -------------------------------------------------------------------------------------
 def open_fillet():
     h.fit()
@@ -571,8 +616,6 @@ def ask_the_person():
 
 
 def same_step_again_and_again():
-    from fission180 import bodies
-
     ok("the box made active", call("activate", {"target": s["box"]}))
     notes = []
     for i in range(8):  # (one dot on the box's top per sketch and extrude: facet copying)
@@ -627,6 +670,7 @@ h.run(
         manufacture_animation_drawing,
         back_to_design,
         in_design,
+        flat_pattern,
         open_fillet,
         refused_while_busy,
         ask_the_person,
