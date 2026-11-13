@@ -2088,7 +2088,7 @@ def _annotation_row(obj):
     return entry
 
 
-def _sheet_row(page, edges):
+def _sheet_row(page, edges, only=None):
     from ... import drawing, drawing_sheets
 
     row = {
@@ -2100,7 +2100,10 @@ def _sheet_row(page, edges):
         "units": drawing.units_of(page),
         "sheet_size_mm": list(_sheet(page)),
         "title_block": drawing.title(page),
-        "views": [_view_row(v, edges) for v in drawing.all_views(page)],
+        "views": [
+            _view_row(v, edges and (only is None or v.Name == only))
+            for v in drawing.all_views(page)
+        ],
         "annotations": [_annotation_row(o) for o in drawing.annotations(page)],
     }
     return row
@@ -2133,8 +2136,9 @@ def get_drawing(ctx, args):
 
     doc = ctx.need_doc()
     _idle(doc)
-    if args.get("drawing"):
-        chosen = _page(ctx, args["drawing"])
+    only = _view(ctx, args["view"]).Name if args.get("view") else None
+    if args.get("drawing") or only:
+        chosen = _page(ctx, args.get("drawing") or only)
         mains = [drawing_sheets.main_page(chosen)]
     else:
         chosen = None
@@ -2144,7 +2148,7 @@ def get_drawing(ctx, args):
         sheets = drawing_sheets.sheets(main)
         if chosen is not None and drawing_sheets.is_sheet_page(chosen):
             sheets = [chosen]
-        first = _sheet_row(sheets[0], args.get("edges"))
+        first = _sheet_row(sheets[0], args.get("edges"), only)
         row = dict(first)
         row["id"] = main.Name
         row["label"] = main.Label
@@ -2159,7 +2163,7 @@ def get_drawing(ctx, args):
         if board:
             row["storyboard"] = board
         if len(sheets) > 1:
-            row["more_sheets"] = [_sheet_row(s, args.get("edges")) for s in sheets[1:]]
+            row["more_sheets"] = [_sheet_row(s, args.get("edges"), only) for s in sheets[1:]]
         out.append(row)
     if not args.get("picture"):
         return json_result({"drawings": out}, compact=True)
