@@ -18,7 +18,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 
-from fission180.ai import tools_core  # noqa: E402
+from fission180.ai import catalog, tools_core  # noqa: E402
 from Fission180Tests.golden import schema  # noqa: E402
 
 OPS = os.path.join(ROOT, "fission180", "ai", "ops")
@@ -152,9 +152,11 @@ class SchemaShape(unittest.TestCase):
         tools = tools_core.mcp_tools()
         self.assertEqual([t["name"] for t in tools], list(tools_core.TOOL_NAMES))
         for item, source in zip(tools, tools_core.TOOLS):
-            self.assertEqual(
-                set(item), {"name", "title", "description", "inputSchema", "annotations"}
-            )
+            keys = {"name", "title", "description", "inputSchema", "annotations"}
+            if item["name"] in catalog.ALWAYS_LOAD:  # (wave 8: Claude Code loads it upfront)
+                keys.add("_meta")
+                self.assertEqual(item["_meta"], {"anthropic/alwaysLoad": True})
+            self.assertEqual(set(item), keys)
             self.assertEqual(item["inputSchema"], source["input_schema"])
             self.assertIsNot(item["inputSchema"], source["input_schema"])
             if item["name"] in VALID:  # none of the first sixteen destroys anything

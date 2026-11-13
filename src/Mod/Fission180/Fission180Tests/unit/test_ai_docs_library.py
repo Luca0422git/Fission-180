@@ -61,6 +61,12 @@ QUESTIONS = (
     ("known issues of the beta", "user/known-issues.md"),
     ("keyboard shortcuts cheat sheet", "user/cheat-sheet.md"),
     ("golden models of shell", "examples/golden-models.md"),
+    # (wave 8, ai-behaviour)
+    ("what questions to ask before building", "handbook.md"),
+    ("which tool is cheapest for a mesh", "handbook.md"),
+    ("the same small step again and again", "troubleshooting.md"),
+    ("a call takes minutes window frozen", "troubleshooting.md"),
+    ("where are the simulation tools workspace", ("handbook.md", "user/parity/simulation.md")),
 )
 
 

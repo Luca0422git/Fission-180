@@ -26,12 +26,19 @@ import time
 BRIDGE_FILE = "bridge.json"
 FOLDER = ("Fission180", "ai")  # under FreeCAD's user data folder (App.getUserAppDataDir())
 CALL_PATH = "/call"
+# (wave 8, ai-speed) while a call runs: what it is doing (POST {} -> status_answer) and a stop
+# of one call by its call_id (POST {"call_id", "reason"} -> {"stopped": bool}). Both are
+# answered on the bridge's own thread, never queued behind the call.
+STATUS_PATH = "/status"
+STOP_PATH = "/stop"
+PATHS = (CALL_PATH, STATUS_PATH, STOP_PATH)
 KEY_HEADER = "X-Fission180-Key"
 MAX_REQUEST_BYTES = 1024 * 1024  # a tool call's arguments; answers (screenshots) can be bigger
 FORMAT = 1
 
 NOT_RUNNING = (
-    "Fission 180 is not running, or 'Allow AI apps to control Fission 180' is off in " "Preferences > AI."
+    "Fission 180 is not running, or 'Allow AI apps to control Fission 180' is off in "
+    "Preferences > AI."
 )
 BAD_KEY = (
     "Fission 180 refused the request: the connection key did not match. Turn 'Allow AI apps "
@@ -58,15 +65,16 @@ def duration_words(seconds):
     return "%d min %d s" % (minutes, rest) if rest else "%d min" % minutes
 
 
-def busy_text(tool, current, seconds):
+def busy_text(tool, current, seconds, doing=""):
     """A new call while `current` has run for `seconds`: it is not run (Fission 180 works on one
-    call at a time on its window's thread, which does not respond until that call is done).
-    Waiting here and asking again only queued more work behind the long one (Luca's Relic
-    design, 2026-11-13: ten minutes frozen, then laggy and frozen again)."""
+    call at a time on its window's thread). Waiting here and asking again only queued more
+    work behind the long one (Luca's Relic design, 2026-11-13: ten minutes frozen, then laggy
+    and frozen again). doing: what the long call says it is doing (progress.doing_words)."""
     return (
-        "Not done: Fission 180 is still working on %s (for %s); its window does not respond "
-        "until that is finished, so %s was not run and nothing was changed. Wait a minute, then "
-        "try again; asking again at once only adds to the wait." % (current, duration_words(seconds), tool)
+        "Not done: Fission 180 is still working on %s (for %s%s); it does one call at a time, "
+        "so %s was not run and nothing was changed. Wait a minute, then try again; asking "
+        "again at once only adds to the wait (the person can press Stop in Fission 180)."
+        % (current, duration_words(seconds), ("; now " + doing) if doing else "", tool)
     )
 
 
@@ -179,7 +187,7 @@ def origin_ok(origin_header):
 
 def check_request(method, path, key_header, key, origin_header=None, length=0):
     """(HTTP status, plain reason) for a request before reading its body; 200 = go on."""
-    if method != "POST" or path.split("?", 1)[0] != CALL_PATH:
+    if method != "POST" or path.split("?", 1)[0] not in PATHS:
         return 404, "not found"
     if not origin_ok(origin_header):
         return 403, "requests from web pages are refused"
@@ -191,8 +199,24 @@ def check_request(method, path, key_header, key, origin_header=None, length=0):
 
 
 # -- envelope ---------------------------------------------------------------------------
-def encode_request(tool, args):
-    return json.dumps({"tool": tool, "args": args or {}}).encode("utf-8")
+def encode_request(tool, args, call_id=None):
+    """A /call body. call_id (the MCP server's own id for the call, a string): a later /stop
+    (the AI app cancelled it) names the call by it."""
+    data = {"tool": tool, "args": args or {}}
+    if call_id is not None:
+        data["call_id"] = str(call_id)
+    return json.dumps(data).encode("utf-8")
+
+
+def decode_call(body):
+    """(tool, args, call_id or None) from a /call body; BridgeError otherwise."""
+    tool, args = decode_request(body)
+    try:
+        data = json.loads(body.decode("utf-8") if isinstance(body, bytes) else body)
+        call_id = data.get("call_id")
+    except Exception:
+        call_id = None
+    return tool, args, call_id if isinstance(call_id, str) and call_id else None
 
 
 def decode_request(body):
@@ -229,6 +253,42 @@ def encode_result(answer):
     return json.dumps(
         result(answer.get("text", ""), answer.get("image_png_base64"), answer.get("is_error"))
     ).encode("utf-8")
+
+
+def status_answer(status, line=""):
+    """The /status answer for progress.current() (None: no call runs): {"working", "tool",
+    "call_id", "seconds", "what", "done", "total", "stopping", "line"}."""
+    out = {"working": bool(status)}
+    if status:
+        for key in ("tool", "call_id", "seconds", "what", "done", "total", "stopping"):
+            out[key] = status.get(key)
+        out["line"] = line
+    return out
+
+
+def decode_status(body):
+    """A /status answer as a dict ({"working": False} when it cannot be read)."""
+    try:
+        data = json.loads(body.decode("utf-8") if isinstance(body, bytes) else body)
+    except (ValueError, UnicodeDecodeError, AttributeError, TypeError):
+        return {"working": False}
+    if not isinstance(data, dict):
+        return {"working": False}
+    data["working"] = bool(data.get("working"))
+    return data
+
+
+def decode_stop(body):
+    """(call_id, reason) of a /stop body; BridgeError when it names no call."""
+    try:
+        data = json.loads(body.decode("utf-8") if isinstance(body, bytes) else body)
+    except (ValueError, UnicodeDecodeError, AttributeError, TypeError) as exc:
+        raise BridgeError("the request is not JSON: %s" % exc)
+    call_id = data.get("call_id") if isinstance(data, dict) else None
+    if not isinstance(call_id, str) or not call_id:
+        raise BridgeError('a stop must be {"call_id": the call\'s id}')
+    reason = data.get("reason")
+    return call_id, reason if isinstance(reason, str) and reason else "the AI app cancelled it"
 
 
 def decode_result(body):

@@ -374,6 +374,184 @@ def signed_volume(points, facets):
     return total / 6.0
 
 
+# ----------------------------------------------------------------------------- touching bodies
+# FreeCAD's mesh booleans (MeshCore's SetOperations, computed in single precision) crash the
+# whole program (a segfault in their Delaunay step) or give a wrong body when the two bodies
+# touch: faces of both in one plane that overlap (a box and a cylinder standing on one
+# floor), a corner or an edge lying on the other body's face (a cone resting on a box), one
+# body flush with the other's face. Checked 2026-11-13 in freecadcmd with 10 such pairs x
+# Join / Cut / Intersect: 4 crashes, 13 wrong bodies or false refusals; OpenCASCADE's solid
+# booleans got all 30 right. So Combine looks for touching first (touching below) and
+# combines touching bodies as solids (mesh.py _exact_boolean); see docs/fission180/parity/mesh.md.
+CONTACT_TOLERANCE = 1e-5  # of the two bodies' size (the diagonal of both together)
+# A corner or an edge on the other's face counts within a tenth of that: on dense meshes
+# (two spheres of 35,000 faces crossing) a corner lies that close to the other surface by
+# chance, and only faces in one plane crash FreeCAD's mesh booleans.
+CONTACT_TOUCH = 0.1
+CONTACT_FAR = 1e-6  # of the farthest coordinate from the origin (single precision there)
+CONTACT_GRID = 48  # cells along the longest side of the region both bodies share, at most
+
+
+def contact_tolerance(diag, farthest):
+    """How close counts as touching for Combine (mm): a little more than single precision
+    rounds away, for bodies of this size this far from the origin."""
+    return max(CONTACT_TOLERANCE * diag + CONTACT_FAR * farthest, 1e-9)
+
+
+def _near_facets(points, facets, lo, hi):
+    """(corners, unit normal, offset, (low, high)) of the facets whose bounding box meets the
+    box lo..hi; facets of no area are left out (they touch nothing)."""
+    found = []
+    for f in facets:
+        p0, p1, p2 = points[f[0]], points[f[1]], points[f[2]]
+        flo = (min(p0[0], p1[0], p2[0]), min(p0[1], p1[1], p2[1]), min(p0[2], p1[2], p2[2]))
+        fhi = (max(p0[0], p1[0], p2[0]), max(p0[1], p1[1], p2[1]), max(p0[2], p1[2], p2[2]))
+        if (
+            fhi[0] < lo[0]
+            or fhi[1] < lo[1]
+            or fhi[2] < lo[2]
+            or flo[0] > hi[0]
+            or flo[1] > hi[1]
+            or flo[2] > hi[2]
+        ):
+            continue
+        n = cross(sub(p1, p0), sub(p2, p0))
+        size = length(n)
+        if size < 1e-300:
+            continue
+        n = (n[0] / size, n[1] / size, n[2] / size)
+        found.append(((p0, p1, p2), n, dot(n, p0), (flo, fhi)))
+    return found
+
+
+def _separated_2d(first, second, tolerance):
+    """True when the convex point sets `first` and `second` (2D; a point, a segment or a
+    triangle each) are more than `tolerance` apart (separating axes)."""
+    for shape in (first, second):
+        count = len(shape)
+        for i in range(count if count > 2 else count - 1):
+            a, b = shape[i], shape[(i + 1) % count]
+            ax, ay = b[1] - a[1], a[0] - b[0]
+            size = math.hypot(ax, ay)
+            if size < 1e-300:
+                continue
+            ax, ay = ax / size, ay / size
+            one = [p[0] * ax + p[1] * ay for p in first]
+            two = [p[0] * ax + p[1] * ay for p in second]
+            if max(one) < min(two) - tolerance or max(two) < min(one) - tolerance:
+                return True
+    return False
+
+
+def _on_face(corners, gaps, face, normal, tolerance):
+    """True when the corners of one facet that lie in another facet's plane (`gaps`: their
+    distances from it) touch that facet: a corner on it, an edge across it, or overlap."""
+    on = [corners[i] for i in range(3) if abs(gaps[i]) <= tolerance]
+    if not on:
+        return False
+    u, v = plane_basis(normal)
+    origin = face[0]
+    flat = [to_2d(p, origin, u, v) for p in face]
+    return not _separated_2d([to_2d(p, origin, u, v) for p in on], flat, tolerance)
+
+
+def _pair_contact(first, second, tolerance):
+    """None, "plane" (the two facets lie in one plane and overlap, within `tolerance`) or
+    "touch" (a corner or an edge of one lies on the other, within CONTACT_TOUCH of it)."""
+    ta, na, da, _box = first
+    tb, nb, db, _box = second
+    gaps_b = [dot(na, p) - da for p in tb]
+    if min(gaps_b) > tolerance or max(gaps_b) < -tolerance:
+        return None  # all of b on one side of a's plane
+    gaps_a = [dot(nb, p) - db for p in ta]
+    if min(gaps_a) > tolerance or max(gaps_a) < -tolerance:
+        return None
+    flat_b = all(abs(g) <= tolerance for g in gaps_b)
+    if flat_b and all(abs(g) <= tolerance for g in gaps_a):
+        return "plane" if _on_face(tb, gaps_b, ta, na, tolerance) else None
+    near = tolerance * CONTACT_TOUCH
+    if _on_face(tb, gaps_b, ta, na, near) or _on_face(ta, gaps_a, tb, nb, near):
+        return "touch"
+    return None
+
+
+def touching(points_a, facets_a, points_b, facets_b, tolerance):
+    """How two meshes touch, for Combine: "plane" when a facet of each lies in one plane
+    (within `tolerance`) and they overlap, "touch" when a corner or an edge of one lies on a
+    facet of the other (within CONTACT_TOUCH x `tolerance`), None when neither (crossing
+    faces are not touching: the booleans handle those). Only the facets inside both bounding
+    boxes are compared, through a grid, so bodies far apart cost almost nothing; "plane" is
+    reported before "touch"."""
+    if not facets_a or not facets_b:
+        return None
+    (alo, ahi), (blo, bhi) = bounds(points_a), bounds(points_b)
+    lo = tuple(max(alo[i], blo[i]) - tolerance for i in range(3))
+    hi = tuple(min(ahi[i], bhi[i]) + tolerance for i in range(3))
+    if any(lo[i] > hi[i] for i in range(3)):
+        return None
+    near_a = _near_facets(points_a, facets_a, lo, hi)
+    near_b = _near_facets(points_b, facets_b, lo, hi)
+    if not near_a or not near_b:
+        return None
+    extent = max(hi[i] - lo[i] for i in range(3))
+    cells = max(1, min(CONTACT_GRID, int(round(len(near_b) ** (1.0 / 3.0) * 2))))
+    cell = max(extent / cells, tolerance * 4.0, 1e-12)
+    top = tuple(max(0, int((hi[i] - lo[i]) / cell)) for i in range(3))
+
+    def span(box):
+        flo, fhi = box
+        return [
+            range(
+                min(top[i], max(0, int((flo[i] - tolerance - lo[i]) / cell))),
+                min(top[i], max(0, int((fhi[i] + tolerance - lo[i]) / cell))) + 1,
+            )
+            for i in range(3)
+        ]
+
+    grid = {}
+    for index, facet in enumerate(near_b):
+        xs, ys, zs = span(facet[3])
+        for i in xs:
+            for j in ys:
+                for k in zs:
+                    grid.setdefault((i, j, k), []).append(index)
+    found = None
+    for facet in near_a:
+        flo, fhi = facet[3]
+        seen = set()
+        xs, ys, zs = span(facet[3])
+        for i in xs:
+            for j in ys:
+                for k in zs:
+                    for index in grid.get((i, j, k), ()):
+                        if index in seen:
+                            continue
+                        seen.add(index)
+                        other = near_b[index]
+                        olo, ohi = other[3]
+                        if (
+                            ohi[0] < flo[0] - tolerance
+                            or ohi[1] < flo[1] - tolerance
+                            or ohi[2] < flo[2] - tolerance
+                            or olo[0] > fhi[0] + tolerance
+                            or olo[1] > fhi[1] + tolerance
+                            or olo[2] > fhi[2] + tolerance
+                        ):
+                            continue
+                        kind = _pair_contact(facet, other, tolerance)
+                        if kind == "plane":
+                            return kind
+                        found = found or kind
+    return found
+
+
+def contact_words(kind):
+    """The plain words for how two bodies touch (touching above)."""
+    if kind == "plane":
+        return "the bodies share a flat face"
+    return "the bodies touch (a corner or an edge of one lies on the other)"
+
+
 # ----------------------------------------------------------------------------- analysis
 def analysis_lines(info):
     """What Repair's analysis says, one line per problem found (empty: nothing found).

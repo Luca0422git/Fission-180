@@ -60,4 +60,5 @@ Done: operation Face1 deleted from Setup1.
 
 ## See also
 
+- Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -83,6 +83,7 @@ import time
 
 from . import log, warn
 from . import recognize_core as core
+from .ai import progress
 
 
 class RecognizeError(ValueError):
@@ -637,11 +638,13 @@ class _Reader:
     def read(self, out):
         t0 = time.time()
         timing = {}
+        progress.step("finding holes")
         holes = self.find_holes()
         threads = self.thread_walls(holes)  # (beta 3 QA)
         islands = self.free_islands(holes)  # (beta 3 QA: raised / engraved text, logos)
         timing["holes"] = time.time() - t0
         t = time.time()
+        progress.step("finding fillets and chamfers")
         blends = self.find_fillets(holes + islands)  # (an island's faces are its own)
         chamfers = self.find_chamfers(holes + islands, blends)
         timing["blends"] = time.time() - t
@@ -694,15 +697,18 @@ class _Reader:
             self.base_shape = self.shape
         else:
             t = time.time()
+            progress.step("taking the features off (OpenCASCADE)")
             removed = self.defeature(holes + islands, chamfers, blends)
             timing["defeaturing"] = time.time() - t
             t = time.time()
             self.base_shape = removed["base"]
+            progress.step("reading the base shape")
             base = self.find_base(removed["base"])
             timing["base"] = time.time() - t
         if base["public"].get("kind") == "none" and not free:
             self._axis_hint(holes + chamfers + blends + islands)
         t = time.time()
+        progress.step("writing the plan")
         plan = core.Plan(self.options.get("taken_ids") or ())
         features = []
         kept_holes = [h for h in holes if h["id"] in removed["ok"]]
@@ -1350,6 +1356,7 @@ class _Reader:
         )
         out = []
         for f in self.facts:
+            progress.step("finding chamfers", f.index, len(self.facts))
             if f.index in taken:
                 continue
             if f.kind == "plane":
@@ -3600,6 +3607,7 @@ def _section(solid, plane, h, box):
     normal)."""
     import Part
 
+    progress.step("a section of the part (OpenCASCADE)")
     frame = core.PLANES[plane]
     size = 4.0 * box.DiagonalLength + 20.0
     center = (box.Center.x, box.Center.y, box.Center.z)
@@ -3709,6 +3717,7 @@ def _prismatic(solid, axis_name, lenient=False):
     region over the levels whose outline it covers) and the bosses / cuts that make the
     rest, or None. lenient: some faces may belong to bosses / cuts along another axis."""
     ranges = []  # (lenient) where the faces of features along other axes are
+    progress.step("reading the part as extrudes along %s" % axis_name)
     walls = _walls(solid, axis_name, allow_taper=True, lenient=lenient, ranges=ranges)
     if walls is None or len(walls[0]) < 2:
         return None

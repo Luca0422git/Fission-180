@@ -513,23 +513,36 @@ def cycle(component):
     doc = component.Document
     doc.openTransaction("Cycle Component Color")
     try:
-        if COLOR_PROP not in component.PropertiesList:
-            component.addProperty(
-                "App::PropertyInteger", COLOR_PROP, "Fission180", "Component colour", 4
-            )
-        # the next colour no other component has (while the palette has one left)
-        taken = {component_color(doc, None)}
-        taken |= {
-            component_color(doc, p) for p in components.list_components(doc) if p is not component
-        }
-        for _try in range(len(PALETTE)):
-            setattr(component, COLOR_PROP, (_cycled(component) + 1) % len(PALETTE))
-            if component_color(doc, component) not in taken:
-                break
+        next_color(component)
         doc.commitTransaction()
     except Exception:
         doc.abortTransaction()
         raise
+    return shown(component)
+
+
+def next_color(component):
+    """cycle() without its undo step (wave 8: the AI's component_colors makes its
+    own "AI: ..." step around it)."""
+    doc = component.Document
+    if COLOR_PROP not in component.PropertiesList:
+        component.addProperty(
+            "App::PropertyInteger", COLOR_PROP, "Fission180", "Component colour", 4
+        )
+    # the next colour no other component has (while the palette has one left)
+    taken = {component_color(doc, None)}
+    taken |= {
+        component_color(doc, p) for p in components.list_components(doc) if p is not component
+    }
+    for _try in range(len(PALETTE)):
+        setattr(component, COLOR_PROP, (_cycled(component) + 1) % len(PALETTE))
+        if component_color(doc, component) not in taken:
+            break
+
+
+def shown(component):
+    """After a colour changed: drawn again (when on) and marked; returns the new colour."""
+    doc = component.Document
     if is_on(doc):
         schedule(doc)
     refresh_marks()

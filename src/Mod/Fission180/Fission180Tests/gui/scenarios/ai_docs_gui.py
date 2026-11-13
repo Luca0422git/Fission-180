@@ -38,11 +38,12 @@ def gui_examples():
     from Fission180Tests.headless import docs_runner
 
     record = bool(os.environ.get("FISSION180_DOCS_RECORD"))
-    rows = docs_runner.run_examples(record=record, gui=True)
+    only = os.environ.get("FISSION180_DOCS_FILTER", "")  # (wave 8: record one tool's example)
+    rows = docs_runner.run_examples(record=record, text_filter=only, gui=True)
     names = [r["label"] for r in rows]
     h.check(
         "the reference examples that need the window ran",
-        len(rows) >= 3 and any("screenshot" in n for n in names),
+        (len(rows) >= 3 and any("screenshot" in n for n in names)) or bool(only and rows),
         names,
     )
     for row in rows:

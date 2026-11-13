@@ -13,8 +13,8 @@ Bevel edges of the current body (Fission 180's Chamfer). distance alone: equal d
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `edges` | object |  |  |  | The edges to bevel. (rules: [selectors](fission180://docs/tools.md#help-selectors)) |
-| `faces` | object |  |  |  | Bevel every sharp edge around these faces. (rules: [selectors](fission180://docs/tools.md#help-selectors)) |
+| `edges` | object |  |  |  | The edges to bevel. A selector picks faces or edges by their geometry, never by names like "Edge7": type, normal [x, y, z], parallel [x, y, z], along [x, y, z], radius, on_faces / not_on_faces (a face selector), at {"axis": "x"\|"y"\|"z", "value": "max"\|"min"\|mm} (or a list), all, any_of [selectors], count (always give it: the tool refuses a different number). Example: the 4 top edges of a box {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4}. The full rules: the server's instructions (Selectors) or get_help topic selectors. |
+| `faces` | object |  |  |  | Bevel every sharp edge around these faces. A selector picks faces or edges by their geometry, never by names like "Edge7": type, normal [x, y, z], parallel [x, y, z], along [x, y, z], radius, on_faces / not_on_faces (a face selector), at {"axis": "x"\|"y"\|"z", "value": "max"\|"min"\|mm} (or a list), all, any_of [selectors], count (always give it: the tool refuses a different number). Example: the 4 top edges of a box {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4}. The full rules: the server's instructions (Selectors) or get_help topic selectors. |
 | `features` | array of strings |  |  | at least 1 item(s) | ids of earlier steps (from get_design's timeline) |
 | `distance` (required) | number | mm |  | > 0 |  |
 | `distance2` | number | mm |  | > 0 |  |

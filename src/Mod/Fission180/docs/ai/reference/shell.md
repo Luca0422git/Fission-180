@@ -13,7 +13,7 @@ Hollow the current body out with a wall thickness (Fission 180's Shell). faces: 
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `faces` | object |  |  |  | The faces to remove. (rules: [selectors](fission180://docs/tools.md#help-selectors)) |
+| `faces` | object |  |  |  | The faces to remove. A selector picks faces or edges by their geometry, never by names like "Edge7": type, normal [x, y, z], parallel [x, y, z], along [x, y, z], radius, on_faces / not_on_faces (a face selector), at {"axis": "x"\|"y"\|"z", "value": "max"\|"min"\|mm} (or a list), all, any_of [selectors], count (always give it: the tool refuses a different number). Example: the 4 top edges of a box {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4}. The full rules: the server's instructions (Selectors) or get_help topic selectors. |
 | `thickness` | number | mm |  | > 0 |  |
 | `direction` | `inside` \| `outside` \| `both` |  | `"inside"` |  |  |
 | `body` | boolean |  |  |  | hollow the whole body, closed (no face removed) |
@@ -66,5 +66,6 @@ Done: AI: Shell 2 mm. Its id is 'Shell1'. Bodies now: Body1: 7872 mm3, 60 x 40 x
 ## See also
 
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
+- Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `edit_extrude_then_shell`, `plastic2_groove_only`, `plastic2_lip_and_groove`, `plastic2_lip_drafted`, `plastic2_lip_open_chain`, `plastic2_lip_root_radius`, `plastic2_lip_suppress`, `plastic2_lip_swap`, `plastic2_snap_distance`, `plastic2_snap_edit_taper`, `plastic2_snap_loop`, `plastic2_snap_parallel` and 30 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -266,6 +266,35 @@ repeats, named in words and by index ([sketches.md](fission180://docs/sketches.m
 - "The answer from Fission 180 was lost ... may or may not have been applied": look at the
   design (`inspect_design`, or `diff_design` since a snapshot) before calling again.
 
+<a id="slow-or-repetitive"></a>
+
+## Slow calls, and the same small step again and again
+
+- **A call takes many seconds and Fission 180 does not respond meanwhile**: every call runs in
+  Fission 180's window. On a part of thousands of faces (a rebuilt mesh, a part with hundreds
+  of holes) `inspect_design`, `check_design` and `compare_to_reference` take seconds each, a
+  solve minutes. `plan_approach` says what is slow on this design (`cost.slow_steps`, and
+  `cost.say_first` when the whole job takes minutes): tell the person before you start, read
+  the numbers each answer already gives, and check once at the end instead of after every
+  small step. Do not call a slow tool again while it runs.
+- **"Note: the last 8 changes were the same small step again and again"**: you are making one
+  sketch and one feature per copy (or copying a mesh facet by facet). Draw every shape in one
+  `create_sketch` and make them in one call, or make one and pattern it; a mesh becomes a
+  solid with `convert_mesh` in one call. A sketch of hundreds of points gets the same note.
+- **A tool of another workspace** (a study, a CAM setup, a storyboard) works from any
+  workspace: call it; `show_workspace` only shows the person where you work.
+- **You do not know which tool does it**: `list_tools` with `goal` ("make it hollow", "turn
+  a mesh into a solid"), or `plan_approach` with the person's words.
+
+```json fission180-calls
+[
+  {"tool": "list_tools", "args": {"goal": "turn a mesh into a solid"},
+   "expect": {"contains": ["The tools for 'turn a mesh into a solid', best first"]}},
+  {"tool": "plan_approach", "args": {"request": "make the plate parametric"},
+   "expect": {"contains": ["set_parameter"], "json": {"goals.0.id": "editable"}}}
+]
+```
+
 ## When the picture and the numbers disagree
 
 Trust the numbers. `render` and `screenshot` are pictures at one size and angle; volumes,

@@ -30,7 +30,7 @@ result's text). API keys never appear in logs or messages.
 import threading
 import time
 
-from . import catalog, tools_core
+from . import approach_core, catalog, tools_core
 from .providers import _common, _stream
 
 MAX_STEPS = 25
@@ -53,14 +53,25 @@ SYSTEM_PROMPT = (
     "lists the faces and edges a selector picks, check_design finds broken steps and bad "
     "solids, render returns a picture. Trust the numbers before the picture. Every "
     "tool call that changes the design is one undo step in Fission 180 (not show_hide or "
-    "activate); undo takes back the last one. Refer to earlier steps by the ids get_design and the tools report (for "
-    "example the sketch id as an extrude's profile). If a tool answers with an error, read "
-    "it, fix the arguments and try again. When the request is unclear or a choice matters "
+    "activate); undo takes back the last one. Refer to earlier steps by the ids get_design "
+    "and the tools report (for example the sketch id as an extrude's profile). If a tool "
+    "answers with an error, read it, fix the arguments and try again. When the request is "
+    "unclear or a choice matters "
     "(a size, which face, whether to replace a file), ask the person instead of guessing. "
     "Keep answers short and plain: the person may be new to CAD. Name every body and sketch "
     "you make with a name that says what it is (rename right after the step that made it: "
-    "\"Base plate\", \"Bracket arm\", \"Hole sketch\"); this is mandatory, and Fission 180 "
-    "refuses your next change until they are named. How to pick faces and "
+    '"Base plate", "Bracket arm", "Hole sketch"); this is mandatory, and Fission 180 '
+    "refuses your next change until they are named. "
+    # (wave 8, ai-behaviour: plan, ask, then pick the cheapest tool; where the tools are)
+    + catalog.APPROACH_HELP.replace(
+        "ask_person shows them as a form where the AI app can; " "otherwise ask in your reply",
+        "ask them in your reply: " "the person reads it in this panel",
+    )
+    + " "
+    + catalog.CHEAPEST_HELP
+    + " "
+    + catalog.WORKSPACES_HELP
+    + " How to pick faces and "
     "edges: " + catalog.SELECTOR_HELP.replace("\n", " ") + " Before guessing how a tool or "
     "feature behaves, search Fission 180's documentation with docs_search and read the part "
     "you need with docs_read; examples_search finds tested recipes and examples. Long "
@@ -212,6 +223,7 @@ class Chat:
         self.max_steps = max(1, int(max_steps))
         self.max_tokens = max_tokens
         self.system = system
+        self.watch = approach_core.RepeatWatch()  # (wave 8: the same small step again and again)
         self.tools = (
             catalog.chat_tools(getattr(adapter, "max_tools", None)) if tools is None else tools
         )
@@ -536,11 +548,11 @@ class Chat:
         if not isinstance(answer, dict):
             return _result("Fission 180 gave no answer for %s." % name, is_error=True)
         text = answer.get("text")
-        return _result(
-            text if isinstance(text, str) else str(text or ""),
-            answer.get("image_png_base64"),
-            answer.get("is_error", False),
-        )
+        text = text if isinstance(text, str) else str(text or "")
+        entry = tools_core.tool(name)
+        if entry is not None and entry["changes_design"]:  # (wave 8: the facet-copying guard)
+            text += self.watch.note(name, args, True, not answer.get("is_error", False))
+        return _result(text, answer.get("image_png_base64"), answer.get("is_error", False))
 
     def reset(self):
         """Forget the conversation (not while send() runs)."""

@@ -13,7 +13,7 @@ import copy
 
 from . import kit
 from .kit import angle, array, boolean, enum, length, number, obj, point2, positive, schema
-from .kit import step_id, string
+from .kit import step_id, step_ids, string
 from .registry import define, example
 from .registry import mm as reg_mm
 
@@ -134,6 +134,8 @@ def _extra_rule(args, problems):
     k = (args.get("set") or {}).get("k_factor")
     if kit.is_type(k, "number") and not 0 <= k <= 1:
         problems.append("set.k_factor must be between 0 and 1")
+    if args.get("delete") and set(args) - {"rule", "delete"}:  # (wave 8, ai-workspaces)
+        problems.append("delete takes only rule (the design rule to delete)")
 
 
 define(
@@ -141,23 +143,24 @@ define(
     "Sheet metal rule",
     "sheet_metal",
     "SHEET METAL > MODIFY > Sheet Metal Rules",
-    "Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): the "
-    "thickness, bend radius, K factor, miter / rip / seam gap and the reliefs that every "
-    "flange, bend and flat pattern of a body following it uses. rule: its name. from: start "
-    "it from another rule (a library rule or one of the design's); without from the design's "
-    "rule of that name is changed (or a new one made with Steel (mm)'s values). set: {field: "
-    "value}: thickness, bend_radius, k_factor (0..1), miter_gap, bend_relief_shape / width / "
-    "depth / remnant, corner_relief_2bend_shape / placement / size, corner_relief_3bend_shape "
-    '/ radius, units (a new rule only); lengths are numbers in the rule\'s units or text in '
-    'Thickness ("Thickness * 2"). active: true makes it the rule new flanges start with. '
-    "Editing a rule that bodies follow rebuilds them. " + RULES_HELP + " Answers the rule's "
-    "values and the design's rules.",
+    "Add or change a sheet metal rule In This Design (Fusion's Sheet Metal Rules): thickness, "
+    "bend radius, K factor, gaps and reliefs of every flange, bend and flat pattern of a body "
+    "following it. rule: its name. from: start from another rule (library or design); "
+    "without it the design's rule of that name changes (or one is made from Steel (mm)). set: "
+    "{field: value} (the fields of the set argument; lengths in the rule's units or text in "
+    'Thickness, "Thickness * 2"). active: the rule new flanges start with. bodies: sheet '
+    "metal bodies that follow it from now on (they rebuild). delete: removes the design rule "
+    "(refused while a body follows it, for the active rule and the last one). Bodies "
+    "following an edited rule rebuild. " + RULES_HELP + " Answers the rule's values and the "
+    "design's rules.",
     schema(
         {
             "rule": string("the rule's name"),
             "from": string("start from this rule (library or design)"),
             "set": _RULE_FIELDS,
             "active": boolean("make it the active rule", default=False),
+            "bodies": step_ids("sheet metal bodies that take this rule"),
+            "delete": boolean("delete this design rule", default=False),
         },
         ["rule"],
     ),
@@ -174,7 +177,12 @@ define(
                 "active": True,
             },
             "a 0.5 mm steel rule, active for the next flanges",
-        )
+        ),
+        example(
+            {"rule": "Aluminum (mm)", "bodies": ["Flange1"]},
+            "the tray made of 1.5 mm aluminium instead (wave 8)",
+        ),
+        example({"rule": "Steel 0.5", "delete": True}, "a rule no body uses any more, deleted"),
     ],
 )
 
@@ -443,9 +451,8 @@ define(
     extra=_extra_bend,
     needs=("solid",),
     id_base="Bend",
-    title_fn=lambda a: "AI: Bend%s" % (
-        " %s deg" % kit.fmt(a["angle"]) if kit.is_type(a.get("angle"), "number") else ""
-    ),
+    title_fn=lambda a: "AI: Bend%s"
+    % (" %s deg" % kit.fmt(a["angle"]) if kit.is_type(a.get("angle"), "number") else ""),
     examples=[
         example(
             {"lines": "Sketch2", "stationary": [10, 20, 1], "angle": 90},
@@ -735,8 +742,14 @@ define(
     title_fn=lambda a: "AI: Convert to sheet metal",
     examples=[
         example(
-            {"face": {"type": "plane", "normal": [0, 0, 1], "at": {"axis": "z", "value": "min"},
-                      "count": 1}},
+            {
+                "face": {
+                    "type": "plane",
+                    "normal": [0, 0, 1],
+                    "at": {"axis": "z", "value": "min"},
+                    "count": 1,
+                }
+            },
             "an even 1 mm U channel becomes sheet metal, measured at its floor",
         )
     ],
@@ -775,8 +788,15 @@ define(
     title_fn=lambda a: "AI: Unfold",
     examples=[
         example(
-            {"face": {"type": "plane", "normal": [0, 0, 1], "at": {"axis": "z", "value": "min"},
-                      "count": 1}, "all": True},
+            {
+                "face": {
+                    "type": "plane",
+                    "normal": [0, 0, 1],
+                    "at": {"axis": "z", "value": "min"},
+                    "count": 1,
+                },
+                "all": True,
+            },
             "lay every bend flat, the floor staying where it is",
         )
     ],
@@ -846,9 +866,15 @@ define(
     title_fn=lambda a: "AI: Rip (%s)" % a.get("type", "edge"),
     examples=[
         example(
-            {"type": "face", "face": {"type": "cylinder", "radius": 2,
-                                      "at": [{"axis": "x", "value": "max"},
-                                             {"axis": "y", "value": "max"}], "count": 1}},
+            {
+                "type": "face",
+                "face": {
+                    "type": "cylinder",
+                    "radius": 2,
+                    "at": [{"axis": "x", "value": "max"}, {"axis": "y", "value": "max"}],
+                    "count": 1,
+                },
+            },
             "cut one round corner out of a converted tube",
         )
     ],
@@ -880,8 +906,14 @@ define(
     title_fn=lambda a: "AI: Create flat pattern",
     examples=[
         example(
-            {"face": {"type": "plane", "normal": [0, 0, 1], "at": {"axis": "z", "value": "min"},
-                      "count": 1}},
+            {
+                "face": {
+                    "type": "plane",
+                    "normal": [0, 0, 1],
+                    "at": {"axis": "z", "value": "min"},
+                    "count": 1,
+                }
+            },
             "the folded tray laid flat from its floor",
         )
     ],

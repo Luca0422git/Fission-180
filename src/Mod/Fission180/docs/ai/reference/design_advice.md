@@ -77,4 +77,5 @@ The answer:
 
 ## See also
 
+- Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -338,8 +338,70 @@ def _middle(edge):
     return p.x, p.y
 
 
+class _Near:
+    """The edges of a compound sorted into a grid of cells by their boxes (grown by
+    TOLERANCE): a point is measured to the edges of its cell only, a straight one by plain
+    sums. (Wave 8, ai-drawing: a point measured against the whole compound with
+    distToShape took about 20 ms, so a section with a few hundred lines took seconds and
+    one of a big assembly many minutes, the window stopped all that time.)"""
+
+    def __init__(self, compound):
+        import Part
+
+        self.Edges = list(compound.Edges) if compound is not None else []
+        self.cells = {}
+        boxes = []
+        for edge in self.Edges:
+            b = edge.BoundBox
+            line = None
+            if isinstance(edge.Curve, (Part.Line, Part.LineSegment)):
+                a, z = edge.Vertexes[0].Point, edge.Vertexes[-1].Point
+                line = (a.x, a.y, a.z, z.x, z.y, z.z)
+            boxes.append((b.XMin - TOLERANCE, b.YMin - TOLERANCE, b.XMax + TOLERANCE,
+                          b.YMax + TOLERANCE, edge, line))  # fmt: skip
+        if not boxes:
+            return
+        x0 = min(b[0] for b in boxes)
+        y0 = min(b[1] for b in boxes)
+        x1 = max(b[2] for b in boxes)
+        y1 = max(b[3] for b in boxes)
+        self.size = max((x1 - x0) / 64.0, (y1 - y0) / 64.0, 4.0 * TOLERANCE)
+        self.origin = (x0, y0)
+        for box in boxes:
+            for i in range(self._cell(box[0], 0), self._cell(box[2], 0) + 1):
+                for j in range(self._cell(box[1], 1), self._cell(box[3], 1) + 1):
+                    self.cells.setdefault((i, j), []).append(box)
+
+    def _cell(self, value, axis):
+        return int((value - self.origin[axis]) // self.size)
+
+    def gap(self, x, y):
+        """The distance from the point (x, y, 0) to the nearest edge near it (inf: none)."""
+        import Part
+
+        best = float("inf")
+        for x0, y0, x1, y1, edge, line in self.cells.get((self._cell(x, 0), self._cell(y, 1)), ()):
+            if not (x0 <= x <= x1 and y0 <= y <= y1):
+                continue
+            if line is not None:
+                ax, ay, az, bx, by, bz = line
+                dx, dy, dz = bx - ax, by - ay, bz - az
+                length = dx * dx + dy * dy + dz * dz
+                t = 0.0 if length < 1e-24 else ((x - ax) * dx + (y - ay) * dy - az * dz) / length
+                t = max(0.0, min(1.0, t))
+                px, py, pz = ax + t * dx - x, ay + t * dy - y, az + t * dz
+                d = (px * px + py * py + pz * pz) ** 0.5
+            else:
+                d = Part.Vertex(V(x, y, 0)).distToShape(edge)[0]
+            best = min(best, d)
+            if best <= TOLERANCE:
+                break
+        return best
+
+
 def _covered(edge, lines, flip):
-    """True when the compound `lines` runs along the whole of `edge`."""
+    """True when `lines` (a compound, or the _Near of one) runs along the whole of
+    `edge`."""
     import Part
 
     if lines is None or not lines.Edges:
@@ -348,7 +410,10 @@ def _covered(edge, lines, flip):
     for t in SAMPLES:
         p = edge.valueAt(first + (last - first) * t)
         try:
-            gap = Part.Vertex(V(p.x, flip * p.y, 0)).distToShape(lines)[0]
+            if isinstance(lines, _Near):
+                gap = lines.gap(p.x, flip * p.y)
+            else:
+                gap = Part.Vertex(V(p.x, flip * p.y, 0)).distToShape(lines)[0]
         except Exception:
             return True
         if gap > TOLERANCE:
@@ -378,10 +443,11 @@ def hidden_lines(section, lines, whole, mode, value):
         return {}
     frame = _Frame(section, behind)
     seams, others = seam_lines(behind, frame)
-    flip = _flip(lines, Part.makeCompound(others.Edges + seams.Edges))
+    flip = _flip(lines, _Near(Part.makeCompound(others.Edges + seams.Edges)))
+    seams, others = _Near(seams), _Near(others)
     hidden = {}
     if mode != "Full":
-        kept = kept_lines(section, whole, frame, mode, value)
+        kept = _Near(kept_lines(section, whole, frame, mode, value))
         deeper = {i: e for i, e in lines if not _covered(e, kept, flip)}
         if len(deeper) == len(lines):
             # nothing of the copy covers any line: something is off (do no harm)

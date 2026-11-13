@@ -194,5 +194,155 @@ class Framing(unittest.TestCase):
         self.assertEqual(json.loads(data.decode("utf-8"))["result"]["text"], "a\nb é")
 
 
+# -- wave 8, ai-behaviour: the AI app's own question form, the guard, the instructions' size ----
+class AskPerson(unittest.TestCase):
+    """ask_person through MCP elicitation where the AI app declared it (Claude Code in a
+    terminal declares elicitation {form, url}; Gemini CLI's client declares roots only:
+    docs/fission180/parity/ai.md "Wave 8"), the sentence to ask in the reply elsewhere."""
+
+    QUESTIONS = [{"question": "A solid or a timeline?", "choices": ["solid", "timeline"],
+                  "default": "solid"}]
+
+    def setUp(self):
+        mcp_core.reset_session()
+        mcp_core.set_sender(None)
+
+    tearDown = setUp
+
+    def initialize(self, capabilities):
+        mcp_core.handle(request("initialize", {"protocolVersion": "2025-11-25",
+                                               "capabilities": capabilities}), FakeFission180())
+
+    def ask(self, fake=None, request_id=7):
+        answer = mcp_core.handle(
+            request("tools/call", {"name": "ask_person",
+                                   "arguments": {"questions": self.QUESTIONS}}, request_id),
+            fake or FakeFission180(),
+        )
+        return answer["result"]["content"][0]["text"], answer["result"]["isError"]
+
+    def test_no_elicitation_says_ask_in_the_reply(self):
+        fake = FakeFission180()
+        self.initialize({"roots": {"listChanged": True}})
+        text, err = self.ask(fake)
+        self.assertFalse(err)
+        self.assertIn("ask the questions in your reply", text)
+        self.assertEqual(fake.calls, [])  # (answered by the server: works with Fission 180 closed)
+
+    def test_capabilities(self):
+        self.assertTrue(mcp_core._client_elicits({"elicitation": {}}))
+        self.assertTrue(mcp_core._client_elicits({"elicitation": {"form": {}, "url": {}}}))
+        self.assertFalse(mcp_core._client_elicits({"elicitation": {"url": {}}}))
+        self.assertFalse(mcp_core._client_elicits({"roots": {}}))
+        self.assertFalse(mcp_core._client_elicits(None))
+
+    def _app(self, reply):
+        """A fake AI app: answers our elicitation/create on another thread, as fission180_mcp's
+        reading thread hands the answer to mcp_core.handle."""
+        import threading
+
+        sent = []
+
+        def send(message):
+            sent.append(message)
+            if message.get("method") == "elicitation/create" and reply is not None:
+                answer = {"jsonrpc": "2.0", "id": message["id"], "result": reply}
+                threading.Timer(0.05, mcp_core.handle, (answer, FakeFission180())).start()
+
+        return send, sent
+
+    def test_the_form_round_trip(self):
+        send, sent = self._app({"action": "accept", "content": {"q1": "timeline"}})
+        mcp_core.set_sender(send, set())
+        self.initialize({"elicitation": {"form": {}}})
+        text, err = self.ask()
+        self.assertFalse(err)
+        self.assertIn("The person answered", text)
+        self.assertIn("A solid or a timeline? timeline", text)
+        create = [m for m in sent if m.get("method") == "elicitation/create"][0]
+        field = create["params"]["requestedSchema"]["properties"]["q1"]
+        self.assertEqual(field["enum"], ["solid", "timeline"])
+        self.assertEqual(mcp_core._PENDING, {})
+
+    def test_declined(self):
+        send, _sent = self._app({"action": "decline"})
+        mcp_core.set_sender(send, set())
+        self.initialize({"elicitation": {}})
+        text, _err = self.ask()
+        self.assertIn("declined", text)
+
+    def test_a_cancelled_call_stops_waiting_and_cancels_the_form(self):
+        cancelled = set()
+        send, sent = self._app(None)  # (the app never answers)
+        mcp_core.set_sender(send, cancelled)
+        self.initialize({"elicitation": {}})
+        import threading
+
+        threading.Timer(0.1, cancelled.add, (7,)).start()
+        text, _err = self.ask(request_id=7)
+        self.assertIn("ask them in your reply", text)
+        self.assertTrue(any(m.get("method") == "notifications/cancelled" for m in sent))
+
+    def test_an_answer_nobody_waits_for_is_ignored(self):
+        self.assertIsNone(mcp_core.handle({"jsonrpc": "2.0", "id": "fission180-99",
+                                           "result": {}}, FakeFission180()))
+
+
+class Guard(unittest.TestCase):
+    def test_the_same_small_step_again_and_again_gets_a_note(self):
+        mcp_core.reset_session()
+        fake = FakeFission180({"text": "Done: AI: Extrude.", "image_png_base64": None,
+                               "is_error": False})
+        texts = []
+        for i in range(8):
+            for name, args in (
+                ("create_sketch", {"plane": "XY", "geometry": [{"rect": [i, 0, i + 1, 1]}]}),
+                ("extrude", {"profile": "Sketch%d" % (i + 1), "distance": 0.5}),
+            ):
+                answer = mcp_core.handle(
+                    request("tools/call", {"name": name, "arguments": args}), fake
+                )
+                texts.append(answer["result"]["content"][0]["text"])
+        self.assertTrue(any("convert_mesh" in t and "pattern" in t for t in texts))
+        self.assertNotIn("Note:", texts[0])
+        mcp_core.reset_session()
+
+
+class Instructions(unittest.TestCase):
+    def test_the_essentials_come_first_and_fit_claude_code(self):
+        # Claude Code cuts a server's instructions after 4,096 characters
+        # (code.claude.com/docs/en/mcp, checked 2026-11-13): what matters most comes first.
+        from fission180.ai import catalog
+
+        head = mcp_core.INSTRUCTIONS[:4096]
+        self.assertLessEqual(len(catalog.ESSENTIALS), catalog.ESSENTIAL_LIMIT)
+        self.assertTrue(mcp_core.INSTRUCTIONS.startswith(catalog.ESSENTIALS))
+        for words in ("plan_approach", "ask_person", "in one message", "convert_mesh",
+                      "facet by facet", "pattern", "any workspace", "show_workspace",
+                      "list_tools with goal", "count", "get_help topics selectors",
+                      "must get a descriptive name", "docs_search"):
+            self.assertIn(words, head, words)
+
+    def test_initialize_carries_them(self):
+        answer = mcp_core.handle(
+            request("initialize", {"protocolVersion": "2025-11-25", "capabilities": {}}),
+            FakeFission180(),
+        )
+        self.assertEqual(answer["result"]["instructions"], mcp_core.INSTRUCTIONS)
+        mcp_core.reset_session()
+
+    def test_no_description_is_cut_in_claude_code(self):
+        # (an upfront tool's description is cut there after 4,096 characters too; ai-common.md
+        # asks for about 900: the longer ones are listed in docs/fission180/parity/ai.md)
+        for item in tools_core.mcp_tools():
+            self.assertLessEqual(len(item["description"]), 4096, item["name"])
+
+    def test_a_few_tools_load_upfront(self):
+        listed = {t["name"]: t for t in tools_core.mcp_tools()}
+        upfront = [n for n, t in listed.items() if t.get("_meta", {}).get("anthropic/alwaysLoad")]
+        self.assertIn("plan_approach", upfront)
+        self.assertLessEqual(len(upfront), 6)
+
+
 if __name__ == "__main__":
     unittest.main()

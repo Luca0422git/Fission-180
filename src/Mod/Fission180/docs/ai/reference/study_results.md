@@ -6,7 +6,7 @@ Fusion: SIMULATION > RESULTS (legend, Show Min / Max, Reaction Force, Results De
 
 ## What it does
 
-The results of a study's last solve as numbers: the minimum and maximum of every result (safety factor, von Mises, 1st / 3rd principal and the stress components in MPa, displacement in mm, strain) with where they are [x, y, z] mm, per body (material, largest stress and displacement, lowest safety factor), the reaction force at every constraint (N), the mesh, and the verdict in a sentence (lowest safety factor against target: "lowest safety factor 1.4 at (x, y, z) on Body1: below 2"; below 1 the part would bend for good). out_of_date: the design or the study changed since the solve. results: only these result keys. Without a study and with several studies it lists them. study: the study's id or name (create_study answers it; default the newest study).
+The results of a study's last solve as numbers: the minimum and maximum of every result (safety factor, von Mises, 1st / 3rd principal and the stress components in MPa, displacement in mm, strain) with where they are [x, y, z] mm, per body (material, largest stress and displacement, lowest safety factor), the reaction force at every constraint (N), the mesh, and the verdict in a sentence (lowest safety factor against target: "lowest safety factor 1.4 at (x, y, z) on Body1: below 2"; below 1 the part would bend for good), Solver Data (mesh quality, how long the solve took) and, after adaptive refinement, the Convergence Plot's numbers. out_of_date: changed since the solve. results: only these keys. With several studies and none given it lists them. study_probe reads values at points, on faces and on a section. study: the study's id or name (create_study answers it; default the newest study).
 
 ## Arguments
 
@@ -18,7 +18,7 @@ The results of a study's last solve as numbers: the minimum and maximum of every
 
 ## Answer
 
-A plain sentence, then JSON with: `study`, `id`, `solved`, `out_of_date`, `verdict`, `safety`, `results`, `bodies`, `reactions`, `mesh`, `safety_basis`, `notes`, `units`. The example below shows a real one.
+A plain sentence, then JSON with: `study`, `id`, `solved`, `out_of_date`, `verdict`, `safety`, `results`, `bodies`, `reactions`, `mesh`, `safety_basis`, `notes`, `units`, `solver`, `solve_seconds`. The example below shows a real one.
 
 ## Errors
 
@@ -121,7 +121,7 @@ Lowest safety factor 1.27 at (6.121, 26.13, 10) mm on Body1: below 2.
  "bodies": {
   "Body1": {
    "displacement_max": 0.21201575620458465,
-... (29 more lines)
+... (44 more lines)
 ```
 
 ## More argument examples

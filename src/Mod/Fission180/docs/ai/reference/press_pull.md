@@ -2,12 +2,12 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fusion: SOLID > MODIFY > Press Pull (Q). Category: Modify. Changes the design (one undo step). Its undo step is named like "AI: Press Pull 5 mm". Needs a solid body.
+Fusion: SOLID > MODIFY > Press Pull (Q) / Offset Face. Category: Modify. Changes the design (one undo step). Its undo step is named like "AI: Press Pull 5 mm". Needs a solid body.
 It builds the design step(s) `press_pull`, `press_pull_type` (the golden models' step language).
 
 ## What it does
 
-Fusion's Press Pull: push or pull faces by a distance (mm, negative pushes in), or give edges (they get a fillet of that radius), or fillet_face (a face a fillet made: that fillet's radius becomes distance). offset_type (faces): automatic (default), new (a new Press Pull step), modify (change the extrude that made the faces, no new step).
+Fusion's Press Pull: push or pull faces by a distance (mm, negative pushes in), or give edges (they get a fillet of that radius), or fillet_face (a face a fillet made: that fillet's radius becomes distance). offset_type (faces): automatic (default), new (a new Press Pull step), modify (change the extrude that made the faces, no new step). offset_face: true makes it an Offset Face step (SOLID > MODIFY > Offset Face: the same move of faces, named so in the timeline).
 
 ## Arguments
 
@@ -18,6 +18,7 @@ Fusion's Press Pull: push or pull faces by a distance (mm, negative pushes in), 
 | `fillet_face` | object |  |  |  | a face of a fillet (a face selector: filters type, normal, along, radius, at, all, count, any_of; see get_help topic selectors). Give count. |
 | `distance` (required) | number | mm |  |  | mm (a radius for edges / fillet faces) |
 | `offset_type` | `automatic` \| `new` \| `modify` |  | `"automatic"` |  |  |
+| `offset_face` | boolean |  | `false` |  | an Offset Face step (faces) |
 
 ## Answer
 

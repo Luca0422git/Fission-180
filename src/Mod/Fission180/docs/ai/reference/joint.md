@@ -6,7 +6,7 @@ Fusion: ASSEMBLE > Joint (J). Category: Assemble. Changes the design (one undo s
 
 ## What it does
 
-Fusion's Joint: the first component moves so that its snap point meets the second's. type rigid | revolute | slider | cylindrical | pinslot | planar | ball; first / second: {component, face | edge | vertex, snap, point}: the element is found on that component with a selector, snap picks which of its snap points (centre of a circle or face, vertex, midpoint...). offset x / y / z (mm), angle (degrees), flip; rotate / slide: the motion axis x | y | z. Answers where the component went and whether the joint holds.
+Fusion's Joint: the first component moves so that its snap point meets the second's. type rigid | revolute | slider | cylindrical | pinslot | planar | ball; first / second: {component, face | edge | vertex | joint_origin, snap, point}: the element is found on that component with a selector, snap picks which of its snap points (centre of a circle or face, vertex, midpoint...). Parts already in place: as_built_joint. offset x / y / z (mm), angle (degrees), flip; rotate / slide: the motion axis x | y | z. Answers where the component went and whether the joint holds.
 
 ## Arguments
 
@@ -20,6 +20,7 @@ Fusion's Joint: the first component moves so that its snap point meets the secon
 | `first.vertex` | array of 3 numbers |  |  |  | the corner clicked |
 | `first.snap` | `centre` \| `vertex` \| `midpoint` \| `circle` \| `point` \| `origin` |  |  |  | which snap point of the element (default: the nearest to point, else its centre) |
 | `first.point` | array of 3 numbers | mm |  |  | where on the element (design coordinates) |
+| `first.joint_origin` | string |  |  |  | a joint origin (joint_origin) instead of an element |
 | `second` (required) | object |  |  |  | one side of a joint: a component and an element of it with a snap point |
 | `second.component` (required) | string |  |  |  | the component or body this side is on (a step in it works) |
 | `second.face` | object |  |  |  | the face clicked (on that component) (a face selector: filters type, normal, along, radius, at, all, count, any_of; see get_help topic selectors). Give count. |
@@ -27,6 +28,7 @@ Fusion's Joint: the first component moves so that its snap point meets the secon
 | `second.vertex` | array of 3 numbers |  |  |  | the corner clicked |
 | `second.snap` | `centre` \| `vertex` \| `midpoint` \| `circle` \| `point` \| `origin` |  |  |  | which snap point of the element (default: the nearest to point, else its centre) |
 | `second.point` | array of 3 numbers | mm |  |  | where on the element (design coordinates) |
+| `second.joint_origin` | string |  |  |  | a joint origin (joint_origin) instead of an element |
 | `offset` | array of 3 numbers | mm |  |  | [x, y, z] offset of the joint origin (mm) |
 | `angle` | number | deg | `0` |  | (degrees) |
 | `flip` | boolean |  | `false` |  |  |

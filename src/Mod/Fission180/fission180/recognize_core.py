@@ -89,19 +89,34 @@ def same(a, b, tol=TOL):
 
 
 # -- vectors (3D tuples) ------------------------------------------------------------------------
+# (wave 8, ai-speed) 3D vectors written out, other lengths the general way: the same numbers
+# (the same additions in the same order), without a generator per call; describe_reference
+# made 1.6 million of these calls on a part of 3,000 faces.
+def _three(a):
+    return type(a) in (tuple, list) and len(a) == 3
+
+
 def add(a, b):
+    if _three(a) and _three(b):
+        return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
     return tuple(x + y for x, y in zip(a, b))
 
 
 def sub(a, b):
+    if _three(a) and _three(b):
+        return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
     return tuple(x - y for x, y in zip(a, b))
 
 
 def mul(a, k):
+    if _three(a):
+        return (a[0] * k, a[1] * k, a[2] * k)
     return tuple(x * k for x in a)
 
 
 def dot(a, b):
+    if _three(a) and _three(b):
+        return 0 + a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
     return sum(x * y for x, y in zip(a, b))
 
 
@@ -117,6 +132,8 @@ def unit(a):
     n = norm(a)
     if n < 1e-15:
         raise ValueError("zero-length vector")
+    if _three(a):
+        return (a[0] / n, a[1] / n, a[2] / n)
     return tuple(x / n for x in a)
 
 

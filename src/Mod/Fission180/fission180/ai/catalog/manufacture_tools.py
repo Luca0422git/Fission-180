@@ -369,14 +369,16 @@ define(
     "Simulate",
     "manufacture",
     "MANUFACTURE > MILLING > ACTIONS > Simulate",
-    "Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simulate, "
-    "without the pictures): machining time (s), cutting and rapid distances (mm), the "
-    "stock's volume before and the volume removed (mm3; the stock is a grid of columns, so "
-    "volumes are within a few percent), and collisions: every rapid move that went into "
-    "material, with its operation, G-code line, place [x, y, z] in setup coordinates and "
-    "depth (mm). An empty collisions list is what a safe program has. operations: only "
-    "these. Every operation simulated needs an up-to-date toolpath (cam_generate). Only the "
-    "cutter is checked, not the holder or clamps. Changes nothing. " + SETUP_HELP,
+    "Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simulate "
+    "without the pictures): machining time (s), cutting and rapid distances (mm), the stock's "
+    "volume and the volume removed (mm3, within a few percent: a grid of columns), "
+    "collisions (rapid moves into material: operation, G-code line, place in setup "
+    "coordinates, depth mm), and the stock compared with the model: gouges (the tool cut into "
+    "the part: area, deepest, where, the operation) and stock_left_on_model (most and mean "
+    "left above the part: a finishing pass needed?). Empty collisions and no gouge is what a "
+    "safe program has. operations: only these; each needs an up-to-date toolpath "
+    "(cam_generate). Only the cutter is checked, not the holder or clamps. 1 to 10 s (a 3D "
+    "finishing toolpath of 100,000 moves: a minute). Changes nothing. " + SETUP_HELP,
     schema(
         {
             "setup": _setup(),
@@ -471,7 +473,8 @@ define(
     "bull nose mills, face mills, chamfer mills, spot drills and drills). With library: its "
     "tools: id (what cam_operation's tool takes), name, number, type, diameter and lengths "
     "(mm), flutes, and the cutting data (spindle_speed rpm, feeds mm/min, stepdown, stepover "
-    "mm). type / diameter (mm, within 0.01) narrow the list. Changes nothing.",
+    "mm). type / diameter (mm, within 0.01) narrow the list. Changes nothing "
+    "(cam_tool_library adds, edits and copies tools).",
     schema(
         {
             "library": string("a library's key (default: list the libraries)"),
@@ -485,5 +488,125 @@ define(
     examples=[
         example({}, "the libraries"),
         example({"library": "sample:mm", "type": "flat"}, "the metric sample end mills"),
+    ],
+)
+
+
+# == wave 8, ai-workspaces: the Setup Sheet and the Tool Library's changes ======================
+define(
+    "cam_setup_sheet",
+    "Setup sheet",
+    "manufacture",
+    "MANUFACTURE > MILLING > ACTIONS > Setup Sheet",
+    "Write a setup's Setup Sheet (Fusion's): one HTML page for the person at the machine with "
+    "the program, the work coordinate system and its origin, the stock and model sizes, every "
+    "tool (number, type, diameter, flute length, flutes) and every operation in machining "
+    "order (strategy, tool, spindle speed, feeds, stepdown, stepover, lowest Z, cutting "
+    'length and time). path: a full path (.html added; a folder: "<setup> setup '
+    'sheet.html" in it). Operations without an up-to-date toolpath have no numbers (the '
+    "answer names them: cam_generate first). A file that exists is not replaced unless the "
+    "person agrees. " + SETUP_HELP,
+    schema(
+        {"setup": _setup(), "path": string("the HTML file to write, or its folder (a full path)")},
+        ["path"],
+    ),
+    changes=False,
+    writes_files=True,
+    confirm_overwrite=True,
+    needs=("solid",),
+    title_fn=lambda a: "AI: Setup Sheet",
+    examples=[example({"path": "~/cnc"}, "the newest setup's sheet in ~/cnc")],
+)
+
+TOOL_LIBRARY_ACTIONS = ("add", "edit", "delete", "copy", "new_library", "delete_library")
+
+
+def _extra_tool_library(args, problems):
+    what = args.get("action")
+    needs = {
+        "add": ("tool",),
+        "edit": ("id", "tool"),
+        "delete": ("id",),
+        "copy": ("id",),
+        "new_library": ("name",),
+        "delete_library": ("library",),
+    }.get(what, ())
+    for key in needs:
+        if key not in args:
+            problems.append("%s needs %s" % (what, key))
+    allowed = {
+        "add": {"library", "tool"},
+        "edit": {"library", "id", "tool"},
+        "delete": {"library", "id"},
+        "copy": {"from_library", "to_library", "id"},
+        "new_library": {"name"},
+        "delete_library": {"library"},
+    }.get(what, set())
+    for key in args:
+        if key != "action" and key not in allowed:
+            problems.append("%s is not for action %s" % (key, what))
+    tool = args.get("tool")
+    if what == "add" and isinstance(tool, dict):
+        _extra_tool({"tool": tool}, problems)
+    if what == "edit" and isinstance(tool, dict) and ("type" in tool or "library" in tool):
+        problems.append("edit changes a tool's values (diameter, cutting...), not its type")
+
+
+define(
+    "cam_tool_library",
+    "Change tool library",
+    "manufacture",
+    "MANUFACTURE > MILLING > MANAGE > Tool Library (New Tool, Edit, Copy, Delete, New Library)",
+    "Change the Tool Library (Fusion's Tool Library dialog). action add: a new tool in "
+    "library (default local:Local) from tool {type, diameter, ...} as cam_operation takes it "
+    "(number: the next free one unless given); edit: the tool id's values laid over (tool: "
+    'only what changes, e.g. {"cutting": {"spindle_speed": 18000}}; in library document it '
+    "changes every operation using it, one undo step, and their toolpaths need regenerating); "
+    "delete: tool id from a library; copy: tool id from from_library (a sample library too) "
+    "into to_library (default local:Local); new_library: an empty local library called name; "
+    "delete_library: a local library with its tools (the person is asked first). The sample "
+    "libraries never change. Local libraries are FreeCAD tool files on this computer, shared "
+    "by every design. Answers the tool with its id (what cam_operation's tool takes).",
+    schema(
+        {
+            "action": enum(TOOL_LIBRARY_ACTIONS, "what to do"),
+            "library": string("the library's key (cam_tools lists them; default local:Local)"),
+            "id": string("the tool's id (cam_tools lists it)"),
+            "tool": free_object("add: the new tool; edit: the values to change"),
+            "from_library": string("copy: the library the tool is in"),
+            "to_library": string("copy: a local library (default local:Local)"),
+            "name": string("new_library: its name"),
+        },
+        ["action"],
+    ),
+    extra=_extra_tool_library,
+    writes_files=True,
+    destructive=True,
+    needs=(),
+    own_id=False,
+    title_fn=lambda a: "AI: Tool library %s" % str(a.get("action", "")).replace("_", " "),
+    examples=[
+        example(
+            {"action": "add", "tool": {"type": "flat", "diameter": 3.175, "flutes": 1}},
+            "a 1/8 in single-flute end mill in the Local library",
+        ),
+        example(
+            {
+                "action": "copy",
+                "from_library": "sample:mm",
+                "id": "sample-mm-flat-6",
+                "to_library": "local:Local",
+            },
+            "copy the sample 6 mm end mill to change it",
+        ),
+        example(
+            {
+                "action": "edit",
+                "library": "document",
+                "id": "sample-mm-flat-6",
+                "tool": {"cutting": {"cutting_feed": 600}},
+            },
+            "slower feed for every operation of this design using that end mill",
+        ),
     ],
 )

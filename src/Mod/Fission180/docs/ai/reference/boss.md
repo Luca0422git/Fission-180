@@ -72,5 +72,6 @@ Done: AI: Boss. Its id is 'Boss'. Bodies now: Body1: 13345.6 mm3, 60 x 40 x 20.8
 
 ## See also
 
+- Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `plastic_boss_alignment_roots`, `plastic_boss_blends`, `plastic_boss_enclosure`, `plastic_boss_fastener`, `plastic_boss_hole_radii`, `plastic_boss_major_draft`, `plastic_boss_ribs_each`, `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

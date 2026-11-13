@@ -6,6 +6,11 @@ numbers. Every call in every recipe is run by Fission 180's tests in real FreeCA
 arguments, the ids the answers report and the numbers are known to be right. Copy the
 calls, change the sizes, and check with the same tools.
 
+Before you start one: `plan_approach` with the person's request picks the route (it names the
+recipe's tools in order, the questions to ask first and the slow steps) and says when a job
+needs no recipe at all (a mesh becomes a solid with one `convert_mesh` call; one change is one
+call). [Before you build](fission180://docs/handbook.md#before-you-build) has the routine.
+
 | Recipe | What it shows |
 |---|---|
 | [L bracket with mounting holes](fission180://docs/recipes/bracket.md) | a side profile extruded, inside fillet, outside chamfer, holes into two faces, material and mass |
@@ -20,7 +25,14 @@ calls, change the sizes, and check with the same tools.
 | [Lofted handle](fission180://docs/recipes/lofted-handle.md) | loft through three profiles, ellipses, checking the size, diff of a cut |
 | [Curved panel from a surface patch](fission180://docs/recipes/surface-patch.md) | 3D boundary curves, surface patch, thicken, surface bodies |
 | [Parametric mounting plate](fission180://docs/recipes/parametric-plate.md) | user parameters, sketch dimensions and model parameters with expressions, a pattern that follows, change and verify |
-| [Is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md) | a simulation study: fixed holes, a force, pre-check, solve, safety factor and reactions, thicken and solve again |
+| [Is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md) | a simulation study: fixed holes, a force, pre-check, mesh, solve, safety factor and reactions, probes at points / faces / a section, a report, thicken and solve again |
+| [Mill a pocketed plate (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md) | CNC milling: setup and origin, a tool of the person's library, facing, pocket, contour with tabs, drilling, Simulate (collisions, gouges, stock left), G-code checked, setup sheet |
+| [An exploded-view video (ANIMATION)](fission180://docs/recipes/exploded-view-video.md) | a storyboard: Home view, Auto Explode all levels with trails, a camera move, a callout, the timeline adjusted, Publish Video |
+| [A laser-cut sheet metal bracket (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md) | a rule, base and edge flanges, holes, the flat pattern and its DXF for a laser cutter, another sheet thickness |
+| [A plastic enclosure (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md) | a plastic rule, box and lid, lip and groove, bosses, a snap fit, Design Advice, a 3D print file, Export Everything |
+| [A fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md) | drawing views, every dimension kind (sizes, ordinates, baseline), a fit and tolerances, centre marks, datum and position tolerance, section and detail, title block, checking with get_drawing and its picture, DXF |
+| [An assembly drawing with an exploded view](fission180://docs/recipes/assembly-drawing.md) | components, a storyboard, an exploded view, a parts list with balloons, Renumber and Align Balloons, the parts list as CSV |
+| [A sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) | the flat pattern drawn with its size, a bend table, bend notes, the folded part beside it, CSV and DXF |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about

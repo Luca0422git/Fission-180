@@ -519,6 +519,7 @@ _JOINT_SIDE = obj(
             "which snap point of the element (default: the nearest to point, else " "its centre)",
         ),
         "point": kit.point3("where on the element (design coordinates)"),
+        "joint_origin": step_id("a joint origin (joint_origin) instead of an element"),
     },
     ["component"],
     "one side of a joint: a component and an element of it with a snap point",
@@ -530,9 +531,9 @@ def _extra_joint(args, problems):
         side = args.get(key)
         if not isinstance(side, dict):
             continue
-        kinds = [k for k in ("face", "edge", "vertex") if k in side]
+        kinds = [k for k in ("face", "edge", "vertex", "joint_origin") if k in side]
         if len(kinds) > 1:
-            problems.append("%s: give one of face, edge, vertex" % key)
+            problems.append("%s: give one of face, edge, vertex, joint_origin" % key)
         if "face" in side:
             kit.check_selector(side["face"], key + ".face", "faces", problems)
         if "edge" in side:
@@ -546,10 +547,11 @@ define(
     "ASSEMBLE > Joint (J)",
     "Fusion's Joint: the first component moves so that its snap point meets the second's. "
     "type rigid | revolute | slider | cylindrical | pinslot | planar | ball; first / second: "
-    "{component, face | edge | vertex, snap, point}: the element is found on that component "
-    "with a selector, snap picks which of its snap points (centre of a circle or face, "
-    "vertex, midpoint...). offset x / y / z (mm), angle (degrees), flip; rotate / slide: the "
-    "motion axis x | y | z. Answers where the component went and whether the joint holds.",
+    "{component, face | edge | vertex | joint_origin, snap, point}: the element is found on "
+    "that component with a selector, snap picks which of its snap points (centre of a circle "
+    "or face, vertex, midpoint...). Parts already in place: as_built_joint. offset x / y / z "
+    "(mm), angle (degrees), flip; rotate / slide: the motion axis x | y | z. Answers where "
+    "the component went and whether the joint holds.",
     schema(
         {
             "type": enum(
@@ -606,7 +608,9 @@ define(
     extra=_extra_drive,
     own_id=False,
     title_fn=lambda a: "AI: Drive joint %s" % a.get("joint", ""),
-    examples=[example({"joint": "Joint", "angle": 45}, "turn the first joint (id Joint) to 45 degrees")],
+    examples=[
+        example({"joint": "Joint", "angle": 45}, "turn the first joint (id Joint) to 45 degrees")
+    ],
 )
 define(
     "ground",

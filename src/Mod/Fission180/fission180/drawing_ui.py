@@ -1539,18 +1539,10 @@ def automatic_views(page):
         # out as if the isometric view were as small as the part's depth, and the kind of
         # each view was read from its direction on the sheet: a long part's corner view
         # counted as a second "Right" view and no view at all was made)
-        base = drawing.add_base_view(page, sources, 0.0, 0.0, "Front", scale=1.0)
+        # (a drawing made From Animation: every view shows the storyboard's end; the same
+        # code as the AI's create_drawing automatic)
         storyboard = drawing._get(page, "Fission180Storyboard", "")
-        if storyboard:
-            # a drawing made From Animation: every view shows the storyboard's end
-            drawing_exploded.add_exploded(base, storyboard)
-        # (the base view's own orientation: a flat pattern is drawn from the top)
-        plan = drawing.automatic_plan(page, list(base.Source), drawing.orientation_of(base))
-        drawing.set_scale(base, plan["scale"])
-        base.X, base.Y = plan["views"]["Base"]
-        for kind in core.AUTO_KINDS:
-            x, y = plan["views"][kind]
-            drawing.add_projected(base, kind, x, y)
+        base = drawing.add_automatic_views(page, sources, storyboard)[0]
         doc.recompute()
         taskui._end_transaction(doc)
     except Exception as exc:
@@ -1561,7 +1553,7 @@ def automatic_views(page):
             "CREATE > Base View, then Projected View." % exc
         )
         return None
-    if not plan["fits"]:
+    if not getattr(page, "Fission180AutoFits", True):
         commands.tell(
             "The design is too big for this sheet even at the smallest scale: the views "
             "overlap. Choose a bigger sheet, or scale the base view down (double-click it)."

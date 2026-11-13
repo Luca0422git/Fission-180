@@ -36,16 +36,20 @@ def get_design(ctx, args):
         "active_body": active.Name if active is not None else None,
         "bodies": [],
     }
+    from .approach_actions import shown_workspace  # (wave 8, ai-behaviour: what the window shows)
+
+    info["workspace"] = shown_workspace(ctx.host, doc)  # (None: no window)
     for body in bodies.solid_bodies(doc):
         shape = body.Shape
+        counts = geometry_facts.counts(shape)  # (wave 8: the numbers kept per shape)
         row = {
             "id": body.Name,
             "label": body.Label,
-            "volume_mm3": round(shape.Volume, 6),
-            "area_mm2": round(shape.Area, 6),
+            "volume_mm3": round(geometry_facts.volume(shape), 6),
+            "area_mm2": round(geometry_facts.area(shape), 6),
             "bbox_mm": _bbox(geometry_facts.tight_box(shape)),
-            "solids": len(shape.Solids),
-            "faces": len(shape.Faces),
+            "solids": counts["solids"],
+            "faces": counts["faces"],
             "tip": body.Tip.Name if body.Tip is not None else None,
         }
         try:
@@ -54,7 +58,7 @@ def get_design(ctx, args):
             label, rho = material.effective(body)
             row["material"] = label
             if rho:
-                row["mass_g"] = round(shape.Volume * rho * 1000.0, 6)
+                row["mass_g"] = round(geometry_facts.volume(shape) * rho * 1000.0, 6)
         except Exception:
             pass
         info["bodies"].append(row)
@@ -221,20 +225,29 @@ def physical_properties(ctx, args):
             row["solid"] = False
             rows.append(row)
             continue
-        shape = bodies.global_shape(body)
+        # (wave 8, ai-speed) the body's own solid and its component's placement: its numbers
+        # are kept between calls (geometry_facts), a moved copy would be new every time
+        from .verify_actions import _placed
+
+        shape, place = _placed(body)
         label, rho = material.effective(body)
+        volume = geometry_facts.volume(shape)
+        counts = geometry_facts.counts(shape)
+        centre = geometry_facts.centre_of_mass(shape)
+        if centre is not None and place is not None:
+            centre = place.multVec(centre)
         row.update(
-            volume_mm3=_round(shape.Volume),
-            area_mm2=_round(shape.Area),
+            volume_mm3=_round(volume),
+            area_mm2=_round(geometry_facts.area(shape)),
             material=label,
             density_kg_m3=_round(rho * 1e9, 3) if rho else None,
-            mass_g=_round(shape.Volume * rho * 1000.0) if rho else None,
-            center_of_mass_mm=_centre(shape),
-            bbox_mm=_bbox(geometry_facts.tight_box(shape)),
-            faces=len(shape.Faces),
-            edges=len(shape.Edges),
-            solids=len(shape.Solids),
-            valid=bool(shape.isValid()),
+            mass_g=_round(volume * rho * 1000.0) if rho else None,
+            center_of_mass_mm=[_round(v) for v in centre] if centre is not None else None,
+            bbox_mm=_bbox(geometry_facts.placed_box(shape, place)),
+            faces=counts["faces"],
+            edges=counts["edges"],
+            solids=counts["solids"],
+            valid=geometry_facts.is_valid(shape),
         )
         rows.append(row)
     if not rows:
@@ -387,5 +400,7 @@ def get_help(ctx, args):
 
 @action("list_tools")
 def list_tools(ctx, args):
-    rows = catalog.tool_list(state(ctx.host), args.get("category"))
-    return json_result({"tools": rows, "count": len(rows)})
+    rows = catalog.tool_list(  # (wave 8, ai-behaviour: by workspace and by goal too)
+        state(ctx.host), args.get("category"), args.get("workspace"), args.get("goal")
+    )
+    return json_result({"tools": rows, "count": len(rows)}, catalog.tool_list_words(args, rows))
