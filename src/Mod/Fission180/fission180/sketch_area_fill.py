@@ -33,12 +33,20 @@ def missing_areas(sketch):
         return []
     shape = sketch.InternalShape
     have = [] if shape.isNull() else list(shape.Faces)
+    # (wave 8, ai-speed) each area's box first: a face holds a point only when its box, grown
+    # by TOL, does; the exact test of every face against every area took 2 s per compute of
+    # a sketch of 320 circles (and create_sketch computes it several times)
+    boxes = []
+    for h in have:
+        box = h.BoundBox
+        box.enlarge(10 * TOL)
+        boxes.append((h, box))
     found = []
     for face in sketch_regions.regions(edges):
         point = sketch_regions.inner_point(face)
         if point is None:
             continue
-        if not any(h.isInside(point, TOL, True) for h in have):
+        if not any(box.isInside(point) and h.isInside(point, TOL, True) for h, box in boxes):
             found.append(face)
     return found
 

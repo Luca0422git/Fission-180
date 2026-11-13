@@ -62,6 +62,7 @@ import FreeCAD as App
 
 from . import bodies, log, warn
 from . import rebuild_core as core
+from .ai import progress
 
 
 class RebuildError(ValueError):
@@ -84,7 +85,8 @@ def references(doc):
     if doc is None:
         return []
     return sorted(
-        (o for o in doc.Objects if getattr(o, "Fission180Type", "") == REFERENCE), key=lambda o: o.ID
+        (o for o in doc.Objects if getattr(o, "Fission180Type", "") == REFERENCE),
+        key=lambda o: o.ID,
     )
 
 
@@ -695,6 +697,7 @@ def compare(ref, target=None, options=None):
     _not_rolled_back(target, "compared")
     body, rebuilt = _target_shape(target)
     place = frame(body=body) if body is not None else App.Placement()
+    progress.step("reading the original's faces")
     known = _reference_facts(ref, place)  # (measured once for all the compares of a rebuild)
     reference = known["shape"]
     tol = float(opts["tolerance"] or getattr(ref, "Tolerance", 0.0) or core.FACE_TOL)
@@ -741,6 +744,7 @@ def compare(ref, target=None, options=None):
     opts["_flat"] = None  # (its flat faces, for the hole calls)
     opts["_fixes"] = {"missing": 0, "extra": 0}
     opts["_index"] = dict(known["index"])  # (selector indexes, built once: _refs)
+    progress.step("matching the faces")
     faces = _match_faces(reference, rebuilt, tol, mesh, opts, rows)
     if not mesh and _same_solid(faces, v_ref, v_new):
         # every face of each part lies on a face of the other and the volumes agree: the same
@@ -749,6 +753,7 @@ def compare(ref, target=None, options=None):
         method = "faces"
     else:
         # (a copy: an OpenCASCADE boolean may touch its arguments' tolerances)
+        progress.step("splitting both solids by each other (one OpenCASCADE step)")
         v_common, v_missing, v_extra, missing, extra, method = _pieces(
             reference.copy(), rebuilt, rows, (v_ref, v_new)
         )
@@ -756,6 +761,7 @@ def compare(ref, target=None, options=None):
     match = max(0.0, min(1.0, v_common / union)) if union > 1e-12 else 0.0
     missing = sorted(missing, key=lambda pair: -pair[1])  # ([(solid, volume)], biggest first)
     extra = sorted(extra, key=lambda pair: -pair[1])
+    progress.step("describing what is missing and what is extra")
     regions_missing = [_region(s, "missing", rebuilt, tol, opts, v) for s, v in missing]
     regions_extra = [_region(s, "extra", rebuilt, tol, opts, v) for s, v in extra]
     regions_missing = [r for r in regions_missing if r is not None]
@@ -923,7 +929,9 @@ def _pieces(a, b, rows=None, volumes=None):
         common, missing, extra = [], [], []
         ok = True
         noise = 0.0
-        for piece in result.Solids:
+        pieces = result.Solids
+        for n, piece in enumerate(pieces):
+            progress.step("sorting the pieces", n, len(pieces))
             volume = piece.Volume
             if abs(volume) <= 1e-7 * scale:
                 # a sliver between faces that lie on each other within a hair (a mesh's facets
@@ -1927,13 +1935,15 @@ def _match_faces(reference, rebuilt, tol, mesh, opts, rows=None):
         # the other part's surface for the facets of round regions and the round faces
         for mine, theirs in ((rows_a, rows_b), (rows_b, rows_a)):
             near = _BoxIndex(theirs, tol)
-            for row in mine:
+            for n, row in enumerate(mine):
+                progress.step("matching the faces", n, len(mine))
                 same = [o for o in near(row) if _same_surface(row, o, tol)]
                 row.matched = _covered(row, same, tol) or _near_surfaces(row, theirs, tol)
     else:
         for mine, theirs in ((rows_a, rows_b), (rows_b, rows_a)):
             near = _BoxIndex(theirs, tol)
-            for row in mine:
+            for n, row in enumerate(mine):
+                progress.step("matching the faces", n, len(mine))
                 same = [o for o in near(row) if _same_surface(row, o, tol)]
                 row.matched = _covered(row, same, tol)
                 if not row.matched and (row.key is None or row.kind in ("cone", "torus")):

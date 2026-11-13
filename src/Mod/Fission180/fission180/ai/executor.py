@@ -953,11 +953,11 @@ def summary(doc):
     except Exception:
         found = []
     for body in found:
-        shape = body.Shape
+        shape = body.Shape  # (its numbers kept per shape: geometry_facts, wave 8)
         box = geometry_facts.tight_box(shape)
         parts.append(
             "%s: %.6g mm3, %.4g x %.4g x %.4g mm"
-            % (body.Label, shape.Volume, box.XLength, box.YLength, box.ZLength)
+            % (body.Label, geometry_facts.volume(shape), box.XLength, box.YLength, box.ZLength)
         )
     return ("Bodies now: " + "; ".join(parts) + ".") if parts else "No solid body yet."
 
@@ -1019,12 +1019,12 @@ def shape_signature(doc):
         return None
     for body in found:
         try:
-            shape = body.Shape
+            shape = body.Shape  # (its numbers kept per shape: geometry_facts, wave 8)
             box = shape.BoundBox
             out[body.Name] = (
-                round(shape.Volume, 6),
-                round(shape.Area, 6),
-                len(shape.Faces),
+                round(geometry_facts.volume(shape), 6),
+                round(geometry_facts.area(shape), 6),
+                geometry_facts.counts(shape)["faces"],
                 tuple(
                     round(v, 6)
                     for v in (box.XMin, box.YMin, box.ZMin, box.XMax, box.YMax, box.ZMax)
