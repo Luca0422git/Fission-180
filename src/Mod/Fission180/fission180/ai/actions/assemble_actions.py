@@ -711,16 +711,22 @@ def appearance(ctx, args):
     from ..ops import selectors
 
     body = _body(ctx, args)
+    look = None
     if "look" in args:
         look = looks.find(args["look"])
         if look is None:
             raise UserError("There is no appearance %r (list_materials lists them)." % args["look"])
-    else:
+    elif "color" in args:
         look = looks.custom(
             args["color"], args.get("shininess", 0.5), args.get("transparency", 0.0)
         )
+    mapping = _texture_map(args.get("texture_map"), body)
 
     def work():
+        if look is None:  # (Texture Map Controls alone: appearance_map_ui.TextureMapPanel)
+            looks.set_map(body, mapping)
+            looks.apply(body)
+            return
         if "faces" in args:
             tip = body.Tip
             names = selectors.select(tip.Shape, args["faces"], "faces")
@@ -744,10 +750,41 @@ def appearance(ctx, args):
                     )
                 )
             looks.set_body(body, look, keep_faces=bool(args.get("keep_face_looks", False)))
+        if mapping is not None:
+            looks.set_map(body, mapping)
         looks.apply(body)
 
     ctx.change(work)
-    return bridge_core.result(
-        "Done: %s%s in %s."
-        % (body.Label, " (some faces)" if "faces" in args else "", look["label"])
-    )
+    text = "Done: %s" % body.Label
+    if look is not None:
+        text += "%s in %s" % (" (some faces)" if "faces" in args else "", look["label"])
+    if mapping is not None:
+        from ... import appearance_mapping
+
+        shown = appearance_mapping.with_defaults(mapping)
+        text += "%s texture map %s" % (
+            "," if look is not None else ":",
+            (
+                "back to the look's own"
+                if not mapping
+                else ", ".join("%s %s" % (k, shown[k]) for k in appearance_mapping.DEFAULTS)
+            ),
+        )
+    return bridge_core.result(text + ".")
+
+
+def _texture_map(spec, body):
+    """The Texture Map Controls' options for the AI's texture_map ({} back to the look's
+    own mapping), or None when not given (appearance_mapping, the panel's own values)."""
+    if spec is None:
+        return None
+    from ... import appearance as looks
+    from ... import appearance_mapping
+
+    if spec.get("reset"):
+        return {}
+    options = appearance_mapping.with_defaults(looks.get_map(body))
+    for key in ("projection", "axis", "offset_u", "offset_v", "rotation", "scale"):
+        if key in spec:
+            options[key] = spec[key]
+    return {} if appearance_mapping.is_default(options) else options

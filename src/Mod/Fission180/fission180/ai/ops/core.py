@@ -438,7 +438,9 @@ class Builder:
         base = self._tip()
         if "faces" in step:
             names = selectors.select(base.Shape, step["faces"], "faces")
-            obj = presspull.make(self.body, base, names, step["distance"], step["id"])
+            # (wave 8) offset_face: Offset Face's step (the same code, its own name)
+            kind = "OffsetFace" if step.get("offset_face") else "PressPull"
+            obj = presspull.make(self.body, base, names, step["distance"], step["id"], kind)
             self.objects[step["id"]] = obj
             self.ops[step["id"]] = "press_pull"
             self._recompute(step, obj)

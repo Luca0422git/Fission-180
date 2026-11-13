@@ -653,6 +653,33 @@ INSERT = [
     },
 ]
 
+
+def _offset_face(answer, run):
+    import FreeCAD as App
+
+    found = [
+        o for o in App.ActiveDocument.Objects if getattr(o, "Fission180Type", "") == "OffsetFace"
+    ]
+    if not found:
+        return "no Offset Face step"
+    box = found[-1].Shape.BoundBox
+    if abs(box.ZLength - 23) > 1e-6:  # (the rounded 20 mm block, its top 3 mm higher)
+        return "Offset Face made a body %g high, expected 23" % box.ZLength
+    return None
+
+
+def _texture_map(answer, run):
+    import FreeCAD as App
+
+    from fission180 import appearance, bodies
+
+    body = [b for b in bodies.list_bodies(App.ActiveDocument) if b.Label == "Rounded"][0]
+    got = appearance.get_map(body)
+    if got.get("projection") != "planar" or got.get("axis") != "x" or got.get("scale") != 50:
+        return "texture map %s" % got
+    return None
+
+
 ANALYSIS = [
     # -- the analyses on parts whose numbers are known ----------
     {"tool": "new_design", "args": {"name": "Analysis AI"}},
@@ -781,6 +808,29 @@ ANALYSIS = [
         "args": {"kind": "curvature_comb", "bodies": ["Rounded"]},
         "expect": "error",
         "contains": ["needs edges"],
+    },
+    # -- Offset Face and Texture Map Controls ----------
+    {
+        "tool": "press_pull",
+        "args": {"faces": TOP_FACE, "distance": 3, "offset_face": True},
+        "check": _offset_face,
+    },
+    {
+        "tool": "press_pull",
+        "args": {"edges": {"type": "line", "count": 1}, "distance": 1, "offset_face": True},
+        "expect": "error",
+        "contains": ["offset_face takes faces"],
+    },
+    {
+        "tool": "appearance",
+        "args": {"texture_map": {"projection": "planar", "axis": "x", "scale": 50}},
+        "contains": ["texture map", "projection planar"],
+        "check": _texture_map,
+    },
+    {
+        "tool": "appearance",
+        "args": {"texture_map": {"reset": True}},
+        "contains": ["back to the look's own"],
     },
 ]
 
