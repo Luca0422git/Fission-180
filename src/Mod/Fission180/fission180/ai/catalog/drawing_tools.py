@@ -298,7 +298,8 @@ define(
     "design), storyboard (a base view's Representation: a storyboard's name, or Model for the "
     "design as it is), a section's depth_mode Full | Slice | Distance with depth and hatch, a "
     "broken view's gap, a breakout's depth / through_all or remove_breakout. To move or turn "
-    "a view: modify_drawing. One undo step.",
+    "a view: modify_drawing. One undo step. A new scale, orientation or storyboard draws the "
+    "view and its projected views again: about 15 s a view of a 1,000-face assembly.",
     schema(
         {
             "view": step_id("the view"),
@@ -898,13 +899,15 @@ define(
     "storyboard; section line and depth, break, breakout, rotation), dimensions (type, value, "
     "the text written, what they measure), annotations (leaders, symbols, ordinates: kind "
     "and text), balloons (number, component), tables (rows), centre marks, centre lines. "
-    "edges true: each view's lines, circles and points (view's own mm) for picks. picture "
-    "true: a PNG of one sheet (frame, title block, views, dimensions, text) drawn from its "
-    "DXF.",
+    "edges true: each view's lines, circles and points (view's own mm) for picks; with "
+    "view, that view's only (a big assembly's edges run to 500 kB). picture true: a PNG of "
+    "one sheet (frame, title block, views, dimensions, text) drawn from its DXF (about 15 s "
+    "for an A2 sheet of a 1,000-face assembly).",
     schema(
         {
             "drawing": step_id("one drawing or sheet (default: all)"),
             "edges": boolean("list each view's lines and circles", default=False),
+            "view": step_id("edges: only this view's (and its drawing)"),
             "picture": boolean("a PNG of the sheet (the drawing's first, or the given sheet)"),
             "width": integer("picture width in pixels", default=1200, minimum=200, maximum=4000),
         }

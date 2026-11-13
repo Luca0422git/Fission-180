@@ -6,7 +6,7 @@ Fusion: DRAWING > MODIFY > Edit View (or double-click a view). Category: Drawing
 
 ## What it does
 
-Change a view as its dialog does: orientation (a base view; its projected views turn with it), style, tangent_edges, scale (its projected views follow; the title block's Scale follows the first base view), label (its text) and show_label, center_marks {holes, extrudes, cuts: true | false} (automated centre marks and lines that follow the design), storyboard (a base view's Representation: a storyboard's name, or Model for the design as it is), a section's depth_mode Full | Slice | Distance with depth and hatch, a broken view's gap, a breakout's depth / through_all or remove_breakout. To move or turn a view: modify_drawing. One undo step.
+Change a view as its dialog does: orientation (a base view; its projected views turn with it), style, tangent_edges, scale (its projected views follow; the title block's Scale follows the first base view), label (its text) and show_label, center_marks {holes, extrudes, cuts: true | false} (automated centre marks and lines that follow the design), storyboard (a base view's Representation: a storyboard's name, or Model for the design as it is), a section's depth_mode Full | Slice | Distance with depth and hatch, a broken view's gap, a breakout's depth / through_all or remove_breakout. To move or turn a view: modify_drawing. One undo step. A new scale, orientation or storyboard draws the view and its projected views again: about 15 s a view of a 1,000-face assembly.
 
 ## Arguments
 

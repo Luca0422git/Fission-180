@@ -503,10 +503,22 @@ def _slide_free(view, origin, offset, step=5.0, tries=60):
     on the sheet."""
     from ... import drawing
 
-    page = drawing.page_of(view)
-    blocked = _blocked(page, skip=(view.Name,))
+    spot = _free_along(
+        drawing.page_of(view), (view.Name,), drawing.view_extent(view), origin, offset, step, tries
+    )
+    if spot is not None:
+        _set_place(view, *spot)
+        return True
+    _set_place(view, origin[0] + offset[0], origin[1] + offset[1])
+    return False
+
+
+def _free_along(page, skip, half, origin, offset, step=5.0, tries=60):
+    """The first place origin + offset (+ more along it) where a view of half size `half`
+    covers nothing and stays on the sheet's free area, or None."""
+    blocked = _blocked(page, skip=skip)
     area = _area(page)
-    hw, hh = drawing.view_extent(view)
+    hw, hh = half
     length = math.hypot(*offset) or 1.0
     ux, uy = offset[0] / length, offset[1] / length
     for i in range(tries):
@@ -516,12 +528,43 @@ def _slide_free(view, origin, offset, step=5.0, tries=60):
         inside = rect[0] >= area[0] - 1e-6 and rect[2] <= area[2] + 1e-6
         inside = inside and rect[1] >= area[1] - 1e-6 and rect[3] <= area[3] + 1e-6
         if not inside:
-            break
+            return None
         if not any(aicore.overlaps(rect, b, 2.0) for b in blocked):
-            _set_place(view, x, y)
-            return True
-    _set_place(view, origin[0] + offset[0], origin[1] + offset[1])
-    return False
+            return x, y
+    return None
+
+
+def _roomy_side(parent, args):
+    """Which side of its cut line a section goes (+1: left of the line's direction) when
+    the AI did not say: the first one with room for it on the sheet, from the size its
+    parts will have seen its way (worked out before TechDraw draws anything: a section of
+    a big assembly takes long, once is enough). Fusion: where the section is placed decides
+    which way it looks."""
+    from ... import drawing
+    from ... import drawing_core as core
+
+    page = drawing.page_of(parent)
+    line = [tuple(p) for p in args["line"]]
+    scale = args.get("scale") or drawing.scale_of(parent) or 1.0
+    sources = [s for s in getattr(parent, "Source", []) or [] if drawing.alive(s)]
+    phw, phh = drawing.view_extent(parent)
+    origin = drawing.view_position(parent)
+    for sign in (1.0, -1.0):
+        nx, ny = _cut_normal(line, sign)
+        (x1, y1), (x2, y2) = line[0], line[1]
+        mid = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+        info = core.section_line(
+            line[0], line[1], (mid[0] + nx * 10.0, mid[1] + ny * 10.0), page.ProjectionType
+        )
+        if info is None:
+            return 1.0
+        direction, xdir, _normal = core.section_axes(drawing.axes_of(parent), info)
+        w, h, _d = drawing.model_extent(sources, core.view_axes(direction, xdir))
+        shw, shh = w * scale / 2.0, h * scale / 2.0
+        reach = abs(nx) * (phw + shw) + abs(ny) * (phh + shh) + aicore.VIEW_GAP
+        if _free_along(page, (), (shw, shh), origin, (nx * reach, ny * reach)) is not None:
+            return sign
+    return 1.0
 
 
 def _cut_normal(line, side_sign):
@@ -641,7 +684,10 @@ def add_drawing_view(ctx, args):
             x, y = args.get("at", (px + dx, py + dy))
             view = drawing.add_projected(parent, args["direction"], x, y)
         elif kind == "section":
-            sign = 1.0 if int(args.get("side", 1)) >= 0 else -1.0
+            if "side" in args or "at" in args:
+                sign = 1.0 if int(args.get("side", 1)) >= 0 else -1.0
+            else:
+                sign = _roomy_side(parent, args)
             view, normal = _make_section(parent, args, sign)
         elif kind == "detail":
             px, py = drawing.view_position(parent)
@@ -677,14 +723,7 @@ def add_drawing_view(ctx, args):
                 moved = True
             elif kind == "section":
                 moved = True
-                if not _along_cut(parent, view, normal) and "side" not in args:
-                    # no room on that side of the cut: from the other side (Fusion: where
-                    # the section is placed decides which way it looks)
-                    drawing.delete_objects(doc, [view])
-                    view, normal = _make_section(parent, args, -1.0)
-                    doc.recompute()
-                    _idle(doc)
-                    _along_cut(parent, view, normal)  # (no room either: the answer says so)
+                _along_cut(parent, view, normal)  # (by its real size now)
             if kind in ("base", "exploded", "detail"):
                 moved = _place_free(view, page)
             if moved:
@@ -2049,7 +2088,7 @@ def _annotation_row(obj):
     return entry
 
 
-def _sheet_row(page, edges):
+def _sheet_row(page, edges, only=None):
     from ... import drawing, drawing_sheets
 
     row = {
@@ -2061,7 +2100,10 @@ def _sheet_row(page, edges):
         "units": drawing.units_of(page),
         "sheet_size_mm": list(_sheet(page)),
         "title_block": drawing.title(page),
-        "views": [_view_row(v, edges) for v in drawing.all_views(page)],
+        "views": [
+            _view_row(v, edges and (only is None or v.Name == only))
+            for v in drawing.all_views(page)
+        ],
         "annotations": [_annotation_row(o) for o in drawing.annotations(page)],
     }
     return row
@@ -2094,8 +2136,9 @@ def get_drawing(ctx, args):
 
     doc = ctx.need_doc()
     _idle(doc)
-    if args.get("drawing"):
-        chosen = _page(ctx, args["drawing"])
+    only = _view(ctx, args["view"]).Name if args.get("view") else None
+    if args.get("drawing") or only:
+        chosen = _page(ctx, args.get("drawing") or only)
         mains = [drawing_sheets.main_page(chosen)]
     else:
         chosen = None
@@ -2105,7 +2148,7 @@ def get_drawing(ctx, args):
         sheets = drawing_sheets.sheets(main)
         if chosen is not None and drawing_sheets.is_sheet_page(chosen):
             sheets = [chosen]
-        first = _sheet_row(sheets[0], args.get("edges"))
+        first = _sheet_row(sheets[0], args.get("edges"), only)
         row = dict(first)
         row["id"] = main.Name
         row["label"] = main.Label
@@ -2120,7 +2163,7 @@ def get_drawing(ctx, args):
         if board:
             row["storyboard"] = board
         if len(sheets) > 1:
-            row["more_sheets"] = [_sheet_row(s, args.get("edges")) for s in sheets[1:]]
+            row["more_sheets"] = [_sheet_row(s, args.get("edges"), only) for s in sheets[1:]]
         out.append(row)
     if not args.get("picture"):
         return json_result({"drawings": out}, compact=True)
