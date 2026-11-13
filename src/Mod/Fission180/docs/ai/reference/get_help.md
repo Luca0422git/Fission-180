@@ -6,13 +6,13 @@ Fusion: (Fission 180's documentation for AI models). Category: Help. Read-only. 
 
 ## What it does
 
-Read Fission 180's rules for AI tools: overview, selectors (how to pick faces and edges), picks (planes, axes, faces, edges, corners), body_picks, sketches (planes and coordinates), geometry (sketch shapes), curves (paths and rails), steps (ids), expressions (parameters in fields), workflow (how to build and check a part), checking (the tools that check your work with numbers and pictures), docs (where the documentation is and how to search it), tools (every tool by category with its Fusion command). Without topic: overview.
+Read Fission 180's rules for AI tools: overview, approach (before you build: plan, ask, pick the cheapest tool), workspaces (where every workspace's tools are), selectors (how to pick faces and edges), picks (planes, axes, faces, edges, corners), body_picks, sketches (planes and coordinates), geometry (sketch shapes), curves (paths and rails), steps (ids), expressions (parameters in fields), workflow (how to build and check a part), checking (the tools that check your work with numbers and pictures), docs (where the documentation is and how to search it), tools (every tool by category with its Fusion command). Without topic: overview.
 
 ## Arguments
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `topic` | `overview` \| `selectors` \| `picks` \| `body_picks` \| `sketches` \| `geometry` \| `curves` \| `steps` \| `expressions` \| `workflow` \| `checking` \| `docs` \| `tools` |  | `"overview"` |  |  |
+| `topic` | `overview` \| `approach` \| `workspaces` \| `selectors` \| `picks` \| `body_picks` \| `sketches` \| `geometry` \| `curves` \| `steps` \| `expressions` \| `workflow` \| `checking` \| `docs` \| `tools` |  | `"overview"` |  |  |
 
 ## Answer
 

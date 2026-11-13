@@ -15,7 +15,7 @@ Create a sketch with closed shapes (and lines) in it, ready for extrude, revolve
 |---|---|---|---|---|---|
 | `plane` | `XY` \| `XZ` \| `YZ` |  |  |  |  |
 | `offset` | number | mm | `0` |  | mm along the plane's normal |
-| `face` | object |  |  |  | Instead of plane: the flat face to sketch on (one face). With plane and offset too: the sketch lies on that face (the face at that offset) in the plane's axes, and follows the face when the part changes (a pocket or a hole on a plate's top stays on top when the plate gets thicker). (rules: [selectors](fission180://docs/tools.md#help-selectors)) |
+| `face` | object |  |  |  | Instead of plane: the flat face to sketch on (one face). With plane and offset too: the sketch lies on that face (the face at that offset) in the plane's axes, and follows the face when the part changes (a pocket or a hole on a plate's top stays on top when the plate gets thicker). A selector picks faces or edges by their geometry, never by names like "Edge7": type, normal [x, y, z], parallel [x, y, z], along [x, y, z], radius, on_faces / not_on_faces (a face selector), at {"axis": "x"\|"y"\|"z", "value": "max"\|"min"\|mm} (or a list), all, any_of [selectors], count (always give it: the tool refuses a different number). Example: the 4 top edges of a box {"type": "line", "at": {"axis": "z", "value": "max"}, "count": 4}. The full rules: the server's instructions (Selectors) or get_help topic selectors. |
 | `on` | string |  |  |  | Instead of plane: the id of a construction plane to sketch on |
 | `auto_project` | boolean |  |  |  | with face: project the face's edges into the sketch |
 | `geometry` (required) | array of objects |  |  | at least 1 item(s) | (rules: [geometry](fission180://docs/tools.md#help-geometry)) |
@@ -86,6 +86,7 @@ Done: AI: Sketch on face. Its id is 'Sketch2'. Bodies now: Body1: 24000 mm3, 60 
 
 ## See also
 
+- Recipe: [an assembly drawing with an exploded view, balloons and a parts list](fission180://docs/recipes/assembly-drawing.md)
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
 - Recipe: [an exploded-view video of an assembly (ANIMATION)](fission180://docs/recipes/exploded-view-video.md)
@@ -94,11 +95,13 @@ Done: AI: Sketch on face. Its id is 'Sketch2'. Bodies now: Body1: 24000 mm3, 60 
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
 - Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
+- Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)
 - Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
 - Recipe: [stepped shaft with a keyway](fission180://docs/recipes/shaft-with-keyway.md)
 - Recipe: [sheet-like U bracket (thin extrude with bends)](fission180://docs/recipes/sheet-like-part.md)
+- Recipe: [a sheet metal drawing with the flat pattern, a bend table and bend notes](fission180://docs/recipes/sheet-metal-drawing.md)
 - Recipe: [cantilever snap-fit hook](fission180://docs/recipes/snap-fit.md)
 - Recipe: [is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md)
 - Recipe: [threaded fastener (hex bolt M8 x 30)](fission180://docs/recipes/threaded-fastener.md)
