@@ -77,7 +77,8 @@ stripes kink (G1). The analysis lists those edges; a curvature-continuous blend 
   {"tool": "fillet", "args": {"edges": {"type": "line", "at": {"axis": "z", "value": "max"},
     "count": 4}, "radius": 3}},
   {"tool": "analysis", "args": {"kind": "zebra"},
-   "expect": {"contains": ["8 tangent edges with a curvature jump"]}}
+   "expect": {"contains": ["8 tangent edges with a curvature jump"]}},
+  {"tool": "check_design", "args": {}, "expect": {"json": {"ok": true}}}
 ]
 ```
 

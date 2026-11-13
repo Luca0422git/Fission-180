@@ -117,9 +117,12 @@ check the travel without changing the design.
   {"tool": "motion_study", "args": {"joints": ["Joint"],
     "keys": [{"joint": "Joint", "step": 0, "value": 0}, {"joint": "Joint", "step": 100, "value": 30}],
     "report": [0, 100]},
-   "expect": {"contains": ["the assembly is back as it was", "\"step\": 100.0"]}}
+   "expect": {"contains": ["the assembly is back as it was", "\"step\": 100.0"]}},
+  {"tool": "check_design", "args": {}, "expect": {"json": {"ok": true}}}
 ]
 ```
+
+check_design last: the parts touch (the arm sits on the base) but none overlaps.
 
 To copy a jointed part (a screw) into more holes, use
 [duplicate_with_joints](fission180://docs/reference/duplicate_with_joints.md); for a joint

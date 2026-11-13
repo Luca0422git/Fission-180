@@ -22,6 +22,8 @@ calls, change the sizes, and check with the same tools.
 | [Parametric mounting plate](fission180://docs/recipes/parametric-plate.md) | user parameters, sketch dimensions and model parameters with expressions, a pattern that follows, change and verify |
 | [Is this bracket strong enough? (Static Stress)](fission180://docs/recipes/static-stress.md) | a simulation study: fixed holes, a force, pre-check, solve, safety factor and reactions, thicken and solve again |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
+| [An assembly that moves](fission180://docs/recipes/hinged-assembly.md) | which ASSEMBLE tool and what to ask first: as-built joints, rigid group, motion link, contact set, captured position, motion study |
+| [Check a part before it is made](fission180://docs/recipes/check-before-making.md) | the INSPECT analyses as numbers: draft for moulding, inner rounds and reach for milling, zebra for smooth shapes, then the fix |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about
 450 small designs with measured results) by words, tool or op, and
