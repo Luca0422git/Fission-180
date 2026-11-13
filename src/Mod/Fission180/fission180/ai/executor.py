@@ -24,7 +24,7 @@ import time
 import FreeCAD as App
 
 from .. import log, warn
-from . import bridge_core, catalog, geometry_facts, value_fit
+from . import bridge_core, catalog, geometry_facts, progress, value_fit
 
 DEFAULT_IDS = {
     "create_sketch": "Sketch",
@@ -220,15 +220,74 @@ def state(host):
 
 
 # -- one call -------------------------------------------------------------------------------
-def run(tool, args, host):
-    """One tool call -> a bridge_core result. Never raises."""
+def run(tool, args, host, call_id=None):
+    """One tool call -> a bridge_core result. Never raises (a call inside another call lets
+    a stop go up to the outer one, which answers it). call_id: the AI app's own id for the
+    call (a cancel names it: progress.request_stop)."""
     if args is None:
         args = {}
     redo = _redo_names()
-    answer = _run(tool, args, host)
+    token = progress.begin(tool, call_id, catalog.is_read_only(tool))
+    undo_before = _undo_names()
+    try:
+        answer = _run(tool, args, host)
+    except progress.Stopped as stop:
+        if token is None:
+            raise  # (the outer call answers it)
+        answer = _stopped(tool, args, stop, token, undo_before)
+    finally:
+        progress.end(token)
     if answer.get("is_error") and redo:
         answer = _redo_note(answer, redo)
     return answer
+
+
+def _undo_names():
+    """(design name, its Undo list) of the active design, or None."""
+    try:
+        doc = App.ActiveDocument
+        return (doc.Name, list(doc.UndoNames)) if doc is not None else None
+    except Exception:
+        return None
+
+
+def _stopped(tool, args, stop, call, undo_before):
+    """The answer of a call stopped at a safe point (progress.Stopped): the half-made change
+    of a changing call is taken back (its one Undo step, still open), and the answer says
+    what stopped it and what, if anything, was done before (steps already committed)."""
+    seconds = time.monotonic() - call["started"]
+    kept = []
+    if not catalog.is_read_only(tool):
+        try:
+            active = App.getActiveTransaction()
+            if active:
+                App.closeActiveTransaction(True)  # (taken back: nothing half-made stays)
+        except Exception as exc:
+            warn("AI: a stopped call's undo step: %s" % exc)
+        try:
+            doc = App.ActiveDocument
+            if doc is not None:
+                doc.recompute()
+                if undo_before is not None and undo_before[0] == doc.Name:
+                    kept = progress.added_steps(list(doc.UndoNames), undo_before[1])
+        except Exception as exc:
+            warn("AI: after a stopped call: %s" % exc)
+    log("AI: %s stopped after %.1f s (%s)" % (tool, seconds, stop.reason))
+    return bridge_core.error_result(progress.stopped_text(tool, stop.reason, seconds, kept))
+
+
+def _recomputing():
+    """True while a design recomputes: no safe point (progress.set_guard)."""
+    try:
+        for doc in App.listDocuments().values():
+            if doc.Recomputing:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+progress.set_guard(_recomputing)
 
 
 def _redo_names():
@@ -323,7 +382,9 @@ def _run(tool, args, host):
                 naming.apply_name(tool, args.get("name"), made)
             except Exception as exc:
                 warn("AI: naming: %s" % exc)
-            note = naming.note_made(App.ActiveDocument, made_before, made) if naming.enforced() else ""
+            note = (
+                naming.note_made(App.ActiveDocument, made_before, made) if naming.enforced() else ""
+            )
             if note and isinstance(answer.get("text"), str):
                 answer = dict(answer)
                 answer["text"] = answer["text"].rstrip() + note
