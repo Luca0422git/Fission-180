@@ -416,7 +416,7 @@ TIPS = {
             "Click Pattern on Path.",
             "Choose the Pattern Type and click what to copy.",
             "Click the Path box, then the curve or edge.",
-            "Set Quantity and Distance, or drag the ball along the path.",
+            "Set Quantity and Distance, or drag the blue arrow.",
             "Click OK.",
         ],
         "tips": [],
@@ -456,9 +456,9 @@ TIPS = {
     },
     "Fission180_BoundaryFill": {
         "summary": "Makes a solid from the closed spaces that bodies, surfaces and planes enclose.",
-        "what": "Pick tools (bodies, surfaces, planes) that together close off spaces: the cells "
-        "they enclose are listed and shown, and the ones you click become a solid. Use it to fill "
-        "the inside of surfaces or to split space between parts.",
+        "what": "Pick tools (bodies, surfaces, planes) that together close off spaces: the closed "
+        "spaces (cells) they make light up under the mouse, and the ones you click turn blue and "
+        "become a solid. Use it to fill the inside of surfaces or the room between parts.",
         "steps": [
             "Click Boundary Fill.",
             "Click the tools: bodies, surface bodies or planes.",
