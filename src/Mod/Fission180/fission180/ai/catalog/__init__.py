@@ -37,6 +37,9 @@ from . import create_tools  # noqa: F401
 from . import modify_tools  # noqa: F401
 from . import more_tools  # noqa: F401
 from . import history_tools  # noqa: F401
+# wave 8, ai-drawing: every command of the DRAWING workspace (the six drawing tools of
+# history_tools.py moved there, first, in their old order)
+from . import drawing_tools  # noqa: F401
 from . import verify_tools  # noqa: F401  (checking: inspect_design, query_geometry, render...)
 from . import docs_tools  # noqa: F401  (documentation: docs_search, docs_read, examples_search)
 from . import simulate_tools  # noqa: F401  (Static Stress simulation, beta 3)

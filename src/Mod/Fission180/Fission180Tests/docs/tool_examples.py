@@ -1653,3 +1653,80 @@ EXAMPLES += [
         "note": "STEP, STL, 3MF, OBJ and a README in one folder",
     },
 ]
+
+# -- wave 8, ai-drawing: the DRAWING tools that came with it --------------------------------------
+SETUPS.update(
+    {
+        "drawing_dims": DRAWING
+        + [
+            call(
+                "add_drawing_dimension",
+                view="ProjectedView",
+                picks=[{"kind": "circle", "radius": 4}],
+            )
+        ],
+        "drawing_parts": COMPONENTS
+        + [
+            call("create_drawing", base_view="Front"),
+            call("add_drawing_annotation", kind="parts_list", view="BaseView"),
+        ],
+    }
+)
+EXAMPLES += [
+    {
+        "tool": "edit_drawing_view",
+        "setup": "drawing",
+        "args": {"view": "BaseView", "scale": 1, "style": "Visible Edges"},
+        "note": "the base view at 1:1 without hidden edges (its projected views follow)",
+    },
+    {
+        "tool": "modify_drawing",
+        "setup": "drawing",
+        "args": {"kind": "move", "items": ["BaseView"], "by": [-10, 5]},
+        "note": "the base view 10 mm left and 5 mm up; its projected views stay lined up",
+    },
+    {
+        "tool": "edit_title_block",
+        "setup": "drawing",
+        "args": {"values": {"Description": "Plate with a hole", "Revision": "A"}},
+        "note": "a description and a revision in the title block",
+    },
+    {
+        "tool": "drawing_sheet",
+        "setup": "drawing",
+        "args": {"action": "add"},
+        "note": "a second sheet",
+    },
+    {
+        "tool": "edit_drawing_dimension",
+        "setup": "drawing_dims",
+        "args": {"dimensions": ["Dimension"], "tolerance": "fit", "fit": "H7"},
+        "note": "the hole's diameter with its ISO fit class",
+    },
+    {
+        "tool": "add_drawing_geometry",
+        "setup": "drawing",
+        "args": {
+            "kind": "center_mark",
+            "view": "ProjectedView",
+            "picks": [{"kind": "circle", "radius": 4}],
+        },
+        "note": "a centre mark on the hole, seen from above",
+    },
+    {
+        "tool": "add_drawing_symbol",
+        "setup": "drawing",
+        "args": {
+            "kind": "datum_identifier",
+            "view": "BaseView",
+            "pick": {"kind": "line", "near": [0, -5]},
+        },
+        "note": "datum A on the plate's bottom edge",
+    },
+    {
+        "tool": "edit_balloons",
+        "setup": "drawing_parts",
+        "args": {"kind": "renumber", "balloon": "2", "to": 1},
+        "note": "the wheel becomes item 1 (the base takes 2)",
+    },
+]
