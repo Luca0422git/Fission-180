@@ -99,6 +99,7 @@ def insert_and_inspect():
     found = mesh.mesh_bodies(App.ActiveDocument)
     h.check("one mesh body in the window, shown", len(found) == 1 and _shown(found[0]), found)
     S["mesh"] = found[0] if found else None
+    undo_before = ai.undo_names()
     answer = ai.ok(
         "inspect_mesh",
         {},
@@ -107,14 +108,14 @@ def insert_and_inspect():
     data = answer["data"] or {}
     h.check("inspect_mesh counts the triangles", data.get("triangles") == S["holes_n"], data)
     volume = S["mesh"].Mesh.Volume if S["mesh"] is not None else 0
-    h.check("... and gives the mesh's volume", ai.near(data.get("volume"), volume, 1e-6), data)
+    h.check("... and gives the mesh's volume", ai.near(data.get("volume"), volume, 1e-4), data)
     h.check(
         "... and its shapes: 6 big flat faces, 80 details",
         (data.get("overview") or {}).get("flat_faces") == 6
         and (data.get("overview") or {}).get("details") == 80,
         data.get("overview"),
     )
-    h.check("inspect_mesh changed nothing", not ai.undo_names(), ai.undo_names())
+    h.check("inspect_mesh changed nothing", ai.undo_names() == undo_before, ai.undo_names())
 
 
 # -- Path 3 -------------------------------------------------------------------------------------

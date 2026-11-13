@@ -123,8 +123,6 @@ In `docs/fission180/parity/ai.md` ("Wave 8 coverage: mesh", Speed) and the recip
 - start_rebuild keeps rebuild.py's 10,000-triangle limit for a mesh; its words ("turning that
   many into a solid takes many minutes") are from before the shared-edge conversion (50,000
   triangles convert in 11 s): ai-speed's file.
-- An undone convert_mesh leaves the mesh body hidden when the window does not show it again
-  (the dialog's way: the hide is not in the undo step): see the ai_mesh_repair scenario.
 
 ## Changelog lines
 
@@ -146,4 +144,3 @@ In `docs/fission180/parity/ai.md` ("Wave 8 coverage: mesh", Speed) and the recip
 - Convert Mesh's Prismatic keeps round areas as many small flat faces (no cylinder fitting).
 - A MESH step made by an AI can be changed afterwards only from the timeline (double-click),
   not by the AI's edit_step.
-- Undoing a Convert Mesh may leave the mesh body hidden (show it with its eye in the browser).

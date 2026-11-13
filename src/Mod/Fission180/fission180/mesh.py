@@ -677,7 +677,7 @@ CAP_TRIANGLES = 1500  # about how many triangles a Uniform fill of a cut may add
 # a Uniform fill of a cut with more loops or corners than this is not left to FreeCAD's face
 # mesher (minutes for a cut through a plate of holes): _triangulate_region
 MESHER_LOOPS = 6
-MESHER_CORNERS = 400
+MESHER_CORNERS = 120
 
 
 def _cap(mesh, origin, normal, fill):
@@ -823,7 +823,7 @@ def _triangulate_region(polys, fill, spacing):
         # (a plate of 80 holes); the fewest triangles, their long edges split at the middle
         # until none is longer than the spacing, is the same fill in a second
         points, tris, _done = core.split_long_edges(
-            [(x, y, 0.0) for x, y in flat], tris, float(spacing), max_facets=8 * CAP_TRIANGLES
+            [(x, y, 0.0) for x, y in flat], tris, float(spacing), max_facets=2 * CAP_TRIANGLES
         )
         flat = [(p[0], p[1]) for p in points]
     return flat, tris

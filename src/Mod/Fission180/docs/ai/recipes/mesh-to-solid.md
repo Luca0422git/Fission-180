@@ -47,19 +47,21 @@ Then ask the person, before building (most answers change the route):
 Measured in Fission 180's build sandbox (4 shared CPUs, the window waits meanwhile; a
 person's PC is usually faster). A plate with a grid of round holes, as STL:
 
-| Tool | 1,000 triangles | 9,000 | 50,000 | 94,000 |
+| Tool | 900 triangles | 9,000 | 48,000 | 94,000 |
 |---|---|---|---|---|
-| inspect_mesh | under 0.1 s | 0.4 s | 2 s | 4 s |
-| convert_mesh prismatic | 0.2 s | 2 s | 10 s | 19 s |
-| convert_mesh faceted | 0.5 s | 5 s | 30 s | about a minute |
-| mesh_prepare repair | under 0.1 s | 0.3 s | 2 s | 4 s |
-| mesh_modify reduce | under 0.1 s | 0.1 s | 0.5 s | 1 s |
-| start_rebuild | 0.5 s | 3 s | refused (over 10,000) | refused |
-| describe_reference | 1 s | 8 to 12 s | refused | refused |
+| inspect_mesh | under 0.1 s | 0.2 s | 0.8 s | 2.3 s |
+| convert_mesh prismatic | 0.2 s | 1.8 s | 11 s | 27 s |
+| convert_mesh faceted | 0.5 s | 5 s | 28 s | 66 s (refused without allow_slow) |
+| mesh_prepare repair | under 0.1 s | 0.4 s | 2.2 s | 4.2 s |
+| mesh_prepare make_closed | 1.4 s | 1.9 s | 2.5 s | 2.5 s |
+| mesh_modify reduce | under 0.1 s | under 0.1 s | 0.4 s | 0.5 s |
+| mesh_modify plane_cut through the holes | under 0.1 s | 0.5 s | 5 s | 14 s |
+| start_rebuild | 0.1 s | 2 s | refused (over 10,000) | refused |
+| describe_reference | 0.3 s | 4 s (11 s on the dome plate) | refused | refused |
 
 A fillet on the converted 9,000-triangle plate took 11 to 15 s (OpenCASCADE on 2,326 faces).
-`mesh_modify` kind plane_cut with fill uniform through a section with many holes can take
-minutes: fill minimal is quick. The answers end with "Took ..." so you can plan.
+The answers end with "Took ..." so you can plan; every other MESH tool takes under 3.5 s on
+94,000 triangles.
 
 ## 1. The mesh
 

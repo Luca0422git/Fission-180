@@ -67,6 +67,7 @@ def write_broken_mesh():
 def inspect_says_broken():
     ai.ok("new_design", {"name": "Broken box"})
     ai.ok("import_file", {"path": S["path"], "label": "Scan"}, ["as a mesh body"])
+    S["undo"] = ai.undo_names()
     answer = ai.ok(
         "inspect_mesh",
         {},
@@ -79,7 +80,7 @@ def inspect_says_broken():
         data,
     )
     ai.refused("convert_mesh", {}, ["is not closed", "mesh_prepare kind repair"])
-    h.check("nothing changed", not ai.undo_names(), ai.undo_names())
+    h.check("nothing changed", ai.undo_names() == S["undo"], ai.undo_names())
     S["broken"] = _meshes()[0]
 
 
@@ -102,7 +103,11 @@ def repair():
     h.check("closed in the model", repaired is not None and repaired.Mesh.isSolid())
     answer = ai.ok("inspect_mesh", {}, ["closed and clean"])
     h.check("inspect_mesh: 1000 mm3", ai.near((answer["data"] or {}).get("volume"), 1000, 1e-6))
-    h.check("one undo step: AI: Repair", ai.undo_names() == ["AI: Repair"], ai.undo_names())
+    h.check(
+        "one undo step: AI: Repair",
+        ai.undo_names() == ["AI: Repair"] + S["undo"],
+        ai.undo_names(),
+    )
 
 
 # -- Path 4 -------------------------------------------------------------------------------------
