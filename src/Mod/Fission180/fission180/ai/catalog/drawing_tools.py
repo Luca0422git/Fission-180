@@ -138,7 +138,8 @@ define(
     "mm | in, title_block. automatic true: base Front, Top, Right and an isometric laid out at "
     "the largest standard scale that fits. Else a base view (base_view orientation, at [x, y] "
     "sheet mm, scale, style) and projected views (Top, Right, FrontTopRight...). Answers the "
-    "ids and the scale. About 1 s per view for a 1,000-face assembly.",
+    "ids and the scale. Slow on big designs: TechDraw works out each view's hidden lines, "
+    "about 15 s a view of a 1,000-face assembly (draw only the bodies needed).",
     schema(
         {
             "bodies": kit.step_ids("the bodies to draw (default: every visible body)"),
@@ -212,12 +213,13 @@ define(
     "the drawing shows), projected (parent, direction Top, Right... FrontTopRight), section "
     "(parent, line: 2 points cut straight, more bend the cut (half, offset, aligned), side "
     "1 | -1, depth_mode Full | Slice | Distance + depth), detail (parent, center, radius; "
-    "scale default 2x the parent's), break (parent, start, end: the part between is left out, "
+    "scale default 2x the parent's), break (parent, start, end: the part between goes, "
     "across the longer way of the two points; gap mm), breakout (parent, boundary: 3+ points "
     "round what to open, depth mm from the front, default half way, or through_all) or "
     "exploded (a base view of a storyboard's end, default the front one). Points on a view "
     "are in its own mm (model size from its centre, y up: get_drawing edges). at: where on "
-    "the sheet [x, y] mm.",
+    "the sheet [x, y] mm (default: free paper, beside its parent). About 15 s a view of a "
+    "1,000-face assembly (an exploded one: 50 s).",
     schema(
         {
             "drawing": step_id("the drawing or sheet (default: the newest drawing)"),

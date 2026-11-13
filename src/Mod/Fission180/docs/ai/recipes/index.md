@@ -30,6 +30,9 @@ call). [Before you build](fission180://docs/handbook.md#before-you-build) has th
 | [An exploded-view video (ANIMATION)](fission180://docs/recipes/exploded-view-video.md) | a storyboard: Home view, Auto Explode all levels with trails, a camera move, a callout, the timeline adjusted, Publish Video |
 | [A laser-cut sheet metal bracket (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md) | a rule, base and edge flanges, holes, the flat pattern and its DXF for a laser cutter, another sheet thickness |
 | [A plastic enclosure (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md) | a plastic rule, box and lid, lip and groove, bosses, a snap fit, Design Advice, a 3D print file, Export Everything |
+| [A fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md) | drawing views, every dimension kind (sizes, ordinates, baseline), a fit and tolerances, centre marks, datum and position tolerance, section and detail, title block, checking with get_drawing and its picture, DXF |
+| [An assembly drawing with an exploded view](fission180://docs/recipes/assembly-drawing.md) | components, a storyboard, an exploded view, a parts list with balloons, Renumber and Align Balloons, the parts list as CSV |
+| [A sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) | the flat pattern drawn with its size, a bend table, bend notes, the folded part beside it, CSV and DXF |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about

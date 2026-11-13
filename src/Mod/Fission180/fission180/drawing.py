@@ -805,6 +805,25 @@ def add_automatic_views(page, sources, storyboard=""):
     return views
 
 
+def set_place(view, x, y):
+    """Put a view's middle at (x, y) on its sheet without TechDraw working out its lines
+    again. A move changes nothing a view draws, but X and Y touch it and the next recompute
+    ran its whole hidden-line removal once more (wave 8, ai-drawing: a second or so for a
+    small assembly, 15 s a view of a 1,000-face one; a Move of a base view took 90 s). So
+    the view is marked up to date again, unless something else was already waiting for its
+    recompute."""
+    waiting = "Touched" in getattr(view, "State", [])
+    if abs(_value(view.X) - x) > 1e-9:
+        view.X = x
+    if abs(_value(view.Y) - y) > 1e-9:
+        view.Y = y
+    if not waiting and is_view(view):
+        try:
+            view.purgeTouched()
+        except Exception:
+            pass
+
+
 def view_rect(view, margin=0.0):
     """(x0, y0, x1, y1) of what a view draws on the page (mm)."""
     x, y = view_position(view)
@@ -1002,8 +1021,7 @@ def keep_aligned(page):
             _add(view, "App::PropertyFloatList", "Fission180Offset", offset)
         tx, ty = px + offset[0], py + offset[1]
         if abs(tx - cx) > 1e-7 or abs(ty - cy) > 1e-7:
-            view.X = tx
-            view.Y = ty
+            set_place(view, tx, ty)
             changed = True
     for view in all_views(page):
         _LAST[(doc_name, view.Name)] = view_position(view)
