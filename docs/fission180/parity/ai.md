@@ -171,3 +171,41 @@ the top face without flip, a shell thicker than the part) answered "Done" with n
 Tests: `test_ai_docs_library.py`, `test_ai_docs_contract.py` (unit); the docs runner
 (`run_tests.sh --only headless / base`); scenario `ai_docs_gui` (the reference examples that
 need the window, the docs tools through the bridge, Save AI handbook... with a real click).
+
+## Wave 8: the AI works fast, and the window stays alive (ai-speed, 2026-11-13)
+
+Luca: with Claude working through MCP "even Fission itself becomes unresponsive. I have to wait
+a long time for it to finally respond, and by the time it's back, it's really laggy and becomes
+unresponsive again." Fusion has no outside AI connector, so this compares with how Fusion
+behaves during its own long computations.
+
+### Behaviour spec (sources)
+
+| What | Fusion / the AI apps | Source | Fission 180 |
+|---|---|---|---|
+| A long computation | Fusion's window often goes "Not Responding" during long computes and scripts; its progress window's Cancel does not answer while a script runs | Forum: forums.autodesk.com "When running a Python Script, Fusion goes into Not Responding mode" (2024), "fusion360 progress bar blocking" | the window keeps repainting during a long AI call (at every safe point of the tool's own loops, at most every 0.1 s) |
+| Stop a computation | Esc stops timeline playback; Autodesk staff said Esc-to-stop for Compute All, fillets and some solves was being worked on; a Compute All progress bar exists (missing in one 2023 update) | Forum: "Esc to stop current calculation" (Idea Station, Autodesk replies), "Compute All Progress Bar Not Displaying" (2023) | a working line over the 3D view, "AI: working on compare_to_reference (12 s): comparing faces 1,200 of 3,209", with **Stop** (and on the AI panel's Activity tab); Stop ends the call at its next safe point, its half-made change taken back, and the AI is told "Stopped after 12 s: ... Nothing was changed." |
+| Clicks while busy | Fusion's progress filter (FreeCAD's too, Base::SequencerBar) beeps and drops clicks | FreeCAD src/Gui/ProgressBar.cpp | every click, key and wheel outside Stop is dropped while the call runs; the line says "busy with the AI's call: wait, or press Stop"; closing the window is refused |
+| Timers during a long call | n/a | Guess | postponed until the call is over: autosave and recovery copies, the AI bridge's own queue, the chat panel, the browser and timeline polls never run into a half-made change |
+| MCP progress | an MCP client may send `_meta.progressToken`; the server may send `notifications/progress` (progress growing every time, optional total and message), none after the answer | MCP specification, basic/utilities/progress (2025-03-26 and later) | sent every 2 s while Fission 180 works on a call that asked, with the working line's words |
+| Claude Desktop / Claude Code and long calls | community reports: Claude Desktop cancels stdio tool calls at about 60 s and does not reliably extend the wait on progress notifications; Claude Code's limit is MCP_TOOL_TIMEOUT (progress keepalive also reported unreliable); the TypeScript SDK changed resetTimeoutOnProgress's default to true | Forum: github.com/anthropics/claude-code issues 22542, 58687, 63379, 65643 (2026, read through search excerpts; not verified on a real install) | the call the AI app cancels (`notifications/cancelled`) is stopped in Fission 180 when it only reads; a change is left to finish (its result is there when the AI looks; stopping it would make the AI do it all again); no answer is sent for a cancelled call (MCP) |
+
+### What it does (code)
+
+- `fission180/ai/progress.py` (pure): a call's safe points `progress.step(what, done, total)`,
+  `Stopped` (a BaseException), `request_stop`, `current()`. Tools call `step()` in their long
+  loops; outside an AI call it does nothing.
+- `fission180/ai/alive.py`: the pump (Qt), the event filter, the working line and Stop.
+- `bridge.py`: `/status` and `/stop` on the bridge's own thread; call ids; a call that comes
+  while another runs is answered at once that Fission 180 is busy, with what the long one does.
+- `fission180_mcp.py`: progress notifications, cancels passed on.
+- The speed fixes (numbers kept per shape, the exact box the quick way, one solve for a sketch's
+  circles...): `docs/fission180/sessions/ai-speed.md`, with the benchmark's before / after.
+
+### Wave 8 coverage: ai-speed
+
+No ribbon command belongs to this area (it is how every AI call runs); the "working" display
+and Stop are not ribbon commands. Proofs: scenario `ai_speed_alive` (through the real MCP
+server and bridge), headless `speed_checks` (in runner.py), the benchmark
+`Fission180Tests/headless/ai_speed_bench.py` (`run_tests.sh --only speed`), unit
+`test_ai_progress`, `test_ai_mcp_progress`, `test_ai_geometry_index`.

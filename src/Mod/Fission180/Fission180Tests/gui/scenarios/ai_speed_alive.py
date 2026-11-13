@@ -223,6 +223,28 @@ def _bar_rect():
     return QtCore.QRect(top_left, bar.size())
 
 
+def _click(widget, point=None):
+    """A left click on the widget the way the window system delivers it: to its window."""
+    window = widget.window()
+    pos = widget.mapTo(window, point if point is not None else widget.rect().center())
+    QtTest.QTest.mouseClick(window.windowHandle(), QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, pos)
+
+
+def _front():
+    """The title of the design tab in front."""
+    area = Gui.getMainWindow().findChild(QtWidgets.QMdiArea)
+    window = area.currentSubWindow() if area is not None else None
+    return window.windowTitle() if window is not None else None
+
+
+def _ribbon_button():
+    """The ribbon's Create Sketch button (a sketch would open on its click)."""
+    for button in h.ribbon_buttons():
+        if button.objectName() == "Fission180Big_Create_Sketch":
+            return button
+    return None
+
+
 def _selection():
     return [(x.ObjectName, tuple(x.SubElementNames)) for x in Gui.Selection.getSelectionEx()]
 
@@ -301,20 +323,39 @@ def p1_long_read_only_call():
         if seconds > 1.8 and "clicked" not in seen:
             seen["clicked"] = call["pumps"]
             seen["selection_before"] = _selection()
-            centre = view.rect().center()
-            QtTest.QTest.mouseClick(view, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, centre)
-            QtTest.QTest.keyClick(Gui.getMainWindow(), QtCore.Qt.Key_Z, QtCore.Qt.ControlModifier)
-            ribbon = Gui.getMainWindow().findChild(QtWidgets.QToolButton)
+            seen["tabs"] = [_front()]
+            # (as the window system hands them to Qt: to the window first, where the filter
+            # decides; a QTest click sent straight to a widget skips that stage and moves the
+            # keyboard focus before any filter sees it)
+            _click(view)
+            seen["tabs"].append(_front())
+            QtTest.QTest.keyClick(
+                Gui.getMainWindow().windowHandle(), QtCore.Qt.Key_Z, QtCore.Qt.ControlModifier
+            )
+            seen["tabs"].append(_front())
+            ribbon = _ribbon_button()
+            seen["ribbon"] = ribbon.objectName() if ribbon is not None else None
             if ribbon is not None:
-                QtTest.QTest.mouseClick(ribbon, QtCore.Qt.LeftButton)
+                _click(ribbon)
+            seen["tabs"].append(_front())
+            tabs = h.document_tabs()
+            home = [i for i in range(tabs.count()) if tabs.tabText(i) == "Home"] if tabs else []
+            seen["home_tab"] = bool(home)
+            if home:
+                _click(tabs, tabs.tabRect(home[0]).center())
+            seen["tabs"].append(_front())
             seen["selection"] = _selection()
+        # (each next thing at a later look than the one before: a busy machine looks less often)
         if "clicked" in seen and call["pumps"] > seen["clicked"] and "refused_line" not in seen:
             seen["refused_line"] = bar.label.text()  # (a look after the clicks: their words)
-        if seconds > 2.6 and "close" not in seen:
+            seen["closing"] = call["pumps"]
+        if "closing" in seen and call["pumps"] > seen["closing"] and "close" not in seen:
             seen["close"] = Gui.getMainWindow().close()
-        if seconds > 3.4 and "stop" not in seen:
-            seen["stop"] = True
-            QtTest.QTest.mouseClick(bar.stop_button, QtCore.Qt.LeftButton)
+            seen["closed_at"] = call["pumps"]
+        if "closed_at" in seen and call["pumps"] > seen["closed_at"] and seconds > 3.4:
+            if "stop" not in seen:
+                seen["stop"] = True
+                _click(bar.stop_button)
 
     _slow("inspect_design", LONG_S * 3)
     alive.TEST_TICK = tick
@@ -359,8 +400,20 @@ def p1_long_read_only_call():
     h.check("P1 timers waited during the call", stats["timers_held"] > 0, stats)
     h.check(
         "P1 the click in the 3D view, Ctrl+Z and the ribbon click were refused",
-        stats["presses_dropped"] >= 3 and seen.get("selection") == seen.get("selection_before"),
+        stats["presses_dropped"] >= 4 and seen.get("selection") == seen.get("selection_before"),
         (stats, seen.get("selection_before"), seen.get("selection")),
+    )
+    h.check(
+        "P1 ... the design's tab stayed in front (clicked: %s and the Home tab)"
+        % seen.get("ribbon"),
+        len(set(seen.get("tabs", []) + [_front()])) == 1
+        and seen.get("ribbon")
+        and seen.get("home_tab"),
+        (seen.get("tabs"), _front()),
+    )
+    h.check(
+        "P1 ... and no sketch or dialog was started",
+        Gui.ActiveDocument.getInEdit() is None and not Gui.Control.activeDialog(),
     )
     h.check(
         "P1 ... and the line said why",
@@ -442,7 +495,7 @@ def p2_stop_a_change():
             seen["made"] = [b.Label for b in bodies.list_bodies(App.ActiveDocument)]
         if seconds > 1.5 and "stop" not in seen:
             seen["stop"] = True
-            QtTest.QTest.mouseClick(_bar().stop_button, QtCore.Qt.LeftButton)
+            _click(_bar().stop_button)
 
     _slow("new_body", LONG_S * 3, make_body=True)
     alive.TEST_TICK = tick
@@ -535,7 +588,7 @@ def p4_a_call_while_busy():
             threading.Thread(target=second, daemon=True).start()
         if seconds > 2.0 and "stop" not in seen and "got" in seen:
             seen["stop"] = True
-            QtTest.QTest.mouseClick(_bar().stop_button, QtCore.Qt.LeftButton)
+            _click(_bar().stop_button)
 
     _slow("get_design", LONG_S * 3)
     alive.TEST_TICK = tick

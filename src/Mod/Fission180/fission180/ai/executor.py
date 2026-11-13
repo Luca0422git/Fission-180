@@ -616,13 +616,20 @@ class Context:
         self._missing = None
         doc.openTransaction(self.title)
         try:
-            for step in steps:
+            for n, step in enumerate(steps):
+                if len(steps) > 1:  # (a safe point between two steps of the call: wave 8)
+                    progress.step("building %s" % step.get("op", "a step"), n, len(steps))
                 builder.run(step)
             if limited and self._changed_nothing(doc, before, shapes_before):
                 raise _NoChange(self.title)  # (a shell thicker than the part)
             doc.commitTransaction()
             _close_left_transaction(self.title, False)
             return None
+        except progress.Stopped:  # (the person's Stop: everything of the call taken back)
+            doc.abortTransaction()
+            _close_left_transaction(self.title, True)
+            builder.objects.pop(step_id, None)
+            raise
         except Exception as exc:
             doc.abortTransaction()
             _close_left_transaction(self.title, True)
