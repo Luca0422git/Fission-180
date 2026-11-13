@@ -12396,5 +12396,2136 @@
    "text": "Exported 5 files to /home/me/fission180/plate-export (3mf, obj, readme, step, stl); no picture (needs the window).\n{\n \"folder\": \"/home/me/fission180/plate-export\",\n \"files\": {\n  \"step\": {\"file\": \"/home/me/fission180/plate-export/Example.step\", \"bytes\": 6805},\n  \"stl\": {\"file\": \"/home/me/fission180/plate-export/Example.stl\", \"bytes\": 684},\n  \"3mf\": {\"file\": \"/home/me/fission180/plate-export/Example.3mf\", \"bytes\": 1116},\n  \"obj\": {\"file\": \"/home/me/fission180/plate-export/Example.obj\", \"bytes\": 873},\n  \"readme\": {\"file\": \"/home/me/fission180/plate-export/README.txt\", \"bytes\": 601}\n },\n \"bodies\": [\"Body1\"],\n \"leaves_out\": {\n  \"step\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"stl\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"3mf\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"],\n  \"obj\": [\"the timeline (2 steps): the file holds the finished shapes only\", \"1 sketch\"]\n },\n \"seconds\": 0.1\n}",
    "is_error": false
   }
+ },
+ "as_built_joint#1": {
+  "setup": "asm_arm",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   }
+  ],
+  "args": {
+   "type": "revolute",
+   "components": [
+    "Arm",
+    "Base"
+   ],
+   "position": {
+    "component": "Arm",
+    "edge": {
+     "type": "circle",
+     "radius": 3,
+     "at": {
+      "axis": "z",
+      "value": "max"
+     },
+     "count": 1
+    },
+    "snap": "circle"
+   }
+  },
+  "note": "the arm turns on the base about its round hole, where it stands",
+  "answer": {
+   "text": "Done: as-built revolute joint between Arm and Base, where they stand. Its id is 'Joint'. Its origin is at [0, 0, 15]. It holds. Next: drive_joint Joint to move it. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "joint_origin#1": {
+  "setup": "asm_arm",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   }
+  ],
+  "args": {
+   "at": {
+    "component": "Stop",
+    "face": {
+     "normal": [
+      0,
+      0,
+      1
+     ],
+     "at": {
+      "axis": "z",
+      "value": "max"
+     },
+     "count": 1
+    }
+   },
+   "offset": [
+    0,
+    0,
+    5
+   ]
+  },
+  "note": "a joint origin 5 mm above the middle of the stop's top face",
+  "answer": {
+   "text": "Done: joint origin 'Joint Origin 1' on Stop at [25, -15, 20], its Z along [0, 0, 1]. Its id is 'JointOrigin'; use it in joint or as_built_joint as {\"component\": \"Component002\", \"joint_origin\": \"JointOrigin\"}. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "rigid_group#1": {
+  "setup": "asm_hinged",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "components": [
+    "Arm",
+    "Stop"
+   ]
+  },
+  "note": "the stop now turns with the arm",
+  "answer": {
+   "text": "Done: rigid group 'Rigid Group 1' (id 'RigidGroup') locks Arm, Stop together where they stand; they now move as one. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "motion_link#1": {
+  "setup": "asm_slider",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Slide"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        60,
+        -30,
+        70,
+        -20
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch4",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "slider",
+     "components": [
+      "Slide",
+      "Base"
+     ],
+     "position": {
+      "component": "Slide",
+      "edge": {
+       "type": "line",
+       "parallel": [
+        1,
+        0,
+        0
+       ],
+       "at": [
+        {
+         "axis": "y",
+         "value": "min"
+        },
+        {
+         "axis": "z",
+         "value": "max"
+        }
+       ],
+       "count": 1
+      },
+      "snap": "midpoint"
+     }
+    }
+   }
+  ],
+  "args": {
+   "joints": [
+    "Joint",
+    "Joint001"
+   ],
+   "values": [
+    360,
+    36
+   ]
+  },
+  "note": "a turn of the arm slides the block 36 mm",
+  "answer": {
+   "text": "Done: motion link 'Motion Link 1' (id 'MotionLink'): when Revolute 1 moves 1 degree (angle), Slider 1 moves 0.1 mm (slide). Next: drive_joint Joint and check that Joint001 follows. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm; Body004: 1000 mm3, 10 x 10 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "contact#1": {
+  "setup": "asm_hinged",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "mode": "sets",
+   "new_set": [
+    "Arm",
+    "Stop"
+   ]
+  },
+  "note": "the arm stops where it hits the stop",
+  "answer": {
+   "text": "Done: contact is on for contact sets (the components of a set stop where they touch). New contact set 'Contact Set 1' (id 'ContactSet'). Contact sets: Contact Set 1 (id ContactSet): Arm, Stop. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "position#1": {
+  "setup": "asm_moved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   },
+   {
+    "tool": "drive_joint",
+    "args": {
+     "joint": "Joint",
+     "angle": 20
+    }
+   }
+  ],
+  "args": {
+   "action": "capture"
+  },
+  "note": "keep the arm turned 20 degrees as the assembly's position",
+  "answer": {
+   "text": "Done: captured the positions as 'Position 1' (id 'Position') in the timeline. Components: Base at [0, 0, 0]; Arm at [0, 0, 0]; Stop at [0, 0, 0]. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm.",
+   "is_error": false
+  }
+ },
+ "duplicate_with_joints#1": {
+  "setup": "asm_pin",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Pin"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch4",
+     "distance": 8
+    }
+   },
+   {
+    "tool": "joint",
+    "args": {
+     "type": "rigid",
+     "first": {
+      "component": "Pin",
+      "face": {
+       "normal": [
+        0,
+        0,
+        -1
+       ],
+       "count": 1
+      },
+      "snap": "centre"
+     },
+     "second": {
+      "component": "Base",
+      "edge": {
+       "type": "circle",
+       "at": [
+        {
+         "axis": "x",
+         "value": 80
+        },
+        {
+         "axis": "y",
+         "value": 30
+        },
+        {
+         "axis": "z",
+         "value": "max"
+        }
+       ],
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "components": [
+    "Pin"
+   ],
+   "at": [
+    {
+     "component": "Base",
+     "edge": {
+      "type": "circle",
+      "at": [
+       {
+        "axis": "x",
+        "value": 80
+       },
+       {
+        "axis": "y",
+        "value": -30
+       },
+       {
+        "axis": "z",
+        "value": "max"
+       }
+      ],
+      "count": 1
+     },
+     "snap": "circle"
+    }
+   ]
+  },
+  "note": "a second pin in the other hole, joined like the first",
+  "answer": {
+   "text": "Done: 1 duplicate of Pin joined like Rigid 1: Pin:2 (id Component004) at [0, -60, 0]. Bodies now: Body001: 111749 mm3, 140 x 80 x 10 mm; Body002: 2608.63 mm3, 55 x 10 x 5 mm; Body003: 500 mm3, 10 x 10 x 5 mm; Body004: 100.531 mm3, 4 x 4 x 8 mm; Body005: 100.531 mm3, 4 x 4 x 8 mm.",
+   "is_error": false
+  }
+ },
+ "motion_study#1": {
+  "setup": "asm_hinged",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -40,
+        -40,
+        100,
+        40
+       ]
+      },
+      {
+       "circle": [
+        80,
+        30,
+        2
+       ]
+      },
+      {
+       "circle": [
+        80,
+        -30,
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "ground",
+    "args": {
+     "component": "Base"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Arm"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        -5,
+        -5,
+        50,
+        5
+       ]
+      },
+      {
+       "circle": [
+        0,
+        0,
+        3
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Stop"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "rect": [
+        20,
+        -20,
+        30,
+        -10
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch3",
+     "distance": 5
+    }
+   },
+   {
+    "tool": "as_built_joint",
+    "args": {
+     "type": "revolute",
+     "components": [
+      "Arm",
+      "Base"
+     ],
+     "position": {
+      "component": "Arm",
+      "edge": {
+       "type": "circle",
+       "radius": 3,
+       "at": {
+        "axis": "z",
+        "value": "max"
+       },
+       "count": 1
+      },
+      "snap": "circle"
+     }
+    }
+   }
+  ],
+  "args": {
+   "joints": [
+    "Joint"
+   ],
+   "keys": [
+    {
+     "joint": "Joint",
+     "step": 0,
+     "value": 0
+    },
+    {
+     "joint": "Joint",
+     "step": 100,
+     "value": 90
+    }
+   ],
+   "report": [
+    0,
+    50,
+    100
+   ]
+  },
+  "note": "the arm swung from 0 to 90 degrees, where things stand half way",
+  "answer": {
+   "text": "Done: motion study 'Motion Study 1' (id 'MotionStudy') with 1 joint; the assembly is back as it was.\n{\n \"study\": \"MotionStudy\",\n \"label\": \"Motion Study 1\",\n \"mode\": \"once\",\n \"note\": \"joints: [angle (degrees), slide (mm)] at each step; components: where each one's origin stands (mm)\",\n \"at_steps\": [\n  {\n   \"step\": 0.0,\n   \"joints\": {\"Joint\": [0.0, 0.0]},\n   \"components\": {\"Base\": [0.0, 0.0, 0.0], \"Arm\": [0.0, 0.0, 0.0], \"Stop\": [0.0, 0.0, 0.0]},\n   \"solved\": true\n  },\n  {\n   \"step\": 50.0,\n   \"joints\": {\"Joint\": [45.0, 0.0]},\n   \"components\": {\"Base\": [0.0, 0.0, 0.0], \"Arm\": [0.0, 0.0, 0.0], \"Stop\": [0.0, 0.0, 0.0]},\n   \"solved\": true\n  },\n  {\n   \"step\": 100.0,\n   \"joints\": {\"Joint\": [90.0, 0.0]},\n   \"components\": {\"Base\": [0.0, 0.0, 0.0], \"Arm\": [0.0, 0.0, 0.0], \"Stop\": [0.0, 0.0, 0.0]},\n   \"solved\": true\n  }\n ]\n}",
+   "is_error": false
+  }
+ },
+ "component_colors#1": {
+  "setup": "components",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Base"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        -30,
+        -30,
+        30,
+        30
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "new_component",
+    "args": {
+     "label": "Wheel"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "geometry": [
+      {
+       "circle": [
+        0,
+        0,
+        15
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch2",
+     "distance": 5
+    }
+   }
+  ],
+  "args": {},
+  "note": "each component's colour",
+  "answer": {
+   "text": "Display Component Colors is off in the window; each component's colour:\n{\n \"display_component_colors\": \"off\",\n \"swatch\": false,\n \"colors\": [\n  {\"component\": \"(the design)\", \"color\": \"#5c9eeb\"},\n  {\"component\": \"Base\", \"id\": \"Component\", \"color\": \"#f29e40\"},\n  {\"component\": \"Wheel\", \"id\": \"Component001\", \"color\": \"#6bc773\"}\n ]\n}",
+   "is_error": false
+  }
+ },
+ "decal#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "image": "{tmp}/label.png",
+   "face": {
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "max"
+    },
+    "count": 1
+   },
+   "width": 30
+  },
+  "note": "an 80 x 40 pixel label, 30 mm wide, on the plate's top",
+  "answer": {
+   "text": "Done: decal 'label' (id 'Decal'), 80 x 40 pixels, 30 x 15 mm on the flat face Face6 of Body1, its middle at [30, 20, 10]; it covers 450 mm2. Only the look changed (no geometry). Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "canvas#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "image": "{tmp}/photo.png",
+   "plane": "XZ",
+   "width": 100,
+   "opacity": 40
+  },
+  "note": "a reference picture 100 mm wide on the XZ plane",
+  "answer": {
+   "text": "Done: canvas 'photo' (id 'Canvas'), 80 x 40 pixels shown 100 x 50 mm on XZ-plane, centred at [0, 0, 0], facing [0, -1, 0], 40 % opaque. It is not part of the model; sketch over it with create_sketch on the same plane.",
+   "is_error": false
+  }
+ },
+ "insert_svg#1": {
+  "setup": "empty",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   }
+  ],
+  "args": {
+   "path": "{tmp}/logo.svg",
+   "plane": "XY",
+   "name": "Logo"
+  },
+  "note": "an SVG's rectangle and circle in a new sketch on XY",
+  "answer": {
+   "text": "Done: 5 curves of logo.svg in the sketch 'Logo' (id 'Sketch'), fixed in place, 30 x 20 mm (sketch x -15 .. 15, y -10 .. 10); 2 closed areas. Next: extrude with profile Sketch (or emboss). No solid body yet.",
+   "is_error": false
+  }
+ },
+ "derive#1": {
+  "setup": "master_saved",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "set_parameter",
+    "args": {
+     "name": "width",
+     "value": 40
+    }
+   },
+   {
+    "tool": "primitive",
+    "args": {
+     "kind": "box",
+     "length": 40,
+     "width": 30,
+     "height": 20
+    }
+   },
+   {
+    "tool": "rename",
+    "args": {
+     "target": "Body1",
+     "name": "Housing"
+    }
+   },
+   {
+    "tool": "save_as",
+    "args": {
+     "path": "{tmp}/master.FCStd"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Child"
+    }
+   },
+   {
+    "tool": "save_as",
+    "args": {
+     "path": "{tmp}/child.FCStd"
+    }
+   }
+  ],
+  "args": {
+   "source": "{tmp}/master.FCStd",
+   "items": [
+    "Housing",
+    "width"
+   ]
+  },
+  "note": "the master's body and parameter into the child design, linked",
+  "answer": {
+   "text": "Done: derived 1 body and 1 parameter from master into child as 'Derive' (id 'Derive'), linked: it updates when master is saved again. Made: Housing (id Body001, 24000 mm3); width. Bodies now: Housing: 24000 mm3, 40 x 30 x 20 mm.",
+   "is_error": false
+  }
+ },
+ "coordinate_system#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "origin": [
+    60,
+    0,
+    0
+   ],
+   "z_axis": [
+    1,
+    0,
+    0
+   ],
+   "name": "End frame"
+  },
+  "note": "a frame on the plate's end whose Z points along X",
+  "answer": {
+   "text": "Done: user coordinate system 'End frame' (id 'CoordinateSystem') in Body1: origin [60, 0, 0], X [0, 1, 0], Y [0, 0, 1], Z [1, 0, 0]. Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "base_feature#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "action": "start"
+  },
+  "note": "direct edits from here on",
+  "answer": {
+   "text": "Done: a base feature is open. What the next tools make goes into one base feature per body, not step by step; base_feature finish ends it.",
+   "is_error": false
+  }
+ },
+ "compute_all#1": {
+  "setup": "plate_hole",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   }
+  ],
+  "args": {},
+  "note": "everything computed again",
+  "answer": {
+   "text": "Compute All: 4 steps in 0.0 s, all computed. Bodies now: Body1: 23497.3 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
+ },
+ "analysis#1": {
+  "setup": "plate_hole",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   }
+  ],
+  "args": {
+   "kind": "draft",
+   "direction": "Z",
+   "draft_min": 1
+  },
+  "note": "the faces without draft for a mould opening along Z",
+  "answer": {
+   "text": "Draft along [0, 0, 1]: 5 faces under 1 degree(s) (no draft), 0 between 1 and 3 degrees. Next: draft with those faces (refs) and the pull direction.\n{\n \"pull\": [0.0, 0.0, 1.0],\n \"draft_min_deg\": 1.0,\n \"draft_ok_deg\": 3.0,\n \"classes\": {\n  \"along\": \"draft >= draft_ok along the pull (green)\",\n  \"against\": \"draft >= draft_ok against the pull: the other mould half (blue)\",\n  \"under_min\": \"|draft| < draft_min: no draft, will not release (red)\",\n  \"between\": \"draft_min <= |draft| < draft_ok (yellow)\"\n },\n \"bodies\": [\n  {\n   \"body\": \"Body\",\n   \"label\": \"Body1\",\n   \"faces_by_worst_class\": {\"along\": 1, \"against\": 1, \"under_min\": 5, \"between\": 0},\n   \"area_mm2_by_class\": {\"along\": 2349.735, \"against\": 2349.735, \"under_min\": 2251.327, \"between\": 0.0},\n   \"flagged_faces\": [\n    {\n     \"face\": \"Face1\",\n     \"type\": \"plane\",\n     \"area_mm2\": 600.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [0.0, -1.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face6\",\n     \"type\": \"plane\",\n     \"area_mm2\": 600.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [0.0, 1.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face2\",\n     \"type\": \"plane\",\n     \"area_mm2\": 400.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [-1.0, 0.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face3\",\n     \"type\": \"plane\",\n     \"area_mm2\": 400.0,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"plane\", \"normal\": [1.0, 0.0, 0.0], \"count\": 1, \"body\": \"Body\"}\n    },\n    {\n     \"face\": \"Face7\",\n     \"type\": \"cylinder\",\n     \"area_mm2\": 251.327,\n     \"draft_deg\": [0.0, 0.0],\n     \"flag\": \"under_min\",\n     \"share_under_min\": 1.0,\n     \"ref\": {\"type\": \"cylinder\", \"radius\": 4.0, \"count\": 1, \"body\": \"Body\"}\n    }\n   ],\n   \"more\": 0\n  }\n ],\n \"kind\": \"draft\",\n \"seconds\": 0.015\n}",
+   "is_error": false
+  }
+ },
+ "sketch_draw#1": {
+  "setup": "sketch",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch1",
+   "kind": "conic",
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     40,
+     0
+    ],
+    [
+     20,
+     30
+    ]
+   ],
+   "rho": 0.4
+  },
+  "note": "a conic curve from (0, 0) to (40, 0) pulled towards (20, 30)",
+  "answer": {
+   "text": "Done: AI: Conic Curve. New curves 4 to 11 in Sketch1 (0 constraints from the values given). No solid body yet.",
+   "is_error": false
+  }
+ },
+ "sketch_modify#1": {
+  "setup": "sketch",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch1",
+   "kind": "fillet",
+   "points": [
+    [
+     0,
+     0
+    ]
+   ],
+   "radius": 5
+  },
+  "note": "a 5 mm round at the rectangle's corner",
+  "answer": {
+   "text": "Done: AI: Sketch Fillet: fillet arcs [4], radius 5 mm. New curves 4 to 5 in Sketch1. No solid body yet.",
+   "is_error": false
+  }
+ },
+ "sketch_pattern#1": {
+  "setup": "sketch_circle",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_curve_sketch",
+    "args": {
+     "plane": "XY",
+     "curves": [
+      {
+       "circle": [
+        10,
+        0,
+        2
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch1",
+   "kind": "circular",
+   "curves": [
+    0
+   ],
+   "center": {
+    "curve": -1,
+    "point": "start"
+   },
+   "quantity": 6
+  },
+  "note": "six circles round the origin",
+  "answer": {
+   "text": "Done: AI: Sketch Circular Pattern. New curves 1 to 11 in Sketch1. No solid body yet.",
+   "is_error": false
+  }
+ },
+ "sketch_project#1": {
+  "setup": "plate_sketch_above",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_curve_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 20,
+     "curves": [
+      {
+       "point": [
+        0,
+        0
+       ]
+      }
+     ]
+    }
+   }
+  ],
+  "args": {
+   "sketch": "Sketch2",
+   "kind": "project",
+   "faces": {
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "at": {
+     "axis": "z",
+     "value": "max"
+    },
+    "count": 1
+   }
+  },
+  "note": "the plate's top outline into the sketch above it",
+  "answer": {
+   "text": "Done: AI: Project: 4 curves into Sketch2. Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.",
+   "is_error": false
+  }
  }
 }

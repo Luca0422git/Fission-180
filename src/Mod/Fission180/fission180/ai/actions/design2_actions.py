@@ -839,10 +839,15 @@ def component_colors(ctx, args):
         if not components.is_component(part):
             raise UserError("%r is not a component." % ident)
         cycled.append(part)
-    for part in cycled:  # (Cycle Component Color: its own undo step, as in the browser)
-        colours.cycle(part)
-    if cycled:
-        ctx.host.after_change(doc)
+    if cycled:  # (Cycle Component Color, component_colors_ui.cycle, in one "AI: ..." step)
+
+        def work():
+            for part in cycled:
+                colours.next_color(part)
+
+        ctx.change(work)
+        for part in cycled:
+            colours.shown(part)
     if "on" in args and bool(args["on"]) != colours.is_on(doc):
         colours.toggle(doc)
     if "swatch" in args and bool(args["swatch"]) != colours.swatch_on():

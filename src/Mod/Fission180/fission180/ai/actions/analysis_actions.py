@@ -363,7 +363,7 @@ def _draft(ctx, args, owners):
     under = sum(b["faces_by_worst_class"]["under_min"] for b in data["bodies"])
     between = sum(b["faces_by_worst_class"]["between"] for b in data["bodies"])
     text = (
-        "Draft along [%.4g, %.4g, %.4g]: %d face%s under %g degrees (no draft), %d between "
+        "Draft along [%.4g, %.4g, %.4g]: %d face%s under %g degree(s) (no draft), %d between "
         "%g and %g degrees."
         % (tuple(data["pull"]) + (under, "" if under == 1 else "s", start, between, start, stop))
     )

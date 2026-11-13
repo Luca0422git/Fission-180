@@ -39,6 +39,8 @@ def _extra_press_pull(args, problems):
         kit.check_selector(args[mode], mode, "edges" if mode == "edges" else "faces", problems)
     if "offset_type" in args and mode != "faces":
         problems.append("offset_type only applies to faces")
+    if args.get("offset_face") and (mode != "faces" or "offset_type" in args):
+        problems.append("offset_face takes faces (and no offset_type)")
 
 
 def _steps_press_pull(a, sid):
@@ -56,6 +58,8 @@ def _steps_press_pull(a, sid):
     for key in ("faces", "edges", "fillet_face"):
         if key in a:
             step[key] = copy.deepcopy(a[key])
+    if a.get("offset_face"):
+        step["offset_face"] = True  # (wave 8: SOLID > MODIFY > Offset Face)
     return [step]
 
 
@@ -63,11 +67,13 @@ define(
     "press_pull",
     "Press pull",
     "modify",
-    "SOLID > MODIFY > Press Pull (Q)",
+    "SOLID > MODIFY > Press Pull (Q) / Offset Face",
     "Fusion's Press Pull: push or pull faces by a distance (mm, negative pushes in), or give "
     "edges (they get a fillet of that radius), or fillet_face (a face a fillet made: that "
     "fillet's radius becomes distance). offset_type (faces): automatic (default), new (a new "
-    "Press Pull step), modify (change the extrude that made the faces, no new step).",
+    "Press Pull step), modify (change the extrude that made the faces, no new step). "
+    "offset_face: true makes it an Offset Face step (SOLID > MODIFY > Offset Face: the "
+    "same move of faces, named so in the timeline).",
     schema(
         {
             "faces": kit.selector("the faces to move"),
@@ -75,6 +81,7 @@ define(
             "fillet_face": kit.selector("a face of a fillet"),
             "distance": number("mm (a radius for edges / fillet faces)"),
             "offset_type": enum(["automatic", "new", "modify"], default="automatic"),
+            "offset_face": boolean("an Offset Face step (faces)", default=False),
         },
         ["distance"],
     ),
@@ -871,8 +878,12 @@ define(
 
 
 def _extra_appearance(args, problems):
-    if ("look" in args) == ("color" in args):
+    if "look" in args and "color" in args:
         problems.append("give look (a library key) or color ([r, g, b] 0..1), one of them")
+    elif "look" not in args and "color" not in args and "texture_map" not in args:
+        problems.append("give look (a library key) or color ([r, g, b] 0..1), or texture_map alone")
+    if "texture_map" in args and "faces" in args:
+        problems.append("texture_map is for the whole body (no faces)")
     if "faces" in args:
         kit.check_selector(args["faces"], "faces", "faces", problems)
 
@@ -881,13 +892,16 @@ define(
     "appearance",
     "Appearance",
     "modify",
-    "SOLID > MODIFY > Appearance (A)",
+    "SOLID > MODIFY > Appearance (A) / Texture Map Controls",
     "Fusion's Appearance: colour a body, or some faces of it, without changing its material. "
     "body: a step of it (default: the current body); faces: a selector (only these faces); "
     "look: a library key (list_materials) or color [r, g, b] (0..1) with shininess (0..1) and "
     "transparency (0..1). When the body has faces with looks of their own, keep_face_looks "
     "must be given: true keeps them over the new look, false gives the whole body the "
-    "new look (Fusion asks Keep / Remove).",
+    "new look (Fusion asks Keep / Remove). texture_map (Texture Map Controls, alone or with "
+    "a look): how a textured look's pattern lies on the body: projection automatic | box | "
+    "planar | cylindrical | spherical, axis x | y | z, offset_u / offset_v (mm), rotation "
+    "(degrees), scale (%); reset: true puts it back.",
     schema(
         {
             "body": step_id("a step of the body"),
@@ -899,6 +913,18 @@ define(
             "keep_face_looks": boolean(
                 "faces that have looks of their own keep them (true) or take the new "
                 "look too (false); needed when the body has such faces"
+            ),
+            "texture_map": obj(
+                {
+                    "projection": enum(["automatic", "box", "planar", "cylindrical", "spherical"]),
+                    "axis": enum(["x", "y", "z"]),
+                    "offset_u": number("mm"),
+                    "offset_v": number("mm"),
+                    "rotation": number("degrees"),
+                    "scale": number("per cent of the look's own size", above=0),
+                    "reset": boolean("back to the look's own mapping"),
+                },
+                description="Texture Map Controls for the body's textured look",
             ),
         },
     ),

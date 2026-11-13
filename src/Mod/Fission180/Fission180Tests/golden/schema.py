@@ -72,7 +72,10 @@ STEP_KEYS = {
     ),
     "pattern_circ": ({"id", "features", "axis", "count"}, {"angle", "comment"}),
     "mirror": ({"id", "features", "plane"}, {"comment"}),
-    "press_pull": ({"id", "distance"}, {"faces", "edges", "fillet_face", "comment"}),
+    "press_pull": (
+        {"id", "distance"},
+        {"faces", "edges", "fillet_face", "offset_face", "comment"},  # (offset_face: wave 8)
+    ),
     "parameter": ({"name", "value"}, {"unit", "comment"}),
     "edit": ({"target"}, {"set", "constraint", "value", "expressions", "comment"}),
     "check": ({"expect"}, {"comment"}),

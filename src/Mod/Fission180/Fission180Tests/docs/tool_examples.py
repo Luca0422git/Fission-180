@@ -1730,3 +1730,266 @@ EXAMPLES += [
         "note": "the wheel becomes item 1 (the base takes 2)",
     },
 ]
+
+# -- wave 8, ai-design: the DESIGN workspace's new tools ----------------------------------------
+_ARM_AXIS = {"type": "circle", "radius": 3, "at": {"axis": "z", "value": "max"}, "count": 1}
+_HOLE = {
+    "type": "circle",
+    "at": [{"axis": "x", "value": 80}, {"axis": "y", "value": -30}, {"axis": "z", "value": "max"}],
+    "count": 1,
+}
+# a base with two 2 mm holes, an arm turning on it about the origin, a stop beside the arm
+ASM_ARM = EMPTY + [
+    call("new_component", label="Base"),
+    call(
+        "create_sketch",
+        plane="XY",
+        geometry=[{"rect": [-40, -40, 100, 40]}, {"circle": [80, 30, 2]}, {"circle": [80, -30, 2]}],
+    ),
+    call("extrude", profile="Sketch1", distance=10),
+    call("ground", component="Base"),
+    call("new_component", label="Arm"),
+    call(
+        "create_sketch",
+        plane="XY",
+        offset=10,
+        geometry=[{"rect": [-5, -5, 50, 5]}, {"circle": [0, 0, 3]}],
+    ),
+    call("extrude", profile="Sketch2", distance=5),
+    call("new_component", label="Stop"),
+    call("create_sketch", plane="XY", offset=10, geometry=[{"rect": [20, -20, 30, -10]}]),
+    call("extrude", profile="Sketch3", distance=5),
+]
+ASM_HINGED = ASM_ARM + [
+    call(
+        "as_built_joint",
+        type="revolute",
+        components=["Arm", "Base"],
+        position={"component": "Arm", "edge": _ARM_AXIS, "snap": "circle"},
+    ),
+]
+ASM_SLIDER = ASM_HINGED + [
+    call("new_component", label="Slide"),
+    call("create_sketch", plane="XY", offset=10, geometry=[{"rect": [60, -30, 70, -20]}]),
+    call("extrude", profile="Sketch4", distance=10),
+    call(
+        "as_built_joint",
+        type="slider",
+        components=["Slide", "Base"],
+        position={
+            "component": "Slide",
+            "edge": {
+                "type": "line",
+                "parallel": [1, 0, 0],
+                "at": [{"axis": "y", "value": "min"}, {"axis": "z", "value": "max"}],
+                "count": 1,
+            },
+            "snap": "midpoint",
+        },
+    ),
+]
+ASM_PIN = ASM_ARM + [
+    call("new_component", label="Pin"),
+    call("create_sketch", plane="XY", offset=10, geometry=[{"circle": [80, 30, 2]}]),
+    call("extrude", profile="Sketch4", distance=8),
+    call(
+        "joint",
+        type="rigid",
+        first={"component": "Pin", "face": {"normal": [0, 0, -1], "count": 1}, "snap": "centre"},
+        second={
+            "component": "Base",
+            "edge": {
+                "type": "circle",
+                "at": [
+                    {"axis": "x", "value": 80},
+                    {"axis": "y", "value": 30},
+                    {"axis": "z", "value": "max"},
+                ],
+                "count": 1,
+            },
+            "snap": "circle",
+        },
+    ),
+]
+MASTER_SAVED = EMPTY + [
+    call("set_parameter", name="width", value=40),
+    call("primitive", kind="box", length=40, width=30, height=20),
+    call("rename", target="Body1", name="Housing"),
+    call("save_as", path="{tmp}/master.FCStd"),
+    call("new_design", name="Child"),
+    call("save_as", path="{tmp}/child.FCStd"),
+]
+SKETCH_CIRCLE = EMPTY + [call("create_curve_sketch", plane="XY", curves=[{"circle": [10, 0, 2]}])]
+PLATE_SKETCH_ABOVE = PLATE + [
+    call("create_curve_sketch", plane="XY", offset=20, curves=[{"point": [0, 0]}])
+]
+SETUPS.update(
+    {
+        "asm_arm": ASM_ARM,
+        "asm_hinged": ASM_HINGED,
+        "asm_moved": ASM_HINGED + [call("drive_joint", joint="Joint", angle=20)],
+        "asm_slider": ASM_SLIDER,
+        "asm_pin": ASM_PIN,
+        "master_saved": MASTER_SAVED,
+        "sketch_circle": SKETCH_CIRCLE,
+        "plate_sketch_above": PLATE_SKETCH_ABOVE,
+    }
+)
+EXAMPLES += [
+    {
+        "tool": "as_built_joint",
+        "setup": "asm_arm",
+        "args": {
+            "type": "revolute",
+            "components": ["Arm", "Base"],
+            "position": {"component": "Arm", "edge": _ARM_AXIS, "snap": "circle"},
+        },
+        "note": "the arm turns on the base about its round hole, where it stands",
+    },
+    {
+        "tool": "joint_origin",
+        "setup": "asm_arm",
+        "args": {"at": {"component": "Stop", "face": TOP}, "offset": [0, 0, 5]},
+        "note": "a joint origin 5 mm above the middle of the stop's top face",
+    },
+    {
+        "tool": "rigid_group",
+        "setup": "asm_hinged",
+        "args": {"components": ["Arm", "Stop"]},
+        "note": "the stop now turns with the arm",
+    },
+    {
+        "tool": "motion_link",
+        "setup": "asm_slider",
+        "args": {"joints": ["Joint", "Joint001"], "values": [360, 36]},
+        "note": "a turn of the arm slides the block 36 mm",
+    },
+    {
+        "tool": "contact",
+        "setup": "asm_hinged",
+        "args": {"mode": "sets", "new_set": ["Arm", "Stop"]},
+        "note": "the arm stops where it hits the stop",
+    },
+    {
+        "tool": "position",
+        "setup": "asm_moved",
+        "args": {"action": "capture"},
+        "note": "keep the arm turned 20 degrees as the assembly's position",
+    },
+    {
+        "tool": "duplicate_with_joints",
+        "setup": "asm_pin",
+        "args": {
+            "components": ["Pin"],
+            "at": [{"component": "Base", "edge": _HOLE, "snap": "circle"}],
+        },
+        "note": "a second pin in the other hole, joined like the first",
+    },
+    {
+        "tool": "motion_study",
+        "setup": "asm_hinged",
+        "args": {
+            "joints": ["Joint"],
+            "keys": [
+                {"joint": "Joint", "step": 0, "value": 0},
+                {"joint": "Joint", "step": 100, "value": 90},
+            ],
+            "report": [0, 50, 100],
+        },
+        "note": "the arm swung from 0 to 90 degrees, where things stand half way",
+    },
+    {
+        "tool": "component_colors",
+        "setup": "components",
+        "args": {},
+        "note": "each component's colour",
+    },
+    {
+        "tool": "decal",
+        "setup": "plate",
+        "files": {"label.png": "canvas.png"},
+        "args": {"image": "{tmp}/label.png", "face": TOP, "width": 30},
+        "note": "an 80 x 40 pixel label, 30 mm wide, on the plate's top",
+    },
+    {
+        "tool": "canvas",
+        "setup": "plate",
+        "files": {"photo.png": "canvas.png"},
+        "args": {"image": "{tmp}/photo.png", "plane": "XZ", "width": 100, "opacity": 40},
+        "note": "a reference picture 100 mm wide on the XZ plane",
+    },
+    {
+        "tool": "insert_svg",
+        "setup": "empty",
+        "files": {"logo.svg": "shape.svg"},
+        "args": {"path": "{tmp}/logo.svg", "plane": "XY", "name": "Logo"},
+        "note": "an SVG's rectangle and circle in a new sketch on XY",
+    },
+    {
+        "tool": "derive",
+        "setup": "master_saved",
+        "args": {"source": "{tmp}/master.FCStd", "items": ["Housing", "width"]},
+        "note": "the master's body and parameter into the child design, linked",
+    },
+    {
+        "tool": "coordinate_system",
+        "setup": "plate",
+        "args": {"origin": [60, 0, 0], "z_axis": [1, 0, 0], "name": "End frame"},
+        "note": "a frame on the plate's end whose Z points along X",
+    },
+    {
+        "tool": "base_feature",
+        "setup": "plate",
+        "args": {"action": "start"},
+        "note": "direct edits from here on",
+    },
+    {
+        "tool": "compute_all",
+        "setup": "plate_hole",
+        "args": {},
+        "note": "everything computed again",
+        "volatile": True,  # (it says how long it took)
+    },
+    {
+        "tool": "analysis",
+        "setup": "plate_hole",
+        "args": {"kind": "draft", "direction": "Z", "draft_min": 1},
+        "note": "the faces without draft for a mould opening along Z",
+        "volatile": True,  # (it says how long it took)
+    },
+    {
+        "tool": "sketch_draw",
+        "setup": "sketch",
+        "args": {
+            "sketch": "Sketch1",
+            "kind": "conic",
+            "points": [[0, 0], [40, 0], [20, 30]],
+            "rho": 0.4,
+        },
+        "note": "a conic curve from (0, 0) to (40, 0) pulled towards (20, 30)",
+    },
+    {
+        "tool": "sketch_modify",
+        "setup": "sketch",
+        "args": {"sketch": "Sketch1", "kind": "fillet", "points": [[0, 0]], "radius": 5},
+        "note": "a 5 mm round at the rectangle's corner",
+    },
+    {
+        "tool": "sketch_pattern",
+        "setup": "sketch_circle",
+        "args": {
+            "sketch": "Sketch1",
+            "kind": "circular",
+            "curves": [0],
+            "center": {"curve": -1, "point": "start"},
+            "quantity": 6,
+        },
+        "note": "six circles round the origin",
+    },
+    {
+        "tool": "sketch_project",
+        "setup": "plate_sketch_above",
+        "args": {"sketch": "Sketch2", "kind": "project", "faces": TOP},
+        "note": "the plate's top outline into the sketch above it",
+    },
+]
