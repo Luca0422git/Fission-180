@@ -233,6 +233,10 @@ def show_all(label):
     """The AI sets the view the way a person would look at the whole thing (iso, fit)."""
     answer = call("set_view", {"orientation": "iso", "fit": True})
     h.check("%s: set_view iso + fit" % label, not answer["is_error"], answer["text"][:200])
+    try:
+        h.view_still("the 3D view to show the AI's view")
+    except Exception:  # (no 3D view on top)
+        pass
 
 
 def ids_in(text):

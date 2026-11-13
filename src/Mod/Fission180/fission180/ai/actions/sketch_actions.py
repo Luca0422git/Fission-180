@@ -818,6 +818,22 @@ class _Boxes:
         return f.typed if f is not None else None
 
 
+class _NoView:
+    """The 3D view of a sketch session for a sketch that is not open: a tool that made hidden
+    helper lines asks the view to keep them unseen (sketch_helpers.made); with the sketch
+    closed there is nothing drawn to hide (sketch_helpers.opened hides them when it opens)."""
+
+    def getSceneGraph(self):
+        from pivy import coin
+
+        return coin.SoSeparator()
+
+
+class _NoSession:
+    view = _NoView()
+    gl = None
+
+
 def _tool(cls, sketch, **attrs):
     tool = object.__new__(cls)
     tool.sketch = sketch
@@ -826,7 +842,7 @@ def _tool(cls, sketch, **attrs):
     tool.boxes = _Boxes({})
     tool.picks = []
     tool.step = 0
-    tool.session = None
+    tool.session = _NoSession()
     tool.made = None
     tool.note = ""
     tool.active = False
