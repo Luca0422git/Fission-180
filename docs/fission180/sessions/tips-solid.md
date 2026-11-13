@@ -49,6 +49,22 @@ Measured (the runner's report, this sandbox with ten builders sharing four CPUs)
 SOLID pictures in 467 s (3.7 s each: a before / after about 4 to 5 s, a dialog 2 to 3 s),
 the 14 SURFACE ones in 66 s.
 
+All 141 pictures on one page, in ribbon order with their command: `docs/fission180/dev/
+tips-solid-sheet.png` (for the merger; scaled to 60 %).
+
+## Proofs
+
+- `Fission180Tests/unit/test_tips.py` Coverage `test_module_solid` and `test_module_surface`:
+  pass (every command of the two tabs has a complete entry and its 320 x 200 picture of at
+  most 45 KB; all 141 together are 2.3 MB). The whole unit run (`run_tests.sh --only unit`,
+  3813 tests): the only failures are the coverage tests of the other builders' modules, which
+  are not on this branch.
+- GUI scenario `tips_solid_hover`: PASS, 44 checks (real pointer moves; the screenshots show
+  the cards with Extrude's, Rib's, Patch's and Zebra Analysis' pictures).
+- tips-ui's `tips_hover` with these texts and pictures under its Fillet and Thicken (no
+  stand-in data any more): PASS, 44 checks.
+- `make_tip_pictures.sh solid`: 127 made, 0 failed; `surface`: 14 made, 0 failed.
+
 ## Fusion's tooltips (sources)
 
 | What | Source | Kind |
@@ -87,3 +103,13 @@ the 14 SURFACE ones in 66 s.
 
 - Accessibility Analysis and Draft Analysis pictures look alike (both colour the faces by a
   direction, in the same colours).
+- The on / off choices without a dialog (Enable Contact Sets, Enable All Contact, Disable
+  Contact, Capture / Revert Position, Component Drag) show their ribbon menu with the entry
+  lit, not a model; Component Drag's tick is not drawn in the grab.
+- The Component Color Swatch picture cuts the browser at a fixed place of the window (its
+  rows read through Qt are not where the dock draws them): made again on another screen size
+  it would need a new crop.
+- The construction pictures are framed on the part before: a large plane runs out of the
+  picture's edge (it reads as a plane all the same).
+- The pictures were made on this sandbox's software OpenGL and DejaVu fonts; the dialogs in
+  them look as they do on Linux, not with Windows' Segoe UI.
