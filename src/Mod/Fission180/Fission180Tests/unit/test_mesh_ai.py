@@ -304,6 +304,45 @@ class Picks(unittest.TestCase):
         self.assertEqual(len(up), 2)
 
 
+class DescribeAnswer(unittest.TestCase):
+    """describe_reference's answer on a mesh, shortened (rebuild_actions uses these)."""
+
+    def test_unread_faces_are_listed_shortly(self):
+        data = {"unrecognized": [{"faces": [{"n": i} for i in range(7606)], "why": "x"}, {}]}
+        short = ai.short_unrecognized(data, 8)
+        self.assertEqual(len(short["unrecognized"][0]["faces"]), 8)
+        self.assertEqual(short["unrecognized"][0]["faces_total"], 7606)
+        self.assertEqual(short["unrecognized"][1], {})
+        self.assertEqual(len(data["unrecognized"][0]["faces"]), 7606)  # (a copy)
+
+    def test_pattern_copies_are_folded(self):
+        holes = [{"id": "F%d" % i, "kind": "hole"} for i in range(1, 81)]
+        pattern = {
+            "id": "F81",
+            "kind": "pattern",
+            "of": "F1",
+            "features": ["F%d" % i for i in range(1, 81)],
+        }
+        folded = ai.patterns_folded({"features": [pattern] + holes})
+        self.assertEqual([f["id"] for f in folded["features"]], ["F81", "F1"])
+        self.assertEqual(folded["pattern_copies_not_listed"], 79)
+        plain = {"features": holes[:2]}
+        self.assertIs(ai.patterns_folded(plain), plain)
+
+    def test_no_plan(self):
+        self.assertTrue(ai.no_plan({"base": {"kind": "none"}, "plan": [], "confidence": 0}))
+        self.assertTrue(ai.no_plan({"base": {"kind": "extrude"}, "plan": [1], "confidence": 0.3}))
+        self.assertFalse(ai.no_plan({"base": {"kind": "extrude"}, "plan": [1], "confidence": 1}))
+
+    def test_hints(self):
+        pts, facets = field(20, 16, bumps)
+        shapes = ai.overview(pts, facets)
+        self.assertIn("an extrude along z of its outline", ai.base_hint(shapes))
+        self.assertIn("a rectangular_pattern of 5 x 4, 4 x 4 mm apart", ai.pattern_hint(shapes))
+        self.assertIn("mesh_section_sketch", ai.base_hint(None))
+        self.assertEqual(ai.pattern_hint(None), " and a pattern for repeated ones")
+
+
 class FacetCopying(unittest.TestCase):
     def test_signs(self):
         self.assertEqual(ai.facet_copying([("Sketch1", 4)], 3), "")

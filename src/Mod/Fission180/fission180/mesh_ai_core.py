@@ -654,6 +654,89 @@ def picked_facets(points, facets, spec, groups=None, size=None):
     return sorted(set(found))
 
 
+# -- describe_reference's answer on a mesh (rebuild_actions) ------------------------------
+def patterns_folded(data):
+    """The answer with the copies of each pattern left out of features (the pattern keeps
+    their ids, its first one is listed): eighty equal holes are one hole and one pattern, and
+    were eighty entries an AI read one by one (wave 8, the Relic stand-in: 81 features)."""
+    features = data.get("features")
+    if not isinstance(features, list):
+        return data
+    copies = set()
+    for feature in features:
+        if isinstance(feature, dict) and feature.get("kind") == "pattern":
+            members = feature.get("features") or []
+            copies.update(m for m in members if m != feature.get("of"))
+    if not copies:
+        return data
+    out = dict(data)
+    out["features"] = [f for f in features if not (isinstance(f, dict) and f.get("id") in copies)]
+    out["pattern_copies_not_listed"] = len(copies)
+    return out
+
+
+def short_unrecognized(data, cap):
+    """The answer with at most `cap` face selectors in each group of unrecognized faces (the
+    count kept: faces_total), so a part of thousands of facets is not thousands of lines."""
+    rows = data.get("unrecognized")
+    if not isinstance(rows, list):
+        return data
+    out = dict(data)
+    short = []
+    for row in rows:
+        faces = row.get("faces") if isinstance(row, dict) else None
+        if isinstance(faces, list) and len(faces) > cap:
+            row = dict(row, faces=faces[:cap], faces_total=len(faces))
+        short.append(row)
+    out["unrecognized"] = short
+    return out
+
+
+def no_plan(data):
+    """True when describe read no usable plan: no base, no steps, or little confidence."""
+    base = (data.get("base") or {}).get("kind", "none")
+    return base == "none" or not data.get("plan") or float(data.get("confidence") or 0) < 0.5
+
+
+def base_hint(shapes):
+    if not shapes or not shapes.get("axis"):
+        return " (mesh_section_sketch shows the outline at a height)"
+    size = shapes.get("size") or [0, 0, 0]
+    return (
+        " (most of its flat area faces along %s: an extrude along %s of its outline, "
+        "%s x %s x %s mm overall; mesh_section_sketch shows the outline)"
+        % (shapes["axis"], shapes["axis"], _num(size[0]), _num(size[1]), _num(size[2]))
+    )
+
+
+def pattern_hint(shapes):
+    for group in (shapes or {}).get("detail_groups", []):
+        layout = group.get("layout") or {}
+        if "grid" in layout and group["count"] > 1:
+            n1, n2 = layout["grid"]
+            s1, s2 = layout["spacing"]
+            return (
+                " and a pattern for the repeated ones (the %d equal %s: a rectangular_pattern "
+                "of %d x %d, %s x %s mm apart along %s and %s)"
+                % (
+                    group["count"],
+                    group["kind"] + ("es" if group["kind"].endswith("recess") else "s"),
+                    n1,
+                    n2,
+                    _num(s1),
+                    _num(s2),
+                    layout["axes"][0],
+                    layout["axes"][1],
+                )
+            )
+        if "ring" in layout and group["count"] > 1:
+            return " and a circular_pattern of %d for the equal %s details on a ring" % (
+                layout["ring"],
+                group["kind"],
+            )
+    return " and a pattern for repeated ones"
+
+
 # -- a rebuild of a mesh that copies its facets ----------------------------------------------
 SEGMENTS = 60  # line segments in one sketch beyond which a sketch looks traced off facets
 STEPS = 30  # steps in a rebuild of a mesh beyond which it looks copied facet by facet

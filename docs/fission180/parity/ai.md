@@ -539,7 +539,7 @@ volumes).
 
 ### Tests
 
-Unit `test_mesh_ai.py` (28), `test_mesh_convert_freecad.py` (`headless/mesh_convert_check.py`:
+Unit `test_mesh_ai.py` (32), `test_mesh_convert_freecad.py` (`headless/mesh_convert_check.py`:
 the new conversion is the sewn one, a cut through 80 holes closed and quick); the headless
 runner's block `headless/mesh_tools.py` (67 calls: every tool and kind, the repair route,
 the rebuild of both stand-ins, the refusals); scenarios `ai_mesh_relic` and `ai_mesh_repair`

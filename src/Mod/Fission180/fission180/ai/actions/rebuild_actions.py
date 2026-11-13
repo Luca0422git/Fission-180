@@ -140,6 +140,12 @@ def start_rebuild(ctx, args):
     return ctx.done(text, doc)
 
 
+def _core():
+    from ... import mesh_ai_core
+
+    return mesh_ai_core
+
+
 def _mesh_start_words(ref):
     """What start_rebuild adds for a mesh (wave 8, ai-mesh): what the mesh is made of, what
     describe_reference can read of it, and the quick route when a timeline is not needed."""
@@ -205,9 +211,9 @@ def describe_reference(ctx, args):
     if detail == "plan":
         data = _without_face_lists(data)
     # (wave 8) never thousands of facets listed one by one: a list an AI then copied
-    data = _short_unrecognized(data, UNRECOGNIZED_FACES.get(detail, 8))
+    data = _core().short_unrecognized(data, UNRECOGNIZED_FACES.get(detail, 8))
     if detail == "plan":
-        data = _patterns_folded(data)
+        data = _core().patterns_folded(data)
     target = rebuild.target_of(ref)
     head = {
         "reference": ref.Name,
@@ -244,7 +250,7 @@ def describe_reference(ctx, args):
         ". Build the plan in the active body %r, compare_to_reference after each "
         "feature." % (target.Label if target is not None else "?")
     )
-    if getattr(ref, "SourceKind", "") == "mesh" and _no_plan(data):
+    if getattr(ref, "SourceKind", "") == "mesh" and _core().no_plan(data):
         shapes = data.get("mesh_overview") or _mesh_overview(ref)
         if shapes is not None and "mesh_overview" not in head:
             head["mesh_overview"] = shapes
@@ -253,49 +259,6 @@ def describe_reference(ctx, args):
 
 
 UNRECOGNIZED_FACES = {"plan": 8, "summary": 8, "full": 200}  # face selectors per group
-
-
-def _patterns_folded(data):
-    """The answer with the copies of each pattern left out of features (the pattern keeps
-    their ids, its first one is listed): eighty equal holes are one hole and one pattern, and
-    were eighty entries an AI read one by one (wave 8, the Relic stand-in: 81 features)."""
-    features = data.get("features")
-    if not isinstance(features, list):
-        return data
-    copies = set()
-    for feature in features:
-        if isinstance(feature, dict) and feature.get("kind") == "pattern":
-            members = feature.get("features") or []
-            copies.update(m for m in members if m != feature.get("of"))
-    if not copies:
-        return data
-    out = dict(data)
-    out["features"] = [f for f in features if not (isinstance(f, dict) and f.get("id") in copies)]
-    out["pattern_copies_not_listed"] = len(copies)
-    return out
-
-
-def _short_unrecognized(data, cap):
-    """The answer with at most `cap` face selectors in each group of unrecognized faces (the
-    count kept: faces_total), so a part of thousands of facets is not thousands of lines."""
-    rows = data.get("unrecognized")
-    if not isinstance(rows, list):
-        return data
-    out = dict(data)
-    short = []
-    for row in rows:
-        faces = row.get("faces") if isinstance(row, dict) else None
-        if isinstance(faces, list) and len(faces) > cap:
-            row = dict(row, faces=faces[:cap], faces_total=len(faces))
-        short.append(row)
-    out["unrecognized"] = short
-    return out
-
-
-def _no_plan(data):
-    """True when describe read no usable plan: no base, no steps, or little confidence."""
-    base = (data.get("base") or {}).get("kind", "none")
-    return base == "none" or not data.get("plan") or float(data.get("confidence") or 0) < 0.5
 
 
 def _honest_routes(ref, data, shapes, target):
@@ -309,11 +272,21 @@ def _honest_routes(ref, data, shapes, target):
     mesh_there = source is not None and insert.is_mesh_body(source)
     triangles = source.Mesh.CountFacets if mesh_there else 0
     seconds = mesh_ai_core.seconds_words(mesh_ai_core.estimate_seconds(triangles))
-    text = (
-        "No plan could be read from this mesh (base %s, confidence %s): its round or "
-        "free-form areas are small flat facets, which Fission 180 does not fit to features. "
-        % ((data.get("base") or {}).get("kind", "none"), _num(data.get("confidence") or 0))
-    )
+    base = (data.get("base") or {}).get("kind", "none")
+    confidence = _num(data.get("confidence") or 0)
+    if data.get("plan") and base != "none":
+        text = (
+            "Only part of this mesh could be read (confidence %s): the plan in the answer "
+            "covers what was read (%d steps); the rest, its round or free-form areas, are "
+            "small flat facets Fission 180 does not fit to features. "
+            % (confidence, len(data["plan"]))
+        )
+    else:
+        text = (
+            "No plan could be read from this mesh (base %s, confidence %s): its round or "
+            "free-form areas are small flat facets, which Fission 180 does not fit to "
+            "features. " % (base, confidence)
+        )
     if shapes is not None:
         text += "What it is made of: %s " % shapes["words"]
     text += (
@@ -328,50 +301,11 @@ def _honest_routes(ref, data, shapes, target):
             source.Label if source is not None else "the mesh body",
             seconds,
             target.Label if target is not None else "the rebuilt body",
-            _base_hint(shapes),
-            _pattern_hint(shapes),
+            _core().base_hint(shapes),
+            _core().pattern_hint(shapes),
         )
     )
     return text
-
-
-def _base_hint(shapes):
-    if not shapes or not shapes.get("axis"):
-        return " (mesh_section_sketch shows the outline at a height)"
-    size = shapes.get("size") or [0, 0, 0]
-    return (
-        " (most of its flat area faces along %s: an extrude along %s of its outline, "
-        "%s x %s x %s mm overall; mesh_section_sketch shows the outline)"
-        % (shapes["axis"], shapes["axis"], _num(size[0]), _num(size[1]), _num(size[2]))
-    )
-
-
-def _pattern_hint(shapes):
-    for group in (shapes or {}).get("detail_groups", []):
-        layout = group.get("layout") or {}
-        if "grid" in layout and group["count"] > 1:
-            n1, n2 = layout["grid"]
-            s1, s2 = layout["spacing"]
-            return (
-                " and a pattern for the repeated ones (the %d equal %s: a rectangular_pattern "
-                "of %d x %d, %s x %s mm apart along %s and %s)"
-                % (
-                    group["count"],
-                    group["kind"] + ("es" if group["kind"].endswith("recess") else "s"),
-                    n1,
-                    n2,
-                    _num(s1),
-                    _num(s2),
-                    layout["axes"][0],
-                    layout["axes"][1],
-                )
-            )
-        if "ring" in layout and group["count"] > 1:
-            return " and a circular_pattern of %d for the equal %s details on a ring" % (
-                layout["ring"],
-                group["kind"],
-            )
-    return " and a pattern for repeated ones"
 
 
 def _without_face_lists(data):
