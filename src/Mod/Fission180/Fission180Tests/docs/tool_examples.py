@@ -1526,3 +1526,59 @@ EXAMPLES += [
         "note": "a small video of the explosion",
     },
 ]
+
+# -- wave 8, ai-behaviour: planning a job, asking the person, showing a workspace ---------------
+# The plate with its hole exported to STL and brought into a new design as a mesh body (a
+# stand-in for Relic, the 8,486-triangle mesh that started wave 8)
+SETUPS.update(
+    {
+        "plate_mesh": PLATE_HOLE
+        + [
+            call("export", format="stl", path="{tmp}/plate.stl"),
+            call("new_design", name="Relic"),
+            call("import_file", path="{tmp}/plate.stl"),
+        ],
+    }
+)
+EXAMPLES += [
+    {
+        "tool": "plan_approach",
+        "setup": "plate_mesh",
+        "args": {"request": "make this mesh a solid", "target": "MeshBody"},
+        "note": "the route, the questions and the cost for a mesh",
+    },
+    {
+        "tool": "plan_approach",
+        "setup": "plate",
+        "args": {"request": "will this plate break if I stand on it?"},
+        "note": "a Static Stress study, planned",
+    },
+    {
+        "tool": "ask_person",
+        "setup": "none",
+        "args": {
+            "message": "Before I convert the mesh:",
+            "questions": [
+                {
+                    "question": "A solid you can cut and print, or an editable timeline?",
+                    "choices": ["a solid", "an editable timeline"],
+                    "default": "a solid",
+                }
+            ],
+        },
+        "note": "where the app cannot show a form, the answer says to ask in the reply",
+    },
+    {
+        "tool": "list_tools",
+        "setup": "none",
+        "args": {"goal": "make it hollow"},
+        "note": "the tools for a goal in plain words, best first",
+    },
+    {
+        "tool": "show_workspace",
+        "setup": "plate",
+        "gui": True,
+        "args": {"workspace": "design", "tab": "mesh"},
+        "note": "the MESH tab of the DESIGN workspace (needs the Fission 180 window)",
+    },
+]

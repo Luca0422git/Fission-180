@@ -6,6 +6,11 @@ numbers. Every call in every recipe is run by Fission 180's tests in real FreeCA
 arguments, the ids the answers report and the numbers are known to be right. Copy the
 calls, change the sizes, and check with the same tools.
 
+Before you start one: `plan_approach` with the person's request picks the route (it names the
+recipe's tools in order, the questions to ask first and the slow steps) and says when a job
+needs no recipe at all (a mesh becomes a solid with one `convert_mesh` call; one change is one
+call). [Before you build](fission180://docs/handbook.md#before-you-build) has the routine.
+
 | Recipe | What it shows |
 |---|---|
 | [L bracket with mounting holes](fission180://docs/recipes/bracket.md) | a side profile extruded, inside fillet, outside chamfer, holes into two faces, material and mass |

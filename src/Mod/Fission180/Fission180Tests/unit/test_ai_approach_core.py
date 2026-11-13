@@ -326,6 +326,7 @@ class Workspaces(unittest.TestCase):
         self.assertEqual(r["workspaces"][0]["workspace"], "simulation")
         show = [s for s in r["route"] if s["tool"] == "show_workspace"][0]
         self.assertEqual(show["args"], {"workspace": "simulation"})
+        self.assertEqual(steps[:2], ["create_study", "show_workspace"])  # (SIMULATION needs one)
 
     def test_a_study_with_everything_said(self):
         r = plan(

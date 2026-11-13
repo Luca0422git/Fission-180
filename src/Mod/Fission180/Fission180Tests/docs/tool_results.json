@@ -6682,7 +6682,7 @@
   },
   "note": "by category",
   "answer": {
-   "text": "{\n \"tools\": [\n  {\n   \"name\": \"get_design\",\n   \"title\": \"Get design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER (the design's bodies, sketches, parameters) and TIMELINE\",\n   \"read_only\": true,\n   \"available\": true\n  },\n  {\n   \"name\": \"measure\",\n   \"title\": \"Measure\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Measure\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"physical_properties\",\n   \"title\": \"Physical properties\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER > a body > Properties (INSPECT)\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"center_of_mass\",\n   \"title\": \"Center of mass\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Center of Mass\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"interference\",\n   \"title\": \"Interference\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"section_analysis\",\n   \"title\": \"Section analysis\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Section Analysis\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"inspect_design\",\n   \"title\": \"Inspect design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER + TIMELINE + Properties (everything at once)\",\n   \"read_only\": true,\n   \"available\": true\n  },\n  {\n   \"name\": \"query_geometry\",\n   \"title\": \"Query geometry\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"Selection filters + INSPECT > Measure (on what a selector picks)\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"check_design\",\n   \"title\": \"Check design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference + the timeline's warnings\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"diff_design\",\n   \"title\": \"Diff design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"TIMELINE (compare before and after)\",\n   \"read_only\": true,\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 10\n}",
+   "text": "10 tools of category inspect. Every tool works from any workspace.\n{\n \"tools\": [\n  {\n   \"name\": \"get_design\",\n   \"title\": \"Get design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER (the design's bodies, sketches, parameters) and TIMELINE\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Describe the open Fission 180 design\",\n   \"available\": true\n  },\n  {\n   \"name\": \"measure\",\n   \"title\": \"Measure\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Measure\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Measure between two picks a and b of the current body or the origin\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"physical_properties\",\n   \"title\": \"Physical properties\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER > a body > Properties (INSPECT)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Physical properties of bodies, as Fusion's Properties\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"center_of_mass\",\n   \"title\": \"Center of mass\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Center of Mass\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"The centre of mass of bodies together (Fusion's Center of Mass), weighted by their materials.\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"interference\",\n   \"title\": \"Interference\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Find where bodies overlap (Fusion's Interference)\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"section_analysis\",\n   \"title\": \"Section analysis\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Section Analysis\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Cut the design with a plane to look inside (Fusion's Section Analysis)\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"inspect_design\",\n   \"title\": \"Inspect design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"BROWSER + TIMELINE + Properties (everything at once)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Read the whole design as numbers, to check work before trusting a picture\",\n   \"available\": true\n  },\n  {\n   \"name\": \"query_geometry\",\n   \"title\": \"Query geometry\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"Selection filters + INSPECT > Measure (on what a selector picks)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"List the faces, edges or corners (vertices) of a body or step that a selector picks, with facts about each\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"check_design\",\n   \"title\": \"Check design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"INSPECT > Interference + the timeline's warnings\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"Check that the design is sound, before saving or exporting it\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  },\n  {\n   \"name\": \"diff_design\",\n   \"title\": \"Diff design\",\n   \"category\": \"inspect\",\n   \"ribbon\": \"TIMELINE (compare before and after)\",\n   \"read_only\": true,\n   \"workspace\": \"design\",\n   \"purpose\": \"What changed in the design since\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 10\n}",
    "is_error": false
   }
  },
@@ -11251,6 +11251,170 @@
   "note": "a small video of the explosion",
   "answer": {
    "text": "Published /home/me/fission180/explode.avi: 37 frames of 320 x 240 at 12 frames a second (Explode).\n{\n \"file\": \"/home/me/fission180/explode.avi\",\n \"format\": \"avi\",\n \"storyboards\": [\"Explode\"],\n \"frames\": 37,\n \"fps\": 12,\n \"width\": 320,\n \"height\": 240,\n \"length_s\": 3.083\n}",
+   "is_error": false
+  }
+ },
+ "plan_approach#1": {
+  "setup": "plate_mesh",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Relic"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {
+   "request": "make this mesh a solid",
+   "target": "MeshBody"
+  },
+  "note": "the route, the questions and the cost for a mesh",
+  "answer": {
+   "text": "Plan: turn the mesh into a solid (mesh 'plate': 208 triangles).\nRoute: check_design; under a second in all.\nAsk the person first, in one message (2 questions, with the defaults): (1) Do you need an editable timeline (steps you can change later, many calls and much slower), or is a solid you can cut, fillet, measure and print enough? (2) Keep the original (hidden in the design) or replace it?\nNext: check_design.\n{\n \"request\": \"make this mesh a solid\",\n \"goals\": [{\"id\": \"mesh_to_solid\", \"goal\": \"turn the mesh into a solid\"}],\n \"workspaces\": [{\"workspace\": \"design\", \"title\": \"DESIGN\", \"tab\": \"mesh\"}],\n \"route\": [\n  {\n   \"step\": 1,\n   \"tool\": \"check_design\",\n   \"why\": \"one valid, closed solid\",\n   \"where\": \"INSPECT > Interference + the timeline's warnings\",\n   \"seconds\": 0.2,\n   \"for\": \"mesh_to_solid\"\n  }\n ],\n \"ask_first\": [\n  {\n   \"id\": \"editable\",\n   \"question\": \"Do you need an editable timeline (steps you can change later, many calls and much slower), or is a solid you can cut, fillet, measure and print enough?\",\n   \"default\": \"a solid now; a timeline can still be made from it later\"\n  },\n  {\n   \"id\": \"keep_original\",\n   \"question\": \"Keep the original (hidden in the design) or replace it?\",\n   \"default\": \"keep it, hidden\"\n  }\n ],\n \"cost\": {\"seconds\": 0.2, \"about\": \"under a second\", \"slow_steps\": []},\n \"avoid\": [\n  \"Never copy a mesh facet by facet (or triangle by triangle) into sketches and features: thousands of calls for a worse result. convert_mesh makes the solid in one call.\"\n ],\n \"notes\": [\n  \"Not in this Fission 180's tools (left out of the route): inspect_mesh, mesh_prepare, convert_mesh. The person can use the ribbon command instead; tell them which.\"\n ],\n \"about\": {\"id\": \"MeshBody\", \"label\": \"plate\", \"kind\": \"mesh\", \"triangles\": 208, \"closed\": true},\n \"next\": {\"tool\": \"check_design\", \"args\": {}},\n \"design\": {\n  \"open\": true,\n  \"name\": \"Relic\",\n  \"units\": \"mm\",\n  \"workspace\": null,\n  \"meshes\": [{\"id\": \"MeshBody\", \"label\": \"plate\", \"triangles\": 208, \"closed\": true}],\n  \"solids\": []\n }\n}",
+   "is_error": false
+  }
+ },
+ "plan_approach#2": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "request": "will this plate break if I stand on it?"
+  },
+  "note": "a Static Stress study, planned",
+  "answer": {
+   "text": "Plan: find out whether it is strong enough (Static Stress).\nRoute: create_study -> set_study_material -> add_constraint -> add_load -> precheck_study -> solve_study -> study_results; about 9 s in all.\nAsk the person first, in one message (4 questions, with the defaults): (1) Which material? (2) Where is it held or bolted down (which faces or holes do not move)? (3) What load must it carry: how much (N, or a mass in kg), where and in which direction? (4) What safety factor is enough?\nNext: create_study.\n{\n \"request\": \"will this plate break if I stand on it?\",\n \"goals\": [{\"id\": \"strength\", \"goal\": \"find out whether it is strong enough (Static Stress)\"}],\n \"workspaces\": [{\"workspace\": \"simulation\", \"title\": \"SIMULATION\", \"tab\": null}],\n \"route\": [\n  {\n   \"step\": 1,\n   \"tool\": \"create_study\",\n   \"why\": \"a Static Stress study of the design\",\n   \"where\": \"SIMULATION > SETUP > STUDY > New Simulation Study (Static Stress)\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 2,\n   \"tool\": \"set_study_material\",\n   \"why\": \"the material the part is made of (its stiffness and yield strength set the safety factor)\",\n   \"where\": \"SIMULATION > SETUP > MATERIALS > Study Materials\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 3,\n   \"tool\": \"add_constraint\",\n   \"why\": \"fixed where it is held or bolted\",\n   \"args\": {\"kind\": \"fixed\"},\n   \"where\": \"SIMULATION > SETUP > CONSTRAINTS > Structural Constraints\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 4,\n   \"tool\": \"add_load\",\n   \"why\": \"the force or pressure, where and in which direction\",\n   \"where\": \"SIMULATION > SETUP > LOADS > Structural Loads\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 5,\n   \"tool\": \"precheck_study\",\n   \"why\": \"everything the solve needs, before the long part\",\n   \"where\": \"SIMULATION > SETUP > SOLVE > Pre-check\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 6,\n   \"tool\": \"solve_study\",\n   \"why\": \"mesh and solve (CalculiX); the window waits meanwhile\",\n   \"where\": \"SIMULATION > SETUP > SOLVE > Solve\",\n   \"seconds\": 6.8,\n   \"for\": \"strength\"\n  },\n  {\n   \"step\": 7,\n   \"tool\": \"study_results\",\n   \"why\": \"safety factor, stress and displacement with where they are\",\n   \"where\": \"SIMULATION > RESULTS (legend, Show Min / Max, Reaction Force, Results Details)\",\n   \"seconds\": 0.3,\n   \"for\": \"strength\"\n  }\n ],\n \"ask_first\": [\n  {\"id\": \"material\", \"question\": \"Which material?\", \"default\": \"aluminium 6061\"},\n  {\n   \"id\": \"fixed_where\",\n   \"question\": \"Where is it held or bolted down (which faces or holes do not move)?\",\n   \"default\": \"the mounting holes or the face it is bolted to\"\n  },\n  {\n   \"id\": \"load\",\n   \"question\": \"What load must it carry: how much (N, or a mass in kg), where and in which direction?\"\n  },\n  {\"id\": \"safety\", \"question\": \"What safety factor is enough?\", \"default\": \"2\"}\n ],\n \"cost\": {\n  \"seconds\": 8.6,\n  \"about\": \"about 9 s\",\n  \"slow_steps\": [{\"tool\": \"solve_study\", \"seconds\": 6.8, \"about\": \"about 7 s\"}]\n },\n \"avoid\": [\n  \"Every tool works from any workspace: do not switch workspaces to use a tool (show_workspace only shows the person where you work).\"\n ],\n \"notes\": [\n  \"Fission 180 has Static Stress studies (linear, small deformation): no modal, thermal, buckling or drop tests.\"\n ],\n \"next\": {\"tool\": \"create_study\", \"args\": {}},\n \"design\": {\n  \"open\": true,\n  \"name\": \"Example\",\n  \"units\": \"mm\",\n  \"workspace\": null,\n  \"meshes\": [],\n  \"solids\": [\n   {\n    \"id\": \"Body\",\n    \"label\": \"Body1\",\n    \"faces\": 6,\n    \"steps\": 1,\n    \"base\": \"features\",\n    \"sheet_metal\": false,\n    \"thin\": false\n   }\n  ]\n }\n}",
+   "is_error": false
+  }
+ },
+ "ask_person#1": {
+  "setup": "none",
+  "setup_calls": [],
+  "args": {
+   "message": "Before I convert the mesh:",
+   "questions": [
+    {
+     "question": "A solid you can cut and print, or an editable timeline?",
+     "choices": [
+      "a solid",
+      "an editable timeline"
+     ],
+     "default": "a solid"
+    }
+   ]
+  },
+  "note": "where the app cannot show a form, the answer says to ask in the reply",
+  "answer": {
+   "text": "This AI app cannot show questions from Fission 180 itself (MCP elicitation is off or not supported here): ask the questions in your reply, all in one message with their defaults, and wait for the answer.",
+   "is_error": false
+  }
+ },
+ "list_tools#2": {
+  "setup": "none",
+  "setup_calls": [],
+  "args": {
+   "goal": "make it hollow"
+  },
+  "note": "the tools for a goal in plain words, best first",
+  "answer": {
+   "text": "The tools for 'make it hollow', best first: shell. Every tool works from any workspace.\n{\n \"tools\": [\n  {\n   \"name\": \"shell\",\n   \"title\": \"Shell\",\n   \"category\": \"modify\",\n   \"ribbon\": \"SOLID > MODIFY > Shell\",\n   \"read_only\": false,\n   \"workspace\": \"design\",\n   \"purpose\": \"Hollow the current body out with a wall thickness (Fission 180's Shell).\",\n   \"available\": false,\n   \"why_not\": \"No design is open: call new_design or open_design first (or create_sketch, which starts a new design).\"\n  }\n ],\n \"count\": 1\n}",
    "is_error": false
   }
  }

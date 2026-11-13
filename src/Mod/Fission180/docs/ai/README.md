@@ -8,6 +8,11 @@ Fission 180's tests in real FreeCAD.
 
 ## Start here
 
+0. **Before any job of more than one step**: call `plan_approach` with the person's words. It
+   answers the route (the cheapest tools in order), the questions to ask the person first (in
+   one message) and how long the slow steps take: [before you
+   build](fission180://docs/handbook.md#before-you-build), [the cheapest
+   tool](fission180://docs/handbook.md#cheapest-tool), [workspaces](fission180://docs/handbook.md#workspaces).
 1. [The handbook](fission180://docs/handbook.md): what Fission 180 is, how Fusion's ideas map to
    it (timeline, history marker, bodies, components, joints, sketches, parameters), units
    and coordinates, ids, how tool calls become undo steps, a good way to work.
@@ -39,6 +44,9 @@ Fission 180's tests in real FreeCAD.
 
 ## Finding things
 
+- The right tool for a job: `list_tools` with `goal` in plain words ("round the edges", "make
+  it hollow", "turn a mesh into a solid") lists the best tools first with their purpose;
+  `workspace` lists one workspace's tools. Every tool works from any workspace.
 - `docs_search` ranks every section of every document by the words you give (BM25) and
   answers snippets with addresses (`path#anchor`); `docs_read` reads a document or one
   section, in pages; `examples_search` finds recipes and golden models by words, tool, op or

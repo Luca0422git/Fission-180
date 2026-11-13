@@ -938,14 +938,13 @@ def _route_strength(text, facts, target):
         _step("solve_study", "mesh and solve (CalculiX); the window waits meanwhile"),
         _step("study_results", "safety factor, stress and displacement with where they are"),
     ]
-    if facts and facts.get("gui"):
+    if facts and facts.get("gui"):  # (right after the study exists: SIMULATION needs one)
         steps.insert(
-            0,
+            0 if studies else 1,
             _step(
                 "show_workspace",
                 "the person sees the study as you build it",
                 {"workspace": "simulation"},
-                when="once the study exists",
             ),
         )
     return {
@@ -1864,18 +1863,11 @@ def plan_text(result):
     if result["cost"].get("say_first"):
         lines.append(result["cost"]["say_first"])
     nxt = result.get("next")
-    if nxt:
+    if nxt:  # (no braces in the sentence: the JSON after it starts at the first one)
         lines.append(
-            "Next: %s%s."
-            % (nxt["tool"], (" %s" % _json_args(nxt["args"])) if nxt.get("args") else "")
+            "Next: %s%s." % (nxt["tool"], " (its arguments: next.args)" if nxt.get("args") else "")
         )
     return "\n".join(lines)
-
-
-def _json_args(args):
-    import json
-
-    return json.dumps(args, ensure_ascii=False, sort_keys=True)
 
 
 # -- guard rails: the same small step again and again ---------------------------------------------
@@ -1956,7 +1948,7 @@ class RepeatWatch:
             return ""
         if len(set(last)) > 2:
             return ""
-        if self.since_note is not None and self.since_note < self.run:
+        if self.since_note is not None and self.since_note < 2 * self.run:  # (not too often)
             return ""
         self.since_note = 0
         kinds = []
