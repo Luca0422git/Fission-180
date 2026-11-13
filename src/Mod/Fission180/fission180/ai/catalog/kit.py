@@ -327,11 +327,26 @@ def _selector_properties():
     }
 
 
+# wave 8, ai-behaviour: the first sixteen tools carried the whole SELECTOR_HELP (2,000
+# characters) in each of their seven selector arguments: 14,000 characters of every
+# tools/list. The full rules are in the server's instructions and get_help topic selectors;
+# each argument keeps its schema (every filter, typed) and this summary.
+FULL_SELECTOR_SUMMARY = (
+    "A selector picks faces or edges by their geometry, never by names like \"Edge7\": type, "
+    "normal [x, y, z], parallel [x, y, z], along [x, y, z], radius, on_faces / not_on_faces "
+    '(a face selector), at {"axis": "x"|"y"|"z", "value": "max"|"min"|mm} (or a list), all, '
+    "any_of [selectors], count (always give it: the tool refuses a different number). Example: "
+    'the 4 top edges of a box {"type": "line", "at": {"axis": "z", "value": "max"}, "count": '
+    '4}. The full rules: the server\'s instructions (Selectors) or get_help topic selectors.'
+)
+
+
 def full_selector(description):
-    """A selector with the whole selector help in its description (the first 16 tools)."""
+    """A selector of the first 16 tools: its whole schema, and a summary of the rules (the
+    full SELECTOR_HELP is in the instructions and get_help)."""
     return {
         "type": "object",
-        "description": description + " " + SELECTOR_HELP,
+        "description": description + " " + FULL_SELECTOR_SUMMARY,
         "properties": _selector_properties(),
         "additionalProperties": False,
     }
