@@ -209,8 +209,7 @@ def decal_tool(ctx, args):
                 factor = float(args["width"]) / max(1e-9, float(made.BaseWidth))
                 options["scale_x"] = options["scale_y"] = factor
             if options:
-                decal.set_options(made, **options)
-            made.recompute()
+                decal.set_options(made, **options)  # (built again by the step's recompute)
         except decal.DecalError as exc:
             raise UserError(str(exc))
         if App.GuiUp:
@@ -395,8 +394,6 @@ def insert_svg(ctx, args):
         return sketch, ids
 
     sketch, ids = ctx.change(work)
-    if args.get("name") and sketch.Label != args["name"]:
-        sketch.Label = args["name"]
     xs, ys = [], []
     for index in ids:
         try:
@@ -593,7 +590,8 @@ def derive_tool(ctx, args):
         target = doc
     else:
         into = args.get("into", "new")
-        if into == "new":
+        made_new = into == "new"
+        if made_new:
             target = ctx.host.new_document("%s Derive" % derive_core.design_name(source))
             ctx.host.ready(target)
         else:
@@ -607,11 +605,12 @@ def derive_tool(ctx, args):
             # (the Derive dialog's OK: derive_ui.DerivePanel._accept_create)
             master = derive.derive(target, data, keys, origin)
             target.recompute()
-        except derive_core.DeriveError as exc:
+        except Exception as exc:
             target.abortTransaction()
-            raise UserError(str(exc))
-        except Exception:
-            target.abortTransaction()
+            if made_new:  # (the design made for it goes again: nothing is left behind)
+                App.closeDocument(target.Name)
+            if isinstance(exc, derive_core.DeriveError):
+                raise UserError(str(exc))
             raise
         target.commitTransaction()
         ctx.host.show_document(target)

@@ -6,7 +6,7 @@ Fusion: INSERT > Decal. Category: Import and export. Changes the design (one und
 
 ## What it does
 
-Stick a picture on a face (Fusion's Decal): a label, a logo. It follows the face when the part changes and wraps onto tangent faces (chain_faces). Only the look changes: no geometry, no volume (use emboss or sketch_text + extrude for raised letters). image: a full path; face: a selector of one face of body (default the active body); point: where on the face its middle goes ([x, y, z], default the face's centre); width (mm, height follows) or scale / scale_x / scale_y; dx / dy (mm), angle (degrees), opacity (0..100), flip_h / flip_v. Answers its id, size and the face it is on.
+Stick a picture on a face (Fusion's Decal): a label, a logo. It follows the face when the part changes and wraps onto tangent faces (chain_faces). Only the look changes: no geometry, no volume (use emboss or sketch_text + extrude for raised letters). image: a full path; face: a selector of one face of body (default the active body); point: where on the face its middle goes ([x, y, z], default the face's centre); width (mm, height follows) or scale / scale_x / scale_y; dx / dy (mm), angle (degrees), opacity (0..100), flip_h / flip_v. Answers its id, size and the face it is on. Slow on a face with many holes (64 holes: 6 s; it is meshed over the whole face).
 
 ## Arguments
 

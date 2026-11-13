@@ -66,4 +66,5 @@ Done: captured the positions as 'Position 1' (id 'Position') in the timeline. Co
 
 ## See also
 
+- Recipe: [an assembly that moves (hinge, linked slider, stop)](fission180://docs/recipes/hinged-assembly.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

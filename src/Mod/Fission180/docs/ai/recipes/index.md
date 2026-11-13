@@ -34,6 +34,8 @@ call). [Before you build](fission180://docs/handbook.md#before-you-build) has th
 | [An assembly drawing with an exploded view](fission180://docs/recipes/assembly-drawing.md) | components, a storyboard, an exploded view, a parts list with balloons, Renumber and Align Balloons, the parts list as CSV |
 | [A sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) | the flat pattern drawn with its size, a bend table, bend notes, the folded part beside it, CSV and DXF |
 | [Rebuild a part that has no timeline](fission180://docs/recipes/reverse-engineer.md) | reverse engineering: an imported STEP or mesh part rebuilt as timeline steps with start_rebuild, describe_reference, compare_to_reference after every feature, finish_rebuild |
+| [An assembly that moves](fission180://docs/recipes/hinged-assembly.md) | which ASSEMBLE tool and what to ask first: as-built joints, rigid group, motion link, contact set, captured position, motion study |
+| [Check a part before it is made](fission180://docs/recipes/check-before-making.md) | the INSPECT analyses as numbers: draft for moulding, inner rounds and reach for milling, zebra for smooth shapes, then the fix |
 
 Looking for something else? `examples_search` finds recipes and the golden models (about
 450 small designs with measured results) by words, tool or op, and
