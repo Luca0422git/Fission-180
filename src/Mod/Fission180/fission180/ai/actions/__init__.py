@@ -33,3 +33,7 @@ from . import rebuild_actions  # noqa: E402,F401  (beta 3)
 from . import sheetmetal_actions  # noqa: E402,F401  (SHEET METAL and PLASTIC)
 from . import manufacture_actions  # noqa: E402,F401  (the MANUFACTURE workspace, wave 7)
 from . import animation_actions  # noqa: E402,F401  (the ANIMATION workspace, wave 7)
+# wave 8, ai-design: INSERT, CONSTRUCT's UCS, base features, Compute All, component colours
+# (design2_actions) and INSPECT's analyses with numbers (analysis_actions)
+from . import design2_actions  # noqa: E402,F401
+from . import analysis_actions  # noqa: E402,F401
