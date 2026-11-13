@@ -53,8 +53,8 @@ Brief: `docs/fission180/dev/briefs/ai-design.md` (rules: `ai-common.md`). Branch
   into crease (> 1 degree), tangent with a curvature jump (G1) and smooth (G2). Nothing is
   left in the design; picture: true adds render's picture with the flagged faces in orange.
 - Tests: headless `design_tools.py` (4 blocks, ~150 calls), wired into runner.py; GUI
-  scenarios `ai_design_assembly` (64), `ai_design_insert` (48), `ai_design_analysis` (48),
-  `ai_design_sketch` (70) through the real MCP server and bridge (`gui/ai_design_steps.py`);
+  scenarios `ai_design_assembly` (65), `ai_design_insert` (48), `ai_design_analysis` (48),
+  `ai_design_sketch` (71) through the real MCP server and bridge (`gui/ai_design_steps.py`);
   unit `test_ai_catalog.DesignWorkspace`; a recorded reference example per new tool; two
   recipes run by the docs runner.
 

@@ -269,8 +269,8 @@ inspect.md / surface.md (the analyses), sketch.md (the SKETCH tools).
   1 / 1 / 4 / 0 on a box, the 4 mm hole as the tightest round, 1600 / 4926 mm2 reached, 8 G1
   edges on a rounded block, the incircle of a triangle, a slot's arcs...).
 - GUI, through the real MCP server and the AI bridge like an AI app (`ai_design_steps.py`):
-  `ai_design_assembly` (64 checks), `ai_design_insert` (48), `ai_design_analysis` (48),
-  `ai_design_sketch` (70).
+  `ai_design_assembly` (65 checks), `ai_design_insert` (48), `ai_design_analysis` (48),
+  `ai_design_sketch` (71).
 - Unit: `test_ai_catalog.DesignWorkspace` (every ribbon command of the area has a coverage row
   naming real tools; the SKETCH kinds are the tools' classes; the analysis kinds the dialogs').
 - Documentation: a reference example per new tool (recorded), recipes
