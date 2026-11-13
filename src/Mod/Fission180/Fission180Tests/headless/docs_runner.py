@@ -45,6 +45,12 @@ _NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 _DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 # The title block's "drawn by" is the login name of the computer that ran the example
 _DRAWN_BY = re.compile(r'("DrawnBy":\s*)"[^"]*"')
+# (wave 8, ai-workspaces) How long a solve, a mesh, a simulation or an export took is no part
+# of what a page shows ("took 2.3 s", "seconds": 2.3, "solve_seconds": 2.3)
+_TOOK = re.compile(r'(took |"seconds":\s*|"solve_seconds":\s*)\d+(?:\.\d+)?')
+# ... nor the random id a new library tool gets (cam_tool_library: a UUID, as FreeCAD's tool
+# bits have)
+_UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS_TESTS = os.path.join(os.path.dirname(HERE), "docs")
 RESULTS = os.path.join(DOCS_TESTS, "tool_results.json")
@@ -174,6 +180,8 @@ def same_answer(recorded, now, rel=1e-4, absolute=1e-3):
     a, b = recorded.get("text", ""), now.get("text", "")
     a, b = _DATE.sub("<date>", a), _DATE.sub("<date>", b)
     a, b = _DRAWN_BY.sub(r'\1"<user>"', a), _DRAWN_BY.sub(r'\1"<user>"', b)
+    a, b = _TOOK.sub(r"\1<s>", a), _TOOK.sub(r"\1<s>", b)
+    a, b = _UUID.sub("<id>", a), _UUID.sub("<id>", b)
     if _NUMBER.sub("#", a) != _NUMBER.sub("#", b):
         for i, (x, y) in enumerate(zip(a.splitlines(), b.splitlines())):
             if _NUMBER.sub("#", x) != _NUMBER.sub("#", y):
@@ -420,6 +428,11 @@ def run_examples(record=False, text_filter="", gui=False, path=RESULTS):
         start = time.time()
         reset()
         session = Session(gui=gui)
+        # (wave 8, ai-design) "files": {name in {tmp}: a file of Fission180Tests/fixtures}, for
+        # the tools that read a file no tool writes (a picture for decal / canvas)
+        for name, fixture in ex.get("files", {}).items():
+            shutil.copy(os.path.join(os.path.dirname(DOCS_TESTS), "fixtures", fixture),
+                        os.path.join(session.folder, name))  # fmt: skip
         problems = []
         spec = spec_of(ex, tool_examples.SETUPS)
         try:

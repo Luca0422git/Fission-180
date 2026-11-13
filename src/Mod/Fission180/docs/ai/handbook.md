@@ -23,10 +23,11 @@ Fission 180's own dialogs: an `extrude` call builds exactly what the Extrude dia
 the result is a step in the timeline that the person can double-click and edit.
 
 What Fission 180 does not have (yet): T-spline sculpting, simulation studies other than Static
-Stress, rendering, CAM, electronics, `.f3d` files (Fusion's format is closed: STEP comes in
-fine). The SHEET METAL and PLASTIC tabs have their own tools (`flange`, `bend`, `flat_pattern`,
-`boss`, `snap_fit`... see `list_tools` with category `sheet_metal` or `plastic`). The person's
-own documentation lists what is built and what is not: [known issues](fission180://docs/user/known-issues.md),
+Stress, photorealistic rendering, turning and additive CAM (MANUFACTURE mills), electronics,
+`.f3d` files (Fusion's format is closed: STEP comes in fine). Every workspace has its tools:
+DESIGN (with its SOLID, SURFACE, MESH, SHEET METAL, PLASTIC and UTILITIES tabs), SIMULATION,
+MANUFACTURE, ANIMATION and DRAWING ([workspaces](#workspaces)). The person's own documentation
+lists what is built and what is not: [known issues](fission180://docs/user/known-issues.md),
 [feature outline](fission180://docs/user/feature-outline.md) and one Fusion parity spec per
 feature (`user/parity/<feature>.md`).
 
@@ -77,6 +78,111 @@ You call tools; each answers in plain sentences, often followed by JSON:
     "radius": 30},
    "expect": {"error": true, "contains": ["Radius 30 mm is too big here",
      "Largest radius that fits here: 20.00 mm"]}}
+]
+```
+
+<a id="before-you-build"></a>
+
+## Before you build: plan, ask, then work
+
+For any job bigger than a single step, do this first:
+
+1. **`plan_approach`** with the person's words (`request`) and, when the request is about
+   something in the design, its id or name (`target`; by default what the person selected).
+   It reads the design (meshes and their triangles, solids and their faces, whether a body has
+   a timeline, sheet metal, components, studies, CAM setups, drawings, units) and answers in
+   well under a second: the **route** (the tools in order, the cheapest that does the job,
+   with argument hints and where each sits in the ribbon), the **questions** to ask first, the
+   **cost** (the slow steps with the seconds they take on this design) and what to **avoid**.
+2. **Ask its open questions in one message**, each with the default it gives, and wait for
+   the answer. `ask_person` shows them as a form inside the AI app where the app supports it
+   (MCP elicitation: Claude Code in a terminal does; Claude Desktop and Gemini CLI did not
+   when this was written); elsewhere it answers that you should ask in your reply. Do not ask
+   what you can measure or read: sizes, units and what the design holds are facts
+   (`inspect_design`, `measure`).
+3. **Say how long it takes** when the plan's cost has `say_first` (a big study, a big mesh):
+   Fission 180's window does not respond while a long call runs.
+4. Then build one step at a time, checking the numbers each answer gives.
+
+A single change you already know ("round these edges with 2 mm") needs no plan: call the
+tool. `plan_approach` says so too (`single_step`).
+
+```json fission180-calls
+[
+  {"tool": "plan_approach", "args": {"request": "make me a new 60 x 40 x 10 plate with four 6 mm holes in a row"},
+   "expect": {"contains": ["Plan: model a new part.", "Route: examples_search", "hole"],
+     "json": {"goals.0.id": "new_part"}}},
+  {"tool": "new_design", "args": {"name": "Planning"}},
+  {"tool": "primitive", "args": {"kind": "box", "plane": "XY", "length": 60, "width": 40,
+    "height": 10}},
+  {"tool": "plan_approach", "args": {"request": "will it break if I hang 20 kg on it?"},
+   "expect": {"contains": ["Static Stress", "create_study", "Which material?"],
+     "json": {"goals.0.id": "strength", "workspaces.0.workspace": "simulation"}}},
+  {"tool": "plan_approach", "args": {"request": "round the edges"},
+   "expect": {"contains": ["A single step: just call fillet"]}},
+  {"tool": "ask_person", "args": {"questions": [{"question": "Which material?",
+    "default": "aluminium 6061"}]},
+   "expect": {"contains": ["ask the questions in your reply"]}}
+]
+```
+
+(Without the window, `plan_approach` leaves `show_workspace` out of the route; with it, the
+route shows the person the workspace the job is done in.)
+
+<a id="cheapest-tool"></a>
+
+## Pick the cheapest tool that does the job
+
+| The job | The cheap route | Never |
+|---|---|---|
+| A mesh (STL, OBJ, scan) as a solid | `convert_mesh` in one call (repair first if it is open) | copy it facet by facet into sketches and extrudes: thousands of calls for a worse part |
+| A mesh made editable | `start_rebuild` + `describe_reference`; if it reads no plan, the main shapes by hand (base sketch, holes, patterns, fillets last) | one feature per facet |
+| Rows of holes, ribs, dots | one sketch with every shape and one call, or one feature and `rectangular_pattern` / `circular_pattern` / `pattern_on_path` | one call per copy |
+| Holes, threads, screws | `hole`, `thread`, `insert_hardware` | circles cut with extrude (a drawing and CAM no longer see holes) |
+| A size that changes later | `set_parameter` and formulas; change it with `edit_step` / `set_model_parameter` | rebuilding the step |
+| A mesh to print | `export` the mesh as it is | converting it first |
+| A big part (thousands of faces) | read the numbers each answer gives; one check at the end | `inspect_design` / `check_design` / `compare_to_reference` after every small step (seconds each) |
+
+`list_tools` with `goal` finds the tool for a job in plain words, best first, each with its
+purpose:
+
+```json fission180-calls
+[
+  {"tool": "list_tools", "args": {"goal": "make it hollow"},
+   "expect": {"contains": ["best first: shell"], "json": {"tools.0.name": "shell"}}},
+  {"tool": "list_tools", "args": {"goal": "round the edges"},
+   "expect": {"json": {"tools.0.name": "fillet", "tools.0.workspace": "design"}}}
+]
+```
+
+When the same small step comes again and again (a sketch and an extrude per copy, the way an
+AI copies a mesh facet by facet), the answers say so and name the faster route.
+
+<a id="workspaces"></a>
+
+## Workspaces
+
+| Workspace | What is in it | Its tools (list_tools with `workspace`) |
+|---|---|---|
+| DESIGN | the SOLID, SURFACE, MESH, SHEET METAL, PLASTIC and UTILITIES tabs: sketches, features, meshes, sheet metal, plastic rules, assemblies, the timeline | `create_sketch`, `extrude`, `fillet`... `flange`, `flat_pattern`, `boss`, `snap_fit`, `joint`, `start_rebuild` |
+| SIMULATION | Static Stress studies (SETUP and RESULTS tabs) | `create_study`, `add_constraint`, `add_load`, `solve_study`, `study_results` |
+| MANUFACTURE | milling: setups, 2D / 3D / drilling operations, simulation, post processing | `cam_setup`, `cam_operation`, `cam_generate`, `cam_simulate`, `cam_post` |
+| ANIMATION | storyboards: explode, transform, show / hide, callouts, video | `anim_storyboard`, `anim_explode`, `anim_publish_video` |
+| DRAWING | drawings of the design: views, dimensions, annotations, tables, PDF / DXF | `create_drawing`, `add_drawing_view`, `add_drawing_dimension`, `export_drawing` |
+
+**Every tool works from any workspace**: you never need to switch before calling a tool (a
+study is made and solved while the window shows DESIGN). `show_workspace` shows a workspace
+(and a tab of DESIGN, or SETUP / RESULTS of SIMULATION) in the window so the person sees
+where you work; it needs the window and is not an undo step. `inspect_design` and
+`get_design` say which workspace is shown (`workspace`, null without the window).
+
+```json fission180-calls
+[
+  {"tool": "list_tools", "args": {"workspace": "manufacture"},
+   "expect": {"contains": ["tools of the manufacture workspace"]}},
+  {"tool": "show_workspace", "args": {"workspace": "simulation"},
+   "expect": {"error": true, "contains": ["needs the Fission 180 window"]}},
+  {"tool": "inspect_design", "args": {}, "expect": {"json": {"workspace": null}}}
 ]
 ```
 
@@ -139,7 +245,7 @@ x / y axes; on a face that faces +Z (a top face) they are the design's X and Y, 
 | Selection (clicking faces / edges) | selectors: objects that describe the geometry ([selectors.md](fission180://docs/selectors.md)) |
 | INSPECT (Measure, Interference, Section Analysis, Center of Mass) | `measure`, `interference`, `section_analysis`, `center_of_mass`, `physical_properties`; plus `inspect_design`, `query_geometry`, `check_design`, `diff_design` for an AI |
 | Physical Material, Appearance | `physical_material` (density, mass), `appearance` (colour), `list_materials` |
-| Drawings | `create_drawing`, `add_drawing_view`, `add_drawing_dimension`, `add_drawing_annotation`, `get_drawing`, `export_drawing` |
+| Drawings (the DRAWING workspace, every command) | `create_drawing`, `add_drawing_view` (base, projected, section, detail, break, breakout, exploded), `edit_drawing_view`, `modify_drawing` (move, rotate, delete), `edit_title_block`, `drawing_sheet`, `add_drawing_dimension` (every kind, ordinate, baseline, chain, arc length), `edit_drawing_dimension`, `add_drawing_annotation` (text, leader, bend note, parts list, bend table, balloon), `add_drawing_geometry`, `add_drawing_symbol`, `edit_balloons`, `get_drawing` (everything back, and a picture), `export_drawing` (PDF, DXF, DWG, CSV); recipes [part drawing](fission180://docs/recipes/part-drawing.md), [assembly drawing](fission180://docs/recipes/assembly-drawing.md), [sheet metal drawing](fission180://docs/recipes/sheet-metal-drawing.md) |
 | File > Export / Insert | `export` (STEP, IGES, STL, 3MF, OBJ, BREP, DXF), `import_file`, `save`, `save_as`, `open_design` |
 
 <a id="timeline-and-history-marker"></a>
@@ -393,6 +499,8 @@ Rebuild...** (or the rebuilt body's right-click in the 3D view).
 
 ## A good way to work
 
+0. A job of more than one step: `plan_approach` first and its questions in one message
+   ([before you build](#before-you-build)).
 1. Look first: `inspect_design` (or `list_designs`, `new_design`, `open_design`). It answers
    a snapshot id for `diff_design` later.
 2. Plan in millimetres: base sketch and feature, then holes, patterns, fillets and chamfers
@@ -406,6 +514,9 @@ Rebuild...** (or the rebuilt body's right-click in the 3D view).
    volume and bounding box against what was asked, a `render` from two views, then
    `physical_material`, `save_as` or `export` as the person wants.
 
-When something is unclear (a size, which face, whether to replace a file), ask the person;
-search this documentation (`docs_search`) before guessing how a tool behaves; look for a
-tested example (`examples_search`) before inventing a sequence of calls.
+When something is unclear (a size, which face, whether to replace a file), ask the person, all
+the questions in one message with a sensible default for each; search this documentation
+(`docs_search`) before guessing how a tool behaves; look for a tested example
+(`examples_search`) before inventing a sequence of calls. Never refuse a job a tool does
+(turning a mesh into a solid is one `convert_mesh` call); when a job has two honest routes
+(a solid now, or a slow rebuild with a timeline), say both and let the person choose.

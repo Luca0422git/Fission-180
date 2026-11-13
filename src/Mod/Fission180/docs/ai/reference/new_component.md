@@ -53,4 +53,6 @@ Done: new component 'Lid' (id 'Component') with the body 'Body001'; it is the ac
 
 ## See also
 
+- Recipe: [an assembly drawing with an exploded view, balloons and a parts list](fission180://docs/recipes/assembly-drawing.md)
+- Recipe: [an exploded-view video of an assembly (ANIMATION)](fission180://docs/recipes/exploded-view-video.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

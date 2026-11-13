@@ -4,6 +4,33 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-13: MESH > Combine crashing on touching bodies** (in 0.1.0-beta.4.0.3, Opus; found by
+builder tips-workspaces making pictures, task card "Stop MESH > Combine crashing on coplanar
+faces") A box and a cylinder standing on one floor, Combine Join: SIGSEGV (MeshCore
+SetOperations::TriangulateMesh -> Wm4::Delaunay2::Update), the whole app dies; the step
+recomputes on open / undo, so a saved design crashed again. Battery of 10 touching pairs x
+Join/Cut/Intersect, each in its own freecadcmd: 4 crashes, 13 wrong bodies or false refusals
+(cone on its tip: "Join gave nothing"; identical boxes: Intersect 0); a nudge of the tool
+(1e-4..1e-2) did not make MeshCore reliable (holes, wrong refusals); OpenCASCADE on solids made
+of the triangles (`makeShapeFromMesh` + `makeSolid`, fuse/cut/common, `tessellate`) got 30/30.
+Fix: `mesh_core.touching` (pure: facets of both in one plane overlapping -> "plane", a corner /
+edge on the other's facet -> "touch"; grid over the shared box; tolerance 1e-5 x diagonal +
+1e-6 x farthest coordinate, "touch" within a tenth of it: dense crossing spheres otherwise hit
+it by chance; 0.15 s at 35,000 faces, 0.5 s at 117,000); `mesh._boolean`: "plane" never goes to
+MeshCore (exact up to `EXACT_MAX_FACETS` 5000, else a plain refusal), "touch" exact when small,
+else MeshCore checked as before; a MeshCore result with holes (or an empty Join) is also tried
+the exact way when small. Exact result built as a triangle list (`Mesh.Mesh([[p, p, p], ...])`):
+a (points, facets) topology drops the facets at an edge two bodies only touch along. Timing
+(OCC): 1.2 s at 1,850 faces, 21 s at 18,000; MeshCore 0.3 s. Found on the way: FreeCAD's
+`Mesh.Volume` is wrong far from the origin (single precision: a 6,000 mm3 box at x 1500 reads
+5,888; measure near the origin), and MeshCore gives holes on two crossing 10,000-face spheres
+with no touching at all (known issue, refused as before). Tests: unit `test_mesh_touching` (26),
+`test_mesh_touching_freecad` (runs `headless/mesh_touching_check.py` in its own FreeCAD: 32
+checks; against the old mesh.py it dies at the reproduction and says so), scenario
+`mesh_separate_combine` part G (post on the cube's floor through the dialog, undo/redo,
+save/reopen: 114 checks, PASS at 769 and 770 px). Spec: parity/mesh.md Combine rows. [x] fix
+[ ] CI green [ ] release with 4.0.3 (Luca).
+
 **2026-11-13: 0.1.0-beta.4.0.3, AI calls freezing Fission 180** (patch, Opus) Luca: with Claude
 building through MCP, Fission 180 froze for 10+ minutes, came back laggy, froze again; Claude
 listed two connections ("Fission 180" extension, "fission180" settings-file entry). He sent the

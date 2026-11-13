@@ -18,7 +18,7 @@ Read the whole design as numbers, to check work before trusting a picture: every
 
 ## Answer
 
-A plain sentence, then JSON with: `design`, `id`, `file`, `units`, `active_body`, `bodies`, `timeline`, `history_marker`, `parameters`, `sketches`, `selection`, `summary`, `snapshot`. The example below shows a real one.
+A plain sentence, then JSON with: `design`, `id`, `file`, `units`, `active_body`, `bodies`, `timeline`, `history_marker`, `parameters`, `sketches`, `workspace`, `selection`, `summary`, `snapshot`. The example below shows a real one.
 
 ## Errors
 
@@ -118,7 +118,7 @@ Example: 1 body, 4 steps. Snapshot S1.
    "kind": "hole",
    "type": "PartDesign::Hole",
    "body": "Body",
-... (36 more lines)
+... (37 more lines)
 ```
 
 ## More argument examples

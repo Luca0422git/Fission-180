@@ -100,5 +100,7 @@ Done: AI: Create flat pattern. Its id is 'FlatPattern1': flat 78.5239 x 58.5239 
 
 ## See also
 
+- Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
+- Recipe: [a sheet metal drawing with the flat pattern, a bend table and bend notes](fission180://docs/recipes/sheet-metal-drawing.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `sm_flat_bend_box`, `sm_flat_bend_roundtrip`, `sm_flat_contour_flange`, `sm_flat_corner_closure`, `sm_flat_corner_closure_tangent`, `sm_flat_edge_flange`, `sm_flat_hem_flat`, `sm_flat_hem_open`, `sm_flat_k_factor`, `sm_flat_l_bracket`, `sm_flat_moved_body`, `sm_flat_partial_relief` and 7 more
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

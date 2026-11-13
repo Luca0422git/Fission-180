@@ -6,7 +6,7 @@ Fusion: MANUFACTURE > MILLING > MANAGE > Tool Library. Category: Manufacture. Re
 
 ## What it does
 
-Read the Tool Library. Without library: the libraries (key, title, how many tools): document (the tools this design's operations use), local:<name> (the person's own, on this computer), sample:mm and sample:in (Fission 180's sample end mills, ball mills, bull nose mills, face mills, chamfer mills, spot drills and drills). With library: its tools: id (what cam_operation's tool takes), name, number, type, diameter and lengths (mm), flutes, and the cutting data (spindle_speed rpm, feeds mm/min, stepdown, stepover mm). type / diameter (mm, within 0.01) narrow the list. Changes nothing.
+Read the Tool Library. Without library: the libraries (key, title, how many tools): document (the tools this design's operations use), local:<name> (the person's own, on this computer), sample:mm and sample:in (Fission 180's sample end mills, ball mills, bull nose mills, face mills, chamfer mills, spot drills and drills). With library: its tools: id (what cam_operation's tool takes), name, number, type, diameter and lengths (mm), flutes, and the cutting data (spindle_speed rpm, feeds mm/min, stepdown, stepover mm). type / diameter (mm, within 0.01) narrow the list. Changes nothing (cam_tool_library adds, edits and copies tools).
 
 ## Arguments
 
@@ -77,4 +77,5 @@ The answer:
 
 ## See also
 
+- Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

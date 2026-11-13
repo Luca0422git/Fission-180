@@ -25,6 +25,11 @@ FILE(GLOB Fission180_Icons RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPEND
 FILE(GLOB Fission180_UiIcons RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
     fission180/icons/ui/*.svg)
 
+# The pictures of the expanded tooltips (wave 8, fission180/tips), made by
+# tools/fission180/make_tip_pictures.sh.
+FILE(GLOB Fission180_TipPictures RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
+    fission180/icons/tips/*.png)
+
 # Unit tests, golden models (their builder and the model files) and the GUI tests.
 FILE(GLOB_RECURSE Fission180_Tests RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
     Fission180Tests/*.py Fission180Tests/*.json Fission180Tests/*.md Fission180Tests/*.txt)
@@ -44,7 +49,7 @@ FILE(GLOB_RECURSE Fission180_Examples RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFI
     examples/*.FCStd)
 
 SET(Fission180_ALL ${Fission180_Init} ${Fission180_Package} ${Fission180_Icons} ${Fission180_UiIcons}
-    ${Fission180_Docs} ${Fission180_Examples} ${Fission180_Tests} ${Fission180_Fixtures})
+    ${Fission180_TipPictures} ${Fission180_Docs} ${Fission180_Examples} ${Fission180_Tests} ${Fission180_Fixtures})
 
 ADD_CUSTOM_TARGET(Fission180 ALL SOURCES ${Fission180_ALL})
 
@@ -57,6 +62,9 @@ INSTALL(DIRECTORY fission180 DESTINATION Mod/Fission180
     FILES_MATCHING PATTERN "*.py" PATTERN "__pycache__" EXCLUDE)
 INSTALL(FILES ${Fission180_Icons} DESTINATION Mod/Fission180/fission180/icons)
 INSTALL(FILES ${Fission180_UiIcons} DESTINATION Mod/Fission180/fission180/icons/ui)
+if(Fission180_TipPictures)  # (none until the content builders have made them)
+    INSTALL(FILES ${Fission180_TipPictures} DESTINATION Mod/Fission180/fission180/icons/tips)
+endif()
 INSTALL(DIRECTORY Fission180Tests DESTINATION Mod/Fission180
     FILES_MATCHING PATTERN "*.py" PATTERN "*.json" PATTERN "*.md" PATTERN "*.txt"
     PATTERN "__pycache__" EXCLUDE)

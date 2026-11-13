@@ -450,6 +450,9 @@ def inspect_design(ctx, args):
     info["parameters"] = _parameters(doc)
     info["sketches"] = _sketches(doc)
     _assembly(doc, info)
+    from .approach_actions import shown_workspace  # (wave 8, ai-behaviour: what the window shows)
+
+    info["workspace"] = shown_workspace(ctx.host, doc)  # (None: no window)
     try:
         info["selection"] = ctx.host.selection(doc)
     except Exception:

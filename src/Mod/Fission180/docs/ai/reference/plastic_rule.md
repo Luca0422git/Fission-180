@@ -100,5 +100,6 @@ Done: AI: Plastic rule PC 2 mm. No solid body yet.
 
 ## See also
 
+- Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `plastic_rule_boss_wall`, `plastic_rule_edit_moves_boss`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -510,6 +510,10 @@ def cam_generate(ctx, args):
         todo = [o for o in todo if cam.state(o, setup) != "valid"]
     if not cam.operations(setup):
         raise UserError("%s has no operation yet: call cam_operation first." % setup.Label)
+    from .. import workspaces_core as wc
+
+    # (wave 8: FreeCAD's CAM engine makes them in one run that cannot be split: said before it)
+    wc.safe_point("generating %d toolpath%s" % (len(todo), "" if len(todo) == 1 else "s"))
     errors = _generate(todo) if todo else {}
     rows = [_op_row(op, setup) for op in cam.operations(setup)]
     data = {"setup": setup.Label, "id": setup.Name, "generated": [o.Label for o in todo]}
@@ -541,15 +545,29 @@ def cam_simulate(ctx, args):
         play = cam.playback(setup, _ops(ctx, setup, args.get("operations")))
     except core.CamError as exc:
         raise UserError("Not simulated: %s" % exc)
+    import time
+
+    began = time.time()
+    model = _model_heights(setup, play.stock)  # (wave 8, ai-workspaces: gouges)
     per_op = []
     last = 0.0
+    gouged = 0
+    from .. import workspaces_core as wc
+
     for at, item in enumerate(play.operations):
+        wc.safe_point("simulating %s" % item["label"], at, len(play.operations))
         while not play.done() and play.steps[play.at][0] <= at:
             play.step_moves(1)
         removed = play.stock.start_volume() - play.stock.volume()
-        per_op.append(
-            {"name": item["label"], "id": item["name"], "removed_mm3": _r(removed - last, 1)}
-        )
+        row = {"name": item["label"], "id": item["name"], "removed_mm3": _r(removed - last, 1)}
+        if model is not None:
+            found = _compare(play.stock, model)["gouges"]
+            if found["cells"] > gouged:  # (this operation cut into the part where none had)
+                cell = play.stock.cell
+                row["new_gouge_mm2"] = _r((found["cells"] - gouged) * cell * cell, 2)
+                row["deepest_gouge_mm"] = found["deepest_mm"]  # (the deepest after it)
+            gouged = found["cells"]
+        per_op.append(row)
         last = removed
     play.finish()
     stats = play.statistics()
@@ -574,6 +592,25 @@ def cam_simulate(ctx, args):
             for c in play.collisions
         ],
     }
+    gouge_text = ""
+    if model is not None:
+        compared = _compare(play.stock, model)
+        data["gouges"] = compared["gouges"]
+        data["stock_left_on_model"] = compared["left"]
+        data["gouge_tolerance_mm"] = compared["tolerance_mm"]
+        found = compared["gouges"]
+        if found["cells"]:
+            gouge_text = (
+                " GOUGES: the tool cut %s mm2 of the part's top, up to %s mm deep at %s (setup "
+                "coordinates): check the operations' bottom heights and stock to leave."
+                % (core.fmt(found["area_mm2"]), core.fmt(found["deepest_mm"]), found["at"])
+            )
+        else:
+            left = compared["left"]
+            gouge_text = " No gouge; up to %s mm of stock is left on the part." % core.fmt(
+                left["max_mm"] or 0.0
+            )
+    data["seconds"] = round(time.time() - began, 1)
     if play.collisions:
         text = (
             "Simulated %s: %d rapid move%s into the stock (collisions below: raise the "
@@ -593,7 +630,193 @@ def cam_simulate(ctx, args):
             core.fmt(stats["removed"], 1),
             core.fmt(stats["start_volume"], 1),
         )
-    return json_result(data, text, compact=True)
+    return json_result(data, text + gouge_text, compact=True)
+
+
+# == wave 8, ai-workspaces: gouges, the Setup Sheet and the Tool Library =========================
+def _model_heights(setup, stock):
+    """The model's top over the simulation's stock grid (setup coordinates; None when the
+    model cannot be read: the answer then has no gouge numbers)."""
+    from .. import workspaces_core as wc
+
+    try:
+        fr = _cam().frame(setup)
+        triangles = []
+        tolerance = max(0.01, 0.25 * stock.cell)
+        for shape in fr.shapes:
+            points, faces = shape.tessellate(tolerance)
+            triangles += [[tuple(points[i]) for i in face] for face in faces]
+        return wc.model_heights(stock.box, stock.cell, stock.nx, stock.ny, triangles)
+    except Exception as exc:
+        from ... import warn
+
+        warn("cam_simulate: the model's heights could not be worked out: %s" % exc)
+        return None
+
+
+def _compare(stock, model):
+    from .. import workspaces_core as wc
+
+    return wc.compare_stock(
+        stock.heights, model, stock.box, stock.cell, max(0.05, 0.25 * stock.cell)
+    )
+
+
+@action("cam_setup_sheet")
+def cam_setup_sheet(ctx, args):
+    import os
+
+    from .document_actions import _check_overwrite
+
+    cam = _cam()
+    setup = _setup(ctx, args.get("setup"))
+    if not cam.operations(setup):
+        raise UserError("%s has no operation yet: call cam_operation first." % setup.Label)
+    safe = "".join(c if c.isalnum() or c in " _-." else "_" for c in setup.Label).strip()
+    path = ctx.full_path(args["path"])
+    if os.path.isdir(path):
+        path = os.path.join(path, "%s setup sheet.html" % (safe or "Setup"))
+    elif not path.lower().endswith((".html", ".htm")):
+        path += ".html"
+    if not os.path.isdir(os.path.dirname(path)):
+        raise UserError(
+            "The folder %s does not exist: make it first, or give another path."
+            % os.path.dirname(path)
+        )
+    _check_overwrite(ctx, path)
+    try:
+        cam.setup_sheet(setup, path)
+    except _core().CamError as exc:
+        raise UserError("Not done: %s" % exc)
+    rows = [_op_row(op, setup) for op in cam.operations(setup)]
+    tools = sorted({r["tool"] for r in rows if r.get("tool")})
+    total = sum((r.get("toolpath") or {}).get("time_s") or 0.0 for r in rows)
+    stale = [r["name"] for r in rows if r["state"] != "valid"]
+    text = "Written %s: the setup sheet of %s, %d operation%s, %d tool%s, %s of machining." % (
+        path,
+        setup.Label,
+        len(rows),
+        "" if len(rows) == 1 else "s",
+        len(tools),
+        "" if len(tools) == 1 else "s",
+        _core().time_text(total),
+    )
+    if stale:
+        text += " Without an up-to-date toolpath (no numbers on the sheet): %s." % ", ".join(stale)
+    return json_result({"file": path, "operations": rows, "tools": tools}, text, compact=True)
+
+
+def _library_key(ctx, key, write=True):
+    from ... import manufacture_tools as library
+
+    keys = [lib["key"] for lib in library.libraries(ctx.doc)]
+    if key not in keys:
+        raise UserError(
+            "There is no tool library %r: the libraries are %s (cam_tools)."
+            % (key, ", ".join(keys))
+        )
+    if write and key in library.SAMPLES:
+        raise UserError(
+            "%s is Fission 180's sample library and cannot be changed: copy the tool into a "
+            "library of your own (action copy, to local:Local)." % key
+        )
+    return key
+
+
+@action("cam_tool_library")
+def cam_tool_library(ctx, args):
+    from ... import manufacture_tools as library
+
+    core = _core()
+    doc = ctx.doc
+    what = args["action"]
+    try:
+        if what == "new_library":
+            key = library.new_library(args["name"])
+            return json_result(
+                {"library": key, "tools": []},
+                "Done: a new, empty tool library %r (key %s)." % (args["name"], key),
+                compact=True,
+            )
+        key = _library_key(
+            ctx, args.get("library", "local:" + library.DEFAULT_LOCAL), what != "copy"
+        )
+        if what == "delete_library":
+            if not key.startswith("local:"):
+                raise UserError("Only a library of your own (local:...) can be deleted.")
+            count = len(library.tools(key, doc))
+            if not ctx.host.ask(
+                "Delete a tool library?",
+                "An AI app wants to delete your tool library %s with its %d tools. This cannot "
+                "be undone. Allow it?" % (key[6:], count),
+            ):
+                raise UserError(
+                    "Not done: the person did not allow deleting %s (headless Fission 180 never "
+                    "deletes a library)." % key
+                )
+            library.delete_library(key)
+            return bridge_core.result(
+                "Done: tool library %s deleted with its %d tools." % (key, count)
+            )
+        if what == "add":
+            if not args.get("tool") or "type" not in args["tool"]:
+                raise UserError('add needs tool: {"type", "diameter", ...} (the new tool)')
+            tool = _tool(ctx, args["tool"])
+            if "number" not in args["tool"]:
+                tool["number"] = library.next_number(key, doc)
+            tool["id"] = ""
+            made = _save_tool(ctx, key, tool)
+            return _tool_answer("Done: %s added to %s." % (core.tool_title(made), key), key, made)
+        found = library.find(
+            key if what != "copy" else args.get("from_library", key), args.get("id"), doc
+        )
+        if found is None:
+            source = args.get("from_library", key) if what == "copy" else key
+            raise UserError(
+                "%s has no tool with id %r: cam_tools with library %r lists its tools."
+                % (source, args.get("id"), source)
+            )
+        if what == "copy":
+            to = _library_key(ctx, args.get("to_library", "local:" + library.DEFAULT_LOCAL))
+            if not to.startswith("local:"):
+                raise UserError("Tools are copied into a library of your own (local:...).")
+            made = library.copy_tool(found, to, doc)
+            return _tool_answer("Done: %s copied into %s." % (core.tool_title(made), to), to, made)
+        if what == "delete":
+            library.delete_tool(key, found["id"], doc)
+            return bridge_core.result("Done: %s deleted from %s." % (core.tool_title(found), key))
+        changes = dict(args.get("tool") or {})
+        if not changes:
+            raise UserError(
+                "edit needs tool: the values to change ({diameter, cutting {...}, ...})."
+            )
+        if "type" in changes or "library" in changes:
+            raise UserError(
+                "edit changes a tool's values; its type stays (add a new tool instead)."
+            )
+        merged = core.tool(core.merge(found, changes))
+        made = _save_tool(ctx, key, merged)
+        note = ""
+        if key == "document":
+            note = ' Every operation that uses it reads "needs regenerating": cam_generate.'
+        return _tool_answer(
+            "Done: %s changed in %s.%s" % (core.tool_title(made), key, note), key, made
+        )
+    except core.CamError as exc:
+        raise UserError("Not done: %s" % str(exc).rstrip("."))
+
+
+def _save_tool(ctx, key, tool):
+    """Keep a tool (a library file; the design's own tools are changed as one undo step)."""
+    from ... import manufacture_tools as library
+
+    if key == "document":
+        return ctx.change(lambda: library.save_tool(key, tool, ctx.doc))
+    return library.save_tool(key, tool, ctx.doc)
+
+
+def _tool_answer(text, key, tool):
+    return json_result({"library": key, "tool": _tool_row(tool)}, text, compact=True)
 
 
 @action("cam_post")

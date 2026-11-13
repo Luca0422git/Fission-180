@@ -88,5 +88,6 @@ Done: AI: Snap fit (parallel). Its id is 'SnapFit1'. Bodies now: Body1: 11690.2 
 
 ## See also
 
+- Recipe: [a plastic enclosure with bosses, a lip and a snap fit (PLASTIC)](fission180://docs/recipes/plastic-enclosure.md)
 - Golden models built with its steps (read one with docs_read golden/<id>): `plastic2_snap_distance`, `plastic2_snap_edit_taper`, `plastic2_snap_loop`, `plastic2_snap_parallel`, `plastic2_snap_perpendicular`, `plastic2_snap_rolled_back`, `plastic2_snap_skip_point`, `plastic2_snap_two_points`, `plastic2_split_enclosure`
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

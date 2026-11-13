@@ -6,7 +6,7 @@ Fusion: MANUFACTURE > MILLING > ACTIONS > Simulate. Category: Manufacture. Read-
 
 ## What it does
 
-Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simulate, without the pictures): machining time (s), cutting and rapid distances (mm), the stock's volume before and the volume removed (mm3; the stock is a grid of columns, so volumes are within a few percent), and collisions: every rapid move that went into material, with its operation, G-code line, place [x, y, z] in setup coordinates and depth (mm). An empty collisions list is what a safe program has. operations: only these. Every operation simulated needs an up-to-date toolpath (cam_generate). Only the cutter is checked, not the holder or clamps. Changes nothing. setup: the setup's id or name (cam_setup answers it; default: the newest setup).
+Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simulate without the pictures): machining time (s), cutting and rapid distances (mm), the stock's volume and the volume removed (mm3, within a few percent: a grid of columns), collisions (rapid moves into material: operation, G-code line, place in setup coordinates, depth mm), and the stock compared with the model: gouges (the tool cut into the part: area, deepest, where, the operation) and stock_left_on_model (most and mean left above the part: a finishing pass needed?). Empty collisions and no gouge is what a safe program has. operations: only these; each needs an up-to-date toolpath (cam_generate). Only the cutter is checked, not the holder or clamps. 1 to 10 s (a 3D finishing toolpath of 100,000 moves: a minute). Changes nothing. setup: the setup's id or name (cam_setup answers it; default: the newest setup).
 
 ## Arguments
 
@@ -17,7 +17,7 @@ Play a setup's toolpaths against its stock and answer the numbers (Fusion's Simu
 
 ## Answer
 
-A plain sentence, then JSON with: `setup`, `time_s`, `time`, `cut_length_mm`, `rapid_length_mm`, `stock_volume_mm3`, `removed_mm3`, `left_mm3`, `grid_cell_mm`, `operations`, `collisions`. The example below shows a real one.
+A plain sentence, then JSON with: `setup`, `time_s`, `time`, `cut_length_mm`, `rapid_length_mm`, `stock_volume_mm3`, `removed_mm3`, `left_mm3`, `grid_cell_mm`, `operations`, `collisions`, `gouges`, `stock_left_on_model`, `gouge_tolerance_mm`, `seconds`. The example below shows a real one.
 
 ## Errors
 
@@ -50,7 +50,7 @@ The call:
 The answer:
 
 ```text
-Simulated Setup1: no rapid move into the stock, 1:51, 13811.1 mm3 of 73715.1 mm3 removed.
+Simulated Setup1: no rapid move into the stock, 1:51, 13811.1 mm3 of 73715.1 mm3 removed. No gouge; up to 0 mm of stock is left on the part.
 {
  "setup": "Setup1",
  "time_s": 110.55,
@@ -65,7 +65,11 @@ Simulated Setup1: no rapid move into the stock, 1:51, 13811.1 mm3 of 73715.1 mm3
   {"name": "Face1", "id": "CamOp", "removed_mm3": 6656.1},
   {"name": "2D Contour1", "id": "CamOp001", "removed_mm3": 7155.0}
  ],
- "collisions": []
+ "collisions": [],
+ "gouges": {"cells": 0, "area_mm2": 0.0, "deepest_mm": 0.0, "volume_mm3": 0.0},
+ "stock_left_on_model": {"max_mm": 0.0, "mean_mm": 0.0, "volume_mm3": 0.0, "at": [0.16653, 0.16653, -Infinity]},
+ "gouge_tolerance_mm": 0.083267,
+ "seconds": 0.2
 }
 ```
 
@@ -76,4 +80,5 @@ Simulated Setup1: no rapid move into the stock, 1:51, 13811.1 mm3 of 73715.1 mm3
 
 ## See also
 
+- Recipe: [mill a pocketed plate on a CNC router (MANUFACTURE)](fission180://docs/recipes/mill-pocketed-plate.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

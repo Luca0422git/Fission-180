@@ -547,10 +547,9 @@ class Lists(unittest.TestCase):
             self.assertIn("arguments are not right", text)
             self.assertIn("colour is not a known argument", text)
         # Bad calls never reach Fission 180; the documentation tools are answered by the MCP
-        # server itself (docs_core), so they never reach it either.
-        from fission180.ai import docs_core
-
-        self.assertEqual(calls, [n for n in catalog.TOOL_NAMES if n not in docs_core.TOOLS])
+        # server itself (docs_core), so they never reach it either; nor does ask_person (the
+        # AI app's own form, wave 8: mcp_core.LOCAL_TOOLS).
+        self.assertEqual(calls, [n for n in catalog.TOOL_NAMES if n not in mcp_core.LOCAL_TOOLS])
         self.assertEqual(request({"name": "nope", "arguments": {}})["error"]["code"], -32602)
         self.assertEqual(request({"name": "extrude", "arguments": [1]})["error"]["code"], -32602)
 
@@ -696,6 +695,125 @@ class CommandLine(unittest.TestCase):
             timeout=60,
         )
         self.assertEqual(done.returncode, 2)
+
+
+# -- wave 8, ai-design ---------------------------------------------------------------------------
+class DesignWorkspace(unittest.TestCase):
+    """Every command of the DESIGN workspace's groups reaches a tool (or says why not), and the
+    new tools' kinds are the code's own (the SKETCH tools' classes, the analyses)."""
+
+    def _labels(self, group):
+        out = []
+        for entry in group["items"]:
+            if not entry:
+                continue
+            if entry.get("submenu"):
+                out += [i["label"] for i in entry["submenu"] if i]
+            else:
+                out.append(entry["label"])
+        return out
+
+    def test_every_ribbon_command_of_the_area_has_a_tool(self):
+        from fission180 import ribbon_config as rc
+        from fission180.ai.catalog import design2_tools as d
+
+        groups = [
+            rc.SOLID_CREATE,
+            rc.SOLID_MODIFY,
+            rc.CONSTRUCT,
+            rc.INSPECT,
+            rc.INSERT,
+            rc.ASSEMBLE,
+            rc.SURFACE_CREATE,
+            rc.SURFACE_MODIFY,
+            rc.SKETCH_CREATE,
+            rc.SKETCH_MODIFY,
+            rc.SKETCH_CONSTRAINTS,
+            rc.FINISH_SKETCH,
+        ]
+        self.assertEqual({g["id"] for g in groups}, set(d.COVERAGE))
+        for group in groups:
+            mapped = d.COVERAGE[group["id"]]
+            for label in self._labels(group):
+                with self.subTest(group=group["id"], command=label):
+                    self.assertIn(label, mapped, "a ribbon command without a coverage row")
+                    text = mapped[label]
+                    names = d.coverage_tools(text)
+                    if not text.startswith("no tool:"):
+                        self.assertTrue(names, text)
+                    for name in names:
+                        self.assertIn(name, catalog.TOOL_NAMES, text)
+            stale = set(mapped) - set(self._labels(group))
+            self.assertEqual(stale, set(), "coverage rows of no ribbon command")
+
+    def test_sketch_draw_kinds_are_the_sketch_tools(self):
+        from fission180.ai.catalog import sketch_tools
+
+        path = os.path.join(AI, "actions", "sketch_actions.py")
+        classes = ast.literal_eval(_literal(path, "DRAW_CLASSES"))
+        tools = os.path.join(ROOT, "fission180", "sketch_draw_tools.py")
+        with open(tools, encoding="utf-8") as handle:
+            defined = {
+                n.name for n in ast.walk(ast.parse(handle.read())) if isinstance(n, ast.ClassDef)
+            }
+        for kind, cls in classes.items():
+            self.assertIn(kind, sketch_tools.DRAW_KINDS)
+            self.assertIn(cls, defined, kind)
+        self.assertEqual(set(sketch_tools.DRAW_KINDS), set(sketch_tools.DRAW_TITLES))
+
+    def test_analysis_kinds_are_the_dialogs(self):
+        from fission180.ai.catalog import design2_tools
+
+        path = os.path.join(AI, "actions", "analysis_actions.py")
+        kinds = ast.literal_eval(_literal(path, "_KIND"))
+        self.assertEqual(set(kinds), set(design2_tools.ANALYSES))
+        source = os.path.join(ROOT, "fission180", "surface_analysis.py")
+        with open(source, encoding="utf-8") as handle:
+            text = handle.read()
+        for kind, name in kinds.items():
+            self.assertIn('"%s"' % name, text, kind)
+
+    def test_wave8_rules(self):
+        self.assertTrue(
+            catalog.validate("as_built_joint", {"type": "revolute", "components": ["A", "B"]})
+        )
+        self.assertEqual(catalog.validate("as_built_joint", {"components": ["A", "B"]}), [])
+        self.assertTrue(catalog.validate("motion_link", {"joints": ["J", "K"], "values": [0, 1]}))
+        self.assertTrue(catalog.validate("contact", {}))
+        self.assertTrue(catalog.validate("insert_svg", {"path": "/x/logo.svg"}))
+        self.assertTrue(catalog.validate("insert_svg", {"path": "/x/logo.png", "plane": "XY"}))
+        self.assertTrue(catalog.validate("derive", {"source": "/x.FCStd"}))
+        self.assertTrue(catalog.validate("analysis", {"kind": "curvature_comb"}))
+        self.assertTrue(catalog.validate("analysis", {"kind": "zebra", "direction": "Z"}))
+        self.assertEqual(
+            catalog.validate("analysis", {"kind": "draft", "direction": [0, 1, 0]}), []
+        )
+        self.assertTrue(
+            catalog.validate("sketch_draw", {"sketch": "S", "kind": "conic", "points": [[0, 0]]})
+        )
+        self.assertTrue(
+            catalog.validate(
+                "sketch_draw", {"sketch": "S", "kind": "slot_overall", "points": [[0, 0], [9, 0]]}
+            )
+        )
+        self.assertTrue(catalog.validate("sketch_modify", {"sketch": "S", "kind": "fillet"}))
+        self.assertTrue(
+            catalog.validate("sketch_pattern", {"sketch": "S", "kind": "mirror", "curves": [0]})
+        )
+        self.assertTrue(catalog.validate("sketch_project", {"sketch": "S", "kind": "project"}))
+        self.assertTrue(catalog.validate("press_pull", {"edges": {"count": 1}, "distance": 1,
+                                                        "offset_face": True}))  # fmt: skip
+        self.assertTrue(catalog.validate("appearance", {}))
+        self.assertEqual(catalog.validate("appearance", {"texture_map": {"scale": 50}}), [])
+        self.assertEqual(
+            catalog.step_title("sketch_draw", {"kind": "arc_slot"}), "AI: Three Point Arc Slot"
+        )
+        self.assertEqual(
+            catalog.step_title("sketch_pattern", {"kind": "circular"}),
+            "AI: Sketch Circular Pattern",
+        )
+        for name in ("analysis",):
+            self.assertTrue(catalog.is_read_only(name), name)
 
 
 if __name__ == "__main__":

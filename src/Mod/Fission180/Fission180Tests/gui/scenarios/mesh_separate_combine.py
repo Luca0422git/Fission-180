@@ -16,7 +16,16 @@ E  A refusal: Combine the second cube with an open sheet, Join: the dialog says 
    must be closed (Repair first, or Merge); OK waits; Cancel.
 F  Timeline double-click Combine 1: Keep Tools on, OK: the bar is a body again (shown,
    listed), the combined cube still 1180 mm3.
+G  Bodies that share a flat face (they crashed Fission 180 before 0.1.0-beta.4.0.3): Insert
+   Mesh post.stl, a 10 x 4 x 14 post standing on the second cube's floor and 5 mm into it.
+   MESH > Combine, the second cube then the post (browser rows): Join 1360 mm3, Cut 800,
+   Intersect 200, all closed, no message; Join and OK: "Combine 2". Ctrl+Z, Ctrl+Y (the step
+   computed again), saved, closed and opened again (computed again): still 1360 mm3.
 """
+
+import os
+
+import FreeCAD as App
 
 from Fission180Tests.gui import bodies_steps as s
 from Fission180Tests.gui import harness as h
@@ -42,6 +51,10 @@ def sheet_file():
         ((0.0, 0.0, 12.0), (10.0, 10.0, 12.0), (0.0, 10.0, 12.0)),
     ]
     return m.write_stl("sheet.stl", tris)
+
+
+def post_file():
+    return m.write_stl("post.stl", m.box_triangles(25, 3, 0, 35, 7, 14))
 
 
 def near(a, b, tol):
@@ -313,6 +326,121 @@ def f_check():
     h.shot("end")
 
 
+# -- G ----------------------------------------------------------------------------------------
+def g_open():
+    s.menu("MODIFY", "Combine")
+
+
+def g_target():
+    s.click_browser_row("two_boxes (2)")
+
+
+def g_tool():
+    p = m.panel()
+    h.check(
+        "the second cube is the target",
+        p is not None and p.body is not None and p.body.Label == "two_boxes (2)",
+        p and p.body and p.body.Label,
+    )
+    s.click_browser_row("post")
+
+
+def _touching_result(operation, want):
+    p = m.panel()
+    step = m.body("two_boxes (2)")
+    h.check(
+        "%s: %d mm3 (bodies on one floor)" % (operation, want),
+        step is not None and near(m.volume(step), want, 1e-3),
+        step and m.volume(step),
+    )
+    h.check(
+        "%s: closed" % operation, step is not None and m.closed(step), step and m.analysis(step)
+    )
+    text = p.message.text() if p else ""
+    h.check("%s: no message" % operation, not text.strip(), text)
+
+
+def g_join():
+    p = m.panel()
+    h.check("the post is the tool", p is not None and [t.Label for t in p.tools] == ["post"])
+    _touching_result("Join", 1360)
+    m.choose(m.panel().operation, "Cut")
+
+
+def g_cut():
+    _touching_result("Cut", 800)
+    m.choose(m.panel().operation, "Intersect")
+
+
+def g_intersect():
+    _touching_result("Intersect", 200)
+    m.choose(m.panel().operation, "Join")
+
+
+def g_ok():
+    h.task_button("OK")
+
+
+def g_done():
+    h.check("dialog closed", m.panel() is None)
+    cube = m.body("two_boxes (2)")
+    h.check(
+        "timeline: Combine 2",
+        cube is not None and m.timeline_title(cube) == "Combine 2",
+        cube and m.timeline_title(cube),
+    )
+    h.check(
+        "1360 mm3", cube is not None and near(m.volume(cube), 1360.0, 1e-3), cube and m.volume(cube)
+    )
+    h.check("the post is used up", m.body("post") is None, m.browser_labels())
+
+
+def g_check_undo():
+    cube = m.body("two_boxes (2)")
+    h.check(
+        "Ctrl+Z: the second cube as it was",
+        cube is not None and near(m.volume(cube), 1000.0, 1e-6),
+        cube and m.volume(cube),
+    )
+    h.check("Ctrl+Z: the post back", m.body("post") is not None, m.browser_labels())
+
+
+def g_check_redo():
+    cube = m.body("two_boxes (2)")
+    h.check(
+        "Ctrl+Y: 1360 mm3 again",
+        cube is not None and near(m.volume(cube), 1360.0, 1e-3),
+        cube and m.volume(cube),
+    )
+
+
+def g_save_reopen():
+    folder = os.path.join(i.OUT, "mesh_separate_combine")
+    os.makedirs(folder, exist_ok=True)
+    state["file"] = os.path.join(folder, "touching.FCStd")
+    App.ActiveDocument.saveAs(state["file"])
+    h.check("saved", os.path.isfile(state["file"]))
+    App.closeDocument(App.ActiveDocument.Name)
+    App.openDocument(state["file"])
+    m.mesh_tab()
+    h.fit()
+
+
+def g_reopened():
+    cube = m.body("two_boxes (2)")
+    h.check(
+        "opened again: 1360 mm3, closed",
+        cube is not None and near(m.volume(cube), 1360.0, 1e-3) and m.closed(cube),
+        cube and (m.volume(cube), m.analysis(cube)),
+    )
+    h.check(
+        "opened again: still Combine 2",
+        cube is not None and m.timeline_title(cube) == "Combine 2",
+        cube and m.timeline_title(cube),
+    )
+    h.shot("touching")
+
+
 h.run(
     "mesh_separate_combine",
     [i.new_design("MeshSeparate")]
@@ -321,6 +449,9 @@ h.run(
     + m.insert_file(bar_file())
     + [d_open, d_waits, d_target, d_join, d_cut, d_intersect, d_merge, d_ok, d_done]
     + m.insert_file(sheet_file())
-    + [e_open, e_target, e_tool, e_refused, e_waits, e_check, f_edit, f_keep, f_ok, f_check],
+    + [e_open, e_target, e_tool, e_refused, e_waits, e_check, f_edit, f_keep, f_ok, f_check]
+    + m.insert_file(post_file())
+    + [g_open, g_target, g_tool, g_join, g_cut, g_intersect, g_ok, g_done]
+    + [c_undo, g_check_undo, c_redo, g_check_redo, g_save_reopen, g_reopened],
     paced_by="state",
 )

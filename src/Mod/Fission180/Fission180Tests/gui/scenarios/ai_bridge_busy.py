@@ -35,12 +35,12 @@ def setup():
     bridge_core.BUSY_AFTER = 1.0
     real = executor.run
 
-    def run(tool, args, host):
+    def run(tool, args, host, call_id=None):  # (call_id: ai-speed's Stop, wave 8)
         s["ran"].append(tool)
         if tool == "get_timeline" and not s.get("long_done"):
             s["long_done"] = True
             time.sleep(4.0)  # (the long call: the window's thread is busy)
-        return real(tool, args, host)
+        return real(tool, args, host, call_id)
 
     executor.run = run
     App.newDocument("Busy")

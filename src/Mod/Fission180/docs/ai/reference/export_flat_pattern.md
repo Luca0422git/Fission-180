@@ -63,4 +63,5 @@ Exported /home/me/fission180/tray-flat.dxf: the flat pattern of Body1, 78.5239 x
 
 ## See also
 
+- Recipe: [a laser-cut sheet metal bracket and its flat pattern (SHEET METAL)](fission180://docs/recipes/laser-cut-bracket.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -451,5 +451,50 @@ class BridgeFileLocation(unittest.TestCase):
             self.assertIn(path, files)
 
 
+# -- wave 8, ai-behaviour: ask_person's form through the real server (MCP elicitation) ---------
+class AskThroughTheApp(unittest.TestCase):
+    """The real server asks the AI app (elicitation/create) while its reading thread keeps
+    reading, and hands the app's answer back to the waiting tool call; Fission 180 need not run."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.mcp = McpProcess(bridge_core.bridge_path(self.tmp.name))
+        self.addCleanup(self.tmp.cleanup)
+
+    def tearDown(self):
+        if self.mcp.process.poll() is None:
+            self.mcp.close()
+
+    def test_the_form_and_its_answer(self):
+        reply = self.mcp.request(
+            "initialize",
+            {"protocolVersion": "2025-11-25", "capabilities": {"elicitation": {"form": {}}},
+             "clientInfo": {"name": "test", "version": "1"}},
+        )
+        self.assertIn("plan_approach", reply["result"]["instructions"][:4096])
+        self.mcp.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        self.mcp.send({"jsonrpc": "2.0", "id": 41, "method": "tools/call", "params": {
+            "name": "ask_person", "arguments": {"message": "Before I start:", "questions": [
+                {"id": "editable", "question": "A solid or a timeline?", "default": "solid"}]}}})
+        create = self.mcp.receive()
+        self.assertEqual(create["method"], "elicitation/create")
+        self.assertEqual(create["params"]["message"], "Before I start:")
+        self.assertIn("editable", create["params"]["requestedSchema"]["properties"])
+        self.assertEqual(self.mcp.request("ping")["result"], {})  # (still reading meanwhile)
+        self.mcp.send({"jsonrpc": "2.0", "id": create["id"], "result": {
+            "action": "accept", "content": {"editable": "timeline"}}})
+        result = self.mcp.receive()
+        self.assertEqual(result["id"], 41)
+        text = result["result"]["content"][0]["text"]
+        self.assertIn("A solid or a timeline? timeline", text)
+
+    def test_an_app_without_forms(self):
+        self.mcp.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}})
+        result = self.mcp.request("tools/call", {"name": "ask_person", "arguments": {
+            "questions": [{"question": "Which material?"}]}})["result"]
+        self.assertFalse(result["isError"])
+        self.assertIn("ask the questions in your reply", result["content"][0]["text"])
+
+
 if __name__ == "__main__":
     unittest.main()
