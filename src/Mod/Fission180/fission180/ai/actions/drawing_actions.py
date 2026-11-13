@@ -266,7 +266,7 @@ def _place_free(view, page, prefer=None):
     spot = aicore.free_spot(_area(page), blocked, (w, h), prefer)
     if spot is None:
         return False
-    view.X, view.Y = spot
+    drawing.set_place(view, *spot)
     return True
 
 
@@ -401,10 +401,9 @@ def create_drawing(ctx, args):
         views = [base]
         for kind in args.get("projected") or []:
             views.append(drawing.add_projected(base, kind, x, y))  # (laid out below)
-        if len(views) > 1:
-            doc.recompute()
-            _idle(doc)
-        fits = _lay_out(page, base, views[1:], "scale" not in args, args.get("at"))
+        # (laid out by the parts' own sizes before TechDraw draws anything: it draws each
+        # view once, at its scale and place)
+        fits = _lay_out(page, base, views[1:], "scale" not in args, args.get("at"), _size_model)
         drawing._add(page, "App::PropertyBool", "Fission180AutoFits", bool(fits))
         return page, views
 
@@ -438,19 +437,30 @@ def _size1(view):
     return 2.0 * hw / s, 2.0 * hh / s
 
 
-def _set_place(view, x, y):
-    """A view's place; a projected view also keeps it as its offset from its parent (so
-    drawing.keep_aligned does not put it back)."""
+def _size_model(view):
+    """(w, h) a view will draw at 1:1, from its parts' box seen its way (before TechDraw
+    has drawn it: drawing.model_extent)."""
     from ... import drawing
 
-    view.X, view.Y = x, y
+    sources = [s for s in getattr(view, "Source", []) or [] if drawing.alive(s)]
+    w, h, _d = drawing.model_extent(sources, drawing.axes_of(view))
+    return w, h
+
+
+def _set_place(view, x, y):
+    """A view's place (without TechDraw drawing it again: drawing.set_place); a projected
+    view also keeps it as its offset from its parent (so drawing.keep_aligned does not put
+    it back)."""
+    from ... import drawing
+
+    drawing.set_place(view, x, y)
     parent = drawing.parent_of(view)
     if parent is not None and "Fission180Offset" in view.PropertiesList:  # (and sections)
         px, py = drawing.view_position(parent)
         view.Fission180Offset = [x - px, y - py]
 
 
-def _lay_out(page, base, children, rescale, at=None):
+def _lay_out(page, base, children, rescale, at=None, size_of=None):
     """A base view and the views projected from it side by side by their real sizes, the
     block centred on the sheet's free area (or the base view kept at `at`), at the largest
     standard scale up to the base view's own at which it fits (rescale), as a person lays
@@ -459,15 +469,16 @@ def _lay_out(page, base, children, rescale, at=None):
 
     if not children and at is not None:
         return True
+    size_of = size_of or _size1
     s = drawing.scale_of(base) or 1.0
-    kids = [(drawing._get(v, "Fission180Kind", "") or "Right", _size1(v)) for v in children]
+    kids = [(drawing._get(v, "Fission180Kind", "") or "Right", size_of(v)) for v in children]
     scales = [s]
     if rescale:
         scales = [a / float(b) for a, b in drawing_core.SCALES if a / float(b) <= s + 1e-9] or [s]
-    plan = aicore.layout_views(_size1(base), kids, page.ProjectionType, _area(page), scales, at=at)
+    plan = aicore.layout_views(size_of(base), kids, page.ProjectionType, _area(page), scales, at=at)
     if abs(plan["scale"] - s) > 1e-12:
         drawing.set_scale(base, plan["scale"])
-    base.X, base.Y = plan["base"]
+    drawing.set_place(base, *plan["base"])
     for view, (cx, cy) in zip(children, plan["children"]):
         _set_place(view, cx, cy)
     return plan["fits"]
@@ -528,7 +539,36 @@ def _along_cut(parent, section, normal):
     shw, shh = drawing.view_extent(section)
     nx, ny = normal
     reach = abs(nx) * (phw + shw) + abs(ny) * (phh + shh) + aicore.VIEW_GAP
-    _slide_free(section, drawing.view_position(parent), (nx * reach, ny * reach))
+    return _slide_free(section, drawing.view_position(parent), (nx * reach, ny * reach))
+
+
+def _make_section(parent, args, sign):
+    """A section view of `parent` along args' line, placed on the side `sign` of it (+1:
+    left of the line's direction) unless args give its place. Returns (view, normal)."""
+    from ... import drawing
+
+    px, py = drawing.view_position(parent)
+    line = [tuple(p) for p in args["line"]]
+    normal = _cut_normal(line, sign)
+    hw, hh = drawing.view_extent(parent)
+    reach = 2.0 * (abs(normal[0]) * hw + abs(normal[1]) * hh) + aicore.VIEW_GAP
+    pos = args.get("at", (px + normal[0] * reach, py + normal[1] * reach))
+    side = _section_side(args, line, drawing.page_to_local(parent, pos))
+    depth = None
+    if args.get("depth_mode", "Full") != "Full":
+        depth = (args["depth_mode"], float(args.get("depth", 0.0)))
+    view = drawing.add_section(
+        parent,
+        line[0],
+        line[1],
+        side,
+        pos,
+        args.get("label"),
+        args.get("scale"),
+        points=line if len(line) > 2 else None,
+        depth=depth,
+    )
+    return view, normal
 
 
 # -- CREATE: views --------------------------------------------------------------------------------
@@ -575,7 +615,8 @@ def add_drawing_view(ctx, args):
 
     def work():
         if kind in ("base", "exploded"):
-            x, y = args.get("at", (0.7 * w, 0.3 * h))
+            area = _area(page)  # (the middle of the free paper; moved off what it covers)
+            x, y = args.get("at", ((area[0] + area[2]) / 2.0, (area[1] + area[3]) / 2.0))
             view = drawing.add_base_view(
                 page,
                 sources,
@@ -600,28 +641,8 @@ def add_drawing_view(ctx, args):
             x, y = args.get("at", (px + dx, py + dy))
             view = drawing.add_projected(parent, args["direction"], x, y)
         elif kind == "section":
-            px, py = drawing.view_position(parent)
-            line = [tuple(p) for p in args["line"]]
             sign = 1.0 if int(args.get("side", 1)) >= 0 else -1.0
-            normal = _cut_normal(line, sign)
-            hw, hh = drawing.view_extent(parent)
-            reach = 2.0 * (abs(normal[0]) * hw + abs(normal[1]) * hh) + aicore.VIEW_GAP
-            pos = args.get("at", (px + normal[0] * reach, py + normal[1] * reach))
-            side = _section_side(args, line, drawing.page_to_local(parent, pos))
-            depth = None
-            if args.get("depth_mode", "Full") != "Full":
-                depth = (args["depth_mode"], float(args.get("depth", 0.0)))
-            view = drawing.add_section(
-                parent,
-                line[0],
-                line[1],
-                side,
-                pos,
-                args.get("label"),
-                args.get("scale"),
-                points=line if len(line) > 2 else None,
-                depth=depth,
-            )
+            view, normal = _make_section(parent, args, sign)
         elif kind == "detail":
             px, py = drawing.view_position(parent)
             pos = args.get("at", (px + 0.3 * w, py - 0.3 * h))
@@ -655,8 +676,15 @@ def add_drawing_view(ctx, args):
                 _beside(parent, view, args["direction"])
                 moved = True
             elif kind == "section":
-                _along_cut(parent, view, normal)
                 moved = True
+                if not _along_cut(parent, view, normal) and "side" not in args:
+                    # no room on that side of the cut: from the other side (Fusion: where
+                    # the section is placed decides which way it looks)
+                    drawing.delete_objects(doc, [view])
+                    view, normal = _make_section(parent, args, -1.0)
+                    doc.recompute()
+                    _idle(doc)
+                    _along_cut(parent, view, normal)  # (no room either: the answer says so)
             if kind in ("base", "exploded", "detail"):
                 moved = _place_free(view, page)
             if moved:
@@ -698,7 +726,7 @@ def edit_drawing_view(ctx, args):
         raise UserError("%s is not a broken view (gap is a break's)." % view.Label)
     if ("depth_mode" in args or "hatch" in args) and not drawing.is_section(view):
         raise UserError("%s is not a section view." % view.Label)
-    breakout_change = "remove_breakout" in args or (
+    breakout_change = bool(args.get("remove_breakout")) or (
         not drawing.is_section(view) and ("depth" in args or "through_all" in args)
     )
     if breakout_change and not drawing_breakout.has_breakout(view):
