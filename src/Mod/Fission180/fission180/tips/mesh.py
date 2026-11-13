@@ -106,7 +106,7 @@ TIPS = {
         "summary": "Fix a broken mesh: close holes, turn flipped faces, stitch cracks, rebuild.",
         "what": (
             "Scans and downloads often have holes or faces the wrong way round, so they cannot "
-            "be printed or converted. Repair fixes them. The types go from gentle to strong: "
+            "be printed or converted: Repair fixes them. The types go from gentle to strong: "
             "Close Holes, Stitch and Remove (the default), Wrap, Rebuild. The dialog lists the "
             "problems before and after."
         ),

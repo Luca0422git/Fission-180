@@ -145,7 +145,7 @@ TIPS = {
         "picture": "anim_callout.png",
     },
     "Fission180_AnimView": {
-        "summary": "On: changes of the view are recorded as camera moves. Off: the view is yours.",
+        "summary": "Choose whether turning and zooming the view is recorded as a camera move.",
         "what": (
             "With View on (the default), turning, panning or zooming the view with the "
             "playhead past 0 is recorded as a View action, so the camera moves in the "

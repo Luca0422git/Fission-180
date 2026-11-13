@@ -243,9 +243,10 @@ TIPS = {
     "Fission180_SimSolve": {
         "summary": "Solve the study on this computer and show the results.",
         "what": (
-            "Meshes the part and runs the solver (CalculiX) on this computer. The window "
-            "shows each stage and the time taken; Cancel stops it. When it ends the RESULTS "
-            "tab opens with the safety factor. A big part with a fine mesh can take minutes."
+            "Meshes the part and runs the solver (CalculiX) on this computer; the window "
+            "shows each stage and the time taken, and Cancel stops it. When it ends the "
+            "RESULTS tab opens with the safety factor. A big part with a fine mesh can take "
+            "minutes."
         ),
         "steps": [
             "Click Solve.",
@@ -344,8 +345,8 @@ TIPS = {
         "summary": "Set the values the legend's colours run between.",
         "what": (
             "Narrows the colour scale to the values you care about, so small differences show. "
-            "Values beyond the range take the end colours (or grey, from the legend's ... "
-            "menu). Not for the safety factor."
+            "Values beyond the range take the end colours, or grey (the legend's menu). It is "
+            "not offered for the safety factor."
         ),
         "steps": [
             "Pick a result other than Safety Factor in the legend.",

@@ -128,8 +128,8 @@ TIPS = {
         "summary": "Round the corners of sheet metal plates.",
         "what": (
             "Rounds the sharp corners of a sheet metal plate, the short edges that go "
-            "through the thickness. Only those edges light up. The rounds show as arcs in the "
-            "flat pattern. On a solid body it opens the normal Fillet."
+            "through the thickness (only those edges light up). The rounds show as arcs in "
+            "the flat pattern. On a solid body it opens the normal Fillet."
         ),
         "steps": [
             "Click Fillet, then click the corner edges through the thickness.",
