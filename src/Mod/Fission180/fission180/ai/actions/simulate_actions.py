@@ -1200,6 +1200,11 @@ def show_study_results(ctx, args):
     rcore = _results_core()
     from ... import simulation_results_ui as results_ui
 
+    # (read only for the design, so the bridge lets it through while the person works; but
+    # opening the RESULTS tab would finish the person's open dialog or sketch: refused instead)
+    busy = ctx.host.busy()
+    if busy:
+        raise UserError(busy)
     if args.get("finish"):
         results_ui.finish_compare()
         results_ui.finish()

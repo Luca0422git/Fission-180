@@ -562,9 +562,10 @@ def cam_simulate(ctx, args):
         row = {"name": item["label"], "id": item["name"], "removed_mm3": _r(removed - last, 1)}
         if model is not None:
             found = _compare(play.stock, model)["gouges"]
-            if found["cells"] > gouged:
-                row["gouges_mm2"] = found["area_mm2"]
-                row["deepest_gouge_mm"] = found["deepest_mm"]
+            if found["cells"] > gouged:  # (this operation cut into the part where none had)
+                cell = play.stock.cell
+                row["new_gouge_mm2"] = _r((found["cells"] - gouged) * cell * cell, 2)
+                row["deepest_gouge_mm"] = found["deepest_mm"]  # (the deepest after it)
             gouged = found["cells"]
         per_op.append(row)
         last = removed
