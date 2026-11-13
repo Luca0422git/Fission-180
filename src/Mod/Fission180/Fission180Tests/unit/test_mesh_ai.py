@@ -232,6 +232,13 @@ class Overview(unittest.TestCase):
             ),
         )
 
+    def test_a_recess_as_deep_as_the_part_is_a_through_hole(self):
+        pts, facets = field(20, 16, lambda i, j: -5.0 * bumps(i, j))
+        out = ai.overview(pts, facets)
+        group = out["detail_groups"][0]
+        self.assertEqual(group["kind"], "round through hole")
+        self.assertIn("20 equal round through holes about 2 x 2 mm, through the 5 mm", out["words"])
+
     def test_a_box_has_no_details(self):
         out = ai.overview(*box())
         self.assertEqual(out["details"], 0)

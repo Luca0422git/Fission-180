@@ -32,6 +32,9 @@ from . import recognize_core as core
 
 SOFT = 35.0  # degrees: two faces of a mesh meeting at less than this are one round region
 POSITION_TOL = 0.01  # mm: how far a rounded position may be from the measured one
+# (wave 8) faces of a faceted solid beyond which its facets are not read one by one when the
+# mesh is not prismatic (the limit describe_reference's defeaturing uses, beta 4.0.3)
+FACETED_LIMIT = 1500
 
 
 def describe_mesh(mesh, options=None, faceted=None):
@@ -78,6 +81,8 @@ def describe_mesh(mesh, options=None, faceted=None):
         clean, measured = None, []
         notes.append("The mesh's round regions could not be fitted (%s)." % exc)
     opts = dict(options, source="mesh")
+    if clean is None and len(faceted.Faces) > FACETED_LIMIT:
+        return _facets_only(mesh, faceted, notes)
     if clean is None:
         notes.append(
             "The part is not prismatic along X, Y or Z once its holes are closed (or a round "
@@ -91,6 +96,55 @@ def describe_mesh(mesh, options=None, faceted=None):
     out["notes"] = notes + out["notes"]
     out["summary"]["mesh"] = {"triangles": mesh.CountFacets, "volume": round(mesh.Volume, 6)}
     log("recognize_mesh: %d triangles -> %s" % (mesh.CountFacets, out["base"].get("kind")))
+    return out
+
+
+def _facets_only(mesh, faceted, notes):
+    """The answer for a mesh that is not prismatic once its round holes are closed and whose
+    solid keeps more than FACETED_LIMIT faces (domes, fillets, free-form areas as small
+    facets): reading those facets as features finds nothing and took most of a minute
+    (wave 8: 7,606 faces, 48 s, and a list of 7,606 facets an AI then tried to copy), so it
+    is not tried. The shapes the mesh is made of are given instead (mesh_ai_core.overview:
+    its big flat faces, its details grouped, a grid of equal ones), to rebuild by hand."""
+    from . import mesh as mesh_mod
+    from . import mesh_ai_core
+
+    out = {
+        "summary": recognize.summary(faceted),
+        "base": {"kind": "none"},
+        "features": [],
+        "plan": [],
+        "unrecognized": [],
+        "confidence": 0.0,
+        "notes": list(notes),
+    }
+    try:
+        points, facets = mesh_mod.topology(mesh)
+        shapes = mesh_ai_core.overview(points, facets)
+    except Exception as exc:
+        warn("recognize_mesh: no overview (%s)" % exc)
+        shapes = None
+    small = len(faceted.Faces)
+    if shapes is not None:
+        out["mesh_overview"] = shapes
+        small = sum(g.get("triangles", 0) for g in shapes.get("detail_groups", [])) or small
+    out["unrecognized"].append(
+        {
+            "faces": [],
+            "count": small,
+            "why": "small flat facets of round or free-form areas (domes, fillets, free-form "
+            "surfaces): a mesh's facets are not features, so none is listed one by one",
+        }
+    )
+    out["notes"].append(
+        "No plan: the part is not prismatic along X, Y or Z once its round holes are closed, "
+        "and its solid has %d faces, most of them facets of round or free-form areas, which "
+        "Fission 180 does not fit to features." % len(faceted.Faces)
+    )
+    if shapes is not None:
+        out["notes"].append("What it is made of: " + shapes["words"])
+    out["summary"]["mesh"] = {"triangles": mesh.CountFacets, "volume": round(mesh.Volume, 6)}
+    log("recognize_mesh: %d triangles -> facets only (%d faces)" % (mesh.CountFacets, small))
     return out
 
 

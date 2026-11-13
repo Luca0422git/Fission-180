@@ -2082,6 +2082,11 @@ def main():
         run_session(
             run, workspace_tools.SESSION, os.environ.get("FISSION180_HEADLESS_FILTER", "")
         )
+        # wave 8, ai-mesh: the MESH tab's tools and the rebuild of a mesh (mesh_tools.py: it
+        # writes its Relic stand-ins into the run's folder first)
+        from Fission180Tests.headless import mesh_tools
+
+        mesh_tools.run_in(run, os.environ.get("FISSION180_HEADLESS_FILTER", ""))
         report["results"] = run.results
         report["missing"] = [] if os.environ.get("FISSION180_HEADLESS_FILTER") else missing_tools(run)
         report["tools_called"] = len(run.called)

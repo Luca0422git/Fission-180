@@ -11253,5 +11253,481 @@
    "text": "Published /home/me/fission180/explode.avi: 37 frames of 320 x 240 at 12 frames a second (Explode).\n{\n \"file\": \"/home/me/fission180/explode.avi\",\n \"format\": \"avi\",\n \"storyboards\": [\"Explode\"],\n \"frames\": 37,\n \"fps\": 12,\n \"width\": 320,\n \"height\": 240,\n \"length_s\": 3.083\n}",
    "is_error": false
   }
+ },
+ "inspect_mesh#1": {
+  "setup": "mesh_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Mesh"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {},
+  "note": "the plate's mesh: closed, its shapes, and what to do next",
+  "answer": {
+   "text": "plate (id 'MeshBody'): 208 triangles, 60 x 40 x 10 mm, closed (watertight), 23498.8 mm3. A part 60 x 40 x 10 mm: 96 % of its area is 6 big flat faces (most facing along z), and 1 small detail (round or free-form: facets of curved surfaces): 1 round through hole about 8 x 8 mm, through the 10 mm, on its -z face. plate is closed and clean: convert_mesh (method prismatic) gives a solid in under a second.\n{\n \"body\": \"MeshBody\",\n \"label\": \"plate\",\n \"triangles\": 208,\n \"points\": 104,\n \"size\": [60.0, 40.0, 10.0],\n \"box\": [0.0, 0.0, 0.0, 60.0, 40.0, 10.0],\n \"area\": 6950.909668,\n \"closed\": true,\n \"volume\": 23498.779427,\n \"problems\": [],\n \"holes\": 0,\n \"open_edges\": 0,\n \"non_manifold\": 0,\n \"flipped\": 0,\n \"shells\": 1,\n \"duplicated\": 0,\n \"degenerate\": 0,\n \"inside_out\": false,\n \"face_groups\": 1,\n \"overview\": {\n  \"triangles\": 208,\n  \"size\": [60.0, 40.0, 10.0],\n  \"flat_faces\": 6,\n  \"flat_share\": 0.9639,\n  \"axis\": \"z\",\n  \"details\": 1,\n  \"detail_groups\": [\n   {\n    \"count\": 1,\n    \"kind\": \"round through hole\",\n    \"face\": \"-z\",\n    \"footprint\": [8.0, 8.0],\n    \"height\": 10.0,\n    \"triangles\": 96,\n    \"centres\": [[30.0, 20.0, 5.0]]\n   }\n  ],\n  \"words\": \"A part 60 x 40 x 10 mm: 96 % of its area is 6 big flat faces (most facing along z), and 1 small detail (round or free-form: facets of curved surfaces): 1 round through hole about 8 x 8 mm, through the 10 mm, on its -z face.\"\n },\n \"estimates\": {\"convert_prismatic_s\": 0.2, \"convert_faceted_s\": 0.2},\n \"advice\": \"plate is closed and clean: convert_mesh (method prismatic) gives a solid in under a second.\"\n}",
+   "is_error": false
+  }
+ },
+ "convert_mesh#1": {
+  "setup": "mesh_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Mesh"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {
+   "name": "Plate solid"
+  },
+  "note": "a solid body from the mesh, flat faces merged",
+  "answer": {
+   "text": "Done: AI: Convert Mesh. The solid body 'Plate solid' (id 'Body001'): 54 faces from 208 triangles (flat faces merged; 6 big flat faces, the rest are the small flat facets of round or free-form areas), 23498.8 mm3 against the mesh's 23498.8 mm3 (0 % apart). The mesh body plate is hidden and kept (parametric: an edit of the mesh's steps updates the solid). Next: the solid takes fillet, chamfer, hole, press_pull, shell and combine like any body; for a timeline of real features instead (editable sizes), start_rebuild. Bodies now: Plate solid: 23498.8 mm3, 60 x 40 x 10 mm.\nTook under a second.",
+   "is_error": false
+  }
+ },
+ "mesh_prepare#1": {
+  "setup": "mesh_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Mesh"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {
+   "kind": "generate_face_groups"
+  },
+  "note": "the mesh's faces grouped by the way they face",
+  "answer": {
+   "text": "Done: AI: Generate Face Groups (208 -> 208 triangles). The body now: plate001 (id 'FaceGroups'): 208 triangles, 60 x 40 x 10 mm, closed (watertight), 23498.8 mm3. plate001 has 7 face groups (inspect_mesh detail groups lists them). plate001 is closed and clean: convert_mesh (method prismatic) gives a solid in under a second. No solid body yet.\nTook under a second.",
+   "is_error": false
+  }
+ },
+ "mesh_modify#1": {
+  "setup": "mesh_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Mesh"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {
+   "kind": "plane_cut",
+   "plane": "XY",
+   "distance": 5,
+   "fill": "minimal"
+  },
+  "note": "everything above 5 mm cut away, the cut closed",
+  "answer": {
+   "text": "Done: AI: Plane Cut (208 -> 312 triangles). The body now: plate001 (id 'PlaneCut'): 312 triangles, 60 x 40 x 5 mm, closed (watertight), 11749.4 mm3. Cut at the XY plane (normal [0, 0, 1]). plate001 is closed and clean: convert_mesh (method prismatic) gives a solid in under a second. No solid body yet.\nTook under a second.",
+   "is_error": false
+  }
+ },
+ "tessellate#1": {
+  "setup": "plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   }
+  ],
+  "args": {
+   "body": "Body",
+   "name": "Plate mesh"
+  },
+  "note": "the plate as a mesh body, one face group per face",
+  "answer": {
+   "text": "Done: AI: Tessellate Body. The mesh body Plate mesh (id 'Tessellate'): 12 triangles, 60 x 40 x 10 mm, closed (watertight), 24000 mm3; 6 face groups (one per face of Body1). Body1 is used up by it (hidden; undo brings it back). Plate mesh is closed and clean: convert_mesh (method prismatic) gives a solid in under a second. Bodies now: Body1: 24000 mm3, 60 x 40 x 10 mm.\nTook under a second.",
+   "is_error": false
+  }
+ },
+ "mesh_section_sketch#1": {
+  "setup": "mesh_plate",
+  "setup_calls": [
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Example"
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "geometry": [
+      {
+       "rect": [
+        0,
+        0,
+        60,
+        40
+       ],
+       "name": "base"
+      }
+     ]
+    }
+   },
+   {
+    "tool": "extrude",
+    "args": {
+     "profile": "Sketch1",
+     "distance": 10
+    }
+   },
+   {
+    "tool": "create_sketch",
+    "args": {
+     "plane": "XY",
+     "offset": 10,
+     "geometry": [
+      {
+       "circle": [
+        30,
+        20,
+        4
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "tool": "hole",
+    "args": {
+     "sketch": "Sketch2",
+     "diameter": 8,
+     "through_all": true
+    }
+   },
+   {
+    "tool": "export",
+    "args": {
+     "format": "stl",
+     "path": "{tmp}/plate.stl"
+    }
+   },
+   {
+    "tool": "new_design",
+    "args": {
+     "name": "Mesh"
+    }
+   },
+   {
+    "tool": "import_file",
+    "args": {
+     "path": "{tmp}/plate.stl"
+    }
+   }
+  ],
+  "args": {
+   "plane": "XY",
+   "distance": 5
+  },
+  "note": "a sketch of the plate's outline and hole at 5 mm",
+  "answer": {
+   "text": "Done: AI: Mesh Section Sketch. The sketch 'Mesh Section plate' (id 'Sketch') on the XY plane (normal [0, 0, 1]) moved 5 mm holds the section: 2 loops (2 closed), 53 fixed segments, 60 x 40 x 0 mm. These segments trace the mesh's facets: to rebuild, draw the outline again with a few lines, arcs and circles (add_to_sketch, or create_sketch) and extrude that, not these segments. No solid body yet.",
+   "is_error": false
+  }
  }
 }

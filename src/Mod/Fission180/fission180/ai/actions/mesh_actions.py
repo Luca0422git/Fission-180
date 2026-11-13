@@ -337,7 +337,7 @@ def convert_mesh(ctx, args):
     text = (
         "Done: %s. The solid body %r (id %r): %s faces from %s triangles (%s; %d big flat "
         "faces, the rest are the small flat facets of round or free-form areas), %s mm3 "
-        "against the mesh's %s mm3 (%s %% apart), in %.1f s. The mesh body %s is hidden and "
+        "against the mesh's %s mm3 (%s %% apart). The mesh body %s is hidden and "
         "kept%s. Next: the solid takes fillet, chamfer, hole, press_pull, shell and combine "
         "like any body; for a timeline of real features instead (editable sizes), "
         "start_rebuild."
@@ -351,13 +351,19 @@ def convert_mesh(ctx, args):
             flat,
             _num(volume),
             _num(reference),
-            _num(apart, 3),
-            seconds,
+            ("%.2g" % apart) if apart >= 1e-4 else "0",
             source.Label,
-            " (the solid follows its later MESH steps)" if parametric else "",
+            " (parametric: an edit of the mesh's steps updates the solid)" if parametric else "",
         )
     )
-    return bridge_core.result(text.rstrip() + " " + summary(doc) + broke_text(doc, before))
+    text = text.rstrip() + " " + summary(doc) + broke_text(doc, before)
+    return bridge_core.result(text + _took(seconds))
+
+
+def _took(seconds):
+    """The time a step took, on a line of its own at the end of the answer (the window waits
+    meanwhile: an AI plans by it)."""
+    return "\nTook %s." % _core().seconds_words(seconds)
 
 
 # -- the MESH tab's steps ------------------------------------------------------------------------
@@ -482,11 +488,10 @@ def _step_answer(ctx, step, seconds, before_count, more=""):
         parts.append(_facts_words(facts))
         if len(shown) == 1:
             advice = core.advice(info, facts["triangles"], obj.Label)
-    text = "Done: %s (%s -> %s triangles, in %.1f s). %s now: %s.%s" % (
+    text = "Done: %s (%s -> %s triangles). %s now: %s.%s" % (
         ctx.title,
         _thousands(before_count),
         _thousands(sum(o.Mesh.CountFacets for o in shown)),
-        seconds,
         "The bodies" if len(shown) > 1 else "The body",
         "; ".join(parts),
         (" " + more) if more else "",
@@ -494,11 +499,12 @@ def _step_answer(ctx, step, seconds, before_count, more=""):
     import re
 
     info = re.sub(r"^\d+ -> \d+ faces\.?\s*", "", step.StepInfo or "").strip()
-    if info and info not in text and not re.fullmatch(r"\d+ (faces|bodies)", info):
+    plain = r"\d+ (faces|bodies)|\d+ edits?, \d+ faces"  # (said already)
+    if info and info not in text and not re.fullmatch(plain, info):
         text += " (%s.)" % info.rstrip(".")
     if advice:
         text += " " + advice
-    return bridge_core.result(text.replace("..", ".") + " " + summary(doc))
+    return bridge_core.result(text.replace("..", ".") + " " + summary(doc) + _took(seconds))
 
 
 @action("mesh_prepare")
@@ -802,11 +808,10 @@ def tessellate(ctx, args):
     seconds = time.perf_counter() - began
     facts, info, _m = _facts(step)
     text = (
-        "Done: %s (in %.1f s). The mesh body %s; %d face groups (one per face of %s). %s is "
+        "Done: %s. The mesh body %s; %d face groups (one per face of %s). %s is "
         "used up by it (hidden; undo brings it back). %s"
         % (
             ctx.title,
-            seconds,
             _facts_words(facts),
             len(set(step.FaceGroups)) if step.FaceGroups else 1,
             body.Label,
@@ -814,7 +819,7 @@ def tessellate(ctx, args):
             _core().advice(info, facts["triangles"], step.Label),
         )
     )
-    return bridge_core.result(text + " " + summary(doc))
+    return bridge_core.result(text + " " + summary(doc) + _took(seconds))
 
 
 # -- mesh_section_sketch ----------------------------------------------------------------------

@@ -1526,3 +1526,56 @@ EXAMPLES += [
         "note": "a small video of the explosion",
     },
 ]
+
+# -- MESH (wave 8, builder ai-mesh) -------------------------------------------------------------
+# the plate with its hole exported to STL and brought into a new design as a mesh body
+# (MeshBody); the answers that say how long a step took (their last line) are compared by
+# their first line ("volatile")
+MESH_PLATE = PLATE_HOLE + [
+    call("export", format="stl", path="{tmp}/plate.stl"),
+    call("new_design", name="Mesh"),
+    call("import_file", path="{tmp}/plate.stl"),
+]
+SETUPS.update({"mesh_plate": MESH_PLATE})
+EXAMPLES += [
+    {
+        "tool": "inspect_mesh",
+        "setup": "mesh_plate",
+        "args": {},
+        "note": "the plate's mesh: closed, its shapes, and what to do next",
+    },
+    {
+        "tool": "convert_mesh",
+        "setup": "mesh_plate",
+        "volatile": True,
+        "args": {"name": "Plate solid"},
+        "note": "a solid body from the mesh, flat faces merged",
+    },
+    {
+        "tool": "mesh_prepare",
+        "setup": "mesh_plate",
+        "volatile": True,
+        "args": {"kind": "generate_face_groups"},
+        "note": "the mesh's faces grouped by the way they face",
+    },
+    {
+        "tool": "mesh_modify",
+        "setup": "mesh_plate",
+        "volatile": True,
+        "args": {"kind": "plane_cut", "plane": "XY", "distance": 5, "fill": "minimal"},
+        "note": "everything above 5 mm cut away, the cut closed",
+    },
+    {
+        "tool": "tessellate",
+        "setup": "plate",
+        "volatile": True,
+        "args": {"body": "Body", "name": "Plate mesh"},
+        "note": "the plate as a mesh body, one face group per face",
+    },
+    {
+        "tool": "mesh_section_sketch",
+        "setup": "mesh_plate",
+        "args": {"plane": "XY", "distance": 5},
+        "note": "a sketch of the plate's outline and hole at 5 mm",
+    },
+]

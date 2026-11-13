@@ -122,7 +122,9 @@ def overview(points, facets, tolerance=None, limit=8):
     for n, piece in enumerate(pieces):
         host = hosts.get(n)
         plane = planes.get(host) if host is not None else None
-        rows.append(_detail(points, facets, areas, piece, plane, max(tolerance * 10, 1e-6 * size)))
+        rows.append(
+            _detail(points, facets, areas, piece, plane, max(tolerance * 10, 1e-6 * size), extent)
+        )
     groups = equal_groups(rows, size)
     out = {
         "triangles": len(facets),
@@ -191,10 +193,11 @@ def _plane(points, facets, normals, areas, which):
     return normal, core.dot(normal, p)
 
 
-def _detail(points, facets, areas, piece, plane, tolerance):
+def _detail(points, facets, areas, piece, plane, tolerance, extent=None):
     """A detail's row: triangles, size, centre, area; with the flat face it sits on, its side
-    (bump out of the material, recess into it), its footprint on that face, its height, and
-    whether it is round (a footprint about as wide as it is long)."""
+    (bump out of the material, recess into it, a hole through the whole part when a recess is
+    as deep as the part, `extent`, is thick there), its footprint on that face, its height,
+    and whether it is round (a footprint about as wide as it is long)."""
     used = sorted({p for i in piece for p in facets[i]})
     lo, hi = core.bounds([points[p] for p in used])
     row = {
@@ -219,6 +222,8 @@ def _detail(points, facets, areas, piece, plane, tolerance):
     if axis is not None:
         k = AXES.index(axis[1])
         foot = [row["size"][j] for j in range(3) if j != k]
+        if side == "recess" and extent is not None and abs(height - extent[k]) <= tolerance:
+            side = "through hole"
     else:
         foot = sorted(row["size"], reverse=True)[:2]
     foot = sorted(foot, reverse=True)
@@ -428,13 +433,11 @@ def _group_words(group):
     kind = group["kind"]
     if "footprint" in group:
         a, b = group["footprint"]
-        what = "%s about %s x %s mm, %s %s" % (
-            _plural(kind, count),
-            _num(a),
-            _num(b),
-            _num(group["height"]),
-            "deep" if kind.endswith("recess") else "high",
-        )
+        if kind.endswith("through hole"):
+            depth = "through the %s mm" % _num(group["height"])
+        else:
+            depth = "%s %s" % (_num(group["height"]), "deep" if kind.endswith("recess") else "high")
+        what = "%s about %s x %s mm, %s" % (_plural(kind, count), _num(a), _num(b), depth)
         if count == 1:
             what = "1 " + what
         else:
