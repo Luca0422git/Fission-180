@@ -212,7 +212,7 @@ SOLID = {
                 "effect": "emboss",
             }
         ],
-        "view": (0.4, 1, -0.45),
+        "view": "iso",
     },
     "solid_hole": {
         "before": plate(h=12),
@@ -427,7 +427,9 @@ SOLID = {
                 "op": "sketch",
                 "id": "s0",
                 "plane": "XZ",
-                "geometry": [{"polyline": [[0, 0], [30, 0], [30, 6], [8, 6], [8, 25], [0, 25]]}],
+                "geometry": [
+                    {"polyline": [[0, 0], [-30, 0], [-30, 6], [-8, 6], [-8, 25], [0, 25]]}
+                ],
             },
             {"op": "extrude", "id": "e1", "profile": "s0", "distance": 20},
         ],
@@ -436,9 +438,10 @@ SOLID = {
         ],
         # the mirrored half: every face on the far side of the mirror plane
         "after_blue": "changed",
-        "after_filter": lambda face: face.CenterOfMass.x < -1e-6,
+        "after_filter": lambda face: face.CenterOfMass.x > 1e-6,
     },
     "solid_thicken": {
+        "pick_bodies": ["w1"],
         "before": [
             curves("c", "XZ", [{"arc": [0, -20, 30, 50, 130]}]),
             surface("w1", "extrude", [{"sketch": "c", "at": [0, 10]}], {"distance": 30}),
@@ -628,7 +631,7 @@ SOLID = {
         "OffsetPlane", [{"face": TOP}], ("faces", TOP), {"distance": 15}
     ),
     "solid_plane_angle": construct(
-        "PlaneAtAngle", [{"edge": edge_x(0, 10)}], ("edges", edge_x(0, 10)), {"angle": 45}
+        "PlaneAtAngle", [{"edge": edge_x(0, 10)}], ("edges", edge_x(0, 10)), {"angle": 120}
     ),
     "solid_tangent_plane": construct(
         "TangentPlane", [{"face": CYL_FACE}], ("faces", CYL_FACE), {"angle": 0}, before=CYL

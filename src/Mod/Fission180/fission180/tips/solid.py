@@ -746,7 +746,7 @@ TIPS = {
         "picture": "solid_align.png",
     },
     "Fission180_Delete": {
-        "summary": "Deletes the selected bodies, steps, sketches or faces (Del).",
+        "summary": "Deletes the selected bodies, steps, sketches or faces.",
         "what": "A step or sketch is deleted and the later steps keep working where they can. "
         "Faces clicked on a body are removed and the faces around them grow to close the gap.",
         "steps": [
@@ -791,8 +791,8 @@ TIPS = {
         "picture": "solid_physical_material.png",
     },
     "Fission180_Appearance": {
-        "summary": "Gives bodies or faces a look: metal, plastic, wood, paint, glass or any colour "
-        "(A).",
+        "summary": "Gives bodies or faces a look: metal, plastic, wood, paint, glass or any "
+        "colour.",
         "what": "Pick a look from the library, then click bodies, or faces with Apply To Faces. "
         "Only the look changes, not the material or the mass.",
         "steps": [
@@ -884,8 +884,7 @@ TIPS = {
         "picture": "solid_new_component.png",
     },
     "Fission180_Joint": {
-        "summary": "Connects two components so they move like the real thing: hinge, slider, ball "
-        "(J).",
+        "summary": "Connects two components so they move like the real thing: hinge, slider, ball.",
         "what": "Click a snap point on the part that moves, then one on the part it goes to: the "
         "first flies onto the second. The Motion tab sets the type (Rigid, Revolute, Slider, "
         "Cylindrical, Pin-Slot, Planar, Ball) and its limits; Animate plays it.",
@@ -1309,7 +1308,7 @@ TIPS = {
     },
     # ------------------------------------------------------------------ INSPECT
     "Fission180_Measure": {
-        "summary": "Measures lengths, areas, volumes, distances and angles of what you click (I).",
+        "summary": "Measures lengths, areas, volumes, distances and angles of what you click.",
         "what": "Click one thing to see its size; click a second to see the distance between them, "
         "the angle and the X, Y, Z parts. Measure changes nothing in the design.",
         "steps": [
@@ -1475,7 +1474,7 @@ TIPS = {
         "picture": "solid_center_of_mass.png",
     },
     "Fission180_ComponentColors": {
-        "summary": "Draws every component in a colour of its own; again to go back (Shift+N).",
+        "summary": "Draws every component in a colour of its own; again to go back.",
         "what": "Tells the parts of an assembly apart at a glance. Only the display changes.",
         "steps": [
             "Press Shift+N (or click Display Component Colors).",
@@ -1662,7 +1661,7 @@ TIPS = {
     },
     "Fission180_SelectWindow": {
         "summary": "A dragged box selects: left to right what is fully inside, right to left what "
-        "it touches (1).",
+        "it touches.",
         "what": "The usual box selection mode.",
         "steps": [
             "Press 1 (or click Window Selection).",
@@ -1672,7 +1671,7 @@ TIPS = {
         "picture": "solid_select_window.png",
     },
     "Fission180_SelectFreeform": {
-        "summary": "Draw a free shape around things to select them (2).",
+        "summary": "Draw a free shape around things to select them.",
         "what": "Like the box, but any shape: handy around odd groups of faces. The drag direction "
         "works like the box.",
         "steps": [
@@ -1683,7 +1682,7 @@ TIPS = {
         "picture": "solid_select_freeform.png",
     },
     "Fission180_SelectPaint": {
-        "summary": "Drag over things: everything the pointer passes is selected (3).",
+        "summary": "Drag over things: everything the pointer passes is selected.",
         "what": "Paint across many faces or edges in one stroke.",
         "steps": [
             "Press 3 (or click Paint Selection).",

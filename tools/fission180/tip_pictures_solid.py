@@ -343,11 +343,23 @@ def panel_top(widget):
 
     bottom = 0
     for button in widget.findChildren(QtWidgets.QAbstractButton):
-        if button.isVisible() and button.text().replace("&", "").strip() in ("OK", "Cancel"):
+        if button.isVisible() and button.text().replace("&", "").strip() in (
+            "OK",
+            "Cancel",
+            "Close",
+        ):
             point = button.mapTo(widget, button.rect().bottomLeft())
             if point.y() < widget.height() / 3:
                 bottom = max(bottom, point.y())
     return bottom + 6 if bottom else 0
+
+
+def panel_grab(widget=None):
+    """The open dialog as drawn, below its OK / Cancel row (for with_dialog)."""
+    widget = widget if widget is not None else tp.wait_for_panel()
+    tp.wait(150)
+    image = tp.grab(widget)
+    return image.crop((0, panel_top(widget), image.width, image.height))
 
 
 def panel_picture(area=None, focus=None, height=200):
@@ -370,6 +382,8 @@ def panel_picture(area=None, focus=None, height=200):
 def child_named(widget, text, kind=None):
     """The first visible child of the panel whose text (a label, a button) or placeholder
     is `text`."""
+    import re
+
     from PySide import QtWidgets
 
     for child in widget.findChildren(kind or QtWidgets.QWidget):
@@ -377,10 +391,11 @@ def child_named(widget, text, kind=None):
             continue
         for attr in ("text", "placeholderText", "title"):
             try:
-                if getattr(child, attr)() == text:
-                    return child
+                words = re.sub(r"<[^>]+>", "", getattr(child, attr)()).strip()
             except Exception:
                 continue
+            if words == text:
+                return child
     return None
 
 
@@ -675,18 +690,22 @@ def picture(name):
 # ---------------------------------------------------------------- CREATE
 @picture("solid_create_sketch.png")
 def create_sketch():
-    """Before: the three origin planes to click (the XY one in the blue); after: a sketch
-    drawn on it."""
+    """Before: the three origin planes as Create Sketch offers them (big squares), the one to
+    click in the blue; after: a sketch drawn on it."""
     tp.new_design()
-    origin = tp.body().Origin
-    planes = [f for f in origin.OriginFeatures if f.Role.endswith("_Plane")]
-    origin.ViewObject.Visibility = True
-    for feature in origin.OriginFeatures:
-        feature.ViewObject.Visibility = feature in planes
-    xy = [f for f in planes if f.Role == "XY_Plane"][0]
     b = run_steps(
         builder(),
         [
+            {
+                "op": "construct",
+                "id": plane.lower(),
+                "preset": "OffsetPlane",
+                "refs": [{"plane": plane}],
+                "values": {"distance": 0.0},
+            }
+            for plane in ("XY", "XZ", "YZ")
+        ]
+        + [
             {
                 "op": "sketch",
                 "id": "s1",
@@ -695,14 +714,24 @@ def create_sketch():
             }
         ],
     )
+    squares = [b.objects[k] for k in ("xy", "xz", "yz")]
+    for square in squares:
+        for prop, value in (("ResizeMode", "Manual"), ("Length", 70.0), ("Width", 70.0)):
+            try:
+                setattr(square, prop, value)
+            except Exception:
+                pass
+        tint(square, color=(0xC3, 0xCA, 0xD4), transparency=55)
+    tint(squares[0])
+    tp.recompute()
     sketch = b.objects["s1"]
     sketch.ViewObject.Visibility = False
     tp.camera("iso", 1.0)
-    before = tp.render(highlight={xy: all_faces(xy)}, hide_origin=False)
+    before = tp.render(highlight={squares[0]: all_faces(squares[0])})
     sketch.ViewObject.Visibility = True
-    for feature in planes:
-        feature.ViewObject.Visibility = False
-    after = tp.render(highlight={sketch: all_edges(sketch)}, hide_origin=False)
+    for square in squares:
+        square.ViewObject.Visibility = False
+    after = tp.render(highlight={sketch: all_edges(sketch)})
     return tp.before_after(before, after)
 
 
@@ -733,16 +762,12 @@ def face_text():
     spec = text.default_spec()
     spec.update(text="F180", height=10.0, corner=(4.0, 8.0), width=34.0, frame_height=14.0)
     spec["bold"] = True
-    made = text.make(sketch, spec)
+    text.make(sketch, spec)
     tp.recompute()
     tp.view().setCamera(camera)
-    highlight = {sketch: all_edges(sketch)}
-    try:
-        if made.Shape.Edges:
-            highlight[made] = all_edges(made)
-    except Exception:
-        pass
-    after = tp.render(highlight=highlight)
+    # the letters as the sketch draws them (shaded like a closed area): a blue outline on
+    # every glyph would make them unreadable at this size
+    after = tp.render()
     return tp.before_after(before, after)
 
 
@@ -830,7 +855,7 @@ def texture_map():
     shot = tp.render()
     select(tp.body())
     tp.run_command("Fission180_TextureMapControls")
-    panel = tp.grab(tp.wait_for_panel())
+    panel = panel_grab()
     return tp.with_dialog(shot, panel)
 
 
@@ -995,21 +1020,17 @@ def motion_study():
 
 
 def moved_parts():
-    """Two jointed components, the pin then dragged away (a position not captured yet)."""
+    """Two jointed components, the pin then dragged away (a position not captured yet: what
+    a drag does, joints.remember_places first)."""
+    import FreeCAD as App
+    from fission180 import joints
+
     b, base, pin = two_parts(joined=True)
-    run_steps(
-        b,
-        [
-            {
-                "op": "component_move",
-                "id": "m1",
-                "components": ["pin"],
-                "move_type": "translate",
-                "dx": 25,
-                "capture": False,
-            }
-        ],
-    )
+    joints.remember_places(tp.doc(), [pin])
+    place = pin.Placement
+    place.Base = place.Base + App.Vector(25, 0, 0)
+    pin.Placement = place
+    tp.recompute()
     return b
 
 
@@ -1058,7 +1079,7 @@ def interference():
             button.click()
     tp.settle()
     tp.wait(300)
-    return tp.with_dialog(tp.render(), tp.grab(widget))
+    return tp.with_dialog(tp.render(), panel_grab(widget))
 
 
 def analysis_picture(command, picks):
@@ -1116,7 +1137,7 @@ def section():
     tp.settle()
     tp.wait(500)
     shot = tp.render()
-    return tp.with_dialog(shot, tp.grab(tp.wait_for_panel()))
+    return tp.with_dialog(shot, panel_grab())
 
 
 @picture("solid_center_of_mass.png")
@@ -1125,7 +1146,7 @@ def center_of_mass():
     tp.camera("iso", 1.0)
     select(tp.body())
     tp.run_command("Fission180_CenterOfMass")
-    panel = tp.grab(tp.wait_for_panel())
+    panel = panel_grab()
     tp.wait(300)
     return tp.with_dialog(tp.render(), panel)
 
@@ -1154,7 +1175,7 @@ def component_swatch():
     shot = tp.grab(main)
     top = None
     for tree in main.findChildren(QtWidgets.QTreeWidget):
-        if not tree.isVisible() or tree.mapTo(main, tree.rect().topLeft()).x() > 300:
+        if tree.mapTo(main, tree.rect().topLeft()).x() > 300:  # (the browser, at the left)
             continue
         for label in ("Base", "Pin"):
             found = tree.findItems(label, QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive)
@@ -1167,7 +1188,7 @@ def component_swatch():
     tp.run_command("Fission180_ComponentColorSwatch")
     if top is None:
         raise RuntimeError("the browser's component rows were not found")
-    return tp.dialog_picture(shot, area=(0, max(0, top - 70), 300, 190), scale=1.0)
+    return tp.dialog_picture(shot, area=(0, max(0, top - 30), 300, 190), scale=1.0)
 
 
 @picture("solid_properties.png")
@@ -1197,7 +1218,7 @@ def decal():
         panel = tp.wait_for_panel()
         tp.wait(500)
         shot = tp.render()
-        return tp.with_dialog(shot, tp.grab(panel))
+        return tp.with_dialog(shot, panel_grab(panel))
     finally:
         decal_ui.FILE_PICKER = None
 
@@ -1206,10 +1227,11 @@ def insert_picture(kind, plane=True, model=True):
     from fission180 import insert_ui
 
     files = sample_files()
+    tp.new_design()
     if plane:
-        plate()
-    else:
-        tp.new_design()
+        # the curves and pictures come in at the face's origin: the plate is laid round it
+        where = {"dxf": (-5, -5, 50, 35)}.get(kind, (-25, -20, 50, 40))
+        run_steps(builder(), demos.plate(w=where[2], d=where[3], x=where[0], y=where[1]))
     insert_ui.FILE_PICKER = lambda _kind: files[kind]
     try:
         if plane:
@@ -1235,7 +1257,7 @@ def insert_picture(kind, plane=True, model=True):
             return tp.dialog_picture(tp.grab(panel))
         tp.camera("iso", 1.0)
         tp.wait(200)
-        return tp.with_dialog(tp.render(), tp.grab(panel))
+        return tp.with_dialog(tp.render(), panel_grab(panel))
     finally:
         insert_ui.FILE_PICKER = None
 
@@ -1258,7 +1280,7 @@ def insert_component():
     panel = tp.wait_for_panel()
     tp.camera("iso", 1.0)
     tp.wait(300)
-    return tp.with_dialog(tp.render(), tp.grab(panel))
+    return tp.with_dialog(tp.render(), panel_grab(panel))
 
 
 @picture("solid_insert_derive.png")
