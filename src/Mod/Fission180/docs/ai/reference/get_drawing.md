@@ -2,18 +2,21 @@
 
 <!-- Generated from the tool catalogue (src/Mod/Fission180/fission180/ai/catalog) by tools/fission180/make_ai_docs.py: do not edit by hand. The unit test test_ai_docs_contract.py fails when this file and the catalogue differ. -->
 
-Fusion: BROWSER > Drawings. Category: Drawings. Read-only. Needs a drawing.
+Fusion: BROWSER > Drawings (and what the sheets show). Category: Drawings. Read-only. Needs a drawing.
 
 ## What it does
 
-Describe drawings: each drawing's id, sheet, standard, units, title block values and views (id, kind, orientation, scale, position on the sheet, size) with their dimensions (value) and, with edges true, each view's elements (lines with ends, circles with centre and radius, in the view's own mm from its centre) for add_drawing_dimension.
+Describe drawings so you can check your work without a picture: each drawing's sheets (size, standard, units, title block) and on each: views (id, kind, orientation, scale, place and size on the sheet, label, style, what they show: bodies, flat pattern, storyboard; section line and depth, break, breakout, rotation), dimensions (type, value, the text written, what they measure), annotations (leaders, symbols, ordinates: kind and text), balloons (number, component), tables (rows), centre marks, centre lines. edges true: each view's lines, circles and points (view's own mm) for picks; with view, that view's only (a big assembly's edges run to 500 kB). picture true: a PNG of one sheet (frame, title block, views, dimensions, text) drawn from its DXF (about 15 s for an A2 sheet of a 1,000-face assembly).
 
 ## Arguments
 
 | Argument | Type | Unit | Default | Limits | Description |
 |---|---|---|---|---|---|
-| `drawing` | string |  |  |  | one drawing (default: all) |
+| `drawing` | string |  |  |  | one drawing or sheet (default: all) |
 | `edges` | boolean |  | `false` |  | list each view's lines and circles |
+| `view` | string |  |  |  | edges: only this view's (and its drawing) |
+| `picture` | boolean |  |  |  | a PNG of the sheet (the drawing's first, or the given sheet) |
+| `width` | integer |  | `1200` | >= 200, <= 4000 | picture width in pixels |
 
 ## Answer
 
@@ -54,23 +57,21 @@ The answer:
   {
    "id": "Drawing",
    "label": "Example Drawing",
+   "sheet_name": "Sheet 1",
    "standard": "ISO",
    "sheet": "A3",
    "units": "mm",
-   "sheet_size_mm": [
-    420.0,
-    297.0
-   ],
+   "sheet_size_mm": [420.0, 297.0],
    "title_block": {
     "ApprovedBy": "",
     "CheckedBy": "",
-    "Date": "2026-11-11",
+    "Date": "2026-11-13",
     "Description": "",
     "DrawnBy": "root",
     "Material": "Steel",
     "PartNumber": "Example",
     "Revision": "",
-    "Scale": "",
+    "Scale": "2:1",
     "Sheet": "1 / 1",
     "Size": "A3",
     "Title": "Example",
@@ -83,14 +84,11 @@ The answer:
      "kind": "BaseView",
      "orientation": "Front",
      "scale": 2.0,
-     "at": [
-      134.4,
-      172.26
-     ],
-     "half_size_mm": [
-      60.0,
-      10.0
-     ]
+     "scale_text": "2:1",
+     "at": [265.0, 216.5],
+     "half_size_mm": [60.0, 10.0],
+     "style": "Visible and Hidden Edges",
+     "shows": ["Body"]
     },
     {
      "id": "ProjectedView",
@@ -98,15 +96,13 @@ The answer:
      "kind": "ProjectedView",
      "orientation": "Front",
      "scale": 2.0,
-     "at": [
-      134.4,
-      77.22
-     ],
-     "half_size_mm": [
-      60.0,
-      40.0
-     ],
-     "parent": "BaseView"
+     "scale_text": "2:1",
+     "at": [265.0, 146.5],
+     "half_size_mm": [60.0, 40.0],
+     "style": "Visible and Hidden Edges",
+     "parent": "BaseView",
+     "direction": "Top",
+     "shows": ["Body"]
     },
     {
      "id": "ProjectedView001",
@@ -114,19 +110,31 @@ The answer:
      "kind": "ProjectedView",
      "orientation": "Front",
      "scale": 2.0,
-     "at": [
-      0.0,
-      172.26
-     ],
-     "half_size_mm": [
-... (10 more lines)
+     "scale_text": "2:1",
+     "at": [145.0, 216.5],
+     "half_size_mm": [40.0, 10.0],
+     "style": "Visible and Hidden Edges",
+     "parent": "BaseView",
+     "direction": "Right",
+     "shows": ["Body"]
+    }
+   ],
+   "annotations": [],
+   "sheets": [{"id": "Drawing", "name": "Sheet 1"}]
+  }
+... (2 more lines)
 ```
 
 ## More argument examples
 
 - views and their lines and circles:
   `{"edges": true}`
+- a picture of the sheet:
+  `{"picture": true, "width": 800}`
 
 ## See also
 
+- Recipe: [an assembly drawing with an exploded view, balloons and a parts list](fission180://docs/recipes/assembly-drawing.md)
+- Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)
+- Recipe: [a sheet metal drawing with the flat pattern, a bend table and bend notes](fission180://docs/recipes/sheet-metal-drawing.md)
 - [All tools](fission180://docs/tools.md), [the handbook](fission180://docs/handbook.md)

@@ -115,10 +115,12 @@ Done: AI: Extrude 5 mm. Its id is 'Extrude2'. Bodies now: Body1: 36446 mm3, 61.7
 
 ## See also
 
+- Recipe: [an assembly drawing with an exploded view, balloons and a parts list](fission180://docs/recipes/assembly-drawing.md)
 - Recipe: [L bracket with mounting holes](fission180://docs/recipes/bracket.md)
 - Recipe: [enclosure with a lid](fission180://docs/recipes/enclosure-with-lid.md)
 - Recipe: [lofted handle](fission180://docs/recipes/lofted-handle.md)
 - Recipe: [parametric mounting plate](fission180://docs/recipes/parametric-plate.md)
+- Recipe: [a fully dimensioned part drawing](fission180://docs/recipes/part-drawing.md)
 - Recipe: [rebuild a part that has no timeline (reverse engineering)](fission180://docs/recipes/reverse-engineer.md)
 - Recipe: [revolved knob with grip grooves](fission180://docs/recipes/revolved-knob.md)
 - Recipe: [stepped shaft with a keyway](fission180://docs/recipes/shaft-with-keyway.md)
