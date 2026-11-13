@@ -1,22 +1,25 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """The pictures of the DRAWING tab's tooltips (fission180/tips/drawing.py), made in the real
-Fission 180: a small design, a drawing of it, and each command's result on the sheet, before
-and after, with what the command drew in the selection blue.
+Fission 180 (wave 8, tips-sketch-drawing): a small design, a drawing of it, and each command's
+result on the sheet, before and after, with what the command drew in the selection blue.
 
-Run with tools/fission180/make_tip_pictures.sh drawing (inside FreeCAD's GUI under Xvfb).
+    tools/fission180/make_tip_pictures.sh drawing [picture ...]
 
-Each picture is a generator: the code up to its first `yield` sets the sheet up (the "before"
-panel), the code up to the second `yield` runs the command's own functions (the "after"
-panel); the runner waits for TechDraw to draw after each part. The sheet region a picture
-shows is `c.region` (page millimetres). Ink that is new in the after panel is tinted blue
-(what the command made); with `c.mark_before`, ink that the command takes away or moves is
-tinted blue in the before panel (what was picked)."""
+Each picture is a generator run by `make`: the code up to its first `yield` sets the sheet up
+(the "before" panel), the code up to the next `yield` runs what the command runs (the drawing
+modules' own functions: the same code as the command's dialog), and the app settles (TechDraw
+draws) at every `yield`. `yield "wait"` only lets TechDraw draw (a view's edges are named only
+once it has). The paper shown is where the sheet changed (`content_box`: the frame and the
+title block left out), or `c.region` (page millimetres) when a picture sets it. Ink that is new
+in the after panel is tinted the selection blue (what the command made); with `c.mark_before`
+ink the command takes away or moves is tinted in the before panel (what was picked); `c.marks`
+are the clicks, numbered, on the before panel. The dialogs (Title Block, the exports) are
+grabbed as Fission 180 shows them (tip_pictures.dialog_picture)."""
 
 import math
-import os
 
 import FreeCAD as App
-import FreeCADGui as Gui
+import tip_pictures as tp
 
 V = App.Vector
 BASE = (130.0, 200.0)  # where the plate's base view stands (its middle)
@@ -154,6 +157,7 @@ class Context:
         self.page = drawing.create_drawing(doc, sources, standard="ISO", units="mm", sheet="A3")
         self.region = None  # page mm; None: what changed, framed
         self.mark_before = False
+        self.single = False  # the after alone (wide)
         self.marks = []  # [(page point, "1")]: the clicks, drawn on the before panel
         doc.recompute()
 
@@ -283,7 +287,11 @@ def p_projected_view(c):
 
 def p_section_view(c):
     view = c.base()
-    c.marks = [(c.at(view, -20, 35), "1"), (c.at(view, -20, -35), "2"), ((BASE[0] + 85, BASE[1]), "3")]
+    c.marks = [
+        (c.at(view, -20, 35), "1"),
+        (c.at(view, -20, -35), "2"),
+        ((BASE[0] + 85, BASE[1]), "3"),
+    ]
     yield
     from fission180 import drawing
 
@@ -305,6 +313,7 @@ def p_detail_view(c):
 
 def p_break_view(c):
     view = c.base("Top", at=(170, 200), scale=1.0)
+    c.region = (170 - 84, 200 - 22, 170 + 84, 200 + 22)
     c.marks = [(c.at(view, -40, 0), "1"), (c.at(view, 40, 0), "2")]
     yield
     from fission180 import drawing
@@ -321,15 +330,16 @@ def p_breakout_view(c):
     yield
     from fission180 import drawing_breakout
 
-    drawing_breakout.add_breakout(view, pts)
+    drawing_breakout.add_breakout(view, pts, drawing_breakout.default_depth(view))
     c.doc.recompute()
     yield
 
 
 def p_exploded_view(c):
     from fission180 import animation, drawing_exploded
-    yield
+
     view = c.base("Home", at=(135, 205), scale=0.8)
+    yield
     name = animation.new_storyboard(c.doc)
     animation.auto_explode(c.doc, name, 5.0, trails=True)
     drawing_exploded.add_exploded(view, name)
@@ -343,20 +353,6 @@ def p_edit_view(c):
     from fission180 import drawing
 
     drawing.set_view_style(view, "Visible and Hidden Edges")
-    c.doc.recompute()
-    yield
-
-
-def p_title_block(c):
-    yield
-    from fission180 import drawing
-
-    drawing.set_title(
-        c.page,
-        {"Description": "Mounting plate", "PartNumber": "MP-001", "Revision": "B",
-         "DrawnBy": "A. Maker"},
-        by_hand=True,
-    )
     c.doc.recompute()
     yield
 
@@ -401,6 +397,7 @@ def p_delete(c):
 
 def p_centerline(c):
     view = c.base("Front", at=BASE, scale=1.5, style="Visible and Hidden Edges")
+    c.region = (BASE[0] - 26, BASE[1] - 22, BASE[0] + 26, BASE[1] + 22)
     yield
     from fission180 import drawing
 
@@ -440,7 +437,7 @@ def p_center_mark_pattern(c):
 def p_edge_extension(c):
     view = c.base()
     corner = c.at(view, 40.0, 25.0)
-    c.region = (corner[0] - 26, corner[1] - 24, corner[0] + 8, corner[1] + 8)
+    c.region = (corner[0] - 20, corner[1] - 20, corner[0] + 6, corner[1] + 6)
     yield
     from fission180 import drawing
 
@@ -482,7 +479,9 @@ def p_angular_dimension(c):
     yield
     from fission180 import drawing
 
-    bottom = c.edge(view, "line", lambda i: abs(i["p1"][1] - i["p2"][1]) < 1e-6 and i["p1"][1] < -10)
+    bottom = c.edge(
+        view, "line", lambda i: abs(i["p1"][1] - i["p2"][1]) < 1e-6 and i["p1"][1] < -10
+    )
     slant = c.edge(
         view,
         "line",
@@ -562,7 +561,10 @@ def p_ordinate_dimension(c):
     for centre in (HOLE1, HOLE2):
         top = (centre[0], centre[1] + R)
         drawing_annot.add_ordinate(
-            view, origin, c.anchor(view, c.circle(view, centre, R), top), "x",
+            view,
+            origin,
+            c.anchor(view, c.circle(view, centre, R), top),
+            "x",
             c.at(view, centre[0], 34.0),
         )
     c.doc.recompute()
@@ -637,13 +639,30 @@ def p_text(c):
     yield
 
 
+ASSEMBLY_AT = (110.0, 190.0)
+TABLE_AT = (165.0, 222.0)
+
+
+def _assembly_view(c):
+    return c.base("Home", at=ASSEMBLY_AT, scale=1.2)
+
+
+def _around_view(c, view, room=24.0):
+    """Frame the view and the balloons round it (not the parts list beside it)."""
+    from fission180 import drawing
+
+    x0, y0, x1, y1 = drawing.view_rect(view)
+    c.region = (x0 - room, y0 - room, x1 + room, y1 + room)
+
+
 def _parts_list(balloons):
     def picture(c):
-        view = c.base("Home", at=(120, 205), scale=0.9)
+        view = _assembly_view(c)
+        c.single = True  # the parts list is wide: the after alone, the whole picture
         yield
         from fission180 import drawing
 
-        drawing.add_parts_list(c.page, view, (170, 240), balloons=balloons)
+        drawing.add_parts_list(c.page, view, TABLE_AT, balloons=balloons)
         c.doc.recompute()
         yield
 
@@ -657,10 +676,12 @@ p_parts_list = _parts_list(True)
 def p_balloon(c):
     from fission180 import drawing
 
-    view = c.base("Home", at=(120, 205), scale=0.9)
-    drawing.add_parts_list(c.page, view, (170, 240), balloons=False)
+    view = _assembly_view(c)
+    yield "wait"
+    drawing.add_parts_list(c.page, view, TABLE_AT, balloons=False)
     c.doc.recompute()
-    yield
+    _around_view(c, view)
+    yield "before"
     rows = drawing.parts_rows_for(view)
     drawing.add_row_balloons(view, rows)
     c.doc.recompute()
@@ -670,11 +691,14 @@ def p_balloon(c):
 def p_renumber(c):
     from fission180 import drawing, drawing_tools
 
-    view = c.base("Home", at=(120, 205), scale=0.9)
-    drawing.add_parts_list(c.page, view, (170, 240), balloons=True)
+    view = _assembly_view(c)
+    yield "wait"
+    drawing.add_parts_list(c.page, view, TABLE_AT, balloons=True)
     c.doc.recompute()
-    yield
-    balloons = drawing_tools.balloons_of(c.page)
+    _around_view(c, view)
+    c.mark_before = True
+    yield "before"
+    balloons = sorted(drawing_tools.balloons_of(c.page), key=lambda b: str(b.Text))
     if balloons:
         drawing_tools.renumber(c.page, balloons[-1], 1)
     c.doc.recompute()
@@ -684,13 +708,16 @@ def p_renumber(c):
 def p_align_balloons(c):
     from fission180 import drawing, drawing_tools
 
-    view = c.base("Home", at=(120, 205), scale=0.9)
-    drawing.add_parts_list(c.page, view, (170, 240), balloons=True)
+    view = _assembly_view(c)
+    yield "wait"
+    drawing.add_parts_list(c.page, view, TABLE_AT, balloons=True)
     c.doc.recompute()
+    _around_view(c, view, room=30.0)
     c.mark_before = True
-    yield
+    yield "before"
     balloons = drawing_tools.balloons_of(c.page)
-    drawing_tools.align_balloons(balloons, (60.0, 250.0))
+    x0, _y0, _x1, y1 = drawing.view_rect(view)
+    drawing_tools.align_balloons(balloons, (x0 - 12.0, y1 + 10.0))
     c.doc.recompute()
     yield
 
@@ -698,6 +725,7 @@ def p_align_balloons(c):
 def _flat(make):
     def picture(c):
         view = c.base("Top", at=(140, 190), scale=1.0)
+        c.single = make == "table"  # the table stands at the sheet's top left: the after alone
         yield
         from fission180 import flatpattern_drawing as fpd
 
@@ -730,7 +758,6 @@ PICTURES = {
     "Fission180_DrawingBreakoutView": ("block", p_breakout_view),
     "Fission180_DrawingExplodedView": ("assembly", p_exploded_view),
     "Fission180_DrawingEditView": ("block", p_edit_view),
-    "Fission180_DrawingTitleBlock": ("plate", p_title_block),
     "Fission180_DrawingMove": ("plate", p_move),
     "Fission180_DrawingRotate": ("plate", p_rotate),
     "Fission180_DrawingDelete": ("plate", p_delete),
@@ -766,9 +793,8 @@ PICTURES = {
 
 # ---------------------------------------------------------------------------------- the sheet
 SELECT_BLUE = (59, 91, 219)  # Fission 180's selection colour (sketch_mode.SELECT)
-RES = 4.0  # pixels per millimetre of the whole-sheet grabs (cropped and scaled down later)
+RES = 6.0  # pixels per millimetre of the whole-sheet grabs (cropped and scaled down later)
 MARGIN = 6.0  # millimetres of paper round what a picture shows
-PANEL = (146, 176)
 
 
 def grab_page(page):
@@ -789,6 +815,36 @@ def grab_page(page):
     gv.scene().clearSelection()
     source = QtCore.QRectF(0, -height * r, width * r, height * r)
     gv.scene().render(painter, QtCore.QRectF(0, 0, image.width(), image.height()), source)
+    # plain paper round the views: the frame, its zone marks and the title block are left
+    # out (a picture shows what the command does; the title block has its own picture)
+    from fission180 import drawing_core as core
+
+    standard, sheet = drawing.standard_of(page), drawing.sheet_of(page)
+    fx0, fy0, fx1, fy1 = core.frame_rect(standard, sheet)
+    tx0, ty0, tx1, ty1 = core.title_block_rect(standard, sheet)
+    painter.setPen(QtCore.Qt.NoPen)
+    painter.setBrush(QtGui.QColor("#ffffff"))
+    inset = 0.8
+    path = QtGui.QPainterPath()
+    path.addRect(QtCore.QRectF(0, 0, image.width(), image.height()))
+    inside = QtGui.QPainterPath()
+    inside.addRect(
+        QtCore.QRectF(
+            (fx0 + inset) * RES,
+            (height - fy1 + inset) * RES,
+            (fx1 - fx0 - 2 * inset) * RES,
+            (fy1 - fy0 - 2 * inset) * RES,
+        )
+    )
+    painter.drawPath(path.subtracted(inside))
+    painter.drawRect(
+        QtCore.QRectF(
+            (tx0 - inset) * RES,
+            (height - ty1 - inset) * RES,
+            (tx1 - tx0 + 2 * inset) * RES,
+            (ty1 - ty0 + 2 * inset) * RES,
+        )
+    )
     painter.end()
     return image
 
@@ -882,26 +938,41 @@ def crop(image, page, region, size):
 
 
 def tint_new(base, other):
-    """`base` with the ink it has and `other` has not tinted SELECT_BLUE (anti-aliased)."""
+    """`base` with the ink it has and `other` has not drawn in SELECT_BLUE: anti-aliased, and a
+    thin new line (a centre line, a cosmetic line of 0.13 mm) widened by a pixel so that it
+    reads at the picture's size, as the helpers draw highlighted edges thicker."""
     from PySide import QtGui
 
+    w, h = base.width(), base.height()
+    grey_a, line_a = _grey(base, w, h)
+    grey_b, line_b = _grey(other, w, h)
+    new = [0.0] * (w * h)
+    for y in range(h):
+        ra, rb = y * line_a, y * line_b
+        for x in range(w):
+            gain = (grey_b[rb + x] - grey_a[ra + x]) / 255.0  # darker now: new ink
+            if gain > 0.08:
+                new[y * w + x] = gain
     out = QtGui.QImage(base)
-    for y in range(base.height()):
-        for x in range(base.width()):
-            a = QtGui.QColor(base.pixel(x, y))
-            b = QtGui.QColor(other.pixel(x, y))
-            ink = 1.0 - a.lightnessF()
-            if ink - (1.0 - b.lightnessF()) > 0.08:
-                k = min(1.0, ink * 1.3)
-                out.setPixel(
-                    x,
-                    y,
-                    QtGui.qRgb(
-                        int(255 + (SELECT_BLUE[0] - 255) * k),
-                        int(255 + (SELECT_BLUE[1] - 255) * k),
-                        int(255 + (SELECT_BLUE[2] - 255) * k),
-                    ),
-                )
+    for y in range(h):
+        for x in range(w):
+            centre = new[y * w + x]
+            near = 0.0
+            for dy in (-1, 0, 1):
+                yy = y + dy
+                if 0 <= yy < h:
+                    for dx in (-1, 0, 1):
+                        xx = x + dx
+                        if 0 <= xx < w and new[yy * w + xx] > near:
+                            near = new[yy * w + xx]
+            k = min(1.0, max(centre * 2.2, near * 0.9))
+            if k <= 0.0:
+                continue
+            old = QtGui.QColor(base.pixel(x, y))
+            r = old.red() + (SELECT_BLUE[0] - old.red()) * k
+            g = old.green() + (SELECT_BLUE[1] - old.green()) * k
+            b = old.blue() + (SELECT_BLUE[2] - old.blue()) * k
+            out.setPixel(x, y, QtGui.qRgb(int(r), int(g), int(b)))
     return out
 
 
@@ -929,117 +1000,188 @@ def draw_marks(image, to_px, marks):
 
 
 # ---------------------------------------------------------------------------------- the runner
-def _compose_plain(before, after):
-    """Before | arrow | after on Fission 180's dark background, 320 x 200 (stand-in until
-    tip_pictures' own side-by-side is used)."""
-    from PySide import QtCore, QtGui
-
-    image = QtGui.QImage(320, 200, QtGui.QImage.Format_ARGB32)
-    image.fill(QtGui.QColor("#2a2a2a"))
-    painter = QtGui.QPainter(image)
-    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-    top = (200 - PANEL[1]) // 2
-    painter.drawImage(QtCore.QPointF(6, top), before)
-    painter.drawImage(QtCore.QPointF(320 - 6 - PANEL[0], top), after)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(QtGui.QColor("#3fa9f5"))
-    cx, cy = 160.0, 100.0
-    arrow = QtGui.QPolygonF(
-        [QtCore.QPointF(cx - 6, cy - 7), QtCore.QPointF(cx + 6, cy), QtCore.QPointF(cx - 6, cy + 7)]
-    )
-    painter.drawPolygon(arrow)
-    painter.end()
-    return image
+LABELS = ("Before", "After")
+LABEL_ROOM = 16  # pixels under the paper for the "Before" / "After" captions
 
 
-MOST_YIELDS = 4  # wait / before / wait / after at most
+def paper_before_after(before, after):
+    """Two pieces of paper (QImages of PAPER size) side by side on the view's dark grey, the
+    helpers' arrow between them and their captions under them (tip_pictures.before_after's
+    layout, for sheets instead of renders)."""
+    from PIL import Image
 
-
-def steps(out_dir, only=None, compose=None, save=None):
-    """Harness steps that make every picture (or those in `only`) into out_dir."""
-    from fission180 import drawing, drawing_ui
-
-    compose = compose or _compose_plain
-    docs = {}
-
-    def design(name):
-        if name not in docs or docs[name][0] not in App.listDocuments().values():
-            doc = App.newDocument("Tips_" + name)
-            made = DESIGNS[name](doc)
-            doc.recompute()
-            sources = [made] if name == "flat" else drawing.design_bodies(doc)
-            docs[name] = (doc, sources)
-        return docs[name]
-
-    out = []
-    for command, (design_name, picture) in PICTURES.items():
-        if only and command not in only:
-            continue
-        state = {"grabs": 0}
-        short = command.replace("Fission180_Drawing", "")
-
-        def setup(design_name=design_name, picture=picture, state=state):
-            doc, sources = design(design_name)
-            App.setActiveDocument(doc.Name)
-            c = Context(doc, sources)
-            drawing_ui.open_drawing(c.page)
-            state["c"] = c
-            state["gen"] = picture(c)
-
-        setup.done = lambda state=state: drawing_ui.page_widget() is not None
-        setup.done_what = "the drawing's tab is shown"
-        setup.__name__ = short + "_setup"
-        out.append(setup)
-        for i in range(MOST_YIELDS + 1):
-
-            def advance(command=command, state=state, first=(i == 0)):
-                if state.get("finished"):
-                    return
-                c = state["c"]
-                if first:
-                    state["empty"] = grab_page(c.page)
-                else:
-                    label = state["label"] or ("before" if state["grabs"] == 0 else "after")
-                    if label == "before":
-                        state["before"] = grab_page(c.page)
-                        state["grabs"] += 1
-                    elif label == "after":
-                        _finish(command, c, state, compose, save, out_dir)
-                        state["grabs"] += 1
-                try:
-                    state["label"] = next(state["gen"])
-                    c.style()
-                except StopIteration:
-                    state["finished"] = True
-                    c.done()
-
-            advance.__name__ = "%s_%d" % (short, i)
-            out.append(advance)
+    out = Image.new("RGB", tp.SIZE, tp.BACKGROUND)
+    left, right = tp.to_pil(before), tp.to_pil(after)
+    top = (tp.SIZE[1] - LABEL_ROOM - PAPER[1]) // 2
+    out.paste(left, (0, top))
+    out.paste(right, (tp.SIZE[0] - PAPER[0], top))
+    tp.arrow(out, PAPER[0] + 6, tp.SIZE[0] - PAPER[0] - 6, top + PAPER[1] // 2)
+    for x, words in ((PAPER[0] // 2, LABELS[0]), (tp.SIZE[0] - PAPER[0] // 2, LABELS[1])):
+        tp.text(out, (x, tp.SIZE[1] - 5), words, px=11, anchor="mb")
     return out
 
 
-def _finish(command, c, state, compose, save, out_dir):
+PAPER = ((tp.SIZE[0] - tp.GAP) // 2, tp.SIZE[1] - LABEL_ROOM - 4)  # (145, 180)
+
+
+def paper_alone(image):
+    """One piece of paper as the whole picture, on the view's dark grey."""
+    from PIL import Image
+
+    out = Image.new("RGB", tp.SIZE, tp.BACKGROUND)
+    paper = tp.to_pil(image)
+    out.paste(paper, ((tp.SIZE[0] - paper.width) // 2, (tp.SIZE[1] - paper.height) // 2))
+    return out
+
+
+def make(design_name, picture):
+    """One picture: a new design with the demo part, a drawing of it, the picture's own
+    steps (its generator), the sheet grabbed empty, before and after."""
+    from fission180 import drawing, drawing_ui
+
+    doc = tp.new_design("Demo")
+    made = DESIGNS[design_name](doc)
+    doc.recompute()
+    tp.settle()
+    sources = [made] if design_name == "flat" else drawing.design_bodies(doc)
+    c = Context(doc, sources)
+    drawing_ui.open_drawing(c.page)
+    tp.wait_for(lambda: drawing_ui.page_widget() is not None, "the drawing's tab")
+    tp.settle()
+    empty = grab_page(c.page)
+    before = None
+    result = None
+    grabs = 0
+    for label in picture(c):
+        c.style()
+        tp.settle()
+        label = label or ("before" if grabs == 0 else "after")
+        if label == "before":
+            before = grab_page(c.page)
+            grabs += 1
+        elif label == "after":
+            result = _finish(c, empty, before)
+            grabs += 1
+    if result is None:
+        raise RuntimeError("the picture never reached its after")
+    return result
+
+
+def _finish(c, empty, before):
     after = grab_page(c.page)
-    before = state["before"]
+    if c.single:
+        size = (tp.SIZE[0] - 8, tp.SIZE[1] - 8)
+        box = c.region or content_box(c.page, empty, [after])
+        last, _to_px = crop(after, c.page, fit_region(box, size), size)
+        return paper_alone(tint_new(last, crop(before, c.page, fit_region(box, size), size)[0]))
     if c.region:
-        region = fit_region(c.region, PANEL)
+        region = fit_region(c.region, PAPER)
     else:
-        box = content_box(c.page, state["empty"], [before, after], [p for p, _ in c.marks])
-        region = fit_region(box, PANEL)
-    first, to_px = crop(before, c.page, region, PANEL)
-    last, _to_px = crop(after, c.page, region, PANEL)
+        box = content_box(c.page, empty, [before, after], [p for p, _ in c.marks])
+        region = fit_region(box, PAPER)
+    first, to_px = crop(before, c.page, region, PAPER)
+    last, _to_px = crop(after, c.page, region, PAPER)
     shown_before = tint_new(first, last) if c.mark_before else first
     shown_before = draw_marks(shown_before, to_px, c.marks)
     shown_after = tint_new(last, first)
-    picture = compose(shown_before, shown_after)
-    path = os.path.join(out_dir, _picture_name(command))
-    if save is not None:
-        save(picture, path)
-    else:
-        picture.save(path)
+    return paper_before_after(shown_before, shown_after)
 
 
-def _picture_name(command):
+def _register():
     from fission180.tips import drawing as data
 
-    return data.TIPS[command]["picture"]
+    for command, (design_name, function) in PICTURES.items():
+
+        def picture_function(design_name=design_name, function=function):
+            return make(design_name, function)
+
+        picture_function.__name__ = function.__name__
+        tp.picture(data.TIPS[command]["picture"])(picture_function)
+
+
+_register()
+
+
+# ---------------------------------------------------------------------------------- dialogs
+def _drawing_open(design_name="plate", furnish=None):
+    """A design, its drawing open in its tab with a base view (and `furnish(c, view)`)."""
+    from fission180 import drawing, drawing_ui
+
+    doc = tp.new_design("Demo")
+    DESIGNS[design_name](doc)
+    doc.recompute()
+    tp.settle()
+    c = Context(doc, drawing.design_bodies(doc))
+    drawing_ui.open_drawing(c.page)
+    tp.wait_for(lambda: drawing_ui.page_widget() is not None, "the drawing's tab")
+    view = c.base("Home" if design_name == "assembly" else "Top", scale=1.0)
+    tp.settle()
+    if furnish is not None:
+        furnish(c, view)
+        c.doc.recompute()
+        tp.settle()
+    return c
+
+
+def _shown_dialog(open_it):
+    """A dialog the command shows (not modal): opened, drawn, grabbed, closed."""
+    dialog = open_it()
+    if dialog is None:
+        raise RuntimeError("the command opened no dialog")
+    tp.wait_for(lambda: dialog.isVisible(), "the dialog to show")
+    tp.settle()
+    image = tp.grab(dialog)
+    dialog.reject()
+    return image
+
+
+@tp.picture("drawing_title_block.png")
+def title_block():
+    _drawing_open()
+    tp.run_command("Fission180_DrawingTitleBlock")
+    panel_widget = tp.wait_for_panel()
+    from fission180 import taskui
+
+    panel = taskui.current()
+    for key, text in (("Description", "Mounting plate"), ("DrawnBy", "A. Maker")):
+        field = getattr(panel, "fields", {}).get(key)
+        if field is not None:
+            field.setText(text)
+    tp.settle()
+    return tp.dialog_picture(tp.grab(panel_widget))
+
+
+def _export_picture(open_it, furnish=None, design_name="plate"):
+    _drawing_open(design_name, furnish)
+    return tp.dialog_picture(_shown_dialog(open_it))
+
+
+@tp.picture("drawing_export_pdf.png")
+def export_pdf():
+    from fission180 import drawing_ui
+
+    return _export_picture(lambda: drawing_ui.export("pdf"))
+
+
+@tp.picture("drawing_export_dxf.png")
+def export_dxf():
+    from fission180 import drawing_ui
+
+    return _export_picture(lambda: drawing_ui.export("dxf"))
+
+
+@tp.picture("drawing_export_dwg.png")
+def export_dwg():
+    from fission180 import drawing_export_ui
+
+    return _export_picture(drawing_export_ui.export_dwg)
+
+
+@tp.picture("drawing_export_csv.png")
+def export_csv():
+    from fission180 import drawing, drawing_export_ui
+
+    def parts_list(c, view):
+        drawing.add_parts_list(c.page, view, (170, 240), balloons=False)
+
+    return _export_picture(drawing_export_ui.export_csv, parts_list, "assembly")
