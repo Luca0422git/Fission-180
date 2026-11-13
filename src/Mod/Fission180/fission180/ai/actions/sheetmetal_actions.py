@@ -67,12 +67,47 @@ def sheet_metal_rule(ctx, args):
 
     doc = ctx.need_doc()
     name = args["rule"].strip()
+    before = _broken(doc)
+    if args.get("delete"):  # (wave 8, ai-workspaces: the Sheet Metal Rules dialog's Delete)
+        return _delete_sheet_rule(ctx, doc, name, before)
     step = {"op": "sf_sheet_rule", "name": name}
     for key in ("from", "set", "active"):
         if key in args:
             step[key] = args[key]
-    before = _broken(doc)
-    _run_step(ctx, ctx.builder(doc), step)
+    if args.get("bodies"):  # (wave 8: a body's rule swapped, as the Flange dialog's list does)
+        targets = [ctx.body_of(b) for b in args["bodies"]]
+        not_sheet = [b.Label for b in targets if not sheetmetal.is_sheet_metal_body(b)]
+        if not_sheet:
+            raise UserError(
+                "%s %s not sheet metal: convert_to_sheet_metal or a flange makes sheet metal."
+                % (", ".join(not_sheet), "is" if len(not_sheet) == 1 else "are")
+            )
+        builder = ctx.builder(doc)
+        if not ({"from", "set", "active"} & set(args)) and sheetmetal.find_rule(doc, name) is None:
+            from ... import sheetmetal_rules as rules
+
+            if rules.find_library_rule(name) is None:
+                raise UserError(
+                    "There is no rule %r in the design or the library: %s."
+                    % (name, ", ".join(r["name"] for r in sheetmetal.design_rules(doc)))
+                )
+
+        def work():
+            from ... import sheetmetal_rules as rules
+
+            if {"from", "set", "active"} & set(args):
+                builder.run(step)
+            for body in targets:
+                rules.set_body_rule(body, name)
+
+        from ..ops.core import BuildError
+
+        try:
+            ctx.change(work)
+        except (BuildError, ValueError) as exc:
+            raise UserError("Not done (%s): %s." % (ctx.title, _clean(_plain(exc)).rstrip(".")))
+    else:
+        _run_step(ctx, ctx.builder(doc), step)
     data = {
         "rule": sheet_rule_row(sheetmetal.find_rule(doc, name) or {"name": name}),
         "active_rule": sheetmetal.active_rule_name(doc),
@@ -81,6 +116,29 @@ def sheet_metal_rule(ctx, args):
             {"id": b.Name, "label": b.Label, "rule": sheetmetal.body_rule_name(b)}
             for b in sheetmetal.sheet_metal_bodies(doc)
         ],
+    }
+    return json_result(data, _done(ctx, doc, before), compact=True)
+
+
+def _delete_sheet_rule(ctx, doc, name, before):
+    """The Sheet Metal Rules dialog's Delete of a design rule: refused (with the reason) while
+    a body follows it, for the active rule and for the design's last rule."""
+    from ... import sheetmetal
+    from ... import sheetmetal_rules as rules
+
+    if sheetmetal.find_rule(doc, name) is None:
+        raise UserError(
+            "The design has no rule %r: its rules are %s."
+            % (name, ", ".join(r["name"] for r in sheetmetal.design_rules(doc)) or "none")
+        )
+    try:
+        ctx.change(lambda: rules.delete_design_rule(doc, name))
+    except ValueError as exc:
+        raise UserError("Not done: %s" % str(exc).rstrip("."))
+    data = {
+        "deleted": name,
+        "active_rule": sheetmetal.active_rule_name(doc),
+        "design_rules": [r["name"] for r in sheetmetal.design_rules(doc)],
     }
     return json_result(data, _done(ctx, doc, before), compact=True)
 
@@ -111,9 +169,7 @@ def flat_facts(fp):
         "body": body.Name if body is not None else None,
         "stationary_face": fp.Face,
         "flat_size_mm": [_r(box.XLength, 4), _r(box.YLength, 4)],
-        "bbox_mm": [
-            _r(v, 4) for v in (box.XMin, box.YMin, box.ZMin, box.XMax, box.YMax, box.ZMax)
-        ],
+        "bbox_mm": [_r(v, 4) for v in (box.XMin, box.YMin, box.ZMin, box.XMax, box.YMax, box.ZMax)],
         "thickness_mm": _r(float(fp.Thickness), 4),
         "k_factor": _r(fp.KFactor, 4),
         "volume_mm3": _r(solid.Volume, 4),
@@ -214,9 +270,7 @@ def plastic_rule_row(rule):
     row = {key: rule.get(key) for key in core.FIELDS}
     try:
         values = core.evaluated(rule)
-        row["values"] = {
-            key: _r(values[key]) for key in core.LENGTH_FIELDS + core.NUMBER_FIELDS
-        }
+        row["values"] = {key: _r(values[key]) for key in core.LENGTH_FIELDS + core.NUMBER_FIELDS}
     except ValueError as exc:
         row["problem"] = str(exc)
     return row

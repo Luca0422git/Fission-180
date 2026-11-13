@@ -45,6 +45,9 @@ from . import sheetmetal_tools  # noqa: F401  (the SHEET METAL tab)
 from . import plastic_tools  # noqa: F401  (the PLASTIC tab)
 from . import manufacture_tools  # noqa: F401  (the MANUFACTURE workspace, wave 7)
 from . import animation_tools  # noqa: F401  (the ANIMATION workspace, wave 7)
+
+# wave 8, ai-workspaces
+from . import make_tools  # noqa: F401,E402  (UTILITIES > MAKE: 3D Print, Export Everything)
 from .kit import (  # noqa: F401  (the shared texts, re-exported)
     BODY_PICK_HELP,
     CURVES_HELP,

@@ -36,3 +36,5 @@ from . import animation_actions  # noqa: E402,F401  (the ANIMATION workspace, wa
 
 # wave 8, ai-behaviour
 from . import approach_actions  # noqa: E402,F401  (plan_approach, ask_person, show_workspace)
+# wave 8, ai-workspaces
+from . import make_actions  # noqa: E402,F401  (UTILITIES > MAKE: 3D Print, Export Everything)

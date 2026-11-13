@@ -397,3 +397,100 @@ define(
         ),
     ],
 )
+
+
+# == wave 8, ai-workspaces: VIEW and the timeline's own edits ===================================
+VIEW_NAMES = ("iso", "front", "back", "top", "bottom", "left", "right")  # (render_core.VIEW_NAMES)
+
+
+def _extra_view(args, problems):
+    if "direction" in args and "view" in args:
+        problems.append("give view (a standard view) or direction, not both")
+    for key in ("direction", "up"):
+        if key in args and not any(abs(c) > 1e-12 for c in args[key]):
+            problems.append("%s must not be [0, 0, 0]" % key)
+
+
+define(
+    "anim_view",
+    "View action",
+    "animation",
+    "ANIMATION > VIEW > View",
+    "Record a camera move on a storyboard (what Fusion's View records while a person orbits "
+    "and zooms): the camera ends at `at` looking from view (iso, Fusion's Home: from the "
+    "front, right and top; front, back, top, bottom, left, right) or from direction [x, y, z], "
+    "with up the screen's up, and turns, pans and zooms smoothly from where it was. It fits "
+    "the components shown at that time (of: fit these instead); zoom 2 is twice as close; "
+    "perspective true for a perspective camera (orthographic by default). at 0: the "
+    "storyboard just starts with this view. A storyboard without a view yet starts from the "
+    "window's (iso without the window). Publish Video follows these views. Answers the "
+    "action and the camera. " + BOARD_HELP + BASICS,
+    schema(
+        {
+            "storyboard": _board(),
+            "at": _at(),
+            "view": enum(VIEW_NAMES, "a standard view", default="iso"),
+            "direction": vector3("[x, y, z] where the camera looks from (instead of view)"),
+            "up": vector3("[x, y, z] the screen's up (default: the view's own, Z up)"),
+            "of": step_ids("fit these components (default: all that are shown)"),
+            "zoom": positive("how close: 1 fits them, 2 twice as close", default=1.0),
+            "perspective": boolean("a perspective camera", default=False),
+        },
+        ["at"],
+    ),
+    extra=_extra_view,
+    needs=("design",),
+    own_id=False,
+    title_fn=lambda a: "AI: View",
+    examples=[
+        example({"at": 0, "view": "iso"}, "the storyboard starts from the Home view"),
+        example({"at": 3, "view": "front", "zoom": 1.5}, "turn to the front view by 3 s"),
+        example({"at": 6, "of": ["Wheel"], "zoom": 2}, "close in on the wheel by 6 s"),
+    ],
+)
+
+
+def _extra_action(args, problems):
+    if args.get("delete") and any(k in args for k in ("start", "end", "shift")):
+        problems.append("delete takes no start, end or shift")
+    if not args.get("delete") and not any(k in args for k in ("start", "end", "shift")):
+        problems.append("give start / end (seconds), shift (seconds) or delete true")
+    if "shift" in args and any(k in args for k in ("start", "end")):
+        problems.append("give start / end or shift, not both")
+
+
+define(
+    "anim_action",
+    "Edit animation actions",
+    "animation",
+    "ANIMATION > ANIMATION TIMELINE > action > Edit Start/End, drag, Delete",
+    "Change actions already on a storyboard, as the ANIMATION TIMELINE does with its bars: "
+    "start / end (seconds; Edit Start/End: one action), shift (seconds, a drag: every action "
+    "named moves, its length kept, never before 0) or delete true. actions: the ids "
+    "anim_storyboards lists (the recording tools answer them too). A transform or view needs "
+    "at least 0.1 s; a callout's end may be null (shown to the end). Answers the actions' new "
+    "times and the storyboard's length. " + BOARD_HELP + BASICS,
+    schema(
+        {
+            "storyboard": _board(),
+            "actions": array(integer("an action's id", minimum=1), "the actions to change", 1),
+            "start": number("Edit Start/End: when it starts (s)", minimum=0),
+            "end": {
+                "type": ["number", "null"],
+                "description": "when it ends (s; null: a callout to the end)",
+            },
+            "shift": number("move the actions this many seconds later (negative: earlier)"),
+            "delete": boolean("delete the actions", default=False),
+        },
+        ["actions"],
+    ),
+    extra=_extra_action,
+    needs=("design",),
+    own_id=False,
+    title_fn=lambda a: "AI: %s animation action" % ("Delete" if a.get("delete") else "Edit"),
+    examples=[
+        example({"actions": [1], "start": 1, "end": 4}, "the action runs from 1 s to 4 s"),
+        example({"actions": [2, 3], "shift": 2}, "two actions 2 s later"),
+        example({"actions": [4], "delete": True}, "delete an action"),
+    ],
+)
