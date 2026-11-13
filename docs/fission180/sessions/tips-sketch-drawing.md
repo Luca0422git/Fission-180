@@ -58,7 +58,7 @@ pictures and the scripts that make them.
 
 - Making the pictures (make_tip_pictures.sh, sandbox, 4 CPUs shared with nine builders):
   SKETCH 58 in about 4.5 min (4.3 to 4.7 s each: two sketches, eight renders), DRAWING 43 in
-  2.3 min (2.0 to 5.9 s each; the sheet grabs and the tint in pure Python are about 0.3 s of
+  2.1 min (1.9 to 5.0 s each; the sheet grabs and the tint in pure Python are about 0.3 s of
   that), UTILITIES 22 in about 1 min (1.2 to 5.7 s; Compare with Reference is the
   slowest: a real STEP import, a rebuild started, two AI tool calls, a compare).
 - The pictures are 1.3 MB together (SKETCH 0.44 MB, DRAWING 0.30 MB, UTILITIES 0.52 MB); the
