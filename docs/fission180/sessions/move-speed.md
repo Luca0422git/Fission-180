@@ -56,16 +56,22 @@ scratch experiments that timed every object a recompute rebuilt (a document obse
    Create Copy copied the solid at every rebuild and its new body's first step drew the copy
    again (1.3 s of a 2.6 s rebuild on the Relic-like part).
 
-What a release costs now, per object (`.scratch` experiment `exp_multi`, the second drag of a
-dialog, seconds):
+What a release costs, per object rebuilt (seconds; scratch experiment `exp_multi`: a
+document observer's `slotRecomputedObject` times, the dialog's own release path run directly):
 
-| case | Move step(s) | body rebuild (FreeCAD's own drawing of the body, 2.) | total |
+| case | the Move step: 1st release (its first drawing) / 2nd | the body's own drawing (2.) | whole release: 1st / 2nd |
 |---|---:|---:|---:|
-| 3,000-face solid | 0.11 | 7.54 | 7.72 |
-| 8,500-triangle solid | 0.30 | 1.30 | 1.75 |
-| Relic-like (600 faces, 33 steps) | 0.15 | 1.10 | 1.28 |
-| the three bodies at once | 0.42 | 0.00 + 7.59 + 1.39 | 9.63 |
-| Relic-like, Create Copy (before the Copy change) | 0.58 copy + 0.81 new body's step | 1.17 | 2.65 |
+| 3,000-face solid | 8.02 / 0.04 | 8.45 / 7.23 | 16.5 / 7.3 |
+| Relic-like (600 faces, 33 steps) | 0.60 / 0.11 | 0.84 / 0.90 | 1.47 / 1.02 |
+| 8,500-triangle solid (bce262e4, 2nd release) | - / 0.30 | 1.30 | - / 1.75 |
+| the three bodies at once (bce262e4, 2nd release) | - / 0.42 | 0.00 + 7.59 + 1.39 | - / 9.63 |
+| Relic-like, Create Copy (bce262e4) | 0.58 copy + 0.81 new body's step | 1.17 | 2.65 |
+
+Python's own share of a release is now a few hundredths of a second. The rest is FreeCAD
+meshing the solid: once for the new step's first drawing (cause 3.) and once for the body's
+own hidden drawing (cause 2.). The scenario's release times are about 0.5 s longer than the
+direct path. They include the rebuild timer, the browser and timeline reading the change, and
+the scenario's own look for the result.
 
 ## What changed
 
@@ -146,6 +152,22 @@ Copy, `_rotate` Rotate about the Z axis, `_p2p` Point to Point (two clicks),
 | dense | 15,381 → 108 | - → 64 | - → 77 | 0 of 9 → 15 of 16 | 538 → 51 | 15,533 → 49 | 523 → 16,811 | 16,739 → 16,888 |
 | faceted | 4,874 → 148 | - → 27 | - → 33 | 0 of 21 → 36 of 37 | 617 → 17 | 4,512 → 25 | 542 → 3,426 | 5,808 → 3,458 |
 | multi | 23,401 → 183 | - → 57 | - → 60 | 0 of 12 → 18 of 19 | 621 → 31 | 21,614 → 55 | 672 → 20,708 | 23,091 → 20,792 |
+
+**Luca's Relic file** (his own design, opened read-only from a scratch copy and never
+saved; `FISSION180_MOVE_SPEED_FILE`; its biggest body, 611 faces, X arrow 60 mm, then again
+in the same dialog; Cancel):
+
+| case | open | frame step median | step p90 | frames showing the body move | lag median | caught up | release | hand stop to exact result |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Relic, 1st drag | 6,556 → 1,655 (the dialog itself: 136, below) | - → 37 | - → 41 | 0 of 24 → 26 of 27 | 526 → 29 | 4,382 → 32 | 509 → 2,359 | 5,567 → 2,396 |
+| Relic, 2nd drag | | - → 45 | - → 50 | 0 of 21 → 22 of 23 | 528 → 33 | 4,638 → 37 | 564 → 2,032 | 5,879 → 2,076 |
+
+Profiled (`exp_open` on the file): pressing M on the Relic file now takes 0.14 s for the dialog
+itself. The other 1.6 s of the scenario's "open" is a timeline job left over from opening the
+design. `timeline_ops.settle` → `sketch_auto_project.follow_all` → `hole.earliest_face`
+(1.5 s) ran while the key was handled. It is not part of Move. (The scenario's file case also
+fails its generic "No errors after file_open_design" check, before and after: the file's own
+sketches report broken expressions when it is opened.)
 
 Frames: the work for the mouse between two frames (Fission 180's and FreeCAD's, the drawing
 left out) went from 10-44 ms to 4-8 ms (median); the rest of each frame is software OpenGL
