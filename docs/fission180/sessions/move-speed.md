@@ -110,7 +110,62 @@ Second run:
 
 ## Before / after
 
-(filled in below)
+Scenario `move_speed`, the same scenario file and probe on both: "before" is the code of the
+brief's commit 6fe37f27 (a copy in the worktree's ignored `.scratch/before`, run with
+`FISSION180_MODULE`), "after" is this branch. This sandbox: 4 shared CPUs (load 1.0-2.0),
+Xvfb with software OpenGL, so a frame's drawing alone takes 15-60 ms (a graphics card: 1-5 ms).
+Milliseconds. Cases: `box` 40 x 30 x 10; `relic` a part like Luca's Relic (599 faces, 33
+steps: 4 pads, 27 pockets, 2 grooves); `dense` a 3,006-face solid; `faceted` an
+8,514-triangle solid (a mesh body made solid); `multi` box + dense + faceted at once;
+`relic_again` a second drag in the same dialog; `_turn` the Z turn handle, `_copy` Create
+Copy, `_rotate` Rotate about the Z axis, `_p2p` Point to Point (two clicks),
+`_component` Move Object Components, `_in_component` the body inside a turned component.
+
+- **open**: from M to the dialog ready with its manipulator.
+- **frame step**: time between frames that showed the body somewhere new while the hand
+  moved ("-": the body never moved while the hand did).
+- **lag**: how far the drawn body was behind the hand.
+- **caught up**: from the hand stopping until every moved body was drawn where the hand is.
+- **release**: from letting go to the exact result. Before, the scenario's hand held the
+  button until the app had caught up, so the rebuild happened before the release.
+- **hand stop to exact result**: the total wait after the hand stops. This column compares
+  across versions.
+
+| case | open | frame step median | step p90 | frames showing the body move | lag median | caught up | release | hand stop to exact result |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| box | 171 → 88 | 93 → 19 | 110 → 23 | 10 of 29 → 50 of 51 | 88 → 10 | 46 → 18 | 553 → 422 | 960 → 444 |
+| box_edit (from the timeline) | | 94 → 18 | 108 → 20 | 11 of 29 → 55 of 56 | 78 → 15 | 87 → 17 | 427 → 385 | 885 → 406 |
+| relic | 3,847 → 136 | - → 32 | - → 38 | 0 of 20 → 29 of 30 | 534 → 28 | 3,650 → 28 | 515 → 2,004 | 4,760 → 2,040 |
+| relic_again (2nd drag) | | → 31 | → 40 | → 31 of 32 | → 23 | → 29 | → 1,568 | → 1,607 |
+| relic_turn | 4,188 → 180 | - → 29 | - → 64 | 0 of 29 → 20 of 27 | | | 510 → 1,977 | 4,760 → 2,053 |
+| relic_copy | 4,228 → 162 | - → 38 | - → 41 | 0 of 19 → 26 of 27 | 577 → 33 | 4,126 → 37 | 502 → 1,669 | 5,232 → 1,715 |
+| relic_rotate | 4,205 → 151 | - → 26 | - → 28 | 0 of 27 → 34 of 36 | | | 508 → 1,958 | 5,161 → 1,991 |
+| relic_p2p (2nd click to result) | | | | | | | | 4,320 → 2,205 |
+| relic_component | 1,165 → 898 | - → 28 | - → 31 | 0 of 23 → 34 of 35 | 561 → 20 | 264 → 26 | 435 → 585 | 775 → 617 |
+| relic_in_component | 5,706 → 1,409 | - → 29 | - → 35 | 0 of 21 → 33 of 34 | 547 → 19 | 4,622 → 29 | 642 → 1,964 | 5,937 → 2,003 |
+| dense | 15,381 → 108 | - → 64 | - → 77 | 0 of 9 → 15 of 16 | 538 → 51 | 15,533 → 49 | 523 → 16,811 | 16,739 → 16,888 |
+| faceted | 4,874 → 148 | - → 27 | - → 33 | 0 of 21 → 36 of 37 | 617 → 17 | 4,512 → 25 | 542 → 3,426 | 5,808 → 3,458 |
+| multi | 23,401 → 183 | - → 57 | - → 60 | 0 of 12 → 18 of 19 | 621 → 31 | 21,614 → 55 | 672 → 20,708 | 23,091 → 20,792 |
+
+Frames: the work for the mouse between two frames (Fission 180's and FreeCAD's, the drawing
+left out) went from 10-44 ms to 4-8 ms (median); the rest of each frame is software OpenGL
+drawing (15 ms for the box, 25 ms for the Relic-like part, 55 ms for the 3,000-face solid). In
+every frame drawn between the release and the result the body is where it was let go
+(`release_off` under 0.000003 mm, `release_hidden` 0).
+
+**"multi" was not slower before.** The 3,682 ms "caught up" of the first measurements looked
+only at the first body of the three (the box). Measured on every body, the before code caught
+up after 21,614 ms and showed the exact result 23,091 ms after the hand stopped. The 10,990 ms
+release of the first after measurement (commit bce262e4) did not include the 20,200 ms the
+dialog had spent opening. Now the dialog opens in 183 ms and the first release takes
+20,792 ms: two meshings of each body, explained below.
+
+A first release is now open's former work plus the release: the new Move step's first
+drawing and the body's own drawing, both FreeCAD's (causes 2. and 3.). A second release in
+the same dialog redraws only the body (`relic_again` 1.6 s). The dialog takes its rebuild once
+for a whole Move. Before, it rebuilt at open, again whenever the hand paused, and again at
+the end. For the Relic-like part, open plus drag plus result went from 3.8 + 4.8 = 8.6 s
+to 0.1 + 2.0 = 2.1 s.
 
 ## FreeCAD facts and traps (for the next one)
 
@@ -138,8 +193,51 @@ Second run:
 
 ## Still open
 
-(filled in below)
+1. **FreeCAD draws every body's own shape on every rebuild (cause 2.)**: what is left of a
+   release. One body rebuild costs 7.5 s on the 3,000-face solid, 1.3 s on the
+   8,500-triangle solid and 1.0-1.1 s on the Relic-like part, and every PartDesign change in
+   Fission 180 (an extrude, a fillet, an edit) pays it, not only Move. Python cannot stop it
+   (facts above). Proposed core patch, **not applied**: it cannot be compiled or tested in
+   this sandbox, it needs the 4-hour full build, and Luca's releases are patches.
+   - In `ViewProviderBody::updateData`, when `prop` is the body's Shape and
+     `DisplayModeBody` is "Through", set `VisualTouched = true` and skip
+     `ViewProviderPartExt::updateData` (keep `ViewProviderGeometryObject::updateData`).
+   - In `onChanged(DisplayModeBody)`, call `updateVisual()` when the body is switched to
+     "Tip" and is touched.
+   - Around `ViewProviderPartExt::onChanged(Visibility)` in "Through" mode, do not let a
+     touched body mesh its unused shape when it is shown again.
+   - Expected: a release on the Relic-like part 0.2 s (2nd drag) / 0.8 s (1st), on the
+     3,000-face solid 0.2 s / 7.5 s, and every PartDesign change drawn once instead of twice.
+2. **A new step meshes a solid it shares with the step before it (cause 3.)**: the first
+   release pays the new Move step's first drawing (0.55-0.66 s on the Relic-like part, 7.4 s
+   on the 3,000-face solid). This is FreeCAD 1.1's `BRepTools::Clean` before meshing. A core
+   option: skip the clean when the faces' triangulation already meets the deflection.
+3. **Cancel after a drag** still rebuilds the body's own drawing: 2.2 s on the Relic-like
+   part, 2.3 s before. Cancel after Create Copy dropped from 2.4 s to 0.3 s.
+4. **Other live drags** were not measured this time: Press Pull's and Extrude's arrows
+   (they change the shape itself, so it cannot simply be moved; on slow parts they rebuild
+   only when the hand rests: `taskui` SLOW_DRAG), sketch Move, joint drags. The preselection
+   change (off while any handle is dragged) applies to all of them.
+5. The frame times here are software OpenGL: on a graphics card a frame is the 4-8 ms of work
+   measured plus a few ms of drawing. The scenario checks the work between frames against
+   the brief's targets (16 ms box, 33 ms big parts). Measured 4-8 ms, which leaves CI's slower
+   machine 2-4 times the room. It is an `h.speed_check`: counted normally, printed only under
+   `--stress`.
 
 ## What changed for Luca
 
-(filled in below)
+- **Move (M) opens at once**, even on a big part. Before, it took about 4 s on a part like
+  your Relic and 15 s on a 3,000-face block, before you could grab an arrow.
+- **While you drag** an arrow, a turn handle or the rotate handle, the part follows the mouse
+  smoothly. Only the picture moves, as in Fusion. Before, a complex part did not move at all
+  until you stopped, then it jumped there seconds later.
+- **When you let go**, Fission 180 works out the real result once, about 2 s on a Relic-like
+  part (1.6 s for a second drag in the same dialog). Meanwhile the part stays exactly where
+  you dropped it. Before, the whole move took about 8.6 s on that part, from pressing M to
+  the result.
+- **Nothing else changes**: the typed values, snapping, Point to Point, Rotate, Create Copy,
+  OK / Cancel / Esc, one Undo step, editing the Move from the timeline, several bodies at
+  once, components.
+- **What still takes time** after letting go is FreeCAD redrawing a hidden copy of the
+  body's shape. It never shows that copy, but it draws it anyway. Removing that needs a
+  change inside FreeCAD and a full build, so it is listed for a full release.
