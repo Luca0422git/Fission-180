@@ -53,6 +53,13 @@ constraint; the palette reads the solver every 0.3 s (`sketch_palette._mode_time
 rebuild (most of a release; a core patch is described there, it needs the full build);
 Cancel after a drag rebuilds (2.2 s on the Relic-like part); other live drags (Press Pull,
 Extrude arrows, sketch Move, joints) not measured.
+**The patch's trial run (#14, publish off) failed once more, on Fission 180's own AppImage
+only:** the documentation example `export_everything#1` (wave 8) says its STEP file has 6,805
+bytes, the AppImage's has 6,808 (a STEP file names the program that wrote it; the tests on
+stock FreeCAD cannot see it). `docs_runner.same_answer` now compares a written file's size
+loosely (`"bytes"`: 2 %, at least 16 bytes; unit tested). **A recorded example must not pin a
+number that depends on the program writing a file.** Everything else in the trial passed
+(Windows installer, golden models on Windows and Linux, headless, sim, smoke, journey).
 Version: 0.1.0-beta.4.0.3, the number already in VERSION, `_FALLBACK_VERSION` and the
 CHANGELOG heading (the Move line is under its "Faster"); Luca asked for the release without
 choosing another.

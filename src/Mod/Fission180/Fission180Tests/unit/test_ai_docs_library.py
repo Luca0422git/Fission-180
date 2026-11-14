@@ -363,6 +363,18 @@ class ToolExamples(unittest.TestCase):
         self.assertIsNone(  # today's date in a title block is not a difference
             docs_runner.same_answer(dated, dict(dated, text=dated["text"].replace("22", "23")))
         )
+        sized = {"text": 'Exported.\n{"step": {"bytes": 6805}, "stl": {"bytes": 684}}'}
+        sized["is_error"] = False
+        self.assertIsNone(  # a file's size is the writing program's: a few bytes are none
+            docs_runner.same_answer(sized, dict(sized, text=sized["text"].replace("6805", "6808")))
+        )
+        self.assertIn(  # an empty or a doubled file still is
+            "bytes",
+            docs_runner.same_answer(sized, dict(sized, text=sized["text"].replace("6805", "0"))),
+        )
+        self.assertTrue(
+            docs_runner.same_answer(sized, dict(sized, text=sized["text"].replace("684", "1400")))
+        )
         drawn = {"text": 'Done.\n{"DrawnBy": "root", "sheet": "A3"}', "is_error": False}
         self.assertIsNone(  # nor the login name of the computer that ran the example
             docs_runner.same_answer(

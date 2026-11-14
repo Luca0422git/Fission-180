@@ -51,6 +51,13 @@ _TOOK = re.compile(r'(took |"seconds":\s*|"solve_seconds":\s*)\d+(?:\.\d+)?')
 # ... nor the random id a new library tool gets (cam_tool_library: a UUID, as FreeCAD's tool
 # bits have)
 _UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
+# ... and a written file's size is the size on the computer that ran the example: a STEP file
+# names the program that wrote it in its header (6,805 bytes from FreeCAD 1.1.4, 6,808 from
+# Fission 180's own build: the 0.1.0-beta.4.0.3 patch's trial run). Sizes are compared loosely
+# (BYTES_REL), so an empty or a doubled file is still a difference.
+_BYTES = re.compile(r'("bytes":\s*)(\d+)')
+BYTES_REL = 0.02
+BYTES_ABS = 16
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS_TESTS = os.path.join(os.path.dirname(HERE), "docs")
 RESULTS = os.path.join(DOCS_TESTS, "tool_results.json")
@@ -182,6 +189,13 @@ def same_answer(recorded, now, rel=1e-4, absolute=1e-3):
     a, b = _DRAWN_BY.sub(r'\1"<user>"', a), _DRAWN_BY.sub(r'\1"<user>"', b)
     a, b = _TOOK.sub(r"\1<s>", a), _TOOK.sub(r"\1<s>", b)
     a, b = _UUID.sub("<id>", a), _UUID.sub("<id>", b)
+    sizes_a = [int(size) for _key, size in _BYTES.findall(a)]
+    sizes_b = [int(size) for _key, size in _BYTES.findall(b)]
+    a, b = _BYTES.sub(r"\1<bytes>", a), _BYTES.sub(r"\1<bytes>", b)
+    if len(sizes_a) == len(sizes_b):  # (another count shows as another text just below)
+        for x, y in zip(sizes_a, sizes_b):
+            if abs(x - y) > max(BYTES_ABS, BYTES_REL * max(x, y)):
+                return "a file of %d bytes is now %d bytes" % (x, y)
     if _NUMBER.sub("#", a) != _NUMBER.sub("#", b):
         for i, (x, y) in enumerate(zip(a.splitlines(), b.splitlines())):
             if _NUMBER.sub("#", x) != _NUMBER.sub("#", y):
@@ -243,8 +257,10 @@ def undo_problems(tool, before, after, answer):
         return problems
     added = len(new) - len(old)
     if answer["is_error"] or not entry["changes_design"] or tool in tool_docs.VIEW_STATE_ONLY:
-        problems.append("made an undo step %r although it %s" % (
-            new[:1], "failed" if answer["is_error"] else "is documented as none"))
+        problems.append(
+            "made an undo step %r although it %s"
+            % (new[:1], "failed" if answer["is_error"] else "is documented as none")
+        )
     elif added > 1 or not new or not new[0].startswith("AI:"):
         problems.append(
             "should make one undo step named 'AI: ...', the undo list is now %r" % (new[:3],)
