@@ -4,6 +4,25 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-14: where things stand (session out of resources)** The cloud session ran out of its
+disk / memory / time allowance (the machine restarted twice, then Claude's app said "out of disk,
+memory or time"). Luca chose to push: `develop` pushed at 3ea351af (all of wave 8, the Combine and
+3D Contour fixes, plain words for kernel refusals; "Fission 180 tests" not yet seen green on it).
+The Move work (builder move-speed, brief `docs/fission180/dev/briefs/move-speed.md`) is on its
+own branch `sf/move-speed` (pushed as a backup, NOT merged): live drag (only the picture moves:
+`move_live.py`), the step keeps the solid at a placement (no copies), Move opens at once (its
+steps made at the first movement), preselection off while dragging, the body held where it was
+let go until its step is drawn; scenario `move_speed`; session log
+`docs/fission180/sessions/move-speed.md` (Relic-like: open 4 s -> at once, drag follows the
+mouse (before: did not move until the hand stopped), release about 2 s; "multi" was not
+slower: the first before-number looked at one body only). Still to do on it: the ten older
+Move scenarios one at a time (bodies_move, book_components_move, components2_move,
+components_move, extrude_multibody_move, fixdecal_body_move, modify2_move_face,
+regress_revolve_move, surface4_move_faces, surface4_move_mirror) and the 770 px check, unit,
+golden, lint; then merge into develop, CHANGELOG line, MEMORY. Then: Luca picks the version
+(suggested 0.1.0-beta.4.1; VERSION / _FALLBACK_VERSION / CHANGELOG heading still say 4.0.3)
+and runs the patch release when the tests are green.
+
 **2026-11-13: wave 8 merged: an AI that can use all of Fission 180, and Fusion-style tooltips**
 (Opus, merger; ten builders in worktrees, briefs `docs/fission180/dev/briefs/ai-*.md`, `tips.md`;
 session logs `docs/fission180/sessions/<builder>.md`) Luca: Claude refused Relic's mesh, then
