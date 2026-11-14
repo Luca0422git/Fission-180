@@ -84,6 +84,8 @@ First run (commit bce262e4):
   moment the step's real Shape or Placement arrives, so no frame shows a body moved twice.
 - `move.py`: the Move step keeps its base's solid as it is (the same TShape) at the moved
   placement: no copies, and the step's view only moves what it has drawn (3.).
+  **Changed at the merge** (it moved the origin of sketches on the moved faces, also in saved
+  designs): one copy at no placement, see "Finished and merged" at the end.
 - `handles3d.py`: preselection off while any handle is dragged, back when the last drag ends.
 - `bodies_panel.py`, `move_ui.py`, `revolve_ui.py`, `component_move_ui.py`: a click is judged by
   when FreeCAD made it (after a long rebuild the release of a drag reached the dialog late
@@ -108,6 +110,7 @@ Second run:
 - `move.py`: **Create Copy keeps the source's solid at a placement**; the copy body's first
   step (`PartDesign::FeatureBase`, which drops its base's placement and puts the shape at its
   own) gets the same placement. Its rebuild copies nothing and its view keeps its drawing.
+  **Changed at the merge** for the same reason: one copy at no placement.
 - the probe: `caught_up` waits for every moved body (it looked only at the first: "multi"
   seemed to catch up in 3.7 s while its last body took about 22 s, which read as if the new
   release of 11 s were slower), the time to open the dialog, and the frames drawn between the
@@ -184,7 +187,8 @@ dialog had spent opening. Now the dialog opens in 183 ms and the first release t
 
 A first release is now open's former work plus the release: the new Move step's first
 drawing and the body's own drawing, both FreeCAD's (causes 2. and 3.). A second release in
-the same dialog redraws only the body (`relic_again` 1.6 s). The dialog takes its rebuild once
+the same dialog redraws only the body (`relic_again` 1.6 s; since the merge's fix it draws
+the step again too, see the end). The dialog takes its rebuild once
 for a whole Move. Before, it rebuilt at open, again whenever the hand paused, and again at
 the end. For the Relic-like part, open plus drag plus result went from 3.8 + 4.8 = 8.6 s
 to 0.1 + 2.0 = 2.1 s.
@@ -253,8 +257,8 @@ to 0.1 + 2.0 = 2.1 s.
 - **While you drag** an arrow, a turn handle or the rotate handle, the part follows the mouse
   smoothly. Only the picture moves, as in Fusion. Before, a complex part did not move at all
   until you stopped, then it jumped there seconds later.
-- **When you let go**, Fission 180 works out the real result once, about 2 s on a Relic-like
-  part (1.6 s for a second drag in the same dialog). Meanwhile the part stays exactly where
+- **When you let go**, Fission 180 works out the real result once, about 2.5 s on a Relic-like
+  part (also for a second drag in the same dialog; 2 s and 1.6 s before the merge's fix). Meanwhile the part stays exactly where
   you dropped it. Before, the whole move took about 8.6 s on that part, from pressing M to
   the result.
 - **Nothing else changes**: the typed values, snapping, Point to Point, Rotate, Create Copy,
@@ -263,3 +267,123 @@ to 0.1 + 2.0 = 2.1 s.
 - **What still takes time** after letting go is FreeCAD redrawing a hidden copy of the
   body's shape. It never shows that copy, but it draws it anyway. Removing that needs a
   change inside FreeCAD and a full build, so it is listed for a full release.
+
+## Finished and merged into develop (2026-11-14, a later session)
+
+The builder's session ended before the older scenarios were run (out of resources). Another
+session merged the branch into a local develop (9081ce98, a clean merge), ran what was left and
+more, found a bug that would have changed saved designs, fixed it, and pushed.
+
+### The bug: a Move step with a placement moved the origin of every sketch on its faces
+
+`replay_06_play_brick` failed on the merged code (the brick is turned over with Move, then three
+tubes are sketched on its inner face: two tubes landed on each other). The cause, measured
+headless (old code against the branch, the same script):
+
+- FreeCAD gives a sketch or a plane on a face the origin and the axes of **the step the face
+  belongs to**: `Attacher.cpp` takes `App::GeoFeature::getGlobalPlacement(...)` of the support
+  as `refOrg` ("origin of linked object") and its rotation for the axes. The branch made the
+  Move step keep its base's solid "at a placement" (the step's Placement = the movement), so
+  the sketch's origin and X direction travelled with the Move. Before: origin at the design's
+  origin projected on the face. A box turned over about Y and moved 5: sketch at (0, 0, 10)
+  before, at (35, 0, 10) turned 180 degrees on the branch.
+- **A design saved by 0.1.0-beta.4.0.2 with a sketch on a moved body's face changed when it was
+  recomputed**: its Move step got the placement, the sketch re-attached, the extruded circle
+  jumped off the part (same volume, another place: nothing reports an error).
+- The same for Create Copy: the copy step and the new body's first step
+  (`PartDesign::FeatureBase`) had the placement.
+
+The fix (`move.placed_copy`): the Move and Copy steps hold **one copy of the solid where the
+movement puts it, at no placement of their own**, as the released version did, with one copy
+instead of four (0.09 s for it on the 3,000-face solid, headless; the released code's four
+copies were the "copied four times" of cause 1). A step still carrying a placement (made by
+the branch's code) loses it at its next rebuild. A failed Move step shows the body unmoved
+with its base's placement built in (`_show_unmoved`).
+
+Two other ways were measured and not taken: the solid shared inside a compound at no placement
+(no copy at all, but the step becomes a Compound and FreeCAD's `BRepTools::Clean` strips the
+triangles of the step before it, which it shares; `book_library2_big_pattern` then read a box
+0.00004 off centre) and the branch's placement (wrong, above).
+
+What the fix costs: the 3D view draws a moved body's step again at **every** release (the
+branch drew it only at the first release in a dialog; a second drag in the same dialog cost
+about 0.5 s less on the Relic-like part). Opening at once, the live drag and the body held
+where it was let go do not depend on how the step holds its result. Numbers below.
+
+Kept from now on by `Fission180Tests/headless/move_frames_check.py` and
+`unit/test_move_frames_freecad.py`: Move on a body whose first step has a placement of its
+own, a body in a turned component, Create Copy, each with a sketch and a Pad on the moved
+face, compared object by object with what 0.1.0-beta.4.0.2 built, and that version's saved
+design (`fixtures/move_frames_v1.FCStd`) recomputed. It fails on the branch's code (3 of 4).
+
+### Tests on the merged, fixed code (FreeCAD 1.1.4, this sandbox, one scenario at a time)
+
+- **The ten older Move scenarios**, all PASS: bodies_move 85, book_components_move 38, components2_move 349, components_move 219, extrude_multibody_move 48, fixdecal_body_move 132, modify2_move_face 56, regress_revolve_move 28, surface4_move_faces 27, surface4_move_mirror 41.
+- **`move_speed`**: 151 checks PASS. Milliseconds, this run (the same scenario and probe as the
+  table above; "before" is the released code, "branch" the branch as it was pushed):
+
+  | case | open | frame step median | release: before / branch / merged |
+  |---|---:|---:|---:|
+  | box | 97 | 22 | 553 / 422 / 399 |
+  | relic (1st drag) | 176 | 37 | 515 after a 3.7 s catch-up / 2,004 / 2,427 |
+  | relic_again (2nd drag) | | 36 | - / 1,568 / 2,392 |
+  | relic_copy | 144 | 37 | 502 after 4.1 s / 1,669 / 2,286 |
+  | relic_component | 942 | 40 | 435 / 585 / 562 |
+  | dense (3,000 faces) | 141 | 61 | 523 after 15.5 s / 16,811 / 15,676 |
+  | faceted (8,500 triangles) | 149 | 36 | 542 after 4.5 s / 3,426 / 3,751 |
+  | multi (three bodies) | 195 | 63 | 672 after 21.6 s / 20,708 / 21,112 |
+
+  Nothing recomputes while the hand moves (recomputes_moving 0 in every case), the body is
+  where it was let go in every frame of the release (release_hidden 0).
+- **The 770 px check** (GitHub's 1538 x 770 view: a throwaway wrapper makes the main window
+  one pixel taller right after the new design, then runs the scenario unchanged): the ten,
+  `move_speed` and `drag_release_lost`, all PASS (one check more each: the view's size).
+- **67 other scenarios that use the changed files or open Move**, one at a time, all PASS:
+  bodies_combine 93, bodies_delete 64, bodies_qa 317, bodies_qa_2 240, bodies_split 85,
+  bodies_timeline 65, body_pick_hover 53, body_pick_hover_combine 9, body_pick_many 52,
+  book_components2_refs 70, book_components2_structure 91, book_components_active 95,
+  book_components_menus 42, book_components_nested 28, book_components_project 39,
+  book_drawings_balloons 54, book_drawings_export 83, book_drawings_tools 51,
+  book_extrude_picking 49, book_joints_ground 60, book_library2_big_pattern 25,
+  book_library2_dialog_kept 18, book_looks_kept 93, book_params_fields 69, components2_bodies
+  309, components_extrude 171, data_panel_fusion 61, drag_release_lost 100, exchange2_link 42,
+  exchange2_step_insert 76, fillet 67, fixdecal_components 134, fixdecal_reopen 75,
+  fixpattern_old_file 110, fixsketch_move 71, gaps_join_new_body 241, handle_size 62,
+  insert_step 38, inspect_construct_use 50, joints2_drag 80, joints_basic 86, modeling2_bodies
+  57, modify_align_split 48, polish2_value_boxes 63, primitives_box 78, primitives_shapes 102,
+  replay_06_play_brick 199, replay_12_pizza_cutter 525, replay_15_gear_train 158, revolve_axes
+  80, revolve_basic 76, revolve_edit 57, selection_filters 76, selection_other 30,
+  sketch_move_dialog 251, sketch_paste_move 9, sketch_qa 461, surface4_delete_merge 48,
+  surface4_fillet 55, surface4_misc 28, surface4_presspull 50, surface4_qa 88,
+  surface4_replace_face 28, surface4_split_face 25, surface4_step_part 19, versions_link 25,
+  vex_insert_many 37
+- **Two scenarios needed a word**: `drag_release_lost` case M4 let go of Move's arrow "while
+  the preview recomputes"; Move no longer recomputes while a handle is dragged, so the case
+  now checks that nothing recomputed while the button was down (its checks after the release
+  are unchanged; a release lost to the selection is still M1 / M2c / M8, a release eaten by
+  the progress bar still H3 / P2 / E4 on the other handles; **not tested**: a release eaten
+  while Move still rebuilds during a drag, which is Move Object = Faces and components with
+  Create Copy). `book_library2_big_pattern` failed on the branch's code only (the shared
+  solid's triangles) and passes unchanged with the fix.
+- Unit 4,029 OK (10 skipped); golden 653 pass + 2 xfail; headless 1,041 calls / 222 tools,
+  docs 257 items, agent 81, rebuild 153 + 15, recognize 71 parts: 0 failed; smoke, journey,
+  restart passed. black clean; flake8 shows only long lines these files already had.
+- **Red on GitHub before this merge and still red** (run #88 on develop 9081ce98, wave 8; both
+  fail the same way in this sandbox, neither uses Move): `sim_core_job` ("F: the window's
+  timers ran while the AI solved: 0 ticks in 3.4 s", twice) and `sketch_explain_paths` (flaky:
+  "G: the palette says so: 4 left to define", then passes). The same run failed "No new
+  fixed waits in the GUI tests" (wave 8's `ai_bridge_busy`: a slow tool on purpose and the
+  pace of the AI's calls, now marked as the exempt kinds they are), which skipped the base
+  tests there.
+
+### FreeCAD facts (for the next one)
+
+- A sketch / plane on a face (`FlatFace`) takes its origin and axes from the support step's
+  Placement, not from the design's origin: a step that must not change what is built on it
+  keeps the placement it had. A Move-like step therefore cannot use its Placement to move.
+- `Shape.transformed(matrix, False)` with a rigid matrix returns the same solid (a partner:
+  same TShape) at another location, as a shape of its own that can be changed (a feature's
+  `Shape` cannot: "This object is immutable"); `transformed(matrix, True)` copies the geometry
+  but keeps the original location on the result. This FreeCAD has no `moved()` / `located()`.
+- The box of a drawn shape is read off its triangles: it is a few 0.0001 mm inside the exact
+  box and not exactly symmetric; `optimalBoundingBox(False, False)` is exact.

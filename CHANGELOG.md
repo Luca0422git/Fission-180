@@ -51,6 +51,15 @@ releases published under the old name (their tags are `sciforge-v...`).
 
 ### Faster
 
+- **Move (M) is live on complex parts.** The dialog opens at once (before: about 4 s on a part
+  of 600 faces and 30 steps, 15 s on a 3,000-face solid). While you drag an arrow or a turn
+  handle the part follows the mouse smoothly, whatever its size: only its picture moves, as in
+  Fusion (before, a complex part stood still until the hand stopped, then jumped seconds
+  later). The real result is worked out once, when you let go (about 2.5 s on that 600-face
+  part; from pressing M to the finished move it was about 8.6 s before), and the part stays
+  where you dropped it meanwhile. Components move live the same way. Nothing else about Move
+  changes: typed values, snapping, Point to Point, Rotate, Create Copy, one Undo step, editing
+  it from the timeline.
 - AI questions on big designs: about a second instead of 5 to 50 (get_design on a 1,700-face
   plate 10 s -> 1.2 s; the same question again under 0.1 s); an AI sketch of 320 circles 50 s ->
   0.6 s; reading Relic-like rebuilds several times faster.

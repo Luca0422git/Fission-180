@@ -18,6 +18,11 @@ time you start it, but treat that as a safety net, not a plan.
   look odd. Fission 180 says so in a small yellow warning on the Press Pull button and in its
   dialog. *Workaround:* use Fillet, Chamfer, Offset Face or Extrude for those faces, or press
   Undo (Ctrl+Z) when a result looks wrong.
+- **After you let go of a Move on a big part, the exact result takes a moment** (about 2.5 s
+  on a part of 600 faces, about 16 s on a 3,000-face solid). Dragging itself is live, and the
+  part stays where you dropped it meanwhile. Most of the wait is FreeCAD drawing a hidden copy
+  of the body again after every change; removing it needs a change inside FreeCAD and a full
+  build, so it is planned for a full release, not a patch.
 - **English only.** Fission 180's own screens, menus and messages are in English; there are no
   translations yet.
 - **The SHEET METAL and PLASTIC tabs** are still the least used so far. A few of Fusion's options
