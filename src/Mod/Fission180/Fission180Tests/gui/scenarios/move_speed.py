@@ -152,13 +152,23 @@ def select(objs):
         Gui.Selection.addSelection(obj.Document.Name, obj.Name)
 
 
+def press_m():
+    """M, timed: the time to the dialog being ready is the case's "open" (opened())."""
+    S["pressed"] = time.perf_counter()
+    S.pop("open_ms", None)
+    h.press("m")
+
+
 def opened(count, components=False):
     def done():
         p = panel()
         if p is None or p.dirty or p._timer.isActive():
             return False
         picked = p.options.get("components" if components else "bodies") or []
-        return len(picked) == count and getattr(p, "triad", None) is not None
+        ready = len(picked) == count and getattr(p, "triad", None) is not None
+        if ready and S.get("pressed") is not None and S.get("open_ms") is None:
+            S["open_ms"] = round((time.perf_counter() - S["pressed"]) * 1000.0, 1)
+        return ready
 
     return done
 
@@ -185,27 +195,33 @@ def turn_path(index, degrees):
     return path
 
 
-def shown_objects(copy=False):
-    """What the 3D view draws the moved bodies with: their Tip (the Move step), or for Create
-    Copy the new bodies' first step."""
-    from fission180 import bodies as fb
+def moved_bodies(copy=False):
+    """The bodies the drag moves: the picked ones, or for Create Copy the new bodies (the
+    probe follows each through the step that shows it: a new Move makes its step when the
+    drag is let go)."""
     from fission180 import move
 
     p = panel()
+    if not copy:
+        return list(p.options.get("bodies") or [])
     found = []
     for step in p.steps:
-        owner = move.copy_body(step) if copy else fb.body_of(step)
+        owner = move.copy_body(step)
         if owner is not None:
-            found.append(mp.shown_object(owner))
+            found.append(owner)
     return found
+
+
+def shown_steps(objs):
+    return [mp.shown_object(o) for o in objs]
 
 
 def start_drag(case, objs, pixels=None, path=None, axis=None, handle=None, profile=False):
     p = panel()
     S["case"] = case
     S["watched"] = objs
-    S["box0"] = box_of(objs)
-    S["vol0"] = sum(o.Shape.Volume for o in objs)
+    S["box0"] = box_of(shown_steps(objs))
+    S["vol0"] = sum(o.Shape.Volume for o in shown_steps(objs))
     S["value0"] = {k: float(p.options.get(k) or 0.0) for k in ("dx", "dy", "dz", "angle")}
     probe = S["probe"] = mp.Probe(objs, axis=axis, handle=handle or p.triad, profile_moving=profile)
     start, end = pixels if pixels is not None else (path(0.0), path(1.0))
@@ -227,7 +243,7 @@ def exact_shown():
     if p is None or p.dirty or p._timer.isActive() or getattr(p.doc, "Recomputing", False):
         return False
     probe = S["probe"]
-    for obj in S["watched"]:
+    for obj in shown_steps(S["watched"]):
         drawn = mp.drawn_transform(obj)
         if drawn is not None and not drawn.isSame(obj.Placement, 1e-4):  # (Coin keeps floats)
             return False
@@ -261,7 +277,9 @@ def finish(case, kind="move", index=0, big=True, value_key=None):
     final = float(p.options.get(value_key, 0.0)) if p is not None else None
     moved = final - S["value0"].get(value_key, 0.0) if final is not None else None
     summary = probe.summary(drag, final=moved if kind == "move" else None, lag=kind == "move")
-    entry = record(case, summary, {"load": round(os.getloadavg()[0], 2)})
+    extra = {"load": round(os.getloadavg()[0], 2), "open": S.pop("open_ms", None)}
+    S.pop("pressed", None)
+    entry = record(case, summary, extra)
     lines = probe.profile_lines()
     if lines:
         S.setdefault("profiles", {})[case] = lines[:60]
@@ -307,7 +325,7 @@ def finish(case, kind="move", index=0, big=True, value_key=None):
             (got - want).Length < 1e-4,  # (the view's transforms keep floats)
             (got, want),
         )
-    vol = sum(o.Shape.Volume for o in S["watched"])
+    vol = sum(o.Shape.Volume for o in shown_steps(S["watched"]))
     h.check("%s: volume kept" % case, s.close(vol, S["vol0"], 1e-6), (vol, S["vol0"]))
     return entry
 
@@ -335,12 +353,12 @@ def arrow_case(case, bodies_fn, index=0, along=60.0, big=True, profile=False, ok
         S["undo0"] = len(S["doc"].UndoNames or [])
         S["moves0"] = len(moves())
         select(S["bodies"])
-        h.press("m")
+        press_m()
 
     def b_drag():
         start_drag(
             case,
-            shown_objects(),
+            moved_bodies(),
             pixels=arrow_pixels(index, along),
             axis=AXES[index],
             profile=profile,
@@ -461,7 +479,7 @@ def box_steps():
     def edit_drag():
         p = panel()
         h.check("box_edit: editing", p is not None and p.editing, p)
-        start_drag("box_edit", shown_objects(), pixels=arrow_pixels(0, -30.0), axis=AXES[0])
+        start_drag("box_edit", moved_bodies(), pixels=arrow_pixels(0, -30.0), axis=AXES[0])
 
     def edit_ok():
         h.task_button("OK")
@@ -531,7 +549,7 @@ def relic_steps():
 
     def open_relic():
         select([S["relic"]])
-        h.press("m")
+        press_m()
 
     def relic_open():
         return opened(1)()
@@ -543,7 +561,7 @@ def relic_steps():
 
     # the Z turn handle
     def turn_drag():
-        start_drag("relic_turn", shown_objects(), path=turn_path(2, 60.0))
+        start_drag("relic_turn", moved_bodies(), path=turn_path(2, 60.0))
 
     def turn_turned():
         p = panel()
@@ -568,7 +586,7 @@ def relic_steps():
         S["still"] = [mp.shown_object(S["relic"])]  # the original's own last step
         S["still_at"] = [mp.drawn_points(o, mp._Centers()) for o in S["still"]]
         pixels = arrow_pixels(1, 80.0)
-        start_drag("relic_copy", shown_objects(copy=True), pixels=pixels, axis=AXES[1])
+        start_drag("relic_copy", moved_bodies(copy=True), pixels=pixels, axis=AXES[1])
 
     def copy_kept():
         after = [mp.drawn_points(o, mp._Centers()) for o in S["still"]]
@@ -601,7 +619,7 @@ def relic_steps():
         def path(t):
             return h.screen_point(handle.point_at(60.0 * t))
 
-        start_drag("relic_rotate", shown_objects(), path=path, handle=handle)
+        start_drag("relic_rotate", moved_bodies(), path=path, handle=handle)
 
     def rotate_turned():
         p = panel()
@@ -656,11 +674,11 @@ def relic_steps():
         S["part"] = part
         h.fit()
         select([part])
-        h.press("m")
+        press_m()
 
     def component_drag():
         pixels = arrow_pixels(0, 60.0)
-        start_drag("relic_component", [mp.shown_object(S["relic"])], pixels=pixels, axis=AXES[0])
+        start_drag("relic_component", [S["relic"]], pixels=pixels, axis=AXES[0])
 
     def ok():
         h.task_button("OK")
@@ -671,7 +689,7 @@ def relic_steps():
 
     def inbody_drag():
         pixels = arrow_pixels(0, 40.0)
-        start_drag("relic_in_component", shown_objects(), pixels=pixels, axis=AXES[0])
+        start_drag("relic_in_component", moved_bodies(), pixels=pixels, axis=AXES[0])
 
     def inbody_done():
         h.check("relic_in_component: one Move step", len(moves()) == S["moves0"] + 1, moves())
@@ -799,6 +817,7 @@ def report():
     with open(os.path.join(out_dir(), "move-speed-report.json"), "w") as f:
         json.dump(data, f, indent=1)
     cols = (
+        "open",
         "step_median",
         "step_p90",
         "lag_median",
@@ -809,19 +828,26 @@ def report():
         "body_frames",
         "frames",
         "recomputes_moving",
+        "caught_up",
         "release",
         "stop_to_result",
+        "release_frames",
+        "release_off",
         "click_to_result",
     )
     lines = [
         "# Move/Copy drag: how it follows the mouse",
         "",
         "Milliseconds. A 125 Hz mouse, the button held on the handle, held still at the end, "
-        "let go. step = time between frames that showed the body somewhere new while the "
-        "hand moved; lag = how far the drawn body was behind the hand; draw = one frame's "
-        "drawing (software OpenGL here); between = the work for the mouse between two "
-        "frames; release = from the release to the exact result shown; stop_to_result = "
-        "from the hand stopping to the exact result.",
+        "let go. open = from M to the dialog ready with its manipulator; step = time "
+        "between frames that showed the body somewhere new while the hand moved; lag = how "
+        "far the drawn body was behind the hand; draw = one frame's drawing (software OpenGL "
+        "here); between = the work for the mouse between two frames; caught_up = from the "
+        "hand stopping until every moved body was drawn where the hand is; release = from "
+        "the release to the exact result shown; stop_to_result = from the hand stopping to "
+        "the exact result (what compares across versions); release_frames / release_off = "
+        "frames drawn between the release and the exact result, and how far (mm) the body "
+        "was drawn from where it was let go in them.",
         "",
         "| case | " + " | ".join(cols) + " |",
         "|---|" + "---:|" * len(cols),

@@ -568,6 +568,7 @@ class MovePanel(BodyPanel):
         # step's shape has (from its last rebuild): what the picture moves on from
         self.live = move_live.LiveMove()
         self._built = {}
+        self._finishing = False  # OK: the steps are made even when nothing moved
         super().__init__(doc, "Move" if feature is None else "Edit Move", feature is not None)
         self.target = self.steps[0] if self.steps else None
         self._show_options()
@@ -1255,24 +1256,35 @@ class MovePanel(BodyPanel):
                 pass
         return [s for s in shapes if not s.isNull()]
 
+    def _unmoved_box(self):
+        """The box round what this Move moves as it was before it (design coordinates), or
+        None. The bodies' own boxes where only a shift takes them to design coordinates: a
+        copy of each solid to measure it (_unmoved) took 0.8 s on a 600-face part, twice
+        for each pick (move-speed)."""
+        if self._faces_mode() or type(self)._unmoved is not MovePanel._unmoved:
+            return _box_of(self._unmoved())  # faces, components: their own shapes
+        boxes = []
+        for body in self.options["bodies"]:
+            step = self._step_of(body)
+            source = step.BaseFeature if step is not None else body
+            try:
+                boxes.append(_design_box(source))
+            except Exception:
+                pass
+        return _union([b for b in boxes if b is not None])
+
     def _size(self):
-        shapes = self._unmoved()
-        if not shapes:
+        box = self._unmoved_box()
+        if box is None:
             return 20.0
-        box = shapes[0].BoundBox
-        for shape in shapes[1:]:
-            box.add(shape.BoundBox)
         return max(8.0, 0.45 * max(box.XLength, box.YLength, box.ZLength))
 
     def _new_pivot(self):
         if getattr(self, "_pivot_user", False) and self.options["pivot"] is not None:
             return  # a pivot set with Set Pivot stays
-        shapes = self._unmoved()
-        if not shapes:
+        box = self._unmoved_box()
+        if box is None:
             return
-        box = shapes[0].BoundBox
-        for shape in shapes[1:]:
-            box.add(shape.BoundBox)
         self.options["pivot"] = list(box.Center)
 
     def _pivot(self):
@@ -1462,8 +1474,18 @@ class MovePanel(BodyPanel):
         for Create Copy the new body's), or None when the picture cannot simply be moved."""
         if self._faces_mode() or self.setting_pivot or self._timer.isActive():
             return None
+        picked = list(self.options.get("bodies") or [])
         steps = [s for s in self.steps if bodies.alive(s)]
-        if not steps or len(steps) != len(self.options.get("bodies") or []):
+        if picked and not steps and not self.editing and not self.options["copy"]:
+            # no steps yet (_waits_for_movement): each body's last step is drawn moved
+            items = []
+            for body in picked:
+                shown = getattr(body, "Tip", None) if bodies.alive(body) else None
+                if shown is None:
+                    return None
+                items.append((shown, App.Placement()))
+            return items
+        if not steps or len(steps) != len(picked):
             return None
         items = []
         for step in steps:
@@ -1511,7 +1533,7 @@ class MovePanel(BodyPanel):
                 self.target = None
             move.check(self.options)
         try:
-            move.transform(self.options)
+            place = move.transform(self.options)
         except move.NeedsPick:
             if self.steps and not self.editing:
                 for step in self.steps:
@@ -1519,8 +1541,35 @@ class MovePanel(BodyPanel):
                 self.steps = []
                 self.target = None
             raise
+        if self._waits_for_movement(place):
+            move.check(self.options)  # (what is wrong with the picks is said at once)
+            return
         self.steps = move.build(self.options, self.steps)
         self.target = self.steps[0] if self.steps else None
+
+    def _waits_for_movement(self, place):
+        """A new Move makes its steps at the first movement (a drag let go, a value typed, a
+        point picked), not when the bodies are picked (move-speed): a step that moves nothing
+        cost a first drawing of each body's step and a rebuild of each body (15 s on a
+        3,000-face part, 2 s on a part like Luca's Relic) before the manipulator could be
+        used. OK with nothing moved still makes them (accept); Create Copy makes its copy at
+        once (it shows the new body)."""
+        return (
+            not self.editing
+            and not self.steps
+            and not self._finishing
+            and not self.options.get("copy")
+            and move.is_identity(place)
+        )
+
+    def accept(self):
+        self._finishing = True
+        try:
+            if not self.steps and not self._faces_mode() and self.options.get("bodies"):
+                self.dirty = True  # nothing was moved: the steps are made now
+            return super().accept()
+        finally:
+            self._finishing = False
 
     def _apply_faces(self):
         """Move Object Faces: one Move step (move_face.py) in the faces' body."""
@@ -1596,6 +1645,41 @@ class MovePanel(BodyPanel):
         if not self.steps:
             return self.error or "Nothing to move yet."
         return ""
+
+
+def _box_of(shapes):
+    return _union([shape.BoundBox for shape in shapes if not shape.isNull()])
+
+
+def _union(boxes):
+    if not boxes:
+        return None
+    box = App.BoundBox(boxes[0])
+    for other in boxes[1:]:
+        box.add(other)
+    return box
+
+
+def _design_box(obj):
+    """The box of `obj`'s shape in design coordinates (bodies.global_shape's box), read from
+    the shape itself when its body or component only shifts it (a turned one is copied and
+    turned, as before)."""
+    shape = obj.Shape
+    if shape.isNull():
+        return None
+    try:
+        parent = obj.getParentGeoFeatureGroup()
+    except Exception:
+        parent = None
+    place = parent.getGlobalPlacement() if parent is not None else App.Placement()
+    if abs(place.Rotation.Angle) > 1e-12:
+        return bodies.global_shape(obj).BoundBox
+    try:
+        box = App.BoundBox(shape.optimalBoundingBox(False, False))  # (exact, as a copy's)
+    except Exception:
+        box = App.BoundBox(shape.BoundBox)
+    box.move(place.Base)
+    return box
 
 
 def _snap(obj, short, point):

@@ -171,14 +171,15 @@ def local_movement(place, frame):
     return frame.inverse().multiply(place).multiply(frame)
 
 
-def moved_placement(base, movement, body):
+def moved_placement(base, movement, body, shape=None):
     """Where a Move step puts the solid of `base`: the base's own placement moved by
     `movement` (design coordinates), in `body`'s coordinates. The step keeps the base's
     solid as it is (the same OpenCASCADE shape, nothing copied) at this placement: the 3D
     view keeps its tessellation and only moves it, and later steps build on it in the
     body's coordinates (PartDesign takes the previous step's placement)."""
     frame = body.getGlobalPlacement() if body is not None else App.Placement()
-    return local_movement(movement, frame).multiply(base.Shape.Placement)
+    shape = base.Shape if shape is None else shape
+    return local_movement(movement, frame).multiply(shape.Placement)
 
 
 # -- the features -----------------------------------------------------------------------------------
@@ -223,14 +224,16 @@ class MoveFeature:
 
     def _build(self, obj):
         base = obj.BaseFeature
-        if base is None or base.Shape.isNull() or not base.Shape.Faces:
+        shape = base.Shape if base is not None else None
+        # (faces counted, not listed: 0.15 s for 8,500 faces on every rebuild)
+        if shape is None or shape.isNull() or shape.countElement("Face") == 0:
             # (a surface body moves too: Fusion's SURFACE > MODIFY > Move/Copy, surface-4)
             raise MoveError("There is nothing before this step to move.")
         # The base's solid itself at the moved placement (move-speed, 2026-11-13): before,
         # it was copied four times and its copy tessellated again (1.5 s for a 600-face
         # part); a placement costs nothing and the view only moves what it has drawn.
-        place = moved_placement(base, obj.Movement, bodies.body_of(obj))
-        obj.Shape = base.Shape  # (FreeCAD puts it at the step's placement while it builds)
+        place = moved_placement(base, obj.Movement, bodies.body_of(obj), shape)
+        obj.Shape = shape  # (FreeCAD puts it at the step's placement while it builds)
         if not obj.Placement.isSame(place, 1e-12):
             obj.Placement = place
 
@@ -261,16 +264,27 @@ class CopyFeature:
         source = obj.Source
         if source is None:
             return  # the original was deleted: the copy keeps its shape, as in Fusion
-        if source.Shape.isNull() or not source.Shape.Faces:
+        shape = source.Shape  # with its own placement
+        if shape.isNull() or shape.countElement("Face") == 0:
             raise MoveError("The body it copies has nothing here.")
         # The new body takes this shape in its own coordinates: a body in a moved
-        # component would otherwise be moved twice (components-2). One transform from the
-        # source's coordinates to the new body's (before: four copies of the solid).
+        # component would otherwise be moved twice (components-2). The source's solid
+        # itself, at the placement that takes it from the source's coordinates to the new
+        # body's (move-speed: before, a copy of the solid at every rebuild, and the new
+        # body's first step drew that new solid again: 1.3 s of a 2.6 s rebuild on a
+        # 600-face part; a placement costs nothing and the view only moves its drawing).
         body = copy_body(obj)
         target = body.getGlobalPlacement() if body is not None else App.Placement()
         whole = target.inverse().multiply(obj.Movement).multiply(frame_of(source))
-        shape = source.Shape  # with its own placement
-        obj.Shape = shape.transformed(whole.toMatrix(), True)
+        place = whole.multiply(shape.Placement)
+        obj.Shape = shape  # (FreeCAD puts it at the step's placement while it builds)
+        if not obj.Placement.isSame(place, 1e-12):
+            obj.Placement = place
+        # The new body's first step (PartDesign::FeatureBase) takes this solid without its
+        # placement, at its own: it gets the same one.
+        first = base_step(body, obj)
+        if first is not None and not first.Placement.isSame(place, 1e-12):
+            first.Placement = place
 
     def dumps(self):
         return None
@@ -296,6 +310,16 @@ def moved_body(step):
     if is_copy(step):
         return bodies.body_of(step.Source) if step.Source is not None else None
     return bodies.body_of(step)
+
+
+def base_step(body, step):
+    """The first step of a copy's new body (PartDesign::FeatureBase on `step`), or None."""
+    if body is None:
+        return None
+    for obj in body.Group:
+        if obj.TypeId == "PartDesign::FeatureBase" and obj.BaseFeature is step:
+            return obj
+    return None
 
 
 def copy_body(step):

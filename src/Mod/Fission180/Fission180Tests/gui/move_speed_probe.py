@@ -21,8 +21,14 @@ summary() gives, in milliseconds:
   between     from one frame to the start of the next one's drawing (median): the work done
               for the mouse in between (Fission 180's and FreeCAD's), when the hand keeps moving
   blocked     the longest time the program did not run while the hand moved
+  caught_up   from the hand stopping until every moved body was drawn where the hand is
+              (several bodies at once: the last of them)
   release     from the release until the exact result was shown (the shape built at the final
               value, nothing drawn moved by a transform any more)
+  stop_to_result  from the hand stopping until the exact result was shown (the hold and
+              the release included): what compares across versions
+  release_frames / release_off  frames drawn between the release and the exact result, and
+              how far (mm) the first body was drawn from where it was let go in them
 and counts: moves sent, values the dialog took, frames, frames that showed the body move.
 Not a scenario itself.
 """
@@ -127,7 +133,7 @@ def drawn_center(obj, centers):
 
 
 def shown_object(body):
-    """The object the 3D view draws a body with (its Tip)."""
+    """The object the 3D view draws a body with (its Tip); any other object itself."""
     return getattr(body, "Tip", None) or body
 
 
@@ -237,8 +243,9 @@ class HandDrag:
 
 
 class Probe:
-    """What happens during one drag (see the module). `watched`: the objects whose drawn
-    middle is followed (the shown steps of the moved bodies; the first one is measured);
+    """What happens during one drag (see the module). `watched`: the bodies whose drawn
+    middle is followed (each through the step that shows it at that moment, its Tip: a new
+    Move makes its step when the drag is let go; the first body is measured);
     `axis`: the design direction the drag moves them along (None: the distance from where they
     started); `handle`: the dragged handle (its on_drag is wrapped to record the values)."""
 
@@ -247,11 +254,19 @@ class Probe:
         self.axis = App.Vector(axis) if axis is not None else None
         self.centers = _Centers()
         self.frames = []  # (time, drawn offset of the first watched object)
+        self.rest = []  # per frame: the drawn offsets of the other watched objects (axis only)
         self.paints = []  # time a paint of the 3D view began
         self.draws = []  # how long each frame took to draw (paint to swap)
         self.beats = []
         self.taken = []  # (time, value) the handle gave
         self.start = self._now_points()
+        self.start_rest = []
+        if self.axis is not None:
+            for obj in self.watched[1:]:
+                try:
+                    self.start_rest.append(drawn_center(shown_object(obj), self.centers))
+                except Exception:
+                    self.start_rest.append(None)
         self.handle = handle
         self._saved_drag = None
         if handle is not None and getattr(handle, "on_drag", None) is not None:
@@ -293,14 +308,14 @@ class Probe:
         self.held = self.points_now()
 
     def points_now(self):
-        return [drawn_points(obj, self.centers) for obj in self.watched]
+        return [drawn_points(shown_object(obj), self.centers) for obj in self.watched]
 
     def _now_points(self):
         obj = self.watched[0] if self.watched else None
         if obj is None:
             return None
         try:
-            return drawn_points(obj, self.centers)
+            return drawn_points(shown_object(obj), self.centers)
         except Exception:
             return None
 
@@ -315,12 +330,29 @@ class Probe:
             return (now[0] - self.start[0]).dot(self.axis)
         return max((a - c).Length for a, c in zip(now, self.start))
 
+    def offsets_rest(self):
+        """How far each other watched object is drawn from where it started, along the axis
+        (several bodies moved at once: the drag is caught up when all of them are)."""
+        found = []
+        for obj, start in zip(self.watched[1:], self.start_rest):
+            try:
+                now = drawn_center(shown_object(obj), self.centers)
+            except Exception:
+                now = None
+            found.append(None if now is None or start is None else (now - start).dot(self.axis))
+        return found
+
     def _frame(self):
         t = time.perf_counter()
         try:
             self.frames.append((t, self.offset()))
         except Exception:
             self.frames.append((t, None))
+        if self.start_rest:
+            try:
+                self.rest.append(self.offsets_rest())
+            except Exception:
+                self.rest.append([None] * len(self.start_rest))
         if self.paints:
             self.draws.append(t - self.paints[-1])
 
@@ -394,11 +426,24 @@ class Probe:
         release = None
         if drag.t_release is not None and self.exact_at is not None:
             release = max(0.0, self.exact_at - drag.t_release)
+        # the frames drawn from the release to the exact result, and how far the first body
+        # was drawn from where it was let go in them (Fusion: it stays there, no jump back)
+        off = []
+        if drag.t_release is not None and self.exact_at is not None:
+            for t, d in self.frames:
+                if drag.t_release < t <= self.exact_at + 0.002:
+                    off.append(None if d is None or not final else abs(d - final))
         caught = None
         if final:
-            for t, d in self.frames:
-                if t >= t1 and d is not None and abs(d - final) < max(0.05, 0.01 * abs(final)):
-                    caught = t - t1
+            near = max(0.05, 0.01 * abs(final))
+
+            def there(d):
+                return d is not None and abs(d - final) < near
+
+            for k, (t, d) in enumerate(self.frames):
+                rest = self.rest[k] if k < len(self.rest) else []
+                if t >= t1 and there(d) and all(there(x) for x in rest):
+                    caught = t - t1  # every moved body drawn where the hand is
                     break
         draws = [d for t, d in zip([f[0] for f in self.frames], self.draws) if t0 <= t <= t1]
         between = []
@@ -442,6 +487,8 @@ class Probe:
             "caught_up": ms([caught] if caught is not None else [], "max"),
             "release": ms([release] if release is not None else [], "max"),
             "stop_to_result": ms([self.exact_at - t1] if self.exact_at is not None else [], "max"),
+            "release_frames": len(off),
+            "release_off": max((x for x in off if x is not None), default=None),
             "final": final,
             "drag_ms": round(span * 1000.0, 1),
         }

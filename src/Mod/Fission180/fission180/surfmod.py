@@ -34,8 +34,9 @@ MEMORY = "Fission180PickPoints"
 
 # -- shapes ----------------------------------------------------------------------------------
 def has_faces(shape):
+    # (counted, not listed: listing 8,500 faces took 0.15 s, Move asked on every rebuild)
     try:
-        return shape is not None and not shape.isNull() and bool(shape.Faces)
+        return shape is not None and not shape.isNull() and shape.countElement("Face") > 0
     except Exception:
         return False
 
@@ -43,7 +44,7 @@ def has_faces(shape):
 def is_open_shape(shape):
     """Faces and no solid: what a surface body holds."""
     try:
-        return has_faces(shape) and not shape.Solids
+        return has_faces(shape) and shape.countElement("Solid") == 0
     except Exception:
         return False
 
