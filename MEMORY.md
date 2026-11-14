@@ -63,7 +63,17 @@ number that depends on the program writing a file.** Everything else in the tria
 Version: 0.1.0-beta.4.0.3, the number already in VERSION, `_FALLBACK_VERSION` and the
 CHANGELOG heading (the Move line is under its "Faster"); Luca asked for the release without
 choosing another.
-[x] merged [x] tests here [ ] CI green [ ] patch release 0.1.0-beta.4.0.3 (Luca's go: 2026-11-14).
+[x] merged [x] tests here [x] CI green (run #92 on acfe1732, the first green run since wave 8)
+[x] **0.1.0-beta.4.0.3 released 2026-11-14 10:28 UTC** (patch release run #16; tag
+`fission180-v0.1.0-beta.4.0.3`, `Release` = develop = acfe1732; Luca's go: "Fix it and get this
+thing pushed to release", Claude started the workflow). It holds wave 8 (tooltips, the AI in
+every workspace, AI speed), the Combine / 3D Contour / kernel-words fixes and live Move.
+How it went: tests green on 2c959ddb, but the trial run (publish off) failed on the AppImage
+(the STEP size above); fixed, tests and a second trial green on acfe1732, then published.
+**Before a release, start a trial run of the patch workflow (publish off) together with the
+tests: it is the only place the docs examples run on Fission 180's own build.**
+Next: nothing waits on Move; `sf/move-speed` on GitHub is merged and can be deleted; the open
+Move items are in the session log (the body's hidden drawing: a core patch for a full build).
 
 **2026-11-14: where things stand (session out of resources)** The cloud session ran out of its
 disk / memory / time allowance (the machine restarted twice, then Claude's app said "out of disk,
