@@ -126,6 +126,8 @@ class ReleaseWatch:
 
         WATCHES.discard(self)
         self.handle = None
+        if not WATCHES:
+            release_preselection()
         if self.filter is not None:
             try:
                 QtWidgets.QApplication.instance().removeEventFilter(self.filter)
@@ -147,6 +149,55 @@ def watch_release(handle):
     except Exception as exc:
         handle._release_watch = None
         warn("handle: %s" % exc)
+    hold_preselection(getattr(handle, "view", None))
+
+
+# While a handle is dragged, FreeCAD's preselection is off (move-speed, 2026-11-13): it looked
+# for what is under the mouse on every move, a ray through the whole part (4 ms a move on a
+# 600-face part, more on bigger ones), and lit the faces the dragged handle passed over;
+# Fusion lights nothing while a manipulator is dragged. Switched back on when the last drag
+# ends (ReleaseWatch.remove), whatever ended it.
+_PRESELECTION = {"root": None, "mode": None}
+
+
+def hold_preselection(view=None):
+    """Preselection off in `view` (default the active 3D view) until the drags end."""
+    if _PRESELECTION["root"] is not None:
+        return
+    try:
+        view = view or Gui.ActiveDocument.ActiveView
+        root = view.getSceneGraph()
+        field = root.getField("preselectionMode")
+        if field is None:
+            return
+        _PRESELECTION["mode"] = field.get()
+        _PRESELECTION["root"] = root
+    except Exception:
+        return
+
+    def off():  # (not inside the Coin event that pressed the handle)
+        try:
+            root = _PRESELECTION["root"]
+            if root is None or not WATCHES:
+                return
+            root.getField("preselectionMode").set("OFF")
+            Gui.Selection.clearPreselection()
+        except Exception:
+            pass
+
+    QtCore.QTimer.singleShot(0, off)
+
+
+def release_preselection():
+    """Preselection back as it was (the last drag ended)."""
+    root, mode = _PRESELECTION["root"], _PRESELECTION["mode"]
+    _PRESELECTION["root"] = _PRESELECTION["mode"] = None
+    if root is None or not mode:
+        return
+    try:
+        root.getField("preselectionMode").set(mode)
+    except Exception:
+        pass  # the view went with its design
 
 
 def stop_watching(handle):
@@ -525,8 +576,11 @@ class PathHandle(_Handle):
 
     def box_geometry(self):
         point = self.point()
-        return point, point, point, handle_look.mm(
-            self.view, point, handle_look.core.half_width_px("ball")
+        return (
+            point,
+            point,
+            point,
+            handle_look.mm(self.view, point, handle_look.core.half_width_px("ball")),
         )
 
     def _apply(self, value):
