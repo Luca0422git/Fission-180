@@ -11,7 +11,10 @@ The release gets lost four ways (fission180/drag_guard.py); each case makes one 
        keeps that release (it selects the face), so the arrow never hears of it.
   M2c  Move: drag the X arrow 30 mm, hold still until the moved body is under the mouse
        (it follows the arrow), let go.
-  M4   Move: let go while the preview recomputes. FreeCAD's progress bar eats the release.
+  M4   Move: drag the X arrow and hold it a moment on a slow design, then let go. Since Move
+       draws only the picture while a handle is dragged (move_live.py, move-speed), nothing
+       recomputes while the button is down, so there is no recompute for the release to fall
+       into (before, the preview recomputed and FreeCAD's progress bar ate the release).
   M8   Move, Rotate about Z: drag the blue turn handle 40 degrees and let go over the body.
   H2b  Offset Plane: double-click the arrow at a person's pace with the part behind it.
        FreeCAD hands the second press to the scene only together with the release.
@@ -110,6 +113,17 @@ def case_eaten(name):
     h.check(
         "case %s: Qt knows the button is up" % name,
         info.get("fired") and not info.get("Qt left button down right after", True),
+        info,
+    )
+
+
+def case_live(name):
+    """Move draws only the picture while its arrow is dragged (move_live.py): the slow part
+    was not rebuilt while the button was down, so no recompute could take the release."""
+    info = st.get("info") or {}
+    h.check(
+        "case %s: nothing recomputed while the arrow was dragged and held" % name,
+        info.get("fired") is False and "hook error" not in info,
         info,
     )
 
@@ -325,13 +339,15 @@ def m4_drag():
     d.move(pos)
     d.press(pos)
     d.moves([d.lerp(pos, screen(end3), i / 8.0) for i in range(1, 9)])
-    st["info"] = d.release_during_recompute(screen(end3 + X * 2))
+    # (armed as for the other cases: a recompute of the slow part while the button is down
+    # would take the release; none comes, and the button comes up after the wait)
+    st["info"] = d.release_during_recompute(screen(end3 + X * 2), timeout_ms=1500)
     let_go(m_dragging)
     st["hover"] = [screen(end3 + X * k) for k in (6, 12, 18)]
 
 
 def m4_after():
-    case_eaten("M4")
+    case_live("M4")
     judge("M4", m_dragging, m_dx, m_final)
 
 
