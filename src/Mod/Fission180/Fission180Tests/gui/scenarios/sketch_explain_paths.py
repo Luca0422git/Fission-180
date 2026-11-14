@@ -227,6 +227,12 @@ def g_redundant():
     d.commitTransaction()
 
 
+# (the palette reads the solver's result every 0.3 s (sketch_palette._mode_timer): the next step
+# waits for it, as a person sees it, instead of looking at once: flaky on GitHub run #88)
+g_redundant.done = lambda: freedom_text() == "Redundant constraints"
+g_redundant.done_what = "the palette to say Redundant constraints"
+
+
 def g_palette():
     state("redundant")
     h.check("G: the palette says so", freedom_text() == "Redundant constraints", freedom_text())

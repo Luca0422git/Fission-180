@@ -39,18 +39,24 @@ scenarios, `move_speed` 151 checks, 67 others that use the changed files or open
 7,400+ checks), the ten + `move_speed` + `drag_release_lost` again at GitHub's 770 px view,
 unit 4,029 OK, golden 653 + 2 xfail, headless / docs / agent / rebuild / recognize 0 failed,
 smoke + journey + restart, black, check_waits 0 / 0, check_links.
-**Still red, from wave 8, not Move (same on GitHub run #88 before this merge and here):**
-`sim_core_job` ("F: the window's timers ran while the AI solved: 0 ticks in 3.4 s", fails
-twice: ai-speed holds the window's timers during an AI call?) and `sketch_explain_paths`
-(flaky: "G: the palette says so: 4 left to define", then passes). Luca's patch release needs
-them green or judged.
+**The two wave 8 reds (GitHub runs #88 and #90), fixed the same day** (Luca: "Fix it and get
+this thing pushed to release"): both were checks, not the app. `sim_core_job` F counted a
+QTimer's ticks during the AI's solve; since wave 8 timers wait during an AI call on purpose
+(`ai/alive.py`: autosave and polls must not change the design under the call) and the window
+is kept alive by `alive.pump`. F now reads `alive.stats()`: looked at at least once a second
+on average (11-13 looks in 4 s here, 24 in 13.6 s under `--stress`: not while the study is
+handed over and its results are read), repainted, the working line with Stop shown, timers
+held. `sketch_explain_paths` looked at the sketch palette at once after a scripted
+constraint; the palette reads the solver every 0.3 s (`sketch_palette._mode_timer`):
+`g_redundant` now waits for it (6 of 6 here; it had failed 1 run in 2).
 **Still open on Move** (session log): FreeCAD draws every body's own hidden shape at every
 rebuild (most of a release; a core patch is described there, it needs the full build);
 Cancel after a drag rebuilds (2.2 s on the Relic-like part); other live drags (Press Pull,
 Extrude arrows, sketch Move, joints) not measured.
-Version: still 0.1.0-beta.4.0.3 (VERSION, `_FALLBACK_VERSION`, the CHANGELOG heading: the
-Move line is under its "Faster"); Luca picks the number (suggested 0.1.0-beta.4.1).
-[x] merged [x] tests here [ ] CI green (two wave 8 scenarios) [ ] Luca: version, patch release.
+Version: 0.1.0-beta.4.0.3, the number already in VERSION, `_FALLBACK_VERSION` and the
+CHANGELOG heading (the Move line is under its "Faster"); Luca asked for the release without
+choosing another.
+[x] merged [x] tests here [ ] CI green [ ] patch release 0.1.0-beta.4.0.3 (Luca's go: 2026-11-14).
 
 **2026-11-14: where things stand (session out of resources)** The cloud session ran out of its
 disk / memory / time allowance (the machine restarted twice, then Claude's app said "out of disk,
@@ -1162,10 +1168,11 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   (`move.placed_copy`); `unit/test_move_frames_freecad.py` compares with what 0.1.0-beta.4.0.2
   built. Cost: the step is drawn again at every release (FreeCAD skips the drawing only for
   the same solid at another placement).
-- **Open (GitHub run #88, 2026-11-14, wave 8; the same in the sandbox):** `sim_core_job` fails
-  "F: the window's timers ran while the AI solved: 0 ticks in 3.4 s" (twice);
-  `sketch_explain_paths` is flaky ("G: the palette says so: 4 left to define", then passes).
-  Neither uses Move.
+- **Timers wait during an AI call (wave 8, `ai/alive.py`): a test must not count a QTimer's
+  ticks to show the window is alive there** (`sim_core_job` F did and failed on GitHub runs
+  #88 and #90); read `alive.stats()` (pumps, paints, shown, timers_held). And a check on a
+  panel that polls (the sketch palette's "left to define": every 0.3 s) waits for it with the
+  step's `done` (`sketch_explain_paths` was flaky). Both fixed 2026-11-14.
 - **Done 2026-10-30 (Luca: "fix the packaging with the PNG icon and the linux stuff"; core patch #20, create_bundle.sh: the 256 px PNG next to the desktop file and as `.DirIcon`, then `chmod -R a+rX AppDir`; both refusals reproduced with appimagetool build 333 on a small AppDir, which packs after). Was: BEFORE THE NEXT FULL BUILD: appimagetool's "continuous" build changed (2026-10-29, build 333) and now refuses an AppDir whose files other users cannot read** ("has mode 0700 ... found 3330 problem(s)": folders of the bundled conda environment such as usr/ssl, usr/var/cache/fontconfig, usr/cmake). It broke the 0.1.0-beta.3.1.3 patch release (run #10, linux job, nothing published). `tools/fission180/repack_module.sh` now runs `chmod -R a+rX` on the unpacked AppImage before packing (reproduced locally: a 0700 folder is refused, after the chmod it packs). `package/rattler-build/linux/create_bundle.sh` (the full build) downloads the same continuous tool and needs the same `chmod -R a+rX AppDir` before its appimagetool call, with a FISSION180 comment and a core-patches.md entry: not done yet because that file counts in the core id (it would have refused the patch release). Do it as the first commit of the next full build. **Confirmed by the build dry run #15 (2026-10-30, `sf/gui-tests-rework`, ee57bdd2): the Linux build compiled and passed its smoke test, then appimagetool build 333 refused the AppDir for its icon first** ("org.fission180.Fission180{.png,.xpm} defined in desktop file but not found", "No valid .DirIcon": create_bundle.sh copies only the .svg). The fix, for Luca to decide (core id): in create_bundle.sh, next to the .svg copy, a 256 px PNG as `AppDir/org.fission180.Fission180.png` (src/Gui/Icons/fission180-icon-256.png) with `.DirIcon` linked to it, plus the chmod above; or pin appimagetool to a fixed release instead of `continuous`.
 - **A left release Fission 180 keeps from FreeCAD left its navigation thinking the button was held (Luca, 2026-10-29; fixed in 0.1.0-beta.3.1.3).** `selection_ui._ViewFilter` lets FreeCAD see every left press (a click, a box or a Component Drag cannot be told apart yet) but kept the Component Drag's moves and release: FreeCAD's `NavigationStyle.button1down` stayed true, and in the Revit style a middle-drag (pan: BUTTON3 alone) and Shift + middle-drag (orbit) matched no case until the next real left click. Now `_release_for_freecad` hands FreeCAD a release with the selection node's `selectionMode` OFF (the scene graph root IS the SoFCUnifiedSelection; AUTO 0, ON 1, OFF 2) and Ctrl (no "click on nothing clears the selection"), on every release the filter keeps (drag, box, cancelled, Select Other). FreeCAD fixed the same class itself for its ClarifySelection (gh #29090, `resetButtonState()`, not reachable from Python; a navigation-style switch would reset it but loses ZoomAtCursor and the like). Same day: the ViewCube kept turning after a release that went to another widget; a move without the left button now ends its press. Scenario `navigation_stuck_buttons` (4 checks fail on the old code).
 - **The Windows installer left NO Fission 180 when updating over a Fission 180 whose AI connector ran (Luca, 2026-10-28; fixed in 0.1.0-beta.3.1.2, core patch #19).** Claude Desktop (Gemini CLI, Claude Code) keeps Fission 180's AI connector running: Fission 180's own `bin\python.exe`. FreeCAD's installer checks only for `Fission180.exe` / `Fission180Cmd.exe`, then `RMDir /r` deleted file after file, stopped at the connector's open files ("Failed to remove ... no files are in use") and aborted. Now (`include/utils.nsh`): programs running from the folder are found by path (`Get-CimInstance Win32_Process`); the connector is stopped after asking, others get Retry / Cancel; the folder is moved aside to `<folder>.old` in ONE step (refused while a file is open: Retry / Cancel, nothing changed) and only then deleted; the uninstaller stops the connector too. Windows test `tools/fission180/test_installer.ps1` (installs over a running connector, with a file held open, uninstall) in the patch release and the full build. The quick update (`install_update.ps1`) already stopped the connector. Lesson: never delete in place what cannot be put back; move first, delete after.

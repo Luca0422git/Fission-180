@@ -15,8 +15,10 @@ C  Solve again to the end: done, the tip bends 0.2 mm (beam theory 0.2000, withi
 D  Generate Mesh (a mesh-only job): the mesh statistics, the results kept.
 E  A third solve cancelled while meshing: the last results stay (same summary, the result
    object still there), nothing left behind.
-F  solve_study from Fission 180's AI chat: solved, and the window's timers kept running while it
-   solved (the window repaints; no mouse or keys meanwhile).
+F  solve_study from Fission 180's AI chat: solved, and the window lived while it solved (since
+   wave 8, fission180/ai/alive.py: it looks at the window at least once a second, repaints
+   and shows the working line with Stop; timers wait on purpose and no mouse or keys get
+   through, so nothing changes the design under the call).
 G  Nothing printed as an error at any step (the harness checks after every step).
 """
 
@@ -211,7 +213,7 @@ def after_second_cancel():
 
 
 def ai_solve():
-    from fission180.ai import bridge
+    from fission180.ai import alive, bridge
 
     ticks = []
     timer = QtCore.QTimer()
@@ -224,11 +226,29 @@ def ai_solve():
     timer.stop()
     text = str(answer)
     h.check("F: the AI's solve is done", "solved" in text, text[:300])
+    # Until wave 8 a QTimer ticking showed the window was alive. Now timers wait during an AI
+    # call on purpose (autosave and polls must not change the design under it) and the window
+    # is kept alive by alive.pump: it handles its events at every safe point of the call.
+    stats = alive.stats()
+    h.check(
+        # (on average: it is looked at up to ten times a second while Gmsh and CalculiX run in
+        # the background, and not while the study is handed over and its results are read)
+        "F: the window was looked after while the AI solved (at least once a second)",
+        stats["pumps"] >= max(1, int(took)),
+        "%d looks in %.1f s" % (stats["pumps"], took),
+    )
+    h.check("F: it repainted meanwhile", stats["paints"] > 0, stats)
+    h.check(
+        "F: the working line with Stop was shown",
+        stats["shown"] and any("solving" in line for line in stats["lines"]),
+        stats["lines"][-3:],
+    )
     during = [t for t in ticks if started <= t <= started + took]
     h.check(
-        "F: the window's timers ran while the AI solved",
-        len(during) >= max(1, int(took / 0.5)),
-        "%d ticks in %.1f s" % (len(during), took),
+        "F: timers waited for the end of the call (nothing ran under it)",
+        stats["timers_held"] > 0 and len(during) <= 1,
+        "%d held, %d of this step's own ticks in %.1f s"
+        % (stats["timers_held"], len(during), took),
     )
 
 
