@@ -39,7 +39,8 @@ def setup():
         s["ran"].append(tool)
         if tool == "get_timeline" and not s.get("long_done"):
             s["long_done"] = True
-            time.sleep(4.0)  # (the long call: the window's thread is busy)
+            # a long tool call on purpose (the app under test): the window's thread is busy
+            time.sleep(4.0)  # slow on purpose (the app under test)
         return real(tool, args, host, call_id)
 
     executor.run = run
@@ -50,7 +51,9 @@ def _call(name, tool, delay):
     from fission180.ai import fission180_mcp
 
     def work():
-        time.sleep(delay)
+        # input pace: when an AI app sends its call (the bridge measures how long the
+        # call before it has been running: BUSY_AFTER)
+        time.sleep(delay)  # input pace: the moment the call is sent
         client = fission180_mcp.BridgeClient(bridge_file(), timeout=30, retry_wait=0.01)
         s["answers"][name] = client.call_tool(tool, {})
 
