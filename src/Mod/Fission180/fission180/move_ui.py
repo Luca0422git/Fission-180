@@ -1544,8 +1544,16 @@ class MovePanel(BodyPanel):
         if self._waits_for_movement(place):
             move.check(self.options)  # (what is wrong with the picks is said at once)
             return
+        first = not self.steps
         self.steps = move.build(self.options, self.steps)
         self.target = self.steps[0] if self.steps else None
+        if first:
+            # the steps were made just now (a drag let go, a value, a point, OK): each body's
+            # previous last step stays drawn (where it was let go) until its Move step is
+            # drawn (move_live): no frame drawn during the rebuild is without the body
+            for step in self.steps:
+                if bodies.alive(step) and not move.is_copy(step) and step.BaseFeature:
+                    self.live.hand_over(step.BaseFeature, step)
 
     def _waits_for_movement(self, place):
         """A new Move makes its steps at the first movement (a drag let go, a value typed, a

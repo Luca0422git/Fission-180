@@ -21,8 +21,9 @@ hand (move_speed_probe.Probe). For every drag:
   box      the 40 x 30 x 10 box: X arrow, OK, Undo / Redo; a hole after the Move, then the
            Move edited from the timeline (the hole waits after the marker) and dragged back
   relic    a part like Luca's Relic (move_speed_parts.RELIC: 599 faces, 33 features): X
-           arrow (profiled); Z turn handle, Cancel; Create Copy with the Y arrow, Cancel;
-           Rotate about the Z axis (the blue handle), Cancel; Point to Point (two clicks:
+           arrow (profiled), then again in the same dialog (relic_again); Z turn handle,
+           Cancel; Create Copy with the Y arrow, Cancel; Rotate about the Z axis (the blue
+           handle), Cancel; Point to Point (two clicks:
            the time to the result), Cancel; the body made a component, turned and moved:
            Move Object Components with the X arrow; the body inside it moved with the X
            arrow (its own coordinates turned)
@@ -32,8 +33,8 @@ hand (move_speed_probe.Probe). For every drag:
 
 The report goes to move-speed-report.json / .md next to the other output.
 FISSION180_MOVE_SPEED_CASES=box,relic runs only those groups (a quicker look while working);
-FISSION180_MOVE_SPEED_FILE=<a .FCStd> also drags the X arrow on the biggest body of that design
-(opened, never saved; Cancel).
+FISSION180_MOVE_SPEED_FILE=<a .FCStd> also drags the X arrow on the biggest body of that design,
+twice (opened, never saved; Cancel).
 
 Run alone: tools/fission180/run_tests.sh --scenario move_speed
 """
@@ -308,6 +309,14 @@ def finish(case, kind="move", index=0, big=True, value_key=None):
         probe.held is not None and worst < 1e-3,
         "%.6f mm" % worst,
     )
+    # Fusion: while the result is worked out after the release the body stays drawn where it
+    # was let go (no jump back, no gap): every frame drawn meanwhile shows it there
+    off = summary.get("release_off")
+    h.check(
+        "%s: drawn where it was let go until the result" % case,
+        summary.get("release_hidden") == 0 and (off is None or off < 1e-3),
+        (summary.get("release_frames"), summary.get("release_hidden"), off),
+    )
     between = summary.get("between_median")
     limit = TARGET_BIG if big else TARGET_SMALL
     h.speed_check(
@@ -347,7 +356,10 @@ def dragged(fn, case):
 
 
 # -- one plain drag group (open, drag an arrow, result, OK) ------------------------------------
-def arrow_case(case, bodies_fn, index=0, along=60.0, big=True, profile=False, ok=True):
+def arrow_case(case, bodies_fn, index=0, along=60.0, big=True, profile=False, ok=True, again=False):
+    """Open Move on the bodies, drag arrow `index` by `along` mm, check the result, OK.
+    `again`: a second drag in the same dialog (case + "_again", back 30 mm), its steps made."""
+
     def a_open():
         S["bodies"] = bodies_fn()
         S["undo0"] = len(S["doc"].UndoNames or [])
@@ -375,6 +387,16 @@ def arrow_case(case, bodies_fn, index=0, along=60.0, big=True, profile=False, ok
         dragged(b_drag, case),
         after_release(case, "move", index, big=big),
     ]
+    if again:
+
+        def c_drag_again():
+            pixels = arrow_pixels(index, -30.0)
+            start_drag(case + "_again", moved_bodies(), pixels=pixels, axis=AXES[index])
+
+        steps += [
+            dragged(c_drag_again, case + "_again"),
+            after_release(case + "_again", "move", index, big=big),
+        ]
     if ok:
 
         def d_ok():
@@ -697,7 +719,7 @@ def relic_steps():
     closed = (lambda: panel() is None, "the dialog closed")
     return (
         [named(build, "relic_build", timeout_s=240)]
-        + arrow_case("relic", lambda: [S["relic"]], profile=True)
+        + arrow_case("relic", lambda: [S["relic"]], profile=True, again=True)
         + [named(undo, "relic_undo", timeout_s=60), named(undone, "relic_undone")]
         # the Z turn handle
         + [
@@ -804,7 +826,7 @@ def file_steps():
 
     return (
         [named(open_file, "file_open_design", opened_file, "the design opened", 240)]
-        + arrow_case("file", lambda: [S["file_body"]], ok=False)
+        + arrow_case("file", lambda: [S["file_body"]], ok=False, again=True)
         + cancel_steps("file", lambda: None)
     )
 
@@ -833,6 +855,8 @@ def report():
         "stop_to_result",
         "release_frames",
         "release_off",
+        "release_hidden",
+        "release_inside",
         "click_to_result",
     )
     lines = [
@@ -847,7 +871,9 @@ def report():
         "the release to the exact result shown; stop_to_result = from the hand stopping to "
         "the exact result (what compares across versions); release_frames / release_off = "
         "frames drawn between the release and the exact result, and how far (mm) the body "
-        "was drawn from where it was let go in them.",
+        "was drawn from where it was let go in them; release_hidden = how many of them did "
+        "not draw every moved body; release_inside = how many were drawn in the middle of a "
+        "recompute.",
         "",
         "| case | " + " | ".join(cols) + " |",
         "|---|" + "---:|" * len(cols),

@@ -27,8 +27,9 @@ summary() gives, in milliseconds:
               value, nothing drawn moved by a transform any more)
   stop_to_result  from the hand stopping until the exact result was shown (the hold and
               the release included): what compares across versions
-  release_frames / release_off  frames drawn between the release and the exact result, and
-              how far (mm) the first body was drawn from where it was let go in them
+  release_frames / release_off / release_hidden  frames drawn between the release and the
+              exact result, how far (mm) the first body was drawn from where it was let go in
+              them, and how many of them did not draw every moved body
 and counts: moves sent, values the dialog took, frames, frames that showed the body move.
 Not a scenario itself.
 """
@@ -132,9 +133,39 @@ def drawn_center(obj, centers):
     return found[0] if found else None
 
 
+def is_drawn(obj):
+    """True when the 3D view draws `obj`: shown, with triangles in its view's geometry."""
+    from pivy import coin
+
+    vobj = obj.ViewObject
+    if vobj is None or not vobj.isVisible():
+        return False
+    search = coin.SoSearchAction()
+    search.setType(coin.SoCoordinate3.getClassTypeId())
+    search.setInterest(coin.SoSearchAction.FIRST)
+    search.apply(vobj.RootNode)
+    path = search.getPath()
+    if path is None:
+        return False
+    return path.getTail().point.getNum() > 0
+
+
 def shown_object(body):
-    """The object the 3D view draws a body with (its Tip); any other object itself."""
-    return getattr(body, "Tip", None) or body
+    """The object the 3D view draws a body with: its Tip, or while the Tip is hidden the step
+    of the body that is shown (PartDesign shows one at a time); any other object itself."""
+    tip = getattr(body, "Tip", None)
+    if tip is None:
+        return body
+    try:
+        if tip.ViewObject.isVisible():
+            return tip
+        for obj in body.Group:
+            vobj = getattr(obj, "ViewObject", None)
+            if "BaseFeature" in obj.PropertiesList and vobj is not None and vobj.isVisible():
+                return obj
+    except Exception:
+        pass
+    return tip
 
 
 class HandDrag:
@@ -255,6 +286,7 @@ class Probe:
         self.centers = _Centers()
         self.frames = []  # (time, drawn offset of the first watched object)
         self.rest = []  # per frame: the drawn offsets of the other watched objects (axis only)
+        self.drawn = []  # per frame: every watched body drawn (its shown step visible, with faces)
         self.paints = []  # time a paint of the 3D view began
         self.draws = []  # how long each frame took to draw (paint to swap)
         self.beats = []
@@ -296,9 +328,16 @@ class Probe:
         self.recomputes = []  # when a design was recomputed during the drag
         probe = self
 
+        self.recomputing = []  # (start, end) of every recompute of a design during the probe
+
         class _Recomputes:
+            def slotBeforeRecomputeDocument(self, doc):
+                probe._began = time.perf_counter()
+
             def slotRecomputedDocument(self, doc):
-                probe.recomputes.append(time.perf_counter())
+                now = time.perf_counter()
+                probe.recomputes.append(now)
+                probe.recomputing.append((getattr(probe, "_began", None) or now, now))
 
         self._observer = _Recomputes()
         App.addDocumentObserver(self._observer)
@@ -353,6 +392,10 @@ class Probe:
                 self.rest.append(self.offsets_rest())
             except Exception:
                 self.rest.append([None] * len(self.start_rest))
+        try:
+            self.drawn.append(all(is_drawn(shown_object(obj)) for obj in self.watched))
+        except Exception:
+            self.drawn.append(None)
         if self.paints:
             self.draws.append(t - self.paints[-1])
 
@@ -429,10 +472,15 @@ class Probe:
         # the frames drawn from the release to the exact result, and how far the first body
         # was drawn from where it was let go in them (Fusion: it stays there, no jump back)
         off = []
+        hidden = inside = 0
         if drag.t_release is not None and self.exact_at is not None:
-            for t, d in self.frames:
+            for k, (t, d) in enumerate(self.frames):
                 if drag.t_release < t <= self.exact_at + 0.002:
                     off.append(None if d is None or not final else abs(d - final))
+                    if k < len(self.drawn) and self.drawn[k] is False:
+                        hidden += 1
+                    if any(a <= t <= b for a, b in self.recomputing):
+                        inside += 1  # drawn in the middle of a recompute
         caught = None
         if final:
             near = max(0.05, 0.01 * abs(final))
@@ -488,6 +536,8 @@ class Probe:
             "release": ms([release] if release is not None else [], "max"),
             "stop_to_result": ms([self.exact_at - t1] if self.exact_at is not None else [], "max"),
             "release_frames": len(off),
+            "release_hidden": hidden,
+            "release_inside": inside,
             "release_off": max((x for x in off if x is not None), default=None),
             "final": final,
             "drag_ms": round(span * 1000.0, 1),
