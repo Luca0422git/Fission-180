@@ -158,6 +158,32 @@ def watch_release(handle):
 # Fusion lights nothing while a manipulator is dragged. Switched back on when the last drag
 # ends (ReleaseWatch.remove), whatever ended it.
 _PRESELECTION = {"root": None, "mode": None}
+PRESELECTION_ON = "AUTO"  # FreeCAD's own default (SoFCUnifiedSelection.preselectionMode)
+
+
+def preselection_mode(root):
+    """The name of the 3D view's preselection mode ("AUTO", "ON", "OFF") as a plain string,
+    or None when the view has none. (Coin hands the field's value back as an SbString, which
+    the field does not take back: 0.1.0-beta.4.0.3 kept it and could never switch the hover
+    highlight on again after the first drag of a handle.)"""
+    try:
+        field = root.getField("preselectionMode")
+        if field is None:
+            return None
+        value = field.get()
+        text = value.getString() if hasattr(value, "getString") else str(value)
+        return str(text).strip() or None
+    except Exception:
+        return None
+
+
+def _set_preselection(root, mode):
+    """True when the view's preselection mode is `mode` afterwards."""
+    try:
+        root.getField("preselectionMode").set(str(mode))
+    except Exception:
+        return False
+    return preselection_mode(root) == str(mode)
 
 
 def hold_preselection(view=None):
@@ -167,10 +193,10 @@ def hold_preselection(view=None):
     try:
         view = view or Gui.ActiveDocument.ActiveView
         root = view.getSceneGraph()
-        field = root.getField("preselectionMode")
-        if field is None:
-            return
-        _PRESELECTION["mode"] = field.get()
+        mode = preselection_mode(root)
+        if mode is None or mode == "OFF":
+            return  # nothing to switch off (the person's own choice stays)
+        _PRESELECTION["mode"] = mode
         _PRESELECTION["root"] = root
     except Exception:
         return
@@ -180,10 +206,10 @@ def hold_preselection(view=None):
             root = _PRESELECTION["root"]
             if root is None or not WATCHES:
                 return
-            root.getField("preselectionMode").set("OFF")
-            Gui.Selection.clearPreselection()
-        except Exception:
-            pass
+            if _set_preselection(root, "OFF"):
+                Gui.Selection.clearPreselection()
+        except Exception as exc:
+            warn("handle: preselection off: %s" % exc)
 
     QtCore.QTimer.singleShot(0, off)
 
@@ -195,9 +221,12 @@ def release_preselection():
     if root is None or not mode:
         return
     try:
-        root.getField("preselectionMode").set(mode)
-    except Exception:
-        pass  # the view went with its design
+        if preselection_mode(root) is None:
+            return  # the view went with its design
+        if not _set_preselection(root, mode) and not _set_preselection(root, PRESELECTION_ON):
+            warn("handle: the hover highlight could not be switched on again (%s)" % mode)
+    except Exception as exc:
+        warn("handle: preselection back: %s" % exc)
 
 
 def stop_watching(handle):

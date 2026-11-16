@@ -4,6 +4,26 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-16: 0.1.0-beta.4.0.3 broke the hover highlight; fixed as 0.1.0-beta.4.0.4** Luca:
+"the faces on bodies and whole bodies dont highlight when hovering over them anymore". Cause:
+move-speed's `handles3d.hold_preselection` switches FreeCAD's preselection off while a handle
+is dragged and kept the old mode as Coin handed it back (`field.get()`: an SbString); the
+field does not take an SbString back, `set()` raised, and the `except: pass` round it hid
+that. So after the first drag of any handle watched by `handles3d.watch_release` (Move's
+triad, Revolve's angle, the primitives, LinearHandle / PathHandle of the construction planes,
+Section, Emboss, mesh tools, curve picks) the view's `preselectionMode` stayed OFF: no face,
+edge or body lit in that design again. Not Extrude's / Press Pull's arrows (Coin draggers).
+None of the 78 scenarios run for the merge hovered after a drag. Fix: the mode is kept as a
+plain string (`handles3d.preselection_mode`), set back and read back, AUTO if that fails, and
+a failure is logged. New scenario `hover_after_drag` (38 checks: the pointer lights the top
+face before a drag, nothing lights and the switch is off while the Move arrow is held, it is
+back at the release, the body lights with the dialog open, after OK, after Esc, after two
+drags and Cancel in an edited Move); it fails on 4.0.3 at the release of the first drag.
+**Lessons: a switch that is turned off for a while gets a test that it comes back; never
+`except: pass` round putting a setting back (log it); a value read from a Coin field is an
+SbString, not a str.**
+[x] fixed [x] scenario [ ] CI green [ ] patch release 0.1.0-beta.4.0.4.
+
 **2026-11-14 (later): Move speed finished and merged into develop; a bug found at the merge
 fixed** (session log `docs/fission180/sessions/move-speed.md`, its last section) Luca: "finish
 the move-speed branch: run its remaining tests, merge it into develop". `sf/move-speed` merged

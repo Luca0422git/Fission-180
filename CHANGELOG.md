@@ -8,6 +8,19 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.0.4
+
+### Fixed
+
+- **Faces and bodies no longer lit up under the mouse** in 0.1.0-beta.4.0.3, once an arrow or
+  turn handle of Move had been dragged in a design (or a drag handle of Revolve, the
+  primitives, the construction planes, Section and a few other tools): nothing was
+  highlighted in that design any more until Fission 180 was started again.
+  Clicking still worked; only the highlight was gone. Fission 180 switches the highlight off
+  while such a handle is dragged (new in 0.1.0-beta.4.0.3, so nothing lights up under a
+  moving manipulator) and could not switch it back on. It comes back the moment the handle is
+  let go.
+
 ## 0.1.0-beta.4.0.3
 
 ### New
