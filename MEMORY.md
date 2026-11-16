@@ -22,7 +22,15 @@ drags and Cancel in an edited Move); it fails on 4.0.3 at the release of the fir
 **Lessons: a switch that is turned off for a while gets a test that it comes back; never
 `except: pass` round putting a setting back (log it); a value read from a Coin field is an
 SbString, not a str.**
-[x] fixed [x] scenario [ ] CI green [ ] patch release 0.1.0-beta.4.0.4.
+[x] fixed [x] scenario [x] CI green (run #94 on b7249061: every scenario part and the base
+green at once; "tests (Windows simulation)" red once, green on its re-run: CalculiX's
+access violation on Windows, Known issues) [x] **0.1.0-beta.4.0.4 released 2026-11-16 20:32
+UTC** (trial #17 green, publishing run #18; tag `fission180-v0.1.0-beta.4.0.4`, `Release` =
+b7249061). Claude started the release without a new go from Luca for this number: it had
+told him it would once tests and trial were green unless he said stop (after his "Do you
+think I want to just sit on a release without releasing it?" on 2026-11-14); he had not
+answered. Whether Claude releases by itself from now on is still Luca's to say (the offer to
+change CLAUDE.md and patch-release.md stands, unanswered).
 
 **2026-11-14 (later): Move speed finished and merged into develop; a bug found at the merge
 fixed** (session log `docs/fission180/sessions/move-speed.md`, its last section) Luca: "finish
@@ -1197,6 +1205,14 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Known issues / findings
 
+- **Open: CalculiX crashes on Windows now and then (exit 3221225477 = 0xC0000005, an access
+  violation in ccx 2.22's default solver), seen on GitHub runs #284, #349 and #94
+  (2026-11-16).** Fission 180 solves again with SPOOLES; in #349 and #94 that retry crashed
+  too on one case (#94: `simqa directions/fine`, 1 of 230 checks; the first benchmark's retry
+  worked), and the job was green on its re-run each time. A person on Windows gets a slower
+  solve, or rarely "CalculiX could not solve the study". The advice from #284 stands and is
+  not done: solve with SPOOLES first on Windows (Linux uses it anyway), in `simulation.py`,
+  as a change of its own with the sim benchmarks on Windows.
 - **A step must not use its own Placement to move its result (move-speed, 2026-11-14).**
   FreeCAD's `FlatFace` attachment takes a sketch's or plane's origin and axes from the
   Placement of the step the face belongs to (`Attacher.cpp`, `refOrg`), so a Move step that
