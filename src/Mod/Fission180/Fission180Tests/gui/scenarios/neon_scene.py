@@ -180,7 +180,7 @@ def setup():
     h.draw_rectangle(sk2, 60, 0, 20, 20)
     App.ActiveDocument.recompute()
     sk2.ViewObject.Visibility = True
-    s["body"] = body
+    s["body"], s["sketch2"] = body, sk2
     Gui.Selection.clearSelection()
     h.fit()
     grid_ui.redraw_all()
@@ -297,6 +297,55 @@ def back_to_v():
     h.shot("v")
 
 
+def extrude_open():
+    Gui.Selection.clearSelection()
+    Gui.Selection.addSelection(App.ActiveDocument.Name, s["sketch2"].Name)
+    Gui.runCommand("Fission180_Extrude")
+
+
+extrude_open.done = lc.task_open
+extrude_open.done_what = "the Extrude dialog to open"
+
+
+def extrude_arrow_on_screen():
+    """(The arrow's colour is checked on its nodes in scene_is_neon: on screen it stands on
+    the picked profile, which has the same colour, as in Dark.)"""
+    h.caught_up(what="the Extrude dialog's preview")
+    h.view_drawn()
+    h.shot("extrude")
+
+
+def extrude_closed():
+    h.task_button("Cancel")
+    Gui.Selection.clearSelection()
+
+
+extrude_closed.done = lambda: not lc.task_open()
+extrude_closed.done_what = "the Extrude dialog to close"
+
+
+def sketch_open():
+    Gui.ActiveDocument.setEdit(s["sketch2"].Name)
+
+
+sketch_open.done = lambda: Gui.ActiveDocument.getInEdit() is not None
+sketch_open.done_what = "the sketch to open for editing"
+
+
+def sketch_shot():
+    h.caught_up(what="the sketch")
+    h.view_drawn()
+    h.shot("sketch")
+
+
+def sketch_closed():
+    Gui.ActiveDocument.resetEdit()
+
+
+sketch_closed.done = lambda: Gui.ActiveDocument.getInEdit() is None
+sketch_closed.done_what = "the sketch to close"
+
+
 def save_in_neon():
     s["neon_path"] = os.path.join(h.OUT_DIR, "neon_scene-neon.FCStd")
     Gui.Selection.clearSelection()
@@ -361,6 +410,7 @@ def all_back():
 h.run(
     "neon_scene",
     [setup, to_neon, scene_is_neon, selected_face, to_johnny, johnny, back_to_v, save_in_neon,
-     thumbnails_alike, back_to_dark, all_back],
+     thumbnails_alike, extrude_open, extrude_arrow_on_screen, extrude_closed, sketch_open, sketch_shot,
+     sketch_closed, back_to_dark, all_back],
     paced_by="state",
 )
