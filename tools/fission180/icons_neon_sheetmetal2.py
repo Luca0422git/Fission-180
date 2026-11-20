@@ -38,3 +38,15 @@ def _():
 def _():
     plate = [iso(-14, -14, 0), iso(14, -14, 0), iso(14, 4, 0), iso(4, 14, 0), iso(-14, 14, 0)]
     return nb_poly(plate, NB_P, 1.4, 0.14) + nb_line(*iso(14, 4, 0), *iso(4, 14, 0), c=NB_S, w=2.2)
+
+
+@neon_icon("sm_bend")
+def _():
+    # the flat part, the flap bent up about the bend, the flap's flat place dashed, the turn
+    return (
+        nb_sheet("M4 38 H22", NP)
+        + nb_sheet("M22 38 Q28 38 30 32 L36 14", NS)
+        + nseg(31, 38, 45, 38, NS, NI, dash="3 2.4", cap="butt", glow=0.14)
+        + nl("M45 32 Q46 23 42 18", NS, NW, cap="butt")
+        + nhead(41, 16, math.radians(-125), NS, NW, 5)
+    )

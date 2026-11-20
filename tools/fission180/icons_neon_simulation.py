@@ -30,40 +30,45 @@ def nb_beam(c_root=NB_P, c_arm=NB_S):
 
 @neon_icon("sim_study")
 def _():
-    return nb_beam() + nb_stress(35, 24, 5, 14)
+    # the study row: the bracket on its wall and a result scale (hot cell on top)
+    return (
+        nseg(8, 8, 8, 40, NP, NW, cap="butt")
+        + nl("M8 12 L3 17 M8 22 L3 27 M8 32 L3 37", NP, NI, glow=0.14, cap="butt")
+        + npoly([(8, 15), (30, 15), (30, 24), (8, 24)], NP, NW, fo=0.14, close=False)
+        + nf("M8 15 H17 V24 H8 Z", NS, 0.4)
+        + npoly([(35, 8), (43, 8), (43, 40), (35, 40)], NS, NW)
+        + nf("M35 8 H43 V18 H35 Z", NA, 0.6)
+        + nseg(35, 24, 43, 24, NS, NI, glow=0, cap="butt")
+    )
 
 
 def nb_clip(c=NB_P):
     """A clipboard: cut-corner board with a clip at the top."""
-    return (
-        nb_poly(nb_cut(10, 7, 26, 35, 4), c, 1.5, 0.10)
-        + nb_poly(nb_cut(17, 4, 12, 5, 1.5), c, 1.3, 0.3, glow=False)
-    )
+    return ncut(9, 7, 28, 36, c, 4, fo=0.08) + ncut(17, 3.5, 12, 6, c, 1.5, NI, fo=0.3)
 
 
 @neon_icon("sim_precheck")
 def _():
     return (
         nb_clip()
-        + nb_line(15, 17, 31, 17, NB_T, 1.4, glow=False)
-        + nb_line(15, 24, 31, 24, NB_T, 1.4, glow=False)
-        + nb_line(15, 31, 25, 31, NB_T, 1.4, glow=False)
+        + nl("M14 17 H32 M14 24 H32 M14 31 H25", NT, NI, glow=0.14, cap="butt")
+        + ndot(29, 31, NS, 1.6)
     )
 
 
 @neon_icon("sim_precheck_ok")
 def _():
-    return nb_clip() + nb_line(15, 17, 29, 17, NB_T, 1.4, glow=False) + nb_ok_badge(31, 33, 9.5)
+    return nb_clip() + nseg(14, 17, 27, 17, NT, NI, glow=0.14, cap="butt") + nb_ok_badge(31, 33, 9.5)
 
 
 @neon_icon("sim_precheck_warn")
 def _():
-    return nb_clip() + nb_line(15, 17, 29, 17, NB_T, 1.4, glow=False) + nb_warn_badge(31, 33, 17)
+    return nb_clip() + nseg(14, 17, 27, 17, NT, NI, glow=0.14, cap="butt") + nb_warn_badge(31, 33, 17)
 
 
 @neon_icon("sim_precheck_error")
 def _():
-    return nb_clip() + nb_line(15, 17, 29, 17, NB_T, 1.4, glow=False) + nb_bad_badge(31, 33, 9.5)
+    return nb_clip() + nseg(14, 17, 27, 17, NT, NI, glow=0.14, cap="butt") + nb_bad_badge(31, 33, 9.5)
 
 
 @neon_icon("sim_stage_done")
@@ -123,13 +128,15 @@ def _():
 
 @neon_icon("sim_results")
 def _():
-    # the bracket's arm in three result bands, and the legend
+    # the bracket in result bands (hot at the root) and the scale beside it
     return (
-        nb_poly([(6, 38), (28, 38), (28, 14), (6, 22)], NB_P, 1.4, 0.06)
-        + poly([(6, 22), (28, 14), (28, 22), (6, 30)], NB_S, 'fill-opacity="0.30"')
-        + poly([(6, 30), (28, 22), (28, 30), (6, 38)], NB_A, 'fill-opacity="0.40"')
-        + line(6, 30, 28, 22, NB_A, 1.0) + line(6, 22, 28, 14, NB_S, 1.0)
-        + nb_stress(34, 10, 6, 28)
+        npoly([(5, 38), (27, 38), (27, 14), (5, 22)], NP, NW, fo=0.0)
+        + nf("M5 30 L27 22 L27 38 L5 38 Z", NA, 0.35)
+        + nf("M5 22 L27 14 L27 22 L5 30 Z", NS, 0.25)
+        + nseg(5, 30, 27, 22, NP, NI, glow=0, cap="butt")
+        + npoly([(34, 8), (42, 8), (42, 40), (34, 40)], NS, NW)
+        + nf("M34 8 H42 V18 H34 Z", NA, 0.6)
+        + nseg(34, 24, 42, 24, NS, NI, glow=0, cap="butt")
     )
 
 
@@ -151,10 +158,11 @@ def nb_ring(cx, cy, r, c=NB_P):
 
 @neon_icon("sim_pin")
 def _():
+    # a pin through an eye: the ring as two thin circles, the pin's axis across it
     return (
-        nb_ring(24, 24, 14)
-        + nb_line(24, 4, 24, 44, NB_S, 1.6)
-        + nb_octagon(24, 24, 5.5, NB_S, 1.4, 0.4)
+        ncircle(24, 24, 15, NP, NW, 0.08)
+        + ncircle(24, 24, 7, NS, NW, 0.25)
+        + nseg(24, 3, 24, 45, NS, NI, dash="4 2.5", cap="butt", glow=0.2)
     )
 
 
@@ -165,10 +173,12 @@ def _():
 
 @neon_icon("sim_moment")
 def _():
+    # a turning load: an angular arc with its head, round the point it acts on (secondary, like
+    # every other load: a load is not a warning)
     return (
-        nb_path("M 12 30 A 13 13 0 1 1 30 37", NB_A, 2.2)
-        + nb_solid([(25, 42.5), (35, 38), (27, 30.5)], NB_A)
-        + nb_dot(24, 24, NB_T, 2.4)
+        nl("M14 33 L9 24 L14 14 L24 9 L34 14 L39 24 L35 32", NS, NW + 0.2, cap="butt")
+        + nhead(29, 37, math.radians(145), NS, NW, 6)
+        + ndot(24, 24, NT, 2.6)
     )
 
 
@@ -180,3 +190,27 @@ def _():
         x, y = 24 + 16 * math.cos(a), 24 + 16 * math.sin(a)
         out += line(24, 24, x, y, NB_S, 1.2) + nb_dot(x, y, NB_S, 2.4)
     return out + nb_octagon(24, 24, 4, NB_S, 1.2, 0.5)
+
+
+@neon_icon("sim_bolt")
+def _():
+    # a bolt clamping two plates: hex head, shank, nut; the plates in the load's colour
+    return (
+        npoly([(13, 4), (35, 4), (35, 11), (13, 11)], NP, NW, fo=0.14)
+        + nl("M20.5 4 V11 M27.5 4 V11", NP, NI, glow=0, cap="butt")
+        + nl("M6 15 H42 V22 H6 Z M6 25 H42 V32 H6 Z", NS, NW, NS, 0.14, glow=0.3)
+        + npoly([(20, 11), (28, 11), (28, 44), (20, 44)], NP, NW, close=False)
+        + npoly([(14, 35), (34, 35), (34, 41), (14, 41)], NP, NW, fo=0.14)
+    )
+
+
+@neon_icon("sim_attributes")
+def _():
+    # a table of attributes: a header row and two rows
+    return (
+        ncut(4, 7, 40, 34, NP, 4, fo=0.06)
+        + nf("M4 7 H44 V16 H4 Z", NP, 0.3)
+        + nl("M4 16 H44 M4 28.5 H44 M18 7 V41", NP, NI, glow=0.14, cap="butt")
+        + ndot(11, 22.3, NS, 1.8)
+        + ndot(11, 34.8, NS, 1.8)
+    )
