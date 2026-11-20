@@ -70,4 +70,4 @@ brief says).
 ## Tests
 
 - `test_neon_icons`, `test_theme_identity`: pass before each commit.
-- `run_tests.sh --only unit`: see the end of this report.
+- `run_tests.sh --only unit` (with FreeCAD, so `test_theme_identity` ran in full): 4061 tests, OK (10 skipped), "all passed".
