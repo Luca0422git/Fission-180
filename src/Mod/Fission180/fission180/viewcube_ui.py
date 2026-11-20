@@ -30,7 +30,7 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import log, viewcube, warn
+from . import log, neon_shell_paint as neon, viewcube, warn
 from .compat import QtCore, QtGui, QtWidgets
 
 NAME = "Fission180ViewCube"
@@ -61,6 +61,10 @@ AXIS_COLOURS = {
     "Z": QtGui.QColor(80, 150, 245),
 }
 
+# Neon Lights (design 6.3): a glowing wireframe cube with see-through faces. Axis colours keep
+# their meaning (X red, Y green, Z blue) in brighter, neon shades.
+NEON_AXIS = {"X": "#ff2e55", "Y": "#39ff88", "Z": "#2e9bff"}
+
 _state = {"on": False, "timer": None, "shown": True, "warned": set(), "view": None, "cube": None}
 
 
@@ -77,6 +81,20 @@ def _shade(colour, factor):
         min(255, int(colour.green() * factor)),
         min(255, int(colour.blue() * factor)),
     )
+
+
+def _hidden_parts(q):
+    """Widget points of the cube parts that face away from the camera (Neon Lights draws
+    them faintly through its see-through faces)."""
+    out = []
+    for region in viewcube.REGIONS:
+        normal = viewcube.project(q, viewcube.unit(region["direction"]))
+        if normal[2] > 1e-4:
+            continue
+        out.append(
+            [viewcube.to_pixels(viewcube.project(q, p), CX, CY, SIZE) for p in region["points"]]
+        )
+    return out
 
 
 def _polygon(points):
@@ -359,6 +377,9 @@ class ViewCube(QtWidgets.QWidget):
     def _draw(self, painter):
         if self.q is None:
             return
+        if neon.on():
+            self._draw_neon(painter)
+            return
         pen = QtGui.QPen(OUTLINE, 1.0)
         pen.setJoinStyle(QtCore.Qt.RoundJoin)
         for part in self.parts:
@@ -373,24 +394,99 @@ class ViewCube(QtWidgets.QWidget):
             self._draw_button(painter, control)
         self._draw_triad(painter)
 
-    def _draw_label(self, painter, face):
+    # -- Neon Lights ------------------------------------------------------------------------
+    def _draw_neon(self, painter):
+        """The cube as glowing lines: the far side shows faintly through see-through faces,
+        the near parts carry a thin tint, the hovered part lights up in `secondary`."""
+        primary = neon.colour("primary")
+        hot = neon.colour("primary_hot")
+        secondary = neon.colour("secondary")
+        # the far side, dashed and faint, through the cube
+        far = QtGui.QPen(neon.colour("primary", alpha=0.28), 1.0, QtCore.Qt.DashLine)
+        far.setDashPattern([2.0, 3.0])
+        painter.setPen(far)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        for points in _hidden_parts(self.q):
+            painter.drawPolygon(_polygon(points))
+        for part in self.parts:
+            path = QtGui.QPainterPath()
+            path.addPolygon(_polygon(part["points"]))
+            path.closeSubpath()
+            hovered = part["name"] == self.hover
+            if hovered:
+                fill = QtGui.QColor(secondary)
+                fill.setAlphaF(0.42)
+            else:
+                fill = QtGui.QColor(primary)
+                tint = 0.06 if part["kind"] == "face" else 0.14
+                fill.setAlphaF(tint * (0.6 + 0.6 * part["shade"]))
+            painter.fillPath(path, fill)
+            neon.glow_path(painter, path, secondary if hovered else primary, 1.1, 0.8)
+            if part["kind"] == "face" and part["facing"] > 0.12:
+                self._draw_label(painter, part["name"], hot)
+        for control in self.buttons:
+            self._draw_neon_button(painter, control, primary, secondary)
+        self._draw_triad(painter)
+
+    def _draw_neon_button(self, painter, control, primary, secondary):
+        hovered = control["id"] == self.hover
+        line = secondary if hovered else primary
+        fill = QtGui.QColor(line)
+        fill.setAlphaF(0.45 if hovered else 0.12)
+        path = QtGui.QPainterPath()
+        kind = control["kind"]
+        if kind == "triangle":
+            path.addPolygon(_polygon(control["points"]))
+            path.closeSubpath()
+        elif kind == "home":
+            left, top, side = control["rect"]
+            mid = left + side / 2.0
+            path.addPolygon(_polygon([
+                (mid, top + 1.0),
+                (left + side, top + side * 0.5),
+                (left + side * 0.82, top + side * 0.5),
+                (left + side * 0.82, top + side - 1.0),
+                (left + side * 0.18, top + side - 1.0),
+                (left + side * 0.18, top + side * 0.5),
+                (left, top + side * 0.5),
+            ]))
+            path.closeSubpath()
+            path.addRect(QtCore.QRectF(mid - side * 0.1, top + side * 0.66, side * 0.2, side * 0.34 - 1))
+        elif kind == "arc":
+            cx, cy = control["centre"]
+            r = control["radius"]
+            rect = QtCore.QRectF(cx - r, cy - r, 2 * r, 2 * r)
+            arc = QtGui.QPainterPath()
+            arc.arcMoveTo(rect, control["start"])
+            arc.arcTo(rect, control["start"], control["end"] - control["start"])
+            neon.glow_path(painter, arc, line, 2.0, 0.8)
+            path.addPolygon(_polygon(viewcube.arc_head(control)))
+            path.closeSubpath()
+        painter.fillPath(path, fill)
+        neon.glow_path(painter, path, line, 1.1, 0.8)
+
+    def _draw_label(self, painter, face, neon_colour=None):
         text = viewcube.FACE_LABELS[face]
         # Text is laid out in hundredths of the cube's half width, then mapped flat onto
         # the face (Qt fonts need whole pixel sizes).
         m11, m12, m21, m22, dx, dy = viewcube.label_transform(self.q, face, CX, CY, SIZE)
         k = 0.01
         transform = QtGui.QTransform(m11 * k, m12 * k, m21 * k, m22 * k, dx, dy)
-        font = QtGui.QFont(QtWidgets.QApplication.font())
-        font.setBold(True)
-        font.setPixelSize(34)
+        if neon_colour is not None:  # Neon Lights: the display face (Orbitron)
+            font = neon.display_font(30)
+        else:
+            font = QtGui.QFont(QtWidgets.QApplication.font())
+            font.setBold(True)
+            font.setPixelSize(34)
+        size = font.pixelSize()
         width = QtGui.QFontMetricsF(font).horizontalAdvance(text)
         room = 2 * viewcube.INNER * 100 * 0.86
         if width > room:
-            font.setPixelSize(max(8, int(34 * room / width)))
+            font.setPixelSize(max(8, int(size * room / width)))
         painter.save()
         painter.setTransform(transform, True)
         painter.setFont(font)
-        painter.setPen(LABEL)
+        painter.setPen(LABEL if neon_colour is None else neon_colour)
         painter.drawText(QtCore.QRectF(-100, -50, 200, 100), QtCore.Qt.AlignCenter, text)
         painter.restore()
 
@@ -439,13 +535,19 @@ class ViewCube(QtWidgets.QWidget):
         for letter, direction in (("X", (1, 0, 0)), ("Y", (0, 1, 0)), ("Z", (0, 0, 1))):
             local = viewcube.project(self.q, direction)
             axes.append((local[2], letter, local))
-        font = QtGui.QFont(QtWidgets.QApplication.font())
-        font.setBold(True)
-        font.setPixelSize(9)
+        lit = neon.on()
+        if lit:
+            font = neon.display_font(8)
+        else:
+            font = QtGui.QFont(QtWidgets.QApplication.font())
+            font.setBold(True)
+            font.setPixelSize(9)
         painter.setFont(font)
         for _, letter, local in sorted(axes):
-            colour = AXIS_COLOURS[letter]
+            colour = QtGui.QColor(NEON_AXIS[letter]) if lit else AXIS_COLOURS[letter]
             end = QtCore.QPointF(ox + local[0] * TRIAD_LENGTH, oy - local[1] * TRIAD_LENGTH)
+            if lit:
+                neon.glow_line(painter, (ox, oy), (end.x(), end.y()), colour, 1.6)
             pen = QtGui.QPen(colour, 2.0)
             pen.setCapStyle(QtCore.Qt.RoundCap)
             painter.setPen(pen)
@@ -659,6 +761,16 @@ def _cubes():
         return Gui.getMainWindow().findChildren(QtWidgets.QWidget, NAME)
     except Exception:
         return []
+
+
+def theme_changed():
+    """The look or Neon Lights' colours changed: every cube drawn again (it repaints only
+    when the camera moves otherwise)."""
+    for cube in _cubes():
+        try:
+            cube.update()
+        except RuntimeError:
+            pass
 
 
 def cube_of(view):

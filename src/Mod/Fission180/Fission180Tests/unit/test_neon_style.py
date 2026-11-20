@@ -112,7 +112,12 @@ class StyleSheet(unittest.TestCase):
             re.sub(r"/\*.*?\*/", "", qss, flags=re.S),
         )
         colour = re.compile(r"^(#[0-9a-f]{6}|transparent|rgba\([0-9, .]+\))$")
-        bad = [v for v in values if not colour.match(v.strip())]
+        # (B2) a Qt gradient whose every stop is a colour (the ribbon's hover glow)
+        gradient = re.compile(
+            r"^q(?:linear|radial)gradient\((?:[a-z0-9]+:[0-9.]+,\s*)+"
+            r"(?:stop:[0-9.]+\s+(?:#[0-9a-f]{6}|rgba\([0-9, .]+\))(?:,\s*|\)$))+"
+        )
+        bad = [v for v in values if not (colour.match(v.strip()) or gradient.match(v.strip()))]
         self.assertEqual(bad, [])
         self.assertEqual(qss.count("{"), qss.count("}"))
 
