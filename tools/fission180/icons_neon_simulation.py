@@ -142,3 +142,41 @@ def _():
         a = math.radians(i * 15 + 7.5)
         pts.append((24 + r * math.cos(a), 24 + r * math.sin(a)))
     return nb_poly(pts, NB_P, 1.5, 0.10) + nb_circle(24, 24, 5.5, NB_S, 1.6)
+
+
+def nb_ring(cx, cy, r, c=NB_P):
+    """A thick ring (a pin's eye, a bearing) as two thin concentric lines."""
+    return nb_circle(cx, cy, r + 2, c, 1.4, 0.12) + circle(cx, cy, r - 2, "none", c, 1.4)
+
+
+@neon_icon("sim_pin")
+def _():
+    return (
+        nb_ring(24, 24, 14)
+        + nb_line(24, 4, 24, 44, NB_S, 1.6)
+        + nb_octagon(24, 24, 5.5, NB_S, 1.4, 0.4)
+    )
+
+
+@neon_icon("sim_bearing")
+def _():
+    return nb_ring(24, 27, 14) + nb_arrow(24, 2, 24, 31, NB_S, 2.0, 6.5)
+
+
+@neon_icon("sim_moment")
+def _():
+    return (
+        nb_path("M 12 30 A 13 13 0 1 1 30 37", NB_A, 2.2)
+        + nb_solid([(25, 42.5), (35, 38), (27, 30.5)], NB_A)
+        + nb_dot(24, 24, NB_T, 2.4)
+    )
+
+
+@neon_icon("sim_rigid_connector")
+def _():
+    out = nb_circle(24, 24, 16, NB_P, 1.6)
+    for i in range(6):
+        a = math.radians(i * 60 + 15)
+        x, y = 24 + 16 * math.cos(a), 24 + 16 * math.sin(a)
+        out += line(24, 24, x, y, NB_S, 1.2) + nb_dot(x, y, NB_S, 2.4)
+    return out + nb_octagon(24, 24, 4, NB_S, 1.2, 0.5)
