@@ -83,6 +83,17 @@ class ImageOptions(QtWidgets.QDialog):
             "in Fission 180 yet as a separate choice.)"
         )
         form.addRow("", self.antialias)
+        self.normal = None
+        if _neon():
+            # Neon Lights only (Dark and Light keep their dialog exactly): the picture shows
+            # the neon screen, Hologram included, unless this is ticked (design 6.6).
+            self.normal = QtWidgets.QCheckBox("Normal look")
+            self.normal.setObjectName("Fission180ImageNormalLook")
+            self.normal.setToolTip(
+                "Take the picture in the normal look (dark background, plain bodies) "
+                "instead of Neon Lights"
+            )
+            form.addRow("", self.normal)
         self.message = QtWidgets.QLabel("")
         self.message.setWordWrap(True)
         self.message.setStyleSheet("color: #ff8a80;")
@@ -157,7 +168,13 @@ class ImageOptions(QtWidgets.QDialog):
         if not os.path.splitext(path)[1]:
             path += ".png"
         try:
-            save(path, self.width.value(), self.height.value(), self.transparent.isChecked())
+            save(
+                path,
+                self.width.value(),
+                self.height.value(),
+                self.transparent.isChecked(),
+                normal=self.normal is not None and self.normal.isChecked(),
+            )
         except Exception as exc:
             self.message.setText("⚠ The image could not be saved: %s" % exc)
             return
@@ -177,13 +194,29 @@ def _safely(fn, *args):
         warn("Capture Image: %s" % exc)
 
 
-def save(path, width, height, transparent=False):
-    """The 3D view as an image file of width x height pixels."""
+def _neon():
+    try:
+        from . import theme
+
+        return theme.is_neon()
+    except Exception:
+        return False
+
+
+def save(path, width, height, transparent=False, normal=False):
+    """The 3D view as an image file of width x height pixels; `normal`: in the normal look
+    while Neon Lights is on (otherwise what is on screen)."""
     view = Gui.ActiveDocument.ActiveView
     background = "Transparent" if transparent else "Current"
     if os.path.isfile(path):
         os.remove(path)  # the save dialog asked about replacing it: a failure must show
-    view.saveImage(path, int(width), int(height), background)
+    if normal and _neon():
+        from . import neon_view
+
+        with neon_view.normal_look(App.ActiveDocument):
+            view.saveImage(path, int(width), int(height), background)
+    else:
+        view.saveImage(path, int(width), int(height), background)
     if not os.path.isfile(path):
         raise IOError("nothing was written")
     log(

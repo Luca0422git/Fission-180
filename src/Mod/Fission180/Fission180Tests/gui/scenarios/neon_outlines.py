@@ -95,6 +95,10 @@ def setup():
     s["line_colour"] = tuple(body.ViewObject.LineColor)
     s["dark_path"] = os.path.join(h.OUT_DIR, "neon_outlines-dark.FCStd")
     App.ActiveDocument.saveAs(s["dark_path"])
+    # App-level saveAs leaves the window's "modified" flag set from the recompute (only
+    # FreeCAD's Gui save clears it): clear it, so the check below sees what the switch does.
+    Gui.getDocument("NeonOutlines").Modified = False
+    s["undo"] = App.ActiveDocument.UndoCount
 
 
 def to_neon():
@@ -114,6 +118,7 @@ def outline_shown():
     edge = App.Vector(20, 0, 10)  # the middle of the top front edge
     h.check("... drawn in the outline colour", near_outline_on_screen(edge) <= 70, near_outline_on_screen(edge))
     h.check("the design is not marked modified", not Gui.getDocument("NeonOutlines").Modified)
+    h.check("no undo step was added", App.ActiveDocument.UndoCount == s["undo"], App.ActiveDocument.UndoCount)
     h.check("the body's own line colour is unchanged", tuple(s["body"].ViewObject.LineColor) == s["line_colour"])
     h.shot("outline")
 

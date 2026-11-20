@@ -1032,7 +1032,10 @@ def export_everything(doc, folder=None, open_after=True):
         view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument else None
         if view is None or not hasattr(view, "saveImage"):
             return
-        view.saveImage(path, 1600, 1200, "Current")
+        from . import neon_view  # Neon Lights: exports are in the normal look (design 3)
+
+        with neon_view.normal_look(doc):
+            view.saveImage(path, 1600, 1200, "Current")
 
     written = export.export_everything(doc, folder, chosen, screenshot, _design_name(doc))
     if open_after:
