@@ -250,7 +250,7 @@ def _():
 def _():
     return (
         nseg(18, 4, 18, 44, NP, NI, dash="3 2.5", cap="butt")
-        + npoly([(22, 8), (32, 8), (32, 15), (37, 20), (37, 32), (22, 32)], NP, NW, fo=0.18)
+        + npoly([(22, 9), (32, 9), (37, 14), (37, 32), (22, 32)], NP, NW, fo=0.18)
         + nl("M32 39 Q32 45 18 45 Q4 45 4 39 Q4 35 11 34", NS, NW, cap="butt", join="round")
         + nhead(12, 33.8, -0.1, NS, NW, 4.4)
     )
@@ -511,11 +511,9 @@ def _():
 @neon_icon("trim")
 def _():
     return (
-        nl("M6 34 Q20 16 42 14", NP, NW, cap="butt")
-        + nl("M10 8 L26 40", NS, NW, cap="butt")
-        + nl("M18 24 Q12 30 6 34", NA, NW + 0.4, cap="butt", dash="2.6 2.2", glow=0.3)
-        + nseg(6, 28, 12, 40, NA, NI, cap="butt")
-        + nseg(12, 28, 6, 40, NA, NI, cap="butt")
+        nl("M18 24 Q26 15 42 13", NP, NW, cap="butt")
+        + nl("M10 6 L26 40", NS, NW, cap="butt")
+        + nl("M18 24 Q12 30 5 34", NA, NW, cap="butt", dash="2.6 2.2", glow=0.3)
     )
 
 
@@ -754,7 +752,7 @@ def _():
     return npoly([(4, 26), (24, 14), (44, 26), (24, 38)], NT, NW, fo=0.0) + nl(
         "M9 23 L29 35 M14 20 L34 32 M19 17 L39 29 M9 29 L29 17 M14 32 L34 20 M19 35 L39 23",
         NP,
-        1.0,
+        1.25,
         glow=0.12,
         cap="butt",
     )
