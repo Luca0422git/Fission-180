@@ -214,6 +214,17 @@ def theme_changed():
     _safely(lambda: __import__("fission180.browser_ui").browser_ui.widget().refresh(force=True))
     # the sketch tools' pointers carry their ribbon picture: drawn again in the new look
     _safely(lambda: __import__("fission180.sketch_cursor").sketch_cursor.forget())
+    _safely(_ribbon_bar_margins)
+
+
+def _ribbon_bar_margins():
+    """The ribbon's tool bar keeps no margin. Qt gives a QToolBar its style's margin again
+    when the app's style sheet changes, so after Light -> Dark the whole window sat 4 px
+    lower than at start (found by the look_unchanged scenario, 2026-11-20)."""
+    holder = _main().findChild(QtWidgets.QToolBar, "Fission180RibbonBar")
+    if holder is not None:
+        holder.setContentsMargins(0, 0, 0, 0)
+        holder.layout().setContentsMargins(0, 0, 0, 0)
 
 
 def _set_sketch_mode(on):
