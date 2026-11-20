@@ -7,28 +7,28 @@
 
 
 def nb_film(x, y, w, h, c=NB_P):
-    """A strip of film: a cut-corner frame with sprocket dashes along its top and bottom."""
-    out = nb_poly(nb_cut(x, y, w, h, 4), c, 1.5, 0.10)
-    n = max(2, int(w // 7))
+    """A strip of film: a cut-corner frame with a row of sprocket squares along its top and
+    bottom, spaced so they stay apart at 18 px."""
+    out = ncut(x, y, w, h, c, 4, fo=0.06)
+    n = max(2, int(w // 11))
     for i in range(n):
-        hx = x + 4 + i * (w - 10.0) / max(1, n - 1)
-        out += rect(hx, y + 2.2, 2.4, 1.6, c, 0) + rect(hx, y + h - 3.8, 2.4, 1.6, c, 0)
+        hx = x + 7 + i * (w - 14.0) / max(1, n - 1)
+        out += ndot(hx, y + 3.6, c, 1.1) + ndot(hx, y + h - 3.6, c, 1.1)
     return out
 
 
 def nb_play(cx, cy, r, c=NB_S, fo=0.22):
-    return nb_poly([(cx - r * 0.6, cy - r), (cx + r, cy), (cx - r * 0.6, cy + r)], c, 1.7, fo)
+    return npoly([(cx - r * 0.6, cy - r), (cx + r, cy), (cx - r * 0.6, cy + r)], c, NW, fo)
 
 
 @neon_icon("workspace_animation")
 def _():
-    # two parts lifting apart inside a film frame, a guide line between them
+    # a film frame; inside it a part moving out along its path (its start position dashed)
     return (
-        nb_film(4, 4, 40, 40)
-        + nb_box(0, 0, 0, 10, 10, 4, NB_P, 19, 29)
-        + nb_line(19, 25, 19, 19.5, NB_S, 1.0, glow=False, extra='stroke-dasharray="1.6 1.4"')
-        + nb_box(0, 0, 10, 10, 10, 4, NB_S, 19, 29)
-        + nb_arrow(36, 33, 36, 13, NB_S, 1.6, 4.4)
+        nb_film(3, 6, 42, 36)
+        + nl("M11 22 H19 V30 H11 Z", NP, NI, dash="2.6 2", cap="butt", glow=0.12)
+        + nseg(19, 26, 26, 23, NS, NI, cap="butt", glow=0.2)
+        + nbox(0, 0, 0, 8, 8, 7, NS, 33, 23, fo=0.2)
     )
 
 
@@ -44,32 +44,32 @@ def _():
 
 @neon_icon("anim_play")
 def _():
-    return nb_play(24, 24, 12, NB_S, 0.25)
+    return ntransport("play")
 
 
 @neon_icon("anim_pause")
 def _():
-    return nb_poly(nb_cut(13, 12, 8, 24, 2.5), NB_T, 1.6, 0.2) + nb_poly(nb_cut(27, 12, 8, 24, 2.5), NB_T, 1.6, 0.2)
+    return ntransport("pause")
 
 
 @neon_icon("anim_to_start")
 def _():
-    return nb_line(11, 12, 11, 36, NB_T, 2.4) + nb_poly([(38, 12), (38, 36), (17, 24)], NB_T, 1.6, 0.2)
+    return ntransport("start")
 
 
 @neon_icon("anim_to_end")
 def _():
-    return nb_line(37, 12, 37, 36, NB_T, 2.4) + nb_poly([(10, 12), (10, 36), (31, 24)], NB_T, 1.6, 0.2)
+    return ntransport("end")
 
 
 @neon_icon("anim_previous")
 def _():
-    return nb_poly([(24, 13), (24, 35), (8, 24)], NB_T, 1.6, 0.2) + nb_poly([(40, 13), (40, 35), (24, 24)], NB_T, 1.6, 0.2)
+    return ntransport("rewind")
 
 
 @neon_icon("anim_next")
 def _():
-    return nb_poly([(8, 13), (8, 35), (24, 24)], NB_T, 1.6, 0.2) + nb_poly([(24, 13), (24, 35), (40, 24)], NB_T, 1.6, 0.2)
+    return ntransport("forward")
 
 
 @neon_icon("anim_loop")
@@ -88,32 +88,33 @@ def _():
     # a bulb: its left half dark glass, its right half lit
     return (
         nb_path("M24 6 L31 9 L34 16 L31 23 V30 H17 V23 L14 16 L17 9 Z", NB_P, 1.5, NB_P, 0.10)
-        + nb_path("M24 6 L31 9 L34 16 L31 23 V30 H24 Z", NB_A, 1.5, NB_A, 0.30, glow=False)
-        + nb_line(18, 34, 30, 34, NB_P, 1.6)
-        + nb_line(20, 38, 28, 38, NB_P, 1.6)
-        + nb_line(37, 9, 41, 6, NB_A, 1.5)
-        + nb_line(38, 17, 43, 17, NB_A, 1.5)
+        + nf("M24 6 L31 9 L34 16 L31 23 V30 H24 Z", NS, 0.4)
+        + nb_line(18, 35, 30, 35, NB_P, 1.6)
+        + nb_line(20, 40, 28, 40, NB_P, 1.6)
+        + nb_line(37, 9, 41, 5, NB_S, 1.5)
+        + nb_line(38, 17, 44, 17, NB_S, 1.5)
     )
 
 
-def nb_camera(dot):
+def nb_camera(lamp):
+    """A film camera: a cut-corner body, a lens hood, two reels, and its lamp (lit or not)."""
     return (
-        nb_poly(nb_cut(6, 17, 25, 17, 3.5), NB_P, 1.5, 0.12)
-        + nb_poly([(31, 22), (42, 16), (42, 35), (31, 29)], NB_P, 1.5, 0.08)
-        + nb_circle(13, 12, 4.2, NB_P, 1.4)
-        + nb_circle(24, 11, 5.2, NB_P, 1.4)
-        + nb_circle(37, 39, 4.3, dot, 1.4, 0.45)
+        ncut(5, 19, 26, 17, NB_P, 3.5, fo=0.1)
+        + npoly([(31, 24), (43, 18), (43, 37), (31, 31)], NB_P, NW, 0.06)
+        + ncircle(12, 12, 5, NB_P, NW)
+        + ncircle(25, 12, 5, NB_P, NW)
+        + lamp
     )
 
 
 @neon_icon("anim_view")
 def _():
-    return nb_camera(NB_A)
+    return nb_camera(ndot(37, 42, NB_S, 2.4))
 
 
 @neon_icon("anim_view_off")
 def _():
-    return nb_camera(NB_T)
+    return nb_camera(nseg(4, 44, 44, 6, NB_T, NW))
 
 
 @neon_icon("anim_scratch")

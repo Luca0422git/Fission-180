@@ -17,21 +17,20 @@ def nb_result_strip(x0, x1, y, h=5.0):
 
 @neon_icon("simr_report")
 def _():
-    return (
-        nb_page(10, 5, 29, 38, NB_P, 7, 0)
-        + nb_result_strip(14, 34, 15)
-        + nb_line(14, 29, 34, 29, NB_T, 1.4, glow=False)
-        + nb_line(14, 34, 34, 34, NB_T, 1.4, glow=False)
-        + nb_line(14, 39, 27, 39, NB_T, 1.4, glow=False)
-    )
+    # a report page: a result bar of four cells (hot on the left) and two lines of text
+    out = npage(8, 4, 32, 40, NP, 7, 0)
+    for k, (c, fo) in enumerate(((NA, 0.75), (NS, 0.7), (NS, 0.45), (NS, 0.25))):
+        x = 13 + k * 6
+        out += nf("M%d 15 H%d V21 H%d Z" % (x, x + 4.4, x), c, fo)
+    return out + nl("M13 29 H35 M13 36 H28", NT, NI, glow=0.14, cap="butt")
 
 
 @neon_icon("simr_solver_data")
 def _():
-    out = nb_page(10, 5, 29, 38, NB_P, 7, 0)
-    for k in range(5):
-        out += line(14, 17 + k * 5, 35, 17 + k * 5, NB_T, 1.2)
-    return out + line(22, 15, 22, 39, NB_T, 1.0)
+    # the solver's numbers: a page with a two-column table
+    return npage(8, 4, 32, 40, NP, 7, 0) + nl(
+        "M13 17 H35 M13 25 H35 M13 33 H35 M21 13 V39", NT, NI, glow=0.14, cap="butt"
+    )
 
 
 @neon_icon("simr_details")
@@ -50,3 +49,16 @@ def _():
 @neon_icon("simr_finish")
 def _():
     return nb_octagon(24, 24, 16, NB_S, 1.6, 0.16) + nb_check(24, 24, 16, NB_S, 2.6)
+
+
+@neon_icon("simr_convergence")
+def _():
+    # a chart: the value settling onto its target (dashed) step by step
+    return (
+        nl("M6 4 V42 H44", NT, NW, cap="butt")
+        + nseg(6, 14, 44, 14, NP, NI, dash="3 2.4", cap="butt", glow=0.14)
+        + nl("M10 38 L17 24 L25 18 L33 15.5 L41 14.5", NS, NW, cap="butt", glow=0.3)
+        + ndot(17, 24, NS, 1.9)
+        + ndot(25, 18, NS, 1.9)
+        + ndot(33, 15.5, NS, 1.9)
+    )

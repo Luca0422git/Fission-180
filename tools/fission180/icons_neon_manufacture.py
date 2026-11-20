@@ -5,41 +5,37 @@
 # flake8: noqa
 
 
-def nb_mill(cx, top, tip, r=3.4, c=NB_A):
-    """An end mill standing upright, drawn as an outline with two flute lines."""
-    return (
-        nb_poly([(cx - r, top), (cx + r, top), (cx + r, tip), (cx - r, tip)], c, 1.4, 0.18)
-        + line(cx - r, tip - 7, cx + r, tip - 4, c, 1.0)
-        + line(cx - r, tip - 11, cx + r, tip - 8, c, 1.0)
+def nb_mill(cx, top, tip, r=3.4, c=NB_S):
+    """An end mill standing upright: an outline with one flute line (secondary: the tool is
+    what acts, never a warning)."""
+    return npoly([(cx - r, top), (cx + r, top), (cx + r, tip - 2), (cx, tip), (cx - r, tip - 2)], c, NW, 0.18) + nseg(
+        cx - r, tip - 10, cx + r, tip - 5, c, NI, glow=0, cap="butt"
     )
 
 
 @neon_icon("workspace_manufacture")
 def _():
-    # a plate with the zig-zag the tool has cut on its top, and the tool still cutting
-    pts = [iso(x, y, 6, 24, 33) for x, y in [(4, 4), (20, 4), (20, 10), (4, 10), (4, 16), (20, 16)]]
-    d = "M%.2f %.2f " % pts[0] + " ".join("L%.2f %.2f" % p for p in pts[1:])
+    # a plate with the path the tool has cut on its top, and the tool above it
+    q = lambda a, b, h: iso(a, b, h, 22, 22, 1.0)  # noqa: E731
+    cut = [q(5, 4, 6), q(5, 20, 6), q(12, 20, 6), q(12, 8, 6)]
     return (
-        nb_box(0, 0, 0, 24, 24, 6, NB_P, 24, 33)
-        + nb_path(d, NB_S, 1.6)
-        + nb_mill(30, 3, 25, 3.4)
-        + nb_dot(30, 27.5, NB_S, 1.5)
+        nbox(0, 0, 0, 24, 24, 6, NP, 22, 22, inner=False, fo=0.12)
+        + nl(_d(cut), NS, NW, cap="butt", glow=0.3)
+        + nb_mill(36, 3, 24, 3.6)
     )
 
 
 @neon_icon("cam_post")
 def _():
     # the program as a page, sent out
-    return nb_page(7, 5, 24, 32, NB_P, 6, 4, NB_T) + nb_arrow(24, 40, 43, 40, NB_S, 1.8, 5)
+    return npage(5, 4, 26, 34, NP, 7, 3, NT) + narrow(22, 42, 45, 42, NS, NW, 5.5)
 
 
 @neon_icon("cam_sheet")
 def _():
-    # a setup sheet: a page with a small plate on it and a table
+    # a setup sheet: a page with the part on it and a short table
     return (
-        nb_page(9, 4, 30, 40, NB_P, 6, 0)
-        + nb_box(0, 0, 0, 9, 9, 3, NB_S, 24, 14, glow=False)
-        + nb_line(13, 29, 35, 29, NB_T, 1.2, glow=False)
-        + nb_line(13, 35, 35, 35, NB_T, 1.2, glow=False)
-        + nb_line(24, 26, 24, 39, NB_T, 1.2, glow=False)
+        npage(7, 3, 32, 42, NP, 7, 0)
+        + nbox(0, 0, 0, 10, 10, 5, NS, 22, 13, fo=0.2, inner=False)
+        + nl("M12 31 H34 M12 38 H34 M22 27 V42", NT, NI, glow=0.14, cap="butt")
     )

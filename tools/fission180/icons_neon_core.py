@@ -5,228 +5,16 @@ make_icons.py; the sheet metal and plastic tools' own icons live in their area f
 navigation bar, the browser and the timeline.
 
 Run by make_icons.py in its own namespace (like every tools/fission180/icons_*.py file), so the
-helpers there (iso, _grow, _path_bounds, neon_icon, math) are at hand. Each @neon_icon recipe
+helpers there (iso, _grow, _path_bounds, neon_icon, math) and the kit are at hand. Each @neon_icon recipe
 returns the SVG body in the neon language directly (no automatic conversion): original line art
 on the 48 x 48 canvas, angular (cut corners, brackets, straight segments), two-tone (primary for
 the object, secondary for what the tool does, alert only for warnings and deleting), every line
 with a wider faint copy under it (the glow; Qt draws SVG Tiny, which has no blur). Colours are
 the role tokens that fission180/neon_icons.py replaces with the preset's colours at run time.
 
-Line weights were chosen on contact sheets at 36 px and 18 px (tools/fission180/
-neon_icon_sheet.py): 2.1 for outlines (about 1 px at 18 px), 1.4 for inner detail, glow 2x + 0.9
-at 0.24 opacity so neighbouring lines never merge into one blob.
+The drawing kit (nl, npoly, ncut, nbox, ndot, nhead, ntransport...) and the set's one stroke
+and glow standard are in icons_neon__kit.py, shared with the area files' recipes.
 """
-
-NP, NS, NA, NT, NG = "#n30001", "#n30002", "#n30003", "#n30004", "#n30006"
-NW, NI = 2.1, 1.4  # outline and inner-detail widths
-
-
-def _d(points, close=False):
-    """A path through points (absolute moves and lines)."""
-    out = "M%.2f %.2f" % points[0]
-    for x, y in points[1:]:
-        out += " L%.2f %.2f" % (x, y)
-    return out + (" Z" if close else "")
-
-
-def nl(d, c=NP, w=NW, fill="none", fo=0.0, glow=0.24, dash=None, join="miter", cap="square"):
-    """One neon line (a path): its glow, then the line. `fill` + `fo` give a faint face."""
-    _path_bounds(d, w / 2)
-    extra = ' stroke-dasharray="%s"' % dash if dash else ""
-    glow_colour = NP if c == NT else c
-    out = ""
-    if glow:
-        out += (
-            '<path d="%s" fill="none" stroke="%s" stroke-width="%.2f" stroke-opacity="%.2f" '
-            'stroke-linejoin="%s" stroke-linecap="%s"/>'
-            % (d, glow_colour, w * 2.0 + 0.9, glow, join, cap)
-        )
-    face = ' fill="%s" fill-opacity="%.2f"' % (fill, fo) if fill != "none" else ' fill="none"'
-    out += (
-        '<path d="%s"%s stroke="%s" stroke-width="%.2f" '
-        'stroke-linejoin="%s" stroke-linecap="%s"%s/>'
-        % (d, face, c, w, join, cap, extra)
-    )
-    return out
-
-
-def nf(d, c=NP, fo=0.16):
-    """A faint face with no line (under lines drawn separately)."""
-    _path_bounds(d, 0)
-    return '<path d="%s" fill="%s" fill-opacity="%.2f" stroke="none"/>' % (d, c, fo)
-
-
-def npoly(points, c=NP, w=NW, fo=0.0, close=True, **kw):
-    return nl(_d(points, close), c, w, c if fo else "none", fo, **kw)
-
-
-def nseg(x1, y1, x2, y2, c=NP, w=NW, **kw):
-    return nl(_d([(x1, y1), (x2, y2)]), c, w, **kw)
-
-
-def ndot(x, y, c=NS, r=2.0):
-    """A small solid square node (a sketch point, a light)."""
-    _grow(x, y, r)
-    return '<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="%s"/>' % (
-        x - r,
-        y - r,
-        2 * r,
-        2 * r,
-        c,
-    )
-
-
-def ndiamond(x, y, c=NS, r=2.4):
-    _grow(x, y, r)
-    return '<polygon points="%s" fill="%s"/>' % (
-        P([(x, y - r), (x + r, y), (x, y + r), (x - r, y)]),
-        c,
-    )
-
-
-def ncut(x, y, w, h, c=NP, cut=None, lw=NW, fo=0.0, corners="tr bl", **kw):
-    """A rectangle with cut corners (the HUD frame)."""
-    k = cut if cut is not None else min(w, h) * 0.25
-    tl = "tl" in corners and k
-    tr = "tr" in corners and k
-    br = "br" in corners and k
-    bl = "bl" in corners and k
-    pts = [(x + (tl or 0), y), (x + w - (tr or 0), y)]
-    if tr:
-        pts.append((x + w, y + tr))
-    pts.append((x + w, y + h - (br or 0)))
-    if br:
-        pts.append((x + w - br, y + h))
-    pts.append((x + (bl or 0), y + h))
-    if bl:
-        pts.append((x, y + h - bl))
-    pts.append((x, y + (tl or 0)))
-    return npoly(pts, c, lw, fo, **kw)
-
-
-def nbrackets(x, y, w, h, c=NP, k=5.0, lw=NW, **kw):
-    """Four corner brackets around a box (a HUD target frame)."""
-    out = ""
-    for cx, cy, sx, sy in (
-        (x, y, 1, 1),
-        (x + w, y, -1, 1),
-        (x + w, y + h, -1, -1),
-        (x, y + h, 1, -1),
-    ):
-        out += npoly([(cx, cy + sy * k), (cx, cy), (cx + sx * k, cy)], c, lw, close=False, **kw)
-    return out
-
-
-def narrow(x1, y1, x2, y2, c=NS, w=NW, head=5.0, **kw):
-    """A line with an open chevron head (line art, not a solid triangle)."""
-    a = math.atan2(y2 - y1, x2 - x1)
-    h1 = (x2 - head * math.cos(a - 0.6), y2 - head * math.sin(a - 0.6))
-    h2 = (x2 - head * math.cos(a + 0.6), y2 - head * math.sin(a + 0.6))
-    return nl(_d([(x1, y1), (x2, y2)]) + " " + _d([h1, (x2, y2), h2]), c, w, **kw)
-
-
-def nhead(x, y, ang, c=NS, w=NW, head=5.0):
-    """Only a chevron head at (x, y) pointing along ang (radians)."""
-    h1 = (x - head * math.cos(ang - 0.6), y - head * math.sin(ang - 0.6))
-    h2 = (x - head * math.cos(ang + 0.6), y - head * math.sin(ang + 0.6))
-    return nl(_d([h1, (x, y), h2]), c, w)
-
-
-def nbox(x, y, z, dx, dy, dz, c=NP, ox=24, oy=30, s=1.0, top=None, w=NW, fo=0.14, inner=True):
-    """An isometric block as a glowing wireframe: faint faces, the silhouette at full weight,
-    the three inner edges thinner. `top` colours the top face (the face a tool acts on)."""
-    q = lambda a, b, h: iso(a, b, h, ox, oy, s)  # noqa: E731
-    T = [q(x, y, z + dz), q(x + dx, y, z + dz), q(x + dx, y + dy, z + dz), q(x, y + dy, z + dz)]
-    B = [q(x, y, z), q(x + dx, y, z), q(x + dx, y + dy, z), q(x, y + dy, z)]
-    out = nf(_d([T[3], T[2], B[2], B[3]], True), c, fo * 0.7)  # left face
-    out += nf(_d([T[1], T[2], B[2], B[1]], True), c, fo * 0.35)  # right face
-    out += nf(_d(T, True), top or c, fo * (1.9 if top else 1.4))
-    out += nl(_d([T[0], T[1], B[1], B[2], B[3], T[3]], True), c, w)
-    if inner:
-        out += nl(_d([T[3], T[2], T[1]]) + " " + _d([T[2], B[2]]), c, w * 0.66, glow=0.16)
-    if top:
-        out += nl(_d(T, True), top, w * 0.9)
-    return out
-
-
-def nplus(cx, cy, c=NS, r=6.5):
-    """ "Create": a cut-corner badge over a ground-coloured patch with a plus."""
-    k = r * 0.45
-    pts = [
-        (cx - r + k, cy - r),
-        (cx + r, cy - r),
-        (cx + r, cy + r - k),
-        (cx + r - k, cy + r),
-        (cx - r, cy + r),
-        (cx - r, cy - r + k),
-    ]
-    patch = '<polygon points="%s" fill="%s"/>' % (P(pts), NG)
-    _grow(cx, cy, r + 1)
-    return (
-        patch
-        + npoly(pts, c, 1.6)
-        + nl(
-            "M%.2f %.2f H%.2f M%.2f %.2f V%.2f"
-            % (cx - r * 0.5, cy, cx + r * 0.5, cx, cy - r * 0.5, cy + r * 0.5),
-            c,
-            1.8,
-            cap="butt",
-        )
-    )
-
-
-def nmesh(cx, cy, r, c=NP, hi=None, w=NW):
-    """A triangulated hexagon (a mesh): outline, spokes; `hi` fills chosen triangles."""
-    pts = [
-        (cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a)))
-        for a in (-90, -30, 30, 90, 150, 210)
-    ]
-    out = ""
-    for k, col in (hi or {}).items():
-        out += nf(_d([(cx, cy), pts[k], pts[(k + 1) % 6]], True), col, 0.45)
-    out += nl(_d(pts, True), c, w)
-    spokes = " ".join(_d([(cx, cy), p]) for p in pts)
-    mids = _d([pts[0], pts[2], pts[4]], True)
-    return out + nl(spokes + " " + mids, c, NI * 0.85, glow=0.14)
-
-
-def nsheet(x0, y0, x1, y1, lift, c=NS, fo=0.18, w=NW):
-    """A curved surface: a thin band between two parallel curves (top edge bowed up)."""
-    d = "M%.2f %.2f Q%.2f %.2f %.2f %.2f L%.2f %.2f Q%.2f %.2f %.2f %.2f Z" % (
-        x0,
-        y0,
-        (x0 + x1) / 2,
-        y0 - lift,
-        x1,
-        y1,
-        x1 + 6,
-        y1 + 6,
-        (x0 + x1) / 2 + 6,
-        y0 - lift + 6,
-        x0 + 6,
-        y0 + 6,
-    )
-    return nl(d, c, w, c, fo)
-
-
-def ncog(cx, cy, r, teeth=8, c=NT, w=NW, hub=None):
-    """An angular cog: flat-topped teeth, a hexagonal hub."""
-    pts = []
-    for i in range(teeth):
-        a0 = 2 * math.pi * i / teeth
-        for da, rr in ((-0.20, r * 0.74), (-0.13, r), (0.13, r), (0.20, r * 0.74)):
-            pts.append((cx + rr * math.cos(a0 + da), cy + rr * math.sin(a0 + da)))
-    out = npoly(pts, c, w, fo=0.0)
-    hub_r = r * 0.34
-    hexagon = [
-        (
-            cx + hub_r * math.cos(math.radians(30 + 60 * i)),
-            cy + hub_r * math.sin(math.radians(30 + 60 * i)),
-        )
-        for i in range(6)
-    ]
-    return out + npoly(hexagon, hub or NS, NI + 0.2)
-
 
 # ---- SOLID > CREATE -----------------------------------------------------------------------
 @neon_icon("sketch_create")
@@ -284,7 +72,7 @@ def _():
         nseg(24, 5, 24, 43, NS, NI, dash="3.5 2.5", cap="butt")
         + npoly([(20, 10), (20, 38), (6, 38)], NP, NW, fo=0.2)
         + npoly([(28, 10), (28, 38), (42, 38)], NS, NW, glow=0.3)
-        + ndiamond(24, 24, NS, 2.2)
+        + ndot(24, 24, NS, 2.0)
     )
 
 
@@ -323,13 +111,13 @@ def _():
 
 @neon_icon("shell")
 def _():
-    q = lambda a, b, h: iso(a, b, h, 24, 38, 1.0)  # noqa: E731
-    rim = [q(3, 3, 16), q(17, 3, 16), q(17, 17, 16), q(3, 17, 16)]
-    floor = [q(3, 3, 5), q(17, 3, 5), q(17, 17, 5), q(3, 17, 5)]
+    # a hollowed block: the outer silhouette, the thin rim of the opening, its dark inside
+    q = lambda a, b, h: iso(a, b, h, 24, 36, 1.0)  # noqa: E731
+    rim = [q(4, 4, 16), q(18, 4, 16), q(18, 18, 16), q(4, 18, 16)]
     return (
-        nbox(0, 0, 0, 20, 20, 16, NP, 24, 38, inner=True)
-        + nl(_d(rim, True), NS, NI + 0.3, NG, 0.8)
-        + nl(_d([rim[0], floor[0], floor[1]]) + " " + _d([floor[0], floor[3]]), NS, NI, glow=0.18)
+        nbox(0, 0, 0, 22, 22, 16, NP, 24, 36, inner=False, fo=0.12)
+        + nl(_d(rim, True), NS, NW, NG, 0.85, glow=0.3)
+        + nseg(rim[0][0], rim[0][1], rim[0][0], rim[0][1] + 8, NS, NI, cap="butt", glow=0.14)
     )
 
 
@@ -375,11 +163,11 @@ def _():
 # ---- ASSEMBLE / CONSTRUCT / INSPECT / INSERT / SELECT ------------------------------------
 @neon_icon("new_component")
 def _():
+    # a part inside the HUD frame of a new component
     return (
-        nbox(0, 0, 0, 10, 10, 9, NP, 16, 42, fo=0.1)
-        + nbox(0, 0, 0, 10, 10, 9, NP, 32, 42, fo=0.1)
-        + nbox(0, 0, 0, 10, 10, 9, NP, 24, 28, fo=0.1)
-        + nplus(38, 12, NS, 6)
+        nbrackets(4, 8, 32, 34, NP, 6, NI + 0.3)
+        + nbox(0, 0, 0, 13, 13, 11, NP, 20, 28, fo=0.16)
+        + nplus(37, 11, NS, 6.5)
     )
 
 
@@ -435,16 +223,19 @@ def _():
     return (
         ncut(6, 9, 36, 30, NP, 5, fo=0.1)
         + npoly([(9, 35), (18, 23), (25, 30), (31, 24), (39, 33)], NS, NW, close=False)
-        + ndiamond(31, 16, NA, 3)
+        + noct(31, 16, 3.2, NS, NI, 0.6)
     )
 
 
 @neon_icon("insert_mesh")
 def _():
+    # a coarse mesh patch coming in from outside (the insert arrow of insert_component)
     return (
-        nmesh(21, 27, 14, NP, {0: NS, 3: NS})
-        + nl("M34 6 L42 6 L42 14", NS, NW, cap="butt")
-        + nseg(42, 6, 33, 15, NS, NW)
+        nl("M6 40 L16 22 L30 26 L22 42 Z M16 22 L22 42 M30 26 L38 40 L22 42", NP, NW, NP, 0.1)
+        + ndot(16, 22, NP, 1.8)
+        + ndot(30, 26, NP, 1.8)
+        + nl("M44 4 V14 M44 4 H34", NS, NW, cap="butt")
+        + narrow(44, 4, 30, 18, NS, NW, 5)
     )
 
 
@@ -547,7 +338,7 @@ def _():
 
 @neon_icon("mesh_face_groups")
 def _():
-    return nmesh(24, 24, 18, NP, {0: NS, 1: NS, 3: NA, 4: NA})
+    return nmesh(24, 24, 18, NP, {0: NS, 1: NS, 3: NT, 4: NT})
 
 
 @neon_icon("mesh_repair")
@@ -559,20 +350,24 @@ def _():
 
 @neon_icon("mesh_remesh")
 def _():
+    # an even grid of triangles (a square split in four, each split once) and a cycle arrow
     return (
-        nmesh(20, 26, 14, NP)
-        + nl("M30 10 Q42 8 42 22", NS, NW, cap="butt")
-        + nhead(42, 22, math.pi / 2, NS, NW, 4)
-        + nl("M42 34 Q40 43 30 42", NS, NW, cap="butt", dash="3 2")
+        npoly([(5, 17), (31, 17), (31, 43), (5, 43)], NP, NW, fo=0.1)
+        + nl("M18 17 V43 M5 30 H31 M5 17 L31 43", NP, NI, glow=0.14, cap="butt")
+        + nl("M24 5 H42 V22", NS, NW, cap="butt")
+        + nhead(42, 27, math.pi / 2, NS, NW, 5)
+        + nhead(19, 5, math.pi, NS, NW, 5)
     )
 
 
 @neon_icon("mesh_reduce")
 def _():
+    # one big triangle split in four: fewer, larger faces; a minus and a down arrow
     return (
-        nmesh(20, 24, 15, NP)
-        + nseg(36, 28, 44, 28, NS, NW + 0.3, cap="butt")
-        + narrow(40, 8, 40, 22, NS, NW, head=4)
+        npoly([(4, 42), (34, 42), (19, 12)], NP, NW, fo=0.1)
+        + npoly([(11.5, 27), (26.5, 27), (19, 42)], NP, NI, glow=0.14)
+        + nseg(32, 8, 44, 8, NS, NW + 0.3, cap="butt")
+        + narrow(40, 15, 40, 32, NS, NW, 5)
     )
 
 
@@ -589,6 +384,119 @@ def _():
         nmesh(12, 24, 9, NP)
         + narrow(22, 24, 28, 24, NS, NI + 0.4, head=3.4)
         + nbox(0, 0, 0, 11, 11, 10, NS, 37, 30, fo=0.16)
+    )
+
+
+# ---- automatic icons that read badly: drawn by hand ---------------------------------------
+@neon_icon("material")
+def _():
+    # a material ball on a two-tone floor tile
+    return (
+        nf("M8 38 L24 30 L40 38 L24 46 Z", NP, 0.06)
+        + nl("M8 38 L24 30 L40 38 L24 46 Z", NP, NI, glow=0.14)
+        + nl("M16 34 L32 42", NP, NI, glow=0, cap="butt")
+        + ncircle(24, 20, 13, NP, NW, 0.1)
+        + nl("M13 16 Q24 25 35 16", NS, NI, glow=0.2, cap="butt")
+        + nl("M15 11 Q18 7 23 6.5", NS, NW, cap="butt", glow=0.34)
+    )
+
+
+@neon_icon("emboss")
+def _():
+    # a raised letter on a plate
+    return (
+        nbox(0, 0, 0, 24, 24, 4, NP, 24, 22, inner=False, fo=0.1)
+        + nl("M15 32 L24 8 L33 32 M18.5 23 H29.5", NS, NW + 0.2, cap="butt", glow=0.34)
+    )
+
+
+@neon_icon("mesh_shell")
+def _():
+    # a mesh hollowed to a wall: outer and inner hexagons, tied by three short struts
+    outer = [(24 + 19 * math.cos(math.radians(a)), 24 + 19 * math.sin(math.radians(a)))
+             for a in (-90, -30, 30, 90, 150, 210)]
+    inner = [(24 + 10 * math.cos(math.radians(a)), 24 + 10 * math.sin(math.radians(a)))
+             for a in (-90, -30, 30, 90, 150, 210)]
+    struts = " ".join(_d([outer[k], inner[k]]) for k in range(6))
+    return (
+        npoly(outer, NP, NW, fo=0.14)
+        + nl(_d(inner, True), NS, NW, NG, 0.9, glow=0.3)
+        + nl(struts, NP, NI, glow=0.14, cap="butt")
+    )
+
+
+def _file(mark):
+    """An inserted file: a page with a folded corner and a picture of what it holds."""
+    return npage(6, 4, 30, 38, NP, 7, 0) + mark
+
+
+@neon_icon("insert_dxf")
+def _():
+    # a 2D drawing: a profile with a hole and a dimension line
+    return _file(
+        nl("M11 34 V20 L19 14 H31 V34 Z", NS, NI + 0.3, glow=0.24)
+        + ncircle(22, 25, 3.6, NS, NI)
+        + nl("M11 39 H31", NT, NI, glow=0.14, cap="butt")
+        + nl("M11 37 V41 M31 37 V41", NT, NI, glow=0, cap="butt")
+    )
+
+
+@neon_icon("insert_svg")
+def _():
+    # a vector curve with its two handles
+    return _file(
+        nl("M11 34 C13 16 27 32 31 14", NS, NW, cap="butt", glow=0.3)
+        + nl("M11 34 L11 22 M31 14 L31 26", NT, NI, glow=0, cap="butt")
+        + ndot(11, 21, NT, 1.9)
+        + ndot(31, 27, NT, 1.9)
+    )
+
+
+@neon_icon("insert_step")
+def _():
+    # a 3D part in front of its file
+    return (
+        npage(4, 3, 26, 32, NP, 6, 2)
+        + nbox(0, 0, 0, 14, 14, 11, NS, 32, 30, fo=0.18)
+    )
+
+
+@neon_icon("sphere")
+def _():
+    # a wire sphere: the outline, its equator, one meridian, a highlight
+    return (
+        ncircle(24, 24, 18, NS, NW, 0.1)
+        + nl("M6 24 Q24 33 42 24", NS, NI, glow=0.16, cap="butt")
+        + nl("M24 6 Q15 24 24 42", NS, NI, glow=0.16, cap="butt")
+        + nl("M12 15 Q15 10 21 8.5", NT, NW, cap="butt", glow=0.3)
+    )
+
+
+def _views(frames):
+    """Viewport layouts: each view an outlined frame with cut corners (they were solid grey
+    tiles that merged at 18 px)."""
+    return "".join(ncut(x, y, w, h, NT, 3, NW, fo=0.1) for x, y, w, h in frames)
+
+
+@neon_icon("view_single")
+def _():
+    return _views([(5, 9, 38, 30)])
+
+
+@neon_icon("view_two_h")
+def _():
+    return _views([(5, 9, 17, 30), (26, 9, 17, 30)])
+
+
+@neon_icon("view_two_v")
+def _():
+    return _views([(5, 7, 38, 15), (5, 26, 38, 15)])
+
+
+@neon_icon("nav_viewports")
+def _():
+    return "".join(
+        ncut(x, y, 15, 15, NT, 3, NW, fo=0.06, glow=0.16) for x, y in ((5, 5), (28, 5), (5, 28), (28, 28))
     )
 
 
@@ -652,7 +560,7 @@ def _():
         + nhead(35, 16.2, 0.1, NT, NW, 4.6)
         + nl("M38 20 Q44 27 32 31 Q22 34 13 33", NT, NW, cap="butt", dash="3 2.4")
         + nseg(24, 6, 24, 42, NP, NI, dash="2.5 2.5", cap="butt", glow=0.14)
-        + ndiamond(24, 24, NS, 3)
+        + ndot(24, 24, NS, 2.4)
     )
 
 
@@ -667,26 +575,14 @@ def _():
 
 @neon_icon("nav_pan")
 def _():
-    hand = [
-        (14, 42),
-        (9, 28),
-        (12, 26),
-        (16, 31),
-        (16, 10),
-        (20, 10),
-        (20, 24),
-        (20, 6),
-        (24, 6),
-        (24, 24),
-        (24, 8),
-        (28, 8),
-        (28, 25),
-        (28, 12),
-        (32, 12),
-        (32, 34),
-        (28, 42),
-    ]
-    return npoly(hand, NT, NW, fo=0.0, close=True) + nf(_d(hand, True), NP, 0.14)
+    # an angular open hand: one outline, the fingers told apart by two short notches
+    hand = [(15, 43), (8, 29), (12, 27), (16, 31), (16, 9), (21, 9), (21, 7), (27, 7),
+            (27, 10), (33, 10), (33, 36), (29, 43)]
+    return (
+        npoly(hand, NT, NW, fo=0.0)
+        + nf(_d(hand, True), NP, 0.12)
+        + nl("M21 9 V22 M27 10 V22", NT, NI, glow=0.14, cap="butt")
+    )
 
 
 @neon_icon("nav_zoom")
@@ -749,19 +645,17 @@ def _():
 
 @neon_icon("nav_grid")
 def _():
+    # a floor grid in perspective: the outline and one line each way (three by three cells
+    # filled into a solid diamond at 18 px)
     return npoly([(4, 26), (24, 14), (44, 26), (24, 38)], NT, NW, fo=0.0) + nl(
-        "M9 23 L29 35 M14 20 L34 32 M19 17 L39 29 M9 29 L29 17 M14 32 L34 20 M19 35 L39 23",
-        NP,
-        1.25,
-        glow=0.12,
-        cap="butt",
+        "M14 20 L34 32 M14 32 L34 20", NP, NI, glow=0.18, cap="butt"
     )
 
 
 # ---- BROWSER ------------------------------------------------------------------------------
 def _eye(c_line, c_iris):
     lid = "M4 24 L14 15 L34 15 L44 24 L34 33 L14 33 Z"
-    return nl(lid, c_line, NW, NP, 0.08) + ndiamond(24, 24, c_iris, 6) + ndot(24, 24, NG, 1.6)
+    return nl(lid, c_line, NW, NP, 0.08) + noct(24, 24, 5.6, c_iris, NW, 0.35) + ndot(24, 24, c_iris, 1.6)
 
 
 @neon_icon("eye")
@@ -771,14 +665,14 @@ def _():
 
 @neon_icon("eye_off")
 def _():
+    # the eye's outline dashed (hidden), struck through
     return nl(
         "M4 24 L14 15 L34 15 L44 24 L34 33 L14 33 Z",
-        NP,
-        NI + 0.2,
-        dash="3 2.4",
+        NT,
+        NW,
+        dash="4.5 2.6",
         cap="butt",
-        glow=0.1,
-    ) + nseg(8, 40, 40, 8, NP, NW)
+    ) + nseg(9, 41, 39, 7, NT, NW + 0.4)
 
 
 @neon_icon("folder")
@@ -828,9 +722,7 @@ def _():
 
 @neon_icon("point")
 def _():
-    return nl("M24 6 V17 M24 31 V42 M6 24 H17 M31 24 H42", NP, NI + 0.3, cap="butt") + ndiamond(
-        24, 24, NS, 4.2
-    )
+    return nl("M24 6 V17 M24 31 V42 M6 24 H17 M31 24 H42", NP, NI + 0.3, cap="butt") + ndot(24, 24, NS, 3.4)
 
 
 @neon_icon("axis")
@@ -847,8 +739,8 @@ def _():
     hatch = " ".join("M%.1f 44 L%.1f 40" % (x, x + 4) for x in range(8, 40, 6))
     return (
         nbox(0, 0, 0, 16, 16, 12, NP, 24, 34)
-        + nseg(6, 40, 42, 40, NA, NW, cap="butt")
-        + nl(hatch, NA, 1.2, cap="butt", glow=0.16)
+        + nseg(6, 40, 42, 40, NT, NW, cap="butt")
+        + nl(hatch, NT, NI, cap="butt", glow=0.16)
     )
 
 
@@ -862,42 +754,27 @@ def _():
     return nl("M14 14 L34 34 M34 14 L14 34", NT, NW + 0.5, cap="square")
 
 
-# ---- TIMELINE -----------------------------------------------------------------------------
-def _play(x, flip=False, w=NW):
-    pts = [(x, 12), (x + 18, 24), (x, 36)]
-    if flip:
-        pts = [(2 * x + 18 - px, py) for px, py in pts]
-    return npoly(pts, NT, w, fo=0.0) + nf(_d(pts, True), NP, 0.2)
-
-
+# ---- TIMELINE (the same buttons as the animation timeline: ntransport) --------------------
 @neon_icon("tl_play")
 def _():
-    return _play(16)
+    return ntransport("play")
 
 
 @neon_icon("tl_prev")
 def _():
-    return _play(14, True)
+    return ntransport("back")
 
 
 @neon_icon("tl_next")
 def _():
-    return _play(10) + nseg(35, 12, 35, 36, NS, NW + 0.6, cap="butt")
+    return ntransport("step")
 
 
 @neon_icon("tl_end")
 def _():
-    return (
-        _play(8)
-        + nseg(30, 12, 30, 36, NS, NW, cap="butt")
-        + nseg(37, 12, 37, 36, NS, NW, cap="butt")
-    )
+    return ntransport("end")
 
 
 @neon_icon("tl_start")
 def _():
-    return (
-        _play(22, True)
-        + nseg(18, 12, 18, 36, NS, NW, cap="butt")
-        + nseg(11, 12, 11, 36, NS, NW, cap="butt")
-    )
+    return ntransport("start")
