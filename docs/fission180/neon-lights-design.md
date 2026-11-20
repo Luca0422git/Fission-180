@@ -48,8 +48,10 @@ striking at a glance, and still a CAD program Luca can do real work in every day
 **Non-goals**
 - No change to how anything *works*: same commands, dialogs, options, shortcuts, positions.
 - No change to what is saved: a design made in Neon Lights opens exactly the same in Dark, on
-  another computer, or in plain FreeCAD. Drawings stay black on white paper; exports, PDFs and
-  STEP/STL files are untouched by the look.
+  another computer, or in plain FreeCAD, including the preview picture saved inside it. Drawings
+  stay black on white paper; exports, PDFs and STEP/STL files are untouched by the look. The one
+  exception, by Luca's choice: Capture Image shows the neon screen unless "Normal look" is ticked
+  (6.6).
 - No Fusion parity requirement for this look (it is deliberately not Fusion; Dark keeps Fusion
   parity). To be recorded in MEMORY.md's Decisions log.
 - The Windows Open / Save file window is drawn by Windows and cannot be restyled; it stays as is.
@@ -236,6 +238,12 @@ neon icon falls back to a recoloured copy of the normal one, never to a blank.
   neon colours: shared helpers map the existing colours to neon roles (like `translate()` does
   for style sheets), files with their own colours are swept.
 - Measure's dots/labels follow too (see the note in MEMORY.md's known issues about their size).
+- **Pictures made from the view** (Luca, 2026-11-20: "Previews normal, Capture = screen"): the
+  preview picture FreeCAD saves inside a design (shown on Home, the Data Panel, Versions) is
+  always made in the normal look: `neon_view` takes every neon scene change off around FreeCAD's
+  save and puts it back after, and a test proves the saved preview equals one saved in Dark.
+  **Capture Image** shows what is on screen (neon, Hologram included), with a check box "Normal
+  look" to take a plain one instead. Animation and simulation result images follow Capture.
 
 ### 6.7 Effects
 
@@ -309,15 +317,36 @@ at once in the real window behind it. Stored under `Mod/Fission180/Neon`.
 - A **showcase scenario** that takes screenshots of the main surfaces in a few presets (ribbon
   with a menu open, a command dialog, sketch mode, Hologram, Home), sent to Luca for review.
 
-### 6.13 Delivery
+### 6.13 Real hardware checks (Luca tests on both machines)
 
-- Branch `sf/neon-lights` (from `develop`), merged into `develop` when its tests are green, as
-  move-speed was.
+The sandbox draws the 3D view in software under xvfb, so speed and the shader can only be
+judged on real graphics cards. Luca (2026-11-20) tests on **both** his Windows PC and his Linux
+laptop (CachyOS, KDE Wayland via XWayland, AMD Radeon 680M). At each checkpoint he installs the
+branch's quick-update build (CI's `Fission180-quick-update-<sha>` artifact) on both and runs a
+short check written for him: a built-in **Neon self-check** (Fission 180 > Diagnostics) that
+orbits a sample part with effects off and on, toggles Hologram, and prints the frame times, the
+idle CPU use and whether the rim-light shader compiled; he pastes the result back.
+
+- The rim-light shader also runs a **self-test at start** (compiles, draws one frame, reads it
+  back); on any failure Hologram uses the flat see-through material and logs why. It is on by
+  default only once Luca's two machines pass.
+- Windows-only paths (`winsound`, see-through menus on Windows, the boot sequence over a
+  Windows window) are checked by Luca at the checkpoints; the sandbox covers Linux/xvfb.
+
+### 6.14 Delivery
+
+- Luca (2026-11-20): "this IS the update ... id like the update to be all in one, not half baked
+  patches until its done." He develops nothing else meanwhile, so no patch release interrupts.
+- Work happens on branch `sf/neon-lights` (from `develop`, as move-speed did); it is merged into
+  `develop` only when **everything** is finished, tested here and checked by Luca on both
+  machines. Nothing reaches `develop` or a release half done.
 - **First a sample** (font, a few icons, a menu, one dialog, the 3D view in two presets) as real
   screenshots for Luca's OK, before the builders redraw everything.
 - Then builders work in parallel, each owning its own files (the plan lists them).
-- Release: all in Fission 180's own files, so it can go out without the full build; Luca decides
-  when and under which number.
+- Shipping: everything is in Fission 180's own folder (`tools/fission180/core_id.sh` ignores it),
+  so it can go out without the 4-hour build. New file types (fonts and their licence, the neon
+  icons, the sound files) need install rules in `src/Mod/Fission180/CMakeLists.txt` and must
+  pass `tools/fission180/check_install.sh`. Luca decides the release number and when.
 
 ## 7. Left to the builders (decide, write down why, test)
 
@@ -337,4 +366,6 @@ at once in the real window behind it. Stored under `Mod/Fission180/Neon`.
 - Chakra Petch + Orbitron as fonts (to be confirmed by the sample).
 - A Hologram quick toggle in the navigation bar while Neon Lights is on.
 - Glitch every 40-120 s, 80-150 ms long; effects at about 40% over the 3D view.
-- The speed budget (10% per frame, about 2% idle CPU).
+- The speed budget (10% per frame, about 2% idle CPU), judged on Luca's two machines.
+- The rim-light shader behind a start-up self-test, on by default only after Luca's machines pass.
+- A "Neon self-check" in Diagnostics for Luca's hardware checks.
