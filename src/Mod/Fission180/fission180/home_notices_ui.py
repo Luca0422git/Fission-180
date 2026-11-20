@@ -86,7 +86,9 @@ class Line(QtWidgets.QFrame):
         super().__init__()
         self.setObjectName(name)
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setStyleSheet(QSS % name)
+        from . import neon_qss_panels
+
+        neon_qss_panels.style(self, QSS % name, "home_notice")
         row = QtWidgets.QHBoxLayout(self)
         row.setContentsMargins(12, 6, 8, 6)
         row.setSpacing(6)

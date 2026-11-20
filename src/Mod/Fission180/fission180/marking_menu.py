@@ -16,7 +16,7 @@ import math
 
 import FreeCADGui as Gui
 
-from . import recent, registry, ribbon_config as cfg, taskui, ui_icon, warn
+from . import neon_qss_panels, recent, registry, ribbon_config as cfg, taskui, theme, ui_icon, warn
 from .compat import QtCore, QtGui, QtWidgets
 from .ribbon_ui import build_menu, resolve, run
 
@@ -37,7 +37,8 @@ class MarkingMenu(QtWidgets.QWidget):
         super().__init__(parent, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
         self.setObjectName("Fission180MarkingMenu")
-        self.setStyleSheet(STYLE)  # before building, so buttons size themselves with it
+        # before building, so buttons size themselves with it
+        neon_qss_panels.style(self, STYLE, "marking")
         self.ensurePolished()
         available = registry.available_commands()
         size = 2 * RADIUS + 200
@@ -162,6 +163,14 @@ class MarkingMenu(QtWidgets.QWidget):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         mid = QtCore.QPointF(self.width() / 2, (self.height() - 220) / 2)
+        if theme.is_neon():
+            try:
+                _paint_neon_ring(painter, mid)
+            except Exception as exc:  # never an exception out of a paint
+                warn("marking menu: Neon Lights ring: %s" % exc)
+            finally:
+                painter.end()
+            return
         painter.setPen(QtGui.QPen(QtGui.QColor("#56606f"), 1.5))
         painter.setBrush(QtGui.QColor("#30363f"))
         painter.drawEllipse(mid, RADIUS, RADIUS)
@@ -173,6 +182,57 @@ class MarkingMenu(QtWidgets.QWidget):
             self.close()
         else:
             super().keyPressEvent(event)
+
+
+def _paint_neon_ring(painter, mid):
+    """Neon Lights' ring: dark glass, a glowing rim, a dashed inner orbit, tick marks
+    between the slots and a crosshair at the centre (colours of the look's palette)."""
+    primary = QtGui.QColor(theme.neon("primary", "#56606f"))
+    hot = QtGui.QColor(theme.neon("primary_hot", "#f5f5f5"))
+    second = QtGui.QColor(theme.neon("secondary", "#3fa9f5"))
+    ground = QtGui.QColor(theme.neon("background", "#30363f"))
+    ground.setAlpha(236)
+    painter.setPen(QtCore.Qt.NoPen)
+    painter.setBrush(ground)
+    painter.drawEllipse(mid, RADIUS, RADIUS)
+    glow = QtGui.QColor(primary)
+    glow.setAlpha(70)
+    painter.setBrush(QtCore.Qt.NoBrush)
+    painter.setPen(QtGui.QPen(glow, 5.0))
+    painter.drawEllipse(mid, RADIUS - 3.5, RADIUS - 3.5)
+    painter.setPen(QtGui.QPen(primary, 1.6))
+    painter.drawEllipse(mid, RADIUS - 1.5, RADIUS - 1.5)
+    dim = QtGui.QColor(primary)
+    dim.setAlpha(120)
+    orbit = QtGui.QPen(dim, 1.0)
+    orbit.setDashPattern([3.0, 4.0])
+    painter.setPen(orbit)
+    painter.drawEllipse(mid, RADIUS * 0.55, RADIUS * 0.55)
+    painter.setPen(QtGui.QPen(second, 1.6))
+    for i in range(8):
+        angle = math.radians(90 - 45 * i - 22.5)  # between two slots
+        cos, sin = math.cos(angle), -math.sin(angle)
+        painter.drawLine(
+            QtCore.QPointF(mid.x() + (RADIUS - 12) * cos, mid.y() + (RADIUS - 12) * sin),
+            QtCore.QPointF(mid.x() + (RADIUS - 4) * cos, mid.y() + (RADIUS - 4) * sin),
+        )
+    painter.setPen(QtGui.QPen(dim, 1.0))
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        painter.drawLine(
+            QtCore.QPointF(mid.x() + 10 * dx, mid.y() + 10 * dy),
+            QtCore.QPointF(mid.x() + 22 * dx, mid.y() + 22 * dy),
+        )
+    diamond = QtGui.QPolygonF(
+        [
+            QtCore.QPointF(mid.x(), mid.y() - 6),
+            QtCore.QPointF(mid.x() + 6, mid.y()),
+            QtCore.QPointF(mid.x(), mid.y() + 6),
+            QtCore.QPointF(mid.x() - 6, mid.y()),
+        ]
+    )
+    painter.setPen(QtGui.QPen(hot, 1.4))
+    painter.setBrush(QtGui.QColor(primary))
+    painter.drawPolygon(diamond)
 
 
 STYLE = """

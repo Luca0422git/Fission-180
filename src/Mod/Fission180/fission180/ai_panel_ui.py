@@ -17,7 +17,7 @@ their tab. The badges are Fission 180's own (a colour and letters), never a comp
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import log, theme, ui_icon, ui_icon_path, warn
+from . import log, neon_qss_panels, theme, ui_icon, ui_icon_path, warn
 from .compat import QtCore, QtGui, QtWidgets
 
 TITLE = "AI"
@@ -62,12 +62,55 @@ def _qss():
     )
 
 
+def _neon_badge(painter, size, letters, colour):
+    """Neon Lights: the badge keeps its own hue as a glowing cut-corner frame on dark glass,
+    its letters in the hue (the look's frames; Dark and Light keep the filled square)."""
+    hue = QtGui.QColor(colour).lighter(135)
+    ground = QtGui.QColor(theme.palette()["background"])
+    c = size * 0.24
+    shape = QtGui.QPolygonF(
+        [
+            QtCore.QPointF(1.5, 1.5 + c),
+            QtCore.QPointF(1.5 + c, 1.5),
+            QtCore.QPointF(size - 1.5, 1.5),
+            QtCore.QPointF(size - 1.5, size - 1.5 - c),
+            QtCore.QPointF(size - 1.5 - c, size - 1.5),
+            QtCore.QPointF(1.5, size - 1.5),
+        ]
+    )
+    glow = QtGui.QColor(hue)
+    glow.setAlpha(70)
+    painter.setPen(QtGui.QPen(glow, 3.0))
+    fill = QtGui.QColor(hue)
+    fill.setAlpha(46)
+    painter.setBrush(ground)
+    painter.drawPolygon(shape)
+    painter.setBrush(fill)
+    painter.setPen(QtGui.QPen(hue, 1.4))
+    painter.drawPolygon(shape)
+    font = painter.font()
+    font.setBold(True)
+    font.setPixelSize(int(size * (0.34 if len(letters) > 2 else 0.42)))
+    painter.setFont(font)
+    painter.setPen(hue.lighter(115))
+    painter.drawText(QtCore.QRectF(0, 0, size, size), QtCore.Qt.AlignCenter, letters)
+
+
 def badge(badge_id, size=28):
     """An AI's badge: its letters on its colour, in a rounded square (Fission 180's own)."""
     letters, colour = BADGES.get(badge_id, BADGES["other"])
     pixmap = QtGui.QPixmap(size, size)
     pixmap.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pixmap)
+    if theme.is_neon():
+        try:
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            _neon_badge(painter, size, letters, colour)
+        except Exception as exc:
+            warn("AI panel: badge: %s" % exc)
+        finally:
+            painter.end()
+        return QtGui.QIcon(pixmap)
     try:
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         painter.setPen(QtCore.Qt.NoPen)
@@ -143,7 +186,8 @@ class _TitleBar(QtWidgets.QWidget):
         super().__init__()
         self.setObjectName("Fission180AITitle")
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setStyleSheet(_qss())  # (a title bar is not inside the panel: its own style)
+        # (a title bar is not inside the panel: its own style)
+        neon_qss_panels.style(self, _qss(), "ai")
         row = QtWidgets.QHBoxLayout(self)
         row.setContentsMargins(10, 4, 4, 4)
         label = QtWidgets.QLabel(TITLE)
@@ -174,7 +218,7 @@ class AIPanel(QtWidgets.QWidget):
         super().__init__()
         self.setObjectName("Fission180AIPanel")
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setStyleSheet(_qss())
+        neon_qss_panels.style(self, _qss(), "ai")
         column = QtWidgets.QVBoxLayout(self)
         column.setContentsMargins(8, 8, 8, 6)
         column.setSpacing(6)
@@ -373,6 +417,24 @@ def refresh():
     page = panel()
     if page is not None:
         page.refresh()
+
+
+def theme_changed():
+    """A look or preset switch (theme.LISTENERS): the panel's style and its badges again in
+    the look's colours (they are baked from theme's colours when made)."""
+    found = _state["dock"]
+    try:
+        if found is None:
+            return
+        title = found.titleBarWidget()
+        for widget in (title, found.widget()):
+            if widget is not None:
+                neon_qss_panels.style(widget, _qss(), "ai")
+        refresh()
+    except RuntimeError:
+        pass
+    except Exception as exc:
+        warn("AI panel: look: %s" % exc)
 
 
 class PanelCommand:

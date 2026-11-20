@@ -96,6 +96,7 @@ def _build_entries():
 class CommandSearchDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent, QtCore.Qt.Popup)
+        self.setObjectName("Fission180Search")  # (Neon Lights' rules: neon_qss_panels)
         self.setMinimumWidth(520)
         self._entries = _build_entries()
 

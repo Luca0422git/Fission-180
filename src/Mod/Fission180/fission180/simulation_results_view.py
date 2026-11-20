@@ -1004,6 +1004,7 @@ class ColourBar(QtWidgets.QWidget):
             try:
                 from . import theme
 
+                text_colour = QtGui.QColor(theme.neon("text", "#f5f5f5"))
                 if theme.is_light():
                     text_colour = QtGui.QColor("#1f2329")
             except Exception:
@@ -1200,6 +1201,11 @@ class Legend(QtWidgets.QFrame):
                 try:
                     from . import theme
 
+                    colour = {  # Neon Lights: the look's colours (Dark keeps its own)
+                        "below": theme.neon("alert", colour),
+                        "meets": theme.neon("secondary_hot", colour),
+                        "above": theme.neon("secondary", colour),
+                    }.get(state, theme.neon("text_dim", colour))
                     if theme.is_light():  # (darker on the light look's white panel)
                         colour = {"below": "#c62828", "meets": "#9a6b00", "above": "#1f6fbf"}.get(
                             state, "#5b6573"
