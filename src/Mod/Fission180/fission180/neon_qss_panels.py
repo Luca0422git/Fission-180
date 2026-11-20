@@ -25,6 +25,7 @@ from . import warn
 
 PROP_TEXT = "fission180NeonText"  # the style sheet the panel asked for (dark colours)
 PROP_PART = "fission180NeonPart"  # which BLOCKS entry it gets in Neon Lights
+PROP_ROLE = "fission180NeonRole"  # colour(): the palette role of the widget's text in Neon Lights
 
 # -- this file's own frame pieces ----------------------------------------------------------
 # piece -> (width, height, slice in image px, border in screen px)
@@ -127,11 +128,12 @@ def svg(piece, p):
             )
         return _svg(w, h, body)
     if piece == "slot":
-        # a sunk value slot: dark, no frame but a line under it with a square end
+        # a sunk value slot: dark, no frame but a line under it with a square end (the line a
+        # little dim, so the focused field's glowing frame stands out from it)
         body = [
             _poly(_pts(1, 1, w - 2, h - 2, 4, ("br",)), fill=p["field"], stroke=p["line"], width=1.0,
                   opacity=0.6),
-            _line(1, h - 2, w - 7, h - 2, primary, 2.0),
+            _line(1, h - 2, w - 7, h - 2, primary, 2.0, 0.7),
             _line(1, h - 2, 6, h - 2, hot, 2.4),
         ]
         return _svg(w, h, body)
@@ -218,6 +220,7 @@ def values(p, frames, fonts, mine):
         secondary_fill=rgba(p["secondary"], 0.12),
         alert_fill=rgba(p["alert"], 0.16),
         line_soft=rgba(p["primary"], 0.35),
+        fit_small=FIT_SMALL,
     )
     return v
 
@@ -242,6 +245,12 @@ QSint--ActionGroup QToolButton[class="header"] {{ color: {primary_hot}; font-wei
     border: none; background: transparent; text-transform: uppercase; letter-spacing: 1.5px; {display} }}
 QSint--ActionGroup QFrame[class="header"] QLabel {{ color: {primary_hot}; background: transparent;
     text-transform: uppercase; letter-spacing: 1.5px; font-weight: bold; {display} }}
+/* a long title made to fit before the hazard stripes (fit_titles): tighter, then smaller,
+   then the stripes left out */
+QSint--ActionGroup QToolButton[class="header"][fission180Fit="1"] {{ letter-spacing: 0.5px; }}
+QSint--ActionGroup QToolButton[class="header"][fission180Fit="2"] {{ letter-spacing: 0px; font-size: {fit_small}px; }}
+QSint--ActionGroup QToolButton[class="header"][fission180Fit="3"] {{ letter-spacing: 0px; font-size: {fit_small}px; }}
+QSint--ActionGroup QFrame[class="header"][fission180Fit="3"] {{ background-image: none; }}
 QSint--ActionGroup QFrame[class="content"] {{ background: {chrome}; border: 1px solid {line};
     border-top: none; }}
 QSint--ActionGroup QFrame[class="content"] QTreeView, QSint--ActionGroup QFrame[class="content"] QListView,
@@ -309,7 +318,15 @@ def _home(v, widget):
 #Fission180HomeAIs {{ background: {field}; border: 1px solid {primary_dim}; }}
 #Fission180HomeAIs::item {{ padding: 3px; }}
 #Fission180HomeAIs::item:hover {{ background: {hover_fill}; }}
-""".format(**v)
+""".format(**v) + _see_through()
+
+
+def _see_through():
+    """Home's scroll area, rows and list see-through, so neon_home's animated backdrop (a child
+    at the bottom of the page) shows; never the page itself (neon_home.SEE_THROUGH)."""
+    from . import neon_home
+
+    return neon_home.SEE_THROUGH_QSS + "\n"
 
 
 def _home_update(v, widget):
@@ -424,6 +441,14 @@ def _caption(v, widget):
     return "QLabel {{ color: {secondary}; text-transform: uppercase; letter-spacing: 1.5px; }}".format(**v)
 
 
+def _role_colour(v, widget):
+    """The colour of the palette role the widget asked for through colour() (none: no rule)."""
+    role = widget.property(PROP_ROLE) if widget is not None else None
+    if not role or role not in v:
+        return ""
+    return "\nQWidget {{ color: {0}; }}".format(v[role])
+
+
 BLOCKS = {
     "home": _home,
     "home_update": _home_update,
@@ -437,6 +462,7 @@ BLOCKS = {
     "data_upload": _data_upload,
     "dim_label": _dim_label,
     "caption": _caption,
+    "role_colour": _role_colour,
 }
 
 _assets = {}  # palette digest -> values() (the pieces are files: made once per palette)
@@ -482,7 +508,7 @@ def style(widget, text, part):
         widget.setStyleSheet(text)
         return
     try:
-        neon_text = theme.translate(text) + block(part, theme.palette(), widget)
+        neon_text = theme.translate(wrap(text)) + block(part, theme.palette(), widget)
         _set_raw(widget, neon_text)
         if text and "#" in text:
             widget.setProperty("fission180Qss", text)  # theme's own restyle starts from this
@@ -494,6 +520,27 @@ def style(widget, text, part):
             widget.setStyleSheet(text)
         except RuntimeError:
             pass
+
+
+def wrap(text):
+    """A style sheet of property lines only ("color: #fff;") as a rule ("* { color: #fff; }"),
+    so rules can be added after it: Qt reads "props + rule" as one broken sheet, retries it
+    wrapped in "* {...}" and the added rule is lost."""
+    if text and text.strip() and "{" not in text:
+        return "* { %s }\n" % text.strip()
+    return text
+
+
+def colour(widget, text, role=None):
+    """`text` (a style sheet in Dark's colours, e.g. "color: #9fd2ff;") on `widget`, and in
+    Neon Lights its text colour the palette's `role` instead (None: theme.translate's colours).
+    Dark's literal is what is remembered, so leaving Neon Lights with the panel open gives the
+    exact Dark colour back, and a preset switch the new preset's colour."""
+    try:
+        widget.setProperty(PROP_ROLE, role or "")
+    except RuntimeError:
+        return
+    style(widget, text, "role_colour")
 
 
 def restyle_all():
@@ -512,7 +559,187 @@ def restyle_all():
             warn("Neon Lights: panel restyle: %s" % exc)
 
 
+# -- long dialog titles ------------------------------------------------------------------------
+# The title of a command dialog is in caps, letter-spaced, in the display face; a long one
+# ("CREATE MESH SECTION SKETCH", 279 px) ran into the hazard stripes at the strip's right end.
+# fit_titles() gives such a title a tighter spacing, then a smaller size, and as a last resort
+# leaves the stripes out (property fission180Fit, rules in qss()).
+FIT_SPACING = (1.5, 0.5, 0.0, 0.0)  # letter-spacing (px) of each level, as in the rules
+FIT_SMALL = 11  # font size (px) of levels 2 and 3
+FIT_GAP = 6  # px kept between the title's end and the stripes
+PROP_FIT = "fission180Fit"
+_fit = {"filter": None, "views": []}
+
+
+def fit_level(widths, room):
+    """The first level (0-2) whose title width in `widths` fits in `room` px; 3 (no stripes)
+    when none does."""
+    for level, width in enumerate(widths[:3]):
+        if width <= room:
+            return level
+    return 3
+
+
+def stripes_left(header):
+    """The x (in the header strip) where the hazard stripes start."""
+    return header.width() - SIZES["strip"][3] - SIZES["hazard"][0]
+
+
+def _title_widths(title):
+    """The title's text width at each level (from its font as the style sheet sets it)."""
+    from .compat import QtGui
+
+    text = title.text().replace("&", "").upper()
+    out = []
+    for level in range(3):
+        font = QtGui.QFont(title.font())
+        font.setCapitalization(QtGui.QFont.AllUppercase)
+        font.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, FIT_SPACING[level])
+        if level >= 2:
+            font.setPixelSize(FIT_SMALL)
+        out.append(QtGui.QFontMetrics(font).horizontalAdvance(text))
+    return out
+
+
+def _title_of(header):
+    from .compat import QtWidgets
+
+    for child in header.findChildren(QtWidgets.QToolButton):
+        if child.property("class") == "header":
+            return child
+    return None
+
+
+def _set_fit(widget, level):
+    value = str(level) if level else ""
+    if (widget.property(PROP_FIT) or "") == value:
+        return False
+    widget.setProperty(PROP_FIT, value)
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+    widget.update()
+    return True
+
+
+def fit_title(header):
+    """Make `header`'s title (a command dialog's) fit before its hazard stripes."""
+    from . import theme
+
+    title = _title_of(header)
+    if title is None:
+        return
+    if not theme.is_neon():
+        _set_fit(title, 0)
+        _set_fit(header, 0)
+        return
+    start = title.x() + (title.iconSize().width() + 4 if not title.icon().isNull() else 0) + 2
+    level = fit_level(_title_widths(title), stripes_left(header) - FIT_GAP - start)
+    changed = _set_fit(title, level)
+    changed = _set_fit(header, 3 if level == 3 else 0) or changed
+    if changed:
+        title.updateGeometry()
+
+
+def _headers(root):
+    from .compat import QtWidgets
+
+    return [w for w in root.findChildren(QtWidgets.QFrame) if w.property("class") == "header"]
+
+
+def fit_titles():
+    """Every open command dialog's title (see fit_title); also watches the task views for
+    dialogs opened later (a filter on the task view's widgets only, not the whole app)."""
+    from . import theme
+
+    try:
+        neon = theme.is_neon()
+        for view in _task_views():
+            if neon:
+                _watch(view)
+            else:
+                _unwatch(view)
+            for header in _headers(view):
+                fit_title(header)
+    except Exception as exc:
+        warn("Neon Lights: dialog titles: %s" % exc)
+
+
+def _task_views():
+    from .compat import QtWidgets
+
+    try:
+        import FreeCADGui as Gui
+
+        main = Gui.getMainWindow()
+    except Exception:
+        return []
+    if main is None:
+        return []
+    return [
+        w for w in main.findChildren(QtWidgets.QWidget)
+        if w.metaObject().className() == "Gui::TaskView::TaskView"
+    ]
+
+
+def _make_filter():
+    from .compat import QtCore
+
+    kinds = (QtCore.QEvent.Show, QtCore.QEvent.Resize, QtCore.QEvent.LayoutRequest)
+
+    class TitleWatch(QtCore.QObject):
+        def eventFilter(self, obj, event):  # noqa: N802 (Qt's name)
+            try:
+                kind = event.type()
+                if kind == QtCore.QEvent.ChildAdded:
+                    child = event.child()
+                    if child is not None and child.isWidgetType():
+                        _watch(child)
+                elif kind in kinds and obj.isWidgetType() and obj.property("class") == "header" \
+                        and obj.metaObject().className() != "QSint::ActionLabel":
+                    header = obj
+                    QtCore.QTimer.singleShot(0, lambda: _fit_alive(header))
+            except Exception as exc:  # never break a dialog
+                warn("Neon Lights: dialog title: %s" % exc)
+            return False
+
+    return TitleWatch()
+
+
+def _fit_alive(header):
+    try:
+        fit_title(header)
+    except RuntimeError:
+        pass  # the dialog closed meanwhile
+    except Exception as exc:
+        warn("Neon Lights: dialog title: %s" % exc)
+
+
+def _watch(widget):
+    """The title watcher on `widget` and everything in it (once each)."""
+    from .compat import QtWidgets
+
+    if _fit["filter"] is None:
+        _fit["filter"] = _make_filter()
+    for each in [widget] + widget.findChildren(QtWidgets.QWidget):
+        if not each.property("fission180FitWatched"):
+            each.setProperty("fission180FitWatched", True)
+            each.installEventFilter(_fit["filter"])
+
+
+def _unwatch(widget):
+    """The title watcher off again (Dark and Light: no filter left on the task view)."""
+    from .compat import QtWidgets
+
+    if _fit["filter"] is None:
+        return
+    for each in [widget] + widget.findChildren(QtWidgets.QWidget):
+        if each.property("fission180FitWatched"):
+            each.setProperty("fission180FitWatched", None)
+            each.removeEventFilter(_fit["filter"])
+
+
 def theme_changed():
     """A look or preset switch (theme.LISTENERS): the panels again in the new colours."""
     _assets.clear()
     restyle_all()
+    fit_titles()

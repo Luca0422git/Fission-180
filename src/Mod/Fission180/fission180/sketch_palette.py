@@ -223,8 +223,11 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         if text != self.freedom.text():
             self.freedom.setText(text)
             bad = conflicting or redundant
-            colour = "#ff8a80" if bad else ("#f5f5f5" if locked else theme.neon("secondary", "#9fd2ff"))
-            self.freedom.setStyleSheet("color: %s;" % colour)
+            colour = "#ff8a80" if bad else ("#f5f5f5" if locked else "#9fd2ff")
+            # Dark's colour in the sheet (and remembered); Neon Lights: the secondary colour
+            neon_qss_panels.colour(
+                self.freedom, "color: %s;" % colour, None if bad or locked else "secondary"
+            )
 
     def _refresh_mode(self):
         """Show whether new curves are drawn as construction (X with nothing selected

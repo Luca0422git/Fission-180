@@ -2,16 +2,25 @@
 """Neon Lights on the command dialogs and Fission 180's other panels (neon-lights-design.md
 6.3, plan task B3), with the panels open while the look and the preset change.
 
-1. Dark: pictures of the Extrude dialog, Home's New button, the Data Panel's Upload button and
-   path, the sketch palette, Measure's box in the sketch and the sketch's marking menu.
+1. Dark: pictures of Home (its New button and its background), the Data Panel's Upload button
+   and path, the sketch palette, Measure's box in the sketch and the sketch's marking menu.
 2. Look = Neon Lights (V) with the sketch, Measure and the Data Panel open: the palette's title
    strip, its Finish button, Measure's box, the Data Panel (Upload filled with the primary
    colour, the path's links in the secondary), Home and the marking ring are in V's colours.
+   A sheet of property lines only ("color: ...;") gets its neon rule in a real Qt widget.
 3. Preset = Johnny with all of them still open: each repainted in Johnny's colours, nothing
    keeps V's.
-4. The Extrude dialog in Johnny: the header strip with its primary tab and the title in caps,
-   a field glowing when it has the focus, OK filled with the primary colour.
-5. Look = Dark: every picture of step 1 again, the same; no panel keeps a neon rule.
+4. Still Johnny: the Extrude dialog (header strip with its primary tab, the title in caps, the
+   focused field glowing, OK filled, a long title ending before the hazard stripes), and
+   Home's animated background moving on the screen behind its panels.
+5. The sketch and Measure opened again (in Johnny), then Look = Dark with them STILL open:
+   the palette, its degrees-of-freedom line, Measure's box, a verdict-like label made in
+   Johnny and the marking menu are as in Dark (no neon colour mapped back to a wrong one).
+6. Look = Dark: Home, its background (still) and the Data Panel as in step 1; no panel keeps a
+   neon rule.
+
+Pictures of the main window are taken with the screen-effects layer (scan lines, corners)
+hidden: it darkens every grab in Neon Lights.
 """
 
 import os
@@ -42,6 +51,31 @@ def near(a, b, tolerance=40):
     ) <= tolerance
 
 
+def effects_layers():
+    """The screen-effects layers (neon_effects) shown over the main window."""
+    out = []
+    for w in Gui.getMainWindow().findChildren(QtWidgets.QWidget):
+        try:
+            if w.objectName().startswith("Fission180NeonEffects") and w.isVisible():
+                out.append(w)
+        except RuntimeError:
+            pass
+    return out
+
+
+def grab_main(rect=None):
+    """The main window's picture without the screen-effects layer (hidden for the grab only)."""
+    main = Gui.getMainWindow()
+    hidden = effects_layers()
+    for w in hidden:
+        w.hide()
+    try:
+        return (main.grab(rect) if rect is not None else main.grab()).toImage()
+    finally:
+        for w in hidden:
+            w.show()
+
+
 def seen(widget, points):
     """The colours a person sees at `points` of `widget` (from the window's picture: FreeCAD's
     overlay panels grab see-through on their own)."""
@@ -49,7 +83,7 @@ def seen(widget, points):
         image = widget.grab().toImage()
         return [QtGui.QColor(image.pixel(x, y)).name() for x, y in points]
     main = Gui.getMainWindow()
-    image = main.grab().toImage()
+    image = grab_main()
     out = []
     for x, y in points:
         spot = widget.mapTo(main, QtCore.QPoint(x, y))
@@ -64,7 +98,7 @@ def picture(widget, own=False):
         return widget.grab().toImage()
     main = Gui.getMainWindow()
     top_left = widget.mapTo(main, QtCore.QPoint(0, 0))
-    return main.grab(QtCore.QRect(top_left, widget.size())).toImage()
+    return grab_main(QtCore.QRect(top_left, widget.size()))
 
 
 def same_as_dark(name, widget, own=False):
@@ -219,6 +253,50 @@ def styled_left_neon():
     return left
 
 
+def text_colour(label):
+    """The colour Qt really draws `label`'s text in (after its style sheet is applied)."""
+    label.ensurePolished()
+    return label.palette().color(QtGui.QPalette.WindowText).name()
+
+
+def freedom():
+    box = palette_box()
+    return box.findChild(QtWidgets.QLabel, "Fission180PaletteFreedom") if box is not None else None
+
+
+def home_strip():
+    """The screen's pixels of a strip of Home's background inside its list (on the screen, not
+    a grab: the screen only repaints what changed, neon-extras.md)."""
+    page = home_page()
+    scroll = page.scroll
+    top = scroll.mapToGlobal(QtCore.QPoint(scroll.width() // 3, scroll.height() - 160))
+    image = QtWidgets.QApplication.primaryScreen().grabWindow(0, top.x(), top.y(), 4, 150).toImage()
+    return [QtGui.QColor(image.pixel(1, y)).name() for y in range(image.height())]
+
+
+def _home_in_front():
+    from fission180 import home_ui
+
+    sub = home_ui.subwindow()
+    area = Gui.getMainWindow().findChild(QtWidgets.QMdiArea)
+    return sub is not None and area is not None and area.currentSubWindow() is sub
+
+
+def hide_effects():
+    s["effects"] = effects_layers()
+    for w in s["effects"]:
+        w.hide()
+
+
+def show_effects():
+    for w in s.get("effects") or []:
+        try:
+            w.show()
+        except RuntimeError:
+            pass
+    s["effects"] = []
+
+
 # -- 1. Dark ------------------------------------------------------------------------------------
 def setup():
     lc.setup()
@@ -244,6 +322,18 @@ dark_home.done_what = "Home to show its New button"
 
 def dark_home_picture():
     s["dark"]["home_new"] = picture(home_new())
+    s["dark_home_strip"] = home_strip()
+
+
+dark_home_picture.done = lambda: _home_in_front()
+dark_home_picture.done_what = "Home to be in front"
+
+
+def dark_home_still():
+    """Dark's Home has no animated background: its background is the same a moment later."""
+    h.settle(what="Home")
+    now = home_strip()
+    h.check("Dark's Home background does not move", now == s["dark_home_strip"], (now[:4], s["dark_home_strip"][:4]))
 
 
 def back_to_design():
@@ -312,6 +402,11 @@ def dark_pictures():
     s["dark"]["palette_title"] = picture(palette_title())
     s["dark"]["palette_finish"] = picture(palette_finish(), own=True)
     s["dark"]["measure"] = picture(measure_box())
+    label = freedom()
+    h.check("the palette shows its degrees-of-freedom line", label is not None)
+    if label is not None:
+        s["dark_freedom"] = (label.styleSheet(), text_colour(label))
+        print("[Fission 180] neon_panels: degrees-of-freedom line in Dark %r %s" % s["dark_freedom"])
 
 
 def _open_ring():
@@ -423,7 +518,34 @@ def neon_panels_v():
     h.caught_up(what="the sketch's panel")
     print("[Fission 180] neon_panels: Data Panel width in V %d" % data_panel().width())
     check_open_panels("v")
+    property_lines_get_their_rule("v")
     h.shot("v-sketch-palette")
+
+
+def property_lines_get_their_rule(key):
+    """A sheet of property lines only ("color: ...;", as the palette's Feature Options title and
+    the Data Panel's details set) still gets its neon rule in a real Qt widget: Qt used to drop
+    it (the sheet is wrapped as "* {...}" before the rule is added)."""
+    from fission180 import neon_qss_panels
+
+    p = palette_of(key)
+    for part, text, role in (
+        ("dim_label", "padding: 0 10px; color: #c9d1dc;", "text_dim"),
+        ("caption", "font-weight: bold; padding: 4px 6px;", "secondary"),
+    ):
+        label = QtWidgets.QLabel("Feature Options")
+        neon_qss_panels.style(label, text, part)
+        got = text_colour(label)
+        h.check("[%s] a %s sheet of property lines gets its neon colour" % (key, part), near(got, p[role], 8),
+                (got, p[role], label.styleSheet()[:160]))
+        if part == "caption":
+            h.check("[%s] ... and its caps" % key, label.font().capitalization() == QtGui.QFont.AllUppercase)
+        label.deleteLater()
+    label = freedom()
+    if label is not None and s.get("dark_freedom") and "#9fd2ff" in s["dark_freedom"][0]:
+        got = text_colour(label)
+        h.check("[%s] the degrees-of-freedom line in the secondary colour" % key, near(got, p["secondary"], 8),
+                (got, p["secondary"]))
 
 
 def neon_ring_v():
@@ -461,7 +583,93 @@ def johnny_panels():
     for name, widget in (("palette", palette_box()), ("Measure", measure_box()), ("Home", home_page())):
         if widget is not None:
             h.check("%s keeps nothing of V" % name, v["primary_hot"] not in widget.styleSheet())
+    property_lines_get_their_rule("johnny")
+    # a label coloured as the simulation results' verdict is ("meets": Dark's #ffd666), made
+    # in Neon Lights and kept open through the switch back to Dark
+    from fission180 import neon_qss_panels
+
+    p = palette_of("johnny")
+    verdict = QtWidgets.QLabel("Meets the target", Gui.getMainWindow())
+    verdict.setObjectName("Fission180NeonPanelsVerdict")
+    neon_qss_panels.colour(verdict, "QLabel { color: #ffd666; }", "secondary_hot")
+    s["verdict"] = verdict
+    got = text_colour(verdict)
+    h.check("a verdict label in Johnny's colour", near(got, p["secondary_hot"], 8), (got, p["secondary_hot"]))
     h.shot("johnny-sketch-palette")
+
+
+# -- 5. Dark with the sketch and Measure still open (opened again in Johnny) ---------------------
+def back_to_design_johnny():
+    back_to_design()
+
+
+back_to_design_johnny.done = _design_in_front
+back_to_design_johnny.done_what = "the design's tab to be in front"
+
+
+def sketch_in_johnny():
+    dark_sketch()
+
+
+sketch_in_johnny.done = dark_sketch.done
+sketch_in_johnny.done_what = dark_sketch.done_what
+
+
+def measure_in_johnny():
+    dark_measure()
+
+
+measure_in_johnny.done = dark_measure.done
+measure_in_johnny.done_what = dark_measure.done_what
+
+
+def to_dark_open():
+    h.caught_up(what="the sketch's panel")
+    h.check("the sketch's panels are in Johnny's colours before the switch",
+            palette_of("johnny")["primary_hot"] in palette_box().styleSheet())
+    to_dark()
+
+
+to_dark_open.done = lambda: __import__("fission180.theme", fromlist=["x"]).name() == "dark"
+to_dark_open.done_what = "the look to be Dark"
+
+
+def dark_open_panels():
+    """The panels that were open through Neon Lights, now in Dark: as Dark's pictures."""
+    h.caught_up(what="the sketch's panel")
+    h.check("the sketch is still open", palette_box() is not None and measure_box() is not None)
+    same_as_dark("palette_title", palette_title())
+    same_as_dark("palette_finish", palette_finish(), own=True)
+    same_as_dark("measure", measure_box())
+    label = freedom()
+    if label is not None and s.get("dark_freedom"):
+        now = (label.styleSheet(), text_colour(label))
+        h.check("the degrees-of-freedom line as in Dark", now == s["dark_freedom"], (now, s["dark_freedom"]))
+    verdict = s.get("verdict")
+    if verdict is not None:
+        got = text_colour(verdict)
+        h.check("the verdict label in Dark's own colour again", got == "#ffd666", (got, verdict.styleSheet()))
+        verdict.deleteLater()
+        s["verdict"] = None
+
+
+def dark_ring_open():
+    _open_ring()
+
+
+dark_ring_open.done = _ring_shown
+dark_ring_open.done_what = "the sketch's marking menu to open"
+
+
+def dark_ring_open_picture():
+    now = s["ring"].grab().toImage()
+    share = lc._differing(s["dark"]["ring"], now) if now.size() == s["dark"]["ring"].size() else 1.0
+    h.check("the marking menu looks as it did in Dark", share <= lc.SHARE, "%.3f%%" % (share * 100))
+    s["ring"].close()
+
+
+dark_ring_open_picture.done = _ring_closed
+dark_ring_open_picture.done_what = "the marking menu to close"
 
 
 def leave_sketch():
@@ -476,7 +684,9 @@ leave_sketch.done = lambda: palette_box() is None and not lc.task_open()
 leave_sketch.done_what = "the sketch to close"
 
 
-# -- 4. the Extrude dialog in Johnny --------------------------------------------------------------
+# -- 4. the Extrude dialog and Home's animated background in Johnny ------------------------------
+
+
 def extrude_open():
     Gui.Selection.clearSelection()
     Gui.Selection.addSelection(App.ActiveDocument.Name, lc.s["sketch2"].Name)
@@ -509,6 +719,59 @@ def extrude_johnny():
 
 extrude_johnny.done = lambda: s.get("field") is not None and s["field"].hasFocus()
 extrude_johnny.done_what = "the Distance field to take the focus"
+
+
+LONG_TITLE = "Create Mesh Section Sketch"
+
+
+def _title():
+    from fission180 import neon_qss_panels
+
+    header = task_header()
+    return header, (neon_qss_panels._title_of(header) if header is not None else None)
+
+
+def _title_end():
+    """Where the title's text ends in its header strip (px), as Qt draws it now."""
+    header, title = _title()
+    metrics = QtGui.QFontMetrics(title.font())
+    start = title.x() + (title.iconSize().width() + 4 if not title.icon().isNull() else 0) + 2
+    return start + metrics.horizontalAdvance(title.text().replace("&", "").upper())
+
+
+def long_title():
+    header, title = _title()
+    h.check("the dialog's title is there", title is not None)
+    s["title_text"] = title.text()
+    title.setText(LONG_TITLE)
+
+
+def _long_title_fits():
+    from fission180 import neon_qss_panels
+
+    header, title = _title()
+    return title.text() == LONG_TITLE and _title_end() <= neon_qss_panels.stripes_left(header)
+
+
+long_title.done = _long_title_fits
+long_title.done_what = "the long title to end before the hazard stripes"
+
+
+def long_title_check():
+    from fission180 import neon_qss_panels
+
+    header, title = _title()
+    h.check(
+        "a long dialog title ends before the hazard stripes",
+        _title_end() <= neon_qss_panels.stripes_left(header),
+        (_title_end(), neon_qss_panels.stripes_left(header), title.property(neon_qss_panels.PROP_FIT)),
+    )
+    h.check("... still in caps", title.font().capitalization() == QtGui.QFont.AllUppercase)
+    print("[Fission 180] neon_panels: long title level %r, ends at %d, stripes at %d" % (
+        title.property(neon_qss_panels.PROP_FIT), _title_end(), neon_qss_panels.stripes_left(header)))
+    image = grab_main(QtCore.QRect(header.mapTo(Gui.getMainWindow(), QtCore.QPoint(0, 0)), header.size()))
+    image.save(os.path.join(h.OUT_DIR, "neon_panels-long-title-johnny.png"))
+    title.setText(s["title_text"])
 
 
 def _bottom_glow(field, p):
@@ -557,15 +820,45 @@ home_johnny.done = lambda: home_new() is not None and home_new().isVisible()
 home_johnny.done_what = "Home to show"
 
 
+home_johnny.done = lambda: home_new() is not None and home_new().isVisible() and _home_in_front()
+
+
 def home_johnny_check():
+    from fission180 import neon_home, neon_settings
+
     p = palette_of("johnny")
     new = home_new()
     fill = seen(new, [(new.width() - 8, new.height() // 2), (8, new.height() // 2)])
     h.check("Home's New is filled with the primary colour", any(near(c, p["primary"]) for c in fill), fill)
     h.shot("johnny-home")
+    h.check("HomeAnimation is on", bool(neon_settings.get("HomeAnimation")))
+    page = home_page()
+    h.check("Home has its animated background", neon_home.backdrop(page) is not None)
+    hide_effects()  # (its own animation would change the pixels too)
 
 
-# -- 5. Dark again ------------------------------------------------------------------------------------
+home_johnny_check.done = lambda: __import__("fission180.neon_home", fromlist=["x"]).running(home_page())
+home_johnny_check.done_what = "Home's animated background to run"
+
+
+def home_first_frame():
+    s["home_frame"] = home_strip()
+
+
+def _home_moved():
+    return home_strip() != s["home_frame"]
+
+
+home_first_frame.done = _home_moved
+home_first_frame.done_what = "Home's background to move on the screen, through its list"
+
+
+def home_moves():
+    h.check("Home's background moves on the screen behind its panels (two frames differ)", _home_moved())
+    show_effects()
+
+
+# -- 6. Dark again: Home and the Data Panel -------------------------------------------------------
 def to_dark():
     from fission180 import neon_settings
 
@@ -577,9 +870,32 @@ to_dark.done = lambda: __import__("fission180.theme", fromlist=["x"]).name() == 
 to_dark.done_what = "the look to be Dark"
 
 
+def dark_home_show():
+    from fission180 import home_ui
+
+    home_ui.show()
+
+
+dark_home_show.done = lambda: home_new() is not None and home_new().isVisible() and _home_in_front()
+dark_home_show.done_what = "Home to be in front"
+
+
 def dark_home_again():
+    from fission180 import neon_home
+
     h.check("no panel keeps a neon rule", not styled_left_neon(), styled_left_neon())
     same_as_dark("home_new", home_new())
+    h.check("Dark's Home has no animated background", neon_home.backdrop(home_page()) is None)
+
+
+dark_home_again.done = _home_in_front
+dark_home_again.done_what = "Home to be in front"
+
+
+def dark_home_background_again():
+    h.settle(what="Home")
+    now = home_strip()
+    h.check("Dark's Home background as before", now == s["dark_home_strip"], (now[:4], s["dark_home_strip"][:4]))
 
 
 def dark_data_panel_again():
@@ -590,71 +906,24 @@ def dark_data_panel_again():
     h.check("the path's links as in Dark", panel.crumbs.text() == s["dark_crumbs_text"], panel.crumbs.text()[:200])
 
 
-dark_sketch_again = lambda: dark_sketch()  # noqa: E731
-dark_sketch_again.__name__ = "dark_sketch_again"
-dark_sketch_again.done = dark_sketch.done
-dark_sketch_again.done_what = dark_sketch.done_what
-
-
-def dark_measure_again():
-    Gui.runCommand("Fission180_Measure")
-
-
-dark_measure_again.done = dark_measure.done
-dark_measure_again.done_what = dark_measure.done_what
-
-
-def dark_pictures_again():
-    h.caught_up(what="the sketch's panel")
-    same_as_dark("palette_title", palette_title())
-    same_as_dark("palette_finish", palette_finish(), own=True)
-    same_as_dark("measure", measure_box())
-
-
-def dark_ring_again():
-    _open_ring()
-
-
-dark_ring_again.done = _ring_shown
-dark_ring_again.done_what = "the sketch's marking menu to open"
-
-
-def dark_ring_again_picture():
-    now = s["ring"].grab().toImage()
-    share = lc._differing(s["dark"]["ring"], now) if now.size() == s["dark"]["ring"].size() else 1.0
-    h.check("the marking menu looks as it did in Dark", share <= lc.SHARE, "%.3f%%" % (share * 100))
-    s["ring"].close()
-
-
-dark_ring_again_picture.done = _ring_closed
-dark_ring_again_picture.done_what = "the marking menu to close"
-
-
 def done():
-    from fission180 import sketch_mode
-
-    from fission180 import measure_ui
-
-    if measure_ui.MeasurePanel.last is not None:
-        measure_ui.MeasurePanel.last.close()
-    sketch_mode.finish_sketch()
-
-
-done.done = lambda: palette_box() is None
-done.done_what = "the sketch to close"
+    show_effects()
+    h.check("no sketch left open", palette_box() is None)
 
 
 h.run(
     "neon_panels",
     [
-        setup, dark_home, dark_home_picture, back_to_design, dark_data_panel, dark_data_panel_picture,
-        dark_sketch, dark_measure, dark_pictures, dark_ring, dark_ring_picture,
+        setup, dark_home, dark_home_picture, dark_home_still, back_to_design, dark_data_panel,
+        dark_data_panel_picture, dark_sketch, dark_measure, dark_pictures, dark_ring, dark_ring_picture,
         to_neon, neon_panels_v, neon_ring_v, neon_ring_v_check,
         to_johnny, johnny_panels, leave_sketch,
-        extrude_open, extrude_johnny, field_glows, extrude_closed, home_johnny, home_johnny_check,
-        to_dark, dark_home_again, back_to_design_again, dark_data_panel_again,
-        dark_sketch_again, dark_measure_again, dark_pictures_again, dark_ring_again, dark_ring_again_picture,
-        done,
+        extrude_open, extrude_johnny, field_glows, long_title, long_title_check, extrude_closed,
+        home_johnny, home_johnny_check, home_first_frame, home_moves,
+        back_to_design_johnny, sketch_in_johnny, measure_in_johnny,
+        to_dark_open, dark_open_panels, dark_ring_open, dark_ring_open_picture, leave_sketch,
+        dark_home_show, dark_home_again, dark_home_background_again, back_to_design_again,
+        dark_data_panel_again, done,
     ],
     paced_by="state",
 )
