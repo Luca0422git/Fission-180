@@ -13,6 +13,7 @@ PARTS = (
     "neon_popups",
     "neon_icons",
     "neon_view",
+    "neon_scene",
     "neon_effects",
     "neon_boot",
     "neon_sound",
