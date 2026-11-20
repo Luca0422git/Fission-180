@@ -7,8 +7,10 @@ dissolves. Any click or key skips it. It is a child widget painted over the main
 window of its own, no event loop of its own), so loading goes on and a file opened from the
 command line opens behind it as usual.
 
-Shown once per start, on the first time Neon Lights comes on (the start, when the look is Neon
-Lights), when the setting Boot is on. Never in tests (FISSION180_SCENARIO_FILE set) unless a
+Shown once per start, only when Fission 180 starts in Neon Lights (not when someone switches
+to it during a run: theme.set_theme() marks that), when the setting Boot is on. It never takes
+the keyboard focus, and it is opaque until its fade (nothing under it is painted); the still
+parts are one picture per size and a frame repaints only the parts that move. Never in tests (FISSION180_SCENARIO_FILE set) unless a
 scenario calls show(force=True).
 """
 
@@ -45,6 +47,8 @@ MARK = (0, 520)
 TEXT = (300, 1750)
 BAR = (550, 2000)
 FADE = (2000, DURATION)
+# While each moving part changes (ms; a frame after its end draws its last state).
+SPANS = {"mark": MARK, "text": TEXT, "bar": BAR}
 _state = {"shown": False, "widget": None, "filter": None, "on": False}
 
 
@@ -121,19 +125,27 @@ def _widget_class():
             super().__init__(parent)
             self.setObjectName("Fission180NeonBoot")
             self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
-            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, False)
-            self.setFocusPolicy(QtCore.Qt.StrongFocus)
+            # Opaque until the fade: nothing under it is painted while it covers the window
+            # (the fade lets the window show through, so it turns this off then).
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+            # It never takes the keyboard focus: the focus stays where it was, and keys reach
+            # the skip filter (which keeps them from the window behind it).
+            self.setFocusPolicy(QtCore.Qt.NoFocus)
             self.setCursor(QtCore.Qt.ArrowCursor)
             self.colours = _palette()
             self.body_font, self.display_font = _fonts()
             self.rng = random.Random(180)
             self.clock = QtCore.QElapsedTimer()
             self.timer = QtCore.QTimer(self)
+            self.timer.setTimerType(QtCore.Qt.PreciseTimer)
             self.timer.setInterval(int(1000 / FPS))
             self.timer.timeout.connect(self._tick)
             self.t = 0
             self.frames = 0
-            self.lines = None  # the scan-line pattern, made once per size
+            self.pictures = None  # (size, full, under, lines brush): the still parts, per size
+            self.final = None  # the last frame, faded out at the end
+            self.fading = False
+            self.layers = {}  # (colour, unit) -> the mark's line art in that colour
             self.setGeometry(parent.rect())
 
         def start(self):
@@ -141,21 +153,52 @@ def _widget_class():
             self.timer.start()
             self.show()
             self.raise_()
-            self.setFocus(QtCore.Qt.OtherFocusReason)
 
         def _tick(self):
+            self.step(self.clock.elapsed())
+
+        def step(self, now):
+            """The screen at `now` ms: only the parts that move are repainted."""
             try:
-                self.t = self.clock.elapsed()
+                before = self.t
+                self.t = now
                 if self.t >= DURATION:
                     finish("done")
                     return
                 parent = self.parentWidget()
                 if parent is not None and self.geometry() != parent.rect():
-                    self.setGeometry(parent.rect())
-                self.update()
+                    self.setGeometry(parent.rect())  # a resize event repaints it all
+                    return
+                if self.t >= FADE[0]:
+                    if not self.fading:
+                        self.fading = True
+                        self.final = self._frame(FADE[0])
+                        self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, False)
+                    self.update()
+                    return
+                region = QtGui.QRegion()
+                rects = self._rects()
+                for key, rect in rects.items():
+                    start, end = SPANS[key]
+                    if self.t >= start and before <= end:
+                        if key == "text":  # only the lines being typed (and the cursor)
+                            rect = self._typing(rect, before, self.t)
+                        elif key == "bar":  # only the segments lit since, and the numbers
+                            rect = self._filling(rect, before, self.t)
+                        region = region.united(rect)
+                if not region.isEmpty():
+                    self.update(region)
             except Exception as exc:
                 warn("Neon Lights: boot: %s" % exc)
                 finish("error")
+
+        def resizeEvent(self, event):  # noqa: N802
+            super().resizeEvent(event)
+            self.pictures = None
+            self.layers = {}
+            self.final = None
+            if self.fading:
+                self.final = self._frame(FADE[0])
 
         # any click or key skips it
         def mousePressEvent(self, event):  # noqa: N802
@@ -166,23 +209,143 @@ def _widget_class():
             event.accept()
             finish("key")
 
-        def _scanlines(self, size):
-            if self.lines is not None and self.lines.size() == size:
-                return self.lines
-            pix = QtGui.QPixmap(size)
-            pix.fill(QtCore.Qt.transparent)
-            p = QtGui.QPainter(pix)
-            p.setPen(QtGui.QColor(0, 0, 0, 70))
-            for y in range(0, size.height(), 3):
-                p.drawLine(0, y, size.width(), y)
+        # -- the layout and the still pictures
+        def _geometry(self):
+            w, h = self.width(), self.height()
+            cx, cy = w / 2.0, h * 0.40
+            unit = max(28.0, min(w, h) / 11.0)
+            return cx, cy, unit
+
+        def _rects(self):
+            """Where each moving part is drawn (they do not overlap): the mark and its name,
+            the typed lines, the bar with its labels."""
+            cx, cy, unit = self._geometry()
+            font = QtGui.QFont(self.body_font)
+            font.setPixelSize(max(11, int(unit * 0.30)))
+            font.setLetterSpacing(QtGui.QFont.PercentageSpacing, 110)
+            text_w = QtGui.QFontMetricsF(font).horizontalAdvance("> M" + LINES[0]) + 8
+            half = max(unit * 6.4, text_w / 2.0 + 4)
+            left, width = int(cx - half), int(2 * half) + 2
+            ys = [cy - unit * 1.35, cy + unit * 2.05, cy + unit * 5.35, cy + unit * 6.9]
+            ys = [int(y) for y in ys]
+            name = QtGui.QFont(self.display_font)
+            name.setPixelSize(int(unit * 0.62))
+            name.setWeight(QtGui.QFont.Bold)
+            name.setLetterSpacing(QtGui.QFont.PercentageSpacing, 135)
+            name_w = QtGui.QFontMetricsF(name).horizontalAdvance("FISSION 180")
+            # the mark, its split copies and glitch slices reach 2.8 units from the middle
+            mark_half = min(half, max(name_w / 2.0 + unit * 0.6, unit * 2.9) + 4)
+            rects = {
+                "mark": QtCore.QRect(int(cx - mark_half), ys[0], int(2 * mark_half) + 2, ys[1] - ys[0]),
+                "text": QtCore.QRect(left, ys[1], width, ys[2] - ys[1]),
+                "bar": QtCore.QRect(left, ys[2], width, ys[3] - ys[2]),
+            }
+            return {k: r.intersected(self.rect()) for k, r in rects.items()}
+
+        def _text_layout(self, unit):
+            """The typed lines' font, metrics and line step (shared by drawing and _typing)."""
+            font = QtGui.QFont(self.body_font)
+            font.setPixelSize(max(11, int(unit * 0.30)))
+            font.setLetterSpacing(QtGui.QFont.PercentageSpacing, 110)
+            metrics = QtGui.QFontMetricsF(font)
+            return font, metrics, metrics.height() * 1.25
+
+        def _typing(self, rect, before, t):
+            """The part of the text's place that changes between `before` and `t`: the lines
+            from the one being typed then to the one being typed now."""
+            _cx, cy, unit = self._geometry()
+            _font, _metrics, step = self._text_layout(unit)
+            top = cy + unit * 2.1
+            first = max(0, len(typed(before)) - 1)
+            last = max(first, len(typed(t)) - 1)
+            y0 = int(top + first * step) - 2
+            y1 = int(top + (last + 1) * step) + 3
+            return QtCore.QRect(rect.left(), y0, rect.width(), y1 - y0).intersected(rect)
+
+        def _filling(self, rect, before, t):
+            """The part of the bar's place that changes between `before` and `t`: the
+            segments lit since (with their halo) and the percentage under the bar."""
+            if before < BAR[0] <= t:
+                return rect  # the frame and the label come in: all of it once
+            cx, cy, unit = self._geometry()
+            top = cy + unit * 2.1 + unit * 3.6
+            seg_w, gap = unit * 0.32, unit * 0.09
+            total = SEGMENTS * seg_w + (SEGMENTS - 1) * gap
+            left = cx - total / 2.0
+            a, b = segments(before), segments(t)
+            region = QtGui.QRegion()
+            if b > a:
+                x0 = int(left + a * (seg_w + gap)) - 3
+                x1 = int(left + b * (seg_w + gap)) + 3
+                region = region.united(QtCore.QRect(x0, int(top) - 3, x1 - x0, int(unit * 0.34) + 6))
+            pad = unit * 0.16
+            label_y = int(top + unit * 0.34 + pad) + 2
+            pct_w = int(unit * 2.0)
+            region = region.united(QtCore.QRect(int(left + total + pad) - pct_w, label_y, pct_w + 4,
+                                                int(unit * 0.4) + 6))
+            return region.intersected(rect)
+
+        def _content(self):
+            out = QtCore.QRect()
+            for rect in self._rects().values():
+                out = out.united(rect)
+            return out
+
+        def _pictures(self):
+            """The still parts in one picture per size: the background, the glow, the scan
+            lines, the corner marks and the hint ("full"); and the background and glow alone
+            ("under"), put back under the moving parts before they are drawn again."""
+            if self.pictures is not None and self.pictures[0] == self.size():
+                return self.pictures
+            w, h = max(1, self.width()), max(1, self.height())
+            c = self.colours
+            under = QtGui.QPixmap(w, h)
+            under.fill(QtGui.QColor(c["background"]))
+            p = QtGui.QPainter(under)
+            glow = QtGui.QRadialGradient(w / 2.0, h * 0.42, max(w, h) * 0.45)
+            g0 = QtGui.QColor(c["primary"])
+            g0.setAlpha(46)
+            glow.setColorAt(0.0, g0)
+            glow.setColorAt(1.0, QtGui.QColor(0, 0, 0, 0))
+            p.fillRect(QtCore.QRect(0, 0, w, h), QtGui.QBrush(glow))
             p.end()
-            self.lines = pix
+            # the scan lines: a 1x3 tile as a brush (one fill, not a line per row)
+            tile = QtGui.QImage(1, 3, QtGui.QImage.Format_ARGB32_Premultiplied)
+            tile.fill(QtCore.Qt.transparent)
+            tile.setPixelColor(0, 0, QtGui.QColor(0, 0, 0, 70))
+            lines = QtGui.QBrush(tile)
+            full = QtGui.QPixmap(under)
+            p = QtGui.QPainter(full)
+            p.fillRect(QtCore.QRect(0, 0, w, h), lines)
+            p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            self._corners(p, w, h)
+            p.end()
+            self.pictures = (self.size(), full, under, lines)
+            return self.pictures
+
+        def _frame(self, t):
+            """The whole screen at time t as a picture (the fade dims this one)."""
+            pix = QtGui.QPixmap(max(1, self.width()), max(1, self.height()))
+            p = QtGui.QPainter(pix)
+            try:
+                self._paint(p, QtGui.QRegion(self.rect()), t)
+            finally:
+                p.end()
             return pix
 
         def paintEvent(self, event):  # noqa: N802
             painter = QtGui.QPainter(self)
             try:
-                self._paint(painter)
+                if self.fading and self.final is not None:
+                    # dissolving: horizontal slices drop out, from the middle outward first;
+                    # the window shows through them (nothing is cleared, the slices are not
+                    # painted) and through the rest as it fades
+                    w, h = self.width(), self.height()
+                    painter.setClipRegion(self._kept(_phase(self.t, FADE), w, h))
+                    painter.setOpacity(opacity(self.t))
+                    painter.drawPixmap(0, 0, self.final)
+                else:
+                    self._paint(painter, event.region(), self.t)
                 self.frames += 1
             except Exception as exc:
                 warn("Neon Lights: boot paint: %s" % exc)
@@ -190,34 +353,33 @@ def _widget_class():
             finally:
                 painter.end()
 
-        def _paint(self, p):
-            c = self.colours
-            t = self.t
-            w, h = self.width(), self.height()
-            alpha = opacity(t)
+        def _paint(self, p, region, t):
+            """The screen at time t inside `region`: the still picture, and the moving parts
+            drawn again only where the region meets them."""
+            _size, full, under, lines = self._pictures()
+            for rect in region:
+                p.drawPixmap(rect, full, rect)
+            moving = region.intersected(self._content())
+            if moving.isEmpty():
+                return
+            p.save()
+            p.setClipRegion(moving)
+            for rect in moving:
+                p.drawPixmap(rect, under, rect)
             p.setRenderHint(QtGui.QPainter.Antialiasing, True)
-            if t > FADE[0]:
-                # dissolving: horizontal slices drop out, from the middle outward first; the
-                # window shows through them (nothing is cleared, the slices are not painted)
-                p.setClipRegion(self._kept(_phase(t, FADE), w, h))
-            p.setOpacity(alpha)
-            bg = QtGui.QColor(c["background"])
-            p.fillRect(self.rect(), bg)
-            # a faint radial glow behind the mark
-            glow = QtGui.QRadialGradient(w / 2.0, h * 0.42, max(w, h) * 0.45)
-            g0 = QtGui.QColor(c["primary"])
-            g0.setAlpha(46)
-            glow.setColorAt(0.0, g0)
-            glow.setColorAt(1.0, QtGui.QColor(0, 0, 0, 0))
-            p.fillRect(self.rect(), QtGui.QBrush(glow))
-
-            cx, cy = w / 2.0, h * 0.40
-            unit = max(28.0, min(w, h) / 11.0)
-            self._mark(p, cx, cy, unit, t)
-            self._text(p, cx, cy + unit * 2.1, unit, t)
-            self._bar(p, cx, cy + unit * 2.1 + unit * 3.6, unit, t)
-            p.drawPixmap(0, 0, self._scanlines(self.size()))
-            self._corners(p, w, h)
+            rects = self._rects()
+            cx, cy, unit = self._geometry()
+            if moving.intersects(rects["mark"]):
+                self._mark(p, cx, cy, unit, t)
+            if moving.intersects(rects["text"]):
+                self._text(p, cx, cy + unit * 2.1, unit, t)
+            if moving.intersects(rects["bar"]):
+                self._bar(p, cx, cy + unit * 2.1 + unit * 3.6, unit, t)
+            for rect in moving:
+                p.fillRect(rect, lines)  # the scan lines over the moving parts too
+            # the corner marks and the hint, where a moving part's place reaches them
+            self._corners(p, self.width(), self.height())
+            p.restore()
 
         def _kept(self, f, w, h):
             from PySide import QtGui as G
@@ -248,28 +410,16 @@ def _widget_class():
                 return
             jitter = (1.0 - m) * unit * 0.6
             r = unit * 0.95
-            gap = unit * 0.22
             for dx, colour, a in (
                 (-jitter * 0.6 - (1 - m) * 4, c["alert"], int(140 * (1 - m) + 30)),
                 (jitter * 0.6 + (1 - m) * 4, c["secondary"], int(140 * (1 - m) + 30)),
                 (0.0, c["primary"], int(255 * min(1.0, m * 1.6))),
             ):
+                layer, origin = self._mark_layer(colour, unit)
+                shift = dx + (self.rng.uniform(-jitter, jitter) if m < 1 else 0.0)
                 p.save()
-                p.translate(dx + (self.rng.uniform(-jitter, jitter) if m < 1 else 0.0), 0)
-                for width, aa in ((unit * 0.26, a // 5), (unit * 0.075, a)):
-                    p.setPen(self._pen(colour, width, aa))
-                    p.setBrush(QtCore.Qt.NoBrush)
-                    left = QtCore.QRectF(cx - r - gap, cy - r, 2 * r, 2 * r)
-                    right = QtCore.QRectF(cx - r + gap, cy - r, 2 * r, 2 * r)
-                    p.drawArc(left, 90 * 16, 180 * 16)
-                    p.drawArc(right, -90 * 16, 180 * 16)
-                    p.drawLine(QtCore.QPointF(cx - gap, cy - r * 0.55), QtCore.QPointF(cx - gap, cy + r * 0.55))
-                    p.drawLine(QtCore.QPointF(cx + gap, cy - r * 0.55), QtCore.QPointF(cx + gap, cy + r * 0.55))
-                # the spark of the split
-                p.setPen(self._pen(c["secondary"], max(1.5, unit * 0.05), a))
-                s = unit * 0.32
-                p.drawLine(QtCore.QPointF(cx, cy - s), QtCore.QPointF(cx, cy + s))
-                p.drawLine(QtCore.QPointF(cx - s * 0.5, cy), QtCore.QPointF(cx + s * 0.5, cy))
+                p.setOpacity(p.opacity() * a / 255.0)
+                p.drawPixmap(QtCore.QPointF(cx + origin.x() + shift, cy + origin.y()), layer)
                 p.restore()
             # the name
             font = QtGui.QFont(self.display_font)
@@ -295,19 +445,47 @@ def _widget_class():
                     p.fillRect(QtCore.QRectF(cx - r * 1.6 + self.rng.uniform(-jitter, jitter) * 2,
                                              y, r * 3.2, hh), col)
 
+        def _mark_layer(self, colour, unit):
+            """One colour's copy of the mark's line art (glow and line, and the spark),
+            stroked once per size into a picture; a frame copies it (shifted, faded)."""
+            key = (colour, round(unit, 2))
+            cache = self.layers
+            if key in cache:
+                return cache[key]
+            c = self.colours
+            r = unit * 0.95
+            gap = unit * 0.22
+            half = int(r + gap + unit * 0.3) + 2
+            pix = QtGui.QPixmap(2 * half, 2 * half)
+            pix.fill(QtCore.Qt.transparent)
+            p = QtGui.QPainter(pix)
+            p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            p.translate(half, half)  # the mark's centre
+            for width, aa in ((unit * 0.26, 51), (unit * 0.075, 255)):
+                p.setPen(self._pen(colour, width, aa))
+                p.setBrush(QtCore.Qt.NoBrush)
+                p.drawArc(QtCore.QRectF(-r - gap, -r, 2 * r, 2 * r), 90 * 16, 180 * 16)
+                p.drawArc(QtCore.QRectF(-r + gap, -r, 2 * r, 2 * r), -90 * 16, 180 * 16)
+                p.drawLine(QtCore.QPointF(-gap, -r * 0.55), QtCore.QPointF(-gap, r * 0.55))
+                p.drawLine(QtCore.QPointF(gap, -r * 0.55), QtCore.QPointF(gap, r * 0.55))
+            # the spark of the split
+            p.setPen(self._pen(c["secondary"], max(1.5, unit * 0.05), 255))
+            s = unit * 0.32
+            p.drawLine(QtCore.QPointF(0, -s), QtCore.QPointF(0, s))
+            p.drawLine(QtCore.QPointF(-s * 0.5, 0), QtCore.QPointF(s * 0.5, 0))
+            p.end()
+            cache[key] = (pix, QtCore.QPointF(-half, -half))
+            return cache[key]
+
         def _text(self, p, cx, top, unit, t):
             c = self.colours
             lines = typed(t)
             if not lines:
                 return
-            font = QtGui.QFont(self.body_font)
-            font.setPixelSize(max(11, int(unit * 0.30)))
-            font.setLetterSpacing(QtGui.QFont.PercentageSpacing, 110)
+            font, metrics, step = self._text_layout(unit)
             p.setFont(font)
-            metrics = QtGui.QFontMetricsF(font)
             width = metrics.horizontalAdvance(LINES[0]) + metrics.horizontalAdvance("> ")
             left = cx - width / 2.0
-            step = metrics.height() * 1.25
             for i, line in enumerate(lines):
                 y = top + i * step
                 done = len(line) == len(LINES[i])
@@ -400,19 +578,29 @@ def _widget_class():
 
 
 def _filter_class():
-    from PySide import QtCore
+    from PySide import QtCore, QtWidgets
+
+    press = (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.KeyPress)
 
     class _Skip(QtCore.QObject):
         """A click or key anywhere (a dialog that came up over the boot screen included)
-        skips it; the event itself goes on."""
+        skips it. A key meant for the window behind the boot screen stops here (the boot
+        screen has no focus of its own, so the key would reach the widget that has it);
+        a key or click in another window goes on."""
 
         def eventFilter(self, obj, event):  # noqa: N802
             try:
-                kind = event.type()
-                if kind in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.KeyPress):
-                    widget = _state["widget"]
-                    if widget is not None and obj is not widget:
-                        QtCore.QTimer.singleShot(0, lambda: finish("input"))
+                if event.type() not in press:
+                    return False
+                widget = _state["widget"]
+                if widget is None or obj is widget:
+                    return False
+                QtCore.QTimer.singleShot(0, lambda: finish("input"))
+                if event.type() == QtCore.QEvent.KeyPress and isinstance(obj, QtWidgets.QWidget):
+                    window = widget.parentWidget()
+                    if window is not None and obj.window() is window:
+                        event.accept()
+                        return True
             except Exception:
                 pass
             return False
@@ -441,6 +629,8 @@ def show(force=False):
 
             if _state["shown"] or _in_tests() or not theme.is_neon():
                 return None
+            if _switched_in():
+                return None
             if not neon_settings.get("Boot"):
                 return None
         window = _main_window()
@@ -456,6 +646,7 @@ def show(force=False):
         app.installEventFilter(skip)
         _state["filter"] = skip
         widget.start()
+        _home_follows()  # Home's moving background waits under the boot screen
         try:
             from . import neon_sound
 
@@ -486,6 +677,7 @@ def finish(why="done"):
         pass
     if widget is None:
         return
+    _home_follows()
     try:
         widget.timer.stop()
         widget.hide()
@@ -497,6 +689,29 @@ def finish(why="done"):
         pass
     except Exception as exc:
         warn("Neon Lights: boot: %s" % exc)
+
+
+def _home_follows():
+    """Home's moving background starts or stops for the boot screen (on the event loop)."""
+    try:
+        from PySide import QtCore
+
+        from . import neon_home
+
+        QtCore.QTimer.singleShot(0, neon_home.follow_all)
+    except Exception as exc:
+        warn("Neon Lights: boot: %s" % exc)
+
+
+def _switched_in():
+    """True when Neon Lights came on by switching to it during this run (Preferences), not
+    by Fission 180 starting in it: the boot screen is for the start only."""
+    try:
+        from . import theme
+
+        return bool(theme._state.get("switched"))
+    except Exception:
+        return False
 
 
 def widget():
@@ -536,6 +751,8 @@ def _start_when_ready():
 
 def enable():
     _state["on"] = True
+    if _switched_in():
+        _state["shown"] = True  # switched to Neon Lights mid-run: no boot screen this run
     if not _state["shown"] and not _in_tests():
         _start_when_ready()
 
@@ -551,5 +768,8 @@ def refresh():
     if w is not None:
         try:
             w.colours = _palette()
+            w.pictures = None
+            w.layers = {}
+            w.update()
         except RuntimeError:
             pass

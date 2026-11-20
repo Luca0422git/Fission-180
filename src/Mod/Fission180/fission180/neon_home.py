@@ -7,11 +7,13 @@ stream of characters falling down the right side, drawn behind Home's content. h
 attach(page) when Home's page is made and detach(page) when it goes.
 
 It is a child widget at the bottom of the page (clicks pass through it). Its timer runs at
-most FPS frames a second, and only while Neon Lights is on, the setting HomeAnimation is on,
-the page is visible (Home's tab in front) and the main window is active; otherwise it is
-stopped (no timer, no painting). The still parts (the background, the grid's converging lines,
-the horizon) are drawn once per size into a picture; each frame adds the moving lines and the
-characters.
+most FPS frames a second (a frame never comes sooner than MIN_GAP_MS after the last), and only
+while Neon Lights is on, the setting HomeAnimation is on, the page is visible (Home's tab in
+front), the main window is active and the boot screen is not up; otherwise it is stopped (no
+timer, no painting). The still parts (the background, the grid's converging lines, the horizon)
+are drawn once per size into a picture, and each column of falling characters into a strip.
+A frame repaints only what moved: thin strips around the floor's lines and the drops' old and
+new places, copied from those pictures (and the same strips of Home's see-through list).
 
 For the grid to show through, Home's own panels must not paint an opaque background in Neon
 Lights (SEE_THROUGH lists the object names; builder "panels" makes them transparent there).
@@ -22,7 +24,11 @@ import random
 
 from . import warn
 
-FPS = 24  # at most 30 (design 6.9); 24 is smooth for slow motion and cheaper
+FPS = 12  # at most 30 (design 6.9); the motion is slow, so 12 is smooth enough and cheap
+# A frame never comes sooner than this after the last one, whatever the timer does (a timer
+# can fire early, or twice in a row after a busy moment): the cap holds by design.
+MIN_GAP_MS = 1000.0 / FPS - 4.0
+GLYPH = 12  # the falling characters' size (px)
 SPEED = 0.18  # grid rows per second toward the viewer
 # Not the page itself (#Fission180Home): it must stay opaque, or the 3D view of a design's tab
 # behind Home (MDI tabs are stacked, all "visible") shows through on screen. The backdrop
@@ -97,15 +103,19 @@ def _backdrop_class():
             self.page = page
             self.colours = _colours()
             self.still = None
+            self.strips = {}  # column -> QPixmap of its characters (made once per size)
+            self.layout_key = None
+            self.columns = []  # (x, start, speed, length) of each column of characters
             self.clock = QtCore.QElapsedTimer()
             self.clock.start()
             self.timer = QtCore.QTimer(self)
-            self.timer.setTimerType(QtCore.Qt.CoarseTimer)
+            self.timer.setTimerType(QtCore.Qt.PreciseTimer)
             self.timer.setInterval(int(math.ceil(1000.0 / FPS)))
             self.timer.timeout.connect(self._tick)
-            self.frames = 0
-            self.rng = random.Random(180)
-            self.drops = []
+            self.t = 0.0  # the animation's time (s): moves only on a frame, never in a paint
+            self.last_ms = None
+            self.frames = 0  # frames advanced (at most FPS a second, by _tick's own check)
+            self.paints = 0  # paint events (Qt may paint more often: exposes, the list above)
             self._viewports = None
             self.setGeometry(page.rect())
             self.lower()
@@ -124,6 +134,8 @@ def _backdrop_class():
                     return "the window is minimized"
                 if not window.isActiveWindow():
                     return "the window is not active"
+                if _boot_up():
+                    return "the boot screen is up"
                 sub = _subwindow(self.page)
                 if sub is not None:
                     area = sub.mdiArea()
@@ -141,32 +153,58 @@ def _backdrop_class():
             try:
                 if self.should_run():
                     if not self.timer.isActive():
+                        self.last_ms = None
                         self.timer.start()
                         self.update()
                 elif self.timer.isActive():
                     self.timer.stop()
             except RuntimeError:
                 pass
+            except Exception as exc:
+                warn("Neon Lights: Home background: %s" % exc)
 
         def _tick(self):
             try:
                 if not self.should_run():
                     self.timer.stop()
                     return
-                self.update()
-                # and the scroll areas' viewports over it: Qt did not repaint Home's
-                # (see-through) list for the backdrop's own update, so the floor stood still
-                # on screen behind it (window.grab() showed it moving). page.update() is
-                # no help: the opaque backdrop covers the page, nothing under it is painted.
-                try:
-                    for viewport in self.viewports():
-                        viewport.update()
-                except RuntimeError:  # a scroll area went: found again next frame
-                    self._viewports = None
+                now = self.clock.elapsed()
+                # The frame cap holds by design: a timer firing early (or twice in a row after
+                # a busy moment) never makes a frame sooner than MIN_GAP_MS after the last one.
+                if not due(self.last_ms, now):
+                    return
+                self.last_ms = now
+                self.advance(now / 1000.0)
             except Exception as exc:
                 warn("Neon Lights: Home background: %s (switched off)" % exc)
-                self.timer.stop()
+                try:
+                    self.timer.stop()
+                except Exception:
+                    pass
                 _drop(self.page)
+
+        def advance(self, t):
+            """One frame: the time moves to `t` (s) and only what moved is repainted: thin
+            strips around the floor's old and new lines and the falling characters' old and
+            new places (not the page, not Home's list as a whole)."""
+            self._layout()
+            region = self._moving(self.t)
+            self.t = t
+            region = region.united(self._moving(t))
+            self.frames += 1
+            self.update(region)
+            # The see-through list over the backdrop: Qt did not repaint it for the backdrop's
+            # own update (the floor stood still on screen behind it), so the same strips of it
+            # are asked for too.
+            try:
+                for viewport in self.viewports():
+                    offset = viewport.mapTo(self.page, QtCore.QPoint(0, 0))
+                    part = region.translated(-offset.x(), -offset.y()).intersected(viewport.rect())
+                    if not part.isEmpty():
+                        viewport.update(part)
+            except RuntimeError:  # a scroll area went: found again next frame
+                self._viewports = None
+            return region
 
         def viewports(self):
             """The see-through scroll areas' viewports (Home's list; the tile lists inside it
@@ -181,17 +219,71 @@ def _backdrop_class():
         def recolour(self):
             self.colours = _colours()
             self.still = None
+            self.strips = {}
             self.update()
 
         def resizeEvent(self, event):  # noqa: N802
             super().resizeEvent(event)
             self.still = None
-            self.drops = []
+            self.strips = {}
+            self.layout_key = None
 
-        # -- painting
+        # -- what moves where
         def _horizon(self):
             return int(self.height() * 0.38)
 
+        def _row_ys(self, t):
+            h = self.height()
+            hy = self._horizon()
+            return [(hy + (h - hy) * depth, depth) for depth in rows(t * SPEED * 6.0)]
+
+        def _layout(self):
+            """The columns of characters: down the right edge of Home's list (not under the
+            AI column). Worked out again when the page or the list changes size."""
+            w, h = self.width(), self.height()
+            right = w - 18
+            scroll = getattr(self.page, "scroll", None)
+            try:
+                if scroll is not None and scroll.isVisible():
+                    right = scroll.mapTo(self.page, QtCore.QPoint(scroll.width(), 0)).x() - 24
+            except RuntimeError:
+                pass
+            key = (w, h, right)
+            if key == self.layout_key:
+                return
+            if self.layout_key is not None:
+                self.update()  # the columns moved: everything once
+            self.layout_key = key
+            count = max(3, min(10, right // 140))
+            left = right - count * (GLYPH + 6)
+            rng = random.Random(180)
+            self.columns = [
+                (left + i * (GLYPH + 6), rng.uniform(0, h), rng.uniform(26, 60), rng.randint(6, 16))
+                for i in range(count)
+            ]
+            self.strips = {}
+
+        def _drop_place(self, i, t):
+            """Column i's falling drop at time t: (n, f) so that its characters are the
+            strip's cells n-length+1 .. n, drawn f pixels lower than their cells."""
+            x, start, speed, length = self.columns[i]
+            head = (start + t * speed) % (self.height() + length * GLYPH)
+            n = int(head // GLYPH)
+            return n, head - n * GLYPH
+
+        def _moving(self, t):
+            """The region that changes at time t: the floor's lines and the drops."""
+            w = self.width()
+            region = QtGui.QRegion()
+            for y, _depth in self._row_ys(t):
+                region = region.united(QtCore.QRect(0, int(y) - 3, w, 7))
+            for i, (x, _s, _v, length) in enumerate(self.columns):
+                n, f = self._drop_place(i, t)
+                top = int((n - length + 1) * GLYPH + f) - GLYPH
+                region = region.united(QtCore.QRect(int(x) - 2, top, GLYPH + 8, (length + 2) * GLYPH))
+            return region
+
+        # -- painting
         def _make_still(self):
             w, h = max(1, self.width()), max(1, self.height())
             c = self.colours
@@ -235,60 +327,72 @@ def _backdrop_class():
             p.end()
             self.still = pix
 
-        def _stream(self, p, t):
-            """A faint column of characters falling down the right side."""
-            w, h = self.width(), self.height()
-            size = 12
-            right = w - 18
-            scroll = getattr(self.page, "scroll", None)  # Home's list: not under the AI column
-            try:
-                if scroll is not None and scroll.isVisible():
-                    right = scroll.mapTo(self.page, QtCore.QPoint(scroll.width(), 0)).x() - 24
-            except RuntimeError:
-                pass
-            columns = max(3, min(10, right // 140))
-            left = right - columns * (size + 6)
-            if len(self.drops) != columns:
-                self.drops = [
-                    (self.rng.uniform(0, h), self.rng.uniform(26, 60), self.rng.randint(6, 16))
-                    for _ in range(columns)
-                ]
+        def _strip(self, i):
+            """Column i's characters, one per cell, drawn once per size (transparent around
+            them); a frame copies a few slices of it at fading strengths."""
+            pix = self.strips.get(i)
+            if pix is not None:
+                return pix
+            length = self.columns[i][3]
+            cells = int(self.height() // GLYPH) + 2 * length + 6
+            pix = QtGui.QPixmap(GLYPH + 4, cells * GLYPH)
+            pix.fill(QtCore.Qt.transparent)
+            p = QtGui.QPainter(pix)
+            p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
             font = QtGui.QFont("Monospace")
             font.setStyleHint(QtGui.QFont.TypeWriter)
-            font.setPixelSize(size)
+            font.setPixelSize(GLYPH)
             p.setFont(font)
-            colour = QtGui.QColor(self.colours["secondary"])
-            for i, (start, speed, length) in enumerate(self.drops):
-                head = (start + t * speed) % (h + length * size)
-                x = left + i * (size + 6)
-                for k in range(length):
-                    y = head - k * size
-                    if y < -size or y > h:
+            p.setPen(QtGui.QColor(self.colours["secondary"]))
+            for cell in range(cells):
+                m = cell - length - 2  # the strip starts above the page's top
+                p.drawText(QtCore.QPointF(1, cell * GLYPH + GLYPH - 2), _glyph(m, i))
+            p.end()
+            self.strips[i] = pix
+            return pix
+
+        def _stream(self, p, clip):
+            """The faint columns of characters falling down the right side."""
+            for i, (x, _s, _v, length) in enumerate(self.columns):
+                n, f = self._drop_place(i, self.t)
+                top = int((n - length + 1) * GLYPH + f)
+                if not clip.intersects(QtCore.QRect(int(x) - 2, top - GLYPH, GLYPH + 8, (length + 2) * GLYPH)):
+                    continue
+                strip = self._strip(i)
+                for k0, k1, alpha in _bands(length):
+                    # the drop's characters k0..k1 (0 = the head, lowest on the page)
+                    m_low, m_high = n - k1, n - k0
+                    src_y = (m_low + length + 2) * GLYPH
+                    hgt = (m_high - m_low + 1) * GLYPH
+                    if src_y < 0 or src_y + hgt > strip.height():
                         continue
-                    colour.setAlpha(int(70 * (1.0 - k / float(length))) + (30 if k == 0 else 0))
-                    p.setPen(colour)
-                    seed = (int(head / size) - k) * 31 + i * 17
-                    p.drawText(QtCore.QPointF(x, y), _GLYPHS[seed % len(_GLYPHS)])
+                    p.setOpacity(alpha / 255.0)
+                    p.drawPixmap(QtCore.QPointF(x - 1, m_low * GLYPH + f - GLYPH + 2), strip,
+                                 QtCore.QRectF(0, src_y, strip.width(), hgt))
+            p.setOpacity(1.0)
 
         def paintEvent(self, event):  # noqa: N802
             p = QtGui.QPainter(self)
             try:
                 if self.still is None or self.still.size() != self.size():
                     self._make_still()
-                p.drawPixmap(0, 0, self.still)
-                t = self.clock.elapsed() / 1000.0
-                w, h = self.width(), self.height()
-                hy = self._horizon()
+                self._layout()
+                region = event.region()
+                for rect in region:
+                    p.drawPixmap(rect, self.still, rect)
+                w = self.width()
                 col = QtGui.QColor(self.colours["grid"])
-                p.setRenderHint(QtGui.QPainter.Antialiasing, False)
-                for depth in rows(t * SPEED * 6.0):
-                    y = hy + (h - hy) * depth
+                for y, depth in self._row_ys(self.t):
+                    # a 1 or 2 pixel band (a filled rectangle: a wide pen's line through a
+                    # clip of many strips is ten times slower)
+                    thick = 1 if depth < 0.6 else 2
+                    band = QtCore.QRect(0, int(round(y - thick / 2.0)), w, thick)
+                    if not region.intersects(band):
+                        continue
                     col.setAlpha(int(28 + 92 * depth))
-                    p.setPen(QtGui.QPen(col, 1.0 if depth < 0.6 else 1.6))
-                    p.drawLine(QtCore.QPointF(0, y), QtCore.QPointF(w, y))
-                p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
-                self._stream(p, t)
-                self.frames += 1
+                    p.fillRect(band, col)
+                self._stream(p, region)
+                self.paints += 1
             except Exception as exc:
                 warn("Neon Lights: Home background: %s (switched off)" % exc)
                 QtCore.QTimer.singleShot(0, lambda: _drop(self.page))
@@ -296,6 +400,40 @@ def _backdrop_class():
                 p.end()
 
     return Backdrop
+
+
+def due(last_ms, now_ms):
+    """True when a new frame may be drawn at now_ms, the last one having been drawn at
+    last_ms (None: none yet). At most FPS frames a second, whatever the timer does (pure)."""
+    return last_ms is None or now_ms - last_ms >= MIN_GAP_MS
+
+
+def _glyph(m, column):
+    """The character in cell m of a column (fixed per cell: a drop carries them down)."""
+    return _GLYPHS[(m * 31 + column * 17) % len(_GLYPHS)]
+
+
+def _bands(length):
+    """A drop's characters in slices (k0, k1, alpha), k = 0 its head: a few copies of its
+    strip at fading strengths instead of one coloured character at a time (pure)."""
+    out = [(0, 0, 100)]
+    k = 1
+    while k < length:
+        k1 = min(length - 1, k + 2)
+        middle = (k + k1) / 2.0
+        out.append((k, k1, int(70 * (1.0 - middle / float(length)))))
+        k = k1 + 1
+    return out
+
+
+def _boot_up():
+    """True while the boot screen is over the window (Home waits under it)."""
+    try:
+        from . import neon_boot
+
+        return neon_boot.widget() is not None
+    except Exception:
+        return False
 
 
 def _subwindow(page):
@@ -311,9 +449,12 @@ def _subwindow(page):
 
 
 def _tab_changed(*_args):
-    from PySide import QtCore
+    try:
+        from PySide import QtCore
 
-    QtCore.QTimer.singleShot(0, follow_all)
+        QtCore.QTimer.singleShot(0, follow_all)
+    except Exception as exc:
+        warn("Neon Lights: Home background: %s" % exc)
 
 
 def _hook_class():
@@ -424,14 +565,18 @@ def _alive(page):
 
 
 def follow_all():
-    """Every backdrop's timer on or off for the state now."""
-    _state["pages"] = [p for p in _state["pages"] if _alive(p)]
-    for key in list(_state["backdrops"]):
-        backdrop = _state["backdrops"][key]
-        try:
-            backdrop.follow()
-        except RuntimeError:
-            _state["backdrops"].pop(key, None)
+    """Every backdrop's timer on or off for the state now. Runs from timers and signals:
+    never raises."""
+    try:
+        _state["pages"] = [p for p in _state["pages"] if _alive(p)]
+        for key in list(_state["backdrops"]):
+            backdrop = _state["backdrops"][key]
+            try:
+                backdrop.follow()
+            except RuntimeError:
+                _state["backdrops"].pop(key, None)
+    except Exception as exc:
+        warn("Neon Lights: Home background: %s" % exc)
 
 
 def _sync():

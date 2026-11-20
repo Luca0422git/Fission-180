@@ -788,6 +788,7 @@ def set_theme(name):
     _use(current())
     _restyle_all()
     if is_neon() and not was_neon:
+        _state["switched"] = True  # switched to it during the run: no boot screen (neon_boot)
         _neon_part("enable")
     log("look: %s" % _state["name"])
     return _state["name"]

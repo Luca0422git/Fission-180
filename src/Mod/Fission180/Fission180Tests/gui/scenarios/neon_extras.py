@@ -6,9 +6,9 @@
 2. UI sounds: no hook while Sounds is off (the default); on, a menu opening, a button click,
    a command's OK and a warning message each play their sound (through a stand-in player);
    with this machine's real ways to play (xvfb: no sound device) play() never raises.
-3. The animated Home: behind Home's page while Home is in front, at most 30 frames a second;
-   stopped when the design's tab is clicked, running again back on Home; the setting off
-   takes it away.
+3. The animated Home: behind Home's page while Home is in front, at most FPS (12) frames a
+   second; waiting while the boot screen is up; stopped when the design's tab is clicked,
+   running again back on Home; the setting off takes it away.
 4. Back to Dark: no boot screen, no sound hook, no Home background is left.
 """
 
@@ -39,6 +39,8 @@ def setup():
 
     lc.set_look("neon")
     h.check("tests never get the boot screen on their own", neon_boot.widget() is None)
+    h.check("switching to Neon Lights during a run is marked: no boot screen for it",
+            neon_boot._switched_in())
     h.check("... nor when asked without force", neon_boot.show() is None)
     h.check("sounds are off by default: no hook", not neon_sound.hooked())
 
@@ -50,8 +52,17 @@ setup.done_what = "Neon Lights to be on"
 def boot_starts():
     from fission180 import neon_boot
 
+    s["focus_before"] = QtWidgets.QApplication.focusWidget()
     s["boot"] = neon_boot.show(force=True)
-    h.check("the boot screen is up", neon_boot.widget() is not None)
+    w = neon_boot.widget()
+    h.check("the boot screen is up", w is not None)
+    if w is not None:
+        h.check("... it does not take the keyboard focus",
+                not w.hasFocus() and w.focusPolicy() == QtCore.Qt.NoFocus
+                and QtWidgets.QApplication.focusWidget() is s["focus_before"],
+                QtWidgets.QApplication.focusWidget())
+        h.check("... it is opaque until its fade (nothing under it is painted)",
+                w.testAttribute(QtCore.Qt.WA_OpaquePaintEvent))
 
 
 def _boot_far():
@@ -74,6 +85,8 @@ def boot_shown():
     if w is None:
         h.check("the boot screen is still up", False)
         return
+    h.check("... still opaque before the fade", w.t >= neon_boot.FADE[0]
+            or w.testAttribute(QtCore.Qt.WA_OpaquePaintEvent))
     window = Gui.getMainWindow()
     h.check("it covers the whole window", w.geometry() == window.rect(), (w.geometry(), window.rect()))
     h.check("... painted frames", w.frames > 5, w.frames)
@@ -189,6 +202,29 @@ def click_a_button():
 
 click_a_button.done = lambda: _played("click") and len(__import__("FreeCAD").listDocuments()) > len(s["docs_before"])
 click_a_button.done_what = "the click sound and the new design"
+
+
+def players_reaped():
+    from fission180 import neon_sound
+
+    s["played_before_reap"] = len(neon_sound.played())
+
+
+def _reaped():
+    from fission180 import neon_sound
+
+    return not neon_sound._state["procs"]
+
+
+players_reaped.done = _reaped
+players_reaped.done_what = "the finished players collected by the timer, with no new sound"
+
+
+def players_reaped_checked():
+    from fission180 import neon_sound
+
+    h.check("finished players are collected without another sound (no zombies)",
+            len(neon_sound.played()) == s["played_before_reap"] and _reaped())
 
 
 def ok_sound():
@@ -359,7 +395,10 @@ def home_rate_checked():
     b = neon_home.backdrop(_page())
     ms = max(1, s["clock"].elapsed())
     fps = (b.frames - s["frames0"]) * 1000.0 / ms
-    h.check("at most 30 frames a second", fps <= 31.0, "%.1f fps" % fps)
+    # the cap holds by design (neon_home.due): never more than FPS, whatever the timer does
+    h.check("at most %d frames a second" % neon_home.FPS, fps <= neon_home.FPS + 0.5, "%.1f fps" % fps)
+    h.check("... frames advance only on the timer, not on every paint", b.frames <= b.paints + 1,
+            (b.frames, b.paints))
     h.check("... the backdrop takes no clicks",
             b.testAttribute(QtCore.Qt.WA_TransparentForMouseEvents))
     widgets = [c for c in _page().children() if isinstance(c, QtWidgets.QWidget)]
@@ -401,6 +440,35 @@ def home_shot():
     h.shot("home-johnny")
 
 home_shot.while_busy = True
+
+
+def boot_over_home():
+    from fission180 import neon_boot
+
+    neon_boot.show(force=True)
+
+
+boot_over_home.done = lambda: neon_boot_up() and not _running()
+boot_over_home.done_what = "Home's background to wait while the boot screen is up"
+boot_over_home.while_busy = True
+
+
+def neon_boot_up():
+    from fission180 import neon_boot
+
+    return neon_boot.widget() is not None
+
+
+def boot_over_home_checked():
+    h.check("Home's background waits under the boot screen", _why() == "the boot screen is up", _why())
+    from fission180 import neon_boot
+
+    neon_boot.finish("click")
+
+
+boot_over_home_checked.done = _running
+boot_over_home_checked.done_what = "Home's background to run again after the boot screen"
+boot_over_home_checked.while_busy = True
 
 
 def design_tab():
@@ -485,9 +553,11 @@ h.run(
     "neon_extras",
     [
         setup, boot_starts, boot_shown, boot_click, boot_again_for_a_key, boot_key,
-        sounds_on, menu_sound, click_sound, click_a_button, ok_sound, press_ok, warning_sound,
+        sounds_on, menu_sound, click_sound, click_a_button, players_reaped, players_reaped_checked,
+        ok_sound, press_ok, warning_sound,
         real_players_never_raise, sounds_off,
-        home_front, home_animates, home_rate, home_rate_checked, home_moves, home_shot, design_tab,
+        home_front, home_animates, home_rate, home_rate_checked, home_moves, home_shot,
+        boot_over_home, boot_over_home_checked, design_tab,
         stopped_on_design, back_home, animation_setting_off,
         back_to_dark, nothing_left,
     ],
