@@ -774,7 +774,7 @@ def _fail(where, exc):
     try:
         from . import neon
 
-        neon._state["failed"]["neon_effects"] = "%s: %s" % (where, exc)
+        neon.mark_failed("neon_effects", "%s: %s" % (where, exc))
     except Exception:
         pass
     _state["cfg"] = None  # nothing more is painted; the layer goes once this event is over

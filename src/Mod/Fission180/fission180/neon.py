@@ -69,6 +69,12 @@ def active():
     return _state["active"]
 
 
+def mark_failed(part, why):
+    """A part that broke on its own (in a timer or a paint, not in enable/refresh) reports
+    itself here so failed() and the self-check list it."""
+    _state["failed"][part] = str(why)
+
+
 def failed():
     """{part: why} of the parts switched off because they failed."""
     return dict(_state["failed"])
