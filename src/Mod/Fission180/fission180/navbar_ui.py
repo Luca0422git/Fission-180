@@ -82,7 +82,9 @@ class NavBar(QtWidgets.QWidget):
         try:
             from . import neon_view
 
-            neon_view.set_hologram(bool(checked))
+            # flips what is stored (not the button's own tick, which can be out of step when
+            # the setting changed elsewhere, e.g. on the Preferences page)
+            neon_view.set_hologram(not neon_view.hologram())
             self.hologram.setChecked(bool(neon_view.hologram()))
         except Exception as exc:
             warn("navigation bar: Hologram: %s" % exc)
@@ -163,6 +165,18 @@ def theme_changed():
             _bar.neon_sync()
         except RuntimeError:
             pass
+
+
+def hologram_changed():
+    """neon_view.set_hologram: the Hologram button's tick follows the stored setting, wherever
+    it was changed (this button, the Preferences page, a script)."""
+    try:
+        if _bar is not None:
+            from . import neon_view
+
+            _bar.hologram.setChecked(bool(neon_view.hologram()))
+    except Exception as exc:  # (RuntimeError: the bar's widget is gone)
+        warn("navigation bar: Hologram tick: %s" % exc)
 
 
 def bar():

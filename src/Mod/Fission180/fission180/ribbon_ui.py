@@ -22,6 +22,9 @@ CONTEXTUAL += MANUFACTURE_TABS
 # The ANIMATION workspace's tab (animation_ui, wave 7 animation): shown instead of the design's.
 ANIMATION_TABS = ("anim_animation",)
 CONTEXTUAL += ANIMATION_TABS
+# The workspace button: its fixed size and every text it shows (each must fit it in every look)
+WORKSPACE_SIZE = (136, 74)
+WORKSPACE_LABELS = ("DESIGN ▾", "DRAWING ▾", "SIMULATION ▾", "MANUFACTURE ▾", "ANIMATION ▾")
 
 
 def resolve(command, available):
@@ -778,7 +781,7 @@ class RibbonWidget(QtWidgets.QWidget):
         button = QtWidgets.QToolButton()
         button.setProperty("role", "workspace")
         button.setText("DESIGN ▾")
-        button.setFixedSize(136, 74)
+        button.setFixedSize(*WORKSPACE_SIZE)
         self.workspace = button
         button.clicked.connect(lambda: self._workspace_menu(button))
         return button

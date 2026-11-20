@@ -7,6 +7,51 @@ brackets around group names, the navigation bar's HUD frame, the timeline's mark
 chips, the browser's selection bar) is painted by the widgets themselves while Neon Lights is
 on (neon_shell_paint)."""
 
+# opacity of `primary` in a browser row that is selected / under the mouse: the ::item rules
+# below and the indent, which browser_ui.drawBranches paints itself
+ROW_SELECTED = 0.22
+ROW_HOVER = 0.10
+# The workspace button (ribbon_ui, a fixed 136 x 74): its font size, letter spacing and side
+# padding in px. Orbitron is wide: at 12 px with 2 px spacing MANUFACTURE did not fit
+# (ribbon_ui.WORKSPACE_LABELS must all fit: neon_shell checks it with the font's metrics).
+WORKSPACE_FONT_PX = 10
+WORKSPACE_SPACING = 1
+WORKSPACE_PAD = 6
+
+
+def close_svg(p, hover=False):
+    """The document tabs' close button in Neon Lights (16 x 16): a chamfered key with a thin
+    cross; on hover it lights up in `alert`."""
+    line = p["alert"] if hover else p["primary_dim"]
+    cross = p["primary_hot"] if not hover else p.get("bright", p["primary_hot"])
+    fill = p["alert"] if hover else p["primary"]
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">'
+        '<path d="M4 1.5 H14.5 V12 L12 14.5 H1.5 V4 Z" fill="%s" fill-opacity="%s" stroke="%s" '
+        'stroke-width="1"/>'
+        '<path d="M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5" stroke="%s" stroke-width="1.6" '
+        'stroke-linecap="square"/>'
+        "</svg>" % (fill, "0.35" if hover else "0.08", line, cross)
+    )
+
+
+def _close_images(p, frames):
+    """{"close": path, "close_hover": path} written next to Neon Lights' frame pictures (the
+    folder is made per palette); {} without frames."""
+    import os
+
+    if not frames:
+        return {}
+    folder = os.path.dirname(next(iter(frames.values())))
+    out = {}
+    for name, hover in (("close", False), ("close_hover", True)):
+        path = os.path.join(folder, "doc_tab_%s.svg" % name)
+        if not os.path.isfile(path):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(close_svg(p, hover))
+        out[name] = path.replace("\\", "/")
+    return out
+
 
 def _values(p, frames, fonts):
     from .neon_palette import mix, rgba
@@ -21,8 +66,8 @@ def _values(p, frames, fonts):
             "stop:1 %s)" % (rgba(p["primary"], 0.42), rgba(p["primary"], 0.14), rgba(p["primary"], 0.0))
         ),
         pressed_fill=rgba(p["primary"], 0.28),
-        selected_fill=rgba(p["primary"], 0.22),
-        row_hover=rgba(p["primary"], 0.10),
+        selected_fill=rgba(p["primary"], ROW_SELECTED),
+        row_hover=rgba(p["primary"], ROW_HOVER),
         tab_fill=rgba(p["primary"], 0.10),
         docbar=mix(p["background"], p["primary"], 0.03),
         ribbon=(
@@ -31,8 +76,19 @@ def _values(p, frames, fonts):
         ),
         workspace_frame=border(frames, "button_default") if frames else "",
         display=fonts[1] or fonts[0] or "",
+        ws_px=WORKSPACE_FONT_PX,
+        ws_spacing=WORKSPACE_SPACING,
+        ws_pad=WORKSPACE_PAD,
     )
     v["display_rule"] = ("font-family: \"%s\";" % v["display"]) if v["display"] else ""
+    images = _close_images(p, frames)
+    v["close_rules"] = (
+        "#Fission180DocumentTabs::close-button { image: url(%s); subcontrol-position: right; }\n"
+        "#Fission180DocumentTabs::close-button:hover { image: url(%s); }"
+        % (images["close"], images["close_hover"])
+        if images
+        else ""
+    )
     return v
 
 
@@ -55,7 +111,8 @@ def qss(p, frames, fonts, translucent):
 #Fission180Ribbon QToolButton[role="group"]:hover, #Fission180Ribbon QToolButton[role="group"]:pressed,
 #Fission180Ribbon QToolButton[role="group"][open="true"] {{ background: {selected_fill}; color: {primary_hot}; }}
 #Fission180Ribbon QToolButton[role="workspace"] {{ background: transparent; color: {primary_hot};
-    font-weight: bold; font-size: 12px; padding: 0px 8px; letter-spacing: 2px; {display_rule} {workspace_frame} }}
+    font-weight: bold; font-size: {ws_px}px; padding: 0px {ws_pad}px; letter-spacing: {ws_spacing}px;
+    {display_rule} {workspace_frame} }}
 #Fission180Ribbon QToolButton[role="workspace"]:hover {{ background: {hover_glow}; color: {bright}; }}
 #Fission180Ribbon QFrame[role="separator"] {{ background: {primary_dim}; }}
 #Fission180Ribbon QLabel[role="document"] {{ color: {text}; font-size: 13px; }}
@@ -67,6 +124,7 @@ def qss(p, frames, fonts, translucent):
 #Fission180DocumentTabs::tab:hover {{ background: {row_hover}; color: {primary_hot}; }}
 #Fission180DocumentTabs::tab:selected {{ background: {tab_fill}; color: {primary_hot};
     border-bottom: 2px solid {primary}; }}
+{close_rules}
 
 /* -- Neon Lights: browser ----------------------------------------------------------------- */
 #Fission180Browser {{ font-size: 13px; background: {view}; }}
