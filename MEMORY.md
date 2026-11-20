@@ -4,6 +4,35 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-20: Neon Lights wave started (branch `sf/neon-lights`; nothing on `develop` until it is
+all done).** Luca: a third look, "Neon Lights", a full cyberpunk overhaul of every part of the
+window ("when people walk past me, i want them to look at my screen and ask ... that looks
+sick!"), presets with pop-culture names + custom colours, coloured body outlines, Hologram
+bodies (switch), effects (glow, scan lines, CRT, glitch; lighter over the 3D view), the techy
+font everywhere, boot-up sequence, UI sounds, animated Home. **Dark and Light must not change.**
+"All in one" update: merged into `develop` only when finished and checked by Luca on his Windows
+PC and Linux laptop. Design `docs/fission180/neon-lights-design.md`, plan
+`docs/fission180/plan-neon-lights.md`, builders' brief `docs/fission180/dev/briefs/neon-common.md`.
+Phase A (orchestrator) done: A1 Dark/Light guard (`tools/fission180/theme_identity.py` +
+`test_theme_identity.py`, scenario `look_unchanged` with `fixtures/look_baseline/`); A2-A3
+`neon_palette.py` (17 presets, roles, derived shades, contrast) + `neon_settings.py`; A4 third look
+in `theme.py` (`neon()`, `neon3d()`, `palette()`, `refresh_neon()`, `normal_look()`, translate
+tables both ways, `LISTENERS`, `NEON_SWAP`), `neon.py` + part stubs, scenario `neon_switch`; A5
+fonts (Chakra Petch, Orbitron, OFL), `neon_frames.py`, the style sheet in three owned parts,
+`neon_popups.py`; A6 `tools/fission180/neon_icon_style.py` + `make_icons.py` writes 426 neon icons
+to `icons/neon/`, `neon_icons.py`; A7 `neon_view.py` display-only outline override, normal look
+around saves, neon grid; A8 scenario `neon_showcase`. Phase B: ten builder cloud sessions
+(tag `neon-lights`, branches `sf/neon-<id>`: chrome, shell, panels, icons-a, icons-b, bodies,
+scene, effects, extras, settings), launched 21:53 UTC. Open: `neon_outlines` "not marked
+modified" check (builder bodies).
+Found on the way: (1) **old bug, fixed** (Dark too): after any app style change (Light -> Dark)
+Qt gave the ribbon's tool bar its style margin back and the whole window sat 4 px lower;
+`shell._ribbon_bar_margins` in `theme_changed`. (2) `make_icons.py` regenerates
+`icons/ui/split_body.svg` differently from the committed file (an old hand edit): restore it after
+running. (3) A frame rule named like a palette key in a style template put a border-image into a
+`background:` and Qt dropped every later rule (window white); test now guards it.
+[x] Phase A [ ] builders merged [ ] Luca's hardware checks [ ] merged into develop.
+
 **2026-11-16: 0.1.0-beta.4.0.3 broke the hover highlight; fixed as 0.1.0-beta.4.0.4** Luca:
 "the faces on bodies and whole bodies dont highlight when hovering over them anymore". Cause:
 move-speed's `handles3d.hold_preselection` switches FreeCAD's preselection off while a handle
@@ -769,6 +798,7 @@ Quick updates come from green "Fission 180 tests" runs on `develop`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-20 | Neon Lights: an opt-in third look that is deliberately not Fusion (cyberpunk); Dark keeps Fusion parity and must not change | Luca wants to show off a look of his own; Dark/Light guarded by theme_identity + look_unchanged |
 | 2026-10-09 | Fork at 1.1.4 with full history (not a flat copy) | Makes merging future FreeCAD releases a normal `git merge` |
 | 2026-10-09 | Removed FreeCAD-org automation workflows (translations, stale bot, backport, labeler, CodeQL, scorecards, Fedora nightly, weekly release, dependabot); `CI_master.yml` made manual-only | They serve FreeCAD's organization, fail or waste minutes here; a weekly release cron would have run on our default branch |
 | 2026-10-09 | Fission 180 module lives at `src/Mod/Fission180` and is installed by the normal CMake build | Ships inside every Fission 180 build; no separate add-on install step |
