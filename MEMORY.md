@@ -1213,6 +1213,18 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   solve, or rarely "CalculiX could not solve the study". The advice from #284 stands and is
   not done: solve with SPOOLES first on Windows (Linux uses it anyway), in `simulation.py`,
   as a change of its own with the sim benchmarks on Windows.
+- **TO DO (Luca, 2026-11-20, noted only, not fixed yet): Measure's point dots grow when you zoom
+  in, and their yellow hides the distance text.** Luca: "the measure tools points are just a
+  little too big ... zooming in on it makes them massive. can we have them stay consistent with
+  the zoom? and maybe not have it light yellow? its impossible to see the text." Cause found:
+  `measure_ui._dot_size()` makes each dot a real 3D ball (`handles3d.Overlay.dot`, an
+  `SoSphere`) 0.8% of the body's diagonal, so it is model-sized and fills the screen when
+  zoomed in; colour `DOT = (0.98, 0.78, 0.25)` (amber, lit to pale yellow), and the white
+  `SoText2` label (14 px) sits at the line's midpoint, so on a short distance it lands on the
+  dots. Wanted: dots a fixed size on screen at every zoom (screen-space marker, or a radius
+  rescaled from the camera on every view change), a darker / non-yellow colour, and the
+  distance text readable over them (offset or a backing). Check the other `Overlay.dot` users
+  (Center of Mass dots, snap dots `SNAP`) for the same zoom problem.
 - **A step must not use its own Placement to move its result (move-speed, 2026-11-14).**
   FreeCAD's `FlatFace` attachment takes a sketch's or plane's origin and axes from the
   Placement of the step the face belongs to (`Attacher.cpp`, `refOrg`), so a Move step that
