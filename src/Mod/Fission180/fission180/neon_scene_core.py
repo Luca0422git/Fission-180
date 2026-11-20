@@ -194,29 +194,135 @@ def shade(rgb, role):
     return tuple(rgb) if value is None else value
 
 
+# Every Live made so far, in order (its index is its code): neon_scene's sweep repaints the
+# shapes already on screen from this list.
+LIVES = []
+CODE_STEP = 2.0 ** -20  # about 1e-6: far under what a screen shows (1/255), far over float32 rounding
+
+
+def coded(rgb, code):
+    """`rgb` with `code` written into its red channel's last digits (invisible: at most about
+    1e-4 for the 100-odd constants): every Live's neon value is its own, so a shape already
+    drawn in a neon colour can be traced back to the constant it came from and given its exact
+    Dark value again (neon_scene.sweep; two roles often share a neon colour)."""
+    r, g, b = rgb
+    step = (code + 1) * CODE_STEP
+    return (r - step if r > 0.5 else r + step, g, b)
+
+
 class Live(tuple):
     """A 3D colour constant: the tuple `rgb` itself, read as the neon colour of `role` while
-    Neon Lights is on (see the module's doc)."""
+    Neon Lights is on (see the module's doc).
+
+    What reads which value (pinned by test_neon_scene_core.LiveOperations, FreeCAD's Python
+    3.11 and 3.13 alike):
+    - The colour of the look in use (neon in Neon Lights, else `rgb`): iterating, unpacking
+      (`f(*c)`, `r, g, b = c`), `tuple(c)`, `list(c)`, indexing and slicing (`c[0]`, `c[:2]`),
+      `min/max/sum`, comprehensions (`[x * 0.5 for x in c]`), `c + (1.0,)` and `(1.0,) + c`
+      (overridden here), `json.dumps(c)`, `numpy.array(c)` and value(). In Neon Lights the
+      red channel carries the constant's code (see coded()).
+    - Always the stored Dark value: `==`/`!=`/`<`, `hash`, `repr`/`str`, `len`, `in`, `%`
+      formatting (`"%s, %s, %s" % c`: CPython reads a tuple's items directly), `copy.copy`
+      and `pickle` (both give a plain Dark tuple) and normal(). So tables keyed by colour
+      keep working.
+    Rules: to show a colour through `%` or `repr`, pass `tuple(c)` (or value()); whatever is
+    saved (a property, a json file, a preference) takes normal(), never `c` itself, or a
+    design saved in Neon Lights would keep a neon colour.
+    """
 
     def __new__(cls, rgb, role):
         self = super().__new__(cls, rgb)
         self.role = role
+        self.code = len(LIVES)
+        LIVES.append(self)
         return self
 
     def normal(self):
         """The Dark value as a plain tuple."""
         return tuple(tuple.__iter__(self))
 
+    def value_in(self, roles):
+        """The colour in a look: `roles` is roles3d() of a neon palette, or None for Dark/Light
+        (and for a save's preview picture)."""
+        value = roles.get(self.role) if roles else None
+        return self.normal() if value is None else coded(value, self.code)
+
+    def value(self):
+        """The colour of the look in use, as a plain tuple."""
+        return tuple(self._now_or_normal())
+
     def _now(self):
         value = role_rgb(self.role)
-        return value if value is not None else self.normal()
+        return value if value is None else coded(value, self.code)
 
     def __iter__(self):
-        return iter(self._now())
+        return iter(self._now_or_normal())
+
+    def _now_or_normal(self):
+        value = self._now()
+        return value if value is not None else self.normal()
 
     def __getitem__(self, index):
-        return self._now()[index]
+        return self._now_or_normal()[index]
+
+    def __add__(self, other):
+        return tuple(self._now_or_normal()) + tuple(other)
+
+    def __radd__(self, other):
+        return tuple(other) + tuple(self._now_or_normal())
 
     def __reduce__(self):
         return (tuple, (self.normal(),))
 
+
+def roles_now():
+    """roles3d() of the palette in use while Neon Lights is on (and not drawing a saved preview
+    picture), else None: what Live constants read now."""
+    if not neon_live():
+        return None
+    try:
+        role_rgb("primary")  # fills the cache
+        return _cache["roles"] or None
+    except Exception:
+        return None
+
+
+# How shapes are drawn from a constant (handle_look_core.shaded, hot_colour's lightening and the
+# `[c * k for c in COLOUR]` glow of many files): a sweep follows these too.
+SCALES = (0.35, 0.4, 0.45, 0.5, 0.6, 0.75)
+
+
+def _derived(rgb):
+    out = [tuple(rgb)]
+    out += [tuple(c * k for c in rgb) for k in SCALES]
+    lit = tuple(min(1.0, c + (1.0 - c) * 0.55) for c in rgb)  # hot_colour without its own hot
+    out += [lit, tuple(c * 0.75 for c in lit), tuple(c * 0.40 for c in lit)]
+    return out
+
+
+def key(rgb):
+    """A colour as Coin keeps it (float32), so a value read back from a node compares equal."""
+    import struct
+
+    return struct.unpack("3f", struct.pack("3f", *(float(c) for c in rgb[:3])))
+
+
+def colour_map(old, new, lives=None):
+    """{key(colour drawn in look `old`): colour in look `new`} for every Live constant and the
+    ways shapes are drawn from one (_derived). `old`/`new` are roles3d() tables or None (the
+    normal look). Neon values are coded, so going from neon to anything is exact; going from
+    the normal look, two constants with the same Dark value and different roles give the
+    colour of the one most constants share (a handle drawn before Neon Lights was switched on
+    may take a neighbour role's neon colour until it is drawn again; never the other way)."""
+    votes = {}
+    for live in LIVES if lives is None else lives:
+        before, after = live.value_in(old), live.value_in(new)
+        if before == after:
+            continue
+        for a, b in zip(_derived(before), _derived(after)):
+            k = key(a)
+            if k == key(b):
+                continue
+            counts = votes.setdefault(k, {})
+            counts[b] = counts.get(b, 0) + 1
+    return {k: max(counts, key=lambda v: (counts[v], v)) for k, counts in votes.items()}

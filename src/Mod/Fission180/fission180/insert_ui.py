@@ -20,6 +20,7 @@ from . import (
     warn,
 )
 from .compat import QtCore, QtGui, QtWidgets
+from .neon_scene_core import Live
 
 # Tests put a function(kind) -> path here instead of the file dialog.
 FILE_PICKER = None
@@ -41,6 +42,7 @@ TITLES = {
     "image": "Insert Canvas",
 }
 INFO_STYLE = "color: #9fb3c8;"
+GUIDE = Live((0.98, 0.84, 0.25), "hot")  # Calibrate's line between the two points
 
 
 def _length(mm):
@@ -1741,8 +1743,8 @@ class CalibratePanel(_InsertPanel):
             if self.line is None:
                 self.line = coin.SoAnnotation()
                 material = coin.SoMaterial()
-                material.diffuseColor.setValue(0.98, 0.84, 0.25)
-                material.emissiveColor.setValue(0.98, 0.84, 0.25)
+                material.diffuseColor.setValue(*GUIDE)
+                material.emissiveColor.setValue(*GUIDE)
                 style = coin.SoDrawStyle()
                 style.lineWidth = 2
                 style.pointSize = 8

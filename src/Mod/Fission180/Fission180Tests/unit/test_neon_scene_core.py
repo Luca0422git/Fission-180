@@ -19,7 +19,7 @@ class _Console:
     PrintWarning = PrintError = PrintLog = PrintMessage
 
 
-class NeonSceneCore(unittest.TestCase):
+class _WithTheme(unittest.TestCase):
     def setUp(self):
         self.groups = {}
         fake = types.ModuleType("FreeCAD")
@@ -40,6 +40,8 @@ class NeonSceneCore(unittest.TestCase):
         else:
             sys.modules["FreeCAD"] = self._saved
 
+
+class NeonSceneCore(_WithTheme):
     def test_live_is_its_dark_value_outside_neon(self):
         blue = self.core.Live((0.16, 0.50, 0.93), "arrow")
         for look in ("dark", "light"):
@@ -57,10 +59,13 @@ class NeonSceneCore(unittest.TestCase):
     def test_live_reads_neon_in_neon(self):
         blue = self.core.Live((0.16, 0.50, 0.93), "arrow")
         self.theme._use("neon")
-        want = self.np.rgb01(self.theme.palette()["arrow"])
+        want = self.core.coded(self.np.rgb01(self.theme.palette()["arrow"]), blue.code)
         self.assertEqual(tuple(blue), want)
         self.assertEqual((lambda *a: a)(*blue), want)
         self.assertEqual(blue[2], want[2])
+        # the code is invisible: the colour on screen (0..255) is the role's
+        role = self.np.rgb01(self.theme.palette()["arrow"])
+        self.assertEqual([round(c * 255) for c in blue], [round(c * 255) for c in role])
         # equality and repr stay the Dark value (tables keyed by colour keep working)
         self.assertEqual(blue, (0.16, 0.50, 0.93))
         self.assertEqual(blue.normal(), (0.16, 0.50, 0.93))
@@ -109,6 +114,95 @@ class NeonSceneCore(unittest.TestCase):
         odd = self.core.Live((0.1, 0.2, 0.3), "no_such_role")
         self.assertEqual(tuple(odd), (0.1, 0.2, 0.3))
         self.assertEqual(self.core.shade((0.1, 0.2, 0.3), "no_such_role"), (0.1, 0.2, 0.3))
+
+
+class LiveOperations(_WithTheme):
+    """What reads the look in use and what reads the stored Dark value (Live's doc)."""
+
+    DARK = (0.16, 0.50, 0.93)
+
+    def _blue(self):
+        self.theme._use("neon")
+        blue = self.core.Live(self.DARK, "arrow")
+        return blue, blue.value()
+
+    def test_these_read_the_look_in_use(self):
+        blue, now = self._blue()
+        self.assertNotEqual(now, self.DARK)
+        self.assertEqual(tuple(blue), now)
+        self.assertEqual(list(blue), list(now))
+        self.assertEqual(blue[1], now[1])
+        self.assertEqual(blue[:2], now[:2])
+        self.assertEqual(blue[-1], now[-1])
+        r, g, b = blue
+        self.assertEqual((r, g, b), now)
+        self.assertEqual(max(blue), max(now))
+        self.assertEqual(min(blue), min(now))
+        self.assertEqual(sum(blue), sum(now))
+        self.assertEqual([c * 0.5 for c in blue], [c * 0.5 for c in now])
+        self.assertEqual(blue + (1.0,), now + (1.0,))
+        self.assertEqual((1.0,) + blue, (1.0,) + now)
+        import json
+
+        self.assertEqual(json.loads(json.dumps(blue)), list(now))  # saved values take normal()
+        try:
+            import numpy
+        except ImportError:
+            return
+        self.assertEqual(tuple(numpy.array(blue)), now)
+
+    def test_these_read_the_stored_dark_value(self):
+        import copy
+        import pickle
+
+        blue, _now = self._blue()
+        self.assertEqual(blue, self.DARK)
+        self.assertEqual(hash(blue), hash(self.DARK))
+        self.assertEqual(repr(blue), repr(self.DARK))
+        self.assertEqual(str(blue), str(self.DARK))
+        self.assertEqual(len(blue), 3)
+        self.assertIn(0.16, blue)
+        self.assertEqual("%s %s %s" % blue, "0.16 0.5 0.93")
+        self.assertEqual(copy.copy(blue), self.DARK)
+        self.assertIs(type(copy.copy(blue)), tuple)
+        self.assertEqual(pickle.loads(pickle.dumps(blue)), self.DARK)
+        self.assertIs(type(pickle.loads(pickle.dumps(blue))), tuple)
+        self.assertEqual(blue.normal(), self.DARK)
+
+
+class ColourMap(_WithTheme):
+    """neon_scene.sweep's table: what is on screen, from one look to another."""
+
+    def _roles(self, key):
+        return self.core.roles3d(self.np.derive(self.np.roles(key)))
+
+    def test_neon_values_of_different_constants_differ(self):
+        roles = self._roles("v")
+        values = [self.core.key(live.value_in(roles)) for live in self.core.LIVES]
+        self.assertEqual(len(values), len(set(values)))
+
+    def test_neon_back_to_dark_is_exact_even_when_roles_share_a_colour(self):
+        a = self.core.Live((0.10, 0.20, 0.30), "marker")
+        b = self.core.Live((0.40, 0.50, 0.60), "rail")  # marker and rail are both "primary"
+        roles = self._roles("v")
+        self.assertEqual(roles["marker"], roles["rail"])
+        back = self.core.colour_map(roles, None, [a, b])
+        self.assertEqual(back[self.core.key(a.value_in(roles))], a.normal())
+        self.assertEqual(back[self.core.key(b.value_in(roles))], b.normal())
+        # and what handle_look draws from them (shaded body, lit under the mouse, glow)
+        for derived_a, derived_dark in zip(self.core._derived(a.value_in(roles)), self.core._derived(a.normal())):
+            self.assertEqual(back[self.core.key(derived_a)], derived_dark)
+
+    def test_dark_to_neon_and_preset_to_preset(self):
+        a = self.core.Live((0.11, 0.22, 0.33), "arrow")
+        v, johnny = self._roles("v"), self._roles("johnny")
+        there = self.core.colour_map(None, v, [a])
+        self.assertEqual(there[self.core.key(a.normal())], a.value_in(v))
+        on = self.core.colour_map(v, johnny, [a])
+        self.assertEqual(on[self.core.key(a.value_in(v))], a.value_in(johnny))
+
+    def test_nothing_to_do_between_dark_and_light(self):
+        self.assertEqual(self.core.colour_map(None, None), {})
 
 
 if __name__ == "__main__":

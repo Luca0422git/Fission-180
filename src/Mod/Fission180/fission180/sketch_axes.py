@@ -56,8 +56,10 @@ def same(a, b, tol=0.02):
 
 def shown(freecad, default, wanted):
     """The colour one axis line is drawn in: `wanted` while FreeCAD paints it in its own
-    default colour, FreeCAD's colour otherwise (the line is hovered or selected)."""
-    if same(freecad, default):
+    default colour, FreeCAD's colour otherwise (the line is hovered or selected). FreeCAD's
+    own default is the Dark value of `default` in every look; `wanted` (a Live constant) is
+    read in the look in use each time, so Neon Lights and a save's preview picture follow."""
+    if same(freecad, default.normal() if hasattr(default, "normal") else default):
         return tuple(wanted)
     return tuple(float(freecad[i]) for i in range(3))
 

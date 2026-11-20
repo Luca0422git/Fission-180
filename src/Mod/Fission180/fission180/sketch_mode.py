@@ -239,6 +239,7 @@ _state = {
     "profilelib": None,
     "polygon": None,  # {"circumscribed": bool} while Fission 180's polygon tool runs
     "centerline": False,  # new lines are centerlines (Linetype > Centerline, nothing selected)
+    "neon_written": False,  # the last sketch colours written were Neon Lights' (theme_changed)
 }
 
 
@@ -367,6 +368,7 @@ def enable():
     except Exception as exc:
         warn("sketch snapping: %s" % exc)
     _save_and_apply(_all_params())
+    _state["neon_written"] = bool(neon_table())
     _patch_profilelib()
     try:
         observer = _GuiObserver()
@@ -425,6 +427,7 @@ def disable():
             _state[key] = None
     _unpatch_profilelib()
     _restore_params()
+    _state["neon_written"] = False
 
 
 # The user's own values of the settings above, kept until Fission 180 is switched off. In
@@ -503,12 +506,18 @@ def theme_changed():
         return
     from . import neon_scene_core
 
+    # Neon Lights' own names (SelectionColor, HighlightColor...) are written only while Neon
+    # Lights is on or right after it was: a Dark <-> Light switch writes LIGHT's names alone,
+    # as before Neon Lights existed, and leaves a person's own change of the others alone.
+    neon = bool(neon_table())
+    touch_neon = neon or _state.get("neon_written", False)
     for group, kind, name, value in _all_params():
-        if name in LIGHT or name in neon_scene_core.SKETCH_PARAMS:
+        if name in LIGHT or (touch_neon and name in neon_scene_core.SKETCH_PARAMS):
             try:
                 getattr(App.ParamGet(group), "Set" + kind)(name, value)
             except Exception as exc:
                 warn("sketch colours: %s" % exc)
+    _state["neon_written"] = neon
 
 
 def _save_and_apply(params):
