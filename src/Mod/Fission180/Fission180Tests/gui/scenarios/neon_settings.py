@@ -652,6 +652,7 @@ def rename_and_delete():
     wi.click(find(QtWidgets.QPushButton, "Fission180NeonDelete"))
     h.check("Delete asks first", "Delete" in p.asking() and "Toxic" in p.asking(), p.asking())
     h.check("... still listed", lst.count() == 1)
+    scroll_to(find(QtWidgets.QWidget, "Fission180NeonConfirm"))
     save_picture("delete-asks")
     wi.click(find(QtWidgets.QPushButton, "Fission180NeonConfirmYes"))
     h.check("deleted after Yes", lst.count() == 0 and neon_settings.saved_sets() == [])
