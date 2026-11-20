@@ -1012,6 +1012,18 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
         finally:
             painter.restore()
 
+    def _neon_ground(self, painter, option, rect):
+        """A strip of the row left out of the shifted cell the style tints (under the eye,
+        under the activate mark) in the row's selection or hover tint, as the indent before
+        it (BrowserWidget.drawBranches)."""
+        try:
+            selected = bool(option.state & QtWidgets.QStyle.State_Selected)
+            painter.fillRect(rect, neon_paint.colour("view", "#000000"))
+            for tint in self.tree._neon_row_tint(selected, option.rect.top(), option.rect.bottom() + 1):
+                painter.fillRect(rect, tint)
+        except Exception as exc:
+            _neon_warn("row tint", exc)
+
     def helpEvent(self, event, view, option, index):
         try:
             node = self._node(index)
@@ -1031,6 +1043,9 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
         node = self._node(index)
         if node is None:
             return super().paint(painter, option, index)
+        if neon_paint.on():  # Neon Lights: the row's tint under the eye too (no gap)
+            self._neon_ground(painter, option, QtCore.QRect(
+                option.rect.left(), option.rect.top(), EYE + 2, option.rect.height()))
         if node["visible"] is not None:
             icon = ui_icon("eye" if node["visible"] else "eye_off")
             mode = QtGui.QIcon.Normal if node["visible"] else QtGui.QIcon.Disabled
@@ -1050,6 +1065,9 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
         shifted = QtWidgets.QStyleOptionViewItem(option)
         room = (RADIO + 10 + (MARK + 4 if mark else 0)) if radio else 0
         shifted.rect = option.rect.adjusted(EYE + 2, 0, -room, 0)
+        if room and neon_paint.on():  # ... and under the activate mark at the end
+            self._neon_ground(painter, option, QtCore.QRect(
+                option.rect.right() - room + 1, option.rect.top(), room, option.rect.height()))
         if node["status"] == "error":
             shifted.palette.setColor(QtGui.QPalette.Text, _neon("alert", "#ff8a80"))
         elif node["status"] == "warning":
@@ -1316,6 +1334,12 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         painter.save()
         try:
             painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+            # the row's selection or hover tint across the indent, in exactly the row's own
+            # colour (Qt painted this area in another shade: brighter when selected, fainter
+            # under the mouse; the view's colour first wipes it)
+            painter.fillRect(QtCore.QRectF(rect), neon_paint.colour("view", "#000000"))
+            for tint in self._neon_row_tint(selected, top, bottom):
+                painter.fillRect(QtCore.QRectF(rect), tint)
             for level, item in enumerate(chain):
                 x = right - indent * (level + 1) + indent / 2.0
                 if x < rect.left():
@@ -1335,6 +1359,24 @@ class BrowserWidget(QtWidgets.QTreeWidget):
                     painter.drawLine(QtCore.QPointF(x, top), QtCore.QPointF(x, bottom))
         finally:
             painter.restore()
+
+    def _neon_row_tint(self, selected, top, bottom):
+        """The layers of tint a row's cell shows in Neon Lights, to paint over the view's
+        colour (as measured on screen): ::item:selected once when selected (neon_qss_shell);
+        under the mouse ::item:hover once more on a selected row, twice on another (Qt lays
+        its row hover under the cell's own); none for a plain row."""
+        from . import neon_qss_shell
+
+        layers = []
+        if selected:
+            layers.append(neon_paint.colour("primary", alpha=neon_qss_shell.ROW_SELECTED))
+        viewport = self.viewport()
+        if viewport.underMouse():
+            y = viewport.mapFromGlobal(QtGui.QCursor.pos()).y()
+            if top <= y < bottom:
+                hover = neon_paint.colour("primary", alpha=neon_qss_shell.ROW_HOVER)
+                layers += [hover] if selected else [hover, hover]
+        return layers
 
     @staticmethod
     def _neon_chevron(painter, x, y, opened, colour):

@@ -596,6 +596,7 @@ def set_hologram(on):
 
         neon_settings.put("Hologram", bool(on))
         refresh()
+        getattr(__import__("sys").modules.get("fission180.navbar_ui"), "hologram_changed", bool)()  # (button's tick)
     except Exception as exc:
         warn("Neon Lights: Hologram: %s" % exc)
 

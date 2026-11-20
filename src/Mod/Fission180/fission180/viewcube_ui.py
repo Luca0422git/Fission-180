@@ -45,6 +45,7 @@ HOME_AT = (6.0, 6.0, 18.0)  # the house: left, top, side
 TRIAD_AT = (21.0, HEIGHT - 21.0)  # far enough in that its letters are never cut off
 TRIAD_LENGTH = 11.0
 MARGIN_RIGHT, MARGIN_TOP = 2, 2
+_LABEL_PATHS = {}  # (text, font family, px) -> a face name's outline in Neon Lights
 IDLE_OPACITY = 0.55  # see-through while the mouse is elsewhere
 POLL_MS = 40
 DRAG_START = 5  # pixels the mouse may move on a click before it becomes a drag
@@ -397,21 +398,33 @@ class ViewCube(QtWidgets.QWidget):
     # -- Neon Lights ------------------------------------------------------------------------
     def _draw_neon(self, painter):
         """The cube as glowing lines: the far side shows faintly through see-through faces,
-        the near parts carry a thin tint, the hovered part lights up in `secondary`."""
+        the near parts carry a thin tint, the hovered part lights up in `secondary`.
+
+        Fast enough to repaint every 40 ms while orbiting: the outlines of every part and
+        button go into one path that is glowed once (a glow is three strokes), instead of
+        three strokes per part (26 parts: 4-5 ms a picture, against 0.3 ms in Dark)."""
         primary = neon.colour("primary")
         hot = neon.colour("primary_hot")
         secondary = neon.colour("secondary")
         # the far side, dashed and faint, through the cube
         far = QtGui.QPen(neon.colour("primary", alpha=0.28), 1.0, QtCore.Qt.DashLine)
         far.setDashPattern([2.0, 3.0])
+        hidden = QtGui.QPainterPath()
+        for points in _hidden_parts(self.q):
+            hidden.addPolygon(_polygon(points))
+            hidden.closeSubpath()
         painter.setPen(far)
         painter.setBrush(QtCore.Qt.NoBrush)
-        for points in _hidden_parts(self.q):
-            painter.drawPolygon(_polygon(points))
+        painter.drawPath(hidden)
+        lines = QtGui.QPainterPath()  # every outline in `primary`
+        lit = QtGui.QPainterPath()  # the hovered one, in `secondary`
+        labels = []
+        painter.save()
+        # the fills without antialiasing: every edge is covered by its glowing line anyway
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        painter.setPen(QtCore.Qt.NoPen)
         for part in self.parts:
-            path = QtGui.QPainterPath()
-            path.addPolygon(_polygon(part["points"]))
-            path.closeSubpath()
+            polygon = _polygon(part["points"])
             hovered = part["name"] == self.hover
             if hovered:
                 fill = QtGui.QColor(secondary)
@@ -420,17 +433,74 @@ class ViewCube(QtWidgets.QWidget):
                 fill = QtGui.QColor(primary)
                 tint = 0.06 if part["kind"] == "face" else 0.14
                 fill.setAlphaF(tint * (0.6 + 0.6 * part["shade"]))
-            painter.fillPath(path, fill)
-            neon.glow_path(painter, path, secondary if hovered else primary, 1.1, 0.8)
+            painter.setBrush(fill)
+            painter.drawPolygon(polygon)
+            outline = lit if hovered else lines
+            outline.addPolygon(polygon)
+            outline.closeSubpath()
             if part["kind"] == "face" and part["facing"] > 0.12:
-                self._draw_label(painter, part["name"], hot)
+                labels.append(part["name"])
+        painter.restore()
+        arcs, lit_arcs = QtGui.QPainterPath(), QtGui.QPainterPath()
         for control in self.buttons:
-            self._draw_neon_button(painter, control, primary, secondary)
-        self._draw_triad(painter)
+            hovered = control["id"] == self.hover
+            self._neon_button_paths(
+                painter, control, secondary if hovered else primary,
+                lit if hovered else lines, lit_arcs if hovered else arcs, hovered,
+            )
+        strokes = [
+            (arcs, primary, 2.0), (lines, primary, 1.1), (lit_arcs, secondary, 2.0), (lit, secondary, 1.1),
+        ]
+        strokes = [entry for entry in strokes if not entry[0].isEmpty()]
+        self._neon_glow(painter, strokes + self._triad_strokes())
+        for path, colour, width in strokes:
+            painter.setPen(neon.glow_pen(colour, width))
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawPath(path)
+        for name in labels:
+            self._draw_label(painter, name, hot)
+        self._draw_triad(painter, glowed=True)
 
-    def _draw_neon_button(self, painter, control, primary, secondary):
-        hovered = control["id"] == self.hover
-        line = secondary if hovered else primary
+    def _triad_strokes(self):
+        """The axis triad's lines (path, colour, width) for _neon_glow."""
+        ox, oy = TRIAD_AT
+        found = []
+        for letter, direction in (("X", (1, 0, 0)), ("Y", (0, 1, 0)), ("Z", (0, 0, 1))):
+            local = viewcube.project(self.q, direction)
+            path = QtGui.QPainterPath(QtCore.QPointF(ox, oy))
+            path.lineTo(ox + local[0] * TRIAD_LENGTH, oy - local[1] * TRIAD_LENGTH)
+            found.append((path, QtGui.QColor(NEON_AXIS[letter]), 1.6))
+        return found
+
+    @staticmethod
+    def _neon_glow(painter, strokes):
+        """The glow under the cube's lines (neon_shell_paint.GLOW's wide faint copies), drawn
+        at half size on a small picture and laid over the cube stretched smooth: a quarter of
+        the pixels to cover, and the stretch softens it like a blur."""
+        glow = QtGui.QImage(WIDTH // 2, HEIGHT // 2, QtGui.QImage.Format_ARGB32_Premultiplied)
+        glow.fill(QtCore.Qt.transparent)
+        p = QtGui.QPainter(glow)
+        try:
+            p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            p.scale(0.5, 0.5)
+            p.setBrush(QtCore.Qt.NoBrush)
+            for extra, alpha in neon.GLOW:
+                for path, colour, width in strokes:
+                    p.setPen(neon.glow_pen(colour, width + extra, alpha * 0.8))
+                    p.drawPath(path)
+        finally:
+            p.end()
+        painter.save()
+        try:
+            painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+            painter.drawImage(QtCore.QRectF(0, 0, WIDTH, HEIGHT), glow)
+        finally:
+            painter.restore()
+
+    @staticmethod
+    def _neon_button_paths(painter, control, line, outline, arcs, hovered):
+        """A button of the cube in Neon Lights: its fill painted now, its outline added to
+        `outline` (and an arc button's arc to `arcs`) for _draw_neon to glow all at once."""
         fill = QtGui.QColor(line)
         fill.setAlphaF(0.45 if hovered else 0.12)
         path = QtGui.QPainterPath()
@@ -456,14 +526,12 @@ class ViewCube(QtWidgets.QWidget):
             cx, cy = control["centre"]
             r = control["radius"]
             rect = QtCore.QRectF(cx - r, cy - r, 2 * r, 2 * r)
-            arc = QtGui.QPainterPath()
-            arc.arcMoveTo(rect, control["start"])
-            arc.arcTo(rect, control["start"], control["end"] - control["start"])
-            neon.glow_path(painter, arc, line, 2.0, 0.8)
+            arcs.arcMoveTo(rect, control["start"])
+            arcs.arcTo(rect, control["start"], control["end"] - control["start"])
             path.addPolygon(_polygon(viewcube.arc_head(control)))
             path.closeSubpath()
         painter.fillPath(path, fill)
-        neon.glow_path(painter, path, line, 1.1, 0.8)
+        outline.addPath(path)
 
     def _draw_label(self, painter, face, neon_colour=None):
         text = viewcube.FACE_LABELS[face]
@@ -472,12 +540,12 @@ class ViewCube(QtWidgets.QWidget):
         m11, m12, m21, m22, dx, dy = viewcube.label_transform(self.q, face, CX, CY, SIZE)
         k = 0.01
         transform = QtGui.QTransform(m11 * k, m12 * k, m21 * k, m22 * k, dx, dy)
-        if neon_colour is not None:  # Neon Lights: the display face (Orbitron)
-            font = neon.display_font(30)
-        else:
-            font = QtGui.QFont(QtWidgets.QApplication.font())
-            font.setBold(True)
-            font.setPixelSize(34)
+        if neon_colour is not None:  # Neon Lights: the display face (Orbitron), as a path
+            self._draw_neon_label(painter, text, transform, neon_colour)
+            return
+        font = QtGui.QFont(QtWidgets.QApplication.font())
+        font.setBold(True)
+        font.setPixelSize(34)
         size = font.pixelSize()
         width = QtGui.QFontMetricsF(font).horizontalAdvance(text)
         room = 2 * viewcube.INNER * 100 * 0.86
@@ -489,6 +557,35 @@ class ViewCube(QtWidgets.QWidget):
         painter.setPen(LABEL if neon_colour is None else neon_colour)
         painter.drawText(QtCore.QRectF(-100, -50, 200, 100), QtCore.Qt.AlignCenter, text)
         painter.restore()
+
+    @staticmethod
+    def _draw_neon_label(painter, text, transform, colour):
+        """A face's name in Neon Lights: its outline is worked out once (_LABEL_PATHS) and
+        filled through the face's transform; drawing text through a slanted transform
+        rebuilt every letter on every picture (a third of the cube's time)."""
+        font = neon.display_font(30)
+        key = (text, font.family(), font.pixelSize())
+        path = _LABEL_PATHS.get(key)
+        if path is None:
+            size = font.pixelSize()
+            metrics = QtGui.QFontMetricsF(font)
+            width = metrics.horizontalAdvance(text)
+            room = 2 * viewcube.INNER * 100 * 0.86
+            if width > room:
+                font.setPixelSize(max(8, int(size * room / width)))
+                metrics = QtGui.QFontMetricsF(font)
+                width = metrics.horizontalAdvance(text)
+            path = QtGui.QPainterPath()
+            # centred on (0, 0) as drawText(AlignCenter) in the 200 x 100 box around it
+            baseline = (metrics.ascent() - metrics.descent()) / 2.0
+            path.addText(QtCore.QPointF(-width / 2.0, baseline), font, text)
+            _LABEL_PATHS[key] = path
+        painter.save()
+        try:
+            painter.setTransform(transform, True)
+            painter.fillPath(path, colour)
+        finally:
+            painter.restore()
 
     def _draw_button(self, painter, control):
         colour = HOVER if control["id"] == self.hover else BUTTON
@@ -529,7 +626,7 @@ class ViewCube(QtWidgets.QWidget):
             painter.setBrush(colour)
             painter.drawPolygon(_polygon(viewcube.arc_head(control)))
 
-    def _draw_triad(self, painter):
+    def _draw_triad(self, painter, glowed=False):
         ox, oy = TRIAD_AT
         axes = []
         for letter, direction in (("X", (1, 0, 0)), ("Y", (0, 1, 0)), ("Z", (0, 0, 1))):
@@ -546,7 +643,7 @@ class ViewCube(QtWidgets.QWidget):
         for _, letter, local in sorted(axes):
             colour = QtGui.QColor(NEON_AXIS[letter]) if lit else AXIS_COLOURS[letter]
             end = QtCore.QPointF(ox + local[0] * TRIAD_LENGTH, oy - local[1] * TRIAD_LENGTH)
-            if lit:
+            if lit and not glowed:  # (glowed: _draw_neon drew the glow already)
                 neon.glow_line(painter, (ox, oy), (end.x(), end.y()), colour, 1.6)
             pen = QtGui.QPen(colour, 2.0)
             pen.setCapStyle(QtCore.Qt.RoundCap)

@@ -139,6 +139,11 @@ tools/fission180/run_tests.sh --scenario a,b` runs any scenario with them (a swe
 is then either a click that now lands on a grid crossing, as designed, or a bug; builder
 regress found one this way: a circle drawn on a coarse grid made nothing).
 
+A scenario that must start with a setting already chosen (a session that starts in Neon
+Lights: `neon_start_dark`) brings a `user.cfg` as `Fission180Tests/fixtures/<scenario>.user.cfg`:
+`run_tests.sh` copies it into the scenario's fresh profile before FreeCAD starts. Write only the
+groups and values the scenario needs (FreeCAD fills in the rest).
+
 ## Proving it holds
 
 A green run proves little: the flaky scenarios also passed on most runs.

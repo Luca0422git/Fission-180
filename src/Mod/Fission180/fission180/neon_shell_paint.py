@@ -121,9 +121,6 @@ def display_font(pixels, bold=True):
     return font
 
 
-_seen = {"neon": False}
-
-
 def _refit_views():
     """Every maximized design window filling its area again. Neon Lights' style changes the
     height of FreeCAD's (hidden) document tab bar and of the ribbon; Qt's MDI area then moves
@@ -153,11 +150,11 @@ def _refit_views():
 def theme_changed():
     """theme.LISTENERS: after a switch of look or of Neon Lights' colours, the bars this
     task paints by hand are painted again (their style sheets follow by themselves)."""
-    lit = theme.is_neon()
-    if lit or _seen["neon"]:  # a switch into, inside or out of Neon Lights
-        _refit_views()
-        QtCore.QTimer.singleShot(0, _refit_views)  # (once the bars' new sizes are laid out)
-    _seen["neon"] = lit
+    # On every switch (a no-op when the windows already fill their area): a session that
+    # started in Neon Lights ran no listener at start-up, so "was Neon on before" cannot be
+    # known here, and a Neon -> Dark switch must still re-fit.
+    _refit_views()
+    QtCore.QTimer.singleShot(0, _refit_views)  # (once the bars' new sizes are laid out)
     for name, step in (
         ("viewcube_ui", "theme_changed"),
         ("navbar_ui", "theme_changed"),
