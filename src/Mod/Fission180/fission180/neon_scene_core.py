@@ -138,7 +138,10 @@ SKETCH_PARAMS = {
     "CursorCrosshairColor": "WHITE",
     "SelectionColor": "SELECT",
     "HighlightColor": "HOVER",
-    "SketchFaceColor": "FACE",
+    # Not "SketchFaceColor": FreeCAD copies it into every sketch's ShapeAppearance (a saved
+    # property, ViewProviderSketch's parameter map), so changing it marked designs modified
+    # and saved the neon shade into them (found at the merge, 2026-11-20). The sketch areas
+    # keep their Dark shade.
 }
 
 
