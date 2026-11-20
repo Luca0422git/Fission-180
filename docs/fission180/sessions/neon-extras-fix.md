@@ -167,8 +167,10 @@ the boot screen. `--root` measures another copy of the package; I used `git arch
 
 - `--only unit`: all passed (4128 tests, `OK (skipped=11)`), `test_theme_identity` and the
   new `test_neon_extras` tests included.
-- `look_unchanged`, `neon_switch`, `neon_extras` with `--repeat 2`: round 1 all PASS
-  (13, 27 and 42 checks); round 2: see below.
+- `look_unchanged`, `neon_switch`, `neon_extras` with `--repeat 2`: PASS in both rounds
+  (13, 27 and 42 checks).
+- `neon_extras --stress` (FreeCAD pinned to one core with 2 busy loops): PASS (42 checks).
+- `neon_extras` screenshots (boot, Home in Johnny) look as before.
 
 ## Facts found (Qt / PySide)
 
