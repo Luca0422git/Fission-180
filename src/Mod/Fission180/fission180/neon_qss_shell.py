@@ -106,7 +106,7 @@ def qss(p, frames, fonts, translucent):
     letter-spacing: 2px; text-transform: uppercase; font-weight: bold; border-bottom: 2px solid transparent; }}
 #Fission180Ribbon QToolButton[role="tab"]:checked {{ color: {primary_hot}; background: {tab_fill}; }}
 #Fission180Ribbon QToolButton[role="tab"]:hover {{ background: transparent; color: {primary_hot}; }}
-#Fission180Ribbon QToolButton[role="group"] {{ color: {primary}; font-size: 12px; letter-spacing: 1px;
+#Fission180Ribbon QToolButton[role="group"] {{ color: {primary}; font-size: 11px; letter-spacing: 0px;
     padding: 1px 6px; text-transform: uppercase; }}
 #Fission180Ribbon QToolButton[role="group"]:hover, #Fission180Ribbon QToolButton[role="group"]:pressed,
 #Fission180Ribbon QToolButton[role="group"][open="true"] {{ background: {selected_fill}; color: {primary_hot}; }}

@@ -239,10 +239,12 @@ QSint--ActionPanel, QSint--ActionPanel QScrollArea, QSint--ActionPanel QScrollAr
     background: {chrome}; }}
 QSint--ActionGroup {{ background: {chrome}; }}
 QSint--ActionGroup QFrame[class="header"] {{ background: transparent; {strip_frame}
+    border-top-width: 1px; border-bottom-width: 2px;
     background-image: url({hazard}); background-repeat: no-repeat; background-position: right center;
     background-origin: padding; }}
 QSint--ActionGroup QToolButton[class="header"] {{ color: {primary_hot}; font-weight: bold; text-align: left;
-    border: none; background: transparent; text-transform: uppercase; letter-spacing: 1.5px; {display} }}
+    border: none; background: transparent; text-transform: uppercase; letter-spacing: 1.5px; {display}
+    font-size: 11px; padding: 0px; }}
 QSint--ActionGroup QFrame[class="header"] QLabel {{ color: {primary_hot}; background: transparent;
     text-transform: uppercase; letter-spacing: 1.5px; font-weight: bold; {display} }}
 /* a long title made to fit before the hazard stripes (fit_titles): tighter, then smaller,

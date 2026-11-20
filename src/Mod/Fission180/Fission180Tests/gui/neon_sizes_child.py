@@ -288,14 +288,16 @@ def compare():
         pages.get("neon", 0) > 1 and pages.get("neon") == pages.get("dark"),
         pages,
     )
-    bad = {key: why for key, why in neon.items() if allowed(key) is None}
+    # Clipped in Dark too: an old Dark limit (Dark must not change, neon-lights-design.md 3), not
+    # Neon Lights' doing; still listed below. Everything else clipped in Neon fails.
+    bad = {key: why for key, why in neon.items() if allowed(key) is None and key not in dark}
     h.check(
         "Interface size %d %%: nothing is clipped in Neon Lights" % size,
         not bad,
         sorted("%s %r: %s" % (k[0], k[1], v) for k, v in bad.items())[:20],
     )
     for key, why in sorted(neon.items()):
-        print("[Fission 180] neon_sizes %d %%: neon clipped %s %r: %s (%s)" % (size, key[0], key[1], why, allowed(key) or "not allowed"), flush=True)
+        print("[Fission 180] neon_sizes %d %%: neon clipped %s %r: %s (%s)" % (size, key[0], key[1], why, allowed(key) or ("clipped in Dark too" if key in dark else "not allowed")), flush=True)
     for key, why in sorted(dark.items()):
         print("[Fission 180] neon_sizes %d %%: dark clipped %s %r: %s" % (size, key[0], key[1], why), flush=True)
     print("[Fission 180] neon_sizes %d %%: clipped in Neon %d, in Dark %d" % (size, len(neon), len(dark)), flush=True)
