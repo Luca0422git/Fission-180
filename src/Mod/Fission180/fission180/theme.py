@@ -154,14 +154,15 @@ def neon(role, otherwise):
     """`otherwise` as given unless Neon Lights is on; then the neon colour of `role` (a key of
     palette()). The way painted code gets a neon colour while Dark and Light keep their own
     literal values exactly."""
-    if not is_neon():
+    if not is_neon() or _neon.get("normal"):
         return otherwise
     return _neon["palette"].get(role, otherwise)
 
 
 def neon3d(rgb, role):
-    """neon() for a 3D colour (r, g, b) in 0..1."""
-    if not is_neon():
+    """neon() for a 3D colour (r, g, b) in 0..1 (the normal colour while a save draws the
+    preview picture, normal_look())."""
+    if not is_neon() or _neon.get("normal"):
         return rgb
     value = _neon["palette"].get(role)
     if not value:
@@ -169,6 +170,12 @@ def neon3d(rgb, role):
     from . import neon_palette
 
     return neon_palette.rgb01(value)
+
+
+def normal_look(on):
+    """While on, neon() and neon3d() give the normal colours (neon_view turns it on while a
+    save draws the preview picture kept in the file)."""
+    _neon["normal"] = bool(on)
 
 
 def translate(text, light=None):
