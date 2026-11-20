@@ -26,6 +26,10 @@ TOKENS = (PRIMARY, SECONDARY, ALERT, TEXT, GROUND)
 # so a thick stroke gets a tight halo instead of a fat tube.
 LINE, DETAIL = 2.1, 1.4
 GLOW_SCALE, GLOW_ADD, GLOW_CAP, GLOW_OPACITY = 2.0, 0.9, 2.6, 0.24
+# the converter's outlines of a normal icon's solid shapes: a block's silhouette (EDGE) and a
+# flat face (FACE). The normal icons' blocks are smaller than the hand-made ones (often three
+# to an icon), so they sit between DETAIL and LINE: at LINE, small blocks filled in at 18 px.
+EDGE, FACE = 1.75, 1.5
 
 
 def glow_width(width):
@@ -203,11 +207,11 @@ def _outline(kind, attrs, colour, name=None):
     face["fill"] = token
     face["fill-opacity"] = "%.2f" % _shade(colour)
     face["stroke"] = token if token.startswith("#n3") else SECONDARY  # (a gradient fill)
-    face["stroke-width"] = "1.25"
+    face["stroke-width"] = "%.2f" % FACE
     face["stroke-linejoin"] = "miter"
     if kind == "rect":
         kind, face = _cut_rect(face)
-    return _glow(kind, face, 1.25, 0.18) + _tag(kind, face)
+    return _glow(kind, face, FACE, 0.18) + _tag(kind, face)
 
 
 # make_icons.py's three-face palettes (top, left, right face): GREY, BLUE, DBLUE, PURPLE, GOLD
@@ -263,11 +267,11 @@ def _block(match, name=None):
     out = ""
     for pts, opacity in ((top, 0.22), (left, 0.12), (right, 0.06)):
         out += _tag("polygon", poly(pts, fill=token, **{"fill-opacity": "%.2f" % opacity}))
-    edge = {"fill": "none", "stroke": token, "stroke-width": "1.35", "stroke-linejoin": "miter"}
+    edge = {"fill": "none", "stroke": token, "stroke-width": "%.2f" % EDGE, "stroke-linejoin": "miter"}
     hexagon = poly([t0, t1, b1, b2, b3, t3], **edge)
-    out += _glow("polygon", hexagon, 1.35, 0.2) + _tag("polygon", hexagon)
+    out += _glow("polygon", hexagon, EDGE, 0.2) + _tag("polygon", hexagon)
     inner = dict(edge)
-    inner["stroke-width"] = "0.85"
+    inner["stroke-width"] = "%.2f" % (DETAIL * 0.8)
     inner["d"] = "M%.2f %.2f L%.2f %.2f L%.2f %.2f M%.2f %.2f L%.2f %.2f" % (t3 + t2 + t1 + t2 + b2)
     del inner["stroke-linejoin"]
     return out + _tag("path", inner)
