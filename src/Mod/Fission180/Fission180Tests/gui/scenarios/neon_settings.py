@@ -132,7 +132,7 @@ def dark_page():
     wi.click(button)
 
 
-dark_page.done = lambda: page() is not None and page().stack.currentWidget() is page().on_page
+dark_page.done = lambda: page() is not None and page().showing()
 dark_page.done_what = "the page to fill in for Neon Lights"
 
 

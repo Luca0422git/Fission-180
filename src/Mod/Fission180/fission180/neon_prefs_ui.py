@@ -559,12 +559,11 @@ class NeonPage(QtWidgets.QWidget):
 
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        self.stack = QtWidgets.QStackedWidget()
-        outer.addWidget(self.stack)
+        # (one of the two is shown; a hidden one takes no room, so Dark's page has no scroll bar)
         self.off_page = self._build_off()
         self.on_page = self._build_on()
-        self.stack.addWidget(self.off_page)
-        self.stack.addWidget(self.on_page)
+        outer.addWidget(self.off_page)
+        outer.addWidget(self.on_page)
         _pages.append(self)
         self.sync()
 
@@ -787,12 +786,8 @@ class NeonPage(QtWidgets.QWidget):
     def sync(self):
         """The page for the look in use, with the stored values."""
         neon = theme.is_neon()
-        shown, hidden = (self.on_page, self.off_page) if neon else (self.off_page, self.on_page)
-        # (a stack is as tall as its tallest page: the hidden one asks for no room)
-        hidden.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-        shown.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-        self.stack.setCurrentWidget(shown)
-        self.stack.updateGeometry()
+        self.off_page.setVisible(not neon)
+        self.on_page.setVisible(neon)
         self.off_line.setText(
             "These settings are for the Neon Lights look (a cyberpunk window in colours you "
             "choose). The look in use now is %s." % theme.name().capitalize()
@@ -805,6 +800,10 @@ class NeonPage(QtWidgets.QWidget):
         self.update()
         for w in self.findChildren(QtWidgets.QWidget):
             QtWidgets.QWidget.update(w)  # (a list's own update() wants an argument)
+
+    def showing(self):
+        """True when the page shows the Neon Lights settings (not the Switch button)."""
+        return not self.on_page.isHidden()
 
     def load_values(self):
         self._loading = True
@@ -1127,7 +1126,7 @@ def theme_changed():
     """theme.LISTENERS: a look or colour change made anywhere shows on the open pages."""
     for page in pages():
         try:
-            if page.isVisible() or page.stack.currentWidget() is not (page.on_page if theme.is_neon() else page.off_page):
+            if page.isVisible() or page.showing() != theme.is_neon():
                 page.sync()
         except Exception as exc:
             warn("Neon Lights settings: %s" % exc)
