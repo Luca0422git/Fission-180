@@ -36,6 +36,8 @@ FILE(GLOB Fission180_NeonIcons RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DE
     fission180/icons/neon/*.svg)
 FILE(GLOB Fission180_Fonts RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
     fission180/fonts/*.ttf fission180/fonts/*.txt)
+FILE(GLOB Fission180_Sounds RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
+    fission180/sounds/*.wav)  # Neon Lights' UI sounds (tools/fission180/make_sounds.py)
 FILE(GLOB Fission180_LookBaseline RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
     Fission180Tests/fixtures/look_baseline/*.png)
 
@@ -74,6 +76,7 @@ INSTALL(FILES ${Fission180_Icons} DESTINATION Mod/Fission180/fission180/icons)
 INSTALL(FILES ${Fission180_UiIcons} DESTINATION Mod/Fission180/fission180/icons/ui)
 INSTALL(FILES ${Fission180_Fonts} DESTINATION Mod/Fission180/fission180/fonts)
 INSTALL(FILES ${Fission180_NeonIcons} DESTINATION Mod/Fission180/fission180/icons/neon)
+INSTALL(FILES ${Fission180_Sounds} DESTINATION Mod/Fission180/fission180/sounds)
 INSTALL(FILES ${Fission180_LookBaseline} DESTINATION Mod/Fission180/Fission180Tests/fixtures/look_baseline)
 if(Fission180_TipPictures)  # (none until the content builders have made them)
     INSTALL(FILES ${Fission180_TipPictures} DESTINATION Mod/Fission180/fission180/icons/tips)
