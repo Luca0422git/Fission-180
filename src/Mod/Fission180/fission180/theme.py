@@ -191,6 +191,9 @@ _state = {"name": "dark", "hook": None}
 # in Dark, Light or another preset; tests: test_neon_theme.py).
 _neon = {"palette": {}, "to_neon": {}, "seen": {}, "back_dark": {}, "back_light": {}}
 LISTENERS = ("sketch_mode", "shell", "home_ui")  # modules whose theme_changed() runs on a switch
+# Colours that are the same in Dark and Light but turn into neon ones (white boxes with
+# near-black text): literal -> palette key.
+NEON_SWAP = {"#fafafa": "field", "#111111": "text"}
 
 
 def _neon_palette():
@@ -230,6 +233,14 @@ def _neon_tables(p):
     for dark_hex, light in _EXTRA.items():
         if light not in dark_values and dark_hex in to_neon:
             to_neon.setdefault(light, to_neon[dark_hex])
+    # Boxes that are white with near-black text in every look (the value boxes in the 3D
+    # view): dark fields with light text in Neon Lights, each with its own exact way back.
+    used = set(p.values()) | set(extra.values())
+    for literal, key in NEON_SWAP.items():
+        value = neon_palette._free(neon_palette.mix(p[key], p["primary"], 0.02), used)
+        used.add(value)
+        to_neon[literal] = value
+        seen[value] = literal
     for old, dark in seen.items():
         if dark in to_neon:
             to_neon.setdefault(old, to_neon[dark])
