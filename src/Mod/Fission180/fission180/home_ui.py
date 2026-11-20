@@ -1646,11 +1646,34 @@ def theme_changed():
         except Exception as exc:
             warn("home: style: %s" % exc)
         _neon_background(page)
+        try:
+            QtCore.QTimer.singleShot(0, lambda: _opaque_again(page))  # after every listener
+        except Exception as exc:
+            warn("home: see-through: %s" % exc)
         page.refresh()
         page.update_ai()
         sub = subwindow()
         if sub is not None:
             sub.setWindowIcon(ui_icon("qa_home"))
+
+
+def _opaque_again(page):
+    """Qt keeps which of Home's widgets are opaque from when they were first styled: after
+    the look changes Home's style sheet (Neon Lights makes its scroll area, rows and list
+    see-through over the animated background, neon_home), have it worked out again, or the
+    screen keeps showing the old opaque panels over the background."""
+    try:
+        from . import neon_home
+
+        for widget in [page] + page.findChildren(QtWidgets.QWidget):
+            if widget.objectName() != neon_home.NAME and not widget.autoFillBackground():
+                widget.setAutoFillBackground(True)
+                widget.setAutoFillBackground(False)
+        page.update()
+    except RuntimeError:
+        pass  # Home was closed meanwhile
+    except Exception as exc:
+        warn("home: see-through: %s" % exc)
 
 
 def ai_panel_ui_qss():

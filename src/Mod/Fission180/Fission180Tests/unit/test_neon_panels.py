@@ -102,7 +102,9 @@ class Rules(unittest.TestCase):
     def _all(self):
         out = {}
         for part, make in neon_qss_panels.BLOCKS.items():
-            out[part] = make(self.v, _Widget("Fission180HomeWelcome"))
+            widget = _Widget("Fission180HomeWelcome")
+            widget.setProperty(neon_qss_panels.PROP_ROLE, "secondary")
+            out[part] = make(self.v, widget)
         frames = neon_frames.write(self.p, self.folder.name)
         out["app"] = neon_qss_panels.qss(self.p, frames, ("Chakra Petch", "Orbitron"), True)
         return out
@@ -154,10 +156,79 @@ class Style(unittest.TestCase):
                 [
                     "home", "home_update", "home_notice", "ai", "sketch_palette",
                     "measure_in_sketch", "measure_results", "marking", "arrow_value",
-                    "data_upload", "dim_label", "caption",
+                    "data_upload", "dim_label", "caption", "role_colour",
                 ]
             ),
         )
+
+    def test_a_sheet_of_property_lines_is_wrapped_before_rules_are_added(self):
+        # (Qt reads "color: x; QLabel { ... }" as broken, retries it as "* {...}" and the
+        # added rule is lost: the caption and dim_label rules never applied)
+        self.assertEqual(neon_qss_panels.wrap("padding: 0 10px; color: #c9d1dc;"),
+                         "* { padding: 0 10px; color: #c9d1dc; }\n")
+        rule = "QLabel { color: #ffffff; }"
+        self.assertEqual(neon_qss_panels.wrap(rule), rule)
+        self.assertEqual(neon_qss_panels.wrap(""), "")
+
+    def _neon_style(self, widget, text, part):
+        """style() as in Neon Lights, with the rules of `part` replaced by a marker."""
+        saved = (theme.is_neon, theme.translate, theme.palette, neon_qss_panels.block,
+                 neon_qss_panels._set_raw)
+        theme.is_neon = lambda: True
+        theme.translate = lambda t, light=None: t
+        theme.palette = lambda: {}
+        neon_qss_panels.block = lambda part, p, w=None: "QLabel { color: NEON; }"
+        neon_qss_panels._set_raw = lambda w, t: w.setStyleSheet(t)
+        try:
+            neon_qss_panels.style(widget, text, part)
+        finally:
+            (theme.is_neon, theme.translate, theme.palette, neon_qss_panels.block,
+             neon_qss_panels._set_raw) = saved
+
+    def test_neon_wraps_a_sheet_of_property_lines(self):
+        widget = _Widget()
+        self._neon_style(widget, "color: #9fd2ff;", "role_colour")
+        self.assertEqual(widget.sheet, "* { color: #9fd2ff; }\nQLabel { color: NEON; }")
+        self.assertEqual(widget.property("fission180Qss"), "color: #9fd2ff;")  # Dark's literal
+
+    def test_colour_keeps_darks_literal(self):
+        for look in ("dark", "light"):
+            theme._state["name"] = look
+            widget = _Widget()
+            neon_qss_panels.colour(widget, "color: #9fd2ff;", "secondary")
+            self.assertEqual(widget.sheet, "color: #9fd2ff;", look)
+            self.assertEqual(widget.property(neon_qss_panels.PROP_ROLE), "secondary")
+        widget = _Widget()
+        self._neon_style(widget, "color: #9fd2ff;", "role_colour")
+        self.assertNotIn("#9fd2ff", widget.sheet.split("}")[-2])
+
+    def test_role_colour_rule(self):
+        v = _palette("v")
+        widget = _Widget()
+        self.assertEqual(neon_qss_panels._role_colour(v, widget), "")
+        widget.setProperty(neon_qss_panels.PROP_ROLE, "secondary")
+        self.assertIn(v["secondary"], neon_qss_panels._role_colour(v, widget))
+
+    def test_home_lets_the_animated_background_through(self):
+        from fission180 import neon_home
+
+        v = dict(_palette("v"), display="", ok_frame="", ok_hover_frame="", ok_pressed_frame="")
+        for key in ("hover_fill", "selected_fill", "alert_fill", "ink"):
+            v.setdefault(key, "#000000")
+        text = neon_qss_panels._home(v, _Widget())
+        self.assertIn(neon_home.SEE_THROUGH_QSS, text)
+        # ... after Home's own rules, never the page itself
+        self.assertGreater(text.index(neon_home.SEE_THROUGH_QSS), text.index("#Fission180HomeAIs"))
+        self.assertNotIn("#Fission180Home,", neon_home.SEE_THROUGH_QSS)
+        self.assertNotIn("#Fission180Home {", neon_home.SEE_THROUGH_QSS)
+
+    def test_long_dialog_titles_fit(self):
+        fit = neon_qss_panels.fit_level
+        self.assertEqual(fit([200, 180, 160], 263), 0)
+        self.assertEqual(fit([279, 253, 230], 263), 1)  # "CREATE MESH SECTION SKETCH"
+        self.assertEqual(fit([300, 280, 250], 263), 2)
+        self.assertEqual(fit([400, 380, 330], 263), 3)  # no room even small: no stripes
+        self.assertEqual(neon_qss_panels.FIT_SPACING[0], 1.5)  # as the title rule says
 
     def test_listed_as_a_listener(self):
         for module in ("neon_qss_panels", "data_panel_ui", "ai_panel_ui", "home_ui"):
