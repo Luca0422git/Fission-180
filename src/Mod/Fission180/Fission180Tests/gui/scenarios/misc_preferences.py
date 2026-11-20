@@ -206,6 +206,7 @@ def p1_window():
             "Keyboard Shortcuts",  # Fission 180's own: every command's key in one list
             "AI",  # Fission 180's own: Allow AI apps to control Fission 180 (parity ai.md)
             "3D Print",  # Fission 180's own: where 3D Print sends the design
+            "Neon Lights",  # Fission 180's own: the Neon Lights look's colours and effects
         ],
         titles,
     )

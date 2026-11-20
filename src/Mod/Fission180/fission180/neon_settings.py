@@ -137,3 +137,10 @@ def load_set(name):
 
 def delete_set(name):
     _write_sets([s for s in saved_sets() if s["name"] != name])
+
+
+def rename_set(old, new):
+    """The saved set `old` called `new` (ValueError with a sentence for the page otherwise)."""
+    from . import neon_prefs_core
+
+    _write_sets(neon_prefs_core.renamed(saved_sets(), old, (new or "").strip()))

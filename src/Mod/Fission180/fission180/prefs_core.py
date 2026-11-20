@@ -44,6 +44,9 @@ PAGES = [
     # Fission 180's own: where 3D Print (UTILITIES > MAKE) sends the design. Fusion keeps its
     # print utility in the 3D Print dialog only; the dialog remembers its choices here too.
     ("print", "3D Print", None),
+    # Fission 180's own: the Neon Lights look's presets, colours and effects (neon-lights-design.md
+    # 6.10; neon_prefs_ui.py builds the page, everything on it applies at once)
+    ("neon", "Neon Lights", None),
 ]
 
 # 3D Print's Send to choices (slicer_core has the slicers) and its formats (export.py's

@@ -597,8 +597,9 @@ class PreferencesDialog(QtWidgets.QDialog):
         inner = QtWidgets.QWidget()
         inner.setObjectName("Fission180PreferencesPage_" + pid)
         layout = QtWidgets.QVBoxLayout(inner)
-        heading = QtWidgets.QLabel("<b>%s</b>" % title)
-        layout.addWidget(heading)
+        if pid != "neon":  # (the Neon Lights page has its own title)
+            heading = QtWidgets.QLabel("<b>%s</b>" % title)
+            layout.addWidget(heading)
         for group, opts in core.groups(pid):
             box = QtWidgets.QGroupBox(group)
             form = QtWidgets.QFormLayout(box)
@@ -626,6 +627,15 @@ class PreferencesDialog(QtWidgets.QDialog):
             self.print_note.setWordWrap(True)
             self.print_note.setStyleSheet("color: #c3cad4;")
             layout.addWidget(self.print_note)
+        if pid == "neon":
+            self.neon = None
+            try:
+                from . import neon_prefs_ui
+
+                self.neon = neon_prefs_ui.NeonPage(self, inner)
+                layout.addWidget(self.neon)
+            except Exception as exc:
+                warn("preferences: Neon Lights page: %s" % exc)
         if pid == "network":
             note = QtWidgets.QLabel(
                 "Fission 180 sends nothing by itself except the update check: one request to "
@@ -807,6 +817,7 @@ class PreferencesDialog(QtWidgets.QDialog):
                     if opt["default"] is None and val == _fallback_default(opt):
                         remove.append(key)
             restart = save(changed, remove)
+            self._neon("commit")
             self.load()
             if restart:
                 labels = ", ".join(core.option(k)["label"] for k in restart)
@@ -841,7 +852,18 @@ class PreferencesDialog(QtWidgets.QDialog):
             super().accept()
 
     def reject(self):
+        self._neon("revert")  # (the Neon Lights page shows its changes at once)
         super().reject()
+
+    def _neon(self, action):
+        page = getattr(self, "neon", None)
+        if page is None:
+            return
+        try:
+            getattr(page, action)()
+            page.sync()
+        except Exception as exc:
+            warn("preferences: Neon Lights page: %s" % exc)
 
 
 def _fallback_default(opt):
