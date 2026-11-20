@@ -16,7 +16,7 @@ BODY_FILES = (
     "ChakraPetch-Bold.ttf",
 )
 DISPLAY_FILES = ("Orbitron[wght].ttf",)
-_state = {"fonts": None, "app_font": None}
+_state = {"fonts": None, "app_font": None, "frames": {}}
 
 
 def folder(p):
@@ -57,6 +57,11 @@ def load_fonts():
     return _state["fonts"]
 
 
+def frame_paths():
+    """{piece: path} of the frame pictures of the palette in use ({} before the first style)."""
+    return dict(_state["frames"])
+
+
 def fonts():
     """(body family, display family) in use; ("", "") before they are loaded."""
     return _state["fonts"] or ("", "")
@@ -66,7 +71,8 @@ def qss(p):
     """The app style sheet in Neon Lights for palette `p`."""
     from . import neon_frames, neon_popups, neon_qss_chrome, neon_qss_panels, neon_qss_shell
 
-    frames = neon_frames.write(p, os.path.join(folder(p), "frames"))
+    frames = neon_frames.write(p, os.path.join(folder(p), "frames%d" % neon_frames.VERSION))
+    _state["frames"] = frames
     names = fonts()
     translucent = neon_popups.compositing()
     return "\n".join(
