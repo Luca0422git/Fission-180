@@ -32,7 +32,9 @@ class UpdateLine(QtWidgets.QFrame):
         super().__init__(parent)
         self.setObjectName("Fission180HomeUpdate")
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setStyleSheet(QSS.format(**theme.DARK))
+        from . import neon_qss_panels
+
+        neon_qss_panels.style(self, QSS.format(**theme.DARK), "home_update")
         self.mode = ""  # "" (hidden) | "available" | "updated"
         row = QtWidgets.QHBoxLayout(self)
         row.setContentsMargins(12, 5, 8, 5)

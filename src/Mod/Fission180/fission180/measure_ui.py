@@ -18,7 +18,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import commands, handles3d, hole_common, log, measure, preview, taskui, ui_icon, warn
-from . import theme, ui_icon_path
+from . import neon_qss_panels, theme, ui_icon_path
 from .compat import QtCore, QtGui, QtWidgets
 
 FILTERS = [
@@ -257,7 +257,7 @@ class MeasurePanel:
             raise RuntimeError("the sketch's panel is not there")
         frame = _InSketchFrame()  # opaque in FreeCAD's floating Tasks panel
         frame.setObjectName("Fission180MeasureInSketch")
-        frame.setStyleSheet(IN_SKETCH_STYLE)
+        neon_qss_panels.style(frame, IN_SKETCH_STYLE, "measure_in_sketch")
         box = QtWidgets.QVBoxLayout(frame)
         box.setContentsMargins(0, 0, 0, 6)
         box.setSpacing(4)
@@ -333,7 +333,7 @@ class MeasurePanel:
         layout.addRow(self.snap)
         self.tree = QtWidgets.QTreeWidget()
         self.tree.setObjectName("Fission180Measure_results")
-        self.tree.setStyleSheet(RESULTS_STYLE)
+        neon_qss_panels.style(self.tree, RESULTS_STYLE, "measure_results")
         self.tree.setColumnCount(2)
         self.tree.setHeaderHidden(True)
         self.tree.setRootIsDecorated(False)

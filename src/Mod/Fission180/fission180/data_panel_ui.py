@@ -26,7 +26,7 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, log, theme, ui_icon, warn
+from . import commands, log, neon_qss_panels, theme, ui_icon, warn
 from . import data_panel_core as dp
 from . import versions as core
 from . import versions_ui as vui
@@ -188,7 +188,7 @@ class _CardDelegate(QtWidgets.QStyledItemDelegate):
         painter.setBrush(_color("ACCENT", "#3fa9f5"))
         painter.drawRoundedRect(box, 3, 3)
         painter.setFont(font)
-        painter.setPen(QtGui.QColor("#ffffff"))
+        painter.setPen(QtGui.QColor(theme.neon("background", "#ffffff")))
         painter.drawText(box, QtCore.Qt.AlignCenter, text)
         return int(left)
 
@@ -756,7 +756,7 @@ class DetailsPane(QtWidgets.QFrame):
         self.info = QtWidgets.QLabel("")
         self.info.setObjectName("Fission180DataPanelDetailsInfo")
         self.info.setWordWrap(True)
-        self.info.setStyleSheet("color: %s;" % (theme.TEXT_DIM or "#c3cad4"))
+        self.restyle()
         right.addWidget(self.info)
         buttons = QtWidgets.QHBoxLayout()
         self.open_button = QtWidgets.QPushButton("Open")
@@ -915,6 +915,10 @@ class DetailsPane(QtWidgets.QFrame):
             self.used_in.addItem(QtWidgets.QListWidgetItem("No design of this place inserts it"))
 
     # -- actions
+    def restyle(self):
+        """The details' words in the look's dim colour (again after a look switch)."""
+        neon_qss_panels.style(self.info, "color: %s;" % (theme.TEXT_DIM or "#c3cad4"), "dim_label")
+
     def _close(self):
         self.panel.details_closed = self.path
         self.hide()
@@ -1038,11 +1042,7 @@ class DataPanel(QtWidgets.QWidget):
             "Copy a design or a STEP / IGES file into this folder (or drop files on the panel)"
         )
         self.upload.clicked.connect(lambda *_: self.upload_file())
-        accent = theme.ACCENT or "#3fa9f5"
-        self.upload.setStyleSheet(
-            "QPushButton#Fission180DataPanelUpload { background: %s; color: #ffffff; "
-            "border: none; border-radius: 3px; padding: 4px 12px; }" % accent
-        )
+        self._style_upload()
         actions.addWidget(self.upload)
         # Fusion's New Project: a project is a folder directly in the project folder (wave 7)
         self.new_project = self._tool(
@@ -1287,7 +1287,7 @@ class DataPanel(QtWidgets.QWidget):
                 width,
                 self.crumbs.fontMetrics().horizontalAdvance,
             )
-            link = theme.TEXT or "#f5f5f5"
+            link = theme.neon("secondary", theme.TEXT or "#f5f5f5")
             parts = []
             for index in shown:
                 if index is None:
@@ -1302,6 +1302,23 @@ class DataPanel(QtWidgets.QWidget):
             self.crumbs.setText(" / ".join(parts))
         except Exception as exc:
             warn("data panel: path: %s" % exc)
+
+    def _style_upload(self):
+        accent = theme.ACCENT or "#3fa9f5"
+        neon_qss_panels.style(
+            self.upload,
+            "QPushButton#Fission180DataPanelUpload { background: %s; color: #ffffff; "
+            "border: none; border-radius: 3px; padding: 4px 12px; }" % accent,
+            "data_upload",
+        )
+
+    def restyle(self):
+        """Its own styles and the path's links again in the look's colours (a look or a
+        Neon Lights preset switch: they are baked from theme's colours when made)."""
+        self._style_upload()
+        self.details.restyle()
+        self._show_crumbs()
+        self.list.viewport().update()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1974,3 +1991,16 @@ class DataPanel(QtWidgets.QWidget):
         """Delete on a folder: versions_ui asks, then the folder goes to the trash."""
         if vui.delete_folder(path, self.place_root(), self):
             self.refresh()
+
+
+def theme_changed():
+    """A look or preset switch (theme.LISTENERS): every Data Panel again in the new colours."""
+    try:
+        for widget in QtWidgets.QApplication.allWidgets():
+            if isinstance(widget, DataPanel):
+                try:
+                    widget.restyle()
+                except RuntimeError:
+                    pass
+    except Exception as exc:
+        warn("data panel: look: %s" % exc)
