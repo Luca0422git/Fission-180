@@ -185,7 +185,7 @@ def widgets_are_neon(key="v", label="v"):
     segments = colours(image, area(bar, QtCore.QRect(4, bar.height() // 2, bar.width() // 3, 1)))
     h.check(
         "%s: the progress bar is segmented (lit and dark segments)" % label,
-        has_near(segments, p["primary"], 120) and has_near(segments, p["field"], 16),
+        has_near(segments, _lit(p), 24) and has_near(segments, p["field"], 16),
         sorted(segments)[:12],
     )
     group = s["check"].parentWidget()
@@ -211,6 +211,14 @@ def widgets_are_neon(key="v", label="v"):
     body, _display = neon_style.fonts()
     h.check("%s: the techy font" % label, bool(body) and d.font().family() == body, (body, d.font().family()))
     h.shot("dialog-%s" % label)
+
+
+def _lit(p):
+    """A lit progress segment over the bar's ground."""
+    from fission180 import neon_qss_chrome
+    from fission180.neon_palette import mix
+
+    return mix(p["field"], p["primary"], neon_qss_chrome.segment_strength(p))
 
 
 def _option(box):

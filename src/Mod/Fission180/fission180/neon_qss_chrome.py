@@ -32,6 +32,17 @@ def picture(frames, piece):
     return "border-image: url(%s) 0 0 0 0 stretch stretch; border-width: 0px;" % frames[piece]
 
 
+def segment_strength(p):
+    """How opaque a progress bar's lit segments are: as bright as the percentage written over
+    them allows (contrast 4 with the text; a bright yellow gets fainter segments)."""
+    from .neon_palette import contrast, mix
+
+    for percent in range(60, 25, -5):
+        if contrast(p["text"], mix(p["field"], p["primary"], percent / 100.0)) >= 4.0:
+            return percent / 100.0
+    return 0.3
+
+
 def qss(p, frames, fonts, translucent):
     """The style for palette `p`; `translucent`: pop-ups can be see-through (a compositing
     window manager), else they get a solid ground so no corner shows black."""
@@ -72,7 +83,7 @@ def qss(p, frames, fonts, translucent):
         hover_fill=rgba(p["primary"], 0.16),
         selected_fill=rgba(p["primary"], 0.24),
         line_soft=rgba(p["primary"], 0.35),
-        segment=rgba(p["primary"], 0.6),
+        segment=rgba(p["primary"], segment_strength(p)),
         default_text=neon_frames.on_colour(p, neon_frames.default_fill(p)),
     )
     return """
