@@ -41,7 +41,7 @@ class MayFire(unittest.TestCase):
     def test_every_busy_flag_blocks(self):
         expected = {
             "mouse_down", "dragging", "text_focus", "task_dialog", "recomputing",
-            "testing", "inactive", "effects_off", "glitch_off",
+            "camera_moving", "testing", "inactive", "effects_off", "glitch_off",
         }
         self.assertEqual(set(g.BLOCKERS), expected)
         for key in g.BLOCKERS:
@@ -54,6 +54,27 @@ class MayFire(unittest.TestCase):
         state = {"mouse_down": True, "testing": True, "unknown": True}
         self.assertFalse(g.may_fire(state))
         self.assertEqual(g.why_not(state), ["mouse_down", "testing"])
+
+
+class HeldBack(unittest.TestCase):
+    def test_nothing_holds_it_back(self):
+        self.assertEqual(g.held_back({}, 0), "fire")
+
+    def test_nobody_looking_drops_it_and_its_timers(self):
+        for key in ("inactive", "testing", "effects_off", "glitch_off"):
+            self.assertEqual(g.held_back({key: True}, 0), "drop", key)
+            self.assertEqual(g.held_back({key: True, "mouse_down": True}, 0), "drop", key)
+
+    def test_a_busy_person_makes_it_wait_slowly_then_start_again(self):
+        self.assertGreaterEqual(g.POLL_S, 0.5)  # not a busy poll
+        for key in ("mouse_down", "dragging", "text_focus", "task_dialog", "recomputing", "camera_moving"):
+            self.assertEqual(g.held_back({key: True}, 1.0), "retry", key)
+            self.assertEqual(g.held_back({key: True}, g.GIVE_UP_S), "restart", key)
+        self.assertEqual(g.held_back({"mouse_down": True}, float("nan")), "restart")
+        self.assertEqual(g.held_back({"mouse_down": True}, None), "retry")
+
+    def test_stoppers_are_blockers(self):
+        self.assertTrue(set(g.STOPPERS) <= set(g.BLOCKERS))
 
 
 if __name__ == "__main__":

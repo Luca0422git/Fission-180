@@ -52,7 +52,7 @@ def no_neon_node_left():
 def near_outline_on_screen(point):
     """Whether pixels at the 3D point's place on screen show the outline colour."""
     widget = h.gl_widget()
-    image = widget.grab().toImage()
+    image = lc.grab(widget).toImage()
     ratio = image.width() / float(max(1, widget.width()))
     spot = h.screen_point(point)
     want = outline_rgb()

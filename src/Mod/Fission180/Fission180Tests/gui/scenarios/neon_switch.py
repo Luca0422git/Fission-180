@@ -171,7 +171,7 @@ def johnny_with_dialog_open():
     h.check("the Extrude dialog is still open", lc.task_open())
     if panel is not None:
         main = Gui.getMainWindow()
-        image = main.grab().toImage()  # (the overlay panel alone grabs see-through)
+        image = lc.grab(main).toImage()  # (the overlay panel alone grabs see-through)
         seen = set()
         for x in range(8, 48, 6):
             spot = panel.mapTo(main, QtCore.QPoint(x, panel.height() - 6))

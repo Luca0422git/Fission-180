@@ -58,7 +58,7 @@ def _patch(image, ratio, x0, y0):
 def _corners():
     """The background at the top and at the bottom of the view (left edge)."""
     widget = h.gl_widget()
-    image = widget.grab().toImage()
+    image = lc.grab(widget).toImage()
     ratio = image.width() / float(max(1, widget.width()))
     return _patch(image, ratio, 3, 3), _patch(image, ratio, 3, widget.height() - 12)
 
@@ -66,7 +66,7 @@ def _corners():
 def _hue_at(point):
     """(hue in degrees, saturation 0..1) of the pixel at a 3D point's place on screen."""
     widget = h.gl_widget()
-    image = widget.grab().toImage()
+    image = lc.grab(widget).toImage()
     ratio = image.width() / float(max(1, widget.width()))
     spot = h.screen_point(point)
     c = QtGui.QColor(image.pixel(int(spot.x() * ratio), int(spot.y() * ratio)))
@@ -76,7 +76,7 @@ def _hue_at(point):
 def _near(point, want):
     """Smallest difference to `want` around a 3D point's place on screen."""
     widget = h.gl_widget()
-    image = widget.grab().toImage()
+    image = lc.grab(widget).toImage()
     ratio = image.width() / float(max(1, widget.width()))
     spot = h.screen_point(point)
     best = 999

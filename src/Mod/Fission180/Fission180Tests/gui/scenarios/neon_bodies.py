@@ -81,7 +81,7 @@ def has_none(kind, name):
 
 def pixel(widget_pos):
     widget = h.gl_widget()
-    image = widget.grab().toImage()
+    image = lc.grab(widget).toImage()
     ratio = image.width() / float(max(1, widget.width()))
     c = QtGui.QColor(image.pixel(int(widget_pos.x() * ratio), int(widget_pos.y() * ratio)))
     return c.red(), c.green(), c.blue()
