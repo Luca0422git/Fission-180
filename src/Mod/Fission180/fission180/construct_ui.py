@@ -26,6 +26,7 @@ from . import bodypick, commands, construct, handles3d, hole_common, log, pickpa
 from . import ui_icon_path
 from .compat import QtCore, QtWidgets
 from .taskui import DistanceField, ValueBoxes
+from .neon_scene_core import Live
 
 ICONS = {
     "OffsetPlane": "offset_plane",
@@ -42,7 +43,7 @@ ICONS = {
     "AxisTwoPoints": "axis_two_points",
     "AxisEdge": "axis_edge",
 }
-ORIGIN_DOT = (0.95, 0.85, 0.35)
+ORIGIN_DOT = Live((0.95, 0.85, 0.35), "marker")
 DISTANCE_TYPES = [("Proportional", "proportional"), ("Physical", "physical")]
 
 

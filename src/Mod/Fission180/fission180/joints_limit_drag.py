@@ -20,8 +20,9 @@ import FreeCADGui as Gui
 
 from . import hover_ghost, joints, joints_core as core, warn
 from .compat import QtCore
+from .neon_scene_core import Live
 
-GHOST_COLOUR = (0.95, 0.75, 0.35)
+GHOST_COLOUR = Live((0.95, 0.75, 0.35), "preview")
 GHOST_TRANSPARENCY = 0.8
 
 

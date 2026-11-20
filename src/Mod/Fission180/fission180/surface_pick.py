@@ -18,9 +18,10 @@ import FreeCAD as App
 
 from . import profile_pick, warn
 from .compat import QtCore
+from .neon_scene_core import Live
 
-BLUE = (0.12, 0.53, 0.90)
-LIGHT = (0.55, 0.80, 1.0)
+BLUE = Live((0.12, 0.53, 0.90), "pick")
+LIGHT = Live((0.55, 0.80, 1.0), "hover")
 RED = (0.90, 0.25, 0.22)
 GREY = (0.70, 0.74, 0.80)
 GREEN = (0.20, 0.75, 0.35)

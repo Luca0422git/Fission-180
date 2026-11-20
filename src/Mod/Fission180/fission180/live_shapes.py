@@ -23,6 +23,7 @@ back when the exact solid comes, at OK / Cancel / Undo, or when the value is ref
 
 from . import live_core as core
 from . import log, warn
+from .neon_scene_core import Live as LiveColour
 
 try:  # FreeCAD ships numpy; the plain loop is the fallback
     import numpy as _np
@@ -783,11 +784,13 @@ def colors(obj):
         line = tuple(vobj.LineColor[:3])
     except Exception:
         pass
-    return face, line
+    from . import theme
+
+    return face, theme.neon3d(line, "outline")  # Neon Lights: the bodies' neon outline
 
 
-CUT_COLOR = (0.95, 0.20, 0.20)  # a cut's picture: the material taken away (cut_preview.RED)
-CUT_LINE = (0.85, 0.08, 0.08)  # its edges (cut_preview.EDGE)
+CUT_COLOR = LiveColour((0.95, 0.20, 0.20), "cut")  # a cut's picture: the material taken away (cut_preview.RED)
+CUT_LINE = LiveColour((0.85, 0.08, 0.08), "cut_edge")  # its edges (cut_preview.EDGE)
 LIVE_XRAY_NAME = "Fission180LiveShapeXRay"
 
 

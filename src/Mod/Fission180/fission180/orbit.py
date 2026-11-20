@@ -25,6 +25,7 @@ Rotations are quaternions (x, y, z, w) like FreeCAD's ``Rotation.Q``; see viewcu
 import math
 
 from . import viewcube
+from .neon_scene_core import Live
 
 CONSTRAINED = "constrained"
 FREE = "free"
@@ -45,7 +46,7 @@ FREECAD_SPHERE_RADIUS = 0.8
 
 # The dot that marks the orbit centre (orbit_ui draws it as a Coin node of this name).
 MARKER_NAME = "Fission180OrbitCenter"
-MARKER_COLOUR = (0.24, 0.80, 0.36)  # a clear green (Fission 180's own shade)
+MARKER_COLOUR = Live((0.24, 0.80, 0.36), "marker")  # a clear green (Fission 180's own shade)
 
 
 def normalise_mode(text):

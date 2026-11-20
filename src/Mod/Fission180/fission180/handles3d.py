@@ -23,9 +23,10 @@ import FreeCADGui as Gui
 from . import drag_guard, handle_look, increments, taskui, warn
 from .compat import QtCore
 from .taskui import BoxCarrier
+from .neon_scene_core import Live
 
-BLUE = (0.30, 0.62, 0.95)  # Fusion's manipulator blue
-BLUE_ACTIVE = (0.55, 0.80, 1.0)
+BLUE = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue
+BLUE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")
 GRAB = {"time": 0.0}  # one press moves one handle
 USED = {"time": 0.0}  # when any handle was last pressed, dragged or let go
 JUST_USED_S = 0.6

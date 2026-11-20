@@ -24,11 +24,12 @@ import FreeCADGui as Gui
 
 from . import commands, log, rebuild, rebuild_core, ui_icon_path, warn
 from .compat import QtCore, QtGui, QtWidgets
+from .neon_scene_core import Live
 
-GHOST = (0.55, 0.68, 0.85)  # a faint blue-grey: the original, under the rebuild
-GHOST_GLOW = (0.16, 0.20, 0.26)
+GHOST = Live((0.55, 0.68, 0.85), "ghost")  # a faint blue-grey: the original, under the rebuild
+GHOST_GLOW = Live((0.16, 0.20, 0.26), "ghost_glow")
 GHOST_TRANSPARENCY = 0.82
-GHOST_EDGE = (0.62, 0.70, 0.80)
+GHOST_EDGE = Live((0.62, 0.70, 0.80), "ghost")
 MISSING = (0.95, 0.22, 0.20)  # material the rebuild lacks: red
 MISSING_GLOW = (0.45, 0.06, 0.05)
 EXTRA = (0.25, 0.80, 0.35)  # material the rebuild has too much: green

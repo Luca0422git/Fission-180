@@ -23,8 +23,9 @@ from . import surface_core as core
 from .bodies_panel import BodyPanel, edit as _edit, start as _start
 from .compat import QtCore, QtWidgets
 from .surface_pick import RED, CellPicker, ShapeOverlay
+from .neon_scene_core import Live
 
-PICKED_COLOR = (0.12, 0.53, 0.90)
+PICKED_COLOR = Live((0.12, 0.53, 0.90), "pick")
 GREEN = (0.20, 0.75, 0.35)
 
 DIRECTIONS = [("One Side", "one_side"), ("Two Sides", "two_sides"), ("Symmetric", "symmetric")]

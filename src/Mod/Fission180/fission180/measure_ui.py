@@ -20,15 +20,16 @@ import FreeCADGui as Gui
 from . import commands, handles3d, hole_common, log, measure, preview, taskui, ui_icon, warn
 from . import theme, ui_icon_path
 from .compat import QtCore, QtGui, QtWidgets
+from .neon_scene_core import Live
 
 FILTERS = [
     ("Face/Edge/Vertex", "sub", True, ""),
     ("Body", "body", True, ""),
     ("Component", "component", True, "A click picks the whole component it lands on"),
 ]
-LINE = (0.98, 0.78, 0.25)  # the measured distance, drawn over the part
-DOT = (0.98, 0.78, 0.25)
-SNAP = (0.55, 0.85, 0.55)
+LINE = Live((0.98, 0.78, 0.25), "measure")  # the measured distance, drawn over the part
+DOT = Live((0.98, 0.78, 0.25), "measure")
+SNAP = Live((0.55, 0.85, 0.55), "snap")
 GREEDY = 1
 NORMAL = 0
 # Results lists: light text on the dark panel like Fusion's (FreeCAD's task panel drew the

@@ -31,6 +31,9 @@ import FreeCADGui as Gui
 
 from . import log, orbit, viewcube, warn
 from .compat import QtCore, QtGui, QtWidgets
+from .neon_scene_core import Live
+
+RIM = Live((0.10, 0.35, 0.16), "marker_rim")  # the orbit dot's darker rim
 
 PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180"
 MODE_KEY = "OrbitMode"  # "constrained" or "free", Fission 180's own, kept across sessions
@@ -130,7 +133,7 @@ class PivotMarker:
         dot.markerIndex.setValue(coin.SoMarkerSet.CIRCLE_FILLED_9_9)
         top.addChild(dot)
         rim_colour = coin.SoMaterial()
-        rim_colour.diffuseColor.setValue(0.10, 0.35, 0.16)  # a darker rim: readable anywhere
+        rim_colour.diffuseColor.setValue(*RIM)  # a darker rim: readable anywhere
         top.addChild(rim_colour)
         rim = coin.SoMarkerSet()
         rim.markerIndex.setValue(coin.SoMarkerSet.CIRCLE_LINE_9_9)
