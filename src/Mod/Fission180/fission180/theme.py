@@ -199,6 +199,7 @@ _state = {"name": "dark", "hook": None}
 _neon = {"palette": {}, "to_neon": {}, "seen": {}, "back_dark": {}, "back_light": {}}
 LISTENERS = ("sketch_mode", "shell", "home_ui", "neon_scene", "neon_shell_paint")  # modules whose theme_changed() runs on a switch
 LISTENERS += ("data_panel_ui", "ai_panel_ui", "neon_qss_panels")  # Neon Lights B3: panels
+LISTENERS += ("neon_prefs_ui",)  # Neon Lights B10: the settings page
 # Colours that are the same in Dark and Light but turn into neon ones (white boxes with
 # near-black text): literal -> palette key.
 NEON_SWAP = {"#fafafa": "field", "#111111": "text"}
