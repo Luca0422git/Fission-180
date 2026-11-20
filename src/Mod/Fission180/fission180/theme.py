@@ -197,7 +197,7 @@ _state = {"name": "dark", "hook": None}
 # session with the dark colour it stands for (so a panel styled while neon was on comes back
 # in Dark, Light or another preset; tests: test_neon_theme.py).
 _neon = {"palette": {}, "to_neon": {}, "seen": {}, "back_dark": {}, "back_light": {}}
-LISTENERS = ("sketch_mode", "shell", "home_ui", "neon_scene")  # modules whose theme_changed() runs on a switch
+LISTENERS = ("sketch_mode", "shell", "home_ui", "neon_scene", "neon_shell_paint")  # modules whose theme_changed() runs on a switch
 # Colours that are the same in Dark and Light but turn into neon ones (white boxes with
 # near-black text): literal -> palette key.
 NEON_SWAP = {"#fafafa": "field", "#111111": "text"}
