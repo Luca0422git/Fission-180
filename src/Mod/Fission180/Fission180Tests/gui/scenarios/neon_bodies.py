@@ -215,6 +215,8 @@ def glow_compared():
     neon_settings.put("Glow", True)
     neon.refresh()
     h.check("Glow on brings it back", has("Edge", neon_view.GLOW_NODE))
+    settle()
+    h.shot("outline-glow")
 
 
 def hologram_on():
@@ -320,6 +322,31 @@ def capture():
     h.check("the neon look is back after it", has("FlatRoot", neon_view.HOLO_NODE) and neon_view._state.get("neon_background") is None)
 
 
+def johnny():
+    from fission180 import neon_settings, theme
+
+    neon_settings.put("Preset", "johnny")
+    theme.refresh_neon()
+
+
+def johnny_shown():
+    from fission180 import neon_view, neon_view_core, theme
+
+    settle()
+    want = neon_view_core.colours(theme.palette(), hologram=True)
+    material = neon_view._find_child(groups("Edge")[0], neon_view.EDGE_NODE)[1]
+    got = tuple(round(c * 255) for c in material.diffuseColor[0].getValue())
+    h.check("another preset (Johnny) recolours the outline at once", distance(got, hex_rgb(want["edge"])) <= 1, (got, want["edge"]))
+    glass = neon_view._find_child(groups("FlatRoot")[0], neon_view.HOLO_NODE)[1]
+    got = tuple(round(c * 255) for c in glass.diffuseColor[0].getValue())
+    h.check("... and the glass", distance(got, hex_rgb(want["glass"])) <= 1, (got, want["glass"]))
+    h.check("... and the design is still not modified", not Gui.getDocument(DOC).Modified and not unchanged())
+    h.shot("hologram-johnny")
+    neon_settings = __import__("fission180.neon_settings").neon_settings
+    neon_settings.put("Preset", "v")
+    theme.refresh_neon()
+
+
 def hologram_off():
     from fission180 import neon_view
 
@@ -355,6 +382,6 @@ h.run(
     "neon_bodies",
     [setup, to_neon, glow_drawn_not_picked, glow_off, glow_compared, hologram_on, hologram_shown,
      hover_face, hover_shown, select_face, selection_shown, save_hologram, thumbnails_alike,
-     capture, hologram_off, all_back, back_to_dark, nothing_left],
+     capture, johnny, johnny_shown, hologram_off, all_back, back_to_dark, nothing_left],
     paced_by="state",
 )

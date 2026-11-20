@@ -15,8 +15,8 @@ RIM_NODE = PREFIX + "Rim"  # the rim-light shader (neon_shader.NODE), after the 
 EDGE_NAMES = (GLOW_NODE, EDGE_NODE, EDGE_BIND)
 FLAT_NAMES = (HOLO_NODE, HOLO_BIND, RIM_NODE)
 
-GLOW_WIDTH = 3.0  # the glow line is this many times the body's own line width
-GLOW_MIN_WIDTH = 4.0
+GLOW_WIDTH = 5.0  # the glow line is this many times the body's own line width
+GLOW_MIN_WIDTH = 8.0
 HOLOGRAM_TRANSPARENCY = 0.72
 
 
@@ -35,7 +35,7 @@ def glow_style(line_width, strength):
         width = 2.0
     width = max(1.0, width)
     strength = min(100, max(0, int(strength)))
-    transparency = 1.0 - 0.55 * strength / 100.0
+    transparency = 1.0 - 0.6 * strength / 100.0
     return max(GLOW_MIN_WIDTH, width * GLOW_WIDTH), round(transparency, 3)
 
 

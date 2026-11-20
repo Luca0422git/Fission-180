@@ -27,14 +27,14 @@ class Names(unittest.TestCase):
 class Glow(unittest.TestCase):
     def test_wider_than_the_edge(self):
         width, _t = core.glow_style(2, 70)
-        self.assertEqual(width, 6.0)
+        self.assertEqual(width, 10.0)
         self.assertEqual(core.glow_style(1, 70)[0], core.GLOW_MIN_WIDTH)
-        self.assertEqual(core.glow_style("bad", 70)[0], 6.0)
+        self.assertEqual(core.glow_style("bad", 70)[0], 10.0)
 
     def test_translucent_never_opaque(self):
         for strength in (-5, 0, 35, 70, 100, 400):
             _w, transparency = core.glow_style(2, strength)
-            self.assertGreater(transparency, 0.4, strength)
+            self.assertGreaterEqual(transparency, 0.4, strength)
             self.assertLessEqual(transparency, 1.0, strength)
         self.assertLess(core.glow_style(2, 100)[1], core.glow_style(2, 20)[1])
 
