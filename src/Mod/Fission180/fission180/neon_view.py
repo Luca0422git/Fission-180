@@ -9,14 +9,19 @@ nodes put in those groups survive recomputes.
 
 - Body outlines: a SoMaterial with override on, first in "Edge", in the outline colour.
 - Edge glow (while Glow is on, always on Hologram bodies): a separator before that, drawing the
-  same SoBrepEdgeSet again wider and translucent, unpickable (clicks pick the real edge only).
-  It comes first because a material override cannot be overridden again further down.
+  same edges again wider and translucent with a plain SoIndexedLineSet (its coordIndex
+  connected to the body's SoBrepEdgeSet, so FreeCAD's hover/selection highlight is not drawn
+  at the glow's width), unpickable (clicks pick the real edge only). It comes first because a
+  material override cannot be overridden again further down.
+- Only the object's own groups: a Body's scene also holds its features' and sketches' scenes
+  (display mode "Through"); those are skipped (a sketch keeps its colours).
 - Hologram bodies: a see-through tinted glass material with override, first in "FlatRoot",
   and the rim-light shader (neon_shader) when its self-test passed. FreeCAD's hover and
   selection colours are set while drawing (emissive), so they still show.
 
 Around a save the neon nodes and the neon background are taken away (the preview picture saved
-in the file is the normal look); normal_look() does the same around other pictures.
+in the file is the normal look); normal_look() does the same around other pictures. A save
+that fails never sends "save finished": a timer queued at its start brings the neon look back.
 """
 
 import contextlib
@@ -77,7 +82,12 @@ def _style():
     if holo and str(_setting("RimLight")).lower() != "off":
         from . import neon_shader
 
-        rim = core.rim_wanted(_setting("RimLight"), holo, neon_shader.self_test()[0])
+        try:
+            ok = neon_shader.self_test()[0]
+        except Exception as exc:
+            warn("Neon Lights: rim light self-test: %s" % exc)
+            ok = False
+        rim = core.rim_wanted(_setting("RimLight"), holo, ok)
     return {
         "hologram": holo,
         "glow": glow,
@@ -98,8 +108,28 @@ def _wants_outline(obj):
         return False
 
 
+def _object_root_type():
+    """The type of every view provider's RootNode (and of a group's children holder):
+    FreeCAD's SoFCSelectionRoot (src/Gui/ViewProvider.cpp, ViewProviderGeoFeatureGroupExtension)."""
+    coin = _coin()
+    kind = coin.SoType.fromName(coin.SbName("SoFCSelectionRoot"))
+    return None if kind.isBad() else kind
+
+
+def _through_other(path, kind):
+    """Whether `path` (from a view provider's RootNode) passes through another object's scene:
+    a Body shows its features' and sketches' scenes in its own (display mode "Through")."""
+    if kind is None:
+        return False
+    for i in range(1, path.getLength() - 1):
+        if path.getNode(i).isOfType(kind):
+            return True
+    return False
+
+
 def _groups(vobj, name):
-    """The view provider's own separators called `name` ("Edge", "FlatRoot")."""
+    """The view provider's own separators called `name` ("Edge", "FlatRoot"), not those of
+    the objects whose scenes it shows (a Body's sketches keep their own colours)."""
     coin = _coin()
     root = getattr(vobj, "RootNode", None)
     if root is None:
@@ -109,10 +139,14 @@ def _groups(vobj, name):
     search.setInterest(coin.SoSearchAction.ALL)
     search.setSearchingAll(True)
     search.apply(root)
+    kind = _object_root_type()
     out = []
     paths = search.getPaths()
     for i in range(paths.getLength()):
-        node = paths[i].getTail()
+        path = paths[i]
+        node = path.getTail()
+        if _through_other(path, kind):
+            continue
         if node.isOfType(coin.SoSeparator.getClassTypeId()) and node not in out:
             out.append(node)
     return out
@@ -192,6 +226,17 @@ def _apply_outline(group, colour):
     material.setOverride(True)
 
 
+def _glow_lines(lines):
+    """A plain line set drawing the same edges as the body's SoBrepEdgeSet `lines` (its
+    coordIndex connected to theirs, so it follows recomputes), without the edge set's hover
+    and selection drawing: sharing the body's own node redrew a hovered or selected edge
+    opaque at the glow's width."""
+    coin = _coin()
+    plain = _named(coin.SoIndexedLineSet(), GLOW_NODE + "Lines")
+    plain.coordIndex.connectFrom(lines.coordIndex)
+    return plain
+
+
 def _apply_glow(group, style):
     """The glow pass: first in "Edge" (before the outline's override), or removed."""
     coin = _coin()
@@ -201,11 +246,15 @@ def _apply_glow(group, style):
         if index >= 0:
             group.removeChild(index)
         return
-    if glow is not None and index != 0:
+    if glow is not None and (index != 0 or glow.getNumChildren() != 6):
         group.removeChild(index)
         glow = None
     if glow is None:
         glow = _named(coin.SoSeparator(), GLOW_NODE)
+        # like FreeCAD's own groups in a body (ViewProviderPartExt::attach): the body's root
+        # caches, the groups inside it do not
+        glow.renderCaching = coin.SoSeparator.OFF
+        glow.boundingBoxCaching = coin.SoSeparator.OFF
         pick = coin.SoPickStyle()
         pick.style = coin.SoPickStyle.UNPICKABLE
         glow.addChild(pick)
@@ -221,17 +270,30 @@ def _apply_glow(group, style):
         draw.style = coin.SoDrawStyle.LINES
         draw.setOverride(True)
         glow.addChild(draw)
-        glow.addChild(lines)
+        glow.addChild(_glow_lines(lines))
         group.insertChild(glow, 0)
+    elif glow.getChild(5).coordIndex.getNum() != lines.coordIndex.getNum():
+        # a different edge set than the one it was made for: follow the new one
+        glow.replaceChild(5, _glow_lines(lines))
     width, transparency = core.glow_style(_line_width(group), style["strength"])
     rgb = _rgb(style["colours"]["glow"])
     material = glow.getChild(3)
-    material.diffuseColor.setValue(*rgb)
-    material.emissiveColor.setValue(*rgb)
-    material.transparency.setValue(transparency)
-    glow.getChild(4).lineWidth = width
-    if glow.getChild(5) is not lines and lines is not None:
-        glow.replaceChild(5, lines)
+    _set_colour(material.diffuseColor, rgb)
+    _set_colour(material.emissiveColor, rgb)
+    if abs(material.transparency[0] - transparency) > 1e-4 or material.transparency.getNum() != 1:
+        material.transparency.setValue(transparency)
+    if abs(glow.getChild(4).lineWidth.getValue() - width) > 1e-4:
+        glow.getChild(4).lineWidth = width
+
+
+def _set_colour(field, rgb):
+    """Set a colour field only when it changes (a write makes Coin draw again)."""
+    try:
+        if field.getNum() == 1 and all(abs(a - b) < 1e-4 for a, b in zip(field[0].getValue(), rgb)):
+            return
+    except Exception:
+        pass
+    field.setValue(*rgb)
 
 
 # -- Hologram bodies -------------------------------------------------------------------------
@@ -435,7 +497,7 @@ def normal_look(doc=None):
             warn("Neon Lights: normal look: %s" % exc)
         yield
     finally:
-        _state["normal"] -= 1
+        _state["normal"] = max(0, _state["normal"] - 1)
         try:
             _to_neon(docs, doc)
         except Exception as exc:
@@ -466,6 +528,7 @@ class _Observer:
             if not _state["on"] or _state["normal"]:
                 return
             _state["saving"].add(doc.Name)
+            _after_failed_save(doc.Name)
             _to_normal([doc], doc)
         except Exception as exc:
             warn("Neon Lights: before saving: %s" % exc)
@@ -478,6 +541,45 @@ class _Observer:
             _to_neon([doc], doc)
         except Exception as exc:
             warn("Neon Lights: after saving: %s" % exc)
+
+
+def _after_failed_save(name):
+    """FreeCAD sends "save finished" within the same call as "save started", but not when the
+    save stops with an error (a read-only file, a write error, a failed rename:
+    App::Document::saveToFile). A timer queued at the start runs after the call: if the design
+    is still "saving" then, the save failed, and the neon look comes back (the other parts'
+    after-save hooks too)."""
+
+    def run():
+        try:
+            if name not in _state["saving"]:
+                return
+            _state["saving"].discard(name)
+            import FreeCAD as App
+
+            doc = App.listDocuments().get(name)
+            log("Neon Lights: the save of %s did not finish; neon look back" % name)
+            _to_neon([doc] if doc is not None else [], doc)
+        except Exception as exc:
+            warn("Neon Lights: after a failed save: %s" % exc)
+
+    try:
+        from PySide import QtCore
+
+        QtCore.QTimer.singleShot(0, run)
+    except Exception as exc:
+        warn("Neon Lights: before saving: %s" % exc)
+
+
+def _reset_pictures():
+    """No save or picture in progress: a switch of look starts from a clean state (and a save
+    that failed before this code knew it cannot keep the normal look on)."""
+    from . import theme
+
+    _state["saving"].clear()
+    _state["normal"] = 0
+    _state.pop("neon_background", None)
+    theme.normal_look(False)
 
 
 class _GuiObserver:
@@ -532,6 +634,7 @@ def enable():
     import FreeCAD as App
     import FreeCADGui as Gui
 
+    _reset_pictures()
     _state["on"] = True
     if _state["observer"] is None:
         _state["observer"] = _Observer()
@@ -539,13 +642,7 @@ def enable():
     if _state.get("gui_observer") is None:
         _state["gui_observer"] = _GuiObserver()
         Gui.addDocumentObserver(_state["gui_observer"])
-    if str(_setting("RimLight")).lower() != "off":
-        try:
-            from . import neon_shader
-
-            neon_shader.self_test()
-        except Exception as exc:
-            warn("Neon Lights: rim light self-test: %s" % exc)
+    # (the rim light's self-test runs the first time a Hologram body needs it: _style())
     apply_all()
     _grid()
     log("Neon Lights: 3D view on")
@@ -556,6 +653,7 @@ def disable():
     import FreeCADGui as Gui
 
     _state["on"] = False
+    _reset_pictures()
     if _state["observer"] is not None:
         try:
             App.removeDocumentObserver(_state["observer"])

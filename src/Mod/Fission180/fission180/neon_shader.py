@@ -5,8 +5,10 @@ body where they are seen edge-on, in the look's outline colour.
 
 Graphics drivers differ, so the shader is only used after self_test() has compiled it, drawn
 one frame off screen with it and read the frame back: the rim must be brighter with it than
-without it. On any failure Hologram uses the flat see-through material (neon_view) and the
-reason is logged. The result is kept for the session.
+without it, and the middle (seen face-on) as drawn without it. On any failure Hologram uses
+the flat see-through material (neon_view) and the reason is logged. The result is kept for the
+session; the test runs the first time Hologram needs it, behind a stored "testing" flag, so a
+driver that crashes during it is never tried again.
 
 The shader keeps FreeCAD's own colours working: the face colour (and its see-through) arrives
 in gl_Color, and so do the hover and selection colours FreeCAD's face set uses while it draws
@@ -112,6 +114,12 @@ def _scene(with_shader):
     camera.farDistance = 10
     root.addChild(camera)
     root.addChild(coin.SoDirectionalLight())
+    if not with_shader:
+        # the plain picture is the face colour itself (the shader does its own shading), so
+        # the middle of both can be compared
+        flat = coin.SoLightModel()
+        flat.model = coin.SoLightModel.BASE_COLOR
+        root.addChild(flat)
     material = coin.SoMaterial()
     material.diffuseColor.setValue(0.1, 0.1, 0.1)
     root.addChild(material)
@@ -176,13 +184,14 @@ def _rim_red(row):
     return edge, row[_SIZE // 2][0]
 
 
-def check():
-    """(ok, reason) from drawing the test scene with and without the shader; not cached."""
-    try:
-        plain = _render(_scene(False))
-        lit = _render(_scene(True))
-    except Exception as exc:
-        return False, "the test picture could not be drawn: %s" % exc
+CENTRE_TOLERANCE = 15  # the face colour reaches the shader: the centre stays as drawn without it
+FLAG = "RimLightTest"  # in neon_settings' group: "testing" while the self-test draws, "crashed"
+TESTING = "testing"
+CRASHED = "crashed"
+
+
+def judge(plain, lit):
+    """(ok, reason) from the middle rows drawn without and with the shader (pure)."""
     if plain is None or lit is None:
         return False, "the test picture could not be drawn off screen"
     plain_rim, lit_rim = _rim_red(plain), _rim_red(lit)
@@ -193,22 +202,81 @@ def check():
         return False, "the shader had no effect (did it compile?): rim %d vs %d" % (edge, plain_rim[0])
     if centre > edge:
         return False, "the shader drew the wrong picture: centre %d, rim %d" % (centre, edge)
+    middle = _SIZE // 2
+    off = max(abs(a - b) for a, b in zip(lit[middle], plain[middle]))
+    if off > CENTRE_TOLERANCE:
+        return False, "the face colour does not reach the shader: centre %s vs %s" % (lit[middle], plain[middle])
     return True, "rim light drawn (rim red %d, without it %d)" % (edge, plain_rim[0])
 
 
+def check():
+    """(ok, reason) from drawing the test scene with and without the shader; not cached."""
+    try:
+        plain = _render(_scene(False))
+        lit = _render(_scene(True))
+    except Exception as exc:
+        return False, "the test picture could not be drawn: %s" % exc
+    return judge(plain, lit)
+
+
+def _params():
+    import FreeCAD as App
+
+    from . import neon_settings
+
+    return App.ParamGet(neon_settings.PARAMS)
+
+
+def _flag():
+    try:
+        return _params().GetString(FLAG, "")
+    except Exception:
+        return ""
+
+
+def _write():
+    """The settings written to disk now: FreeCAD saves them only when it closes, and the flag
+    matters exactly when it does not."""
+    import FreeCAD as App
+
+    App.saveParameter()
+
+
+def _set_flag(value):
+    try:
+        params = _params()
+        if value:
+            params.SetString(FLAG, value)
+        else:
+            params.RemString(FLAG)
+        _write()
+    except Exception as exc:
+        warn("Neon Lights: rim light self-test flag: %s" % exc)
+
+
 def self_test():
-    """(ok, reason): whether the rim light works on this computer. Run once per session; the
-    environment variable FISSION180_NEON_NO_SHADER=1 makes it fail (the flat fallback)."""
+    """(ok, reason): whether the rim light works on this computer. Run once per session, the
+    first time a Hologram body wants it (never at start with Hologram off). A "testing" flag is
+    stored while it draws: if a graphics driver crashes FreeCAD during the test, the flag is
+    still there at the next start, and the shader is never tried again ("crashed"; the flat
+    glass is used). The environment variable FISSION180_NEON_NO_SHADER=1 makes it fail."""
     if _state["result"] is None:
         import os
 
+        flag = _flag()
         if os.environ.get("FISSION180_NEON_NO_SHADER") == "1":
             result = (False, "switched off by FISSION180_NEON_NO_SHADER")
+        elif flag in (TESTING, CRASHED):
+            if flag == TESTING:
+                _set_flag(CRASHED)
+            result = (False, "the self-test did not finish in an earlier session (a graphics driver crash?)")
         else:
+            _set_flag(TESTING)
             try:
                 result = check()
             except Exception as exc:
                 result = (False, "self-test failed: %s" % exc)
+            _set_flag("")
         _state["result"] = result
         if result[0]:
             log("Neon Lights: rim light shader OK (%s)" % result[1])
@@ -217,6 +285,14 @@ def self_test():
     return _state["result"]
 
 
-def reset():
-    """Forget the self-test's result (tests)."""
+def tested():
+    """Whether the self-test has run in this session (tests)."""
+    return _state["result"] is not None
+
+
+def reset(forget_crash=False):
+    """Forget the self-test's result (tests); `forget_crash` also lets it run again after a
+    session that crashed during it."""
     _state["result"] = None
+    if forget_crash:
+        _set_flag("")
