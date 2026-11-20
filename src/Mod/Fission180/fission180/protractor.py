@@ -16,10 +16,11 @@ import FreeCAD as App
 
 from . import angle_snap_core as core
 from . import warn
+from .neon_scene_core import Live
 
-RING = (0.86, 0.88, 0.92)
-LIT = (1.0, 0.85, 0.35)  # the snapped tick and its text (Move's hover yellow)
-FREE = (0.92, 0.94, 0.98)
+RING = Live((0.86, 0.88, 0.92), "ring")
+LIT = Live((1.0, 0.85, 0.35), "hot")  # the snapped tick and its text (Move's hover yellow)
+FREE = Live((0.92, 0.94, 0.98), "bright")
 
 
 def ctrl_held():

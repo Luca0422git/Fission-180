@@ -19,9 +19,10 @@ them back to Fusion's defaults first (reset()).
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import increments, log, nav_core, theme, warn
+from . import increments, log, nav_core, warn
 from . import ui_icon_path
 from .compat import QtCore, QtWidgets
+from .neon_scene_core import Live
 
 PARAMS = increments.PARAMS
 DEFAULTS = {
@@ -35,14 +36,12 @@ DEFAULTS = {
     "Subdivisions": 5,
 }
 NODE_NAME = "Fission180LayoutGrid"
-MAJOR_COLOR = (0.34, 0.36, 0.40)
-MINOR_COLOR = (0.22, 0.23, 0.25)
-X_COLOR = (0.75, 0.25, 0.25)  # the grid's line along X (red) and along Y (green): Fusion's
-Y_COLOR = (0.30, 0.65, 0.30)
-ORIGIN_COLOR = (0.93, 0.93, 0.93)  # the dot where they cross
-NUMBER_COLOR = (0.62, 0.64, 0.68)
-NEON_X = (1.0, 0.18, 0.33)  # the axes in Neon Lights (neon-lights-design.md 6.6)
-NEON_Y = (0.2, 1.0, 0.45)
+MAJOR_COLOR = Live((0.34, 0.36, 0.40), "grid_major")
+MINOR_COLOR = Live((0.22, 0.23, 0.25), "grid_minor")
+X_COLOR = Live((0.75, 0.25, 0.25), "axis_x")  # the grid's line along X (red) and along Y (green): Fusion's
+Y_COLOR = Live((0.30, 0.65, 0.30), "axis_y")
+ORIGIN_COLOR = Live((0.93, 0.93, 0.93), "bright")  # the dot where they cross
+NUMBER_COLOR = Live((0.62, 0.64, 0.68), "grid_text")
 MAX_NUMBERS = 40  # reference numbers along one axis
 _STATE = {"nodes": {}, "timer": None, "step": None, "locked_step": None, "observer": None}
 
@@ -231,19 +230,17 @@ def draw(doc, view=None):
             sep.addChild(item)
         return sep
 
-    # (Neon Lights: the look's grid colours and brighter axes; Dark and Light as they were)
-    neon = theme.is_neon()
-    minor = theme.neon3d(MINOR_COLOR, "grid_minor")
-    major = theme.neon3d(MAJOR_COLOR, "grid_major")
-    for lines, color in ((minors, minor), (majors, major)):
+    # (Neon Lights: the look's grid colours and brighter axes through the Live colours above,
+    # Dark and Light as they were; a saved preview picture gets the normal ones)
+    for lines, color in ((minors, MINOR_COLOR), (majors, MAJOR_COLOR)):
         if lines:
             inner.addChild(lines_node(lines, color))
     # Fusion's grid: the line along X is red, the one along Y green, a dot at the origin
     x_lo, x_hi, y_lo, y_hi = cx - half, cx + half, cy - half, cy + half
     if y_lo <= 0.0 <= y_hi:
-        inner.addChild(lines_node([(x_lo, 0.0, x_hi, 0.0)], NEON_X if neon else X_COLOR, 2))
+        inner.addChild(lines_node([(x_lo, 0.0, x_hi, 0.0)], X_COLOR, 2))
     if x_lo <= 0.0 <= x_hi:
-        inner.addChild(lines_node([(0.0, y_lo, 0.0, y_hi)], NEON_Y if neon else Y_COLOR, 2))
+        inner.addChild(lines_node([(0.0, y_lo, 0.0, y_hi)], Y_COLOR, 2))
     if x_lo <= 0.0 <= x_hi and y_lo <= 0.0 <= y_hi:
         dot = coin.SoSeparator()
         style = coin.SoDrawStyle()

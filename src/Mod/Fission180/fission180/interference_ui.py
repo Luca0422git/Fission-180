@@ -14,8 +14,9 @@ import FreeCADGui as Gui
 from . import analysis, bodypick, commands, hole_common, log, measure, preview, warn
 from . import ui_icon_path
 from .compat import QtCore, QtWidgets
+from .neon_scene_core import Live
 
-RED = (0.92, 0.20, 0.18)
+RED = Live((0.92, 0.20, 0.18), "cut")
 CONTACT = (0.98, 0.65, 0.20)
 
 

@@ -22,6 +22,7 @@ from . import plastic_lip_core as core
 from .compat import QtCore, QtWidgets
 from .hole_common import SelectionField
 from .taskui import ArrowDragger, DistanceField, Panel, ValueBoxes
+from .neon_scene_core import Live
 
 safe = curve_pick.safe("lip")
 
@@ -39,7 +40,7 @@ FIELDS = [
     ("tip_radius", "mm"),
     ("root_radius", "mm"),
 ]
-EDGE_COLOR = (0.35, 0.75, 1.0)
+EDGE_COLOR = Live((0.35, 0.75, 1.0), "pick_edge")
 
 
 def _rule_here(doc, body=None):

@@ -37,6 +37,7 @@ from . import profile_pick
 from .compat import QtCore, QtGui, QtWidgets
 from .pattern_core import PatternError, default_distance
 from .taskui import ArrowDragger, DistanceField, Panel, ValueBoxes
+from .neon_scene_core import Live
 
 PATTERN_TYPES = [
     ("Faces", "faces"),
@@ -59,8 +60,8 @@ COMPUTE_TIPS = {
 }
 AXES = ("X_Axis", "Y_Axis", "Z_Axis")
 AXIS_COLORS = {key: origin_look.axis_colour(key) for key in AXES}  # X red, Y green, Z blue
-PICKED = (0.12, 0.53, 0.90)
-REF = (1.0, 0.62, 0.15)  # the picked direction / axis, drawn orange over the part
+PICKED = Live((0.12, 0.53, 0.90), "pick")
+REF = Live((1.0, 0.62, 0.15), "rail")  # the picked direction / axis, drawn orange over the part
 OVERLAY_CLICK_S = 0.6  # a click the axis/plane overlay took: the selection it makes is ignored
 LIGHT_NOTE = "Preview: %d %s. Built when you press OK."
 

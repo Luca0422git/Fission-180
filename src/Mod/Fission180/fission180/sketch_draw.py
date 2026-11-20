@@ -279,6 +279,7 @@ class Preview:
         self.parts = {}
         for name, colour, width, pattern in PARTS:
             colour = {"BLUE": sketch_mode.BLUE, "ORANGE": sketch_mode.ORANGE}.get(colour, colour)
+            colour = sketch_mode.look(colour)
             if colour == "GUIDE":
                 colour = sketch_infer.GUIDE_COLOR
             sep = coin.SoSeparator()
@@ -325,7 +326,7 @@ class Preview:
         self.transform.translation.setValue(*placement.Base)
         self.transform.rotation.setValue(*placement.Rotation.Q)
         colour = sketch_mode.ORANGE if sketch_mode.construction_mode() else sketch_mode.BLUE
-        self.parts["curves"][0].rgb.setValue(*_rgb(colour))
+        self.parts["curves"][0].rgb.setValue(*_rgb(sketch_mode.look(colour)))
         given = {
             "curves": curves,
             "construction": construction,

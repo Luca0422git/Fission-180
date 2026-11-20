@@ -19,11 +19,13 @@ green blue of all the rest of the axis and make it smaller. and label them." So:
 Colours and sizes are plain data (unit-tested); the coin nodes are built only on demand.
 """
 
+from .neon_scene_core import Live
+
 AXIS_RGB = {
-    "X": (0.90, 0.28, 0.28),
-    "Y": (0.35, 0.78, 0.35),
-    "Z": (0.30, 0.52, 0.98),
-}
+    "X": Live((0.90, 0.28, 0.28), "axis_x"),
+    "Y": Live((0.35, 0.78, 0.35), "axis_y"),
+    "Z": Live((0.30, 0.52, 0.98), "axis_z"),
+}  # neon X/Y/Z hues in Neon Lights (neon_scene_core.Live: the exact values here otherwise)
 PLANE_NORMAL_AXIS = {"XY": "Z", "XZ": "Y", "YZ": "X"}
 IDLE_TRANSPARENCY = 0.80
 HOVER_TRANSPARENCY = 0.55

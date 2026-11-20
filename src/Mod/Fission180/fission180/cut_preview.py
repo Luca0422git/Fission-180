@@ -11,22 +11,23 @@ nothing can stay behind after OK or Cancel. Mouse clicks go through them (they c
 picked).
 """
 import FreeCADGui as Gui
+from .neon_scene_core import Live
 
 NAME = "Fission180CutPreview"
-RED = (0.95, 0.20, 0.20)
-GLOW = (0.45, 0.05, 0.05)
+RED = Live((0.95, 0.20, 0.20), "cut")
+GLOW = Live((0.45, 0.05, 0.05), "cut_glow")
 TRANSPARENCY = 0.45
-EDGE = (0.85, 0.08, 0.08)
+EDGE = Live((0.85, 0.08, 0.08), "cut_edge")
 # Where the part hides the cut (a hole inside a block), the cut still shows through it, fainter
 # (Luca, 2026-11-09: "when im extruding a cut into an object and the cut is occluded by that
 # object, i should still be able to see the red of the cut through the walls of that object")
 XRAY_NAME = NAME + "XRay"
 XRAY_TRANSPARENCY = 0.78
 HIGHLIGHT_NAME = "Fission180BodyHighlight"
-BLUE = (0.247, 0.663, 0.961)  # theme.ACCENT (#3fa9f5), Fission 180's highlight blue
-BLUE_GLOW = (0.10, 0.28, 0.45)
+BLUE = Live((0.247, 0.663, 0.961), "pick")  # theme.ACCENT (#3fa9f5), Fission 180's highlight blue
+BLUE_GLOW = Live((0.10, 0.28, 0.45), "pick_glow")
 BLUE_TRANSPARENCY = 0.6
-BLUE_EDGE = (0.20, 0.55, 0.90)
+BLUE_EDGE = Live((0.20, 0.55, 0.90), "pick_edge")
 
 
 def _mesh_node(coin, shape, name, color, glow, transparency, edge, shared=None):

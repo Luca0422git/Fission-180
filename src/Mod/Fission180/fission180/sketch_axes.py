@@ -20,9 +20,10 @@ axis_of / colours / shown are plain data (unit-tested); the Coin part is AxisCol
 import math
 
 from . import origin_look, warn
+from .neon_scene_core import Live
 
-FREECAD_H = (0.8, 0.2, 0.2)  # FreeCAD 1.1's DrawingParameters::CrossColorH / CrossColorV
-FREECAD_V = (0.2, 0.8, 0.2)
+FREECAD_H = Live((0.8, 0.2, 0.2), "axis_x")  # FreeCAD 1.1's DrawingParameters::CrossColorH / CrossColorV
+FREECAD_V = Live((0.2, 0.8, 0.2), "axis_y")
 NODE = "Fission180SketchAxes"
 SOURCE = "RootCrossMaterials"
 

@@ -8,12 +8,13 @@ to (a picture only: clicks go through it). No Qt.
 import FreeCAD as App
 
 from . import extrude, profile_pick, warn
+from .neon_scene_core import Live
 
 SNAP_NAME = "Fission180SnapTarget"
-SNAP_COLOR = (0.247, 0.663, 0.961)  # Fission 180's highlight blue (cut_preview.BLUE)
-SNAP_GLOW = (0.12, 0.33, 0.55)
+SNAP_COLOR = Live((0.247, 0.663, 0.961), "pick")  # Fission 180's highlight blue (cut_preview.BLUE)
+SNAP_GLOW = Live((0.12, 0.33, 0.55), "pick_glow")
 SNAP_TRANSPARENCY = 0.35
-SNAP_EDGE = (0.20, 0.55, 0.90)
+SNAP_EDGE = Live((0.20, 0.55, 0.90), "pick_edge")
 NEAR_PIXELS = 6  # hits this close (in depth, at the screen's scale) to the front-most one count
 
 

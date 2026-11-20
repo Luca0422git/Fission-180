@@ -21,10 +21,11 @@ import FreeCADGui as Gui
 from . import sketch_areas_core as core
 from . import warn
 from .compat import QtCore
+from .neon_scene_core import Live
 
-PICKED = (0.12, 0.53, 0.90)  # the picked-profile blue of the Extrude dialog (profile_pick)
+PICKED = Live((0.12, 0.53, 0.90), "pick")  # the picked-profile blue of the Extrude dialog (profile_pick)
 PICKED_TRANSPARENCY = 0.35
-HOVER = (0.55, 0.82, 1.0)
+HOVER = Live((0.55, 0.82, 1.0), "hover")
 HOVER_TRANSPARENCY = 0.55
 CLICK_SLOP = 4  # pixels: a press and a release this close are a click (not a box selection)
 NEAR_PX = 5  # pixels: a click this close to a curve or a point is a click on that curve

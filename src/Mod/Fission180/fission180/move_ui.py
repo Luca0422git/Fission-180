@@ -38,6 +38,7 @@ from . import protractor, taskui, ui_icon_path, warn
 from .bodies_panel import BodyPanel, edit as _edit, start as _start
 from .compat import QtCore, QtWidgets
 from .taskui import BoxCarrier, DistanceField, ValueBoxes
+from .neon_scene_core import Live
 
 MOVE_TYPES = [
     ("Free Move", "free"),
@@ -53,7 +54,7 @@ MOVE_OBJECTS = [("Bodies", "bodies"), ("Components", "components"), ("Faces", "f
 CARRIED = ("move_type",) + move.NUMBERS
 AXES = (App.Vector(1, 0, 0), App.Vector(0, 1, 0), App.Vector(0, 0, 1))
 COLORS = ((0.90, 0.30, 0.30), (0.35, 0.80, 0.35), (0.30, 0.55, 1.0))
-HOVER = (1.0, 0.85, 0.35)
+HOVER = Live((1.0, 0.85, 0.35), "hot")
 OVERLAY_CLICK_S = 0.8
 
 
