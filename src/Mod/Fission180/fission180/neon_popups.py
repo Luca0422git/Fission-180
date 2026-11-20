@@ -23,7 +23,7 @@ OPEN_MS = 120
 SCAN_MS = 200
 GLITCH_MS = 120
 START_HEIGHT = 0.85
-_state = {"filter": None, "animations": {}, "translucent": [], "boxes": []}
+_state = {"filter": None, "animations": {}, "translucent": [], "solid": [], "boxes": []}
 _POPUP_NAMES = ("Fission180Tip", "Fission180ParameterNames")
 
 
@@ -81,12 +81,38 @@ def _is_popup(widget):
     return kind == QtCore.Qt.ToolTip and widget.objectName() in _POPUP_NAMES
 
 
-def _make_see_through(widget):
+SOLID = "fission180Solid"
+
+
+def see_through(widget):
+    """Make a pop-up see-through if the screen can show it; whether it is.
+
+    Qt gives a window an alpha channel only if WA_TranslucentBackground is set before its
+    native window is made: set later (a menu opened in Dark, then Neon Lights switched on) the
+    window has no alpha and a see-through ground shows black. Such a pop-up is marked solid
+    instead (property fission180Solid, which the style sheets turn into a solid ground); it
+    gets its glass at the next start."""
     from .compat import QtCore
 
-    if compositing() and not widget.testAttribute(QtCore.Qt.WA_TranslucentBackground):
+    if not compositing():
+        return False
+    if widget.testAttribute(QtCore.Qt.WA_TranslucentBackground):
+        return True
+    if not widget.testAttribute(QtCore.Qt.WA_WState_Created):
         widget.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         _state["translucent"].append(widget)
+        return True
+    if widget.property(SOLID) is not True:
+        widget.setProperty(SOLID, True)
+        _state["solid"].append(widget)
+        style = widget.style()
+        style.unpolish(widget)
+        style.polish(widget)
+    return False
+
+
+def _make_see_through(widget):
+    see_through(widget)
 
 
 # -- the open animation and the scan line ---------------------------------------------------
@@ -250,8 +276,7 @@ def _style_box(box):
     style = {"question": "info", None: "info"}.get(kind, kind)
     if box.property("fission180Kind") != style:
         box.setProperty("fission180Kind", style)
-        box.style().unpolish(box)
-        box.style().polish(box)
+        _repolish(box)
     if kind is not None:
         sign = _sign(kind)
         if sign is not None and not sign.isNull():
@@ -281,8 +306,35 @@ def _unstyle_box(box):
         )
     if box.property("fission180Kind") is not None:
         box.setProperty("fission180Kind", None)
-        box.style().unpolish(box)
-        box.style().polish(box)
+        _repolish(box)
+
+
+def _repolish(box):
+    """The box and its children styled again: rules such as
+    QMessageBox[fission180Kind="error"] QLabel name the box's kind, and Qt does not polish a
+    child again when only its parent's property changed."""
+    from .compat import QtWidgets
+
+    style = box.style()
+    style.unpolish(box)
+    style.polish(box)
+    for child in box.findChildren(QtWidgets.QWidget):
+        child.style().unpolish(child)
+        child.style().polish(child)
+        child.update()
+
+
+def _forget_box(box):
+    """A message box that closed: its system icon back and no longer kept (if it is shown
+    again, Show names it again)."""
+    if any(box is other for other in _state["boxes"]):
+        _unstyle_box(box)
+    _state["boxes"] = [other for other in _state["boxes"] if other is not box and _alive(other)]
+
+
+def boxes():
+    """How many message boxes are kept for a palette change (tests)."""
+    return len(_state["boxes"])
 
 
 def _glitch_on():
@@ -406,6 +458,10 @@ def _make_filter():
         def eventFilter(self, obj, event):
             try:
                 kind = event.type()
+                if kind == QtCore.QEvent.Hide and isinstance(obj, QtWidgets.QMessageBox):
+                    if not event.spontaneous():
+                        _forget_box(obj)
+                    return False
                 if kind not in (QtCore.QEvent.Polish, QtCore.QEvent.Show) or not obj.isWidgetType():
                     return False
                 if _is_popup(obj):
@@ -428,6 +484,14 @@ def enable():
     if _state["filter"] is None:
         _state["filter"] = _make_filter()
         QtWidgets.QApplication.instance().installEventFilter(_state["filter"])
+    # pop-ups made before Neon Lights was switched on: see-through if their window does not
+    # exist yet, else marked solid (see_through())
+    for widget in QtWidgets.QApplication.allWidgets():
+        try:
+            if _is_popup(widget):
+                see_through(widget)
+        except Exception as exc:
+            warn("Neon Lights: pop-up: %s" % exc)
 
 
 def disable():
@@ -448,6 +512,13 @@ def disable():
         except RuntimeError:
             pass
     _state["boxes"] = []
+    for widget in _state["solid"]:
+        try:
+            if _alive(widget):
+                widget.setProperty(SOLID, None)
+        except RuntimeError:
+            pass
+    _state["solid"] = []
     # Pop-ups made see-through stay so (Qt takes the attribute only before a window is
     # made); Dark and Light paint their whole ground, so it shows nothing there.
     _state["translucent"] = []

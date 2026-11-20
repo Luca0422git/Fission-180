@@ -14,6 +14,11 @@
 4. A warning box has the hazard-stripe header; an error box has the red frame and plays its
    glitch once (none with the Glitch effect off); an information box the primary frame.
 5. Another preset (Johnny): everything follows. Dark again: no trace of neon on any of them.
+6. A text box with its own plain `border` and `border-image: none` keeps it in Neon Lights (the
+   frames never squeeze into it).
+7. Pop-ups first shown in Dark (a menu, a drop-down list, the tooltip card, the names list),
+   then Neon Lights switched on where the screen composites: each has an alpha channel or is
+   marked solid, and none shows a black corner; a menu made after the switch is see-through.
 """
 
 import os
@@ -144,6 +149,28 @@ def build_dialog():
 
 build_dialog.done = lambda: s["dialog"].isVisible() and s["dialog"].isActiveWindow()
 build_dialog.done_what = "the dialog to show as the active window"
+
+
+def own_border():
+    """A widget whose own style sets a plain border and border-image: none keeps that border:
+    no neon frame squeezes into it (the app style's border-image does not reach it)."""
+    edit = QtWidgets.QLineEdit("own border", s["dialog"])
+    edit.setStyleSheet("QLineEdit { border: 1px solid #ff0000; border-image: none; background: #102030; }")
+    edit.setGeometry(4, 4, 140, 26)
+    edit.show()
+    QtWidgets.QApplication.processEvents()
+    image = grab(edit)
+    edge = {QtGui.QColor(image.pixel(x, y)).name() for x, y in ((0, 13), (139, 13), (70, 0), (70, 25))}
+    inside = colours(image, QtCore.QRect(2, 2, 3, 3))
+    h.check("own plain border: drawn, 1 px, red", edge == {"#ff0000"} and edit.contentsRect().left() <= 2, (edge, edit.contentsRect()))
+    h.check("... no frame picture inside it", inside == {"#102030"}, inside)
+    edit.setStyleSheet("QLineEdit { border: 1px solid #ff0000; background: #102030; }")
+    QtWidgets.QApplication.processEvents()
+    image = grab(edit)
+    edge = sorted({QtGui.QColor(image.pixel(x, y)).name() for x, y in ((0, 13), (139, 13), (70, 0), (70, 25))})
+    print("[Fission 180] neon_chrome: own 'border: 1px' WITHOUT border-image: none -> edge %s inside %s"
+          % (edge, sorted(colours(image, QtCore.QRect(2, 2, 3, 3)))), flush=True)
+    edit.deleteLater()
 
 
 def focus_box():
@@ -561,6 +588,11 @@ def warning_checked(key="v", label="v"):
     h.check("%s: the warning's sign is the neon one" % label, box.icon() == QtWidgets.QMessageBox.NoIcon and not box.iconPixmap().isNull())
     h.shot("warning-%s" % label)
     box.close()
+    from fission180 import neon_popups
+
+    h.check("%s: a closed warning gets its system icon back and is not kept" % label,
+            neon_popups.boxes() == 0 and box.icon() == QtWidgets.QMessageBox.Warning,
+            (neon_popups.boxes(), box.icon()))
 
 
 def neon_frames_mix(p):
@@ -596,8 +628,15 @@ def error_checked():
     image = grab(box)
     frame = colours(image, QtCore.QRect(1, box.height() // 2, 2, 4))
     h.check("the error box has a red frame", has_near(frame, neon_frames.error_colour(p), 60), frame)
+    label = box.findChild(QtWidgets.QLabel, "qt_msgbox_label")
+    h.check("(the error colour differs from the text colour)", not near(p["bright"], p["text"], 4), (p["bright"], p["text"]))
+    colour = label.palette().color(label.foregroundRole()).name() if label is not None else None
+    h.check("the error's text is in the bright colour, not the text colour", colour == p["bright"], (colour, p["bright"], p["text"]))
     h.shot("error")
     box.close()
+    from fission180 import neon_popups
+
+    h.check("a closed message box is not kept", neon_popups.boxes() == 0, neon_popups.boxes())
 
 
 def error_no_glitch():
@@ -761,13 +800,175 @@ def dark_checked():
     s["dialog"].close()
 
 
+# -- 7. pop-ups shown in Dark, then Neon Lights where the screen composites ---------------
+def dark_popups():
+    """Shown once in Dark, so their windows exist without an alpha channel."""
+    from fission180 import parameters_complete
+
+    os.environ["XDG_CURRENT_DESKTOP"] = "KDE"
+    d = QtWidgets.QDialog(Gui.getMainWindow())
+    d.setObjectName("NeonChromeEarly")
+    column = QtWidgets.QVBoxLayout(d)
+    s["early_combo"] = QtWidgets.QComboBox()
+    s["early_combo"].addItems(["One side", "Two sides"])
+    s["early_edit"] = QtWidgets.QLineEdit("10 mm")
+    column.addWidget(s["early_combo"])
+    column.addWidget(s["early_edit"])
+    d.resize(300, 120)
+    d.show()
+    s["early"] = d
+    menu = make_menu()
+    menu.setObjectName("NeonChromeEarlyMenu")
+    s["early_menu"] = menu
+    menu.popup(Gui.getMainWindow().mapToGlobal(QtCore.QPoint(300, 200)))
+    s["early_combo"].showPopup()
+    c = _card()
+    c.fill({"label": "Extrude", "key": "E", "summary": "Pull a sketch into a solid.", "note": ""}, False)
+    c.show_at(QtCore.QRect(Gui.getMainWindow().mapToGlobal(QtCore.QPoint(400, 300)), QtCore.QSize(40, 20)), True)
+    parameters_complete._show(s["early_edit"], ["Width", "Height"])
+
+
+dark_popups.done = lambda: _early_shown()
+dark_popups.done_what = "the pop-ups to show in Dark"
+
+
+def _early_windows():
+    return {
+        "menu": s["early_menu"],
+        "drop-down list": s["early_combo"].view().window(),
+        "tooltip card": _card(),
+        "names list": _names_any(),
+    }
+
+
+def _names_any():
+    from fission180 import parameters_complete
+
+    return parameters_complete._state["popup"]  # also while hidden (popup() is None then)
+
+
+def _early_shown():
+    return all(w is not None and w.isVisible() for w in _early_windows().values())
+
+
+def early_to_neon():
+    from fission180 import neon_popups
+
+    windows = _early_windows()
+    for name, widget in windows.items():
+        h.check("Dark: the %s's window exists" % name, widget.testAttribute(QtCore.Qt.WA_WState_Created))
+    s["early_ids"] = {name: id(w) for name, w in windows.items()}
+    s["early_menu"].hide()
+    s["early_combo"].hidePopup()
+    _card().close_card()
+    _names_any().hide()
+    lc.set_look("neon")
+    h.check("a compositing desktop is seen", neon_popups.compositing())
+
+
+early_to_neon.done = lambda: _look_neon()
+early_to_neon.done_what = "the look to be Neon Lights"
+
+
+def _look_neon():
+    from fission180 import neon, theme
+
+    return theme.name() == "neon" and neon.active()
+
+
+def early_again():
+    from fission180 import parameters_complete
+
+    s["early_menu"].popup(Gui.getMainWindow().mapToGlobal(QtCore.QPoint(300, 200)))
+    s["early_combo"].showPopup()
+    c = _card()
+    c.fill({"label": "Extrude", "key": "E", "summary": "Pull a sketch into a solid.", "note": ""}, False)
+    c.show_at(QtCore.QRect(Gui.getMainWindow().mapToGlobal(QtCore.QPoint(400, 300)), QtCore.QSize(40, 20)), True)
+    parameters_complete._show(s["early_edit"], ["Width", "Height"])
+    fresh = make_menu()
+    s["fresh_menu"] = fresh
+    fresh.popup(Gui.getMainWindow().mapToGlobal(QtCore.QPoint(600, 200)))
+
+
+early_again.done = lambda: _early_shown() and s["fresh_menu"].isVisible() and _combo_settled()
+early_again.done_what = "the pop-ups to show again in Neon Lights"
+
+
+def _alpha(widget):
+    handle = widget.windowHandle()
+    return handle.format().alphaBufferSize() if handle is not None else None
+
+
+def early_checked():
+    p = palette_of("v")
+    windows = _early_windows()
+    screen = QtWidgets.QApplication.primaryScreen().grabWindow(0).toImage()
+    for name, widget in windows.items():
+        h.check("the %s is the one shown in Dark" % name, id(widget) == s["early_ids"][name])
+        solid = widget.property("fission180Solid") is True
+        alpha = _alpha(widget)
+        h.check(
+            "Neon after Dark: the %s has an alpha channel or is marked solid" % name,
+            alpha == 8 or (solid and not widget.testAttribute(QtCore.Qt.WA_TranslucentBackground)),
+            (alpha, solid),
+        )
+        top_left = widget.mapToGlobal(QtCore.QPoint(0, 0))
+        seen = QtGui.QColor(screen.pixel(top_left.x(), top_left.y())).name()
+        if alpha != 8:
+            h.check(
+                "... its corner is not black (its ground or its frame)",
+                seen != "#000000" and (near(seen, p["menu"], 16) or near(seen, p["primary"], 90)
+                                       or near(seen, p["secondary"], 90)),
+                seen,
+            )
+        middle = QtGui.QColor(screen.pixel(top_left.x() + widget.width() - 12, top_left.y() + widget.height() // 2)).name()
+        h.check("... its ground is not black", middle != "#000000", middle)
+    h.check(
+        "the tooltip card's own style has a solid ground",
+        ("background: %s;" % p["menu"]) in _card().styleSheet(),
+        _card().styleSheet()[:120],
+    )
+    h.check(
+        "the names list's own style has a solid ground",
+        ("background: %s;" % p["menu"]) in _names_any().styleSheet(),
+        _names_any().styleSheet()[:120],
+    )
+    fresh = s["fresh_menu"]
+    h.check(
+        "a menu made in Neon Lights is see-through with an alpha channel",
+        fresh.testAttribute(QtCore.Qt.WA_TranslucentBackground) and _alpha(fresh) == 8
+        and fresh.property("fission180Solid") is None,
+        (_alpha(fresh), fresh.property("fission180Solid")),
+    )
+    h.shot("early-popups")
+    for widget in (s["early_menu"], fresh):
+        widget.hide()
+    s["early_combo"].hidePopup()
+    _card().close_card()
+    _names_any().hide()
+    s["early"].close()
+    os.environ.pop("XDG_CURRENT_DESKTOP", None)
+    lc.set_look("dark")
+
+
+early_checked.done = lambda: _dark()
+early_checked.done_what = "the look to be Dark again"
+
+
+def early_dark():
+    from fission180 import neon_popups
+
+    h.check("Dark: no pop-up is left marked solid", s["early_menu"].property("fission180Solid") is None)
+    h.check("... no pop-up is animating", neon_popups.animating() == 0)
+
+
 h.run(
     "neon_chrome",
-    [setup, build_dialog, focus_box, widgets_are_neon, menu_opens, menu_opened, see_through_menu, glass_checked,
+    [setup, build_dialog, own_border, focus_box, widgets_are_neon, menu_opens, menu_opened, see_through_menu, glass_checked,
      opaque_forced, opaque_checked, ribbon_drop_down, combo_list, combo_checked, tooltip, tooltip_checked,
      card, card_checked, names_list, names_checked, warning_box, warning_checked, error_box,
      error_checked, error_no_glitch, info_box, info_checked, johnny, johnny_focus, johnny_widgets, johnny_menu,
      johnny_menu_checked, johnny_warning, johnny_warning_checked, johnny_card, johnny_card_checked,
-     to_dark, dark_checked],
+     to_dark, dark_checked, dark_popups, early_to_neon, early_again, early_checked, early_dark],
     paced_by="state",
 )

@@ -12,6 +12,10 @@ Sizes: paddings plus frame borders stay within a pixel or two of Dark's, so a di
 for Dark has room for its text in Neon Lights too (scenario neon_sizes checks it)."""
 
 
+# The font of a tab's text (QTabBar::tab below; scenario neon_sizes measures tabs with it).
+TAB_FONT = {"uppercase": True, "letter_spacing": 1}
+
+
 def border(frames, piece):
     """A nine-slice border-image rule for `piece` (neon_frames)."""
     from . import neon_frames
@@ -85,12 +89,18 @@ def qss(p, frames, fonts, translucent):
         line_soft=rgba(p["primary"], 0.35),
         segment=rgba(p["primary"], segment_strength(p)),
         default_text=neon_frames.on_colour(p, neon_frames.default_fill(p)),
+        tab_font="%sletter-spacing: %spx;" % (
+            "text-transform: uppercase; " if TAB_FONT["uppercase"] else "", TAB_FONT["letter_spacing"]
+        ),
     )
     return """
 /* -- Neon Lights: Qt's widgets ------------------------------------------------------------ */
 QMainWindow, QMainWindow > QWidget {{ background: {chrome}; color: {text}; }}
 QWidget {{ color: {text}; selection-background-color: {primary}; selection-color: {background}; }}
 QToolTip {{ background: {tip_ground}; color: {text}; padding: 2px 6px 3px 6px; {tip_frame} }}
+/* a pop-up whose window was made before Neon Lights was on has no alpha channel: solid
+   (neon_popups.see_through marks it) */
+QToolTip[fission180Solid="true"] {{ background: {menu}; }}
 
 QMenuBar {{ background: {chrome}; color: {text}; }}
 QMenuBar::item {{ background: transparent; padding: 3px 8px; }}
@@ -101,6 +111,7 @@ QMenu {{ background: {menu_ground}; color: {text}; padding: 1px 0px; {menu_frame
 /* a menu made with the main window as its parent also matches "QMainWindow > QWidget" above,
    which would give it a solid ground (no glass); this one comes later and wins */
 QMainWindow > QMenu {{ background: {menu_ground}; }}
+QMenu[fission180Solid="true"], QMainWindow > QMenu[fission180Solid="true"] {{ background: {menu}; }}
 QMenu::item {{ padding: 4px 26px 4px 8px; border-width: 0px 0px 0px 4px; border-style: solid;
     border-color: transparent; background: transparent; }}
 QMenu::item:selected {{ color: {primary_hot}; {menu_item_frame} }}
@@ -131,7 +142,7 @@ QTableCornerButton::section {{ background: {header}; border: none; }}
 /* no frame (FreeCAD's overlay docks are tab widgets that size themselves from it) */
 QTabWidget::pane {{ border: none; }}
 QTabBar::tab {{ background: {chrome}; color: {text_dim}; padding: 6px 14px; border: none;
-    text-transform: uppercase; letter-spacing: 1px; }}
+    {tab_font} }}
 QTabBar::tab:selected {{ color: {primary_hot}; {tab_active_frame} }}
 QTabBar::tab:hover {{ color: {text}; }}
 
