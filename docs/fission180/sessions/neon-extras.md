@@ -241,8 +241,8 @@ No other builder's file was changed (home_ui is left to `panels`, see above).
 
 ## neon_switch on the base commit
 
-`neon_switch` run on the unchanged `sf/neon-lights` commit (a419cafa), alone, several times:
-PASS each time so far (3 of 3). On this branch, run alone: PASS 2 of 2. The one FLAKY result
-came from a combined `--scenario look_unchanged,neon_switch` run. I found no way for B9's code
-to cause it (nothing of B9 runs in that scenario), but a Dark pixel difference of about 1% is
-worth the orchestrator watching at the merge.
+`neon_switch` run alone 4 times on the unchanged `sf/neon-lights` commit (a419cafa), without
+any B9 code: PASS, PASS, PASS, then **FLAKY** (failed, then passed in the fresh-profile retry).
+So its occasional failure (the Dark pictures differing by about 1%) is already on the base and
+does not come from this branch. On this branch: 2 of 3 runs PASS, 1 FLAKY, the same pattern.
+It is a race in `neon_switch` (or in what it checks) for the orchestrator to look at.
