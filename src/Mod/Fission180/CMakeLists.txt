@@ -32,6 +32,8 @@ FILE(GLOB Fission180_TipPictures RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_
 
 # Neon Lights (docs/fission180/neon-lights-design.md): its fonts with their licences (SIL OFL),
 # and the pictures that prove Dark and Light look as before (look_unchanged scenario).
+FILE(GLOB Fission180_NeonIcons RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
+    fission180/icons/neon/*.svg)
 FILE(GLOB Fission180_Fonts RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
     fission180/fonts/*.ttf fission180/fonts/*.txt)
 FILE(GLOB Fission180_LookBaseline RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
@@ -57,7 +59,7 @@ FILE(GLOB_RECURSE Fission180_Examples RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFI
 
 SET(Fission180_ALL ${Fission180_Init} ${Fission180_Package} ${Fission180_Icons} ${Fission180_UiIcons}
     ${Fission180_TipPictures} ${Fission180_Docs} ${Fission180_Examples} ${Fission180_Tests} ${Fission180_Fixtures}
-    ${Fission180_Fonts} ${Fission180_LookBaseline})
+    ${Fission180_Fonts} ${Fission180_LookBaseline} ${Fission180_NeonIcons})
 
 ADD_CUSTOM_TARGET(Fission180 ALL SOURCES ${Fission180_ALL})
 
@@ -71,6 +73,7 @@ INSTALL(DIRECTORY fission180 DESTINATION Mod/Fission180
 INSTALL(FILES ${Fission180_Icons} DESTINATION Mod/Fission180/fission180/icons)
 INSTALL(FILES ${Fission180_UiIcons} DESTINATION Mod/Fission180/fission180/icons/ui)
 INSTALL(FILES ${Fission180_Fonts} DESTINATION Mod/Fission180/fission180/fonts)
+INSTALL(FILES ${Fission180_NeonIcons} DESTINATION Mod/Fission180/fission180/icons/neon)
 INSTALL(FILES ${Fission180_LookBaseline} DESTINATION Mod/Fission180/Fission180Tests/fixtures/look_baseline)
 if(Fission180_TipPictures)  # (none until the content builders have made them)
     INSTALL(FILES ${Fission180_TipPictures} DESTINATION Mod/Fission180/fission180/icons/tips)
