@@ -183,18 +183,19 @@ class Banner(QtWidgets.QWidget):
             for dx, dy, a in ((0, 0, 70), (1.5, 0, 40), (-1.5, 0, 40), (0, 1.5, 40)):
                 painter.setPen(_c(p["primary"], a))
                 painter.drawText(text_rect.translated(dx, dy), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, "Neon Lights")
-            painter.setPen(_c(p["primary_hot"]))
+            ink = core.inks(p)
+            painter.setPen(_c(ink["primary_hot_ink"]))
             painter.drawText(text_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, "Neon Lights")
             small = _display_font(7.5, bold=False)
             painter.setFont(small)
-            painter.setPen(_c(p["secondary"]))
+            painter.setPen(_c(ink["secondary_ink"]))
             painter.drawText(
                 r.adjusted(18, 0, -20, -7), QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom,
                 "// colours: " + self.subtitle,
             )
             stripes = QtCore.QRectF(r.right() - 120, r.top() + 10, 86, 8)
             _hazard(painter, stripes, p["alert"], p["background"])
-            painter.setPen(_c(p["text_dim"]))
+            painter.setPen(_c(ink["text_dim_ink"]))
             painter.setFont(_display_font(6.5, bold=False))
             painter.drawText(
                 QtCore.QRectF(r.right() - 140, r.top() + 20, 126, 14),
@@ -235,7 +236,7 @@ class HudBox(QtWidgets.QFrame):
             metrics = QtGui.QFontMetricsF(font)
             title = self.title.upper()
             x, y = r.left() + 16, r.top() + 9
-            painter.setPen(_c(p["primary"]))
+            painter.setPen(_c(core.inks(p)["primary_ink"]))
             painter.drawText(QtCore.QPointF(x, y + metrics.ascent()), title)
             end = x + metrics.horizontalAdvance(title) + 10
             mid = y + metrics.height() / 2.0
@@ -499,29 +500,32 @@ def _qss(p):
         pass
     display = display or body
     font = ("font-family: '%s';" % display) if display else ""
+    ink = core.inks(p)  # (coloured words kept readable, whatever colours are chosen)
     return """
 #Fission180NeonPage QLabel {{ color: {text}; background: transparent; }}
-#Fission180NeonPage QLabel[neonRole="caption"] {{ color: {text_dim}; }}
+#Fission180NeonPage QLabel[neonRole="caption"] {{ color: {text_dim_ink}; }}
 #Fission180NeonPage QLabel[neonRole="row"] {{ color: {text}; {font} font-weight: bold; }}
-#Fission180NeonPage QLabel[neonRole="value"] {{ color: {secondary}; {font} min-width: 34px; }}
-#Fission180NeonPage QLabel[neonRole="message"] {{ color: {alert}; font-weight: bold; }}
-#Fission180NeonPage QLabel[neonRole="note"] {{ color: {secondary}; }}
+#Fission180NeonPage QLabel[neonRole="value"] {{ color: {secondary_ink}; {font} min-width: 34px; }}
+#Fission180NeonPage QLabel[neonRole="message"] {{ color: {alert_ink}; font-weight: bold; }}
+#Fission180NeonPage QLabel[neonRole="note"] {{ color: {secondary_ink}; }}
 #Fission180NeonPage QLineEdit {{ background: {field}; color: {text}; border: 1px solid {line};
-    border-radius: 0px; padding: 3px 6px; font-family: monospace; selection-background-color: {active}; }}
-#Fission180NeonPage QLineEdit:focus {{ border: 1px solid {primary}; }}
-#Fission180NeonPage QLineEdit[invalid="true"] {{ border: 1px solid {alert}; color: {alert}; }}
+    border-image: none; border-radius: 0px; padding: 3px 6px; font-family: monospace; selection-background-color: {active}; }}
+#Fission180NeonPage QLineEdit:focus {{ border: 1px solid {primary}; border-image: none; }}
+#Fission180NeonPage QLineEdit[invalid="true"] {{ border: 1px solid {alert_field_ink}; border-image: none;
+    color: {alert_field_ink}; }}
 #Fission180NeonPage QPushButton[neonRole="action"] {{ background: {button}; color: {text};
-    border: 1px solid {line}; border-radius: 0px; padding: 5px 14px; {font} }}
+    border: 1px solid {line}; border-image: none; border-radius: 0px; padding: 5px 14px; {font} }}
 #Fission180NeonPage QPushButton[neonRole="action"]:hover {{ border-color: {secondary};
-    color: {secondary_hot}; background: {hover}; }}
-#Fission180NeonPage QPushButton[neonRole="action"]:pressed {{ background: {active}; }}
-#Fission180NeonPage QPushButton[neonRole="action"]:disabled {{ color: {disabled}; border-color: {chrome}; }}
-#Fission180NeonPage QPushButton[neonRole="more"] {{ background: transparent; color: {secondary};
-    border: none; padding: 2px 0px; text-align: left; {font} }}
+    border-image: none; color: {secondary_hover_ink}; background: {hover}; }}
+#Fission180NeonPage QPushButton[neonRole="action"]:pressed {{ background: {active}; border-image: none; }}
+#Fission180NeonPage QPushButton[neonRole="action"]:disabled {{ color: {disabled}; border-color: {chrome};
+    border-image: none; }}
+#Fission180NeonPage QPushButton[neonRole="more"] {{ background: transparent; color: {secondary_ink};
+    border: none; border-image: none; padding: 2px 0px; text-align: left; {font} }}
 #Fission180NeonPage QListWidget {{ background: {field}; color: {text}; border: 1px solid {line};
-    border-radius: 0px; outline: none; }}
+    border-image: none; border-radius: 0px; outline: none; }}
 #Fission180NeonPage QListWidget::item {{ padding: 4px 8px; }}
-#Fission180NeonPage QListWidget::item:selected {{ background: {active}; color: {primary_hot};
+#Fission180NeonPage QListWidget::item:selected {{ background: {active}; color: {primary_list_ink};
     border-left: 3px solid {primary}; }}
 #Fission180NeonPage QListWidget::item:hover {{ background: {hover}; }}
 #Fission180NeonPage QCheckBox {{ color: {text}; spacing: 8px; background: transparent; }}
@@ -536,7 +540,7 @@ def _qss(p):
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {line}, stop:0.42 {line},
     stop:0.43 {field}, stop:1 {field}); }}
 #Fission180NeonPage QCheckBox::indicator:disabled {{ border-color: {chrome}; }}
-""".format(font=font, **p)
+""".format(font=font, **dict(p, **ink))
 
 
 class NeonPage(QtWidgets.QWidget):
@@ -556,6 +560,8 @@ class NeonPage(QtWidgets.QWidget):
         self._timer.setInterval(120)
         self._timer.timeout.connect(_safely(self._apply_colours))
         self.snapshot = _snapshot()
+        self.look = theme.current()  # the look the window opened with (Cancel comes back to it)
+        self._syncs = 0
 
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -672,6 +678,20 @@ class NeonPage(QtWidgets.QWidget):
         for button in (self.save_button, self.rename_button, self.delete_button):
             row.addWidget(button)
         box.body.addLayout(row)
+        self.confirm = QtWidgets.QWidget()
+        self.confirm.setObjectName("Fission180NeonConfirm")
+        ask = QtWidgets.QHBoxLayout(self.confirm)
+        ask.setContentsMargins(0, 0, 0, 0)
+        self.confirm_text = _caption("", "Fission180NeonConfirmText")
+        self.confirm_text.setProperty("neonRole", "message")
+        ask.addWidget(self.confirm_text, 1)
+        self.confirm_yes = self._action("Yes", "Fission180NeonConfirmYes", lambda: self._ask_done(True))
+        self.confirm_no = self._action("Keep it", "Fission180NeonConfirmNo", lambda: self._ask_done(False))
+        ask.addWidget(self.confirm_yes)
+        ask.addWidget(self.confirm_no)
+        self.confirm.setVisible(False)
+        self._pending = None
+        box.body.addWidget(self.confirm)
         self.set_message = _caption("", "Fission180NeonSetMessage")
         self.set_message.setProperty("neonRole", "message")
         self.set_message.setVisible(False)
@@ -785,6 +805,7 @@ class NeonPage(QtWidgets.QWidget):
     # -- showing ------------------------------------------------------------------------------
     def sync(self):
         """The page for the look in use, with the stored values."""
+        self._syncs += 1
         neon = theme.is_neon()
         self.off_page.setVisible(not neon)
         self.on_page.setVisible(neon)
@@ -897,9 +918,11 @@ class NeonPage(QtWidgets.QWidget):
         """The whole window in the stored colours (theme.refresh_neon); the page follows
         through theme_changed()."""
         self._timer.stop()
+        before = self._syncs
         if theme.is_neon():
-            theme.refresh_neon()
-        self.sync()
+            theme.refresh_neon()  # (theme_changed() brings this page up to date)
+        if self._syncs == before:
+            self.sync()
 
     def _typed(self, role, text):
         colour, why = core.parse_hex(text)
@@ -932,6 +955,7 @@ class NeonPage(QtWidgets.QWidget):
         start = neon_palette.roles(neon_settings.get("Preset"), before)[role]
         picker = QtWidgets.QColorDialog(QtGui.QColor(start), self)
         picker.setObjectName("Fission180NeonPicker")
+        picker.setAttribute(QtCore.Qt.WA_DeleteOnClose)  # (one per click: gone when closed)
         picker.setOption(QtWidgets.QColorDialog.DontUseNativeDialog, True)
         picker.setWindowTitle("%s colour" % dict((r, l) for r, l, _t in core.COLOUR_ROWS + core.MORE_ROWS)[role])
         picker.currentColorChanged.connect(_safely(lambda c, r=role: self.set_colour(r, c.name())))
@@ -958,11 +982,36 @@ class NeonPage(QtWidgets.QWidget):
         self.set_message.setText(("⚠ " + text) if text else "")
         self.set_message.setVisible(bool(text))
 
+    def _ask(self, text, yes, action):
+        """A question in the page (a saved set would be lost): `action` runs on Yes only."""
+        self._pending = action
+        self.confirm_text.setText("⚠ " + text)
+        self.confirm_yes.setText(yes)
+        self.confirm.setVisible(True)
+
+    def _ask_done(self, yes):
+        action, self._pending = self._pending, None
+        self.confirm.setVisible(False)
+        if yes and action is not None:
+            action()
+
+    def asking(self):
+        """The question shown in the page, or "" (tests)."""
+        return self.confirm_text.text() if not self.confirm.isHidden() else ""
+
     def save_set(self):
         name = self.set_name.text().strip()
         if not name:
             self._say("Type a name for your colours first.")
             return
+        if neon_settings.has_set(name):
+            self._say("")
+            self._ask("A colour set called %s exists already. Replace its colours with the ones in use?" % name,
+                      "Replace", lambda: self._save(name))
+            return
+        self._save(name)
+
+    def _save(self, name):
         neon_settings.save_set(name)
         self.set_name.clear()
         self._say("")
@@ -985,9 +1034,14 @@ class NeonPage(QtWidgets.QWidget):
         if not name:
             self._say("Choose the colour set to delete.")
             return
-        neon_settings.delete_set(name)
         self._say("")
+        self._ask("Delete the colour set %s? This cannot be undone." % name, "Delete",
+                  lambda: self._delete(name))
+
+    def _delete(self, name):
+        neon_settings.delete_set(name)
         self._fill_sets()
+        log("Neon Lights: colour set %s deleted" % name)
 
     def _set_clicked(self, item):
         if item is None:
@@ -1018,27 +1072,34 @@ class NeonPage(QtWidgets.QWidget):
         if dialog is not None and "theme" in getattr(dialog, "widgets", {}):
             dialog.set_widget("theme", "neon")
             dialog.loaded["theme"] = "neon"
-        self.snapshot = _snapshot()
         self.sync()
 
     # -- OK / Cancel ------------------------------------------------------------------------
     def commit(self):
         """OK or Apply: the settings in use are the ones Cancel comes back to."""
         self._close_picker(QtWidgets.QDialog.Accepted)
+        self._ask_done(False)
         if self._timer.isActive():
             self._apply_colours()
         self.snapshot = _snapshot()
+        self.look = theme.current()
+        neon_settings.prune_unused()
 
     def revert(self):
         """Cancel: the Neon Lights settings the window opened with, on screen again."""
         self._close_picker(QtWidgets.QDialog.Rejected)
+        self._ask_done(False)
         self._timer.stop()
-        if _snapshot() == self.snapshot:
-            return
-        _restore(self.snapshot)
-        if theme.is_neon():
-            theme.refresh_neon()
-        log("Neon Lights: settings put back (Cancel)")
+        look_back = theme.current() != self.look  # "Switch to Neon Lights" pressed here
+        if _snapshot() != self.snapshot:
+            _restore(self.snapshot)
+            if theme.is_neon() and not look_back:
+                theme.refresh_neon()
+            log("Neon Lights: settings put back (Cancel)")
+        if look_back:
+            theme.set_theme(self.look)
+            log("Neon Lights: look put back to %s (Cancel)" % self.look)
+        neon_settings.prune_unused()
 
     def _close_picker(self, result):
         picker, self._picker = self._picker, None
@@ -1126,7 +1187,8 @@ def theme_changed():
     """theme.LISTENERS: a look or colour change made anywhere shows on the open pages."""
     for page in pages():
         try:
-            if page.isVisible() or page.showing() != theme.is_neon():
+            # (a page whose window is closed is brought up to date when it shows again)
+            if page.isVisible():
                 page.sync()
         except Exception as exc:
             warn("Neon Lights settings: %s" % exc)

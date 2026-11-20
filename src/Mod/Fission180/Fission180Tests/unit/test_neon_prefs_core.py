@@ -94,6 +94,47 @@ class Readable(unittest.TestCase):
         r["text"] = r["background"]
         self.assertTrue(core.lifted(r))
 
+    def test_white_text_is_not_called_faint(self):
+        """derive() nudges colours to keep them unique (#ffffff comes back #fbfafa): no note."""
+        for key in neon_palette.ORDER:
+            r = neon_palette.roles(key, {"text": "#ffffff"})
+            self.assertFalse(core.lifted(r), key)
+            r = neon_palette.roles(key, {"text": "#FFFFFF"})
+            self.assertFalse(core.lifted(r), key)
+
+    def test_faint_text_is_called_faint(self):
+        r = neon_palette.roles("v", {"text": "#333333", "background": "#000000"})
+        self.assertTrue(core.lifted(r))
+
+
+class Inks(unittest.TestCase):
+    """Review Focus: the page's coloured words stay readable whatever colours are chosen."""
+
+    EXTREMES = (
+        {"alert": "#1a0a10"},
+        {"secondary": "#000000"},
+        {"primary": "#000000", "secondary": "#000000", "alert": "#000000"},
+        {"background": "#ffffff", "primary": "#ffffff", "secondary": "#ffffff", "alert": "#ffffff", "text": "#ffffff"},
+        {"background": "#ffff00", "secondary": "#ffff00", "alert": "#ffff00"},
+    )
+
+    def test_every_ink_readable_on_its_ground(self):
+        for preset in neon_palette.ORDER:
+            for custom in ({},) + self.EXTREMES:
+                p = neon_palette.derive(neon_palette.roles(preset, custom))
+                inks = core.inks(p)
+                self.assertEqual(sorted(inks), sorted(k for k, _c, _g in core.INKS))
+                for key, _colour, ground in core.INKS:
+                    self.assertGreaterEqual(
+                        neon_palette.contrast(inks[key], p[ground]), 4.5, (preset, custom, key, inks[key])
+                    )
+
+    def test_readable_colours_are_kept(self):
+        p = neon_palette.derive(neon_palette.roles("v"))
+        inks = core.inks(p)
+        if neon_palette.contrast(p["secondary"], p["chrome"]) >= 4.5:
+            self.assertEqual(inks["secondary_ink"], p["secondary"])
+
 
 if __name__ == "__main__":
     unittest.main()
