@@ -4,6 +4,7 @@
 and Light look exactly as before (neon-lights-design.md 6.11). FISSION180_RECORD_LOOK=1
 records instead."""
 
+import contextlib
 import os
 
 import FreeCAD as App
@@ -63,8 +64,31 @@ def compare(name, image):
     h.check("%s looks as before" % name, share <= SHARE, "%.4f%% of pixels differ" % (share * 100))
 
 
+@contextlib.contextmanager
+def no_effects():
+    """Neon Lights' screen effects (scan lines, corner shade, glow) hidden while a test samples
+    colours from the window's or a 3D view's picture; nothing else changes (no setting, no
+    repaint of the window). Outside Neon Lights it does nothing."""
+    try:
+        from fission180 import neon_effects
+    except Exception:
+        neon_effects = None
+    if neon_effects is None or (neon_effects.overlay() is None and not neon_effects.view_parts()):
+        yield
+        return
+    with neon_effects.hidden_for_sampling():
+        yield
+
+
+def grab(widget, rect=None):
+    """widget.grab() (of `rect`) as a person sees the widget, without the screen effects: use it
+    for the main window and the 3D view when a check samples colours."""
+    with no_effects():
+        return widget.grab() if rect is None else widget.grab(rect)
+
+
 def window_image():
-    return Gui.getMainWindow().grab().toImage()
+    return grab(Gui.getMainWindow()).toImage()
 
 
 def set_look(name):

@@ -49,7 +49,7 @@ def seen(widget, points):
         image = widget.grab().toImage()
         return [QtGui.QColor(image.pixel(x, y)).name() for x, y in points]
     main = Gui.getMainWindow()
-    image = main.grab().toImage()
+    image = lc.grab(main).toImage()
     out = []
     for x, y in points:
         spot = widget.mapTo(main, QtCore.QPoint(x, y))
@@ -64,7 +64,7 @@ def picture(widget, own=False):
         return widget.grab().toImage()
     main = Gui.getMainWindow()
     top_left = widget.mapTo(main, QtCore.QPoint(0, 0))
-    return main.grab(QtCore.QRect(top_left, widget.size())).toImage()
+    return lc.grab(main, QtCore.QRect(top_left, widget.size())).toImage()
 
 
 def same_as_dark(name, widget, own=False):

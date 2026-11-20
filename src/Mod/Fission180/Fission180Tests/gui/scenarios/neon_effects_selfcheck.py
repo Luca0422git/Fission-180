@@ -2,9 +2,10 @@
 """Fission 180 > Diagnostics > Neon self-check (neon-lights-design.md 6.13, plan task B8).
 
 In Neon Lights, the Diagnostics window's "Neon self-check" button orbits a sample part of about
-3,000 faces with the effects off, on, and with Hologram, measures the idle CPU, and puts a report
-in the window to copy: frame times, idle CPU, the rim-light shader's self-test, the failed Neon
-parts and the platform/graphics card. The designs open before stay as they were, and so do the
+3,000 faces with the effects off, on, with Sounds and with Hologram (in turns of 20 frames),
+measures the idle CPU, and puts a report in the window to copy: processor and clock time per
+frame, the effects layer's paints, a verdict in plain words, idle CPU, the rim-light shader's
+self-test, the failed Neon parts and the platform/graphics card. The designs open before stay as they were, and so do the
 effect and Hologram settings. The sandbox draws in software, so its numbers are printed only;
 the speed budget is judged on Luca's machines.
 """
@@ -74,8 +75,14 @@ def report():
         "Sample part: 3000 faces",
         "effects off",
         "every effect on",
+        "effects + Sounds on",
+        "+ the rolling band",
+        "The rolling band (Settings > Neon Lights > Moving scan band",
         "effects + Hologram on",
-        "Effects add",
+        "Effects over the 3D view: skipped",
+        "3D-view part forced on",
+        "Processor time per frame against effects off",
+        "VERDICT: the effects",
         "Idle CPU",
         "Rim-light shader self-test:",
         "Neon parts switched off: none",
@@ -84,7 +91,23 @@ def report():
     ):
         h.check("the report says %r" % needle, needle in text, text[-400:])
     h.check("the graphics card is named", "Graphics: unknown" not in text, text)
-    h.check("the report has 120-frame runs", text.count("(120 frames)") == 3, text.count("(120 frames)"))
+    h.check("the report has 120-frame runs (off, on, band, Sounds, Hologram, 3D-view part forced)",
+            text.count("(120 frames)") == 6, text.count("(120 frames)"))
+    import re
+
+    on = [line for line in text.splitlines()
+          if line.strip().startswith(("every effect on", "+ the rolling band", "effects + Sounds on"))
+          and "frames)" in line]
+    extra = []
+    for line in on:
+        paints = re.search(r"layer (\d+) paints", line)
+        band = re.search(r"rolling band (\d+) frames", line)
+        if paints:
+            extra.append(int(paints.group(1)) - (int(band.group(1)) if band else 0))
+    # (at most one repaint per block of 20 frames: the one that shows the effects switched on)
+    h.check("orbiting never repaints the layer, except for the rolling band's own frames",
+            len(extra) == 3 and all(e <= 6 for e in extra), on)
+    h.check("Sounds are as set again", not neon_settings.get("Sounds"))
     h.check("the sample design is closed", sorted(App.listDocuments()) == s["docs"], App.listDocuments())
     h.check("the design is active again", App.ActiveDocument and App.ActiveDocument.Name == "LookUnchanged")
     h.check("Hologram is off again", not neon_settings.get("Hologram"))
