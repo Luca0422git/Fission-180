@@ -37,6 +37,47 @@ class Boot(unittest.TestCase):
             self.assertEqual(line, line.upper())
 
 
+class BootOnlyAtStart(unittest.TestCase):
+    """The boot screen is for Fission 180 starting in Neon Lights, not for a switch to it
+    during the run (theme.set_theme marks that)."""
+
+    def setUp(self):
+        from fission180 import theme
+
+        self.theme = theme
+        self.saved = (dict(theme._state), dict(neon_boot._state), os.environ.get("FISSION180_SCENARIO_FILE"))
+        os.environ["FISSION180_SCENARIO_FILE"] = "unit"  # enable() never starts it here
+
+    def tearDown(self):
+        self.theme._state.clear()
+        self.theme._state.update(self.saved[0])
+        neon_boot._state.clear()
+        neon_boot._state.update(self.saved[1])
+        if self.saved[2] is None:
+            os.environ.pop("FISSION180_SCENARIO_FILE", None)
+        else:
+            os.environ["FISSION180_SCENARIO_FILE"] = self.saved[2]
+
+    def test_switched_in_during_the_run_means_no_boot_screen(self):
+        self.theme._state.pop("switched", None)
+        neon_boot._state["shown"] = False
+        self.assertFalse(neon_boot._switched_in())
+        neon_boot.enable()
+        self.assertFalse(neon_boot._state["shown"], "started in Neon Lights: still to come")
+        self.theme._state["switched"] = True
+        self.assertTrue(neon_boot._switched_in())
+        neon_boot.enable()
+        self.assertTrue(neon_boot._state["shown"], "switched to it: never this run")
+        neon_boot.disable()
+
+    def test_set_theme_marks_the_switch(self):
+        import inspect
+
+        source = inspect.getsource(self.theme.set_theme)
+        self.assertIn('_state["switched"] = True', source)
+        self.assertNotIn("switched", inspect.getsource(self.theme.apply), "the start is not a switch")
+
+
 class Home(unittest.TestCase):
     def test_rows_are_in_perspective_and_move_toward_the_viewer(self):
         a = neon_home.rows(0.0)
@@ -48,7 +89,42 @@ class Home(unittest.TestCase):
         self.assertEqual(neon_home.rows(1.0), neon_home.rows(0.0), "it loops seamlessly")
 
     def test_frame_rate_is_capped(self):
-        self.assertLessEqual(neon_home.FPS, 30)
+        self.assertLessEqual(neon_home.FPS, 12, "about 2% of a core at most (design 6.13)")
+
+    def test_frame_cap_holds_whatever_the_timer_does(self):
+        # a timer that fires every millisecond for 10 s (or early, or twice in a row)
+        for step in (1, 7, 40, 83):
+            last, frames = None, 0
+            for now in range(0, 10000, step):
+                if neon_home.due(last, now):
+                    last, frames = now, frames + 1
+            self.assertLessEqual(frames / 10.0, neon_home.FPS + 1, step)
+        self.assertTrue(neon_home.due(None, 0))
+        self.assertTrue(neon_home.due(0, 1000.0 / neon_home.FPS), "a timer on time is never skipped")
+
+    def test_drop_bands_cover_each_character_once(self):
+        for length in range(1, 20):
+            seen = []
+            for k0, k1, alpha in neon_home._bands(length):
+                self.assertTrue(0 < alpha <= 255)
+                seen.extend(range(k0, k1 + 1))
+            self.assertEqual(seen, list(range(length)))
+
+    def test_follow_all_never_raises(self):
+        class Broken:
+            def follow(self):
+                raise ValueError("a broken backdrop")
+
+        saved = dict(neon_home._state)
+        try:
+            neon_home._state["backdrops"] = {1: Broken()}
+            neon_home._state["pages"] = []
+            neon_home.follow_all()  # logs a [Fission 180] warning, never raises
+            neon_home._state["pages"] = None  # even its own bookkeeping going wrong
+            neon_home.follow_all()
+        finally:
+            neon_home._state.clear()
+            neon_home._state.update(saved)
 
 
 class Sound(unittest.TestCase):
@@ -114,6 +190,105 @@ class Sound(unittest.TestCase):
         for proc in neon_sound._state["procs"]:
             proc.kill()
             proc.wait()
+
+    def test_qt_failing_falls_back_to_the_next_way(self):
+        """A way that fails while playing (Qt Multimedia's module missing a piece, a player
+        gone) gives the sound to the next way, and is skipped from then on."""
+        import types
+
+        class Effect:
+            def __init__(self):
+                raise RuntimeError("no Qt Multimedia backend")
+
+        broken = types.ModuleType("fakeqt.QtMultimedia")
+        broken.QSoundEffect = Effect
+
+        def qt_probe():
+            neon_sound._state["qt"] = broken
+            return ("qt", "")
+
+        true = "/bin/true" if os.path.exists("/bin/true") else sys.executable
+        neon_sound.BACKENDS = (qt_probe, lambda: None, lambda: ("cmd", true))
+        self.assertEqual(neon_sound.play("click", force=True), "cmd", "the click still plays")
+        self.assertEqual(neon_sound.backend(), ("cmd", true))
+        self.assertIn(("qt", ""), neon_sound._state["failed"])
+        neon_sound._state["last"] = {}
+        self.assertEqual(neon_sound.play("menu", force=True), "cmd", "and every sound after")
+        self.assertEqual([k for _n, k in neon_sound.played()][-2:], ["cmd", "cmd"])
+        for proc in neon_sound._state["procs"]:
+            proc.wait()
+
+    def test_qt_plays_with_the_module_the_probe_found(self):
+        import types
+
+        made = []
+
+        class Url:
+            @staticmethod
+            def fromLocalFile(path):  # noqa: N802
+                return path
+
+        class Effect:
+            def __init__(self):
+                made.append(self)
+                self.played = 0
+
+            def setSource(self, url):  # noqa: N802
+                self.url = url
+
+            def setVolume(self, v):  # noqa: N802
+                self.volume = v
+
+            def play(self):
+                self.played += 1
+
+        package = types.ModuleType("fakeqt")
+        core = types.ModuleType("fakeqt.QtCore")
+        core.QUrl = Url
+        media = types.ModuleType("fakeqt.QtMultimedia")
+        media.QSoundEffect = Effect
+        sys.modules.update({"fakeqt": package, "fakeqt.QtCore": core, "fakeqt.QtMultimedia": media})
+        try:
+            def qt_probe():
+                neon_sound._state["qt"] = media
+                return ("qt", "")
+
+            neon_sound.BACKENDS = (qt_probe,)
+            neon_sound.prepare()  # when Sounds comes on: the effects made then, not on a click
+            self.assertEqual(len(made), len(neon_sound.NAMES))
+            self.assertEqual(neon_sound.play("done", force=True), "qt")
+            self.assertEqual(len(made), len(neon_sound.NAMES), "no new effect on a click")
+            self.assertEqual(sum(e.played for e in made), 1)
+        finally:
+            for name in ("fakeqt", "fakeqt.QtCore", "fakeqt.QtMultimedia"):
+                sys.modules.pop(name, None)
+
+    def test_sounds_on_chooses_the_way_before_the_first_click(self):
+        calls = []
+        neon_sound.BACKENDS = (lambda: calls.append(1),)
+        neon_sound._prepare_soon()  # outside Qt: at once (in FreeCAD: on the event loop)
+        self.assertEqual(calls, [1])
+        neon_sound._prepare_soon()
+        self.assertEqual(calls, [1], "chosen once")
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "processes")
+    def test_finished_players_are_reaped(self):
+        import subprocess
+
+        proc = subprocess.Popen(["/bin/sh", "-c", "exit 0"])
+        neon_sound._state["procs"] = [proc]
+        proc.wait()  # stands for the time passing
+        neon_sound._reap_tick()  # what the timer runs
+        self.assertEqual(neon_sound._state["procs"], [])
+
+    def test_scaled_copy_is_private(self):
+        target = neon_sound._scaled("click", 37)
+        folder = os.path.dirname(target)
+        self.assertFalse(folder.startswith(os.path.join(tempfile.gettempdir(), "fission180-sounds", "")),
+                         "not the shared temporary folder")
+        if os.name == "posix":
+            self.assertEqual(os.stat(folder).st_mode & 0o077, 0, "only the person can write there")
+        self.assertEqual([f for f in os.listdir(folder) if f.endswith(".part")], [])
 
     def test_scaled_copy_is_quieter(self):
         target = neon_sound._scaled("click", 25)
