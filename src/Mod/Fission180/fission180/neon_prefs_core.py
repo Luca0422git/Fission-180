@@ -98,5 +98,32 @@ def renamed(sets, old, new):
 
 def lifted(roles):
     """True when the chosen Text colour is too faint on the panels made from the chosen
-    Background, so the look shows it lifted (neon_palette.derive keeps text readable)."""
-    return neon_palette.derive(roles)["text"] != roles["text"].lower()
+    Background, so the look shows it lifted (neon_palette.derive keeps text readable).
+
+    The typed colour itself is measured against the panel colours: derive() also nudges every
+    colour by a hair to keep them unique (#ffffff comes back #fbfafa), which is no lifting."""
+    p = neon_palette.derive(roles)
+    text = roles["text"].lower()
+    return any(neon_palette.contrast(text, p[g]) < READABLE for g in GROUNDS)
+
+
+READABLE = 4.5  # the WCAG ratio the page's words keep on its panels
+GROUNDS = ("chrome", "menu", "field", "view")  # the panels text is drawn on
+
+# The page's own coloured words: (key of inks(), palette colour, the ground it is drawn on).
+INKS = (
+    ("primary_ink", "primary", "chrome"),  # section titles
+    ("primary_hot_ink", "primary_hot", "chrome"),  # the banner's title
+    ("primary_list_ink", "primary_hot", "active"),  # the chosen colour set
+    ("secondary_ink", "secondary", "chrome"),  # "In use", notes, strength values, More
+    ("secondary_hover_ink", "secondary_hot", "hover"),  # a button under the mouse
+    ("alert_ink", "alert", "chrome"),  # refusal messages
+    ("alert_field_ink", "alert", "field"),  # a refused colour in its field
+    ("text_dim_ink", "text_dim", "chrome"),  # captions, the banner's small print
+)
+
+
+def inks(p):
+    """The page's coloured words for palette `p`, each kept readable on what it is drawn on
+    (Review Focus: an Alert of #1a0a10 or a Secondary of #000000 must not make words vanish)."""
+    return {key: neon_palette.readable(p[colour], p[ground], READABLE) for key, colour, ground in INKS}

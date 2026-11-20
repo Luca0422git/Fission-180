@@ -906,6 +906,13 @@ def show(page=None):
             return dialog
     except RuntimeError:
         pass
+    try:
+        # The closed window before goes: it belongs to the main window, so each opening kept
+        # one more window (and its Neon Lights page) alive.
+        if dialog is not None and not dialog.isVisible():
+            dialog.deleteLater()
+    except RuntimeError:
+        pass
     dialog = PreferencesDialog()
     _state["dialog"] = dialog
     dialog.finished.connect(lambda *_: QtCore.QTimer.singleShot(0, refocus_main))

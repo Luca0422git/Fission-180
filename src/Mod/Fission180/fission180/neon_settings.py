@@ -4,6 +4,9 @@ FreeCAD's preferences under Mod/Fission180/Neon: the preset, a person's own colo
 colour sets, the effects, Hologram, boot-up, sounds and the animated Home."""
 
 import json
+import os
+import re
+import shutil
 
 from . import neon_palette
 
@@ -111,8 +114,14 @@ def _write_sets(sets):
     _params().SetString(_SETS, json.dumps(sets))
 
 
+def has_set(name):
+    name = (name or "").strip()
+    return any(s["name"] == name for s in saved_sets())
+
+
 def save_set(name):
-    """The colours in use saved as `name` (replacing a set of that name)."""
+    """The colours in use saved as `name` (replacing a set of that name: the page asks first,
+    has_set())."""
     name = (name or "").strip()
     if not name:
         raise ValueError("A colour set needs a name")
@@ -144,3 +153,55 @@ def rename_set(old, new):
     from . import neon_prefs_core
 
     _write_sets(neon_prefs_core.renamed(saved_sets(), old, (new or "").strip()))
+
+
+# -- the pictures made for each palette --------------------------------------------------------
+_DIGEST = re.compile(r"^[0-9a-f]{8}$")
+
+
+def neon_folder():
+    """<UserAppData>/Fission180/neon: one folder per palette tried (neon_style.folder)."""
+    from . import neon_style
+
+    return os.path.dirname(neon_style.folder(neon_palette.derive(neon_palette.roles(neon_palette.DEFAULT))))
+
+
+def prune_folders(keep, base=None):
+    """Delete the picture folders of palettes no longer in use (every colour tried in the live
+    preview wrote one). `keep`: folder names (neon_palette.digest) to leave. Only folders named
+    like a digest directly in `base` (default neon_folder()) go; links, files and anything else
+    stay. Returns the names deleted."""
+    base = base or neon_folder()
+    parts = os.path.normpath(base).split(os.sep)
+    if parts[-2:] != ["Fission180", "neon"] or not os.path.isdir(base):
+        return []  # never outside Fission180/neon
+    gone = []
+    for name in sorted(os.listdir(base)):
+        path = os.path.join(base, name)
+        if name in keep or not _DIGEST.match(name) or os.path.islink(path) or not os.path.isdir(path):
+            continue
+        try:
+            shutil.rmtree(path)
+            gone.append(name)
+        except OSError:
+            pass
+    return gone
+
+
+def prune_unused():
+    """prune_folders() keeping only the palette in use (the stored one when the look is not
+    Neon Lights). Never raises."""
+    try:
+        from . import neon_style, theme
+
+        p = theme.palette() if theme.is_neon() else neon_palette.derive(current_roles())
+        keep = {os.path.basename(neon_style.folder(p))}
+        return prune_folders(keep)
+    except Exception as exc:
+        try:
+            from . import warn
+
+            warn("Neon Lights: tidying the colour pictures: %s" % exc)
+        except Exception:
+            pass
+        return []
