@@ -235,14 +235,14 @@ class Paint:
 
     def __init__(self, coin, colour, hot=None):
         self.material = coin.SoMaterial()
-        self.colour = tuple(colour)
+        self.colour = colour  # kept as given: a Live constant reads the look in use each time
         self.hot = hot
         self._state = None
         self.set(False)
 
     def set(self, hot, colour=None):
-        if colour is not None and tuple(colour) != self.colour:
-            self.colour = tuple(colour)
+        if colour is not None and colour is not self.colour and tuple(colour) != tuple(self.colour):
+            self.colour = colour
             self._state = None
         if self._state == bool(hot):
             return
@@ -363,14 +363,14 @@ class DiscPaint:
 
     def __init__(self, base, colour=core.DISC, hot=core.DISC_HOT):
         self.base = base
-        self.colour = tuple(colour)
-        self.hot = tuple(hot)
+        self.colour = colour  # kept as given (Live constants read the look in use)
+        self.hot = hot
         self._state = None
         self.set(False)
 
     def set(self, hot, colour=None):
-        if colour is not None and tuple(colour) != self.colour:
-            self.colour = tuple(colour)
+        if colour is not None and colour is not self.colour and tuple(colour) != tuple(self.colour):
+            self.colour = colour
             self._state = None
         if self._state == bool(hot):
             return

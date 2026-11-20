@@ -15,6 +15,10 @@ import FreeCADGui as Gui
 from . import insert_ui, log, mesh, mesh_ui, warn
 from . import mesh_core as core
 from .compat import QtCore, QtWidgets
+from .neon_scene_core import Live
+
+PICKED = Live((0.94, 0.34, 0.30), "cut")  # the picked faces: red, they go away
+PICKED_GLOW = Live((0.45, 0.10, 0.08), "cut_glow")
 
 
 class FacetMarks:
@@ -33,8 +37,8 @@ class FacetMarks:
         offset.units.setValue(-2.0)
         self.root.addChild(offset)
         material = coin.SoMaterial()
-        material.diffuseColor.setValue(0.94, 0.34, 0.30)
-        material.emissiveColor.setValue(0.45, 0.10, 0.08)
+        material.diffuseColor.setValue(*PICKED)
+        material.emissiveColor.setValue(*PICKED_GLOW)
         material.transparency.setValue(0.25)
         self.root.addChild(material)
         self.coords = coin.SoCoordinate3()

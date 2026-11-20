@@ -41,6 +41,7 @@ DEFAULTS = {
 NODE_NAME = "Fission180Display"
 HIDE_NAME = "Fission180ObjectVisibility"
 HIDDEN_EDGE_COLOR = Live((0.55, 0.58, 0.62), "hidden_edge")
+HIDDEN_EDGE_MATERIAL = "Fission180HiddenEdgeColour"
 # Object Visibility: the kinds in Fusion's order
 KINDS = [
     "Origins",
@@ -307,6 +308,25 @@ def _draw(doc, coin):
             continue
 
 
+def recolour():
+    """The hidden edges already drawn, in the colour of the look in use (Neon Lights was
+    switched on or off, its colours changed, a save draws its preview picture)."""
+    from pivy import coin
+
+    for node in list(_STATE["nodes"].values()):
+        try:
+            search = coin.SoSearchAction()
+            search.setName(coin.SbName(HIDDEN_EDGE_MATERIAL))
+            search.setInterest(coin.SoSearchAction.ALL)
+            search.setSearchingAll(True)
+            search.apply(node)
+            paths = search.getPaths()
+            for i in range(paths.getLength()):
+                paths[i].getTail().diffuseColor.setValue(*HIDDEN_EDGE_COLOR)
+        except Exception as exc:
+            warn("hidden edges: %s" % exc)
+
+
 def filling():
     """True while a hidden-line visual style fills the faces."""
     return bool(_STATE["on"] and nav_core.style(get("VisualStyle"))[2])
@@ -362,6 +382,7 @@ def _hidden_edges(coin, owners):
     style.lineWidth.setValue(1.0)
     style.linePattern.setValue(0x0F0F)
     material = coin.SoMaterial()
+    material.setName(HIDDEN_EDGE_MATERIAL)
     material.diffuseColor.setValue(*HIDDEN_EDGE_COLOR)
     for item in (light, depth, style, material):
         sep.addChild(item)

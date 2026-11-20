@@ -16,6 +16,7 @@ from . import bodies, commands, handles3d, insert_ui, log, mesh, mesh_ui, origin
 from . import warn
 from . import mesh_core as core
 from .compat import QtCore
+from .neon_scene_core import Live
 
 V = App.Vector
 # role -> (normal, x axis): FreeCAD's origin planes (the XZ plane faces -Y)
@@ -24,7 +25,8 @@ ORIGIN_PLANES = {
     "XZ": (V(0, -1, 0), V(1, 0, 0)),
     "YZ": (V(1, 0, 0), V(0, 1, 0)),
 }
-CUT_LOOK = ((0.30, 0.62, 0.95), 0.70)
+CUT_LOOK = (Live((0.30, 0.62, 0.95), "pick"), 0.70)
+EDGE = Live((0.96, 0.62, 0.20), "alert")  # the cut line round the mesh
 
 
 def origin_frame(role):
@@ -743,7 +745,7 @@ class SectionOverlay:
         pick.style = coin.SoPickStyle.UNPICKABLE
         self.root.addChild(pick)
         material = coin.SoMaterial()
-        material.diffuseColor.setValue(0.96, 0.62, 0.20)
+        material.diffuseColor.setValue(*EDGE)
         self.root.addChild(material)
         style = coin.SoDrawStyle()
         style.lineWidth.setValue(2.5)

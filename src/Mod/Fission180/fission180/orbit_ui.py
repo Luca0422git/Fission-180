@@ -228,6 +228,18 @@ def clear_pivot():
         log("orbit centre reset (none was set)")
 
 
+def recolour():
+    """The orbit-centre dots drawn again in the colours of the look in use (Neon Lights was
+    switched on or off, its colours changed, a save draws its preview picture)."""
+    for entry in list(_pivots.values()):
+        try:
+            marker = entry["marker"]
+            if marker.view is not None and "point" in entry:
+                marker.show(marker.view, App.Vector(*entry["point"]))
+        except Exception as exc:
+            warn("orbit centre: %s" % exc)
+
+
 def _clear_all_pivots():
     for entry in _pivots.values():
         try:

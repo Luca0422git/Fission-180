@@ -27,6 +27,7 @@ from .neon_scene_core import Live
 
 BLUE = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue
 BLUE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")
+TEXT = Live((1.0, 1.0, 1.0), "bright")  # labels in the view
 GRAB = {"time": 0.0}  # one press moves one handle
 USED = {"time": 0.0}  # when any handle was last pressed, dragged or let go
 JUST_USED_S = 0.6
@@ -828,7 +829,7 @@ class Overlay:
         sep.addChild(ball)
         self.content.addChild(sep)
 
-    def text(self, p, text, color=(1.0, 1.0, 1.0)):
+    def text(self, p, text, color=TEXT):
         coin = self.coin
         sep = coin.SoSeparator()
         move = coin.SoTranslation()
