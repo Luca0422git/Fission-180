@@ -257,3 +257,43 @@ def derive(r):
         }
     )
     return p
+
+
+def _hls(colour):
+    import colorsys
+
+    r, g, b = rgb01(colour)
+    return colorsys.rgb_to_hls(r, g, b)
+
+
+def extras(p, dark_hexes):
+    """Neon colours for the extra colours Fission 180's panels write in their own style sheets
+    (theme._EXTRA: warnings, links, dim labels, dark boxes): {dark hex: neon hex}, each one
+    different from the palette's panel colours and from each other, so a style sheet can be
+    translated back exactly. Chosen by what the dark colour looks like: reds -> alert, oranges
+    and yellows -> a warmer alert, greens and blues -> secondary, greys -> dim text, dark boxes
+    -> the panel colours."""
+    used = set(p[k] for k in THEME_KEYS)
+    out = {}
+    for index, dark in enumerate(dark_hexes):
+        h, light, sat = _hls(dark)
+        hue = h * 360.0
+        if sat < 0.25 or dark in ("#5a4a2a",):
+            if light > 0.5:
+                base = mix(p["text_dim"], p["text"], 0.15 + 0.05 * (index % 4))
+            elif dark == "#5a4a2a":
+                base = mix(p["background"], p["alert"], 0.25)
+            else:
+                base = mix(p["chrome"], p["primary"], 0.05 + 0.04 * (index % 4))
+        elif hue < 20 or hue >= 330:
+            base = p["alert"] if light > 0.6 else mix(p["alert"], p["background"], 0.2)
+        elif hue < 70:
+            base = mix(p["alert"], p["secondary"], 0.15)
+        elif hue < 170:
+            base = mix(p["secondary"], "#ffffff", 0.2)
+        else:
+            base = mix(p["secondary"], "#ffffff", 0.1 if light < 0.65 else 0.35)
+        value = _free(base, used)
+        used.add(value)
+        out[dark] = value
+    return out

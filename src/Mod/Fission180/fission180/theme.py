@@ -20,7 +20,9 @@ import re
 from . import log, ui_icon_path, warn
 
 PREF = ("User parameter:BaseApp/Preferences/Mod/Fission180", "Theme")
-THEMES = ("dark", "light")
+# "neon": Neon Lights, the cyberpunk look (docs/fission180/neon-lights-design.md). Its colours
+# come from neon_palette / neon_settings; Dark and Light below are untouched by it.
+THEMES = ("dark", "light", "neon")
 
 DARK = dict(
     chrome="#3b4453",  # ribbon, panels, timeline
@@ -118,7 +120,7 @@ _HEX = re.compile(r"#[0-9a-fA-F]{6}\b")
 
 
 def current():
-    """The look chosen in Preferences: "dark" (Fission 180's own) or "light"."""
+    """The look chosen in Preferences: "dark" (Fission 180's own), "light" or "neon"."""
     try:
         import FreeCAD as App
 
@@ -132,16 +134,111 @@ def is_light():
     return _state["name"] == "light"
 
 
+def is_neon():
+    return _state["name"] == "neon"
+
+
+def name():
+    """The look in use: "dark", "light" or "neon"."""
+    return _state["name"]
+
+
+def palette():
+    """The colours of the look in use (theme.DARK's keys; Neon Lights adds its own)."""
+    if is_neon():
+        return _neon["palette"]
+    return LIGHT if is_light() else DARK
+
+
+def neon(role, otherwise):
+    """`otherwise` as given unless Neon Lights is on; then the neon colour of `role` (a key of
+    palette()). The way painted code gets a neon colour while Dark and Light keep their own
+    literal values exactly."""
+    if not is_neon():
+        return otherwise
+    return _neon["palette"].get(role, otherwise)
+
+
+def neon3d(rgb, role):
+    """neon() for a 3D colour (r, g, b) in 0..1."""
+    if not is_neon():
+        return rgb
+    value = _neon["palette"].get(role)
+    if not value:
+        return rgb
+    from . import neon_palette
+
+    return neon_palette.rgb01(value)
+
+
 def translate(text, light=None):
     """A style sheet in the colours of the look in use (written with the dark colours, or
-    with the light palette's by a panel made while the light look was on)."""
+    with the light or a neon palette's by a panel made while that look was on)."""
     if not text:
         return text
-    table = TO_LIGHT if (is_light() if light is None else light) else TO_DARK
+    if light is None and is_neon():
+        table = _neon["to_neon"]
+    elif is_light() if light is None else light:
+        table = TO_LIGHT if not _neon["back_light"] else dict(TO_LIGHT, **_neon["back_light"])
+    else:
+        table = TO_DARK if not _neon["back_dark"] else dict(TO_DARK, **_neon["back_dark"])
     return _HEX.sub(lambda m: table.get(m.group(0).lower(), m.group(0)), text)
 
 
 _state = {"name": "dark", "hook": None}
+# Neon Lights: the palette in use, its translation table, and every neon colour used in this
+# session with the dark colour it stands for (so a panel styled while neon was on comes back
+# in Dark, Light or another preset; tests: test_neon_theme.py).
+_neon = {"palette": {}, "to_neon": {}, "seen": {}, "back_dark": {}, "back_light": {}}
+LISTENERS = ("sketch_mode", "shell", "home_ui")  # modules whose theme_changed() runs on a switch
+
+
+def _neon_palette():
+    """The neon colours from the stored preset and a person's own colours."""
+    from . import neon_palette
+
+    try:
+        from . import neon_settings
+
+        r = neon_settings.current_roles()
+    except Exception:
+        r = neon_palette.roles(neon_palette.DEFAULT)
+    return neon_palette.derive(r)
+
+
+def _neon_tables(p):
+    """Fill _neon for palette `p`: dark, light and earlier neon colours -> p."""
+    from . import neon_palette
+
+    dark_values = set(DARK.values())
+    extra = neon_palette.extras(p, sorted(_EXTRA))
+    seen = _neon["seen"]
+    for key, dark in DARK.items():
+        if dark not in ("#ffffff", "#000000"):
+            seen[p[key]] = dark
+    for dark_hex, value in extra.items():
+        seen[value] = dark_hex
+    to_neon = {}
+    for key, dark in DARK.items():
+        if dark not in ("#ffffff", "#000000"):
+            to_neon[dark] = p[key]
+    for dark_hex, value in extra.items():
+        to_neon.setdefault(dark_hex, value)
+    for key, light in LIGHT.items():
+        if light not in ("#ffffff", "#000000") and light not in dark_values:
+            to_neon.setdefault(light, p[key])
+    for dark_hex, light in _EXTRA.items():
+        if light not in dark_values and dark_hex in to_neon:
+            to_neon.setdefault(light, to_neon[dark_hex])
+    for old, dark in seen.items():
+        if dark in to_neon:
+            to_neon.setdefault(old, to_neon[dark])
+    _neon["palette"] = p
+    _neon["to_neon"] = to_neon
+    _neon["back_dark"] = dict(seen)
+    _neon["back_light"] = {
+        old: TO_LIGHT.get(dark, dark) for old, dark in seen.items()
+    }
 
 
 def own_background(widget):
@@ -273,10 +370,28 @@ def _use(name):
     global CHROME, MENU, VIEW, TEXT, TEXT_DIM, TEXT_DISABLED, HOVER, ACTIVE, LINE, ACCENT, FIELD
     global QSS
     _state["name"] = name if name in THEMES else "dark"
-    p = LIGHT if _state["name"] == "light" else DARK
+    if _state["name"] == "neon":
+        try:
+            p = _neon_palette()
+            _neon_tables(p)
+        except Exception as exc:
+            warn("theme: Neon Lights colours: %s" % exc)
+            _state["name"] = "dark"
+    if _state["name"] == "neon":
+        p = _neon["palette"]
+    else:
+        p = LIGHT if _state["name"] == "light" else DARK
     CHROME, MENU, VIEW, TEXT = p["chrome"], p["menu"], p["view"], p["text"]
     TEXT_DIM, TEXT_DISABLED, HOVER = p["text_dim"], p["disabled"], p["hover"]
     ACTIVE, LINE, ACCENT, FIELD = p["active"], p["line"], p["accent"], p["field"]
+    if _state["name"] == "neon":
+        try:
+            from . import neon_style
+
+            QSS = neon_style.qss(p)
+            return
+        except Exception as exc:
+            warn("theme: Neon Lights style: %s" % exc)
     QSS = _QSS.format(**p).replace("CHECK_ICON", ui_icon_path("palette_check").replace("\\", "/"))
 
 
@@ -609,13 +724,19 @@ def _view_background():
     App.ParamGet(_VIEW_PARAMS).SetUnsigned("BackgroundColor", value)
 
 
-def set_theme(name):
-    """Switch Fission 180's look now (Preferences > General > Look): colours, panels, icons,
-    3D view, sketch colours. Returns the look in use."""
-    import FreeCAD as App
+def _neon_part(action):
+    """neon.enable() / disable() / refresh(), never raising."""
+    try:
+        from . import neon as neon_parts
 
-    App.ParamGet(PREF[0]).SetString(PREF[1], name if name in THEMES else "dark")
-    _use(current())
+        getattr(neon_parts, action)()
+    except Exception as exc:
+        warn("theme: Neon Lights %s: %s" % (action, exc))
+
+
+def _restyle_all():
+    """The app's style, every styled panel, icons, the 3D view and the listeners in the
+    colours of the look in use."""
     try:
         from PySide import QtWidgets
 
@@ -627,14 +748,40 @@ def set_theme(name):
         _view_background()
     except Exception as exc:
         warn("theme: %s" % exc)
-    for step in ("sketch_mode", "shell", "home_ui"):
+    for step in LISTENERS:
         try:
             module = __import__("fission180." + step, fromlist=["x"])
             getattr(module, "theme_changed", lambda: None)()
         except Exception as exc:
             warn("theme: %s: %s" % (step, exc))
+
+
+def set_theme(name):
+    """Switch Fission 180's look now (Preferences > General > Look): colours, panels, icons,
+    3D view, sketch colours. Returns the look in use."""
+    import FreeCAD as App
+
+    was_neon = is_neon()
+    App.ParamGet(PREF[0]).SetString(PREF[1], name if name in THEMES else "dark")
+    if was_neon and current() != "neon":
+        _neon_part("disable")  # Neon Lights' own parts go before the look changes
+    _use(current())
+    _restyle_all()
+    if is_neon() and not was_neon:
+        _neon_part("enable")
     log("look: %s" % _state["name"])
     return _state["name"]
+
+
+def refresh_neon():
+    """Neon Lights' colours changed (preset, a person's own colours) while it is on: the
+    whole window again in the new colours."""
+    if not is_neon():
+        return
+    _use("neon")
+    _restyle_all()
+    _neon_part("refresh")
+    log("look: neon colours changed")
 
 
 def apply():
@@ -663,6 +810,8 @@ def apply():
         orbit_ui.apply_mode()
     except Exception as exc:
         warn("theme: could not apply the orbit choice: %s" % exc)
+    if is_neon():
+        _neon_part("enable")
     log("theme applied")
 
 
@@ -674,6 +823,8 @@ def _view_background_entry():
 
 def restore():
     global _saved_qss
+    if is_neon():
+        _neon_part("disable")
     try:
         _remove_hook()
     except Exception as exc:

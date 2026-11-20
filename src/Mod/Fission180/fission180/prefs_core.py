@@ -207,10 +207,12 @@ OPTIONS = [
         choices=[
             ("dark", "Dark (Fission 180's own)", True, ""),
             ("light", "Light (white, like Fusion's default)", True, ""),
+            ("neon", "Neon Lights (cyberpunk, your colours)", True, ""),
         ],
         tip="Fission 180's colours. Dark: Fission 180's own look. Light: the white look of Fusion's "
-        "default. The window changes at once; a few icons of FreeCAD's own menus change at "
-        "the next start.",
+        "default. Neon Lights: a cyberpunk look with glowing colours you choose (its own page "
+        "in Preferences). The window changes at once; a few icons of FreeCAD's own menus "
+        "change at the next start.",
         apply="theme",
     ),
     _option(

@@ -210,9 +210,11 @@ def _apply(kind):
             from . import home_ui
 
             home_ui.refresh_soon()  # (Home's "This computer" is the project folder)
-        elif kind == "theme":  # Look: dark or light, at once
-            if theme.current() != ("light" if theme.is_light() else "dark"):
+        elif kind == "theme":  # Look: dark, light or neon, at once
+            if theme.current() != theme.name():
                 theme.set_theme(theme.current())
+        elif kind == "neon":  # a Neon Lights colour or setting (its own page)
+            theme.refresh_neon()
         elif kind == "ai":  # Allow AI apps to control Fission 180 (the bridge on / off)
             from . import ai_ui
             from .ai import bridge
