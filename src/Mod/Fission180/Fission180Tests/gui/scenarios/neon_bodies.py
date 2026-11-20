@@ -11,12 +11,22 @@ bodies, the rim light, pictures.
 - Hologram off puts everything back: ShapeAppearance, Transparency and LineColor are what they
   were, the design is not marked modified and no undo step was added.
 - A design saved with Hologram and the glow on has the normal preview picture.
-- Capture Image shows the neon screen, or the normal look with "Normal look" ticked; the box
-  is only in Neon Lights' Capture Image.
+- Capture Image shows the neon screen (its background and Hologram's glass), or the normal look
+  with "Normal look" ticked; the box is only in Neon Lights' Capture Image; the background
+  setting is what it was afterwards.
+- The glow does not widen FreeCAD's highlights: a hovered edge, and the edges of a selected
+  body, are as wide on screen as in Dark (the glow is a plain line set, not the body's own).
+- A sketch shown inside a body keeps its own colours: no outline, glow or Hologram node in its
+  scene, no glow beside its curves.
+- A save that fails (a read-only file: FreeCAD sends "save started" and never "save finished")
+  leaves nothing in the normal look: outlines, glow, Hologram, neon colours, the background
+  setting and the view's background all come back. A switch Dark -> Neon clears a stuck save.
 """
 
 import os
 import zipfile
+
+import Part
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -113,6 +123,51 @@ def corner_colour(path):
     return c.red(), c.green(), c.blue()
 
 
+def column(point, reach=12):
+    """The colours of the pixels from `reach` above to `reach` below a 3D point on screen."""
+    widget = h.gl_widget()
+    image = widget.grab().toImage()
+    ratio = image.width() / float(max(1, widget.width()))
+    pos = h.screen_point(point)
+    out = []
+    for d in range(-reach, reach + 1):
+        c = QtGui.QColor(image.pixel(int(pos.x() * ratio), int((pos.y() + d) * ratio)))
+        out.append((c.red(), c.green(), c.blue()))
+    return out
+
+
+def changed(before, after, below_from=None):
+    """How many pixels of a column changed clearly (only those from `below_from` pixels below
+    the point, when given)."""
+    reach = (len(before) - 1) // 2
+    return sum(
+        1
+        for i, (a, b) in enumerate(zip(before, after))
+        if distance(a, b) > 40 and (below_from is None or i - reach >= below_from)
+    )
+
+
+EDGE_POINT = App.Vector(20, 0, 0)  # the middle of the pad's bottom front edge
+SKETCH_POINT = App.Vector(75, 0, 0)  # the middle of the loose sketch's line
+
+
+def view_corner():
+    widget = h.gl_widget()
+    image = widget.grab().toImage()
+    c = QtGui.QColor(image.pixel(4, 4))
+    return c.red(), c.green(), c.blue()
+
+
+def background_param():
+    return App.ParamGet("User parameter:BaseApp/Preferences/View").GetUnsigned("BackgroundColor", 0)
+
+
+def neon_top():
+    from fission180 import neon_scene_core, theme
+
+    return hex_rgb(neon_scene_core.background(theme.palette())[0])
+
+
 def settle():
     QtGui.QGuiApplication.processEvents()
     h.view_drawn()
@@ -136,6 +191,12 @@ def setup():
     h.draw_rectangle(sk, 0, 0, 40, 30)
     s["pad"] = extrude.make(body, sk, {"distance": 10.0})
     s["body"] = body
+    # a visible sketch in the body, beside the pad (its curves keep the sketch colours)
+    loose = body.newObject("Sketcher::SketchObject", "Loose")
+    loose.AttachmentSupport = [(planes["XY_Plane"], "")]
+    loose.MapMode = "FlatFace"
+    loose.addGeometry(Part.LineSegment(App.Vector(60, 0, 0), App.Vector(90, 0, 0)))
+    s["loose"] = loose
     App.ActiveDocument.recompute()
     Gui.Selection.clearSelection()
     h.fit()
@@ -152,6 +213,47 @@ def setup():
     s["dark_face"] = pixel(h.screen_point(face_point()))
 
 
+def hover_edge():
+    settle()
+    s["before_hover"] = column(EDGE_POINT)
+    h.move(h.screen_point(EDGE_POINT))
+
+
+hover_edge.done = lambda: any("Edge" in n.split(".")[-1] for n in Gui.Selection.getPreselection().SubElementNames)
+hover_edge.done_what = "the pad's bottom front edge to be pre-selected"
+
+
+def hover_edge_measured():
+    """How many pixels across the edge the hover changed (in the look in use)."""
+    settle()
+    count = changed(s["before_hover"], column(EDGE_POINT))
+    s.setdefault("hover_width", []).append(count)
+    h.shot("hover-edge-%d" % len(s["hover_width"]))
+    h.move(QtCore.QPoint(5, 5))
+    Gui.Selection.clearPreselection()
+
+
+def select_body():
+    Gui.Selection.clearSelection()
+    settle()
+    s["before_select"] = column(EDGE_POINT)
+    Gui.Selection.addSelection(s["body"])
+
+
+select_body.done = lambda: bool(Gui.Selection.getSelection())
+select_body.done_what = "the body to be selected"
+
+
+def select_body_measured():
+    """How far below the edge (into the empty background) the selection's colour reaches."""
+    settle()
+    after = column(EDGE_POINT)
+    s.setdefault("select_seen", []).append(changed(s["before_select"], after))
+    s.setdefault("select_below", []).append(changed(s["before_select"], after, below_from=2))
+    h.shot("select-body-%d" % len(s["select_below"]))
+    Gui.Selection.clearSelection()
+
+
 def to_neon():
     lc.set_look("neon")
 
@@ -164,6 +266,9 @@ def glow_drawn_not_picked():
     from fission180 import neon, neon_view, neon_view_core
 
     h.check("Neon Lights is on with no part failed", neon.active() and not neon.failed(), neon.failed())
+    from fission180 import neon_shader
+
+    h.check("the rim light's self-test has not run (Hologram is off)", not neon_shader.tested())
     h.check("the edges have the glow pass", has("Edge", neon_view.GLOW_NODE))
     glow = neon_view._find_child(groups("Edge")[0], neon_view.GLOW_NODE)[1]
     from pivy import coin
@@ -219,6 +324,47 @@ def glow_compared():
     h.shot("outline-glow")
 
 
+def highlights_compared():
+    from fission180 import neon_view
+
+    h.check("(Glow is on for the highlight checks)", has("Edge", neon_view.GLOW_NODE))
+    dark, neon = s["hover_width"]
+    h.check("hover was seen across the edge in Dark", dark >= 1, s["hover_width"])
+    h.check("a hovered edge is as wide on screen as in Dark (the glow does not widen it)", neon <= dark + 2, s["hover_width"])
+    h.check("selecting the body was seen in Dark", s["select_seen"][0] >= 1, s["select_seen"])
+    dark, neon = s["select_below"]
+    h.check("a selected body's edge is as wide on screen as in Dark", neon <= dark + 1, (s["select_below"], s["select_seen"]))
+    glow = neon_view._find_child(groups("Edge")[0], neon_view.GLOW_NODE)[1]
+    lines = glow.getChild(5)
+    h.check(
+        "the glow draws a plain line set, not the body's own edge set",
+        lines.getTypeId().getName().getString() == "IndexedLineSet" and lines.coordIndex.isConnected(),
+        lines.getTypeId().getName().getString(),
+    )
+    h.check("... with render caching off, like FreeCAD's own groups", glow.renderCaching.getValue() == glow.OFF)
+
+
+def sketch_own_colours():
+    from fission180 import neon_view, theme
+
+    settle()
+    loose = s["loose"].ViewObject
+    h.check("the sketch in the body is shown", loose.Visibility)
+    left = neon_view.neon_nodes(loose.RootNode)
+    h.check("a sketch in a body has no outline, glow or Hologram node", not left, left)
+    body_groups = neon_view._edge_groups(s["body"].ViewObject)
+    sketch_groups = neon_view._groups(loose, "Edge")
+    h.check("... the body's own groups leave out the sketch's", sketch_groups and not any(g in body_groups for g in sketch_groups))
+    col = column(SKETCH_POINT, 20)
+    line = max(col[18:23], key=lambda c: distance(c, col[0]))  # the line (farthest from the background)
+    outline = hex_rgb(theme.palette()["outline"])
+    s["sketch_line"] = line
+    beside, far = col[20 + 5:20 + 8], col[-1]
+    h.check("no glow beside the sketch's curve", all(distance(c, far) <= 10 for c in beside), (beside, far))
+    h.check("the curve is drawn (not the background)", distance(line, far) > 15, (line, far))
+    h.check("the curve is not in the body outline colour", distance(line, outline) > 30, (line, outline))
+
+
 def hologram_on():
     from fission180 import neon_view
 
@@ -234,6 +380,8 @@ def hologram_shown():
     ok, why = neon_shader.self_test()
     h.check("the rim light's self-test passes (software OpenGL too)", ok, why)
     h.check("... so the faces have the rim light", has("FlatRoot", neon_view.RIM_NODE))
+    flag = App.ParamGet(__import__("fission180.neon_settings").neon_settings.PARAMS).GetString(neon_shader.FLAG, "")
+    h.check("... and its 'testing' flag is cleared", flag == "", flag)
     h.check("the design is not marked modified", not Gui.getDocument(DOC).Modified)
     h.check("no undo step was added", App.ActiveDocument.UndoCount == s["undo"], App.ActiveDocument.UndoCount)
     h.check("no view property changed", not unchanged(), unchanged())
@@ -282,6 +430,79 @@ def selection_shown():
     Gui.Selection.clearSelection()
 
 
+def failed_save():
+    import shutil
+    import stat
+
+    settle()
+    s["bg_before"] = background_param()
+    path = os.path.join(h.OUT_DIR, "neon_bodies-readonly.FCStd")
+    if os.path.exists(path):
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+        os.remove(path)
+    shutil.copy(s["dark_path"], path)
+    os.chmod(path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # read-only
+    s["save_error"] = None
+    try:
+        App.getDocument(DOC).saveAs(path)
+    except Exception as exc:
+        s["save_error"] = str(exc) or type(exc).__name__
+
+
+failed_save.done = lambda: not __import__("fission180.neon_view").neon_view._state["saving"]
+failed_save.done_what = "the failed save to be noticed"
+
+
+def failed_save_recovered():
+    from fission180 import neon_view, theme
+
+    h.check("saving to a read-only file failed", s["save_error"] is not None, s["save_error"])
+    h.check("the design is no longer 'saving'", not neon_view._state["saving"], neon_view._state["saving"])
+    h.check("neon colours are live again", not theme._neon.get("normal") and theme.neon("primary", "#123456") != "#123456")
+    h.check("the background setting is what it was", background_param() == s["bg_before"], (background_param(), s["bg_before"]))
+    h.check("the glass is back", has("FlatRoot", neon_view.HOLO_NODE))
+    h.check("... and the glow and outline", has("Edge", neon_view.GLOW_NODE) and has("Edge", neon_view.EDGE_NODE))
+    settle()
+    corner, top = view_corner(), neon_top()
+    h.check("the view's background is neon again (the scene part's after-save ran)", distance(corner, top) <= 10, (corner, top))
+    h.shot("after-failed-save")
+
+
+def stuck_save():
+    """A save stuck in "saving" (as before this fix) is cleared by a switch Dark -> Neon."""
+    from fission180 import neon_view, theme
+
+    neon_view._state["saving"].add(DOC)
+    theme.normal_look(True)
+    lc.set_look("dark")
+
+
+stuck_save.done = lambda: not __import__("fission180.theme").theme.is_neon()
+stuck_save.done_what = "Dark to be on"
+
+
+def stuck_cleared():
+    from fission180 import neon_view, theme
+
+    h.check("Dark clears a stuck save", not neon_view._state["saving"] and not theme._neon.get("normal"))
+    neon_view._state["saving"].add(DOC)
+    theme.normal_look(True)
+    lc.set_look("neon")
+
+
+stuck_cleared.done = to_neon.done
+stuck_cleared.done_what = "Neon Lights to be on"
+
+
+def neon_after_stuck():
+    from fission180 import neon_view, theme
+
+    settle()
+    h.check("Neon clears a stuck save", not neon_view._state["saving"] and "neon_background" not in neon_view._state)
+    h.check("... neon colours are live", not theme._neon.get("normal") and theme.neon("primary", "#123456") != "#123456")
+    h.check("... and the glass and glow are back", has("FlatRoot", neon_view.HOLO_NODE) and has("Edge", neon_view.GLOW_NODE))
+
+
 def save_hologram():
     settle()
     s["neon_path"] = os.path.join(h.OUT_DIR, "neon_bodies-neon.FCStd")
@@ -291,6 +512,7 @@ def save_hologram():
 
     h.check("the glass is back after the save", has("FlatRoot", neon_view.HOLO_NODE))
     h.check("... and the glow", has("Edge", neon_view.GLOW_NODE))
+    h.check("... and the background setting is what it was", background_param() == s["bg_before"], (background_param(), s["bg_before"]))
 
 
 def thumbnails_alike():
@@ -303,23 +525,41 @@ def thumbnails_alike():
 
 
 def capture():
-    from fission180 import capture_ui, theme
+    from fission180 import capture_ui
 
     dialog = capture_ui.ImageOptions()
     h.check("Neon Lights' Capture Image has the 'Normal look' box", dialog.normal is not None)
     dialog.close()
+    settle()
+    bg_before = background_param()
+    widget = h.gl_widget()
+    ratio = widget.devicePixelRatioF()
+    width, height = int(widget.width() * ratio), int(widget.height() * ratio)
     screen = os.path.join(h.OUT_DIR, "neon_bodies-capture.png")
     normal = os.path.join(h.OUT_DIR, "neon_bodies-capture-normal.png")
-    capture_ui.save(screen, 320, 240)
-    capture_ui.save(normal, 320, 240, normal=True)
-    neon_bg = hex_rgb(theme.palette()["background"])
-    dark_bg = hex_rgb(theme.DARK["view"])
+    capture_ui.save(screen, width, height)
+    capture_ui.save(normal, width, height, normal=True)
+    top = neon_top()
+    dark_bg = hex_rgb(__import__("fission180.theme").theme.DARK["view"])
+    h.check("(the neon background differs from Dark's)", distance(top, dark_bg) > 6, (top, dark_bg))
     got_screen, got_normal = corner_colour(screen), corner_colour(normal)
-    h.check("Capture shows the neon screen", distance(got_screen, dark_bg) > distance(got_screen, neon_bg) or distance(got_screen, dark_bg) > 6, (got_screen, neon_bg, dark_bg))
+    h.check("Capture shows the neon background", distance(got_screen, top) <= 10, (got_screen, top))
     h.check("'Normal look' takes the normal one", distance(got_normal, dark_bg) <= 6, (got_normal, dark_bg))
+    pos = h.screen_point(face_point())
+    face = []
+    for path in (screen, normal):
+        image = QtGui.QImage(path)
+        c = QtGui.QColor(image.pixel(int(pos.x() * ratio), int(pos.y() * ratio)))
+        face.append((c.red(), c.green(), c.blue()))
+    h.check(
+        "Capture shows Hologram's dark glass; 'Normal look' the normal face",
+        distance(face[0], s["holo_face"]) <= 12 and distance(face[1], s["dark_face"]) <= 12,
+        (face, s["holo_face"], s["dark_face"]),
+    )
     from fission180 import neon_view
 
-    h.check("the neon look is back after it", has("FlatRoot", neon_view.HOLO_NODE) and neon_view._state.get("neon_background") is None)
+    h.check("the neon look is back after it", has("FlatRoot", neon_view.HOLO_NODE))
+    h.check("... and the background setting is what it was", background_param() == bg_before, (background_param(), bg_before))
 
 
 def johnny():
@@ -380,8 +620,11 @@ def nothing_left():
 
 h.run(
     "neon_bodies",
-    [setup, to_neon, glow_drawn_not_picked, glow_off, glow_compared, hologram_on, hologram_shown,
-     hover_face, hover_shown, select_face, selection_shown, save_hologram, thumbnails_alike,
-     capture, johnny, johnny_shown, hologram_off, all_back, back_to_dark, nothing_left],
+    [setup, hover_edge, hover_edge_measured, select_body, select_body_measured, to_neon,
+     glow_drawn_not_picked, glow_off, glow_compared, hover_edge, hover_edge_measured, select_body,
+     select_body_measured, highlights_compared, sketch_own_colours, hologram_on, hologram_shown,
+     hover_face, hover_shown, select_face, selection_shown, failed_save, failed_save_recovered,
+     stuck_save, stuck_cleared, neon_after_stuck, save_hologram, thumbnails_alike, capture,
+     johnny, johnny_shown, hologram_off, all_back, back_to_dark, nothing_left],
     paced_by="state",
 )
