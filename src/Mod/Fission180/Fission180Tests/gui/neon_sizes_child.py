@@ -2,10 +2,11 @@
 """The second FreeCAD of scenario neon_sizes (scenarios/neon_sizes.py starts it, at another
 Interface size, with a copy of its profile; not a scenario of its own).
 
-In Neon Lights and then in Dark, at the Interface size the parent chose: every label of the
-ribbon, the tabs, the Extrude dialog and the Preferences window is measured. Anything clipped
-in Neon Lights that is not clipped in Dark fails (Review Focus: "Interface size 150 % (and 75 %)
-with the techy font: no clipped labels")."""
+In Neon Lights and then in Dark, at the Interface size the parent chose: every label of every
+ribbon page, every tab bar, the Extrude dialog and the Preferences window is measured. Anything
+clipped in Neon Lights fails, unless it is in ALLOWED with its reason (Review Focus: "Interface
+size 150 % (and 75 %) with the techy font: no clipped labels"). What is clipped in Dark is
+reported, not failed: Dark must not change."""
 
 import os
 
@@ -18,6 +19,64 @@ from Fission180Tests.gui import look_compare as lc
 
 FACTOR = float(os.environ.get("FISSION180_NEON_SIZES_FACTOR", "1"))
 s = {"neon": {}, "dark": {}}
+# (where ends with, text): why it may be clipped in Neon Lights. Keep it short.
+ALLOWED = {}
+
+
+def _tab_font(bar):
+    """The font a tab's text is drawn in: the bar's, with Neon Lights' QTabBar::tab rule
+    (neon_qss_chrome.TAB_FONT) in Neon Lights."""
+    from fission180 import neon_qss_chrome, theme
+
+    font = QtGui.QFont(bar.font())
+    if theme.is_neon():
+        if neon_qss_chrome.TAB_FONT["uppercase"]:
+            font.setCapitalization(QtGui.QFont.AllUppercase)
+        font.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, neon_qss_chrome.TAB_FONT["letter_spacing"])
+    return font
+
+
+def _tab_option(bar, i):
+    """The style option Qt paints tab `i` with (initStyleOption when Python may call it)."""
+    option = QtWidgets.QStyleOptionTab()
+    try:
+        bar.initStyleOption(option, i)
+        return option
+    except (AttributeError, TypeError, RuntimeError):
+        pass
+    option.initFrom(bar)
+    option.rect = bar.tabRect(i)
+    option.text = bar.tabText(i)
+    option.icon = bar.tabIcon(i)
+    option.iconSize = bar.iconSize()
+    option.shape = bar.shape()
+    for side, attr in ((QtWidgets.QTabBar.LeftSide, "leftButtonSize"), (QtWidgets.QTabBar.RightSide, "rightButtonSize")):
+        button = bar.tabButton(i, side)
+        if button is not None and button.isVisible():
+            setattr(option, attr, button.size())
+    return option
+
+
+def tab_clipped(bar, i):
+    """Why tab `i` of `bar` has no room for its text, or None: its text is elided, or wider
+    (in the font it is drawn in) than the room the tab gives it."""
+    text = bar.tabText(i).replace("&&", "\0").replace("&", "").replace("\0", "&")
+    if not text or not bar.isTabVisible(i):
+        return None
+    option = _tab_option(bar, i)
+    shown = option.text.replace("&&", "\0").replace("&", "").replace("\0", "&")
+    if shown != text:
+        return "tab text elided to %r" % shown
+    room = bar.style().subElementRect(QtWidgets.QStyle.SE_TabBarTabText, option, bar)
+    vertical = bar.shape() in (
+        QtWidgets.QTabBar.RoundedWest, QtWidgets.QTabBar.RoundedEast,
+        QtWidgets.QTabBar.TriangularWest, QtWidgets.QTabBar.TriangularEast,
+    )
+    space = room.height() if vertical else room.width()
+    need = QtGui.QFontMetrics(_tab_font(bar)).horizontalAdvance(text)
+    if need > space + 1:
+        return "tab text %d > %d" % (need, space)
+    return None
 
 
 def _rich(text):
@@ -71,8 +130,9 @@ def clipped_in(root):
                     )
             elif isinstance(w, QtWidgets.QTabBar):
                 for i in range(w.count()):
-                    if w.tabRect(i).width() + 1 < w.tabSizeHint(i).width() and not w.elideMode():
-                        out[(_name(w), w.tabText(i))] = "tab %d < %d" % (w.tabRect(i).width(), w.tabSizeHint(i).width())
+                    why = tab_clipped(w, i)
+                    if why:
+                        out[(_name(w), w.tabText(i))] = why
         except RuntimeError:
             continue
     return out
@@ -92,11 +152,20 @@ def scale_is_used():
 
 
 def _measure(look):
-    """The ribbon (every tab), the Extrude dialog and the Preferences window in `look`."""
+    """Every ribbon page (each shown in turn) and every tab bar of the window in `look`."""
     from fission180 import shell
 
     found = s[look]
-    found.update(clipped_in(shell.ribbon()))
+    ribbon = shell.ribbon()
+    front = ribbon.current_tab()
+    pages = list(ribbon.page_index)
+    for tab_id in pages:
+        ribbon.select_tab(tab_id)
+        QtWidgets.QApplication.processEvents()
+        found.update(clipped_in(ribbon))
+    ribbon.select_tab(front)
+    QtWidgets.QApplication.processEvents()
+    s.setdefault("pages", {})[look] = len(pages)
     for bar in Gui.getMainWindow().findChildren(QtWidgets.QTabBar):
         if bar.isVisible():
             found.update(clipped_in(bar))
@@ -201,15 +270,35 @@ def dark_window():
     _measure("dark")
 
 
+def allowed(key):
+    """The reason `key` (where, text) may be clipped, or None."""
+    where, text = key
+    for (end, allowed_text), why in ALLOWED.items():
+        if where.endswith(end) and text == allowed_text:
+            return why
+    return None
+
+
 def compare():
     neon, dark = s["neon"], s["dark"]
-    new = {key: why for key, why in neon.items() if key not in dark}
+    size = round(FACTOR * 100)
+    pages = s.get("pages", {})
     h.check(
-        "Interface size %d %%: nothing is clipped in Neon Lights that is not in Dark" % round(FACTOR * 100),
-        not new,
-        sorted("%s %r: %s" % (k[0], k[1], v) for k, v in new.items())[:20],
+        "Interface size %d %%: every ribbon page was measured in both looks" % size,
+        pages.get("neon", 0) > 1 and pages.get("neon") == pages.get("dark"),
+        pages,
     )
-    print("[Fission 180] neon_sizes %d %%: clipped in Neon %d, in Dark %d" % (round(FACTOR * 100), len(neon), len(dark)), flush=True)
+    bad = {key: why for key, why in neon.items() if allowed(key) is None}
+    h.check(
+        "Interface size %d %%: nothing is clipped in Neon Lights" % size,
+        not bad,
+        sorted("%s %r: %s" % (k[0], k[1], v) for k, v in bad.items())[:20],
+    )
+    for key, why in sorted(neon.items()):
+        print("[Fission 180] neon_sizes %d %%: neon clipped %s %r: %s (%s)" % (size, key[0], key[1], why, allowed(key) or "not allowed"), flush=True)
+    for key, why in sorted(dark.items()):
+        print("[Fission 180] neon_sizes %d %%: dark clipped %s %r: %s" % (size, key[0], key[1], why), flush=True)
+    print("[Fission 180] neon_sizes %d %%: clipped in Neon %d, in Dark %d" % (size, len(neon), len(dark)), flush=True)
 
 
 h.run(

@@ -264,9 +264,10 @@ LOOK = (
 )
 
 
-def _neon_look():
-    """The list in Neon Lights: a small HUD drop-down like the menus (glass, cut corners, a
-    bright bar on the chosen name); "" when the frame pictures are not there."""
+def _neon_look(widget=None):
+    """The list in Neon Lights: a small HUD drop-down like the menus (glass where its window
+    can show it, neon_popups.see_through; cut corners, a bright bar on the chosen name); ""
+    when the frame pictures are not there."""
     from . import neon_popups, neon_style, theme
     from .neon_qss_chrome import border
 
@@ -274,7 +275,8 @@ def _neon_look():
     if "menu" not in frames:
         return ""
     p = theme.palette()
-    ground = "transparent" if neon_popups.compositing() else p["menu"]
+    clear = neon_popups.see_through(widget) if widget is not None else neon_popups.compositing()
+    ground = "transparent" if clear else p["menu"]
     return (
         "QListWidget { background: %s; color: %s; %s }"
         " QListWidget::item { padding: 2px 8px 2px 4px; border-width: 0px 0px 0px 4px;"
@@ -288,7 +290,7 @@ def _look(p):
     """The list's style for the look in use (set only when it changes)."""
     from . import theme
 
-    text = (_neon_look() if theme.is_neon() else "") or LOOK
+    text = (_neon_look(p) if theme.is_neon() else "") or LOOK
     if p.property("fission180Look") != text:
         p.setProperty("fission180Look", text)
         p.setStyleSheet(text)

@@ -124,7 +124,7 @@ class Card(QtWidgets.QFrame):
         from . import theme
 
         if theme.is_neon():
-            text = neon_card_style()
+            text = neon_card_style(self)
             if text:
                 if self.styleSheet() != text:
                     self.setStyleSheet(text)
@@ -223,9 +223,10 @@ class Card(QtWidgets.QFrame):
         self.hide()
 
 
-def neon_card_style():
+def neon_card_style(card=None):
     """The card in Neon Lights: a HUD card (cut corner, bracket marks, glass when the screen
-    can show it), the name in capitals; "" when the frame pictures are not there."""
+    and the card's window can show it, neon_popups.see_through), the name in capitals; ""
+    when the frame pictures are not there."""
     from . import neon_popups, neon_style, theme
     from .neon_qss_chrome import border
 
@@ -233,7 +234,8 @@ def neon_card_style():
     if "tooltip" not in frames:
         return ""
     p = theme.palette()
-    ground = "transparent" if neon_popups.compositing() else p["menu"]
+    clear = neon_popups.see_through(card) if card is not None else neon_popups.compositing()
+    ground = "transparent" if clear else p["menu"]
     return (
         "QFrame#Fission180Tip { background: %s; %s }"
         "QFrame#Fission180Tip QLabel { color: %s; background: transparent; border: none; border-image: none; }"
