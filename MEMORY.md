@@ -81,7 +81,10 @@ and Light pictures 1.6-5.8 % off the baseline, CREATE menu 6 px wider) and neon_
 Inter, GitHub's runners with their system DejaVu (hinting from /etc/fonts, plus
 fonts-dejavu-extra). The look baseline had been recorded with Inter. Fix: `run_tests.sh` starts
 FreeCAD through `AppRun-fission180-tests` (a copy that keeps a FONTCONFIG_FILE already set),
-`gui_env.sh` links exactly the 8 fonts-dejavu-core files; the baseline was recorded again **from
+`gui_env.sh` links exactly the 8 fonts-dejavu-core files and sets Ubuntu's rendering (slight
+hinting, grey antialiasing: without it text came out 1-2 px different from the runners' old
+system setup and insert_canvas, joints_asbuilt_group, sketch_spline_ok, journey_surface missed
+their clicks, CI #165); the baseline was recorded again **from
 the code before Neon Lights** (worktree at 89b5fe89 = develop before the work + the 4 px ribbon
 fix, with today's look_compare/look_unchanged), and today's code matches it. Failed pictures
 now add a "fonts" note (family, widths, FONTCONFIG_FILE; `FISSION180_FONT_REPORT=1` always).

@@ -71,6 +71,30 @@ if [ -d "${_fission180_gui_env_fonts}" ]; then
   <alias><family>sans-serif</family><prefer><family>DejaVu Sans</family></prefer></alias>
   <alias><family>serif</family><prefer><family>DejaVu Serif</family></prefer></alias>
   <alias><family>monospace</family><prefer><family>DejaVu Sans Mono</family></prefer></alias>
+  <!-- Ubuntu's own rendering (fontconfig-config): slight hinting, grey antialiasing; text is as
+       wide as with the runners' system fonts before 2026-11-21, so clicks land where they did -->
+  <match target="pattern">
+    <edit name="antialias" mode="append"><bool>true</bool></edit>
+    <edit name="hintstyle" mode="append"><const>hintslight</const></edit>
+    <edit name="rgba" mode="append"><const>none</const></edit>
+    <edit name="lcdfilter" mode="append"><const>lcddefault</const></edit>
+  </match>
+  <!-- (fonts-dejavu-core: no hinting below 8 pixels) -->
+  <match target="font">
+    <test name="family"><string>DejaVu Sans</string></test>
+    <test compare="less" name="pixelsize"><double>7.5</double></test>
+    <edit name="hinting"><bool>false</bool></edit>
+  </match>
+  <match target="font">
+    <test name="family"><string>DejaVu Serif</string></test>
+    <test compare="less" name="pixelsize"><double>7.5</double></test>
+    <edit name="hinting"><bool>false</bool></edit>
+  </match>
+  <match target="font">
+    <test name="family"><string>DejaVu Sans Mono</string></test>
+    <test compare="less" name="pixelsize"><double>7.5</double></test>
+    <edit name="hinting"><bool>false</bool></edit>
+  </match>
 </fontconfig>
 EOF
     export FONTCONFIG_FILE="${_fission180_gui_env_dir}/fonts.conf"
