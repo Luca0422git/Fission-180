@@ -133,7 +133,8 @@ def window_image():
 def set_look(name):
     from fission180 import preferences_ui, theme
 
-    if theme.current() != name or theme.name() != name:
+    # (theme.name() came with Neon Lights: the baseline is recorded on the code before it)
+    if theme.current() != name or getattr(theme, "name", theme.current)() != name:
         preferences_ui.save({"theme": name})
     QtWidgets.QApplication.processEvents()
 

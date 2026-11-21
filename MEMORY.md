@@ -31,7 +31,7 @@ Qt gave the ribbon's tool bar its style margin back and the whole window sat 4 p
 `icons/ui/split_body.svg` differently from the committed file (an old hand edit): restore it after
 running. (3) A frame rule named like a palette key in a style template put a border-image into a
 `background:` and Qt dropped every later rule (window white); test now guards it.
-[x] Phase A [x] builders merged [x] Luca tested ("Everything seems to be working", 2026-11-21) [x] merged into develop as 0.1.0-beta.4.1.0 [ ] CI green [ ] patch release (Luca).
+[x] Phase A [x] builders merged [x] Luca tested ("Everything seems to be working", 2026-11-21) [x] merged into develop as 0.1.0-beta.4.1.0 [ ] CI green [ ] patch release (Luca asked for it released by the morning of 2026-11-21).
 **2026-11-21 (after midnight): Phase B done, tested, on `sf/neon-lights` (352d2de7).** Ten builders
 (22:00-22:40 UTC), five independent reviewers (two branches each; ~40 real problems: speed of the
 effects layer, ViewCube and animated Home; menus black when first opened in Dark; glow highlights
@@ -73,6 +73,23 @@ handle to every `Gui::QuantitySpinBox` made after that was invalid. Fixed in 00a
 watcher only notes that the task view changed and fits titles once the event loop is back;
 titles are fitted at a start in Neon too. Scenario `neon_extrude` (Dark, then a switch to Neon:
 typed and dragged Extrude, every value field of Fillet and Draft usable) failed before.
+**2026-11-21 (night): CI red on the Neon merge, fixed; the GUI tests' fonts never were the same
+everywhere.** CI #162/#163 failed look_unchanged, neon_switch, neon_shell, neon_start_dark (Dark
+and Light pictures 1.6-5.8 % off the baseline, CREATE menu 6 px wider) and neon_panels. Cause 1
+(tests): **FreeCAD's AppImage `AppRun` sets `FONTCONFIG_FILE=/etc/fonts/fonts.conf` itself**, so
+`gui_env.sh`'s DejaVu-only fonts never reached FreeCAD: the sandbox drew every GUI test with
+Inter, GitHub's runners with their system DejaVu (hinting from /etc/fonts, plus
+fonts-dejavu-extra). The look baseline had been recorded with Inter. Fix: `run_tests.sh` starts
+FreeCAD through `AppRun-fission180-tests` (a copy that keeps a FONTCONFIG_FILE already set),
+`gui_env.sh` links exactly the 8 fonts-dejavu-core files; the baseline was recorded again **from
+the code before Neon Lights** (worktree at 89b5fe89 = develop before the work + the 4 px ribbon
+fix, with today's look_compare/look_unchanged), and today's code matches it. Failed pictures
+now add a "fonts" note (family, widths, FONTCONFIG_FILE; `FISSION180_FONT_REPORT=1` always).
+Cause 2 (real, Neon): Neon's wider font raised the Data Panel dock's least width (292 -> 298 px)
+and nothing lowered it, so back in Dark the panel stayed 6 px wider. `theme.set_theme` now keeps
+each docked panel's size and least size before Neon and, on leaving Neon, puts back those Neon
+widened (one a person made bigger keeps its size). Not covered: a start in Neon then a switch
+(no "before" sizes).
 **Lessons: never take hold of a widget in a ChildAdded/Polish filter (it is half built); every
 new look/listener needs a scenario that switches looks mid-session and then really models
 (type a value, drag an arrow, OK), not only opens dialogs and checks colours.** Also seen once:

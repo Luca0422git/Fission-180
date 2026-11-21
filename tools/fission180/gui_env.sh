@@ -14,6 +14,8 @@
 # the same text). Differences from Luca's Windows PC that no setting removes: Windows draws
 # with Segoe UI at its own scale, a GPU renders the 3D view and a window manager places
 # dialogs. A scenario whose clicks depend on a dialog's size says so in a comment.
+# (FreeCAD's AppRun sets FONTCONFIG_FILE itself: run_tests.sh starts FreeCAD through a copy
+# that keeps this one. Before 2026-11-21 it did not, and every machine used its own fonts.)
 
 _fission180_gui_env_repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 _fission180_gui_env_fonts=/usr/share/fonts/truetype/dejavu
@@ -48,12 +50,23 @@ export TZ=UTC
 
 if [ -d "${_fission180_gui_env_fonts}" ]; then
     _fission180_gui_env_dir="${FISSION180_GUI_ENV_DIR:-${_fission180_gui_env_repo}/.fission180-cache/gui-env}"
-    mkdir -p "${_fission180_gui_env_dir}/fontcache"
+    mkdir -p "${_fission180_gui_env_dir}/fontcache" "${_fission180_gui_env_dir}/fonts"
+    # Exactly the files of fonts-dejavu-core: GitHub's runners also have fonts-dejavu-extra in
+    # the same folder (Condensed, ExtraLight, Oblique, ...), the sandbox does not
+    rm -f "${_fission180_gui_env_dir}/fonts/"*.ttf
+    for _fission180_gui_env_font in DejaVuSans.ttf DejaVuSans-Bold.ttf DejaVuSansMono.ttf \
+        DejaVuSansMono-Bold.ttf DejaVuSansMono-Oblique.ttf DejaVuSansMono-BoldOblique.ttf \
+        DejaVuSerif.ttf DejaVuSerif-Bold.ttf; do
+        if [ -f "${_fission180_gui_env_fonts}/${_fission180_gui_env_font}" ]; then
+            ln -sf "${_fission180_gui_env_fonts}/${_fission180_gui_env_font}" \
+                "${_fission180_gui_env_dir}/fonts/${_fission180_gui_env_font}"
+        fi
+    done
     cat > "${_fission180_gui_env_dir}/fonts.conf" <<EOF
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
-  <dir>${_fission180_gui_env_fonts}</dir>
+  <dir>${_fission180_gui_env_dir}/fonts</dir>
   <cachedir>${_fission180_gui_env_dir}/fontcache</cachedir>
   <alias><family>sans-serif</family><prefer><family>DejaVu Sans</family></prefer></alias>
   <alias><family>serif</family><prefer><family>DejaVu Serif</family></prefer></alias>

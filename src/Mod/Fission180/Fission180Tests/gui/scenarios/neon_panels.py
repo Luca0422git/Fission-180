@@ -379,7 +379,6 @@ def dark_data_panel_picture():
     s["dark"]["upload"] = picture(panel.upload)
     s["dark"]["crumbs"] = picture(panel.crumbs)
     s["dark_crumbs_text"] = panel.crumbs.text()
-    lc.font_report(panel.crumbs, [panel.crumbs.text()[:80]])
 
 
 def dark_sketch():

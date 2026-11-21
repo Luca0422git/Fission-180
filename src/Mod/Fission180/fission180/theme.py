@@ -782,6 +782,12 @@ def set_theme(name):
     import FreeCAD as App
 
     was_neon = is_neon()
+    to_neon = (name if name in THEMES else "dark") == "neon"
+    if to_neon and not was_neon:
+        _state["dock_sizes"] = _dock_sizes()  # put back when leaving Neon Lights
+    leaving = None
+    if was_neon and not to_neon:
+        leaving = _docks_neon_widened()
     App.ParamGet(PREF[0]).SetString(PREF[1], name if name in THEMES else "dark")
     if was_neon and current() != "neon":
         _neon_part("disable")  # Neon Lights' own parts go before the look changes
@@ -790,8 +796,116 @@ def set_theme(name):
     if is_neon() and not was_neon:
         _state["switched"] = True  # switched to it during the run: no boot screen (neon_boot)
         _neon_part("enable")
+    if leaving:
+        _later(lambda: _resize_docks(leaving))
     log("look: %s" % _state["name"])
     return _state["name"]
+
+
+# -- the panels beside the 3D view keep their size through Neon Lights -------------------------
+# Neon's wider font makes a docked panel need more room (the Data Panel: 292 -> 298 pixels), and
+# Qt widens the dock; back in Dark it kept the Neon width (neon_panels on CI, 2026-11-21).
+def _main_window():
+    try:
+        import FreeCADGui as Gui
+
+        return Gui.getMainWindow()
+    except Exception:
+        return None
+
+
+def _dock_side(main, dock):
+    """(orientation, size, least size) of a docked, visible panel along the side it grows on;
+    None for a floating or hidden one."""
+    from PySide import QtCore
+
+    if dock.isFloating() or not dock.isVisible():
+        return None
+    area = main.dockWidgetArea(dock)
+    if area in (QtCore.Qt.LeftDockWidgetArea, QtCore.Qt.RightDockWidgetArea):
+        return QtCore.Qt.Horizontal, dock.width(), dock.minimumWidth()
+    if area in (QtCore.Qt.TopDockWidgetArea, QtCore.Qt.BottomDockWidgetArea):
+        return QtCore.Qt.Vertical, dock.height(), dock.minimumHeight()
+    return None
+
+
+def _dock_sizes():
+    """{dock: (size, least size)} of the docked panels now (before Neon Lights)."""
+    out = {}
+    try:
+        from PySide import QtWidgets
+
+        main = _main_window()
+        if main is None:
+            return out
+        for dock in main.findChildren(QtWidgets.QDockWidget):
+            side = _dock_side(main, dock)
+            if side is not None:
+                out[dock] = side[1:]
+    except Exception as exc:
+        warn("theme: panel sizes: %s" % exc)
+    return out
+
+
+def _docks_neon_widened():
+    """[(dock, orientation, size, least size)] from before Neon Lights of the panels it made
+    bigger, while it is still on: a panel at no more than the size Neon needed (its old size or
+    Neon's least one) grew only because of Neon; one a person made bigger keeps its size."""
+    out = []
+    try:
+        from PySide import QtCore
+
+        main = _main_window()
+        kept = _state.pop("dock_sizes", None) or {}
+        for dock, (before, least_before) in kept.items():
+            try:
+                side = _dock_side(main, dock)
+            except RuntimeError:
+                continue  # (the panel was closed for good)
+            if side is None:
+                continue
+            orientation, now, least = side
+            hint = dock.minimumSizeHint()
+            least = max(least, hint.width() if orientation == QtCore.Qt.Horizontal else hint.height())
+            if before < now <= max(before, least):
+                out.append((dock, orientation, before, least_before))
+    except Exception as exc:
+        warn("theme: panel sizes: %s" % exc)
+    return out
+
+
+def _later(action):
+    try:
+        from PySide import QtCore
+
+        QtCore.QTimer.singleShot(0, action)
+    except Exception as exc:
+        warn("theme: %s" % exc)
+
+
+def _resize_docks(docks):
+    """The panels Neon Lights widened back at their size from before it (after the new look's
+    style is in place, so they may be that small again)."""
+    try:
+        from PySide import QtCore
+
+        main = _main_window()
+        if main is None:
+            return
+        for dock, orientation, size, least in docks:
+            try:
+                if not dock.isFloating() and dock.isVisible():
+                    # Neon's wider content raised the dock's least size (Data Panel: 292 ->
+                    # 298), and nothing lowers it again: the one it had before
+                    if orientation == QtCore.Qt.Horizontal and dock.minimumWidth() > least:
+                        dock.setMinimumWidth(least)
+                    elif orientation == QtCore.Qt.Vertical and dock.minimumHeight() > least:
+                        dock.setMinimumHeight(least)
+                    main.resizeDocks([dock], [size], orientation)
+            except RuntimeError:
+                pass
+    except Exception as exc:
+        warn("theme: panel sizes: %s" % exc)
 
 
 def refresh_neon():

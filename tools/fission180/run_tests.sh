@@ -94,6 +94,21 @@ if [ -x "${FREECAD_DIR}/squashfs-root/AppRun" ]; then
         FC_CMD=("${FREECAD_DIR}/squashfs-root/AppRun" freecadcmd)
         FC_GUI=("${FREECAD_DIR}/squashfs-root/AppRun" freecad)
     fi
+    # The AppImage's AppRun sets FONTCONFIG_FILE=/etc/fonts/fonts.conf itself, which threw away
+    # gui_env.sh's DejaVu-only fonts: until 2026-11-21 every machine drew the GUI tests with its
+    # own fonts (the Claude sandbox with Inter, GitHub's runners with theirs), so pictures taken
+    # in one place differed from the other (look_unchanged, CI #162). A copy of AppRun that keeps
+    # a FONTCONFIG_FILE already set starts FreeCAD instead.
+    apprun="${FREECAD_DIR}/squashfs-root/AppRun"
+    if grep -q '^export FONTCONFIG_FILE=' "${apprun}"; then
+        tests_apprun="${FREECAD_DIR}/squashfs-root/AppRun-fission180-tests"
+        sed -e 's|^export FONTCONFIG_FILE=\(.*\)$|export FONTCONFIG_FILE="${FONTCONFIG_FILE:-\1}"|' \
+            -e 's|^export FONTCONFIG_PATH=\(.*\)$|export FONTCONFIG_PATH="${FONTCONFIG_PATH:-\1}"|' \
+            "${apprun}" > "${tests_apprun}.tmp" && chmod 755 "${tests_apprun}.tmp" \
+            && mv "${tests_apprun}.tmp" "${tests_apprun}" && apprun="${tests_apprun}"
+    fi
+    FC_CMD=("${apprun}" "${FC_CMD[@]:1}")
+    FC_GUI=("${apprun}" "${FC_GUI[@]:1}")
     # A Fission 180 AppImage already has the module built in; stock FreeCAD needs the add-on link.
     if [ -d "${FREECAD_DIR}/squashfs-root/usr/Mod/Fission180" ]; then ADDON=0; else ADDON=1; fi
 elif ls "${FREECAD_DIR}"/bin/{Fission180Cmd,fission180cmd,FreeCADCmd,freecadcmd} >/dev/null 2>&1; then

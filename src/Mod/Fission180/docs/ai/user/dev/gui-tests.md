@@ -30,7 +30,9 @@ scenario (CI #277 to #287). This page is how they work now. The brief that start
 5. **A failure says what it waited for**, with what was on screen instead and a screenshot; open
    menus and modal dialogs are closed and the scenario stops in seconds.
 6. **Every scenario starts from a clean profile** (`run_tests.sh` copies one for each run).
-7. **Same environment everywhere** (`tools/fission180/gui_env.sh`).
+7. **Same environment everywhere** (`tools/fission180/gui_env.sh`). FreeCAD's AppImage `AppRun`
+   sets `FONTCONFIG_FILE` itself, so `run_tests.sh` starts FreeCAD through a copy that keeps
+   gui_env's (until 2026-11-21 it did not: the sandbox drew with Inter, CI with its own fonts).
 8. **Retries diagnose, they never pass a test.** A failed scenario runs once more in a fresh
    profile only to label it FLAKY (failed, then passed: a race to fix) or FAILED (twice). The
    job stays red either way.
