@@ -31,7 +31,32 @@ Qt gave the ribbon's tool bar its style margin back and the whole window sat 4 p
 `icons/ui/split_body.svg` differently from the committed file (an old hand edit): restore it after
 running. (3) A frame rule named like a palette key in a style template put a border-image into a
 `background:` and Qt dropped every later rule (window white); test now guards it.
-[x] Phase A [ ] builders merged [ ] Luca's hardware checks [ ] merged into develop.
+[x] Phase A [x] builders merged [ ] Luca's hardware checks [ ] merged into develop.
+**2026-11-21 (after midnight): Phase B done, tested, on `sf/neon-lights` (352d2de7).** Ten builders
+(22:00-22:40 UTC), five independent reviewers (two branches each; ~40 real problems: speed of the
+effects layer, ViewCube and animated Home; menus black when first opened in Dark; glow highlights
+10 px wide; a failed save left the normal look on; leftovers in Dark; clipped labels; unreadable
+custom colours; icons with the alert colour), nine fix builders (`sf/neon-*-fix`), merged on the
+local `neon-integration` (pushed as `sf/neon-integration`), then `sf/neon-lights` fast-forwarded.
+Every builder report is in `docs/fission180/sessions/neon-*.md`, screenshots in
+`docs/fission180/images/neon/`. Tests at 352d2de7: unit all pass; scenarios look_unchanged,
+look_light, home_screen, misc_preferences and all 17 neon_* (incl. neon_sizes, neon_start_dark,
+neon_glow_speed, neon_effects_selfcheck) PASS. Measured here: all effects +0.9 % CPU per orbit
+frame (layer never repaints during 3D frames), animated Home ~1.5-2 % of a core, ViewCube 2.0 ms.
+Facts found: (1) **FreeCAD copies `SketchFaceColor` / `SketchEdgeColor` / `SketchVertexColor` into
+every sketch's saved ShapeAppearance / LineColor / PointColor** (ViewProviderSketch's parameter
+map): a look must never change those parameters (it marked designs modified). (2) Qt gives a
+window an alpha channel only if `WA_TranslucentBackground` is set before its native window
+exists: pop-ups already shown in Dark get a solid neon ground (chrome-fix). (3) Dark already clips
+some ribbon group labels at 150 % interface size (CONSTRAINTS, CONTACTS, MATERIALS) and every
+dialog title's size hint: old, Dark-only, left as is (Dark must not change); neon_sizes fails only
+on what Neon clips and Dark does not. (4) Saved previews of a design whose part sits on z = 0 vary
+up to 1.6 % between two saves in any look (grid and faces in one plane); neon_scene allows 2 %
+and keeps its strict "no neon colour in the preview" check. (5) Builders all edited MEMORY.md
+and neon_showcase.py despite the brief: keep the orchestrator's MEMORY at merges.
+Next: Luca's hardware check (plan C3) on Windows and Linux with the CI quick update of
+`sf/neon-lights` and Fission 180 > Diagnostics > Neon self-check; then the rim light default,
+CHANGELOG, version, merge into develop, release.
 
 **2026-11-16: 0.1.0-beta.4.0.3 broke the hover highlight; fixed as 0.1.0-beta.4.0.4** Luca:
 "the faces on bodies and whole bodies dont highlight when hovering over them anymore". Cause:
