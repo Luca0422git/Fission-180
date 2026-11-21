@@ -330,18 +330,26 @@ def _neon_again():
     return theme.is_neon() and not theme._neon.get("normal") and _off(_corners()[0], _rgb255(top)) <= 6
 
 
+# This design's grid lines at height 0 and the pad's bottom face / the profile's shade lie in
+# the same plane, so which one a preview shows there varies from save to save in every look
+# (up to 1.6 % of pixels between two saves in Dark; seen 0.6 % at the merge, 2026-11-21: Dark's
+# own axis colours blended with grey, no neon colour). The strict guard is the check below it:
+# no neon colour in the saved preview (0.1 %).
+PREVIEW_NOISE = 0.02
+
+
 def _previews_alike(dark_key, neon_key, label):
     dark, neon = _thumbnail(s[dark_key]), _thumbnail(s[neon_key])
     if dark is None or neon is None:
         h.check("%s: both files have a preview picture" % label, False, (dark is None, neon is None))
         return
     share = lc._differing(dark, neon) if dark.size() == neon.size() else 1.0
-    if share > lc.SHARE:
+    if share > PREVIEW_NOISE:
         dark.save(os.path.join(h.OUT_DIR, "neon_scene-thumb-%s-dark.png" % neon_key))
         neon.save(os.path.join(h.OUT_DIR, "neon_scene-thumb-%s-neon.png" % neon_key))
     h.check(
         "%s: the preview saved in Neon Lights is the one saved in Dark" % label,
-        share <= lc.SHARE,
+        share <= PREVIEW_NOISE,
         "%.3f%% of pixels differ" % (share * 100),
     )
     h.check(
