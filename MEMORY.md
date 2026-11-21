@@ -31,7 +31,7 @@ Qt gave the ribbon's tool bar its style margin back and the whole window sat 4 p
 `icons/ui/split_body.svg` differently from the committed file (an old hand edit): restore it after
 running. (3) A frame rule named like a palette key in a style template put a border-image into a
 `background:` and Qt dropped every later rule (window white); test now guards it.
-[x] Phase A [x] builders merged [ ] Luca's hardware checks [ ] merged into develop.
+[x] Phase A [x] builders merged [x] Luca tested ("Everything seems to be working", 2026-11-21) [x] merged into develop as 0.1.0-beta.4.1.0 [ ] CI green [ ] patch release (Luca).
 **2026-11-21 (after midnight): Phase B done, tested, on `sf/neon-lights` (352d2de7).** Ten builders
 (22:00-22:40 UTC), five independent reviewers (two branches each; ~40 real problems: speed of the
 effects layer, ViewCube and animated Home; menus black when first opened in Dark; glow highlights
@@ -54,6 +54,15 @@ on what Neon clips and Dark does not. (4) Saved previews of a design whose part 
 up to 1.6 % between two saves in any look (grid and faces in one plane); neon_scene allows 2 %
 and keeps its strict "no neon colour in the preview" check. (5) Builders all edited MEMORY.md
 and neon_showcase.py despite the brief: keep the orchestrator's MEMORY at merges.
+**2026-11-21: Neon Lights merged into `develop` as 0.1.0-beta.4.1.0** (Luca: "Everything seems to
+be working. Let's get it pushed"). VERSION, `_FALLBACK_VERSION`, CHANGELOG ("### New" + the 4 px
+ribbon fix). Rim light ships on "auto": its self-test runs the first time Hologram needs it,
+behind a stored "testing" flag (a crash there means flat glass next time), so no extra gate.
+Last run on the merge: unit all pass; look_unchanged, look_light, neon_switch, neon_extrude,
+home_screen PASS (the full neon_* set passed on sf/neon-lights before). Release: when
+Actions > Fission 180 tests is green on develop, Luca runs Actions > Fission 180 patch release.
+Leftovers: the `sf/neon-*` builder branches on GitHub can be deleted; `neon_panels` DOF-line
+flake (see below); Dark clips some ribbon group labels at 150 % (old, Dark-only).
 **2026-11-21: Luca's first test found every command broken after a switch to Neon Lights**
 (Extrude: arrow and typed 10 mm read 0, "the distance must not be zero"; Draft: "Internal C++
 object (QAbstractSpinBox) already deleted"; Fillet's value box empty; starting in Neon Lights was

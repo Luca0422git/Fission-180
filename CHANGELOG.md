@@ -8,6 +8,40 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.1.0
+
+### New
+
+- **Neon Lights, a third look.** Preferences > General > Look > **Neon Lights** turns the whole
+  window into a cyberpunk screen: cut-corner glowing frames with bracket marks, see-through
+  menus that fade in, hazard stripes on dialog titles and warnings, segmented progress bars,
+  the techy Chakra Petch / Orbitron fonts, a glowing wireframe ViewCube and 426 icons redrawn
+  as neon line art. Dark and Light look exactly as before.
+- **17 colour presets with your own colours on top**: Johnny, V, Night City, Judy, Arasaka,
+  The Grid, Replicant, Red Pill, Kaneda, Section 9, Outrun, Vaporwave, Miami, Pip-Boy,
+  Mainframe, Augmented and Upside Down. The new **Neon Lights** page in Preferences picks a
+  preset, changes any colour (including the outline colour of your bodies), saves your own
+  colour sets, and shows every change in the window at once. Text always stays readable,
+  whatever colours you pick.
+- **Glowing body outlines and Hologram bodies.** In Neon Lights the edges of your bodies glow in
+  the outline colour; the **Hologram** button on the navigation bar turns them into see-through
+  tinted glass with bright edges. Only what you see changes: designs are saved exactly as in
+  Dark, and the preview picture in the file stays the normal look. Capture Image shows the neon
+  screen, or the normal look with its "Normal look" box ticked.
+- **Screen effects** (each one switchable, with a strength): glow, scan lines, a CRT vignette and
+  an occasional glitch that never fires while you drag, pick or type. They are lighter over the
+  model and cost about 1 % while turning it.
+- **Extras**, each with its own switch: a boot-up screen when Fission 180 starts in Neon Lights
+  (any click or key skips it), an animated Home background, and UI sounds (off until you turn
+  them on).
+- **Fission 180 > Diagnostics > Neon self-check** measures the effects and Hologram on your
+  graphics card and gives a report to paste back.
+
+### Fixed
+
+- **After switching between Light and Dark the whole window sat 4 pixels lower** than at start
+  (the ribbon's bar got Qt's margin back). It stays where it was now.
+
 ## 0.1.0-beta.4.0.4
 
 ### Fixed
