@@ -43,7 +43,42 @@ def _differing(a, b):
     return bad / float(max(1, width * height))
 
 
-def compare(name, image):
+def _font(font):
+    info = QtGui.QFontInfo(font)
+    return "%s -> %s %s %.1fpt/%dpx" % (
+        font.family() or ",".join(font.families()), info.family(), info.styleName(),
+        info.pointSizeF(), info.pixelSize(),
+    )
+
+
+def font_report(widget=None, texts=()):
+    """Which fonts this machine draws with (a note on a failed picture: pictures recorded on
+    one machine and compared on another differ when their fonts do)."""
+    parts = []
+    try:
+        app = QtWidgets.QApplication.instance()
+        parts.append("app %s" % _font(app.font()))
+        if widget is not None:
+            parts.append("widget %s" % _font(widget.font()))
+            metrics = QtGui.QFontMetrics(widget.font())
+            for text in texts:
+                parts.append("%r %dpx" % (text, metrics.horizontalAdvance(text)))
+        screen = app.primaryScreen()
+        if screen is not None:
+            parts.append("dpi %.1f ratio %.2f" % (screen.logicalDotsPerInch(), screen.devicePixelRatio()))
+        conf = os.environ.get("FONTCONFIG_FILE", "")
+        parts.append("FONTCONFIG_FILE %s" % (conf or "-"))
+        families = QtGui.QFontDatabase.families()
+        parts.append("%d families: %s" % (len(families), ", ".join(families[:20])))
+        folder = "/usr/share/fonts/truetype/dejavu"
+        if os.path.isdir(folder):
+            parts.append("dejavu: %s" % ", ".join(sorted(os.listdir(folder))))
+    except Exception as exc:
+        parts.append("(font report: %s)" % exc)
+    h.note("fonts", "; ".join(parts))
+
+
+def compare(name, image, widget=None, texts=()):
     """Record or compare one picture."""
     path = os.path.join(BASELINE, name + ".png")
     if RECORD:
@@ -51,16 +86,20 @@ def compare(name, image):
         image.save(path)
         h.check("recorded %s" % name, os.path.isfile(path), path)
         return
+    if os.environ.get("FISSION180_FONT_REPORT") == "1":
+        font_report(widget, texts)
     saved = QtGui.QImage(path)
     if saved.isNull():
         h.check("%s: a baseline exists" % name, False, path)
         return
     if saved.size() != image.size():
+        font_report(widget, texts)
         h.check("%s: same size as before" % name, False, (saved.size(), image.size()))
         return
     share = _differing(saved, image)
     if share > SHARE:
         image.save(os.path.join(h.OUT_DIR, "look_unchanged-%s-now.png" % name))
+        font_report(widget, texts)
     h.check("%s looks as before" % name, share <= SHARE, "%.4f%% of pixels differ" % (share * 100))
 
 
@@ -149,7 +188,8 @@ def make_round(look, prefix=""):
             return
 
         def read(shown):
-            compare("%s-menu" % look, shown.grab().toImage())
+            texts = [a.text() for a in shown.actions() if a.text()]
+            compare("%s-menu" % look, shown.grab().toImage(), shown, texts)
 
         h.choose_from(label.click, [], "CREATE's drop-down", read=read)
         h.wait_for(lambda: h.open_menu() is None, "the menu to close")

@@ -108,6 +108,8 @@ def same_as_dark(name, widget, own=False):
         return
     now = picture(widget, own)
     if now.size() != before.size():
+        text = widget.text() if hasattr(widget, "text") else ""
+        lc.font_report(widget, [text[:80]] if text else [])
         h.check("%s: the same size as in Dark" % name, False, (before.size(), now.size()))
         return
     share = lc._differing(before, now)
@@ -377,6 +379,7 @@ def dark_data_panel_picture():
     s["dark"]["upload"] = picture(panel.upload)
     s["dark"]["crumbs"] = picture(panel.crumbs)
     s["dark_crumbs_text"] = panel.crumbs.text()
+    lc.font_report(panel.crumbs, [panel.crumbs.text()[:80]])
 
 
 def dark_sketch():
