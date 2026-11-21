@@ -31,7 +31,7 @@ Qt gave the ribbon's tool bar its style margin back and the whole window sat 4 p
 `icons/ui/split_body.svg` differently from the committed file (an old hand edit): restore it after
 running. (3) A frame rule named like a palette key in a style template put a border-image into a
 `background:` and Qt dropped every later rule (window white); test now guards it.
-[x] Phase A [x] builders merged [x] Luca tested ("Everything seems to be working", 2026-11-21) [x] merged into develop as 0.1.0-beta.4.1.0 [ ] CI green [ ] patch release (Luca asked for it released by the morning of 2026-11-21).
+[x] Phase A [x] builders merged [x] Luca tested ("Everything seems to be working", 2026-11-21) [x] merged into develop as 0.1.0-beta.4.1.0 [x] CI green (#166, 1375f138) [x] **0.1.0-beta.4.1.0 released 2026-11-21 10:33 UTC** (patch release run #20; `Release` and the tag at 1375f138).
 **2026-11-21 (after midnight): Phase B done, tested, on `sf/neon-lights` (352d2de7).** Ten builders
 (22:00-22:40 UTC), five independent reviewers (two branches each; ~40 real problems: speed of the
 effects layer, ViewCube and animated Home; menus black when first opened in Dark; glow highlights
@@ -2506,6 +2506,24 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
+
+Luca: "And released / Keep working through the night. If jobs fail, fix them." CI #162/#163
+failed the Dark/Light picture checks and neon_panels. Found: the GUI tests never used
+gui_env's fonts (FreeCAD's AppRun sets FONTCONFIG_FILE itself; the sandbox drew with Inter, the
+runners with their own DejaVu), plus a real Neon leftover (the Data Panel stayed 6 px wider in
+Dark after Neon). Fixed in 6de2c1e1 (AppRun-fission180-tests, exactly the 8 fonts-dejavu-core
+files, theme.set_theme puts back the panels Neon widened, baseline recorded again from the code
+before Neon) and 1375f138 (Ubuntu's slight hinting, so text is as wide as on the runners
+before: CI #165 had 4 scenarios missing clicks without it). CI #166 green (the Windows simulation
+job hit the known CalculiX crash once, green on its re-run). Patch release trial #19 green,
+then run #20 published 0.1.0-beta.4.1.0 at 10:33 UTC. Lessons: (1) a picture baseline must be
+recorded in the environment CI uses; check the fonts the app really drew with
+(`FISSION180_FONT_REPORT=1`) before trusting one. (2) Never push to develop between a green
+test run and the patch release (the release takes develop's newest commit and needs its tests).
+Open: neon_panels DOF-line flake; the `sf/neon-*` branches can be deleted; a start in Neon
+then a switch does not give the Data Panel its Dark width back (no "before" size).
 
 ### Session log: book parity wave 7 finished, 0.1.0-beta.4.0.1 released, patch 4.0.2 (`develop`, 2026-11-12)
 
