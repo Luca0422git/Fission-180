@@ -54,6 +54,21 @@ on what Neon clips and Dark does not. (4) Saved previews of a design whose part 
 up to 1.6 % between two saves in any look (grid and faces in one plane); neon_scene allows 2 %
 and keeps its strict "no neon colour in the preview" check. (5) Builders all edited MEMORY.md
 and neon_showcase.py despite the brief: keep the orchestrator's MEMORY at merges.
+**2026-11-21: Luca's first test found every command broken after a switch to Neon Lights**
+(Extrude: arrow and typed 10 mm read 0, "the distance must not be zero"; Draft: "Internal C++
+object (QAbstractSpinBox) already deleted"; Fillet's value box empty; starting in Neon Lights was
+fine). Cause, bisected in the app: the panels builder's dialog-title watcher (installed by
+`neon_qss_panels.theme_changed`, i.e. only on a look switch) handled ChildAdded with
+`event.child()` + `findChildren()` under it while Qt was still building the child; Python's
+handle to every `Gui::QuantitySpinBox` made after that was invalid. Fixed in 00aaa8f7: the
+watcher only notes that the task view changed and fits titles once the event loop is back;
+titles are fitted at a start in Neon too. Scenario `neon_extrude` (Dark, then a switch to Neon:
+typed and dragged Extrude, every value field of Fillet and Draft usable) failed before.
+**Lessons: never take hold of a widget in a ChildAdded/Polish filter (it is half built); every
+new look/listener needs a scenario that switches looks mid-session and then really models
+(type a value, drag an arrow, OK), not only opens dialogs and checks colours.** Also seen once:
+`neon_panels` "the degrees-of-freedom line as in Dark" failed then passed (FLAKY): a race with
+the sketch palette's 0.3 s poll; open.
 Next: Luca's hardware check (plan C3) on Windows and Linux with the CI quick update of
 `sf/neon-lights` and Fission 180 > Diagnostics > Neon self-check; then the rim light default,
 CHANGELOG, version, merge into develop, release.
