@@ -7,8 +7,9 @@ step's own when no face of its base lies on the same surface); ``HoverLook`` dra
 on top of the 3D view in its own Coin nodes (never FreeCAD's, which FreeCAD may delete).
 """
 from . import warn
+from .neon_scene_core import Live
 
-COLOR = (0.30, 0.62, 0.95)  # Fusion's hover blue
+COLOR = Live((0.30, 0.62, 0.95), "hover")  # Fusion's hover blue
 TOL = 1e-6
 
 

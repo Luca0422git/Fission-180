@@ -44,6 +44,9 @@ PAGES = [
     # Fission 180's own: where 3D Print (UTILITIES > MAKE) sends the design. Fusion keeps its
     # print utility in the 3D Print dialog only; the dialog remembers its choices here too.
     ("print", "3D Print", None),
+    # Fission 180's own: the Neon Lights look's presets, colours and effects (neon-lights-design.md
+    # 6.10; neon_prefs_ui.py builds the page, everything on it applies at once)
+    ("neon", "Neon Lights", None),
 ]
 
 # 3D Print's Send to choices (slicer_core has the slicers) and its formats (export.py's
@@ -207,10 +210,12 @@ OPTIONS = [
         choices=[
             ("dark", "Dark (Fission 180's own)", True, ""),
             ("light", "Light (white, like Fusion's default)", True, ""),
+            ("neon", "Neon Lights (cyberpunk, your colours)", True, ""),
         ],
         tip="Fission 180's colours. Dark: Fission 180's own look. Light: the white look of Fusion's "
-        "default. The window changes at once; a few icons of FreeCAD's own menus change at "
-        "the next start.",
+        "default. Neon Lights: a cyberpunk look with glowing colours you choose (its own page "
+        "in Preferences). The window changes at once; a few icons of FreeCAD's own menus "
+        "change at the next start.",
         apply="theme",
     ),
     _option(

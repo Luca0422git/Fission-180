@@ -257,6 +257,45 @@ def _typed(_text=None):
     _show(edit, found)
 
 
+LOOK = (
+    "QListWidget { background: #ffffff; color: #111111; border: 1px solid #3fa9f5; }"
+    " QListWidget::item { padding: 2px 8px; }"
+    " QListWidget::item:selected { background: #3fa9f5; color: #ffffff; }"
+)
+
+
+def _neon_look(widget=None):
+    """The list in Neon Lights: a small HUD drop-down like the menus (glass where its window
+    can show it, neon_popups.see_through; cut corners, a bright bar on the chosen name); ""
+    when the frame pictures are not there."""
+    from . import neon_popups, neon_style, theme
+    from .neon_qss_chrome import border
+
+    frames = neon_style.frame_paths()
+    if "menu" not in frames:
+        return ""
+    p = theme.palette()
+    clear = neon_popups.see_through(widget) if widget is not None else neon_popups.compositing()
+    ground = "transparent" if clear else p["menu"]
+    return (
+        "QListWidget { background: %s; color: %s; %s }"
+        " QListWidget::item { padding: 2px 8px 2px 4px; border-width: 0px 0px 0px 4px;"
+        " border-style: solid; border-color: transparent; background: transparent; }"
+        " QListWidget::item:selected { color: %s; %s }"
+        % (ground, p["text"], border(frames, "menu"), p["primary_hot"], border(frames, "menu_item"))
+    )
+
+
+def _look(p):
+    """The list's style for the look in use (set only when it changes)."""
+    from . import theme
+
+    text = (_neon_look(p) if theme.is_neon() else "") or LOOK
+    if p.property("fission180Look") != text:
+        p.setProperty("fission180Look", text)
+        p.setStyleSheet(text)
+
+
 def _show(edit, names):
     from .compat import QtCore, QtWidgets
 
@@ -275,19 +314,15 @@ def _show(edit, names):
         p.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         p.setFocusPolicy(QtCore.Qt.NoFocus)
         p.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        p.setStyleSheet(
-            "QListWidget { background: #ffffff; color: #111111; border: 1px solid #3fa9f5; }"
-            " QListWidget::item { padding: 2px 8px; }"
-            " QListWidget::item:selected { background: #3fa9f5; color: #ffffff; }"
-        )
         p.itemClicked.connect(lambda item: accept(item.text()))
         _state["popup"] = p
+    _look(p)
     p.clear()
     p.addItems(names)
     p.setCurrentRow(0)
     row = max(18, p.sizeHintForRow(0))
     width = max(edit.width(), p.sizeHintForColumn(0) + 24)
-    p.resize(width, row * len(names) + 4)
+    p.resize(width, row * len(names) + (4 if p.property("fission180Look") == LOOK else 14))
     p.move(edit.mapToGlobal(QtCore.QPoint(0, edit.height() + 1)))
     p.show()
     p.raise_()

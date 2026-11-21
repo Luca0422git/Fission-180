@@ -35,6 +35,7 @@ from . import origin_look, profile_pick, protractor, revolve, taskui, ui_icon_pa
 from . import value_limits, warn
 from .compat import QtCore, QtWidgets
 from .taskui import BoxCarrier, DistanceField, Panel, ValueBoxes
+from .neon_scene_core import Live
 
 TYPE_LABELS = [("Angle", "angle"), ("To", "to"), ("Full", "full")]
 DIRECTION_LABELS = [
@@ -50,15 +51,15 @@ OPERATION_LABELS = [
     ("New Component", "new_component"),
 ]
 ACTIVE_STYLE = "QPushButton { background: #1f6fbf; color: white; border: 1px solid #5aa0e6; }"
-HANDLE = (0.30, 0.62, 0.95)  # Fusion's manipulator blue
-HANDLE_ACTIVE = (0.55, 0.80, 1.0)
-HANDLE_TWO = (0.25, 0.75, 0.85)
+HANDLE = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue
+HANDLE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")
+HANDLE_TWO = Live((0.25, 0.75, 0.85), "rail")
 AXIS_COLORS = dict(origin_look.AXIS_RGB, construction=(0.95, 0.62, 0.22))
-AXIS_HOVER = (0.55, 0.80, 1.0)
+AXIS_HOVER = Live((0.55, 0.80, 1.0), "hover")
 PLANE_IDLE = ((0.55, 0.65, 0.80), 0.82)  # the origin squares offered as a To object
 PLANE_HOVER = ((0.55, 0.80, 1.0), 0.6)
 PLANE_PICKED = ((0.30, 0.62, 0.95), 0.78)  # light: it stays shown
-AXIS_PICKED = (0.12, 0.53, 0.90)
+AXIS_PICKED = Live((0.12, 0.53, 0.90), "pick")
 PICK_PIXELS = 8.0  # how near a drawn axis a click must be (viewport pixels)
 ON_LINE_PIXELS = 4.0  # this near, the drawn axis wins over what else is under the mouse
 # An area that is not picked yet wins over a line unless the click is right on the line: the

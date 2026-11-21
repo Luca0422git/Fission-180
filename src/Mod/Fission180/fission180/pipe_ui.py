@@ -33,9 +33,10 @@ from .primitives_ui import (
     set_combo,
 )
 from .taskui import DistanceField, Panel, ValueBoxes
+from .neon_scene_core import Live
 
 SECTION_LABELS = [("Circular", "circular"), ("Square", "square"), ("Triangular", "triangular")]
-PATH_COLOR = (0.12, 0.53, 0.90)
+PATH_COLOR = Live((0.12, 0.53, 0.90), "pick")
 
 
 class PathHandle(LinearHandle):

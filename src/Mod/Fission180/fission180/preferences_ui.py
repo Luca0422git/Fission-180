@@ -210,9 +210,11 @@ def _apply(kind):
             from . import home_ui
 
             home_ui.refresh_soon()  # (Home's "This computer" is the project folder)
-        elif kind == "theme":  # Look: dark or light, at once
-            if theme.current() != ("light" if theme.is_light() else "dark"):
+        elif kind == "theme":  # Look: dark, light or neon, at once
+            if theme.current() != theme.name():
                 theme.set_theme(theme.current())
+        elif kind == "neon":  # a Neon Lights colour or setting (its own page)
+            theme.refresh_neon()
         elif kind == "ai":  # Allow AI apps to control Fission 180 (the bridge on / off)
             from . import ai_ui
             from .ai import bridge
@@ -595,8 +597,9 @@ class PreferencesDialog(QtWidgets.QDialog):
         inner = QtWidgets.QWidget()
         inner.setObjectName("Fission180PreferencesPage_" + pid)
         layout = QtWidgets.QVBoxLayout(inner)
-        heading = QtWidgets.QLabel("<b>%s</b>" % title)
-        layout.addWidget(heading)
+        if pid != "neon":  # (the Neon Lights page has its own title)
+            heading = QtWidgets.QLabel("<b>%s</b>" % title)
+            layout.addWidget(heading)
         for group, opts in core.groups(pid):
             box = QtWidgets.QGroupBox(group)
             form = QtWidgets.QFormLayout(box)
@@ -624,6 +627,15 @@ class PreferencesDialog(QtWidgets.QDialog):
             self.print_note.setWordWrap(True)
             self.print_note.setStyleSheet("color: #c3cad4;")
             layout.addWidget(self.print_note)
+        if pid == "neon":
+            self.neon = None
+            try:
+                from . import neon_prefs_ui
+
+                self.neon = neon_prefs_ui.NeonPage(self, inner)
+                layout.addWidget(self.neon)
+            except Exception as exc:
+                warn("preferences: Neon Lights page: %s" % exc)
         if pid == "network":
             note = QtWidgets.QLabel(
                 "Fission 180 sends nothing by itself except the update check: one request to "
@@ -805,6 +817,7 @@ class PreferencesDialog(QtWidgets.QDialog):
                     if opt["default"] is None and val == _fallback_default(opt):
                         remove.append(key)
             restart = save(changed, remove)
+            self._neon("commit")
             self.load()
             if restart:
                 labels = ", ".join(core.option(k)["label"] for k in restart)
@@ -839,7 +852,18 @@ class PreferencesDialog(QtWidgets.QDialog):
             super().accept()
 
     def reject(self):
+        self._neon("revert")  # (the Neon Lights page shows its changes at once)
         super().reject()
+
+    def _neon(self, action):
+        page = getattr(self, "neon", None)
+        if page is None:
+            return
+        try:
+            getattr(page, action)()
+            page.sync()
+        except Exception as exc:
+            warn("preferences: Neon Lights page: %s" % exc)
 
 
 def _fallback_default(opt):
@@ -880,6 +904,13 @@ def show(page=None):
             if page:
                 dialog.show_page(page)
             return dialog
+    except RuntimeError:
+        pass
+    try:
+        # The closed window before goes: it belongs to the main window, so each opening kept
+        # one more window (and its Neon Lights page) alive.
+        if dialog is not None and not dialog.isVisible():
+            dialog.deleteLater()
     except RuntimeError:
         pass
     dialog = PreferencesDialog()

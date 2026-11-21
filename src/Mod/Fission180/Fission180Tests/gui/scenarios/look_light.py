@@ -70,8 +70,8 @@ def choose_light():
     if combo is None:
         return
     h.check(
-        "... Dark or Light",
-        [combo.itemData(i) for i in range(combo.count())] == ["dark", "light"],
+        "... Dark, Light or Neon Lights",
+        [combo.itemData(i) for i in range(combo.count())] == ["dark", "light", "neon"],
         [combo.itemText(i) for i in range(combo.count())],
     )
     combo.setCurrentIndex(combo.findData("light"))

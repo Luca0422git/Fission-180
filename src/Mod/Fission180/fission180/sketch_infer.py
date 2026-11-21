@@ -2048,7 +2048,7 @@ class Overlay:
         # the arc being dragged: solid, in the colour of the curves being drawn
         preview = coin.SoSeparator()
         preview_color = coin.SoBaseColor()
-        preview_color.rgb.setValue(*_rgb(sketch_mode.BLUE))
+        preview_color.rgb.setValue(*_rgb(sketch_mode.look(sketch_mode.BLUE)))
         preview_style = coin.SoDrawStyle()
         preview_style.lineWidth = 2.0
         self.preview_coords = coin.SoCoordinate3()

@@ -30,15 +30,16 @@ import FreeCADGui as Gui
 from . import commands, log, text, theme, ui_icon_path, warn
 from . import text_core as core
 from .compat import QtCore, QtWidgets
+from .neon_scene_core import Live
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/SketchText"
-LINE = (0.36, 0.70, 1.0)  # the sketch's blue for curves that can still move
-LINE_FIXED = (0.94, 0.94, 0.94)  # fully constrained (white on the dark background)
-FILL = (0.45, 0.77, 1.0)  # the sketch's profile shade
+LINE = Live((0.36, 0.70, 1.0), "sketch_free")  # the sketch's blue for curves that can still move
+LINE_FIXED = Live((0.94, 0.94, 0.94), "bright")  # fully constrained (white on the dark background)
+FILL = Live((0.45, 0.77, 1.0), "pick_fill")  # the sketch's profile shade
 FILL_TRANSPARENCY = 0.72
-PREVIEW = (0.98, 0.78, 0.30)  # the text being placed or edited
-HANDLE = (0.30, 0.62, 0.95)  # Fusion's manipulator blue
-HANDLE_ACTIVE = (0.55, 0.80, 1.0)
+PREVIEW = Live((0.98, 0.78, 0.30), "preview")  # the text being placed or edited
+HANDLE = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue
+HANDLE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")
 CLICK_SLOP = 4  # pixels: a press and a release this close are a click
 NEAR_PX = 6  # pixels: this close to a letter's outline counts as on the text
 DOT_PX = 9  # pixels: a click this close to a frame dot picks it
@@ -2003,14 +2004,15 @@ class ViewProviderText:
             vobj.LineWidth = 1.5
             vobj.PointSize = 1.0
             vobj.PointColor = (0.94, 0.94, 0.94)
+            fill = FILL.normal()  # saved in the design: never the Neon Lights colour
             if "ShapeAppearance" in vobj.PropertiesList:
                 material = vobj.ShapeAppearance[0]
-                material.DiffuseColor = (FILL[0], FILL[1], FILL[2], 1.0)
-                material.AmbientColor = (FILL[0] * 0.5, FILL[1] * 0.5, FILL[2] * 0.5, 1.0)
-                material.EmissiveColor = (FILL[0] * 0.3, FILL[1] * 0.3, FILL[2] * 0.3, 1.0)
+                material.DiffuseColor = (fill[0], fill[1], fill[2], 1.0)
+                material.AmbientColor = (fill[0] * 0.5, fill[1] * 0.5, fill[2] * 0.5, 1.0)
+                material.EmissiveColor = (fill[0] * 0.3, fill[1] * 0.3, fill[2] * 0.3, 1.0)
                 vobj.ShapeAppearance = [material]
             else:
-                vobj.ShapeColor = FILL
+                vobj.ShapeColor = fill
             vobj.Transparency = 55
         except Exception as exc:
             warn("text display: %s" % exc)

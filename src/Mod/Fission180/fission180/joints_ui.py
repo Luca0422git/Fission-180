@@ -27,6 +27,7 @@ from . import preview, ui_icon_path, warn
 from .bodies_panel import BodyPanel, edit as _edit, start as _start
 from .compat import QtCore, QtGui, QtWidgets
 from .taskui import DistanceField
+from .neon_scene_core import Live
 
 TYPES = [(core.TITLES[t], t) for t in core.JOINT_TYPES]
 MODES = ["Simple", "Between Two Faces", "Two Edge Intersection"]
@@ -39,8 +40,8 @@ ICON_BY_TYPE = {
     "planar": "joint_planar",
     "ball": "joint_ball",
 }
-SNAP = (0.55, 0.65, 0.78)  # a snap point that is not the nearest
-SNAP_HOT = (0.30, 0.62, 0.95)  # Fusion's manipulator blue: the snap the click would take
+SNAP = Live((0.55, 0.65, 0.78), "snap")  # a snap point that is not the nearest
+SNAP_HOT = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue: the snap the click would take
 AXIS_COLORS = ((0.93, 0.33, 0.31), (0.36, 0.78, 0.40), (0.31, 0.66, 0.95))  # X red, Y green, Z blue
 PICK_PIXELS = 14.0
 HOVER_MS = 30

@@ -23,10 +23,11 @@ one set of preferences. Nothing here goes into a design or its undo history.
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import log, nav_core, theme, warn
+from . import log, nav_core, warn
 from . import surface_analysis as sa
 from . import ui_icon_path
 from .compat import QtCore, QtWidgets
+from .neon_scene_core import Live
 
 PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180/Display"
 DEFAULTS = {
@@ -39,7 +40,8 @@ DEFAULTS = {
 }
 NODE_NAME = "Fission180Display"
 HIDE_NAME = "Fission180ObjectVisibility"
-HIDDEN_EDGE_COLOR = (0.55, 0.58, 0.62)
+HIDDEN_EDGE_COLOR = Live((0.55, 0.58, 0.62), "hidden_edge")
+HIDDEN_EDGE_MATERIAL = "Fission180HiddenEdgeColour"
 # Object Visibility: the kinds in Fusion's order
 KINDS = [
     "Origins",
@@ -128,16 +130,7 @@ def apply_view(view):
         viewer.setOverrideMode(mode)
     except Exception as exc:
         warn("visual style: %s" % exc)
-    top, bottom = nav_core.environment(get("Environment"))
-    try:
-        if get("Environment") == "Theme":
-            viewer.setGradientBackground("NONE")
-            viewer.setBackgroundColor(*nav_core.rgb(theme.VIEW))
-        else:
-            viewer.setGradientBackground("LINEAR")
-            viewer.setGradientBackgroundColor(nav_core.rgb(top), nav_core.rgb(bottom))
-    except Exception as exc:
-        warn("environment: %s" % exc)
+    apply_background(viewer)
     camera = get("Camera")
     try:
         want = camera
@@ -149,6 +142,38 @@ def apply_view(view):
             view.setCameraType(want)
     except Exception as exc:
         warn("camera: %s" % exc)
+
+
+def apply_background(viewer):
+    """The Environment's background on one viewer. "Theme" is the look's own: flat, or Neon
+    Lights' faint gradient (neon_scene.gradient); any other environment is the person's choice
+    and stays, in every look."""
+    from . import neon_scene
+
+    top, bottom = nav_core.environment(get("Environment"))
+    try:
+        if get("Environment") == "Theme":
+            neon = neon_scene.gradient()
+            if neon is not None:
+                viewer.setGradientBackground("LINEAR")
+                viewer.setGradientBackgroundColor(*neon)
+                return
+            viewer.setGradientBackground("NONE")
+            viewer.setBackgroundColor(*nav_core.rgb(neon_scene.flat_background()))
+        else:
+            viewer.setGradientBackground("LINEAR")
+            viewer.setGradientBackgroundColor(nav_core.rgb(top), nav_core.rgb(bottom))
+    except Exception as exc:
+        warn("environment: %s" % exc)
+
+
+def apply_backgrounds():
+    """The background of every 3D view again (the look or its colours changed)."""
+    for view in views():
+        try:
+            apply_background(view.getViewer())
+        except Exception as exc:
+            warn("environment: %s" % exc)
 
 
 def apply_all():
@@ -283,6 +308,25 @@ def _draw(doc, coin):
             continue
 
 
+def recolour():
+    """The hidden edges already drawn, in the colour of the look in use (Neon Lights was
+    switched on or off, its colours changed, a save draws its preview picture)."""
+    from pivy import coin
+
+    for node in list(_STATE["nodes"].values()):
+        try:
+            search = coin.SoSearchAction()
+            search.setName(coin.SbName(HIDDEN_EDGE_MATERIAL))
+            search.setInterest(coin.SoSearchAction.ALL)
+            search.setSearchingAll(True)
+            search.apply(node)
+            paths = search.getPaths()
+            for i in range(paths.getLength()):
+                paths[i].getTail().diffuseColor.setValue(*HIDDEN_EDGE_COLOR)
+        except Exception as exc:
+            warn("hidden edges: %s" % exc)
+
+
 def filling():
     """True while a hidden-line visual style fills the faces."""
     return bool(_STATE["on"] and nav_core.style(get("VisualStyle"))[2])
@@ -338,6 +382,7 @@ def _hidden_edges(coin, owners):
     style.lineWidth.setValue(1.0)
     style.linePattern.setValue(0x0F0F)
     material = coin.SoMaterial()
+    material.setName(HIDDEN_EDGE_MATERIAL)
     material.diffuseColor.setValue(*HIDDEN_EDGE_COLOR)
     for item in (light, depth, style, material):
         sep.addChild(item)
@@ -673,6 +718,12 @@ def _area_changed(*_):
 def enable():
     """Fission 180's interface is on: the remembered display settings on every view."""
     _STATE["on"] = True
+    try:
+        from . import neon_scene
+
+        neon_scene.leftover()  # a session that ended in Neon Lights: its background settings
+    except Exception as exc:
+        warn("display settings: %s" % exc)
     try:
         if _STATE["observer"] is None:
             _STATE["observer"] = _Watch()

@@ -368,6 +368,11 @@ run_one_scenario() {
     mkdir -p "${out}"
     profile="$(mktemp -d)"
     cp -a "${TEMPLATE}/." "${profile}/"
+    # A scenario that needs settings chosen before FreeCAD starts (a session that starts in
+    # Neon Lights: neon_start_dark) brings them as Fission180Tests/fixtures/<name>.user.cfg.
+    if [ -f "${MODULE}/Fission180Tests/fixtures/${name}.user.cfg" ]; then
+        cp "${MODULE}/Fission180Tests/fixtures/${name}.user.cfg" "${profile}/user.cfg"
+    fi
     # Through the launcher: a scenario that does not even load fails at once instead of
     # leaving FreeCAD open until the timeout. The harness ends a stuck step itself (with
     # what was on screen) long before this 15-minute kill.

@@ -37,6 +37,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import __version__, commands, home_core as core, log, theme, ui_icon, versions, warn
+from . import neon_qss_panels
 from .compat import QtCore, QtGui, QtWidgets
 
 OPTION = ("User parameter:BaseApp/Preferences/Mod/Fission180", "ShowHomeAtStart")
@@ -333,7 +334,7 @@ class _TileDelegate(QtWidgets.QStyledItemDelegate):
                 painter.setPen(QtCore.Qt.NoPen)
                 painter.setBrush(QtGui.QColor(0, 0, 0, 150))
                 painter.drawRoundedRect(box, 4, 4)
-                painter.setBrush(QtGui.QColor("#ffffff"))
+                painter.setBrush(QtGui.QColor(theme.neon("primary_hot", "#ffffff")))
                 for i in (-1, 0, 1):
                     painter.drawEllipse(box.center() + QtCore.QPointF(i * 5.5, 0), 1.7, 1.7)
             finally:
@@ -508,7 +509,7 @@ class HomeView(QtWidgets.QWidget):
         super().__init__()
         self.setObjectName("Fission180Home")
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setStyleSheet(QSS.format(**_colours()))
+        neon_qss_panels.style(self, QSS.format(**_colours()), "home")
         self.generation = 0  # tiles of an older listing ignore late answers
         self.tiles = {}  # tile id -> QListWidgetItem waiting for its picture
         self.pinned = set()
@@ -528,6 +529,8 @@ class HomeView(QtWidgets.QWidget):
         self.refresh()
         self.update_banner()
         _no_tab_focus(self)
+        if theme.is_neon():
+            _neon_background(self)
 
     # -- pieces
     def _ai(self):
@@ -549,7 +552,7 @@ class HomeView(QtWidgets.QWidget):
             "Allow AI apps (Claude Desktop, Gemini CLI...) to control Fission 180. "
             "The same switch as Preferences > AI."
         )
-        self.ai_toggle.setStyleSheet(ai_panel_ui._qss())
+        neon_qss_panels.style(self.ai_toggle, ai_panel_ui._qss(), "ai")
         self.ai_toggle.toggled.connect(self._ai_toggled)
         column.addWidget(self.ai_toggle, 0, QtCore.Qt.AlignLeft)
         self.ai_status = QtWidgets.QLabel("")
@@ -930,7 +933,7 @@ class HomeView(QtWidgets.QWidget):
             item.setText(
                 "%s\nConflict copy%s" % (versions.design_name(conflict), ", " + who if who else "")
             )
-            item.setForeground(QtGui.QColor("#ffb74d"))
+            item.setForeground(QtGui.QColor(theme.neon("alert", "#ffb74d")))
             item.setToolTip(
                 "%s\nYour cloud app made this copy: %s was changed on two computers. "
                 "Right-click: Compare, Keep This One." % (tile["path"], conflict)
@@ -1632,14 +1635,65 @@ def _opened(name):
 
 
 def theme_changed():
-    """The look was switched: Home's tiles drawn again (their background is the look's)."""
+    """The look was switched: Home's tiles drawn again (their background is the look's), its
+    style again in the look's colours (Neon Lights: also after a preset switch), and Neon
+    Lights' animated background attached or taken off (neon_home)."""
     page = view()
     if page is not None:
+        try:
+            neon_qss_panels.style(page, QSS.format(**_colours()), "home")
+            neon_qss_panels.style(page.ai_toggle, ai_panel_ui_qss(), "ai")
+        except Exception as exc:
+            warn("home: style: %s" % exc)
+        _neon_background(page)
+        try:
+            QtCore.QTimer.singleShot(0, lambda: _opaque_again(page))  # after every listener
+        except Exception as exc:
+            warn("home: see-through: %s" % exc)
         page.refresh()
         page.update_ai()
         sub = subwindow()
         if sub is not None:
             sub.setWindowIcon(ui_icon("qa_home"))
+
+
+def _opaque_again(page):
+    """Qt keeps which of Home's widgets are opaque from when they were first styled: after
+    the look changes Home's style sheet (Neon Lights makes its scroll area, rows and list
+    see-through over the animated background, neon_home), have it worked out again, or the
+    screen keeps showing the old opaque panels over the background."""
+    try:
+        from . import neon_home
+
+        for widget in [page] + page.findChildren(QtWidgets.QWidget):
+            if widget.objectName() != neon_home.NAME and not widget.autoFillBackground():
+                widget.setAutoFillBackground(True)
+                widget.setAutoFillBackground(False)
+        page.update()
+    except RuntimeError:
+        pass  # Home was closed meanwhile
+    except Exception as exc:
+        warn("home: see-through: %s" % exc)
+
+
+def ai_panel_ui_qss():
+    from . import ai_panel_ui
+
+    return ai_panel_ui._qss()
+
+
+def _neon_background(page):
+    """Neon Lights' animated background behind Home (neon_home) while Neon Lights is on;
+    taken off in Dark and Light."""
+    try:
+        from . import neon_home
+
+        if theme.is_neon():
+            neon_home.attach(page)
+        else:
+            neon_home.detach(page)
+    except Exception as exc:
+        warn("home: Neon Lights background: %s" % exc)
 
 
 def _follow_browser():

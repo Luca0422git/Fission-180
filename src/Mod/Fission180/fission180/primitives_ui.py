@@ -33,6 +33,7 @@ from .compat import QtCore, QtGui, QtWidgets
 from .primitives import PrimitiveError
 from .primitives_core import nearest_snap, nice_floor, round_to
 from .taskui import BoxCarrier, DistanceField, Panel, ValueBoxes
+from .neon_scene_core import Live
 
 OPERATION_LABELS = [
     ("Join", "join"),
@@ -43,9 +44,9 @@ OPERATION_LABELS = [
 ]
 POSITION_LABELS = [("Inside", "inside"), ("On Center", "center"), ("Outside", "outside")]
 ACTIVE_STYLE = "QPushButton { background: #1f6fbf; color: white; border: 1px solid #5aa0e6; }"
-HANDLE = (0.30, 0.62, 0.95)  # Fusion's manipulator blue
-HANDLE_ACTIVE = (0.55, 0.80, 1.0)
-OUTLINE = (0.35, 0.70, 1.0)
+HANDLE = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue
+HANDLE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")
+OUTLINE = Live((0.35, 0.70, 1.0), "pick_edge")
 SNAP_PIXELS = 10.0  # a click this near the origin, a corner or a centre on the plane lands on it
 
 

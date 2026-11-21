@@ -22,6 +22,7 @@ disc ~18-20 px); the unit tests (test_handle_look_core) keep the proportions.
 """
 
 import math
+from .neon_scene_core import Live
 
 # -- the distance arrow (pixels) ------------------------------------------------------------
 ARROW_PX = 32.0  # foot to tip
@@ -49,16 +50,20 @@ TRIAD_RING = 0.6  # the turn handles' arcs run at this share of TRIAD_PX
 TRIAD_RING_WIDTH_PX = 3.0
 
 # -- colours (RGB 0..1) ---------------------------------------------------------------------
-BLUE = (0.16, 0.50, 0.93)  # the arrow (Fusion's manipulator blue)
-BLUE_HOT = (0.48, 0.76, 1.0)  # under the mouse / dragged
-OUTLINE = (0.93, 0.96, 1.0)  # the thin light outline
-DISC = (0.97, 0.97, 0.97)  # the angle disc
-DISC_HOT = (0.74, 0.87, 1.0)
-DOT = (0.16, 0.18, 0.22)
-DISC_OUTLINE = (0.36, 0.40, 0.46)  # a disc's rim (white on a light part needs an edge)
-ARC = (0.82, 0.86, 0.92)  # the thin light arc / line
-AXIS_COLOURS = ((0.90, 0.28, 0.28), (0.35, 0.78, 0.35), (0.30, 0.52, 0.98))  # Move: X Y Z
-AXIS_HOT = (1.0, 0.85, 0.35)
+BLUE = Live((0.16, 0.50, 0.93), "arrow")  # the arrow (Fusion's manipulator blue)
+BLUE_HOT = Live((0.48, 0.76, 1.0), "arrow_hot")  # under the mouse / dragged
+OUTLINE = Live((0.93, 0.96, 1.0), "rim")  # the thin light outline
+DISC = Live((0.97, 0.97, 0.97), "disc")  # the angle disc
+DISC_HOT = Live((0.74, 0.87, 1.0), "disc_hot")
+DOT = Live((0.16, 0.18, 0.22), "dot")
+DISC_OUTLINE = Live((0.36, 0.40, 0.46), "disc_rim")  # a disc's rim (white on a light part needs an edge)
+ARC = Live((0.82, 0.86, 0.92), "arc")  # the thin light arc / line
+AXIS_COLOURS = (
+    Live((0.90, 0.28, 0.28), "axis_x"),
+    Live((0.35, 0.78, 0.35), "axis_y"),
+    Live((0.30, 0.52, 0.98), "axis_z"),
+)  # Move: X Y Z
+AXIS_HOT = Live((1.0, 0.85, 0.35), "hot")
 
 
 def length_mm(mm_per_px, pixels=ARROW_PX):

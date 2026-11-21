@@ -5,7 +5,7 @@ ribbon_config.py; this module only turns that data into Qt widgets."""
 
 import FreeCADGui as Gui
 
-from . import log, registry, ribbon_config as cfg, ui_icon, warn
+from . import log, neon_shell_paint as neon_paint, registry, ribbon_config as cfg, ui_icon, warn
 from .compat import QtCore, QtGui, QtWidgets
 
 BIG = 36  # ribbon icon size (Fusion: about 36-40 px at 100% scaling)
@@ -22,6 +22,9 @@ CONTEXTUAL += MANUFACTURE_TABS
 # The ANIMATION workspace's tab (animation_ui, wave 7 animation): shown instead of the design's.
 ANIMATION_TABS = ("anim_animation",)
 CONTEXTUAL += ANIMATION_TABS
+# The workspace button: its fixed size and every text it shows (each must fit it in every look)
+WORKSPACE_SIZE = (136, 74)
+WORKSPACE_LABELS = ("DESIGN ▾", "DRAWING ▾", "SIMULATION ▾", "MANUFACTURE ▾", "ANIMATION ▾")
 
 
 def resolve(command, available):
@@ -231,6 +234,7 @@ def build_menu(parent, entries, available, context=None):
             submenu.setTitle(entry["label"])
             if entry.get("icon"):
                 submenu.setIcon(ui_icon(entry["icon"]))
+                submenu.menuAction().setProperty("fission180Icon", entry["icon"])
             menu.addMenu(submenu)
             # (wave 7, replay-f) kept with its menu: when nothing on the Python side held the
             # submenu, a garbage collection deleted it and CREATE > Pattern vanished from the
@@ -278,6 +282,87 @@ def build_menu(parent, entries, available, context=None):
     return menu
 
 
+class _TabButton(QtWidgets.QToolButton):
+    """A ribbon tab. In Neon Lights the active one gets a glowing underline with a chamfered
+    end (painted here; Dark and Light draw only what the style sheet says)."""
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not (self.isChecked() and neon_paint.on()):
+            return
+        try:
+            painter = QtGui.QPainter(self)
+            try:
+                painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+                w, h = self.width(), self.height()
+                y = h - 2.0
+                path = QtGui.QPainterPath(QtCore.QPointF(4.0, y))
+                path.lineTo(QtCore.QPointF(w - 10.0, y))
+                path.lineTo(QtCore.QPointF(w - 5.0, y - 4.0))  # the chamfered end
+                neon_paint.glow_path(painter, path, neon_paint.colour("primary"), 2.0)
+                # a small square tick at the start
+                painter.fillRect(QtCore.QRectF(1.0, y - 1.5, 2.0, 3.0), neon_paint.colour("primary_hot"))
+            finally:
+                painter.end()
+        except Exception as exc:
+            _neon_warn("tab", exc)
+
+
+class _GroupLabel(QtWidgets.QToolButton):
+    """A group's name under its icons. In Neon Lights it sits between small bracket marks."""
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not neon_paint.on():
+            return
+        try:
+            painter = QtGui.QPainter(self)
+            try:
+                painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+                text = self.text()
+                metrics = QtGui.QFontMetricsF(self.font())
+                width = min(self.width() - 4.0, metrics.horizontalAdvance(text) + 14.0)
+                height = min(self.height() - 4.0, metrics.height() + 2.0)
+                left = (self.width() - width) / 2.0
+                top = (self.height() - height) / 2.0
+                rect = QtCore.QRectF(left, top, width, height)
+                hot = self.underMouse() or self.property("open") == "true"
+                neon_paint.glow_path(
+                    painter,
+                    neon_paint.side_brackets(rect, 3.0),
+                    neon_paint.colour("primary_hot" if hot else "primary_dim"),
+                    1.2,
+                    0.7,
+                )
+            finally:
+                painter.end()
+        except Exception as exc:
+            _neon_warn("group label", exc)
+
+
+_NEON_WARNED = set()
+
+
+def _neon_warn(what, exc):
+    if what not in _NEON_WARNED:
+        _NEON_WARNED.add(what)
+        warn("ribbon: Neon Lights %s: %s" % (what, exc))
+
+
+def theme_changed():
+    """neon_shell_paint.theme_changed: the hand-painted parts again (tabs, group labels)."""
+    try:
+        from . import shell
+
+        ribbon = shell.ribbon()
+        if ribbon is not None:
+            ribbon.update()
+            for child in ribbon.findChildren(QtWidgets.QToolButton):
+                child.update()
+    except Exception as exc:
+        _neon_warn("repaint", exc)
+
+
 class GroupWidget(QtWidgets.QWidget):
     """Large icons on top, 'NAME ▾' underneath; the name opens the full menu. Commands pinned
     to the toolbar (ribbon_pins) get a large icon after the group's own."""
@@ -296,7 +381,7 @@ class GroupWidget(QtWidgets.QWidget):
         self.buttons = []
         outer.addLayout(self.row)
 
-        self.label = QtWidgets.QToolButton()
+        self.label = _GroupLabel()
         self.label.setProperty("role", "group")
         self.label.setText(group["title"] + " ▾")
         self.label.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
@@ -469,7 +554,7 @@ class RibbonWidget(QtWidgets.QWidget):
         self.pages = QtWidgets.QStackedWidget()
         self.page_index = {}
         for tab in cfg.TABS:
-            button = QtWidgets.QToolButton()
+            button = _TabButton()
             button.setProperty("role", "tab")
             button.setText(tab["title"])
             button.setCheckable(True)
@@ -696,7 +781,7 @@ class RibbonWidget(QtWidgets.QWidget):
         button = QtWidgets.QToolButton()
         button.setProperty("role", "workspace")
         button.setText("DESIGN ▾")
-        button.setFixedSize(136, 74)
+        button.setFixedSize(*WORKSPACE_SIZE)
         self.workspace = button
         button.clicked.connect(lambda: self._workspace_menu(button))
         return button
@@ -761,6 +846,14 @@ class RibbonWidget(QtWidgets.QWidget):
             simulation.triggered.connect(lambda: simulation_ui.enter_workspace())
         except Exception as exc:
             warn("workspace menu: %s" % exc)
+        for action, icon in (
+            (design, "workspace_design"),
+            (simulation, "workspace_simulation"),
+            (manufacture, "workspace_manufacture"),
+            (animation, "workspace_animation"),
+            (drawings.menuAction(), "dw_base_view"),
+        ):
+            action.setProperty("fission180Icon", icon)  # (redrawn for a new look)
         menu.exec_(button.mapToGlobal(QtCore.QPoint(0, button.height())))
 
     def _show_app_menu(self, button):
@@ -769,7 +862,9 @@ class RibbonWidget(QtWidgets.QWidget):
         menu = QtWidgets.QMenu(button)
         menu.setObjectName("Fission180AppMenu")
         try:
-            self._fill_file_menu(menu.addMenu(ui_icon("document"), "File"))
+            file_menu = menu.addMenu(ui_icon("document"), "File")
+            file_menu.menuAction().setProperty("fission180Icon", "document")
+            self._fill_file_menu(file_menu)
             from . import freecad_tools_ui
 
             menu.addMenu(freecad_tools_ui.menu(menu))  # FreeCAD's workbenches (pass-through)
@@ -801,6 +896,7 @@ class RibbonWidget(QtWidgets.QWidget):
             for action in source.actions():
                 if action in found:
                     own = copy.addAction(ui_icon("tl_settings"), "Preferences")
+                    own.setProperty("fission180Icon", "tl_settings")
                     own.setObjectName("Fission180_Preferences")
                     own.triggered.connect(
                         lambda _=False: run(("Fission180_Preferences", None), "Preferences")
@@ -821,6 +917,7 @@ class RibbonWidget(QtWidgets.QWidget):
                 continue
             resolved = resolve(entry["command"], available)
             action = menu.addAction(ui_icon(entry["icon"]), _menu_text(entry))
+            action.setProperty("fission180Icon", entry["icon"] or "")
             action.setEnabled(bool(resolved) and is_active(resolved))
             action.triggered.connect(lambda _=False, r=resolved, e=entry: run(r, e["label"]))
         return menu

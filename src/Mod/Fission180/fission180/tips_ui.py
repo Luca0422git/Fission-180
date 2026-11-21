@@ -123,6 +123,12 @@ class Card(QtWidgets.QFrame):
     def _look(self):
         from . import theme
 
+        if theme.is_neon():
+            text = neon_card_style(self)
+            if text:
+                if self.styleSheet() != text:
+                    self.setStyleSheet(text)
+                return
         back = theme.MENU or "#454f61"
         text = theme.TEXT or "#f5f5f5"
         dim = theme.TEXT_DIM or "#c3cad4"
@@ -215,6 +221,34 @@ class Card(QtWidgets.QFrame):
         self.mode = ""
         self.info = None
         self.hide()
+
+
+def neon_card_style(card=None):
+    """The card in Neon Lights: a HUD card (cut corner, bracket marks, glass when the screen
+    and the card's window can show it, neon_popups.see_through), the name in capitals; ""
+    when the frame pictures are not there."""
+    from . import neon_popups, neon_style, theme
+    from .neon_qss_chrome import border
+
+    frames = neon_style.frame_paths()
+    if "tooltip" not in frames:
+        return ""
+    p = theme.palette()
+    clear = neon_popups.see_through(card) if card is not None else neon_popups.compositing()
+    ground = "transparent" if clear else p["menu"]
+    return (
+        "QFrame#Fission180Tip { background: %s; %s }"
+        "QFrame#Fission180Tip QLabel { color: %s; background: transparent; border: none; border-image: none; }"
+        "QLabel#Fission180TipTitle { font-weight: bold; color: %s; text-transform: uppercase;"
+        " letter-spacing: 1px; }"
+        "QLabel#Fission180TipKey { color: %s; letter-spacing: 1px; }"
+        "QLabel#Fission180TipNote { color: %s; }"
+        "QLabel#Fission180TipStepsTitle { font-weight: bold; color: %s; text-transform: uppercase;"
+        " letter-spacing: 1px; }"
+        "QLabel#Fission180TipHints { color: %s; }"
+        % (ground, border(frames, "tooltip"), p["text"], p["secondary_hot"], p["secondary"],
+           p["text_dim"], p["secondary"], p["text_dim"])
+    )
 
 
 # -- what is hovered ---------------------------------------------------------------------------

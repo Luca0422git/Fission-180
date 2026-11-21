@@ -23,11 +23,12 @@ import FreeCADGui as Gui
 from . import drag_guard, handle_look, handles3d, profile_pick, warn
 from .compat import QtCore, QtGui, QtWidgets
 from .taskui import BoxCarrier
+from .neon_scene_core import Live
 
-HANDLE = (0.30, 0.62, 0.95)  # Fusion's manipulator blue
-HANDLE_ACTIVE = (0.55, 0.80, 1.0)
-PATH_COLOR = (0.12, 0.53, 0.90)
-RAIL_COLOR = (0.95, 0.55, 0.15)
+HANDLE = Live((0.30, 0.62, 0.95), "arrow")  # Fusion's manipulator blue
+HANDLE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")
+PATH_COLOR = Live((0.12, 0.53, 0.90), "pick")
+RAIL_COLOR = Live((0.95, 0.55, 0.15), "rail")
 
 
 def safe(prefix):

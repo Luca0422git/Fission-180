@@ -22,7 +22,7 @@ import FreeCADGui as Gui
 
 from . import _remember, components, doc_epoch, timeline_core as core, undo_fast
 from . import timeline_ops as ops
-from . import log, ui_icon, warn
+from . import log, neon_shell_paint as neon_paint, theme, ui_icon, warn
 from .compat import QtCore, QtGui, QtWidgets, Signal
 from .inline_edit import InlineEditor
 
@@ -177,6 +177,9 @@ class _Marker(QtWidgets.QFrame):
         self._guide = None
 
     def paintEvent(self, event):
+        if neon_paint.on():
+            self._paint_neon()
+            return
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         w, h = self.width(), self.height()
@@ -186,11 +189,33 @@ class _Marker(QtWidgets.QFrame):
         painter.drawRoundedRect(QtCore.QRectF(0, 0, w, 7), 2, 2)  # the grip
         painter.end()
 
+    def _paint_neon(self):
+        """Neon Lights: the marker as a bright vertical beam (the palette's `marker`) with a
+        chamfered grip on top."""
+        try:
+            painter = QtGui.QPainter(self)
+            try:
+                painter.setRenderHint(QtGui.QPainter.Antialiasing)
+                w, h = self.width(), self.height()
+                beam = neon_paint.colour("marker", "#e8e8e8")
+                mid = w / 2.0
+                neon_paint.glow_line(painter, (mid, 6.0), (mid, h), beam, 2.0)
+                grip = neon_paint.chamfer_path(QtCore.QRectF(0.5, 0.5, w - 1.0, 7.0), 2.5, ("bl", "br"))
+                painter.fillPath(grip, beam)
+                neon_paint.glow_path(painter, grip, beam, 0.8, 0.8)
+            finally:
+                painter.end()
+        except Exception as exc:
+            _neon_warn("marker", exc)
+
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             self.setFocus()
             self._guide = QtWidgets.QFrame(self.timeline._inner)
-            self._guide.setStyleSheet("background: #6fb7f0;")
+            guide = "background: #6fb7f0;"
+            if neon_paint.on():  # Neon Lights: the drop guide in the palette's secondary
+                guide = guide.replace("#6fb7f0", theme.neon("secondary", "#6fb7f0"))
+            self._guide.setStyleSheet(guide)
             self._guide.resize(2, self.height())
             self._guide.show()
             event.accept()
@@ -351,6 +376,8 @@ class _ItemButton(QtWidgets.QToolButton):
     def paintEvent(self, event):
         super().paintEvent(event)
         item = self.item
+        if neon_paint.on():
+            _neon_chip(self)
         marks = step_colors(item)  # (library-2: Component Color Swatch)
         if not (marks or item.suppressed or item.status != "ok" or item.locked):
             return
@@ -369,13 +396,13 @@ class _ItemButton(QtWidgets.QToolButton):
             except Exception:
                 pass
         if item.suppressed:  # struck through, like a step that is switched off
-            pen = QtGui.QPen(QtGui.QColor("#c3cad4"), 2)
+            pen = QtGui.QPen(QtGui.QColor(theme.neon("text_dim", "#c3cad4")), 2)
             painter.setPen(pen)
             painter.drawLine(4, h - 4, w - 4, 4)
         if item.status != "ok":
             color = "#ff5c5c" if item.status == "error" else "#f2c440"
             painter.setPen(QtCore.Qt.NoPen)
-            painter.setBrush(QtGui.QColor(color))
+            painter.setBrush(_badge_colour(item.status, color))
             badge = QtGui.QPolygonF(
                 [
                     QtCore.QPointF(w - 10, h - 2),
@@ -438,6 +465,7 @@ class _GroupButton(QtWidgets.QToolButton):
         self.setProperty("role", "step")
         self.setFocusPolicy(QtCore.Qt.ClickFocus)  # Esc drops a drag
         self.setIcon(ui_icon("folder"))
+        self.setProperty("fission180Icon", "folder")  # (redrawn when the look changes)
         self.setIconSize(QtCore.QSize(ICON, ICON))
         bad = [m for m in members if m.status == "error"]
         warned = [m for m in members if m.status == "warning"]
@@ -535,10 +563,12 @@ class _GroupButton(QtWidgets.QToolButton):
 
     def paintEvent(self, event):
         super().paintEvent(event)
+        if neon_paint.on():
+            _neon_chip(self)
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(QtGui.QColor("#e8e8e8"))
+        painter.setBrush(QtGui.QColor(theme.neon("secondary", "#e8e8e8")))
         w, h = self.width(), self.height()
         if self.opened:  # small triangle: open (down) or closed (right)
             tri = [
@@ -556,12 +586,86 @@ class _GroupButton(QtWidgets.QToolButton):
         painter.end()
 
 
+_NEON_WARNED = set()
+
+
+def _neon_warn(what, exc):
+    if what not in _NEON_WARNED:
+        _NEON_WARNED.add(what)
+        warn("timeline: Neon Lights %s: %s" % (what, exc))
+
+
+def _style():
+    """The timeline's own style: STYLE, plus Neon Lights' chips while it is on."""
+    if not neon_paint.on():
+        return STYLE
+    try:
+        from . import neon_qss_shell
+
+        return STYLE + neon_qss_shell.timeline(theme.palette())
+    except Exception as exc:
+        _neon_warn("style", exc)
+        return STYLE
+
+
+def _badge_colour(status, literal):
+    """The warning / error triangle on a step: the palette's alert in Neon Lights (a warning
+    a little paler than an error), the literal otherwise."""
+    if not neon_paint.on():
+        return QtGui.QColor(literal)
+    from .neon_palette import mix
+
+    alert = theme.neon("alert", literal)
+    return QtGui.QColor(alert if status == "error" else mix(alert, theme.neon("text", "#ffffff"), 0.35))
+
+
+def _neon_chip(button):
+    """Neon Lights: a step as a chamfered chip; a glowing frame when selected, hovered or
+    in trouble."""
+    try:
+        selected = button.property("selected") in (True, "true")
+        status = button.property("status") or "ok"
+        hovered = button.underMouse()
+        if not (selected or hovered or status != "ok"):
+            return
+        if status != "ok":
+            line = _badge_colour(status, "#ff5c5c")
+        else:
+            line = neon_paint.colour("primary" if selected else "primary_dim")
+        painter = QtGui.QPainter(button)
+        try:
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            rect = QtCore.QRectF(button.rect()).adjusted(1.0, 1.0, -1.0, -1.0)
+            neon_paint.glow_path(
+                painter, neon_paint.chamfer_path(rect, 4.0), line, 1.2, 1.0 if selected else 0.6
+            )
+        finally:
+            painter.end()
+    except Exception as exc:
+        _neon_warn("step", exc)
+
+
+def theme_changed():
+    """neon_shell_paint.theme_changed: the timeline's own style for the look in use."""
+    if _dock is None:
+        return
+    try:
+        timeline = widget()
+        if timeline is not None:
+            timeline.setStyleSheet(_style())
+            timeline.update()
+            for child in timeline.findChildren(QtWidgets.QWidget):
+                child.update()
+    except RuntimeError:
+        pass
+
+
 class TimelineWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Fission180Timeline")
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setStyleSheet(STYLE)
+        self.setStyleSheet(_style())
         self._sig = None
         self._doc_name = None
         self._timeline = core.build([], {})

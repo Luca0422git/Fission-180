@@ -51,7 +51,30 @@ def _doc():
 def _palette():
     from . import theme
 
+    if theme.is_neon():
+        return theme.palette()  # Neon Lights: DARK's keys in the look's colours
     return theme.LIGHT if theme.is_light() else theme.DARK
+
+
+def _neon_on():
+    from . import theme
+
+    return theme.is_neon()
+
+
+def _chamfered(rect, cut=4.0):
+    """A bar's shape in Neon Lights: two corners cut."""
+    c = min(cut, rect.height() / 2.0, rect.width() / 2.0)
+    return QtGui.QPolygonF(
+        [
+            QtCore.QPointF(rect.left(), rect.top() + c),
+            QtCore.QPointF(rect.left() + c, rect.top()),
+            QtCore.QPointF(rect.right(), rect.top()),
+            QtCore.QPointF(rect.right(), rect.bottom() - c),
+            QtCore.QPointF(rect.right() - c, rect.bottom()),
+            QtCore.QPointF(rect.left(), rect.bottom()),
+        ]
+    )
 
 
 def _later(fn, *args):
@@ -247,19 +270,30 @@ class Canvas(QtWidgets.QWidget):
                 tenth += 1
         # bars
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        neon = _neon_on()
         for act in core.ordered(self.board):
             rect = self.bar_rect(act["id"])
             if rect is None:
                 continue
             colour = QtGui.QColor(COLOURS[act["kind"]])
             picked = act["id"] in self.selected
-            painter.setPen(
-                QtGui.QPen(
-                    QtGui.QColor(colours["bright"]) if picked else colour.darker(140),
-                    2 if picked else 1,
+            if neon:
+                # Neon Lights: the bar keeps its kind's hue as a glowing frame on tinted glass
+                colour = colour.lighter(125)
+                fill = QtGui.QColor(colour)
+                fill.setAlpha(150 if picked else 70)
+                painter.setPen(
+                    QtGui.QPen(QtGui.QColor(colours["primary_hot"]) if picked else colour, 2 if picked else 1.3)
                 )
-            )
-            painter.setBrush(colour if picked else colour.darker(115))
+                painter.setBrush(fill)
+            else:
+                painter.setPen(
+                    QtGui.QPen(
+                        QtGui.QColor(colours["bright"]) if picked else colour.darker(140),
+                        2 if picked else 1,
+                    )
+                )
+                painter.setBrush(colour if picked else colour.darker(115))
             instant = act.get("end") is not None and float(act["end"]) - float(act["start"]) < 1e-9
             if instant:
                 c = rect.center()
@@ -275,9 +309,12 @@ class Canvas(QtWidgets.QWidget):
                     )
                 )
             else:
-                painter.drawRoundedRect(rect, 3, 3)
+                if neon:
+                    painter.drawPolygon(_chamfered(QtCore.QRectF(rect)))
+                else:
+                    painter.drawRoundedRect(rect, 3, 3)
                 if rect.width() > 46:
-                    painter.setPen(QtGui.QColor("#10151c"))
+                    painter.setPen(QtGui.QColor(colours["text"] if neon else "#10151c"))
                     painter.drawText(
                         rect.adjusted(5, 0, -3, 0),
                         int(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft),
@@ -287,7 +324,12 @@ class Canvas(QtWidgets.QWidget):
                     )
         # the playhead
         x = int(self.playhead_x())
-        accent = QtGui.QColor("#ff5c5c")
+        accent = QtGui.QColor(colours["primary"] if neon else "#ff5c5c")
+        if neon:  # the playhead as a bright beam: a faint wide line under it
+            beam = QtGui.QColor(accent)
+            beam.setAlpha(70)
+            painter.setPen(QtGui.QPen(beam, 6))
+            painter.drawLine(x, 4, x, h)
         painter.setPen(QtGui.QPen(accent, 2))
         painter.drawLine(x, 4, x, h)
         painter.setBrush(accent)
@@ -639,7 +681,9 @@ class TimelinePanel(QtWidgets.QWidget):
         self.note.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
         top.addWidget(self.note, 1)
         title = QtWidgets.QLabel("ANIMATION TIMELINE")
-        title.setStyleSheet("color: #9aa4b1; font-weight: bold;")
+        from . import neon_qss_panels
+
+        neon_qss_panels.style(title, "color: #9aa4b1; font-weight: bold;", "caption")
         top.addWidget(title)
         outer.addLayout(top)
 

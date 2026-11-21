@@ -22,9 +22,10 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import warn
+from .neon_scene_core import Live
 
-FILL = (0.45, 0.77, 1.0)  # Fusion-like profile blue
-PICKED = (0.12, 0.53, 0.90)
+FILL = Live((0.45, 0.77, 1.0), "pick_fill")  # Fusion-like profile blue
+PICKED = Live((0.12, 0.53, 0.90), "pick")
 IDLE_TRANSPARENCY = 0.65
 HOVER_TRANSPARENCY = 0.35
 PICKED_TRANSPARENCY = 0.25

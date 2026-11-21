@@ -4,6 +4,75 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-20: Neon Lights wave started (branch `sf/neon-lights`; nothing on `develop` until it is
+all done).** Luca: a third look, "Neon Lights", a full cyberpunk overhaul of every part of the
+window ("when people walk past me, i want them to look at my screen and ask ... that looks
+sick!"), presets with pop-culture names + custom colours, coloured body outlines, Hologram
+bodies (switch), effects (glow, scan lines, CRT, glitch; lighter over the 3D view), the techy
+font everywhere, boot-up sequence, UI sounds, animated Home. **Dark and Light must not change.**
+"All in one" update: merged into `develop` only when finished and checked by Luca on his Windows
+PC and Linux laptop. Design `docs/fission180/neon-lights-design.md`, plan
+`docs/fission180/plan-neon-lights.md`, builders' brief `docs/fission180/dev/briefs/neon-common.md`.
+Phase A (orchestrator) done: A1 Dark/Light guard (`tools/fission180/theme_identity.py` +
+`test_theme_identity.py`, scenario `look_unchanged` with `fixtures/look_baseline/`); A2-A3
+`neon_palette.py` (17 presets, roles, derived shades, contrast) + `neon_settings.py`; A4 third look
+in `theme.py` (`neon()`, `neon3d()`, `palette()`, `refresh_neon()`, `normal_look()`, translate
+tables both ways, `LISTENERS`, `NEON_SWAP`), `neon.py` + part stubs, scenario `neon_switch`; A5
+fonts (Chakra Petch, Orbitron, OFL), `neon_frames.py`, the style sheet in three owned parts,
+`neon_popups.py`; A6 `tools/fission180/neon_icon_style.py` + `make_icons.py` writes 426 neon icons
+to `icons/neon/`, `neon_icons.py`; A7 `neon_view.py` display-only outline override, normal look
+around saves, neon grid; A8 scenario `neon_showcase`. Phase B: ten builder cloud sessions
+(tag `neon-lights`, branches `sf/neon-<id>`: chrome, shell, panels, icons-a, icons-b, bodies,
+scene, effects, extras, settings), launched 21:53 UTC. Open: `neon_outlines` "not marked
+modified" check (builder bodies).
+Found on the way: (1) **old bug, fixed** (Dark too): after any app style change (Light -> Dark)
+Qt gave the ribbon's tool bar its style margin back and the whole window sat 4 px lower;
+`shell._ribbon_bar_margins` in `theme_changed`. (2) `make_icons.py` regenerates
+`icons/ui/split_body.svg` differently from the committed file (an old hand edit): restore it after
+running. (3) A frame rule named like a palette key in a style template put a border-image into a
+`background:` and Qt dropped every later rule (window white); test now guards it.
+[x] Phase A [x] builders merged [ ] Luca's hardware checks [ ] merged into develop.
+**2026-11-21 (after midnight): Phase B done, tested, on `sf/neon-lights` (352d2de7).** Ten builders
+(22:00-22:40 UTC), five independent reviewers (two branches each; ~40 real problems: speed of the
+effects layer, ViewCube and animated Home; menus black when first opened in Dark; glow highlights
+10 px wide; a failed save left the normal look on; leftovers in Dark; clipped labels; unreadable
+custom colours; icons with the alert colour), nine fix builders (`sf/neon-*-fix`), merged on the
+local `neon-integration` (pushed as `sf/neon-integration`), then `sf/neon-lights` fast-forwarded.
+Every builder report is in `docs/fission180/sessions/neon-*.md`, screenshots in
+`docs/fission180/images/neon/`. Tests at 352d2de7: unit all pass; scenarios look_unchanged,
+look_light, home_screen, misc_preferences and all 17 neon_* (incl. neon_sizes, neon_start_dark,
+neon_glow_speed, neon_effects_selfcheck) PASS. Measured here: all effects +0.9 % CPU per orbit
+frame (layer never repaints during 3D frames), animated Home ~1.5-2 % of a core, ViewCube 2.0 ms.
+Facts found: (1) **FreeCAD copies `SketchFaceColor` / `SketchEdgeColor` / `SketchVertexColor` into
+every sketch's saved ShapeAppearance / LineColor / PointColor** (ViewProviderSketch's parameter
+map): a look must never change those parameters (it marked designs modified). (2) Qt gives a
+window an alpha channel only if `WA_TranslucentBackground` is set before its native window
+exists: pop-ups already shown in Dark get a solid neon ground (chrome-fix). (3) Dark already clips
+some ribbon group labels at 150 % interface size (CONSTRAINTS, CONTACTS, MATERIALS) and every
+dialog title's size hint: old, Dark-only, left as is (Dark must not change); neon_sizes fails only
+on what Neon clips and Dark does not. (4) Saved previews of a design whose part sits on z = 0 vary
+up to 1.6 % between two saves in any look (grid and faces in one plane); neon_scene allows 2 %
+and keeps its strict "no neon colour in the preview" check. (5) Builders all edited MEMORY.md
+and neon_showcase.py despite the brief: keep the orchestrator's MEMORY at merges.
+**2026-11-21: Luca's first test found every command broken after a switch to Neon Lights**
+(Extrude: arrow and typed 10 mm read 0, "the distance must not be zero"; Draft: "Internal C++
+object (QAbstractSpinBox) already deleted"; Fillet's value box empty; starting in Neon Lights was
+fine). Cause, bisected in the app: the panels builder's dialog-title watcher (installed by
+`neon_qss_panels.theme_changed`, i.e. only on a look switch) handled ChildAdded with
+`event.child()` + `findChildren()` under it while Qt was still building the child; Python's
+handle to every `Gui::QuantitySpinBox` made after that was invalid. Fixed in 00aaa8f7: the
+watcher only notes that the task view changed and fits titles once the event loop is back;
+titles are fitted at a start in Neon too. Scenario `neon_extrude` (Dark, then a switch to Neon:
+typed and dragged Extrude, every value field of Fillet and Draft usable) failed before.
+**Lessons: never take hold of a widget in a ChildAdded/Polish filter (it is half built); every
+new look/listener needs a scenario that switches looks mid-session and then really models
+(type a value, drag an arrow, OK), not only opens dialogs and checks colours.** Also seen once:
+`neon_panels` "the degrees-of-freedom line as in Dark" failed then passed (FLAKY): a race with
+the sketch palette's 0.3 s poll; open.
+Next: Luca's hardware check (plan C3) on Windows and Linux with the CI quick update of
+`sf/neon-lights` and Fission 180 > Diagnostics > Neon self-check; then the rim light default,
+CHANGELOG, version, merge into develop, release.
+
 **2026-11-16: 0.1.0-beta.4.0.3 broke the hover highlight; fixed as 0.1.0-beta.4.0.4** Luca:
 "the faces on bodies and whole bodies dont highlight when hovering over them anymore". Cause:
 move-speed's `handles3d.hold_preselection` switches FreeCAD's preselection off while a handle
@@ -769,6 +838,7 @@ Quick updates come from green "Fission 180 tests" runs on `develop`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-20 | Neon Lights: an opt-in third look that is deliberately not Fusion (cyberpunk); Dark keeps Fusion parity and must not change | Luca wants to show off a look of his own; Dark/Light guarded by theme_identity + look_unchanged |
 | 2026-10-09 | Fork at 1.1.4 with full history (not a flat copy) | Makes merging future FreeCAD releases a normal `git merge` |
 | 2026-10-09 | Removed FreeCAD-org automation workflows (translations, stale bot, backport, labeler, CodeQL, scorecards, Fedora nightly, weekly release, dependabot); `CI_master.yml` made manual-only | They serve FreeCAD's organization, fail or waste minutes here; a weekly release cron would have run on our default branch |
 | 2026-10-09 | Fission 180 module lives at `src/Mod/Fission180` and is installed by the normal CMake build | Ships inside every Fission 180 build; no separate add-on install step |

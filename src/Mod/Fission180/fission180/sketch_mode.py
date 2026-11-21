@@ -71,6 +71,17 @@ DRIVEN = "#9fb4cc"  # driven (reference) dimensions
 # the part's selection and hover colours follow them too.
 SELECT = "#3b5bdb"  # selected curves and points
 HOVER = "#246eab"  # under the pointer
+_COLOUR_NAMES = {
+    "BLUE": BLUE,
+    "WHITE": WHITE,
+    "GREEN": GREEN,
+    "ORANGE": ORANGE,
+    "PURPLE": PURPLE,
+    "GLYPH": GLYPH,
+    "DRIVEN": DRIVEN,
+    "SELECT": SELECT,
+    "HOVER": HOVER,
+}  # look(): the Neon Lights colour of each (neon_scene_core.sketch_hex)
 
 # (group, kind, name, value) set while Fission 180 is on; old values come back in disable().
 PARAMS = [
@@ -228,6 +239,7 @@ _state = {
     "profilelib": None,
     "polygon": None,  # {"circumscribed": bool} while Fission 180's polygon tool runs
     "centerline": False,  # new lines are centerlines (Linetype > Centerline, nothing selected)
+    "neon_written": False,  # the last sketch colours written were Neon Lights' (theme_changed)
 }
 
 
@@ -356,6 +368,7 @@ def enable():
     except Exception as exc:
         warn("sketch snapping: %s" % exc)
     _save_and_apply(_all_params())
+    _state["neon_written"] = bool(neon_table())
     _patch_profilelib()
     try:
         observer = _GuiObserver()
@@ -414,6 +427,7 @@ def disable():
             _state[key] = None
     _unpatch_profilelib()
     _restore_params()
+    _state["neon_written"] = False
 
 
 # The user's own values of the settings above, kept until Fission 180 is switched off. In
@@ -438,12 +452,48 @@ LIGHT = {
 }
 
 
+def neon_table():
+    """Neon Lights' sketch colours {parameter name: packed colour}, from the palette in use;
+    {} outside Neon Lights and while a save draws the preview picture (Dark's colours then)."""
+    from . import neon_scene_core, theme
+
+    if not neon_scene_core.neon_live():
+        return {}
+    try:
+        return neon_scene_core.sketch(theme.palette())
+    except Exception as exc:
+        warn("Neon Lights: sketch colours: %s" % exc)
+        return {}
+
+
+def look(colour):
+    """One of this module's sketch colours (BLUE, ORANGE, GREEN, SELECT...) in the look in use:
+    `colour` itself unless Neon Lights is on (Fission 180's own drawings of a sketch follow
+    the same colours as FreeCAD's)."""
+    from . import neon_scene_core, theme
+
+    if not neon_scene_core.neon_live():
+        return colour
+    try:
+        names = {value: name for name, value in _COLOUR_NAMES.items()}
+        name = names.get(colour)
+        return neon_scene_core.sketch_hex(theme.palette()).get(name, colour) if name else colour
+    except Exception:
+        return colour
+
+
 def _all_params():
     from . import theme
 
     light = theme.is_light()
+    neon = neon_table()
     params = [
-        (group, kind, name, LIGHT[name] if light and name in LIGHT else value)
+        (
+            group,
+            kind,
+            name,
+            neon[name] if name in neon else LIGHT[name] if light and name in LIGHT else value,
+        )
         for group, kind, name, value in PARAMS
     ]
     return params + [(SNAP, "Bool", "SnapToGrid", option("snap"))]
@@ -454,12 +504,20 @@ def theme_changed():
     values kept by enable() stay kept)."""
     if not _state["on"]:
         return
+    from . import neon_scene_core
+
+    # Neon Lights' own names (SelectionColor, HighlightColor...) are written only while Neon
+    # Lights is on or right after it was: a Dark <-> Light switch writes LIGHT's names alone,
+    # as before Neon Lights existed, and leaves a person's own change of the others alone.
+    neon = bool(neon_table())
+    touch_neon = neon or _state.get("neon_written", False)
     for group, kind, name, value in _all_params():
-        if name in LIGHT:
+        if name in LIGHT or (touch_neon and name in neon_scene_core.SKETCH_PARAMS):
             try:
                 getattr(App.ParamGet(group), "Set" + kind)(name, value)
             except Exception as exc:
                 warn("sketch colours: %s" % exc)
+    _state["neon_written"] = neon
 
 
 def _save_and_apply(params):
@@ -3692,8 +3750,8 @@ class FixedColour:
             return
         field = node.diffuseColor
         values = field.getValues(0)
-        green = _rgb(GREEN)
-        keep = (_rgb(SELECT), _rgb(HOVER))
+        green = _rgb(look(GREEN))
+        keep = (_rgb(look(SELECT)), _rgb(look(HOVER)))
         for i in indices:
             if i >= len(values):
                 continue

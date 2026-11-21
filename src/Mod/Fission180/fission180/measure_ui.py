@@ -18,17 +18,18 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import commands, handles3d, hole_common, log, measure, preview, taskui, ui_icon, warn
-from . import theme, ui_icon_path
+from . import neon_qss_panels, theme, ui_icon_path
 from .compat import QtCore, QtGui, QtWidgets
+from .neon_scene_core import Live
 
 FILTERS = [
     ("Face/Edge/Vertex", "sub", True, ""),
     ("Body", "body", True, ""),
     ("Component", "component", True, "A click picks the whole component it lands on"),
 ]
-LINE = (0.98, 0.78, 0.25)  # the measured distance, drawn over the part
-DOT = (0.98, 0.78, 0.25)
-SNAP = (0.55, 0.85, 0.55)
+LINE = Live((0.98, 0.78, 0.25), "measure")  # the measured distance, drawn over the part
+DOT = Live((0.98, 0.78, 0.25), "measure")
+SNAP = Live((0.55, 0.85, 0.55), "snap")
 GREEDY = 1
 NORMAL = 0
 # Results lists: light text on the dark panel like Fusion's (FreeCAD's task panel drew the
@@ -257,7 +258,7 @@ class MeasurePanel:
             raise RuntimeError("the sketch's panel is not there")
         frame = _InSketchFrame()  # opaque in FreeCAD's floating Tasks panel
         frame.setObjectName("Fission180MeasureInSketch")
-        frame.setStyleSheet(IN_SKETCH_STYLE)
+        neon_qss_panels.style(frame, IN_SKETCH_STYLE, "measure_in_sketch")
         box = QtWidgets.QVBoxLayout(frame)
         box.setContentsMargins(0, 0, 0, 6)
         box.setSpacing(4)
@@ -333,7 +334,7 @@ class MeasurePanel:
         layout.addRow(self.snap)
         self.tree = QtWidgets.QTreeWidget()
         self.tree.setObjectName("Fission180Measure_results")
-        self.tree.setStyleSheet(RESULTS_STYLE)
+        neon_qss_panels.style(self.tree, RESULTS_STYLE, "measure_results")
         self.tree.setColumnCount(2)
         self.tree.setHeaderHidden(True)
         self.tree.setRootIsDecorated(False)

@@ -20,9 +20,10 @@ axis_of / colours / shown are plain data (unit-tested); the Coin part is AxisCol
 import math
 
 from . import origin_look, warn
+from .neon_scene_core import Live
 
-FREECAD_H = (0.8, 0.2, 0.2)  # FreeCAD 1.1's DrawingParameters::CrossColorH / CrossColorV
-FREECAD_V = (0.2, 0.8, 0.2)
+FREECAD_H = Live((0.8, 0.2, 0.2), "axis_x")  # FreeCAD 1.1's DrawingParameters::CrossColorH / CrossColorV
+FREECAD_V = Live((0.2, 0.8, 0.2), "axis_y")
 NODE = "Fission180SketchAxes"
 SOURCE = "RootCrossMaterials"
 
@@ -55,8 +56,10 @@ def same(a, b, tol=0.02):
 
 def shown(freecad, default, wanted):
     """The colour one axis line is drawn in: `wanted` while FreeCAD paints it in its own
-    default colour, FreeCAD's colour otherwise (the line is hovered or selected)."""
-    if same(freecad, default):
+    default colour, FreeCAD's colour otherwise (the line is hovered or selected). FreeCAD's
+    own default is the Dark value of `default` in every look; `wanted` (a Live constant) is
+    read in the look in use each time, so Neon Lights and a save's preview picture follow."""
+    if same(freecad, default.normal() if hasattr(default, "normal") else default):
         return tuple(wanted)
     return tuple(float(freecad[i]) for i in range(3))
 

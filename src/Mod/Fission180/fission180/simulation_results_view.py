@@ -1004,6 +1004,7 @@ class ColourBar(QtWidgets.QWidget):
             try:
                 from . import theme
 
+                text_colour = QtGui.QColor(theme.neon("text", "#f5f5f5"))
                 if theme.is_light():
                     text_colour = QtGui.QColor("#1f2329")
             except Exception:
@@ -1197,6 +1198,11 @@ class Legend(QtWidgets.QFrame):
                 colour = {"below": "#ff8a80", "meets": "#ffd666", "above": "#8cc4ff"}.get(
                     state, "#c3cad4"
                 )
+                # Neon Lights: the look's colour for the verdict (Dark's literal stays in the
+                # sheet, so leaving Neon Lights with the results open gives Dark's back)
+                role = {"below": "alert", "meets": "secondary_hot", "above": "secondary"}.get(
+                    state, "text_dim"
+                )
                 try:
                     from . import theme
 
@@ -1207,7 +1213,12 @@ class Legend(QtWidgets.QFrame):
                 except Exception:
                     pass
                 self.verdict_label.setText(text)
-                self.verdict_label.setStyleSheet("QLabel { color: %s; }" % colour)
+                try:
+                    from . import neon_qss_panels
+
+                    neon_qss_panels.colour(self.verdict_label, "QLabel { color: %s; }" % colour, role)
+                except Exception:
+                    self.verdict_label.setStyleSheet("QLabel { color: %s; }" % colour)
             self.range_label.setText(info.get("span_text", ""))
             self.range_label.setVisible(bool(info.get("custom")))
             self.range_action.setEnabled(info["result"] != "safety")

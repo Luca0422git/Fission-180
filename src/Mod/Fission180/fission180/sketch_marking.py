@@ -138,7 +138,9 @@ def _menu_class():
             self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
             self.setObjectName("Fission180MarkingMenu")
             self.setProperty("sketch", True)
-            self.setStyleSheet(STYLE)
+            from . import neon_qss_panels
+
+            neon_qss_panels.style(self, STYLE, "marking")
             self.ensurePolished()
             available = registry.available_commands()
             size = 2 * RADIUS + 200

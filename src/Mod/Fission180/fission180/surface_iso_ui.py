@@ -10,8 +10,9 @@ curves there. OK keeps them in the sketch (surface_iso.IsoparametricCurves, one 
 from . import log, sketch_draw as draw, surface_iso, theme, warn
 from . import surface_core as core
 from .compat import QtCore, QtWidgets
+from .neon_scene_core import Live
 
-PURPLE = (0.75, 0.52, 0.99)
+PURPLE = Live((0.75, 0.52, 0.99), "rail")
 
 
 class IsoparametricCurve(draw.DrawTool):

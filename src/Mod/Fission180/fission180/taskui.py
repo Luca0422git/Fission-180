@@ -581,7 +581,9 @@ class ArrowValueBox(QtWidgets.QLineEdit):
         self.other_side = other_side  # starts on the arrow's other side (arrow_box_core.spot)
         self.past_tip = past_tip  # starts past the arrow's tip
         self.setObjectName("Fission180ArrowValue")
-        self.setStyleSheet(self.STYLE)
+        from . import neon_qss_panels
+
+        neon_qss_panels.style(self, self.STYLE, "arrow_value")
         self.setFocusPolicy(QtCore.Qt.ClickFocus)  # never by Tab, never by itself
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         self._text = text

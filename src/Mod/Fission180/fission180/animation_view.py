@@ -21,10 +21,11 @@ import FreeCADGui as Gui
 
 from . import animation, warn
 from . import animation_core as core
+from .neon_scene_core import Live
 
 V = App.Vector
 FADE_NAME = "Fission180AnimationFade"
-TRAIL = (0.20, 0.55, 0.95)
+TRAIL = Live((0.20, 0.55, 0.95), "pick")
 PIN_ON = (0.20, 0.75, 0.30)  # a callout tied to a component (Fusion: green pin)
 PIN_FREE = (0.90, 0.25, 0.20)  # a callout in space (red pin)
 

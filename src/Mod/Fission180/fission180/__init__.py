@@ -54,6 +54,10 @@ def ui_icon_path(name):
 
         if theme.is_light() and name not in _KEEP_WHITE and os.path.isfile(path):
             return _light_copy(name, path)
+        if theme.is_neon():
+            from . import neon_icons
+
+            return neon_icons.path(name)
     except Exception:
         pass
     return path

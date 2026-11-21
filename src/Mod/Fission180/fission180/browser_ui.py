@@ -21,9 +21,23 @@ from . import body_visibility
 from . import _remember, browser_core as core
 from . import commands, components, doc_epoch, hover_ghost, selectable, theme
 from . import timeline_ops as ops
-from . import log, ui_icon, warn
+from . import log, neon_shell_paint as neon_paint, ui_icon, warn
 from .compat import QtCore, QtGui, QtWidgets
 from .inline_edit import InlineEditor
+
+
+def _neon(role, literal):
+    """A painted colour of the browser: the literal in Dark and Light, the palette's `role`
+    in Neon Lights (theme.neon)."""
+    return QtGui.QColor(theme.neon(role, literal))
+
+
+def _warning_text():
+    if not neon_paint.on():
+        return QtGui.QColor("#f2c440")
+    from .neon_palette import mix
+
+    return QtGui.QColor(mix(theme.neon("alert", "#f2c440"), theme.neon("text", "#ffffff"), 0.35))
 
 ROLE_NODE = QtCore.Qt.UserRole
 EYE = 18  # width of the eye area at the start of a row
@@ -913,6 +927,25 @@ def _cycle_color_offered():
         return False
 
 
+_NEON_WARNED = set()
+
+
+def _neon_warn(what, exc):
+    if what not in _NEON_WARNED:
+        _NEON_WARNED.add(what)
+        warn("browser: Neon Lights %s: %s" % (what, exc))
+
+
+def theme_changed():
+    """neon_shell_paint.theme_changed: the browser painted again in the look in use."""
+    try:
+        tree = widget()
+        if tree is not None:
+            tree.viewport().update()
+    except RuntimeError:
+        pass
+
+
 class _RowDelegate(QtWidgets.QStyledItemDelegate):
     """Draws the eye between the expand arrow and the icon, like Fusion, and turns a
     click on it into show/hide."""
@@ -958,9 +991,12 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             box = self.units_rect(option.rect)
             painter.setPen(QtGui.QPen(QtGui.QColor(theme.ACCENT or "#3fa9f5")))
             painter.setBrush(QtGui.QBrush(QtGui.QColor(theme.ACCENT or "#3fa9f5")))
-            painter.drawRoundedRect(QtCore.QRectF(box), 3, 3)
+            if neon_paint.on():  # a chamfered key instead of a rounded one
+                painter.drawPath(neon_paint.chamfer_path(QtCore.QRectF(box), 4.0))
+            else:
+                painter.drawRoundedRect(QtCore.QRectF(box), 3, 3)
             # a pencil: a slanted bar with a point
-            pen = QtGui.QPen(QtGui.QColor("#ffffff"))
+            pen = QtGui.QPen(_neon("background", "#ffffff"))
             pen.setWidthF(2.2)
             pen.setCapStyle(QtCore.Qt.RoundCap)
             painter.setPen(pen)
@@ -975,6 +1011,18 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             )
         finally:
             painter.restore()
+
+    def _neon_ground(self, painter, option, rect):
+        """A strip of the row left out of the shifted cell the style tints (under the eye,
+        under the activate mark) in the row's selection or hover tint, as the indent before
+        it (BrowserWidget.drawBranches)."""
+        try:
+            selected = bool(option.state & QtWidgets.QStyle.State_Selected)
+            painter.fillRect(rect, neon_paint.colour("view", "#000000"))
+            for tint in self.tree._neon_row_tint(selected, option.rect.top(), option.rect.bottom() + 1):
+                painter.fillRect(rect, tint)
+        except Exception as exc:
+            _neon_warn("row tint", exc)
 
     def helpEvent(self, event, view, option, index):
         try:
@@ -995,6 +1043,9 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
         node = self._node(index)
         if node is None:
             return super().paint(painter, option, index)
+        if neon_paint.on():  # Neon Lights: the row's tint under the eye too (no gap)
+            self._neon_ground(painter, option, QtCore.QRect(
+                option.rect.left(), option.rect.top(), EYE + 2, option.rect.height()))
         if node["visible"] is not None:
             icon = ui_icon("eye" if node["visible"] else "eye_off")
             mode = QtGui.QIcon.Normal if node["visible"] else QtGui.QIcon.Disabled
@@ -1014,12 +1065,15 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
         shifted = QtWidgets.QStyleOptionViewItem(option)
         room = (RADIO + 10 + (MARK + 4 if mark else 0)) if radio else 0
         shifted.rect = option.rect.adjusted(EYE + 2, 0, -room, 0)
+        if room and neon_paint.on():  # ... and under the activate mark at the end
+            self._neon_ground(painter, option, QtCore.QRect(
+                option.rect.right() - room + 1, option.rect.top(), room, option.rect.height()))
         if node["status"] == "error":
-            shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#ff8a80"))
+            shifted.palette.setColor(QtGui.QPalette.Text, _neon("alert", "#ff8a80"))
         elif node["status"] == "warning":
-            shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#f2c440"))
+            shifted.palette.setColor(QtGui.QPalette.Text, _warning_text())
         elif node["status"] == "suppressed":
-            shifted.palette.setColor(QtGui.QPalette.Text, QtGui.QColor("#8a94a6"))
+            shifted.palette.setColor(QtGui.QPalette.Text, _neon("disabled", "#8a94a6"))
             font = QtGui.QFont(shifted.font)
             font.setStrikeOut(True)
             shifted.font = font
@@ -1038,18 +1092,30 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
                 painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
                 if radio:
                     ring = self.radio_rect(option.rect).adjusted(2, 2, -2, -2)
-                    pen = QtGui.QPen(QtGui.QColor("#4da3ff" if node["active"] else "#9aa4b5"))
+                    pen = QtGui.QPen(
+                        _neon("secondary", "#4da3ff")
+                        if node["active"]
+                        else _neon("text_dim", "#9aa4b5")
+                    )
                     pen.setWidthF(1.4)
                     painter.setPen(pen)
                     painter.setBrush(
-                        QtGui.QBrush(QtGui.QColor("#4da3ff"))
+                        QtGui.QBrush(_neon("secondary", "#4da3ff"))
                         if node["active"]
                         else QtCore.Qt.NoBrush
                     )
-                    painter.drawEllipse(ring)
+                    if neon_paint.on():  # Neon Lights: a diamond, like its radio buttons
+                        c = QtCore.QRectF(ring).center()
+                        r = ring.width() / 2.0 + 0.5
+                        painter.drawPolygon(QtGui.QPolygonF([
+                            QtCore.QPointF(c.x(), c.y() - r), QtCore.QPointF(c.x() + r, c.y()),
+                            QtCore.QPointF(c.x(), c.y() + r), QtCore.QPointF(c.x() - r, c.y()),
+                        ]))
+                    else:
+                        painter.drawEllipse(ring)
                 if node["key"] == self.tree._drop_key:
                     # A dragged body or component is over this row: it can be dropped here.
-                    pen = QtGui.QPen(QtGui.QColor("#4da3ff"))
+                    pen = QtGui.QPen(_neon("secondary", "#4da3ff"))
                     pen.setWidthF(1.5)
                     painter.setPen(pen)
                     painter.setBrush(QtCore.Qt.NoBrush)
@@ -1093,8 +1159,8 @@ class _RowDelegate(QtWidgets.QStyledItemDelegate):
             painter.save()
             try:
                 painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-                painter.setBrush(QtGui.QColor("#1e2430"))
-                pen = QtGui.QPen(QtGui.QColor("#ff5a52"))
+                painter.setBrush(_neon("background", "#1e2430"))
+                pen = QtGui.QPen(_neon("alert", "#ff5a52"))
                 pen.setWidthF(max(1.4, size / 7.0))
                 painter.setPen(pen)
                 painter.drawEllipse(box)
@@ -1219,6 +1285,118 @@ class BrowserWidget(QtWidgets.QTreeWidget):
         self._observer = None
         self._read_cost = 0.0  # how long the last read took (s), and when it ended
         self._read_end = 0.0
+
+    # -- Neon Lights: circuit-trace tree lines and a selection bar ------------------------------
+    def drawRow(self, painter, options, index):
+        super().drawRow(painter, options, index)
+        if not neon_paint.on():
+            return
+        try:
+            if self.selectionModel().isSelected(index):
+                rect = QtCore.QRectF(options.rect)
+                bar = QtCore.QRectF(0.0, rect.top() + 1.0, 3.0, rect.height() - 2.0)
+                painter.save()
+                try:
+                    glow = neon_paint.colour("primary", alpha=0.35)
+                    painter.fillRect(bar.adjusted(0, 0, 3.0, 0), glow)
+                    painter.fillRect(bar, neon_paint.colour("primary"))
+                finally:
+                    painter.restore()
+        except Exception as exc:
+            _neon_warn("selection bar", exc)
+
+    def drawBranches(self, painter, rect, index):
+        if not neon_paint.on():
+            return super().drawBranches(painter, rect, index)
+        try:
+            self._neon_branches(painter, rect, index)
+        except Exception as exc:
+            _neon_warn("tree lines", exc)
+            super().drawBranches(painter, rect, index)
+
+    def _neon_branches(self, painter, rect, index):
+        """Tree lines as circuit traces: thin glowing lines with small square pads where a row
+        joins, and a chamfered chevron on rows that open."""
+        model = self.model()
+        index = index.sibling(index.row(), 0)
+        indent = float(self.indentation())
+        chain = []  # the row and its ancestors, nearest first
+        walk = index
+        while walk.isValid():
+            chain.append(walk)
+            walk = walk.parent()
+        right = float(rect.right()) + 1.0
+        top, bottom = float(rect.top()), float(rect.bottom()) + 1.0
+        mid_y = (top + bottom) / 2.0
+        selected = self.selectionModel().isSelected(index)
+        dim = neon_paint.colour("primary_dim")
+        lit = neon_paint.colour("primary")
+        painter.save()
+        try:
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+            # the row's selection or hover tint across the indent, in exactly the row's own
+            # colour (Qt painted this area in another shade: brighter when selected, fainter
+            # under the mouse; the view's colour first wipes it)
+            painter.fillRect(QtCore.QRectF(rect), neon_paint.colour("view", "#000000"))
+            for tint in self._neon_row_tint(selected, top, bottom):
+                painter.fillRect(QtCore.QRectF(rect), tint)
+            for level, item in enumerate(chain):
+                x = right - indent * (level + 1) + indent / 2.0
+                if x < rect.left():
+                    break
+                has_next = item.row() < model.rowCount(item.parent()) - 1
+                line = QtGui.QPen(lit if (selected and level == 0) else dim, 1.0)
+                painter.setPen(line)
+                if level == 0:
+                    painter.drawLine(QtCore.QPointF(x, top), QtCore.QPointF(x, bottom if has_next else mid_y))
+                    painter.drawLine(QtCore.QPointF(x, mid_y), QtCore.QPointF(right - 2.0, mid_y))
+                    pad = QtCore.QRectF(x - 1.5, mid_y - 1.5, 3.0, 3.0)
+                    if model.hasChildren(item):
+                        self._neon_chevron(painter, x, mid_y, self.isExpanded(item), lit)
+                    else:
+                        painter.fillRect(pad, lit if selected else dim)
+                elif has_next:
+                    painter.drawLine(QtCore.QPointF(x, top), QtCore.QPointF(x, bottom))
+        finally:
+            painter.restore()
+
+    def _neon_row_tint(self, selected, top, bottom):
+        """The layers of tint a row's cell shows in Neon Lights, to paint over the view's
+        colour (as measured on screen): ::item:selected once when selected (neon_qss_shell);
+        under the mouse ::item:hover once more on a selected row, twice on another (Qt lays
+        its row hover under the cell's own); none for a plain row."""
+        from . import neon_qss_shell
+
+        layers = []
+        if selected:
+            layers.append(neon_paint.colour("primary", alpha=neon_qss_shell.ROW_SELECTED))
+        viewport = self.viewport()
+        if viewport.underMouse():
+            y = viewport.mapFromGlobal(QtGui.QCursor.pos()).y()
+            if top <= y < bottom:
+                hover = neon_paint.colour("primary", alpha=neon_qss_shell.ROW_HOVER)
+                layers += [hover] if selected else [hover, hover]
+        return layers
+
+    @staticmethod
+    def _neon_chevron(painter, x, y, opened, colour):
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        box = QtCore.QRectF(x - 5.0, y - 5.0, 10.0, 10.0)
+        painter.fillPath(neon_paint.chamfer_path(box, 2.5), neon_paint.colour("view", "#000000"))
+        neon_paint.glow_path(painter, neon_paint.chamfer_path(box, 2.5), colour, 1.0, 0.6)
+        path = QtGui.QPainterPath()
+        if opened:
+            path.moveTo(x - 2.5, y - 1.0)
+            path.lineTo(x, y + 1.5)
+            path.lineTo(x + 2.5, y - 1.0)
+        else:
+            path.moveTo(x - 1.0, y - 2.5)
+            path.lineTo(x + 1.5, y)
+            path.lineTo(x - 1.0, y + 2.5)
+        painter.setPen(neon_paint.glow_pen(neon_paint.colour("primary_hot"), 1.4))
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.drawPath(path)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
 
     def start(self):
         doc_epoch.install()

@@ -20,6 +20,7 @@ No Qt and no document here but the Ghosts' drawing.
 import FreeCAD as App
 
 from . import warn
+from .neon_scene_core import Live
 
 # What a copy of a face costs the kernel, roughly: a flat or round face 1, a swept or
 # free-form one CURVED times that, a long sweep (a surface of many poles) more again. Above
@@ -32,7 +33,7 @@ CURVED = 8
 HEAVY = 150
 SIMPLE = ("Plane", "Cylinder", "Cone", "Sphere", "Toroid")
 MAX_TRIANGLES = 400000  # more is not drawn (the dialog says how many copies there will be)
-GHOST = (0.12, 0.53, 0.90)
+GHOST = Live((0.12, 0.53, 0.90), "pick")
 
 
 def weight(face):

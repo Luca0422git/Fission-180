@@ -2529,6 +2529,27 @@ def _():
     )
 
 
+# Neon Lights (docs/fission180/neon-lights-design.md 6.5): every recipe is also drawn in the
+# neon language into fission180/icons/neon/ (neon_icon_style.py). A recipe made by hand for the
+# neon look (@neon_icon, in tools/fission180/icons_neon_<area>.py) replaces the automatic one.
+NEON_OUT = os.path.join(os.path.dirname(OUT), "neon")
+NEON_ICONS = {}
+
+
+def neon_icon(name):
+    def register(fn):
+        NEON_ICONS[name] = fn
+        return fn
+
+    return register
+
+
+# The neon set's one stroke/glow standard (LINE, DETAIL, glow_width) lives in
+# neon_icon_style.py; the hand-made kit (icons_neon__kit.py) reads it from there, so the hand
+# recipes and the automatic conversion can never drift apart.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import neon_icon_style  # noqa: E402
+
 # Area icon files: tools/fission180/icons_<area>.py draw more icons with the helpers above
 # (run here, in this module's namespace, so @icon registers them). One file per area keeps
 # builders working side by side from editing the same lines.
@@ -2565,6 +2586,36 @@ def main():
         with open(os.path.join(OUT, name + ".svg"), "w", encoding="utf-8") as handle:
             handle.write(svg(body, list(_BOUNDS)))
     print("[Fission 180] wrote %d icons to %s" % (len(ICONS) + len(RAW), os.path.normpath(OUT)))
+    return write_neon()
+
+
+def write_neon():
+    """The same icons in the Neon Lights language (fission180/icons/neon/)."""
+    os.makedirs(NEON_OUT, exist_ok=True)
+    for name in os.listdir(NEON_OUT):
+        if name.endswith(".svg"):
+            os.remove(os.path.join(NEON_OUT, name))
+    for name, text in sorted(RAW.items()):
+        head, _, rest = text.partition(">")
+        body, _, tail = rest.rpartition("</svg>")
+        with open(os.path.join(NEON_OUT, name + ".svg"), "w", encoding="utf-8") as handle:
+            handle.write(head + ">" + neon_icon_style.neonize(body, name) + "</svg>" + tail)
+    for name, fn in sorted(ICONS.items()):
+        _BOUNDS.clear()
+        if name in NEON_ICONS:
+            body = NEON_ICONS[name]()
+        else:
+            body = neon_icon_style.neonize(fn(), name)
+        with open(os.path.join(NEON_OUT, name + ".svg"), "w", encoding="utf-8") as handle:
+            handle.write(svg(body, list(_BOUNDS), pad=2.5))
+    unknown = sorted(set(NEON_ICONS) - set(ICONS))
+    if unknown:
+        print("[Fission 180] neon icons without a normal icon: %s" % ", ".join(unknown))
+        return 1
+    print(
+        "[Fission 180] wrote %d neon icons (%d made by hand) to %s"
+        % (len(ICONS) + len(RAW), len(NEON_ICONS), os.path.normpath(NEON_OUT))
+    )
     return 0
 
 

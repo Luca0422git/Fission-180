@@ -12,7 +12,7 @@ Geometries, 3D Sketch. Options are remembered between sessions (sketch_mode.opti
 
 import FreeCADGui as Gui
 
-from . import sketch_mode, theme, ui_icon, ui_icon_path, warn
+from . import neon_qss_panels, sketch_mode, theme, ui_icon, ui_icon_path, warn
 from .compat import QtCore, QtGui, QtWidgets
 
 ROWS = [
@@ -62,7 +62,7 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         super().__init__(parent)
         self.session = session
         self.setObjectName("Fission180SketchPalette")
-        self.setStyleSheet(STYLE)
+        neon_qss_panels.style(self, STYLE, "sketch_palette")
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 6)
         outer.setSpacing(2)
@@ -224,7 +224,10 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
             self.freedom.setText(text)
             bad = conflicting or redundant
             colour = "#ff8a80" if bad else ("#f5f5f5" if locked else "#9fd2ff")
-            self.freedom.setStyleSheet("color: %s;" % colour)
+            # Dark's colour in the sheet (and remembered); Neon Lights: the secondary colour
+            neon_qss_panels.colour(
+                self.freedom, "color: %s;" % colour, None if bad or locked else "secondary"
+            )
 
     def _refresh_mode(self):
         """Show whether new curves are drawn as construction (X with nothing selected
@@ -345,11 +348,11 @@ class FeatureOptions(QtWidgets.QWidget):
         layout.setSpacing(2)
         self.header = QtWidgets.QLabel("▾ Feature Options")
         self.header.setObjectName("Fission180PaletteFeaturesTitle")
-        self.header.setStyleSheet("font-weight: bold; padding: 4px 6px;")
+        neon_qss_panels.style(self.header, "font-weight: bold; padding: 4px 6px;", "caption")
         layout.addWidget(self.header)
         self.kind = QtWidgets.QLabel("")
         self.kind.setObjectName("Fission180PaletteFeaturesKind")
-        self.kind.setStyleSheet("padding: 0 10px; color: #c9d1dc;")
+        neon_qss_panels.style(self.kind, "padding: 0 10px; color: #c9d1dc;", "dim_label")
         layout.addWidget(self.kind)
         self.grid_host = QtWidgets.QWidget()
         self.grid = QtWidgets.QGridLayout(self.grid_host)

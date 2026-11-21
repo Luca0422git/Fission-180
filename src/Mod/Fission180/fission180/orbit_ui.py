@@ -31,6 +31,9 @@ import FreeCADGui as Gui
 
 from . import log, orbit, viewcube, warn
 from .compat import QtCore, QtGui, QtWidgets
+from .neon_scene_core import Live
+
+RIM = Live((0.10, 0.35, 0.16), "marker_rim")  # the orbit dot's darker rim
 
 PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180"
 MODE_KEY = "OrbitMode"  # "constrained" or "free", Fission 180's own, kept across sessions
@@ -130,7 +133,7 @@ class PivotMarker:
         dot.markerIndex.setValue(coin.SoMarkerSet.CIRCLE_FILLED_9_9)
         top.addChild(dot)
         rim_colour = coin.SoMaterial()
-        rim_colour.diffuseColor.setValue(0.10, 0.35, 0.16)  # a darker rim: readable anywhere
+        rim_colour.diffuseColor.setValue(*RIM)  # a darker rim: readable anywhere
         top.addChild(rim_colour)
         rim = coin.SoMarkerSet()
         rim.markerIndex.setValue(coin.SoMarkerSet.CIRCLE_LINE_9_9)
@@ -223,6 +226,18 @@ def clear_pivot():
         log("orbit centre reset")
     else:
         log("orbit centre reset (none was set)")
+
+
+def recolour():
+    """The orbit-centre dots drawn again in the colours of the look in use (Neon Lights was
+    switched on or off, its colours changed, a save draws its preview picture)."""
+    for entry in list(_pivots.values()):
+        try:
+            marker = entry["marker"]
+            if marker.view is not None and "point" in entry:
+                marker.show(marker.view, App.Vector(*entry["point"]))
+        except Exception as exc:
+            warn("orbit centre: %s" % exc)
 
 
 def _clear_all_pivots():

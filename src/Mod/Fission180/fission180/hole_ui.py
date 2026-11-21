@@ -27,6 +27,7 @@ from . import hole_tables
 from . import thread_tables as tables
 from .compat import QtCore, QtWidgets
 from .taskui import ArrowDragger, BoxCarrier, DistanceField, Panel, ValueBoxes, on_top_root
+from .neon_scene_core import Live
 
 PLACEMENT_LABELS = [("Single Hole", "single"), ("From Sketch (Multiple Holes)", "sketch")]
 EXTENT_LABELS = [("Distance", "distance"), ("To", "to"), ("All", "all")]
@@ -44,7 +45,8 @@ TAP_TYPE_LABELS = [
 DRILL_LABELS = [("Flat", "flat"), ("Angle", "angle")]
 FIT_LABELS = [("Close", "close"), ("Normal", "normal"), ("Loose", "loose")]
 DIRECTION_LABELS = [("Right hand", "right"), ("Left hand", "left")]
-BLUE = (0.30, 0.62, 0.95)
+BLUE = Live((0.30, 0.62, 0.95), "arrow")
+BLUE_ACTIVE = Live((0.55, 0.80, 1.0), "arrow_hot")  # the disc while dragged
 LINE_TYPES = ("Part::GeomLine", "Part::GeomLineSegment")
 MIN_DIAMETER = 0.1  # mm: the diameter arrow stops here
 TO_WAITING = "Click the face or plane the hole goes to (in the 3D view or the browser)."
@@ -78,7 +80,7 @@ class PointDragger(BoxCarrier):
         self.root = on_top_root(coin, place)  # over the part and grabbable through it
         self.dragger = coin.SoTranslate2Dragger()
         self.dragger.setPart("translator", self._disc(coin, radius, BLUE))
-        self.dragger.setPart("translatorActive", self._disc(coin, radius, (0.55, 0.80, 1.0)))
+        self.dragger.setPart("translatorActive", self._disc(coin, radius, BLUE_ACTIVE))
         for part in ("feedback", "feedbackActive", "xAxisFeedback", "yAxisFeedback"):
             try:
                 self.dragger.setPart(part, coin.SoSeparator())

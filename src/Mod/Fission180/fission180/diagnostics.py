@@ -66,6 +66,28 @@ def report(recent_lines=60):
     return "\n".join(lines)
 
 
+def run_self_check(dialog, box):
+    """Diagnostics > Neon self-check: run it with the dialog out of the way, then show its report
+    in the box (ready to copy)."""
+    try:
+        from .compat import QtCore, QtWidgets
+        from . import neon_selfcheck
+
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        dialog.hide()
+        try:
+            report = neon_selfcheck.run()
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
+            dialog.show()
+            dialog.raise_()
+        box.setPlainText(report)
+        return report
+    except Exception as exc:
+        App.Console.PrintWarning("[Fission 180] Neon self-check: %s\n" % exc)
+        return ""
+
+
 def show():
     text = report()
     App.Console.PrintMessage("[Fission 180] diagnostics\n%s\n" % text)
@@ -86,7 +108,14 @@ def show():
         layout.addWidget(box)
         buttons = QtWidgets.QDialogButtonBox()
         copy = buttons.addButton("Copy", QtWidgets.QDialogButtonBox.ActionRole)
-        copy.clicked.connect(lambda: QtWidgets.QApplication.clipboard().setText(text))
+        copy.clicked.connect(lambda: QtWidgets.QApplication.clipboard().setText(box.toPlainText()))
+        check = buttons.addButton("Neon self-check", QtWidgets.QDialogButtonBox.ActionRole)
+        check.setObjectName("Fission180NeonSelfCheck")
+        check.setToolTip(
+            "Orbits a sample part with the Neon Lights effects off and on, measures the idle CPU\n"
+            "and checks the 3D view's shader (about half a minute). Copy the result and send it."
+        )
+        check.clicked.connect(lambda: run_self_check(dialog, box))
         buttons.addButton(QtWidgets.QDialogButtonBox.Close)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)

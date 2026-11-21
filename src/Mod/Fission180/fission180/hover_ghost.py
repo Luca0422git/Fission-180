@@ -16,8 +16,9 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import warn
+from .neon_scene_core import Live
 
-COLOUR = (0.45, 0.62, 0.92)
+COLOUR = Live((0.45, 0.62, 0.92), "hover")
 TRANSPARENCY = 0.72
 DEFLECTION = 0.002  # of the shape's size: coarse is fine for a ghost
 _STATE = {"node": None, "view": None, "object": None}
