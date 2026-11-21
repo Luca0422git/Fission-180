@@ -1306,7 +1306,8 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 - **Open: CalculiX crashes on Windows now and then (exit 3221225477 = 0xC0000005, an access
   violation in ccx 2.22's default solver), seen on GitHub runs #284, #349 and #94
-  (2026-11-16).** Fission 180 solves again with SPOOLES; in #349 and #94 that retry crashed
+  (2026-11-16), and #166 (2026-11-21: `simqa cantilever_edge_vertex/fine`, SPOOLES retry crashed
+  too).** Fission 180 solves again with SPOOLES; in #349 and #94 that retry crashed
   too on one case (#94: `simqa directions/fine`, 1 of 230 checks; the first benchmark's retry
   worked), and the job was green on its re-run each time. A person on Windows gets a slower
   solve, or rarely "CalculiX could not solve the study". The advice from #284 stands and is
