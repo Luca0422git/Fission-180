@@ -96,6 +96,14 @@ def enable():
     font.setHintingPreference(QtGui.QFont.PreferNoHinting)
     app.setFont(font)
     log("Neon Lights: font %s" % body)
+    try:
+        # long dialog titles fitted beside the stripes from the start too (a look switch does
+        # it through theme.LISTENERS; starting in Neon Lights runs no listener)
+        from . import neon_qss_panels
+
+        neon_qss_panels.fit_titles()
+    except Exception as exc:
+        warn("Neon Lights: dialog titles: %s" % exc)
 
 
 def disable():

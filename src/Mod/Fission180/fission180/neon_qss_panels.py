@@ -570,7 +570,7 @@ FIT_SPACING = (1.5, 0.5, 0.0, 0.0)  # letter-spacing (px) of each level, as in t
 FIT_SMALL = 11  # font size (px) of levels 2 and 3
 FIT_GAP = 6  # px kept between the title's end and the stripes
 PROP_FIT = "fission180Fit"
-_fit = {"filter": None, "views": []}
+_fit = {"filter": None, "views": [], "pending": False}
 
 
 def fit_level(widths, room):
@@ -684,27 +684,45 @@ def _task_views():
 
 
 def _make_filter():
+    """A filter on the task views only. It never touches the widgets being added: Qt sends
+    ChildAdded while a child is still being built, and taking hold of it then (event.child(),
+    findChildren() under it) left Python with a broken handle to number boxes made just after,
+    so every command's Distance / Angle / Radius read 0 after a switch to Neon Lights ("Internal
+    C++ object (QAbstractSpinBox) already deleted"; Luca, 2026-11-21: "it just breaks extrude").
+    A change of the view only asks for one fit once the event loop is back, when every dialog
+    is fully built."""
     from .compat import QtCore
 
-    kinds = (QtCore.QEvent.Show, QtCore.QEvent.Resize, QtCore.QEvent.LayoutRequest)
+    kinds = (
+        QtCore.QEvent.Show,
+        QtCore.QEvent.Resize,
+        QtCore.QEvent.LayoutRequest,
+        QtCore.QEvent.ChildAdded,
+        QtCore.QEvent.ChildRemoved,
+    )
 
     class TitleWatch(QtCore.QObject):
         def eventFilter(self, obj, event):  # noqa: N802 (Qt's name)
             try:
-                kind = event.type()
-                if kind == QtCore.QEvent.ChildAdded:
-                    child = event.child()
-                    if child is not None and child.isWidgetType():
-                        _watch(child)
-                elif kind in kinds and obj.isWidgetType() and obj.property("class") == "header" \
-                        and obj.metaObject().className() != "QSint::ActionLabel":
-                    header = obj
-                    QtCore.QTimer.singleShot(0, lambda: _fit_alive(header))
+                if event.type() in kinds and not _fit["pending"]:
+                    _fit["pending"] = True
+                    QtCore.QTimer.singleShot(0, _fit_later)
             except Exception as exc:  # never break a dialog
                 warn("Neon Lights: dialog title: %s" % exc)
             return False
 
     return TitleWatch()
+
+
+def _fit_later():
+    """Every open dialog's title fitted, once the event loop is back (see _make_filter)."""
+    _fit["pending"] = False
+    try:
+        for view in _task_views():
+            for header in _headers(view):
+                _fit_alive(header)
+    except Exception as exc:
+        warn("Neon Lights: dialog titles: %s" % exc)
 
 
 def _fit_alive(header):
@@ -716,25 +734,35 @@ def _fit_alive(header):
         warn("Neon Lights: dialog title: %s" % exc)
 
 
-def _watch(widget):
-    """The title watcher on `widget` and everything in it (once each)."""
-    from .compat import QtWidgets
-
+def _watch(view):
+    """The title watcher on a task view and its scroll area's inside (not on dialogs' own
+    widgets: see _make_filter)."""
     if _fit["filter"] is None:
         _fit["filter"] = _make_filter()
-    for each in [widget] + widget.findChildren(QtWidgets.QWidget):
+    for each in _watched(view):
         if not each.property("fission180FitWatched"):
             each.setProperty("fission180FitWatched", True)
             each.installEventFilter(_fit["filter"])
 
 
-def _unwatch(widget):
-    """The title watcher off again (Dark and Light: no filter left on the task view)."""
-    from .compat import QtWidgets
+def _watched(view):
+    """A task view, its viewport and the panel inside it (where dialogs come and go)."""
+    out = [view]
+    for name in ("viewport", "widget"):
+        try:
+            inner = getattr(view, name)()
+        except Exception:
+            inner = None
+        if inner is not None:
+            out.append(inner)
+    return out
 
+
+def _unwatch(view):
+    """The title watcher off again (Dark and Light: no filter left on the task view)."""
     if _fit["filter"] is None:
         return
-    for each in [widget] + widget.findChildren(QtWidgets.QWidget):
+    for each in _watched(view):
         if each.property("fission180FitWatched"):
             each.setProperty("fission180FitWatched", None)
             each.removeEventFilter(_fit["filter"])
