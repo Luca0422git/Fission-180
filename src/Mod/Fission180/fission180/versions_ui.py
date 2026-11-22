@@ -84,7 +84,11 @@ def panel_folder():
     try:
         panel_ = _state.get("panel")
         folder = panel_.folder if _alive(panel_) else prefs().GetString("DataPanelFolder", "")
-        if not folder or not os.path.isdir(folder):
+        from . import locations_ui
+
+        # (never a wait on a network drive: the last Data Panel folder on an offline NAS held
+        # every Save and Export, Luca 2026-11-22)
+        if not folder or not locations_ui.isdir_now(folder):
             return None
         if core.inside(project_folder(), folder):
             return folder
@@ -106,12 +110,21 @@ def start_folder(doc=None):
         doc = doc or App.ActiveDocument
         if doc is not None and doc.FileName:
             folder = os.path.dirname(doc.FileName)
-            if os.path.isdir(folder):
+            from . import locations_ui
+
+            if locations_ui.isdir_now(folder):
                 return folder
     except Exception:
         pass
     folder = panel_folder() or project_folder()
-    return folder if os.path.isdir(folder) else os.path.expanduser("~")
+    try:
+        from . import locations_ui
+
+        if locations_ui.isdir_now(folder):
+            return folder
+    except Exception:
+        pass
+    return os.path.expanduser("~")
 
 
 def default_project_folder():
@@ -450,6 +463,17 @@ class SaveDialog(QtWidgets.QDialog):
             folder = (folder or "").strip()
             root = self._place_root(folder) if folder else None
             root = root or project_folder()
+            from . import locations_ui
+
+            if locations_ui.is_remote(root) and not locations_ui.isdir_now(root):
+                # (an offline NAS: no listing of its folders, that would hold the window)
+                self.tree.clear()
+                self._tree_root = None
+                self.message.setText(
+                    "%s is not reachable now (is the NAS on, this computer on its network?)."
+                    % root
+                )
+                return
             self.tree.blockSignals(True)
             try:
                 if self._tree_root is None or not core.same_path(root, self._tree_root):
@@ -515,8 +539,8 @@ class SaveDialog(QtWidgets.QDialog):
             from . import locations_core, locations_ui
 
             for place in locations_ui.all_places():
-                status = locations_core.status(place)
-                offline = place["kind"] != "local" and status != locations_core.OK
+                status = locations_ui.status(place)
+                offline = place["kind"] != "local" and status == locations_core.OFFLINE
                 label = place["name"] + (" (offline)" if offline else "")
                 self.place.addItem(label, place["root"])
             self._match_place(folder)

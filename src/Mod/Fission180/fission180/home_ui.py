@@ -809,7 +809,12 @@ class HomeView(QtWidgets.QWidget):
             if local:
                 _make_default_folder(root)
             tiles, empty = [], "No designs here yet."
-            if not root or not os.path.isdir(root):
+            # (a network folder is looked at on a worker thread: an offline NAS held the
+            # window for minutes at every start, save and close, Luca 2026-11-22)
+            status = locations_ui.folder_status(root, place["kind"])
+            if status == locations_core.CHECKING:
+                empty = "Looking for %s (%s)..." % (place["name"], root)
+            elif status != locations_core.OK:
                 empty = (
                     "The folder of %s (%s) is not there. Choose another one in the ... menu "
                     "(Change Folder...)." % (place["name"], root)
@@ -821,7 +826,7 @@ class HomeView(QtWidgets.QWidget):
                 _finish_unfinished_saves(root)
                 tiles = self._place_tiles(root, locations_core, locations_ui)
             title = place["name"]
-            if not local and locations_core.status(place) != locations_core.OK:
+            if not local and status == locations_core.OFFLINE:
                 title += "  · Offline"
             found.append((location_id, title, "folder", root, tiles, empty))
         # Designs saved in another folder get a row of their own: under This computer's
@@ -941,8 +946,41 @@ class HomeView(QtWidgets.QWidget):
         row.list.addItem(item)
         if not tile.get("cad"):
             tile_id = "%s|%s" % (row.row_id, tile["key"])
-            self.tiles[tile_id] = item
-            self._ask(tile_id, tile["key"], tile["path"])
+            if self._unreachable(tile["path"]):
+                self._show_unreachable(item, tile)
+            else:
+                self.tiles[tile_id] = item
+                self._ask(tile_id, tile["key"], tile["path"])
+
+    @staticmethod
+    def _unreachable(path):
+        """A design on a network drive that is not known to be there now: its tile is not
+        looked at (the one picture worker would hang on it, and every other tile's picture
+        behind it); the tiles are made again once the drive answers."""
+        from . import locations_core, locations_ui
+
+        folder = os.path.dirname(path)
+        return locations_ui.is_remote(folder) and (
+            locations_ui.folder_status(folder) != locations_core.OK
+        )
+
+    def _show_unreachable(self, item, tile):
+        from . import locations_core, locations_ui
+
+        looking = locations_ui.folder_status(os.path.dirname(tile["path"])) == (
+            locations_core.CHECKING
+        )
+        item.setIcon(QtGui.QIcon(_tile_pixmap(None, tile["key"] in self.pinned, True)))
+        item.setData(_STATUS, core.MISSING)
+        item.setForeground(QtGui.QColor(theme.TEXT_DISABLED))
+        where = tile.get("where") or ""
+        line = "looking for it..." if looking else "offline"
+        item.setText("%s\n%s" % (tile["name"], "%s, %s" % (where, line) if where else line))
+        item.setToolTip(
+            "%s\nOn a network drive that is %s." % (
+                tile["path"], "being looked for" if looking else "not reachable now"
+            )
+        )
 
     def _ask(self, tile, key, path, count=True):
         from . import versions_ui
@@ -1075,6 +1113,24 @@ class HomeView(QtWidgets.QWidget):
 
     def _open(self, kind, key, path, status):
         try:
+            from . import locations_core, locations_ui
+
+            folder = os.path.dirname(path)
+            if locations_ui.is_remote(folder):
+                # (no look at a network drive here: the tile's worker found the file, or
+                # the drive's last look says it is there)
+                reach = locations_ui.folder_status(folder)
+                if status != core.OK and reach != locations_core.OK:
+                    commands.tell(
+                        "Looking for the network drive of %s (%s). Try again in a moment."
+                        % (versions.design_name(path), folder)
+                        if reach == locations_core.CHECKING
+                        else "%s is on a network drive that is not reachable now (%s). Is the "
+                        "NAS on, this computer on its network?" % (versions.design_name(path), folder)
+                    )
+                    return
+                open_design(path)
+                return
             if status == core.MISSING or not os.path.exists(path):
                 commands.tell(
                     "%s is not at %s any more. Right-click it to Locate it, or to Remove it "
@@ -1423,7 +1479,7 @@ def _place_offline(path):
     from . import locations_core, locations_ui
 
     place = locations_core.place_of(path, locations_ui.all_places())
-    return place is not None and locations_core.status(place) != locations_core.OK
+    return place is not None and locations_ui.status(place) != locations_core.OK
 
 
 def places_changed():

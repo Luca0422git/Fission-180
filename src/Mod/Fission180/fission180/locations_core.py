@@ -179,11 +179,64 @@ def place_of(path, all_list):
 
 def status(place, isdir=os.path.isdir):
     """OK, or OFFLINE when the folder is not reachable now (the cloud app not running, the
-    NAS off): its designs show greyed, never an error."""
+    NAS off): its designs show greyed, never an error. It looks at the folder: on a network
+    drive that can take minutes when the drive is gone, so the window asks
+    locations_ui.folder_status instead (CHECKING until a background look answers)."""
     try:
         return OK if place["root"] and isdir(place["root"]) else OFFLINE
     except (OSError, ValueError):
         return OFFLINE
+
+
+# -- network drives --------------------------------------------------------------------------
+# Luca, 2026-11-22 (CachyOS, a NAS mounted on the laptop): offline, Fission 180 froze at the
+# start, at every save and at closing. Any look at a folder of an unreachable network drive
+# (even "is it there?") waits until the system gives up: 15 s to minutes for SMB/CIFS, for
+# ever for NFS. Such folders are only ever looked at on a worker thread.
+CHECKING = "checking"
+# Linux file systems whose folders live on another computer (/proc/self/mountinfo's type)
+NETWORK_FS = {
+    "cifs", "smb3", "smbfs", "nfs", "nfs4", "ncpfs", "afs", "ceph", "glusterfs", "9p", "davfs",
+    "coda", "lustre", "beegfs", "gpfs", "orangefs", "fuse.sshfs", "fuse.rclone", "fuse.s3fs",
+    "fuse.davfs2", "fuse.curlftpfs", "fuse.gvfsd-fuse", "fuse.kio-fuse", "fuse.onedriver",
+    "fuse.gcsfuse", "fuse.goofys", "fuse.smbnetfs", "fuse.glusterfs",
+}  # fmt: skip
+
+
+def _unescape_mount(text):
+    """mountinfo writes a space as \\040 (and tab, newline, backslash the same way)."""
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), text)
+
+
+def parse_mountinfo(text):
+    """[(mount point, file system type)] from the text of /proc/self/mountinfo."""
+    found = []
+    for line in (text or "").splitlines():
+        before, sep, after = line.partition(" - ")
+        fields, rest = before.split(), after.split()
+        if not sep or len(fields) < 5 or not rest:
+            continue
+        found.append((_unescape_mount(fields[4]), rest[0]))
+    return found
+
+
+def remote_mount(path, mounts):
+    """The mount point of a network drive that holds `path` (an absolute path, compared as
+    text: nothing on the disk is looked at), or None when the innermost mount holding it is
+    not a network one."""
+    best = None
+    for point, kind in mounts:
+        if versions.inside(point, path):
+            if best is None or len(point) > len(best[0]):
+                best = (point, kind)
+    if best is None or best[1] not in NETWORK_FS:
+        return None
+    return best[0]
+
+
+def unc_path(path):
+    """\\\\server\\share\\... or //server/share/...: a Windows network folder."""
+    return path.startswith("\\\\") or path.startswith("//")
 
 
 # -- version stores ----------------------------------------------------------------------

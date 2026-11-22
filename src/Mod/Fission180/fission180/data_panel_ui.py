@@ -989,7 +989,9 @@ class DataPanel(QtWidgets.QWidget):
             kept = _prefs().GetString("DataPanelFolder", "")
         except Exception:
             kept = ""
-        self.folder = dp.remembered_folder(vui.project_folder(), kept)
+        from . import locations_ui
+
+        self.folder = dp.remembered_folder(vui.project_folder(), kept, locations_ui.isdir_now)
         self.name_field = None  # the name being typed in place (NameField)
         self.conflicts = {}  # file name -> its original's name (sync apps' copies here)
         self.dragging = False
@@ -1211,7 +1213,7 @@ class DataPanel(QtWidgets.QWidget):
             current = 0
             for i, place in enumerate(locations_ui.all_places()):
                 offline = place["kind"] != "local" and (
-                    locations_core.status(place) != locations_core.OK
+                    locations_ui.status(place) == locations_core.OFFLINE
                 )
                 self.places.addItem(
                     place["name"] + (" (offline)" if offline else ""), place["root"]
@@ -1341,22 +1343,37 @@ class DataPanel(QtWidgets.QWidget):
         try:
             self._fill_places()
             project = self.place_root()
-            if self.root is None and not os.path.isdir(project):
+            from . import locations_core, locations_ui
+
+            # (a folder on a network drive is looked at on a worker thread: an offline NAS
+            # held the window for minutes, Luca 2026-11-22)
+            reach = locations_ui.folder_status(project)
+            if (
+                self.root is None
+                and reach == locations_core.OFFLINE
+                and not locations_ui.is_remote(project)
+            ):
                 try:
                     os.makedirs(project, exist_ok=True)
                     log("made the project folder %s" % project)
                 except OSError:
                     pass
-            if not core.inside(project, self.folder) or not os.path.isdir(self.folder):
+                reach = locations_ui.folder_status(project)
+            if reach != locations_core.OK or (
+                not core.inside(project, self.folder) or not os.path.isdir(self.folder)
+            ):
                 self.folder = project
             selected = self.selected_paths()
             self.list.blockSignals(True)  # (the details follow once, at the end)
             self.list.clear()
             self._counts = {}
-            if not os.path.isdir(project):
+            if reach != locations_core.OK:
                 self.crumbs.setText("")
                 self.status.setText(
-                    "The project folder %s is not there. Choose one with the ... button." % project
+                    "Looking for %s..." % project
+                    if reach == locations_core.CHECKING
+                    else "The project folder %s is not there. Choose one with the ... button."
+                    % project
                     if self.root is None
                     else "This place is offline: %s is not reachable now (is the cloud app "
                     "running, the NAS on?)." % project

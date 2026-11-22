@@ -8,6 +8,20 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.1.1
+
+### Fixed
+
+- **No more long freezes when a connected NAS is offline.** With a NAS or other network folder
+  connected (Home > + Connect a cloud or NAS) and the computer away from its network,
+  Fission 180 froze at the start, after every open and save and when closing, then carried on
+  minutes later (seen on Linux with a mounted share; the same could happen on Windows). Home,
+  the Data Panel and the Save and Export dialogs checked whether the NAS folder was there, and
+  the system makes such a check wait until it gives up on the share. Fission 180 now checks
+  network folders in the background: the window answers at once, the NAS's row says "Looking
+  for NAS..." and then "Offline", and its designs come back by themselves when the NAS is
+  reachable again.
+
 ## 0.1.0-beta.4.1.0
 
 ### New

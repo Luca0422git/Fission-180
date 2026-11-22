@@ -351,10 +351,12 @@ def fit_crumbs(labels, width, measure, separator=" / "):
     return [None, count - 1]
 
 
-def remembered_folder(root, kept):
+def remembered_folder(root, kept, isdir=os.path.isdir):
     """The folder the panel opens on: the one it showed last (`kept`) while that is still a
-    folder of the place, else the place's root."""
-    if kept and os.path.isdir(kept) and store.inside(root, kept):
+    folder of the place, else the place's root. (The place is checked first, on the path's
+    text: a folder of another place may be on an offline NAS, and `isdir` is the window's
+    look that never waits on a network drive.)"""
+    if kept and store.inside(root, kept) and isdir(kept):
         return os.path.abspath(kept)
     return os.path.abspath(root)
 

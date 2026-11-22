@@ -1304,6 +1304,27 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Known issues / findings
 
+- **Fixed in 0.1.0-beta.4.1.1: an offline NAS froze Fission 180** (Luca, 2026-11-22, CachyOS
+  laptop with a NAS mounted, only offline: "freezes on launch, and then eventually works ... has
+  trouble saving ... even freezes when trying to close it", "half the time it crashes").
+  Cause (reproduced with a FUSE share that hangs, then a stall sampler): Home's listing
+  (`HomeView._collect`: `os.path.isdir(root)` and `locations_core.status`) looked at every
+  connected place's folder on the GUI thread at the start and after every open, save and close;
+  the Data Panel (`remembered_folder`, `refresh`) and `versions_ui.panel_folder`/`start_folder`
+  (Save/Export dialogs) did too. On an unreachable SMB share each look waits until the kernel
+  gives up (15 s to minutes; NFS hard mounts for ever). Fix: `locations_ui.folder_status` /
+  `isdir_now` / `status(place)`: a folder on a network drive (a "nas" place, a UNC path,
+  Windows DRIVE_REMOTE, a Linux mount whose type is in `locations_core.NETWORK_FS`, from
+  /proc/self/mountinfo) is only ever looked at on a worker thread (one look per folder at a
+  time, answers kept 30 s, CHECKING before the first); a changed answer refreshes Home and the
+  Data Panel. Home tiles on an unreachable drive are not given to the one picture worker (it
+  hung there, and every other tile's picture behind it). Scenario `nas_offline` (every
+  os.stat/listdir/scandir/open into a fake share hangs; checks nothing on the window's thread
+  touches it) failed on the old code with "Home lists the places at once: 20.03 s". The
+  crashes were not reproduced: if they go on, Luca sends Help > Report a Problem with the
+  crash log (or, during a freeze, `pkill -ABRT -x fission180` makes the crash log hold every
+  thread's stack: Fission 180's faulthandler writes it).
+
 - **Open: CalculiX crashes on Windows now and then (exit 3221225477 = 0xC0000005, an access
   violation in ccx 2.22's default solver), seen on GitHub runs #284, #349 and #94
   (2026-11-16), and #166 (2026-11-21: `simqa cantilever_edge_vertex/fine`, SPOOLES retry crashed
@@ -2506,6 +2527,17 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: offline NAS freezes, patch 0.1.0-beta.4.1.1 (`develop`, 2026-11-22)
+
+Luca: CachyOS laptop "has trouble launching fission offline ... freezes ... trouble saving ...
+freezes when trying to close it ... half the time it crashes". Asked: designs on the laptop and
+on a NAS; all looks; only offline. Offline network alone (unshare -n, a DNS that never answers)
+did not reproduce it (start 2.5 s). A FUSE share that hangs 15 s per look (fusepy, /mnt/nas, a
+"nas" place) did: 45 s stalls at the start, after an open, after a save, 15 s at close; a stall
+sampler (main thread's Python stack frozen 2 s) showed `home_ui._collect` -> isdir. Fix above
+(Known issues). Trick worth keeping: during a freeze, `kill -ABRT` of the process makes Fission
+180's crash log (faulthandler, all threads) say where it was stuck.
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 

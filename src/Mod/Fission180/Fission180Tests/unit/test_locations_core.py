@@ -263,5 +263,47 @@ class Places(unittest.TestCase):
         self.assertEqual(lc.conflicts_in(names, "dropbox"), {})
 
 
+class NetworkDrives(unittest.TestCase):
+    """Folders on a network drive are never looked at on the window's thread (an offline NAS
+    held Fission 180 for minutes at every start, save and close, Luca 2026-11-22): which
+    folders those are is decided from the mount table and the path's text alone."""
+
+    MOUNTINFO = "\n".join(
+        [
+            "22 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw",
+            "40 22 0:35 / /home rw,relatime shared:20 - btrfs /dev/nvme0n1p3 rw",
+            "61 22 0:52 / /mnt/nas rw,relatime shared:30 - cifs //nas/share rw,vers=3.1.1",
+            "62 22 0:53 / /mnt/my\\040files rw,relatime - nfs4 nas:/export rw",
+            "63 40 0:54 / /home/luca/Cloud rw - fuse.rclone gdrive: rw",
+            "64 40 0:55 / /home/luca/.mount_Fission rw - fuse.Fission180.AppImage x rw",
+            "garbage line",
+        ]
+    )
+
+    def test_mountinfo(self):
+        mounts = lc.parse_mountinfo(self.MOUNTINFO)
+        self.assertIn(("/mnt/nas", "cifs"), mounts)
+        self.assertIn(("/mnt/my files", "nfs4"), mounts)  # (\\040 is a space)
+        self.assertEqual(len(mounts), 6)
+        self.assertEqual(lc.parse_mountinfo(""), [])
+
+    def test_remote_mount(self):
+        mounts = lc.parse_mountinfo(self.MOUNTINFO)
+        self.assertEqual(lc.remote_mount("/mnt/nas/Fission180/Arm.FCStd", mounts), "/mnt/nas")
+        self.assertEqual(lc.remote_mount("/mnt/nas", mounts), "/mnt/nas")
+        self.assertEqual(lc.remote_mount("/mnt/my files/x", mounts), "/mnt/my files")
+        self.assertEqual(lc.remote_mount("/home/luca/Cloud/a", mounts), "/home/luca/Cloud")
+        self.assertIsNone(lc.remote_mount("/home/luca/Documents/a.FCStd", mounts))
+        self.assertIsNone(lc.remote_mount("/mnt/nasty/a", mounts))  # (not inside /mnt/nas)
+        self.assertIsNone(lc.remote_mount("/home/luca/.mount_Fission/usr", mounts))
+        self.assertIsNone(lc.remote_mount("/tmp/a", []))
+
+    def test_unc_path(self):
+        self.assertTrue(lc.unc_path("\\\\nas\\share\\Arm.FCStd"))
+        self.assertTrue(lc.unc_path("//nas/share/Arm.FCStd"))
+        self.assertFalse(lc.unc_path("C:\\Users\\Luca"))
+        self.assertFalse(lc.unc_path("/home/luca"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,12 +10,16 @@ docs/fission180/parity/cloud.md). The rules are locations_core.py.
   * While a design in a place is open, a note in <place>/.fission180/locks/ says so; opening
     it on another computer within 12 hours asks Open anyway / Open read-only.
   * Designs inside a folder a cloud app syncs keep their versions as copies, never git.
+  * A folder on a network drive (a NAS) is never looked at on the window's thread: an
+    unreachable one held the window for minutes at every start, save and close (Luca's
+    laptop offline, 2026-11-22). folder_status() answers from a look made on a worker thread.
 """
 
 import getpass
 import os
 import shutil
 import socket
+import threading
 import time
 
 import FreeCAD as App
@@ -27,6 +31,8 @@ from .compat import QtCore, QtWidgets
 BROWSE_PICKER = None  # tests: a function returning the folder Browse... picks
 DETECT = None  # tests: a function returning the wizard's offers (locations_core.detect)
 COMPUTER = None  # tests: this computer's name
+REMOTE = None  # tests: a function path -> True when it is on a network drive
+REACH_FRESH = 30.0  # s an answer about a network folder is used before it is asked again
 
 _state = {"watch": None, "on": False, "timer": None, "sync": (0.0, [])}
 _fingerprints = {}  # document name -> the file as it was opened or last saved here
@@ -82,6 +88,151 @@ def user():
         return getpass.getuser()
     except Exception:
         return ""
+
+
+# -- network folders: never looked at on the window's thread ----------------------------------
+_reach = {
+    "lock": threading.Lock(),
+    "answers": {},  # path -> (True/False, when)
+    "busy": set(),  # paths a worker is looking at now (one look at a time per folder)
+    "changed": False,  # an answer the windows have not shown yet
+    "timer": None,
+    "mounts": (0.0, []),
+}
+
+
+def _mounts():
+    """The mounts of this computer (Linux), read again at most every 10 s. Reading
+    /proc/self/mountinfo never touches a network drive."""
+    when, found = _reach["mounts"]
+    if time.time() - when > 10:
+        found = []
+        try:
+            with open("/proc/self/mountinfo", "r", encoding="utf-8", errors="replace") as handle:
+                found = core.parse_mountinfo(handle.read())
+        except OSError:
+            pass
+        _reach["mounts"] = (time.time(), found)
+    return found
+
+
+def _windows_remote(path):
+    try:
+        import ctypes
+
+        drive = os.path.splitdrive(os.path.abspath(path))[0]
+        if not drive:
+            return False
+        return ctypes.windll.kernel32.GetDriveTypeW(drive + "\\") == 4  # DRIVE_REMOTE
+    except Exception:
+        return False
+
+
+def is_remote(path, kind=None):
+    """`path` is on a network drive (a NAS place, a mounted share, \\\\server\\share), decided
+    without looking at the folder itself."""
+    if not path:
+        return False
+    if REMOTE is not None:
+        return bool(REMOTE(path))
+    if kind == "nas" or core.unc_path(path):
+        return True
+    if os.name == "nt":
+        return _windows_remote(path)
+    return core.remote_mount(os.path.abspath(path), _mounts()) is not None
+
+
+def _look(path):
+    try:
+        ok = os.path.isdir(path)
+    except Exception:
+        ok = False
+    with _reach["lock"]:
+        old = _reach["answers"].get(path)
+        _reach["answers"][path] = (ok, time.time())
+        _reach["busy"].discard(path)
+        if old is None or old[0] != ok:
+            _reach["changed"] = True
+
+
+def _look_later(path):
+    """A worker thread looks at the folder (unless one is already looking: a hung look
+    must not pile up threads); the windows show its answer once it is in."""
+    with _reach["lock"]:
+        if path in _reach["busy"]:
+            return
+        _reach["busy"].add(path)
+    try:
+        threading.Thread(target=_look, args=(path,), name="Fission180Reach", daemon=True).start()
+    except Exception as exc:
+        with _reach["lock"]:
+            _reach["busy"].discard(path)
+        warn("places: cannot look at %s: %s" % (path, exc))
+        return
+    _watch_answers()
+
+
+def _watch_answers():
+    try:
+        if _reach["timer"] is None:
+            timer = QtCore.QTimer()
+            timer.setInterval(250)
+            timer.timeout.connect(_answers_in)
+            _reach["timer"] = timer
+        if not _reach["timer"].isActive():
+            _reach["timer"].start()
+    except Exception as exc:
+        warn("places: %s" % exc)
+
+
+def _answers_in():
+    """(the window's thread) a changed answer lists the places again."""
+    try:
+        with _reach["lock"]:
+            changed, _reach["changed"] = _reach["changed"], False
+            idle = not _reach["busy"]
+        if idle and _reach["timer"] is not None:
+            _reach["timer"].stop()
+        if changed:
+            _refresh_views()
+            from . import versions_ui
+
+            panel_ = versions_ui._state.get("panel")
+            if versions_ui._alive(panel_):
+                panel_.refresh()
+    except Exception as exc:
+        warn("places: %s" % exc)
+
+
+def folder_status(path, kind=None):
+    """OK, OFFLINE or CHECKING for a folder, never waiting on a network drive: a folder on
+    this computer's own disks is looked at now; one on a network drive gets the answer of the
+    last look a worker thread made (CHECKING before the first one), and a new look when that
+    answer is older than REACH_FRESH."""
+    if not path:
+        return core.OFFLINE
+    try:
+        if not is_remote(path, kind):
+            return core.OK if os.path.isdir(path) else core.OFFLINE
+    except Exception:
+        return core.OFFLINE
+    with _reach["lock"]:
+        answer = _reach["answers"].get(path)
+    if answer is None or time.time() - answer[1] > REACH_FRESH:
+        _look_later(path)
+    if answer is None:
+        return core.CHECKING
+    return core.OK if answer[0] else core.OFFLINE
+
+
+def isdir_now(path, kind=None):
+    """os.path.isdir that never waits on a network drive (False while it is not known)."""
+    return folder_status(path, kind) == core.OK
+
+
+def status(place):
+    """A place's OK / OFFLINE / CHECKING (locations_core.status without the wait)."""
+    return folder_status(place.get("root"), place.get("kind"))
 
 
 # -- what this computer has -------------------------------------------------------------------
