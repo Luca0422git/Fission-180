@@ -129,7 +129,9 @@ define(
     "value for dimensions, driving or not), how many degrees of freedom are left (0: fully "
     "constrained, Fusion's padlock), the constraints that conflict or are redundant, and its "
     "closed areas (with a point inside each, for regions). Use the indexes in "
-    "sketch_constraint, sketch_dimension, set_sketch_dimension and sketch_delete.",
+    "sketch_constraint, sketch_dimension, set_sketch_dimension and sketch_delete. Indexes "
+    "count from 0; a sketch's message in get_timeline / get_design names its bad constraints "
+    "by these same indexes, e.g. \"(constraints 58 and 59)\".",
     schema({"sketch": kit.step_id("the sketch to read")}, ["sketch"]),
     changes=False,
     examples=[example({"sketch": "Sketch1"}, "curves, constraints and areas of Sketch1")],

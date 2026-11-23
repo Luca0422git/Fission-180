@@ -6,7 +6,7 @@ Fusion: BROWSER > Sketches (and the Sketch Palette). Category: Sketch. Read-only
 
 ## What it does
 
-Read a sketch: its plane and placement, every curve by index (type, points, radius, construction or not), every constraint by index (type, name, the curves it ties, its value for dimensions, driving or not), how many degrees of freedom are left (0: fully constrained, Fusion's padlock), the constraints that conflict or are redundant, and its closed areas (with a point inside each, for regions). Use the indexes in sketch_constraint, sketch_dimension, set_sketch_dimension and sketch_delete.
+Read a sketch: its plane and placement, every curve by index (type, points, radius, construction or not), every constraint by index (type, name, the curves it ties, its value for dimensions, driving or not), how many degrees of freedom are left (0: fully constrained, Fusion's padlock), the constraints that conflict or are redundant, and its closed areas (with a point inside each, for regions). Use the indexes in sketch_constraint, sketch_dimension, set_sketch_dimension and sketch_delete. Indexes count from 0; a sketch's message in get_timeline / get_design names its bad constraints by these same indexes, e.g. "(constraints 58 and 59)".
 
 ## Arguments
 

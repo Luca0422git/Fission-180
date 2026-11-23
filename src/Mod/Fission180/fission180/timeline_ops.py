@@ -703,7 +703,7 @@ def problem(obj, broken_before=None):
     sketch = obj.TypeId == "Sketcher::SketchObject"
     if "Invalid" in state or "Error" in state:
         if sketch:
-            said = _sketch_conflict(obj)
+            said = _sketch_failure(obj)
             if said:
                 return "error", said
         try:
@@ -716,11 +716,14 @@ def problem(obj, broken_before=None):
         return "warning", note
     if sketch:
         try:
-            if obj.MalformedConstraints:
-                return "warning", "The sketch has broken constraints."
-            if obj.RedundantConstraints:
-                return "warning", "The sketch has redundant constraints%s." % _named(
-                    obj, [i - 1 for i in obj.RedundantConstraints]
+            malformed = _from_zero(obj.MalformedConstraints)
+            if malformed:
+                return "warning", "The sketch has broken constraints%s." % _numbered(malformed)
+            redundant = _from_zero(obj.RedundantConstraints)
+            if redundant:
+                return "warning", "The sketch has redundant constraints%s%s." % (
+                    _named(obj, redundant),
+                    _numbered(redundant),
                 )
         except Exception:
             pass
@@ -750,18 +753,67 @@ def _named(sketch, indices):
         return ""
 
 
-def _sketch_conflict(sketch):
-    """A sketch that failed because its constraints conflict: which ones (the solver's last
-    diagnosis, no solve)."""
+def _from_zero(found):
+    """FreeCAD's constraint numbers (the solver counts from 1) as the constraint list's (from
+    0: get_sketch's indexes, Constraints[i])."""
+    return sorted({int(i) - 1 for i in found or () if int(i) >= 1})
+
+
+def _numbered(indices):
+    """" (constraint 3)", " (constraints 2 and 4)": the constraint list's numbers (from 0, as
+    get_sketch gives them), so a message and the list always agree (bug report 2026-11-23:
+    FreeCAD's own text counts from 1 and named a needed constraint)."""
+    if not indices:
+        return ""
+    numbers = [str(i) for i in indices]
+    if len(numbers) == 1:
+        return " (constraint %s)" % numbers[0]
+    return " (constraints %s and %s)" % (", ".join(numbers[:-1]), numbers[-1])
+
+
+def _sketch_failure(sketch):
+    return sketch_failure(sketch)[0]
+
+
+def sketch_failure(sketch, in_sketch=False):
+    """(why a sketch failed, the constraints to blame) from the solver's last diagnosis (no
+    solve): its constraints conflict, say something twice or are broken. The text names them
+    in Fusion's terms and gives their numbers in the constraint list (from 0, as get_sketch);
+    ("", []) for another failure (FreeCAD's reason then). Never FreeCAD's own "Remove the
+    following ..." text: it counts from 1. in_sketch: for the open sketch, whose palette
+    note shows them highlighted (sketch_palette)."""
+    sketch_word = "The sketch" if in_sketch else "It"
     try:
-        conflicting = [i - 1 for i in sketch.ConflictingConstraints]
+        conflicting = _from_zero(sketch.ConflictingConstraints)
+        if conflicting:
+            head = "%s constraints conflict%s%s" % (
+                "The sketch's" if in_sketch else "Its",
+                _named(sketch, conflicting),
+                _numbered(conflicting),
+            )
+            if in_sketch:
+                return head + ", highlighted. Remove one of them.", conflicting
+            return head + ". Edit the sketch and remove one of them.", conflicting
+        for found, what in (
+            (_from_zero(sketch.RedundantConstraints), "redundant"),
+            (_from_zero(sketch.MalformedConstraints), "broken"),
+        ):
+            if not found:
+                continue
+            one = len(found) == 1
+            head = "%s has %s%s%s" % (
+                sketch_word,
+                ("a %s constraint" % what) if one else ("%s constraints" % what),
+                _named(sketch, found) if what == "redundant" else "",
+                _numbered(found),
+            )
+            them = "it" if one else "them"
+            if in_sketch:
+                return "%s, highlighted. Delete %s." % (head, them), found
+            return "%s. Edit the sketch and delete %s." % (head, them), found
     except Exception:
-        return ""
-    if not conflicting:
-        return ""
-    return "Its constraints conflict%s. Edit the sketch and remove one of them." % _named(
-        sketch, conflicting
-    )
+        return "", []
+    return "", []
 
 
 def _friendly(obj, text):

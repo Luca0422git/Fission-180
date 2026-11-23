@@ -168,10 +168,10 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         self.freedom = QtWidgets.QLabel("")
         self.freedom.setObjectName("Fission180PaletteFreedom")
         self.freedom.setProperty("role", "freedom")
-        self.freedom.setToolTip(
-            "How many ways the sketch's curves can still move or change size (degrees of "
-            "freedom). Add dimensions and constraints until it says Fully constrained."
-        )
+        self.freedom.setToolTip(FREEDOM_TIP)
+        # a click on "Redundant constraints" / "Conflicting constraints" shows which
+        self._note_clicks = _NoteClicks(self)
+        self.freedom.installEventFilter(self._note_clicks)
         row = QtWidgets.QHBoxLayout()
         row.setContentsMargins(8, 4, 8, 0)
         row.addWidget(self.freedom)
@@ -223,6 +223,8 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
         if text != self.freedom.text():
             self.freedom.setText(text)
             bad = conflicting or redundant
+            self.freedom.setCursor(QtCore.Qt.PointingHandCursor if bad else QtCore.Qt.ArrowCursor)
+            self.freedom.setToolTip(BAD_TIP if bad else FREEDOM_TIP)
             colour = "#ff8a80" if bad else ("#f5f5f5" if locked else "#9fd2ff")
             # Dark's colour in the sheet (and remembered); Neon Lights: the secondary colour
             neon_qss_panels.colour(
@@ -325,6 +327,45 @@ class Palette(theme.OwnBackground, QtWidgets.QFrame):
             self.deleteLater()
         except Exception:
             pass
+
+
+FREEDOM_TIP = (
+    "How many ways the sketch's curves can still move or change size (degrees of "
+    "freedom). Add dimensions and constraints until it says Fully constrained."
+)
+BAD_TIP = "Click to see which constraints, highlighted in the sketch."
+
+
+def show_bad_constraints(sketch):
+    """The palette note clicked: the sketch's conflicting, redundant or broken constraints
+    in words and by their number in the constraint list (as the timeline says them), beside
+    the pointer, and highlighted in the sketch (sketch_explain)."""
+    from . import commands, sketch_explain, timeline_ops
+
+    text, indices = timeline_ops.sketch_failure(sketch, in_sketch=True)
+    if not indices:
+        return False
+    commands.tell(text)
+    sketch_explain.highlight(sketch, indices)
+    return True
+
+
+class _NoteClicks(QtCore.QObject):
+    """A left click on the palette's note while it reports a problem."""
+
+    def __init__(self, palette):
+        super().__init__(palette)
+        self.palette = palette
+
+    def eventFilter(self, obj, event):
+        try:
+            if event.type() == QtCore.QEvent.MouseButtonRelease and event.button() == QtCore.Qt.LeftButton:
+                sketch = getattr(self.palette.session, "sketch", None)
+                if sketch is not None and show_bad_constraints(sketch):
+                    return True
+        except Exception as exc:
+            warn("sketch palette: constraints note: %s" % exc)
+        return False
 
 
 class FeatureOptions(QtWidgets.QWidget):
