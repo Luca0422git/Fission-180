@@ -33,7 +33,7 @@ PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"  # pref
 KEY = "Touchscreen"
 TICK_MS = 50  # the long press is looked at this often while a finger is down
 
-_state = {"filter": None, "widgets": [], "area": None, "on": False, "timer": None}
+_state = {"filter": None, "area": None, "on": False, "timer": None}
 
 
 def mode():
@@ -98,10 +98,10 @@ class _Filter(QtCore.QObject):
             kind = event.type()
             E = QtCore.QEvent
             if kind == E.Gesture:
-                return mode() == core.ON
+                return _state["on"] and mode() == core.ON
             if kind not in (E.TouchBegin, E.TouchUpdate, E.TouchEnd, E.TouchCancel):
                 return False
-            if mode() != core.ON or obj.metaObject().className() != "QOpenGLWidget":
+            if not _state["on"] or mode() != core.ON or obj.metaObject().className() != "QOpenGLWidget":
                 return False  # (Off: Qt makes mouse events of it, as before)
             device = event.device()
             if device is not None and device.type() != QtGui.QInputDevice.DeviceType.TouchScreen:
@@ -176,11 +176,14 @@ class _Filter(QtCore.QObject):
                 self._mouse(gl, (action[1], action[2]), (what,))
 
     def _zoom(self, viewer, gl, log_factor, at):
-        """FreeCAD's wheel zoom about `at`, exp(log_factor) times as big."""
+        """FreeCAD's wheel zoom about `at`: the model exp(log_factor) times as big
+        (touch_core's zoom). touchpad_core.zoom_units counts how much bigger the view (what is
+        seen) gets: the other way round (it was passed as it was: a spread zoomed out; Luca,
+        2026-11-23: "When i pinch to zoom out, it zooms in, and vice versa")."""
         from . import touchpad_core, touchpad_ui
 
         step, invert = touchpad_ui._zoom_settings()
-        units = self._units().take(touchpad_core.zoom_units(log_factor, step, invert))
+        units = self._units().take(touchpad_core.zoom_units(-log_factor, step, invert))
         if not units:
             return
         point = gl.mapToGlobal(QtCore.QPoint(int(at[0]), int(at[1])))
@@ -264,25 +267,18 @@ def _tick_off():
 
 
 # -- turning it on and off ------------------------------------------------------------------------
-def _install():
-    if _state["filter"] is None:
-        return
-    from .orbit_ui import _is_valid, _same, _view_widgets
+PROPERTY = "fission180Touchscreen"  # (view_hooks: which filter is on a view's widget)
 
-    try:
-        widgets = _view_widgets()
-    except RuntimeError:
-        return
-    _state["widgets"] = [w for w in _state["widgets"] if _is_valid(w)]  # closed views go
-    for widget in widgets:
-        try:
-            if not any(_same(widget, w) for w in _state["widgets"]):
-                if widget.metaObject().className() == "QOpenGLWidget":
-                    widget.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, True)
-                widget.installEventFilter(_state["filter"])
-                _state["widgets"].append(widget)
-        except RuntimeError:
-            pass  # the view of a design being closed
+
+def _takes_touch(widget):
+    if widget.metaObject().className() == "QOpenGLWidget":
+        widget.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, True)
+
+
+def _install():
+    from . import view_hooks
+
+    view_hooks.install(_state["filter"], PROPERTY, prepare=_takes_touch)
 
 
 def _installed_soon():
@@ -312,8 +308,8 @@ def enable():
 
         area = Gui.getMainWindow().findChild(QtWidgets.QMdiArea)
         if area is not None and _state["area"] is None:
-            # (a new design's window is activated before its drawing area is made: the views
-            # are looked for again once the event loop is back, and a moment later)
+            # (the views are looked for again once the event loop is back and a moment later,
+            # in case a view's drawing area comes after its window)
             area.subWindowActivated.connect(lambda *_: _later())
             _state["area"] = area
     except Exception as exc:
@@ -321,16 +317,17 @@ def enable():
 
 
 def disable():
-    """Fission 180's interface turned off: Qt's and FreeCAD's own touch handling again."""
-    from .orbit_ui import _is_valid
+    """Fission 180's interface turned off: Qt's and FreeCAD's own touch handling again (the
+    drawing areas keep taking touch: nobody takes it then, so Qt makes mouse events of it)."""
+    from . import view_hooks
 
     _state["on"] = False
     _tick_off()
-    for widget in _state["widgets"]:
-        try:
-            if _is_valid(widget):
-                widget.removeEventFilter(_state["filter"])
-        except RuntimeError:
-            pass
-    _state["widgets"] = []
+    view_hooks.remove(_state["filter"], PROPERTY)
 
+
+def watching(widget):
+    """Whether the filter is on `widget` (tests)."""
+    from . import view_hooks
+
+    return _state["on"] and view_hooks.on(widget, _state["filter"], PROPERTY)

@@ -134,8 +134,36 @@ class Drags(unittest.TestCase):
         actions = run(tc.Tracker(), seq)
         zooms = [a for a in actions if a[0] == "zoom"]
         self.assertTrue(zooms, actions)
-        self.assertAlmostEqual(sum(a[1] for a in zooms), math.log(1.5), places=6)
+        self.assertTrue(all(a[1] > 0 for a in zooms), zooms)  # (apart: the model grows)
+        # the spread 100 -> 150 px, less the last JITTER_PX (a wobble that small is ignored)
+        self.assertAlmostEqual(sum(a[1] for a in zooms), math.log((150 - tc.JITTER_PX) / 100), places=6)
         self.assertEqual(zooms[-1][2], (150, 100))
+
+    def test_two_finger_pan_with_wobbly_spacing_does_not_zoom(self):
+        # Luca (2026-11-23, a real touchscreen): "When i pan with two fingers ... the whole
+        # screen kinda shakes and zooms in and out super quickly": the fingers' distance
+        # wobbles by some pixels while they move together
+        wobble = [0, 9, -7, 11, -10, 6, -12, 8, -5, 12, -9, 4, -11, 10, -6]
+        seq = [(0.0, "begin", {1: (100, 300)}), (0.01, "update", {1: (100, 300), 2: (260, 300)})]
+        for i in range(1, 31):
+            w = wobble[i % len(wobble)] / 2.0
+            seq.append((0.01 + 0.016 * i, "update", {1: (100 - w, 300 - 5 * i), 2: (260 + w, 300 - 5 * i)}))
+        seq.append((0.6, "end", {}))
+        actions = run(tc.Tracker(), seq)
+        self.assertNotIn("zoom", kinds(actions), actions)
+        self.assertAlmostEqual(sum(a[2] for a in actions if a[0] == "pan"), -150.0)
+
+    def test_holding_still_after_a_pinch_does_not_shake(self):
+        seq = [(0.0, "begin", {1: (100, 100)}), (0.01, "update", {1: (100, 100), 2: (200, 100)})]
+        for i in range(1, 11):  # spread 100 -> 200 px
+            seq.append((0.01 + 0.02 * i, "update", {1: (100 - 5 * i, 100), 2: (200 + 5 * i, 100)}))
+        for i, w in enumerate([3, -4, 5, -3, 4, -5, 2, -4, 5, -2]):  # held, wobbling
+            seq.append((0.3 + 0.02 * i, "update", {1: (50 - w / 2.0, 100), 2: (250 + w / 2.0, 100)}))
+        seq.append((0.6, "end", {}))
+        actions = run(tc.Tracker(), seq)
+        zooms = [a for a in actions if a[0] == "zoom"]
+        self.assertTrue(zooms)
+        self.assertTrue(all(a[1] > 0 for a in zooms), zooms)  # no zooming back and forth
 
     def test_no_zoom_under_4_percent(self):
         seq = [

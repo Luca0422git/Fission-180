@@ -155,12 +155,10 @@ def setup():
 
 
 def _taking_touch():
-    from fission180 import orbit_ui, touch_ui
+    from fission180 import touch_ui
 
     widget = gl()
-    return widget.testAttribute(QtCore.Qt.WA_AcceptTouchEvents) and any(
-        orbit_ui._same(w, widget) for w in touch_ui._state["widgets"]
-    )
+    return widget.testAttribute(QtCore.Qt.WA_AcceptTouchEvents) and touch_ui.watching(widget)
 
 
 setup.done = _taking_touch
@@ -207,8 +205,16 @@ def panned():
     h.check("two fingers pan: the view did not turn", not turned())
 
 
+def model_size():
+    """The body's top face diagonal on screen, in pixels (bigger: zoomed in)."""
+    a = h.screen_point(App.Vector(-20, -15, 10))
+    b = h.screen_point(App.Vector(20, 15, 10))
+    return ((a.x() - b.x()) ** 2 + (a.y() - b.y()) ** 2) ** 0.5
+
+
 def spread():
     s["camera"] = camera()
+    s["size"] = model_size()
     x, y = centre()
     steps = [{1: (x - 40, y), 2: (x + 40, y)}]
     steps += [{1: (x - 40 - 8 * i, y), 2: (x + 40 + 8 * i, y)} for i in range(1, 11)]
@@ -221,6 +227,25 @@ spread.done_what = "a spread to zoom"
 
 def zoomed():
     h.check("a pinch zooms: the view did not turn", not turned())
+    # (Luca, 2026-11-23, on a real screen: "When i pinch to zoom out, it zooms in")
+    h.check("fingers apart zoom in: the model grows", model_size() > s["size"] * 1.2, (s["size"], model_size()))
+
+
+def squeeze():
+    s["camera"] = camera()
+    s["size"] = model_size()
+    x, y = centre()
+    steps = [{1: (x - 120, y), 2: (x + 120, y)}]
+    steps += [{1: (x - 120 + 8 * i, y), 2: (x + 120 - 8 * i, y)} for i in range(1, 11)]
+    touch(steps + [{1: None, 2: None}])
+
+
+squeeze.done = moved
+squeeze.done_what = "fingers together to zoom"
+
+
+def squeezed():
+    h.check("fingers together zoom out: the model shrinks", model_size() < s["size"] / 1.2, (s["size"], model_size()))
 
 
 # -- 2. a tap selects ------------------------------------------------------------------------
@@ -377,6 +402,24 @@ def off_checked():
     Gui.Selection.clearSelection()
 
 
+def interface_off():
+    """Fission 180's interface turned off (touch_ui.disable): FreeCAD's own touch handling."""
+    from fission180 import touch_ui
+
+    touch_ui.disable()
+    s["camera"] = camera()
+    x, y = centre()
+    touch([{1: (x + 200, y + 200)}] + [{1: (x + 200 + 12 * i, y + 200)} for i in range(1, 11)] + [{1: None}])
+    h.check("interface off: a one-finger drag does not turn the view", not turned())
+    h.check("interface off: touch_ui is on no view", not touch_ui.watching(gl()))
+    touch_ui.enable()
+    Gui.Selection.clearSelection()
+
+
+interface_off.done = _taking_touch
+interface_off.done_what = "touch_ui on the view again"
+
+
 # -- 7. a tap in a sketch ------------------------------------------------------------------------
 def sketch_setup():
     App.newDocument("TouchSketch")
@@ -445,10 +488,11 @@ sketch_tapped.done_what = "the sketch to close"
 h.run(
     "touch_screen",
     [
-        setup, one_finger, orbit_speed, two_fingers, panned, spread, zoomed, tap, tapped,
+        setup, one_finger, orbit_speed, two_fingers, panned, spread, zoomed, squeeze, squeezed,
+        tap, tapped,
         cube_tap, cube_tapped, double_tap, double_tapped, long_press, long_press_up,
         two_finger_tap, two_finger_tap_closed, open_extrude, drag_in_command, mouse_like,
-        switched_off, off_checked, sketch_setup, sketch_edit, sketch_hover, sketch_finger_down,
+        switched_off, off_checked, interface_off, sketch_setup, sketch_edit, sketch_hover, sketch_finger_down,
         sketch_finger_up, sketch_tapped,
     ],
     paced_by="state",

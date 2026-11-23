@@ -5,12 +5,13 @@ the actions it returns.
 
   one finger dragged      orbit (mouse_like: a mouse drag: press, moves, release)
   two fingers dragged     pan, by the move of the point between them
-  two fingers pinched     zoom about the point between them
+  two fingers pinched     zoom about the point between them (apart: the model grows)
   one finger tapped       click (a second tap close by and soon: double click)
   one finger held still   right click
   two fingers tapped      right click between them
 
-Actions: ("orbit", dx, dy), ("pan", dx, dy), ("zoom", log_factor, (x, y)), ("click", x, y),
+Actions: ("orbit", dx, dy), ("pan", dx, dy), ("zoom", log_factor, (x, y)) (the model gets
+exp(log_factor) times as big: above 0 when the fingers spread), ("click", x, y),
 ("double_click", x, y), ("right_click", x, y), ("press", x, y), ("move", x, y),
 ("release", x, y). Positions are the view's pixels.
 """
@@ -21,7 +22,14 @@ DRAG_PX = 8.0  # a finger has to move this far before a drag starts (a tap never
 LONG_PRESS_S = 0.5  # held still this long: a right click
 TWO_TAP_S = 0.3  # two fingers down and up within this: a right click
 DOUBLE_TAP_S = 0.4  # a second tap this soon (and DRAG_PX close): a double click
-PINCH = 0.04  # the fingers' distance changes by more than this share (and DRAG_PX) to zoom
+# A pinch starts when the fingers' distance changes by more than PINCH of it and PINCH_PX
+# (two fingers panning wobble apart and together by some pixels; Luca, 2026-11-23, on a real
+# screen: "the whole screen kinda shakes and zooms in and out"); from then on a change of the
+# distance back and forth by less than JITTER_PX is ignored (it follows the fingers JITTER_PX
+# behind), so a held or panning pinch never zooms in and out on the spot.
+PINCH = 0.08
+PINCH_PX = 24.0
+JITTER_PX = 6.0
 
 IDLE, ONE, DRAG, TWO, LIFTING, SPENT = range(6)
 
@@ -182,12 +190,20 @@ class Tracker:
             dx, dy = mid[0] - self.mid[0], mid[1] - self.mid[1]
             if dx or dy:
                 out.append(("pan", dx, dy))
-        if not self.pinching and self.d0 > 0 and abs(d - self.d0) > max(PINCH * self.d0, DRAG_PX):
+        if not self.pinching and self.d0 > 0 and abs(d - self.d0) > max(PINCH * self.d0, PINCH_PX):
             self.pinching, self.tap_ok = True, False
-            self.d = self.d0
-        if self.pinching and self.d > 0 and d > 0 and d != self.d:
-            out.append(("zoom", math.log(d / self.d), (mid[0], mid[1])))
-        self.mid, self.d = mid, d
+            self.d = self.d0  # (the distance the zoom stands at: the change so far counts)
+        if self.pinching and self.d > 0 and d > 0:
+            if d > self.d + JITTER_PX:
+                target = d - JITTER_PX
+            elif d < self.d - JITTER_PX:
+                target = d + JITTER_PX
+            else:
+                target = self.d
+            if target != self.d:
+                out.append(("zoom", math.log(target / self.d), (mid[0], mid[1])))
+                self.d = target
+        self.mid = mid
         return out
 
     def _all_up(self, t):
