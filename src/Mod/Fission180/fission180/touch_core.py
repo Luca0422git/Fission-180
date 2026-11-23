@@ -25,6 +25,16 @@ PINCH = 0.04  # the fingers' distance changes by more than this share before it 
 
 IDLE, ONE, DRAG, TWO, LIFTING, SPENT = range(6)
 
+# Preferences > General > Navigation > Touchscreen
+ON, OFF = "on", "off"
+DEFAULT_MODE = ON
+CHOICES = [(ON, "On"), (OFF, "Off")]
+
+
+def mode_of(text):
+    """The stored choice, or the default for anything else."""
+    return text if text in (ON, OFF) else DEFAULT_MODE
+
 
 def _dist(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])

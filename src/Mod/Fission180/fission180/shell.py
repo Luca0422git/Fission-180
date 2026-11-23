@@ -285,6 +285,8 @@ def enable():
     _safely(lambda: __import__("fission180.orbit_ui").orbit_ui.enable())
     # Touchpad: two fingers pan, a pinch zooms (touchpad_ui; Preferences > Touchpad).
     _safely(lambda: __import__("fission180.touchpad_ui").touchpad_ui.enable())
+    # Touchscreen: one finger orbits, two pan, a pinch zooms, taps click (touch_ui).
+    _safely(lambda: __import__("fission180.touch_ui").touch_ui.enable())
     _safely(lambda: __import__("fission180.selection_ui").selection_ui.enable())
     _safely(_sketch_mode_on)
     _safely(lambda: __import__("fission180.text_ui").text_ui.enable())  # sketch text
@@ -330,6 +332,7 @@ def disable():
         lambda: __import__("fission180.versions_ui").versions_ui.disable(),
         lambda: __import__("fission180.selection_ui").selection_ui.disable(),
         lambda: __import__("fission180.touchpad_ui").touchpad_ui.disable(),
+        lambda: __import__("fission180.touch_ui").touch_ui.disable(),
         lambda: __import__("fission180.orbit_ui").orbit_ui.disable(),
         lambda: __import__("fission180.marking_menu").marking_menu.disable(),
         shortcuts.restore,

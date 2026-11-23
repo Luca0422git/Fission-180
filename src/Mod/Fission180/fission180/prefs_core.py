@@ -10,6 +10,7 @@ nothing here. Sources: docs/fission180/parity/misc.md.
 """
 
 from . import __version__ as _version, interface_scale as _interface_scale, update_core as _update_core
+from . import touch_core as _touch
 from . import touchpad_core as _touchpad
 
 PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
@@ -297,6 +298,20 @@ OPTIONS = [
         "wheel (pick it if your mouse's wheel ever pans). On: scrolling always pans and a "
         "pinch or Ctrl + scroll zooms (for a touchpad Auto does not recognise; a mouse wheel "
         "then pans too).",
+    ),
+    _option(
+        "touchscreen",
+        "general",
+        "Touchscreen",
+        "choice",
+        _touch.DEFAULT_MODE,
+        (PREFS, "String", "Touchscreen"),
+        group="Navigation",
+        choices=[(value, label, True, "") for value, label in _touch.CHOICES],
+        tip="On: in the 3D view one finger dragged turns the view (while a command or a sketch "
+        "is open it works like the mouse), two fingers pan, a pinch zooms, a tap clicks, and "
+        "holding a finger still or tapping with two fingers right-clicks. Off: a finger works "
+        "like the mouse everywhere.",
     ),
     _option(
         "orbit_type",
