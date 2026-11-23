@@ -4,6 +4,12 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-23: 0.1.0-beta.4.2.0 released 05:53 UTC** (patch release run #21; `Release` and the tag
+at 7a720918; Luca: "once its green, release it"). New: touchscreen in the 3D view (one finger
+orbits, two pan and pinch-zoom, tap clicks, long press / two-finger tap right-click; mouse-like
+while a dialog or sketch is open). Fixed: offline NAS freezes, the wheel over the empty Tasks
+strip, the AI screenshot freeze. [ ] Luca tries the touchscreen on his laptop.
+
 **2026-11-20: Neon Lights wave started (branch `sf/neon-lights`; nothing on `develop` until it is
 all done).** Luca: a third look, "Neon Lights", a full cyberpunk overhaul of every part of the
 window ("when people walk past me, i want them to look at my screen and ask ... that looks
@@ -2627,7 +2633,10 @@ changed nothing": the reopened design was marked changed); it passed locally (al
 and in the full CI #172 (7a720918, green). Cause not found: treat as a flake to watch. The
 scenario now says which properties changed after opening (App and view-provider observers) when
 it fails (commits 8285fc1f, 2004392c, merged after the release). Then patch release run #21
-(started from Release, publish) for 0.1.0-beta.4.2.0.
+(started from Release, publish): **0.1.0-beta.4.2.0 published 2026-11-23 05:53 UTC** (tag
+fission180-v0.1.0-beta.4.2.0, Release at 7a720918). Next: Luca tries the touchscreen on his
+laptop (feel of the orbit rate, long press, two-finger tap); the deferred touch minors and the
+touchpad_ui early-install flaw wait for his word.
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 
