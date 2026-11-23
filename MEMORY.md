@@ -1310,13 +1310,17 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   even when empty; Qt sent the wheel (and clicks) to the empty Gui::TaskView::TaskPanel. FreeCAD's
   own see-through pass-through (OverlayManager::eventFilter, testAlpha) did not redirect it,
   although the panel's grab was alpha 0 and "Transparent" was on (cause inside FreeCAD not
-  found; not needed). Proven with real X wheel events (xdotool under Xvfb: a QWheelEvent sent
-  with sendEvent zooms nothing anywhere, so it proves nothing). Fix: shell.py
+  found; not needed). Proven with real X wheel events (xdotool under Xvfb). A wheel event sent
+  with sendEvent must go to the Gui::View3DInventorViewer itself (FreeCAD's interceptEvent
+  says so), not to its QOpenGLWidget: sent there it zooms nothing. Fix: shell.py
   `empty_panel_lets_mouse_through` (a 150 ms timer while Fission 180 is on): no dialog and no
-  task box shown -> WA_TransparentForMouseEvents on the overlay; a dialog open -> a mask of the
-  dialog's parts (TaskEditControl, the task boxes as far as the scroll area shows them, its
-  scroll bar, +6 px). Scenario `view_wheel_strip` (widgetAt in the strip is the GL widget; the
-  dialog's OK button keeps the mouse) failed on the old code (TaskPanel under the mouse).
+  task box shown -> WA_TransparentForMouseEvents on the overlay; a dialog open -> `_PanelForward`
+  on the panel's empty parts (TaskPanel, scroll viewport) passes wheel/press/move/release on to
+  the 3D view under the mouse (a press's drag follows it), like FreeCAD's interceptEvent. A
+  mask on the overlay was tried first: it clipped a dialog's new parts for one timer tick (the
+  sketch palette's title not drawn: neon_panels FLAKY). Scenario `view_wheel_strip` (widgetAt
+  in the strip is the GL widget; the OK button keeps the mouse; a wheel on the empty part below
+  a dialog zooms) failed on the old code (TaskPanel under the mouse).
 
 - **Fixed in 0.1.0-beta.4.1.1: an offline NAS froze Fission 180** (Luca, 2026-11-22, CachyOS
   laptop with a NAS mounted, only offline: "freezes on launch, and then eventually works ... has

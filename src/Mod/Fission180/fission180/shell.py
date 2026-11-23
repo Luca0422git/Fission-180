@@ -569,11 +569,14 @@ def _overlay_titles_off():
 # nothing over a strip on the right of the view (Luca, 2026-11-23: "in the area circled red, i
 # cant zoom in and out with my scroll wheel"). FreeCAD's own pass-through of see-through parts
 # did not take the wheel there. While no command dialog is open (and nothing shows in the
-# panel), the panel ignores the mouse; while one is open, only the dialog itself takes the
-# mouse (a mask): below it the wheel zooms and a click picks in the 3D view, as in Fusion.
+# panel), the panel ignores the mouse. While one is open, the mouse over the panel's empty
+# part (below the dialog) goes on to the 3D view the way FreeCAD forwards it
+# (OverlayManager::Private::interceptEvent: the wheel to the View3DInventorViewer itself), so
+# the wheel zooms and a click picks there, as in Fusion. (A mask on the panel did the same
+# but clipped a dialog's new parts for a moment: the sketch palette's title was not drawn.)
 EMPTY_PANEL_MS = 150
-MASK_MARGIN = 6  # px around the dialog's parts (Neon Lights' glow stays inside)
 _TASK_CONTENT = ("Gui::TaskView::TaskBox", "QSint::ActionGroup", "Gui::TaskView::TaskWatcher")
+_FORWARDED = None  # the event types passed on (set once QtCore is there)
 
 
 def _right_overlay():
@@ -596,38 +599,118 @@ def _panel_shows_something(overlay):
     return False
 
 
-def _dialog_rects(overlay):
-    """The parts of the panel a dialog shows, as QRects in the overlay's pixels: the bar
-    with OK / Cancel and every task box (inside the scroll area, as far as it shows)."""
-    rects = []
+def _empty_parts(overlay):
+    """The panel's own background widgets: the task panel holding the boxes and the scroll
+    area's viewport (an event that lands on one of them landed on no dialog)."""
+    found = []
     for view in overlay.findChildren(QtWidgets.QWidget):
-        if view.metaObject().className() != "Gui::TaskView::TaskView" or not view.isVisible():
+        if view.metaObject().className() != "Gui::TaskView::TaskView":
             continue
-        for child in view.findChildren(QtWidgets.QWidget, options=QtCore.Qt.FindDirectChildrenOnly):
-            if not child.isVisible() or child.width() <= 0 or child.height() <= 0:
-                continue
-            if isinstance(child, QtWidgets.QScrollArea):
-                port = child.viewport()
-                shown = QtCore.QRect(port.mapTo(overlay, QtCore.QPoint(0, 0)), port.size())
-                content = child.widget()
-                if content is not None:
-                    for box in content.findChildren(
-                        QtWidgets.QWidget, options=QtCore.Qt.FindDirectChildrenOnly
-                    ):
-                        if box.isVisible() and box.width() > 0 and box.height() > 0:
-                            area = QtCore.QRect(box.mapTo(overlay, QtCore.QPoint(0, 0)), box.size())
-                            rects.append(area.intersected(shown))
-                bar = child.verticalScrollBar()
-                if bar is not None and bar.isVisible():
-                    rects.append(QtCore.QRect(bar.mapTo(overlay, QtCore.QPoint(0, 0)), bar.size()))
+        for area in view.findChildren(QtWidgets.QScrollArea):
+            found.append(area.viewport())
+            if area.widget() is not None:
+                found.append(area.widget())
+    return found
+
+
+def _view_at(point):
+    """(the widget a forwarded mouse event goes to, the 3D viewer for the wheel) under the
+    global `point`, or (None, None) when no 3D view is there."""
+    try:
+        mdi = _main().findChild(QtWidgets.QMdiArea)
+        if mdi is None:
+            return None, None
+        target = mdi.childAt(mdi.mapFromGlobal(point))
+        if target is None:
+            return None, None
+        if isinstance(target, QtWidgets.QAbstractScrollArea):
+            target = target.viewport()
+        viewer = target
+        while viewer is not None and viewer.metaObject().className() != "Gui::View3DInventorViewer":
+            viewer = viewer.parentWidget()
+        if viewer is None:
+            return None, None
+        return target, viewer
+    except RuntimeError:
+        return None, None
+
+
+class _PanelForward(QtCore.QObject):
+    """On the Tasks panel's empty parts: the mouse goes on to the 3D view under it."""
+
+    def __init__(self):
+        super().__init__()
+        self.watched = []
+        self.pressed = None  # the view a press went to: the drag's moves and release follow
+
+    def watch(self, widgets):
+        for widget in widgets:
+            if all(w is not widget for w in self.watched):
+                widget.installEventFilter(self)
+                self.watched.append(widget)
+
+    def release(self):
+        for widget in self.watched:
+            try:
+                widget.removeEventFilter(self)
+            except RuntimeError:
+                pass
+        self.watched, self.pressed = [], None
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = event.type()
+            if kind not in _FORWARDED:
+                return False
+            point = event.globalPosition().toPoint()
+            if self.pressed is None:
+                if kind == QtCore.QEvent.MouseButtonRelease:
+                    return False
+                under = QtWidgets.QApplication.widgetAt(point)
+                if under is None or all(under is not w for w in self.watched):
+                    return False  # (over the dialog: passed up from one of its controls)
+            target, viewer = _view_at(point)
+            if target is None:
+                return False
+            if kind == QtCore.QEvent.Wheel:
+                receiver = viewer
+                forwarded = QtGui.QWheelEvent(
+                    QtCore.QPointF(receiver.mapFromGlobal(point)),
+                    QtCore.QPointF(point),
+                    event.pixelDelta(),
+                    event.angleDelta(),
+                    event.buttons(),
+                    event.modifiers(),
+                    event.phase(),
+                    event.inverted(),
+                    event.source(),
+                )
             else:
-                rects.append(QtCore.QRect(child.mapTo(overlay, QtCore.QPoint(0, 0)), child.size()))
-    return [r for r in rects if not r.isEmpty()]
+                receiver = self.pressed if self.pressed is not None else target
+                forwarded = QtGui.QMouseEvent(
+                    kind,
+                    QtCore.QPointF(receiver.mapFromGlobal(point)),
+                    QtCore.QPointF(point),
+                    event.button(),
+                    event.buttons(),
+                    event.modifiers(),
+                )
+                if kind in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick):
+                    self.pressed = receiver
+                elif kind == QtCore.QEvent.MouseButtonRelease and event.buttons() == QtCore.Qt.NoButton:
+                    self.pressed = None
+            QtWidgets.QApplication.sendEvent(receiver, forwarded)
+            event.accept()
+            return True
+        except Exception as exc:
+            self.pressed = None
+            warn("interface: the Tasks panel: %s" % exc)
+            return False
 
 
 def empty_panel_lets_mouse_through():
-    """(the timer) The right overlay ignores the mouse while it is empty, and takes it only
-    where the dialog is while one is open."""
+    """(the timer) The right overlay ignores the mouse while it is empty; while a dialog is
+    open its empty part passes the mouse on to the 3D view."""
     try:
         import FreeCADGui as Gui
 
@@ -638,29 +721,21 @@ def empty_panel_lets_mouse_through():
         empty = not dialog and not _panel_shows_something(overlay)
         if overlay.testAttribute(QtCore.Qt.WA_TransparentForMouseEvents) != empty:
             overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, empty)
-        rects = _dialog_rects(overlay) if dialog else []
-        if rects:
-            region = QtGui.QRegion()
-            for rect in rects:
-                region = region.united(
-                    QtGui.QRegion(rect.adjusted(-MASK_MARGIN, -MASK_MARGIN, MASK_MARGIN, MASK_MARGIN))
-                )
-            key = tuple(region.boundingRect().getRect()) + tuple(
-                tuple(r.getRect()) for r in rects
-            )
-        else:
-            region, key = None, None
-        if _state.get("panel_mask") != key:
-            _state["panel_mask"] = key
-            if region is None:
-                overlay.clearMask()
-            else:
-                overlay.setMask(region)
+        forward = _state.get("panel_forward")
+        if forward is None:
+            forward = _state["panel_forward"] = _PanelForward()
+        forward.watch(_empty_parts(overlay))
     except Exception as exc:
         warn("interface: the Tasks panel: %s" % exc)
 
 
 def _empty_panel_on():
+    global _FORWARDED
+    if _FORWARDED is None:
+        E = QtCore.QEvent
+        _FORWARDED = (
+            E.Wheel, E.MouseButtonPress, E.MouseButtonRelease, E.MouseButtonDblClick, E.MouseMove
+        )
     timer = _state.get("empty_panel_timer")
     if timer is None:
         timer = _state["empty_panel_timer"] = QtCore.QTimer()
@@ -674,70 +749,15 @@ def _empty_panel_off():
     timer = _state.get("empty_panel_timer")
     if timer is not None:
         timer.stop()
+    forward = _state.pop("panel_forward", None)
+    if forward is not None:
+        forward.release()
     try:
         overlay = _right_overlay()
         if overlay is not None:
             overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-            overlay.clearMask()
-        _state["panel_mask"] = None
     except Exception as exc:
         warn("interface: the Tasks panel: %s" % exc)
-
-
-def _in_overlay(widget):
-    parent = widget.parentWidget()
-    while parent is not None:
-        if parent.metaObject().className() in ("Gui::OverlayTabWidget", "Gui::OverlaySplitter"):
-            return True
-        parent = parent.parentWidget()
-    return False
-
-
-class _OverlayTitleWatcher(QtCore.QObject):
-    """Flattens FreeCAD's overlay title bars: the ones there now and the ones FreeCAD makes
-    later inside a watched overlay or panel (they are made as children of those)."""
-
-    def __init__(self):
-        super().__init__()
-        self.flat = []  # (title bar, its old maximum height)
-        self.watched = []
-
-    def watch(self, widget):
-        if widget not in self.watched:
-            widget.installEventFilter(self)
-            self.watched.append(widget)
-
-    def flatten(self, widget):
-        """Only title bars over the 3D view: docked panels (the BROWSER) keep theirs."""
-        if _in_overlay(widget) and all(w is not widget for w, _ in self.flat):
-            self.flat.append((widget, widget.maximumHeight()))
-            widget.setMaximumHeight(0)
-
-    def eventFilter(self, obj, event):
-        try:
-            if event.type() in (QtCore.QEvent.ChildAdded, QtCore.QEvent.ChildPolished):
-                child = event.child()
-                if (
-                    isinstance(child, QtWidgets.QWidget)
-                    and child.metaObject().className() == "Gui::OverlayTitleBar"
-                ):
-                    self.flatten(child)
-        except Exception as exc:
-            warn("interface: %s" % exc)
-        return False
-
-    def release(self):
-        for widget in self.watched:
-            try:
-                widget.removeEventFilter(self)
-            except RuntimeError:
-                pass
-        for widget, height in self.flat:
-            try:
-                widget.setMaximumHeight(height)
-            except RuntimeError:
-                pass
-        self.watched, self.flat = [], []
 
 
 def _safely(step):
