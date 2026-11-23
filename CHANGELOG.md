@@ -17,7 +17,8 @@ releases published under the old name (their tags are `sciforge-v...`).
   180's top row, next to the profile button. Drag an empty part of that row to move the window
   (snapping to the screen's edges works as before), double-click it to maximize or restore,
   and drag the window's edges or corners to resize it. Preferences > General > Appearance >
-  Title bar > The system's brings the usual title bar back.
+  Title bar > The system's brings the usual title bar back. Switching between the two keeps
+  the window where it is, with the keyboard (its shortcuts keep working).
 - **Preferences > General > Navigation > Touchpad orbit** swaps which way Shift + two fingers on
   a touchpad turns the view.
 

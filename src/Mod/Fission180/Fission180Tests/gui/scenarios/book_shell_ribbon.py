@@ -175,9 +175,12 @@ def d_profile():
     button = ribbon().profile
     h.check("D a profile button at the top right", button.isVisible() and h.painted(button))
     search_x = button.mapToGlobal(QtCore.QPoint(0, 0)).x()
-    main = Gui.getMainWindow()
-    right = main.mapToGlobal(QtCore.QPoint(main.width(), 0)).x()
-    h.check("D ... the last thing on the right", right - search_x < 60, (search_x, right))
+    right = h.top_row_right()
+    h.check(
+        "D ... the last thing on the right (before minimize, maximize and close)",
+        0 <= right - search_x < 60,
+        (search_x, right),
+    )
     found = {}
 
     def read(menu):

@@ -1337,10 +1337,23 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   window: Qt gives the ribbon's QToolBar its style margin back (the whole window 4 px off, the
   look_unchanged first round 4.3 % different): shell._ribbon_bar_margins after every switch.
   (3) The buttons must be exactly as tall as the row's (the profile button's sizeHint), or the
-  row grows. Not testable here: Windows' maximize of a frameless window (must not cover the
-  taskbar) and Windows 11's snap-layout flyout (only on the system's maximize button); KDE
-  Wayland's move/resize. Scenario `title_bar` (23 checks), look_unchanged/look_light pass
-  (0.035 %: the three buttons).
+  row grows. (4) **Never `setWindowFlag` on the shown main window** (CI #190, four scenarios
+  red twice: selection_filters, sketch_areas_more, replay_00_basics, book_shell_ribbon): Qt
+  destroys the native window and makes a new, hidden one; shown again it no longer had the
+  keyboard (QApplication.activeWindow() None: no window manager under xvfb; KDE's focus
+  stealing prevention could do the same), so E, F, ... did nothing after Fission 180's
+  interface went off and on (leaving the workbench switches the title bar both ways).
+  activateWindow() after show(), at once, after 0 ms or retried every 50 ms for 1 s, did not
+  bring it back. `_frameless` now tells the window system directly
+  (`windowHandle().setFlags`) and the widget without a new window (`overrideWindowFlags`);
+  the same native window stays shown and active (probe: 10 switches, active, same winId and
+  geometry). setWindowFlag only before the window exists. Scenario `title_bar` checks the
+  window is still active after each switch (29 checks). Also the profile button is no
+  longer the last thing on the right: harness `top_row_right()` (book_shell_ribbon,
+  replay_00_basics). Not testable here: Windows' maximize of a frameless window (must not
+  cover the taskbar) and Windows 11's snap-layout flyout (only on the system's maximize
+  button); KDE Wayland's move/resize. look_unchanged/look_light pass (0.035 %: the three
+  buttons).
 - **Fixed in 0.1.0-beta.4.2.2: Shift + two fingers on a touchpad turned the wrong way** (Luca:
   "the touchpad is backwards when revolving using shift and two fingers ... add the option to
   swap"): touchpad_core.orbit_drag (Standard: a mouse drag the other way of the pan pixels;

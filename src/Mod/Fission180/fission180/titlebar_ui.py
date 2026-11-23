@@ -337,21 +337,29 @@ def _alive(widget):
 
 
 def _frameless(mw, on):
-    """The system's title bar off (on) or back (not on); the window keeps its place, its size
-    and whether it is maximized (changing the flag makes Qt hide it: shown again at once)."""
+    """The system's title bar off (on) or back (not on), on the window as it is: it keeps its
+    place, its size, whether it is maximized and the keyboard.
+
+    (Qt's setWindowFlag destroys the window and makes a new one, hidden; shown again it no
+    longer had the keyboard where no window manager, or KDE's focus stealing prevention,
+    handed it back: E, F and the other shortcuts did nothing after Fission 180's interface
+    was turned off and on (CI #190). The window system is told the new flags directly
+    instead, and the widget is told without making a new window.)"""
     has = bool(mw.windowFlags() & QtCore.Qt.FramelessWindowHint)
     if has == on:
         return False
-    state = mw.windowState()
-    geometry = mw.geometry()
-    visible = mw.isVisible()
-    mw.setWindowFlag(QtCore.Qt.FramelessWindowHint, on)
-    if visible:
-        if state & (QtCore.Qt.WindowMaximized | QtCore.Qt.WindowFullScreen):
-            mw.setWindowState(state)
-        else:
-            mw.setGeometry(geometry)
-        mw.show()
+    flags = mw.windowFlags()
+    if on:
+        flags = flags | QtCore.Qt.FramelessWindowHint
+    else:
+        flags = flags & ~QtCore.Qt.FramelessWindowHint
+    handle = mw.windowHandle()
+    if handle is not None:
+        mw.overrideWindowFlags(flags)
+        handle.setFlags(flags)
+    else:
+        # (no window yet: it is made with the flag when it is first shown)
+        mw.setWindowFlag(QtCore.Qt.FramelessWindowHint, on)
     # (a new window flag polishes the window again, and Qt gives the ribbon's tool bar its
     # style margin back: everything sat 4 px lower and further right, as after a look switch)
     _no_bar_margins()

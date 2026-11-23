@@ -670,11 +670,12 @@ def prefs():
 def i_profile():
     button = r.ribbon().profile
     h.check("I a profile button at the top right", button.isVisible() and h.painted(button))
-    main = Gui.getMainWindow()
-    right = main.mapToGlobal(QtCore.QPoint(main.width(), 0)).x()
+    right = h.top_row_right()
+    left = button.mapToGlobal(QtCore.QPoint(0, 0)).x()
     h.check(
-        "I ... the last thing on the right",
-        right - button.mapToGlobal(QtCore.QPoint(0, 0)).x() < 60,
+        "I ... the last thing on the right (before minimize, maximize and close)",
+        0 <= right - left < 60,
+        (left, right),
     )
 
     def pick():

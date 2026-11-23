@@ -88,9 +88,23 @@ def maximized():
     return bool(mw().windowState() & QtCore.Qt.WindowMaximized)
 
 
+def check_active(when):
+    """Switching the title bar makes Qt hide the window and show it again; without a window
+    manager to hand it the keyboard back (and with KDE's focus stealing prevention) it was no
+    longer the active window, and its keyboard shortcuts (E, F, ...) did nothing (CI #190:
+    selection_filters, sketch_areas_more, replay_00_basics, book_shell_ribbon)."""
+    active = QtWidgets.QApplication.activeWindow()
+    h.check(
+        "%s: the window is still the active one (its keyboard shortcuts work)" % when,
+        active is mw(),
+        active and active.metaObject().className(),
+    )
+
+
 # -- A ---------------------------------------------------------------------------------------
 def a_own():
     h.check("the window has no title bar from the system", frameless(), int(mw().windowFlags()))
+    check_active("Fission 180's title bar at start")
     names = ["Minimize", "Maximize", "Close"]
     found = [button(n) for n in names]
     if not h.check("minimize, maximize and close are in Fission 180's top row", all(found), found):
@@ -249,6 +263,7 @@ e_system.done_what = "the system's title bar back"
 def e_system_checked():
     h.check("the system's title bar: no window buttons in the top row", not button("Close").isVisible())
     h.check("... and no grips", not visible_grips())
+    check_active("the system's title bar")
     h.view_drawn()
     h.check("the 3D view still draws", h.gl_widget().isVisible())
     from fission180 import preferences_ui
@@ -263,6 +278,7 @@ e_system_checked.done_what = "Fission 180's title bar again"
 
 def e_own_again():
     h.check("Fission 180's again: the buttons are back", button("Close").isVisible())
+    check_active("Fission 180's title bar again")
     h.view_drawn("the 3D view to draw after the window changed")
     h.check("the 3D view still draws", h.gl_widget().isVisible())
     from fission180 import shell
@@ -275,6 +291,7 @@ e_own_again.done_what = "the system's title bar with Fission 180's interface off
 
 
 def e_off_checked():
+    check_active("Fission 180's interface off")
     from fission180 import shell
 
     shell.enable()
@@ -284,12 +301,16 @@ e_off_checked.done = frameless
 e_off_checked.done_what = "Fission 180's title bar with its interface on again"
 
 
+def e_on_checked():
+    check_active("Fission 180's interface on again")
+
+
 h.run(
     "title_bar",
     [
         a_own, b_maximize, b_maximized, b_restored, b_double_again, c_move, c_moved,
         d_minimize_close, d_checked, e_design, e_system, e_system_checked, e_own_again,
-        e_off_checked,
+        e_off_checked, e_on_checked,
     ],
     paced_by="state",
 )  # fmt: skip

@@ -1277,6 +1277,17 @@ def choose_from(open_it, path, what, report=True, read=None):
     return box["ok"]
 
 
+def top_row_right():
+    """Global x where the top row's own things end: the window's right edge, or the left edge
+    of minimize, maximize and close when they sit there (Fission 180's own title bar,
+    titlebar_ui.py)."""
+    main = Gui.getMainWindow()
+    buttons = main.findChild(QtWidgets.QWidget, "Fission180WindowButtons")
+    if buttons is not None and buttons.isVisible():
+        return buttons.mapToGlobal(QtCore.QPoint(0, 0)).x()
+    return main.mapToGlobal(QtCore.QPoint(main.width(), 0)).x()
+
+
 # -- the 3D view ------------------------------------------------------------------
 def gl_widget():
     area = Gui.getMainWindow().findChild(QtWidgets.QMdiArea)
