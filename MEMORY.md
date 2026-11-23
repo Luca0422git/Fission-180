@@ -2621,6 +2621,13 @@ critical one (no touch reached the ViewCube) and five important ones (Known issu
 with a check that failed first (touch_screen 13 checks, test_touch_core 18), the 13 navigation,
 ViewCube, sketch and marking-menu scenarios green. Luca then said: "once its green, release it.
 I want a release by the morning".
+CI #171 (e5f96fc1, before the touchscreen) failed drawing_reopen twice in a row ("looking at it
+changed nothing": the reopened design was marked changed); it passed locally (alone, after the
+22 scenarios before it in that shard, on one busy CPU, with CI's newer Mesa), alone on CI (#176)
+and in the full CI #172 (7a720918, green). Cause not found: treat as a flake to watch. The
+scenario now says which properties changed after opening (App and view-provider observers) when
+it fails (commits 8285fc1f, 2004392c, merged after the release). Then patch release run #21
+(started from Release, publish) for 0.1.0-beta.4.2.0.
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 
