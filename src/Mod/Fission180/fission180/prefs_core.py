@@ -10,6 +10,7 @@ nothing here. Sources: docs/fission180/parity/misc.md.
 """
 
 from . import __version__ as _version, interface_scale as _interface_scale, update_core as _update_core
+from . import titlebar_core as _titlebar
 from . import touch_core as _touch
 from . import touchpad_core as _touchpad
 
@@ -218,6 +219,21 @@ OPTIONS = [
         "in Preferences). The window changes at once; a few icons of FreeCAD's own menus "
         "change at the next start.",
         apply="theme",
+    ),
+    _option(
+        "titlebar",
+        "general",
+        "Title bar",
+        "choice",
+        _titlebar.DEFAULT_MODE,
+        (PREFS, "String", "TitleBar"),
+        group="Appearance",
+        choices=[(value, label, True, "") for value, label in _titlebar.CHOICES],
+        tip="Fission 180's: no title bar from the system (more room for the design); minimize, "
+        "maximize and close sit at the right end of Fission 180's top row, drag an empty part "
+        "of that row to move the window, double-click it to maximize, drag the window's edges "
+        "to resize it. The system's: the usual title bar above Fission 180.",
+        apply="titlebar",
     ),
     _option(
         "interface_size",

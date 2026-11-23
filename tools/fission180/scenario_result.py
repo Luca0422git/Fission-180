@@ -109,6 +109,14 @@ def main(argv):
             "  %s: %s (%d checks)"
             % (result["name"], "PASS" if result.get("passed") else "FAIL", len(result["checks"]))
         )
+    # FreeCAD's own crash handler: a crash after the results were written (when the window
+    # closed) still fails the scenario (2026-11-23: the first title bar crashed FreeCAD at every
+    # exit while every scenario passed)
+    crash = [line for line in _log_tail(log, 400) if line.startswith("Program received signal")]
+    if found and crash:
+        print("  %s: FreeCAD crashed when it closed (%s; see %s)" % (name, crash[0].strip(), log))
+        failures.append(("exit", "FreeCAD closed without crashing", crash[0].strip()))
+        ok = False
     if not found:
         print("  %s: no result (FreeCAD crashed before the first step? see %s)" % (name, log))
         failures.append(("start", "the scenario started", "no result file (crash before the first step?)"))

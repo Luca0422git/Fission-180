@@ -210,6 +210,10 @@ def _apply(kind):
             from . import home_ui
 
             home_ui.refresh_soon()  # (Home's "This computer" is the project folder)
+        elif kind == "titlebar":  # Title bar: Fission 180's or the system's, at once
+            from . import titlebar_ui
+
+            titlebar_ui.apply()
         elif kind == "theme":  # Look: dark, light or neon, at once
             if theme.current() != theme.name():
                 theme.set_theme(theme.current())

@@ -306,6 +306,8 @@ def enable():
     _safely(lambda: __import__("fission180.update_ui").update_ui.enable())
     # No dialog larger than the screen or partly off it (wave 7).
     _safely(lambda: __import__("fission180.dialog_fit").dialog_fit.enable())
+    # Fission 180's own title bar: the window buttons in the top row (Preferences > Title bar).
+    _safely(lambda: __import__("fission180.titlebar_ui").titlebar_ui.enable())
     log("interface on")
 
 
@@ -322,6 +324,7 @@ def disable():
         timeline_ui.hide()
         return
     for step in (
+        lambda: __import__("fission180.titlebar_ui").titlebar_ui.disable(),
         lambda: __import__("fission180.dialog_fit").dialog_fit.disable(),
         lambda: __import__("fission180.home_ui").home_ui.disable(),
         lambda: __import__("fission180.locations_ui").locations_ui.disable(),
