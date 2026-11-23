@@ -59,7 +59,8 @@ In a 3D view:
 2. **No command open:** one finger dragged orbits.
 3. **Thresholds:** a drag starts after 8 px of movement; a long press is 500 ms with the
    finger within 8 px; a two-finger tap is both fingers down and up within 300 ms, moving
-   less than 8 px; a pinch starts when the fingers' distance changes by more than 4 %.
+   less than 8 px; a pinch starts when the fingers' distance changes by more than 4 % and
+   more than 8 px (so a two-finger tap close together never zooms).
    Changing from one finger to two mid-gesture switches to pan/pinch, never back to orbit.
 4. **Switch:** Preferences > General > Navigation gets "Touchscreen: On / Off" (On by default;
    Off gives Qt's old behaviour).

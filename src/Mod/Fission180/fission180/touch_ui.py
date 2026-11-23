@@ -4,13 +4,17 @@
 Every 3D view's drawing area (a QOpenGLWidget) takes Qt's touch events; touch_core.Tracker
 says what the fingers mean and this file does it:
   orbit  orbit_ui.drag_camera (the ViewCube's and Shift + middle-drag's orbit: the Orbit type
-         and the pivot as set);
+         and the pivot as set), as much per pixel as FreeCAD's own mouse orbit;
   pan    navigate_ui.pan_by (the navigation bar's pan);
   zoom   FreeCAD's own wheel zoom at the point between the fingers (as touchpad_ui does);
   click, double click, right click, a mouse-like drag: mouse events sent to the drawing area,
          the way FreeCAD forwards them itself (OverlayManager::interceptEvent), so a tap selects,
          a right click opens the marking menu and a drag moves a handle as the mouse would.
+Every press comes after a move to it, and a finger's landing moves the mouse there first
+(FreeCAD's sketch acts on what a move put under the pointer).
 While a command's dialog is open or a sketch is in edit, one finger works like the mouse.
+A touch that starts on a widget over the drawing area (the ViewCube, a sketch's green check)
+is left to Qt's own mouse emulation, which takes it to that widget.
 An accepted touch is not turned into mouse events by Qt; FreeCAD's own pan and pinch gestures
 on the viewer are dropped while this is on (they would zoom a second time).
 Preferences > General > Navigation > Touchscreen: On (default) / Off (Qt's mouse emulation,
@@ -54,6 +58,21 @@ def _mouse_like():
         return False
 
 
+def _on_a_child(widget, event):
+    """The touch starts on a widget over the drawing area that takes the mouse (the ViewCube,
+    a sketch's green check): Qt's own mouse emulation takes it there, as with Off."""
+    points = event.points()
+    if not points:
+        return False
+    pos = points[0].position().toPoint()
+    child = widget.childAt(pos)
+    while child is not None and child is not widget:
+        if child.isVisible() and not child.testAttribute(QtCore.Qt.WA_TransparentForMouseEvents):
+            return True
+        child = child.parentWidget()
+    return False
+
+
 def _down(event):
     """{id: (x, y)} of the fingers still on the screen, in the drawing area's pixels."""
     points = {}
@@ -88,21 +107,29 @@ class _Filter(QtCore.QObject):
             if device is not None and device.type() != QtGui.QInputDevice.DeviceType.TouchScreen:
                 return False  # (a touchpad's raw touches: touchpad_ui's)
             now = time.monotonic()
+            if kind == E.TouchBegin and _on_a_child(obj, event):
+                return False  # (not accepted: no more of this touch comes here)
             if kind == E.TouchBegin:
+                try:
+                    self._do(self.tracker.cancel(now))  # (the last touch's end never came)
+                except Exception as exc:
+                    warn("touchscreen: letting go of the last touch: %s" % exc)  # (its view closed)
                 self.widget = obj
                 self.tracker.mouse_like = _mouse_like()
                 if not self.told:
                     self.told = True
                     log("touchscreen: fingers in the 3D view")
-                self._do(self.tracker.begin(now, _down(event)))
+                down = _down(event)
+                self._hover(down)
+                self._do(self.tracker.begin(now, down))
                 _tick_on()
             elif kind == E.TouchUpdate:
                 self._do(self.tracker.update(now, _down(event)))
             elif kind == E.TouchEnd:
                 self._do(self.tracker.end(now, {}))
                 _tick_off()
-            else:  # cancelled: as if lifted, without its click
-                self.tracker.begin(now, {})
+            else:  # cancelled: as if lifted, without its click (a mouse drag is let go of)
+                self._do(self.tracker.cancel(now))
                 _tick_off()
             event.accept()
             return True
@@ -128,9 +155,11 @@ class _Filter(QtCore.QObject):
         for action in actions:
             what = action[0]
             if what == "orbit":
-                from . import orbit_ui
+                from . import orbit, orbit_ui
 
-                orbit_ui.drag_camera(view, action[1], action[2])
+                # (as much per pixel as FreeCAD's own mouse orbit on a view this size)
+                deg_x, deg_y = orbit.degrees_per_pixel(gl.width(), gl.height(), orbit_ui._sensitivity())
+                orbit_ui.drag_camera(view, action[1], action[2], deg_x, deg_y)
             elif what == "pan":
                 from . import navigate_ui
 
@@ -139,8 +168,8 @@ class _Filter(QtCore.QObject):
                 self._zoom(viewer, gl, action[1], action[2])
             elif what == "click":
                 self._mouse(gl, (action[1], action[2]), ("press", "release"))
-            elif what == "double_click":
-                self._mouse(gl, (action[1], action[2]), ("press", "release", "double", "release"))
+            elif what == "double_click":  # (the first tap was a click already: as a mouse's)
+                self._mouse(gl, (action[1], action[2]), ("double", "release"))
             elif what == "right_click":
                 self._mouse(gl, (action[1], action[2]), ("press", "release"), QtCore.Qt.RightButton)
             elif what in ("press", "move", "release"):
@@ -181,20 +210,42 @@ class _Filter(QtCore.QObject):
             self.units = touchpad_core.Units()
         return self.units
 
+    def _hover(self, down):
+        """The mouse onto the finger that just landed (FreeCAD's sketch picks what a move put
+        under the pointer: a press acts on that, not on what is under the press), and a frame
+        drawn so it is found before the finger lifts."""
+        if not down or self.widget is None:
+            return
+        from .touchpad_ui import _parts
+
+        _view, gl, _viewer = _parts(self.widget)
+        if gl is None:
+            return
+        self._mouse(gl, down[min(down)], ("hover",))
+        gl.update()
+
     def _mouse(self, gl, at, steps, button=QtCore.Qt.LeftButton):
         local = QtCore.QPointF(at[0], at[1])
         point = QtCore.QPointF(gl.mapToGlobal(QtCore.QPoint(int(at[0]), int(at[1]))))
         E = QtCore.QEvent
+        none = QtCore.Qt.NoButton
         kinds = {
+            "hover": (E.MouseMove, none, none),
             "press": (E.MouseButtonPress, button, button),
-            "release": (E.MouseButtonRelease, button, QtCore.Qt.NoButton),
+            "release": (E.MouseButtonRelease, button, none),
             "double": (E.MouseButtonDblClick, button, button),
-            "move": (E.MouseMove, QtCore.Qt.NoButton, QtCore.Qt.LeftButton),
+            "move": (E.MouseMove, none, QtCore.Qt.LeftButton),
         }
         for step in steps:
-            kind, which, held = kinds[step]
-            event = QtGui.QMouseEvent(kind, local, point, which, held, QtCore.Qt.NoModifier)
-            QtWidgets.QApplication.sendEvent(gl, event)
+            if step in ("press", "double"):  # (a mouse is over what it presses)
+                self._send(gl, kinds["hover"], local, point)
+            self._send(gl, kinds[step], local, point)
+
+    @staticmethod
+    def _send(gl, kind, local, point):
+        what, which, held = kind
+        event = QtGui.QMouseEvent(what, local, point, which, held, QtCore.Qt.NoModifier)
+        QtWidgets.QApplication.sendEvent(gl, event)
 
 
 # -- the long-press timer -----------------------------------------------------------------------

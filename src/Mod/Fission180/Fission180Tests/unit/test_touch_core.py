@@ -89,6 +89,25 @@ class Taps(unittest.TestCase):
         )
         self.assertEqual(actions, [("right_click", 150, 100)])
 
+    def test_two_finger_tap_close_together_with_jitter_does_not_zoom(self):
+        # (fingers 60 px apart: 3 px of jitter is 5 %, but under the 8 px a tap may move)
+        actions = run(
+            tc.Tracker(),
+            [
+                (0.0, "begin", {1: (100, 100)}),
+                (0.02, "update", {1: (100, 100), 2: (160, 100)}),
+                (0.08, "update", {1: (98, 100), 2: (161, 100)}),
+                (0.15, "end", {}),
+            ],
+        )
+        self.assertEqual(kinds(actions), ["right_click"])
+
+    def test_a_cancelled_tap_does_nothing(self):
+        t = tc.Tracker()
+        self.assertEqual(run(t, [(0.0, "begin", {1: (100, 50)})]), [])
+        self.assertEqual(t.cancel(0.1), [])
+        self.assertEqual(t.state, tc.IDLE)
+
 
 class Drags(unittest.TestCase):
     def test_one_finger_drag_orbits_after_8_px(self):
@@ -154,6 +173,18 @@ class MouseLike(unittest.TestCase):
     def test_tap_is_a_click(self):
         actions = run(tc.Tracker(mouse_like=True), [(0.0, "begin", {1: (10, 20)}), (0.1, "end", {})])
         self.assertEqual(actions, [("click", 10, 20)])
+
+    def test_a_cancelled_drag_lets_go_of_the_button(self):
+        t = tc.Tracker(mouse_like=True)
+        run(t, drag((100, 100), (140, 120))[:-1])  # dragging, the finger still down
+        self.assertEqual(t.cancel(0.5), [("release", 140, 120)])
+        self.assertEqual(t.state, tc.IDLE)
+
+    def test_a_new_touch_after_a_lost_end_lets_go_of_the_button_first(self):
+        t = tc.Tracker(mouse_like=True)
+        run(t, drag((100, 100), (140, 120))[:-1])  # its end never came
+        self.assertEqual(t.begin(1.0, {1: (10, 10)}), [("release", 140, 120)])
+        self.assertEqual(t.state, tc.ONE)
 
     def test_two_fingers_still_pan(self):
         seq = [(0.0, "begin", {1: (100, 100)}), (0.01, "update", {1: (100, 100), 2: (200, 100)})]

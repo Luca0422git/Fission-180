@@ -21,7 +21,7 @@ DRAG_PX = 8.0  # a finger has to move this far before a drag starts (a tap never
 LONG_PRESS_S = 0.5  # held still this long: a right click
 TWO_TAP_S = 0.3  # two fingers down and up within this: a right click
 DOUBLE_TAP_S = 0.4  # a second tap this soon (and DRAG_PX close): a double click
-PINCH = 0.04  # the fingers' distance changes by more than this share before it zooms
+PINCH = 0.04  # the fingers' distance changes by more than this share (and DRAG_PX) to zoom
 
 IDLE, ONE, DRAG, TWO, LIFTING, SPENT = range(6)
 
@@ -69,9 +69,10 @@ class Tracker:
 
     # -- the calls -----------------------------------------------------------------------
     def begin(self, t, points):
+        out = self._let_go()  # (the last touch's end never came)
         self._reset()
         self.state = IDLE
-        return self._points(t, points)
+        return out + self._points(t, points)
 
     def update(self, t, points):
         return self._points(t, points)
@@ -82,10 +83,23 @@ class Tracker:
             out += self._all_up(t)
         return out
 
+    def cancel(self, t):
+        """The system took the touch away: as if lifted, without its click (a mouse drag is
+        let go of, so no button stays held)."""
+        out = self._let_go()
+        self.state = IDLE
+        self._reset()
+        return out
+
     def tick(self, t):
         if self.state == ONE and t - self.t0 >= LONG_PRESS_S:
             self.state = SPENT
             return [("right_click", self.start[0], self.start[1])]
+        return []
+
+    def _let_go(self):
+        if self.state == DRAG and self.mouse:
+            return [("release", self.last[0], self.last[1])]
         return []
 
     # -- the states ----------------------------------------------------------------------
@@ -168,7 +182,7 @@ class Tracker:
             dx, dy = mid[0] - self.mid[0], mid[1] - self.mid[1]
             if dx or dy:
                 out.append(("pan", dx, dy))
-        if not self.pinching and self.d0 > 0 and abs(d / self.d0 - 1.0) > PINCH:
+        if not self.pinching and self.d0 > 0 and abs(d - self.d0) > max(PINCH * self.d0, DRAG_PX):
             self.pinching, self.tap_ok = True, False
             self.d = self.d0
         if self.pinching and self.d > 0 and d > 0 and d != self.d:

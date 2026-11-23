@@ -1317,6 +1317,23 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   a new design's subWindowActivated comes before its QOpenGLWidget exists, so install on the
   next event-loop turn; **touchpad_ui has that flaw too** (its widgets were deleted ones after
   a new design in a probe; navigation_touchpad still passes): not changed, to check.
+  The final review (fresh reviewer, real FreeCAD probes) found and we fixed before release:
+  a touch starting on a child of the drawing area (ViewCube, a sketch's green check) is left to
+  Qt's own mouse emulation (the drawing area took it and clicked the model behind the cube);
+  every press is preceded by a hover move and a finger's landing hovers and redraws (FreeCAD's
+  sketch acts on what a move highlighted: a tap picked the corner the mouse rested on); a
+  double tap sends only double + release (the first tap was a click already); a cancel or a
+  lost end releases a mouse-like drag (no button left held); one finger orbits at FreeCAD's
+  own mouse rate for the view size (orbit.degrees_per_pixel, was the ViewCube's 0.8 deg/px:
+  2-4x too fast); a pinch needs > 4 % and > 8 px (a two-finger tap close together zoomed).
+  Deferred minors (not fixed): the long-press timer keeps ticking after a long press opened
+  the menu (the popup takes the rest of the touch); in a command a second finger landing after
+  the first moved 8 px makes a mouse drag, not a pan; FreeCAD's GestureOverride events still
+  reach the viewer (only matters with its Gesture navigation styles); synthesized clicks carry
+  no keyboard modifiers (Ctrl + tap); the lifted-finger allowance of a two-finger tap is d0 + 8
+  instead of d0/2 + 8; no two-finger gestures over the empty Tasks panel while a dialog is
+  open. Note: a window selection sends the view a copy of its release
+  (selection_ui._forward_release), so a drag's release reaches the view twice.
 
 - **Fixed in 0.1.0-beta.4.2.0 (first planned as 4.1.1): an AI app's screenshot froze Fission 180 for good** (Luca,
   2026-11-23: "on Windows, using ai will crash Fission ... an AI agent taking a screenshot
@@ -2599,6 +2616,11 @@ and two-finger tap right-click; "just do it"): built on `sf/touchscreen`, merged
 4.1.1 became 0.1.0-beta.4.2.0 (New: touchscreen; Fixed: the three above). A slip on the way:
 the Tasks-panel rework deleted `_OverlayTitleWatcher` (pushed, caught by four scenarios,
 restored in e5f96fc1): after replacing a block by text range, diff the file against the old one.
+The whole-branch review of the touchscreen (a fresh reviewer that probed real FreeCAD) found a
+critical one (no touch reached the ViewCube) and five important ones (Known issues); each fixed
+with a check that failed first (touch_screen 13 checks, test_touch_core 18), the 13 navigation,
+ViewCube, sketch and marking-menu scenarios green. Luca then said: "once its green, release it.
+I want a release by the morning".
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 

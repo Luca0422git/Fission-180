@@ -354,15 +354,16 @@ def turn_about_pivot(view, centre, dx, dy, width, height):
     _place(view, cam, new_position, new_rotation)
 
 
-def drag_camera(view, dx, dy, deg_per_pixel=viewcube.ORBIT_DEG_PER_PIXEL):
+def drag_camera(view, dx, dy, deg_per_pixel=viewcube.ORBIT_DEG_PER_PIXEL, deg_y=None):
     """The ViewCube's drag: the same orbit as Shift + middle-drag, in the chosen mode and
-    about the pivot when one is set (else about the point the camera looks at)."""
+    about the pivot when one is set (else about the point the camera looks at). `deg_y`:
+    another rate for up/down moves (the touchscreen's, FreeCAD's own orbit's per view size)."""
     cam, position, rotation = _camera(view)
     centre = pivot()
     if centre is None:
         centre = App.Vector(*orbit.focal_point(position, rotation, cam.focalDistance.getValue()))
     new_position, new_rotation = orbit.orbit_camera(
-        position, rotation, (centre.x, centre.y, centre.z), dx, dy, mode(), deg_per_pixel
+        position, rotation, (centre.x, centre.y, centre.z), dx, dy, mode(), deg_per_pixel, deg_y
     )
     _place(view, cam, new_position, new_rotation)
 
