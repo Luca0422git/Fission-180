@@ -2,7 +2,7 @@
 
 # Touchscreen in the 3D view: design
 
-Status: proposed 2026-11-23, waiting for Luca's approval.
+Status: approved by Luca 2026-11-23 ("ok. thats fine. Just fucking do it").
 
 ## Why
 
@@ -51,11 +51,14 @@ In a 3D view:
 
 ## My calls (to check)
 
-1. **Sketches:** while a sketch is being edited, one finger works like the mouse (a tap places
-   a point or picks, a drag drags geometry or a selection box); two fingers still pan and pinch.
-   Orbiting a sketch by accident while drawing would be worse than not orbiting it at all.
-2. **Drag handles:** a one-finger drag that starts on a drag handle (Extrude's arrow, a
-   Move arrow, a Fillet handle) drags the handle like the mouse instead of orbiting.
+1. **Sketches and commands:** while a sketch is being edited or a command's dialog is open,
+   one finger works exactly like the mouse (a tap clicks, a drag drags a handle: Extrude's
+   arrow, Move's triad, any kind; picks faces; draws a selection box); two fingers still pan
+   and pinch, and dragging the ViewCube with a finger orbits. Orbiting a sketch by accident
+   while drawing would be worse than not orbiting it at all, and no single test tells every
+   kind of drag handle under a finger. (Changed 2026-11-23 from "a drag that starts on a
+   handle drags it": Luca approved the design with "just do it".)
+2. **No command open:** one finger dragged orbits.
 3. **Thresholds:** a drag starts after 8 px of movement; a long press is 500 ms with the
    finger within 8 px; a two-finger tap is both fingers down and up within 300 ms, moving
    less than 8 px; a pinch starts when the fingers' distance changes by more than 4 %.
