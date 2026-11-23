@@ -1421,9 +1421,16 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   (`simqa cantilever_edge_vertex/fine`: default crashed, the SPOOLES retry crashed too).
   Tests: unit test_a_stop_without_a_reason_is_tried_up_to_three_times; engine check "CalculiX
   stops without a reason" (stand-in ccx: two stops then solved; always stops: fails after
-  exactly 3 tries; both failed on the old code). Windows diagnosis (temporary workflow on the
-  session branch, `tools/fission180/ccx_diag`: 26 inputs of the crashing QA cases x 10 solves
-  x 8 settings) to see whether SPOOLES first or one thread avoids the crash. The history:
+  exactly 3 tries; both failed on the old code). **Windows diagnosis (temporary workflow on the
+  session branch, run 2 of "ccx diagnosis", removed after): 26 inputs of the crashing QA cases
+  (cantilever_edge_vertex, directions, moved_component, made on Linux) solved by FreeCAD for
+  Windows' ccx.exe directly from Git Bash, 10 times each with the default solver and with
+  SPOOLES, 1 and 3 threads, and with every CCX_NPROC_* = 1: 1560 solves, 0 crashes.** PARDISO
+  and PASTIX are not linked in that ccx ("the PASTIX library is not linked"): its default
+  solver IS SPOOLES, so "SPOOLES first on Windows" would change nothing (the old notes blaming
+  the default solver were wrong). The crash shows only when FreeCAD (freecadcmd, the QA) starts
+  ccx, about 1 solve in 100; Fission writes the input, then starts ccx (nothing touches the
+  file meanwhile). Not found further (ccx.exe has no symbols); retrying is the fix. The history:
 - **Was open: CalculiX crashes on Windows now and then (exit 3221225477 = 0xC0000005, an access
   violation in ccx 2.22's default solver), seen on GitHub runs #284, #349 and #94
   (2026-11-16), and #166 (2026-11-21: `simqa cantilever_edge_vertex/fine`, SPOOLES retry crashed
