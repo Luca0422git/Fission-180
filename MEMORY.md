@@ -1423,6 +1423,16 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   solve, or rarely "CalculiX could not solve the study". The advice from #284 stands and is
   not done: solve with SPOOLES first on Windows (Linux uses it anyway), in `simulation.py`,
   as a change of its own with the sim benchmarks on Windows.
+- **Fixed in 0.1.0-beta.4.2.1 (worktree agent, 26736954 -> 4ca5f77d): Measure's points keep one
+  size on screen.** `marker_core.py` (pure: sizes in pixels, the colour #d9381f with a white rim,
+  label colours per look, label_offset beside the line, unit test_marker_core 19),
+  `handles3d.Overlay.marker/.label` under FreeCAD's SoShapeScale (as the drag handles: rescaled
+  every frame; SoMarkerSet rejected: 9x9 device px max, one colour), the label a Qt picture
+  (SoImage) re-placed by a 50 ms poll when the view turns; `PointDots(pixels=, flat=)` for the
+  snap and Center of Mass dots; Construct's origin point and a setup's box points one size.
+  Neon keeps its light measure tint (its full primary is the edges' colour). Left: the Center of
+  Mass sign itself (a saved view provider, 2.5 % of the diagonal) still grows with zoom.
+  Scenario measure_markers (100 checks; 29 failed on the old code). Was:
 - **TO DO (Luca, 2026-11-20, noted only, not fixed yet): Measure's point dots grow when you zoom
   in, and their yellow hides the distance text.** Luca: "the measure tools points are just a
   little too big ... zooming in on it makes them massive. can we have them stay consistent with

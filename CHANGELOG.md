@@ -18,6 +18,12 @@ releases published under the old name (their tags are `sciforge-v...`).
 
 ### Fixed
 
+- **Measure's points no longer grow when you zoom in, and the distance is easy to read.** The
+  measured points are small red-orange dots with a white edge that stay the same size however
+  far you zoom in or out (they were balls sized to the part, so zooming in made them huge),
+  and the distance sits in its own small box beside the line, never under the dots (it was
+  pale text on top of pale yellow dots, and unreadable in the Light look). The snap dots and
+  the Center of Mass dot keep one size on screen too.
 - **Pinching on a touchscreen zoomed the wrong way.** Fingers apart now zoom in and fingers
   together zoom out, as much as the fingers' distance changes.
 - **Panning with two fingers on a touchscreen no longer shakes the view.** The fingers'
