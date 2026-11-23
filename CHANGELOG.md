@@ -8,6 +8,24 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.2.2
+
+### New
+
+- **Fission 180 draws its own title bar.** The system's title bar above the window is gone
+  (more room on a laptop screen): minimize, maximize and close sit at the right end of Fission
+  180's top row, next to the profile button. Drag an empty part of that row to move the window
+  (snapping to the screen's edges works as before), double-click it to maximize or restore,
+  and drag the window's edges or corners to resize it. Preferences > General > Appearance >
+  Title bar > The system's brings the usual title bar back.
+- **Preferences > General > Navigation > Touchpad orbit** swaps which way Shift + two fingers on
+  a touchpad turns the view.
+
+### Fixed
+
+- **Shift + two fingers on a touchpad turned the view the wrong way.** It now turns the way a
+  mouse orbit does; pick Reversed in Preferences for the other way.
+
 ## 0.1.0-beta.4.2.1
 
 ### New

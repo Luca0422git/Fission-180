@@ -1317,6 +1317,35 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Known issues / findings
 
+- **New in 0.1.0-beta.4.2.2: Fission 180's own title bar** (Luca, 2026-11-23, laptop: "That top
+  bar that says Fission 180 with the minimize and close button is kinda annoying ... integrate
+  the top bar into the program? for both windows and linux"). `titlebar_ui.py` +
+  `titlebar_core.py`: Qt.FramelessWindowHint on the main window; WindowButtons (minimize,
+  maximize/restore, close; glyphs drawn, red close hover) at the end of the ribbon's
+  application bar (the row of the profile button; its right margin 0 while on); a press on
+  an empty part of that row -> QWindow.startSystemMove (fallback: the window follows the
+  mouse), a double-click toggles maximized; 8 Grip widgets along the edges/corners ->
+  startSystemResize, hidden when maximized. Preferences > Appearance > Title bar (TitleBar:
+  own / system), shell.disable gives the system's back. **Lessons (each crashed or broke
+  something first):** (1) a Python event filter left on the main window and a Python
+  widget's changeEvent that called Gui.getMainWindow() crashed FreeCAD at EVERY exit
+  (SIGSEGV in teardown, after the results were written, so every scenario still passed):
+  filters come off at QApplication.aboutToQuit, nothing asks the main window for anything once
+  it is closing (titlebar_ui._state["closing"], set by its Close event, cleared by enable);
+  `tools/fission180/scenario_result.py` now fails a scenario whose log has "Program received
+  signal" (0 such crashes in ~100 earlier logs). (2) Changing the window flag re-polishes the
+  window: Qt gives the ribbon's QToolBar its style margin back (the whole window 4 px off, the
+  look_unchanged first round 4.3 % different): shell._ribbon_bar_margins after every switch.
+  (3) The buttons must be exactly as tall as the row's (the profile button's sizeHint), or the
+  row grows. Not testable here: Windows' maximize of a frameless window (must not cover the
+  taskbar) and Windows 11's snap-layout flyout (only on the system's maximize button); KDE
+  Wayland's move/resize. Scenario `title_bar` (23 checks), look_unchanged/look_light pass
+  (0.035 %: the three buttons).
+- **Fixed in 0.1.0-beta.4.2.2: Shift + two fingers on a touchpad turned the wrong way** (Luca:
+  "the touchpad is backwards when revolving using shift and two fingers ... add the option to
+  swap"): touchpad_core.orbit_drag (Standard: a mouse drag the other way of the pan pixels;
+  Reversed: 4.2.1's), Preferences > Navigation > Touchpad orbit (TouchpadOrbit).
+
 - **New in 0.1.0-beta.4.2.0: touchscreen in the 3D view** (Luca, 2026-11-23, his CachyOS laptop
   has a touchscreen; design docs/fission180/touchscreen-design.md, plan plan-touchscreen.md).
   `touch_core.Tracker` (pure, 14 unit tests) reads fingers: one finger orbits
