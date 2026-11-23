@@ -24,6 +24,7 @@ import os
 import shutil
 
 import FreeCAD as App
+import FreeCADGui as Gui
 from PySide import QtCore
 
 from Fission180Tests.gui import blend_steps as b
@@ -176,6 +177,12 @@ class _Changes:
         except Exception:
             pass
 
+    def slotChangedObject_gui(self, vp, prop):  # (FreeCADGui's: a view provider's property)
+        try:
+            self._note("%s.ViewObject.%s" % (vp.Object.Name, prop))
+        except Exception:
+            pass
+
     def slotChangedDocument(self, doc, prop):
         try:
             self._note("document.%s" % prop)
@@ -186,10 +193,20 @@ class _Changes:
         return "changed: %s; first: %s" % (", ".join(sorted(set(self.seen)))[:600], " | ".join(self.stacks))
 
 
+class _GuiChanges:
+    def __init__(self, changes):
+        self.changes = changes
+
+    def slotChangedObject(self, vp, prop):
+        self.changes.slotChangedObject_gui(vp, prop)
+
+
 def b_open():
     App.openDocument(state["file"])
     state["changes"] = _Changes()
     App.addDocumentObserver(state["changes"])
+    state["gui_changes"] = _GuiChanges(state["changes"])
+    Gui.addDocumentObserver(state["gui_changes"])
 
 
 def b_browser():
@@ -217,6 +234,7 @@ def b_whole():
     h.check("looking at it changed nothing", not modified, changes.describe() if changes else None)
     if changes is not None:
         App.removeDocumentObserver(changes)
+        Gui.removeDocumentObserver(state["gui_changes"])
         state["changes"] = None
     views = drawing.all_views(page)
     h.check("the three views", sorted(v.Label for v in views) == state["views"], views)
