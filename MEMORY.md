@@ -1304,7 +1304,21 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Known issues / findings
 
-- **Fixed in 0.1.0-beta.4.1.1: an AI app's screenshot froze Fission 180 for good** (Luca,
+- **New in 0.1.0-beta.4.2.0: touchscreen in the 3D view** (Luca, 2026-11-23, his CachyOS laptop
+  has a touchscreen; design docs/fission180/touchscreen-design.md, plan plan-touchscreen.md).
+  `touch_core.Tracker` (pure, 14 unit tests) reads fingers: one finger orbits
+  (orbit_ui.drag_camera), mouse-like while a dialog is open or a sketch in edit; two fingers pan
+  (navigate_ui.pan_by) and pinch-zoom (a FreeCAD wheel at the fingers, touchpad_ui's busy flag
+  so its "On" mode never pans it); tap = click, double tap, long press 500 ms and two-finger
+  tap = right click (marking menu), all as mouse events sent to the QOpenGLWidget. `touch_ui`
+  sets WA_AcceptTouchEvents, drops FreeCAD's QGesture events while on. Preferences > General >
+  Navigation > Touchscreen On/Off. Scenario `touch_screen` (QTest.createTouchDevice +
+  touchEvent sequences). Not tried on a real screen yet (Luca checks it). Found on the way:
+  a new design's subWindowActivated comes before its QOpenGLWidget exists, so install on the
+  next event-loop turn; **touchpad_ui has that flaw too** (its widgets were deleted ones after
+  a new design in a probe; navigation_touchpad still passes): not changed, to check.
+
+- **Fixed in 0.1.0-beta.4.2.0 (first planned as 4.1.1): an AI app's screenshot froze Fission 180 for good** (Luca,
   2026-11-23: "on Windows, using ai will crash Fission ... an AI agent taking a screenshot
   crashes the program silently ... after waiting 15 minutes"). Not Windows-only (found by a
   worktree agent, verified here): during an AI call `ai/alive.py`'s app filter dropped every
@@ -1323,7 +1337,7 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   Scenario `ai_screenshot_alive` (animations ON, real bridge) failed on the old code (each
   call stuck until released at 25 s). Open: the chat panel keeps its own 180 s wait.
 
-- **Fixed in 0.1.0-beta.4.1.1: the wheel did not zoom over a strip on the right of the 3D view**
+- **Fixed in 0.1.0-beta.4.2.0 (first planned as 4.1.1): the wheel did not zoom over a strip on the right of the 3D view**
   (Luca, 2026-11-23, screenshot: from the ViewCube down to the bottom, both looks). FreeCAD's
   right overlay (OverlayRight, the Tasks panel, Width 382 from start_in) floats over the view
   even when empty; Qt sent the wheel (and clicks) to the empty Gui::TaskView::TaskPanel. FreeCAD's
@@ -1341,7 +1355,7 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   in the strip is the GL widget; the OK button keeps the mouse; a wheel on the empty part below
   a dialog zooms) failed on the old code (TaskPanel under the mouse).
 
-- **Fixed in 0.1.0-beta.4.1.1: an offline NAS froze Fission 180** (Luca, 2026-11-22, CachyOS
+- **Fixed in 0.1.0-beta.4.2.0 (first planned as 4.1.1): an offline NAS froze Fission 180** (Luca, 2026-11-22, CachyOS
   laptop with a NAS mounted, only offline: "freezes on launch, and then eventually works ... has
   trouble saving ... even freezes when trying to close it", "half the time it crashes").
   Cause (reproduced with a FUSE share that hangs, then a stall sampler): Home's listing
@@ -2565,7 +2579,7 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Session log
 
-### Session log: offline NAS freezes, patch 0.1.0-beta.4.1.1 (`develop`, 2026-11-22)
+### Session log: offline NAS freezes, wheel strip, AI screenshot, touchscreen: 0.1.0-beta.4.2.0 (`develop`, 2026-11-22/23)
 
 Luca: CachyOS laptop "has trouble launching fission offline ... freezes ... trouble saving ...
 freezes when trying to close it ... half the time it crashes". Asked: designs on the laptop and
@@ -2580,6 +2594,11 @@ empty Tasks overlay took it (Known issues); fixed into the same 0.1.0-beta.4.1.1
 Windows an AI agent's screenshot freezes Fission 180 silently until the agent's 15-minute
 timeout: found by a separate agent in a worktree (Known issues: alive.py held FreeCAD's
 animated Fit All timer back), merged as b1619949 and checked here (fails on the old code).
+Then a touchscreen (brainstormed: Luca picked 2 fingers pan/pinch, 1 finger orbits, long press
+and two-finger tap right-click; "just do it"): built on `sf/touchscreen`, merged; the unreleased
+4.1.1 became 0.1.0-beta.4.2.0 (New: touchscreen; Fixed: the three above). A slip on the way:
+the Tasks-panel rework deleted `_OverlayTitleWatcher` (pushed, caught by four scenarios,
+restored in e5f96fc1): after replacing a block by text range, diff the file against the old one.
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 

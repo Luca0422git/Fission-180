@@ -8,7 +8,17 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
-## 0.1.0-beta.4.1.1
+## 0.1.0-beta.4.2.0
+
+### New
+
+- **Touchscreen in the 3D view.** On a laptop or tablet with a touchscreen: one finger dragged
+  turns the view, two fingers dragged pan it, pinching zooms about your fingers, a tap clicks
+  (selects; a double tap double-clicks), and holding a finger still or tapping with two fingers
+  opens the right-click menu. While a command's dialog is open or a sketch is being edited,
+  one finger works like the mouse instead (it drags handles, picks faces, draws a selection
+  box), and two fingers still pan and zoom. Preferences > General > Navigation > Touchscreen
+  turns it off. Mouse and touchpad work as before.
 
 ### Fixed
 
