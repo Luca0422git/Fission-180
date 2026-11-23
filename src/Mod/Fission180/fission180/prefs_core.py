@@ -300,6 +300,18 @@ OPTIONS = [
         "then pans too).",
     ),
     _option(
+        "touchpad_orbit",
+        "general",
+        "Touchpad orbit",
+        "choice",
+        _touchpad.ORBIT_DEFAULT,
+        (PREFS, "String", "TouchpadOrbit"),
+        group="Navigation",
+        choices=[(value, label, True, "") for value, label in _touchpad.ORBIT_CHOICES],
+        tip="Which way the view turns when you hold Shift and drag two fingers on a touchpad. "
+        "Pick Reversed if it turns the opposite way to what you expect.",
+    ),
+    _option(
         "touchscreen",
         "general",
         "Touchscreen",

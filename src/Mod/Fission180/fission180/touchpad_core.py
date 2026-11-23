@@ -128,6 +128,23 @@ def action(mode, seen, kind, ctrl=False, buttons=False, shift=False):
     return ORBIT if shift else PAN
 
 
+# Preferences > General > Navigation > Touchpad orbit: which way Shift + two fingers turn the
+# view. The scroll's pixels say where the model would move for a pan; turned into a mouse drag
+# as they were, they turned the view the wrong way on Luca's laptop (2026-11-23: "the touchpad
+# is backwards when revolving using shift and two fingers"): Standard is the other way.
+ORBIT_STANDARD, ORBIT_REVERSED = "standard", "reversed"
+ORBIT_DEFAULT = ORBIT_STANDARD
+ORBIT_CHOICES = [(ORBIT_STANDARD, "Standard"), (ORBIT_REVERSED, "Reversed")]
+
+
+def orbit_drag(dx, dy, direction):
+    """The mouse drag (orbit_ui.drag_camera's dx, dy) for a Shift + two-finger scroll that
+    would pan the model by (dx, dy) pixels."""
+    if direction == ORBIT_REVERSED:
+        return dx, dy
+    return -dx, -dy
+
+
 def pixels_per_notch(platform):
     return PIXELS_PER_NOTCH.get(str(platform), DEFAULT_PIXELS_PER_NOTCH)
 

@@ -112,6 +112,15 @@ class Action(unittest.TestCase):
         self.assertEqual(core.action("auto", core.WHEEL, core.WHEEL, shift=True), core.PASS)
         self.assertEqual(core.action("off", core.TOUCHPAD, core.TOUCHPAD, shift=True), core.PASS)
 
+    def test_shift_orbit_turns_the_other_way_by_default_and_can_be_swapped(self):
+        # Luca (2026-11-23, his laptop): "the touchpad is backwards when revolving using shift
+        # and two fingers ... add the option to swap which way the trackpad turns"
+        self.assertEqual(core.ORBIT_DEFAULT, core.ORBIT_STANDARD)
+        self.assertEqual(core.orbit_drag(12.0, -5.0, core.ORBIT_STANDARD), (-12.0, 5.0))
+        self.assertEqual(core.orbit_drag(12.0, -5.0, core.ORBIT_REVERSED), (12.0, -5.0))
+        self.assertEqual(core.orbit_drag(12.0, -5.0, "nonsense"), (-12.0, 5.0))  # (the default)
+        self.assertEqual([v for v, _label in core.ORBIT_CHOICES], [core.ORBIT_STANDARD, core.ORBIT_REVERSED])
+
     def test_pinch_as_ctrl_wheel(self):
         self.assertEqual(core.action("auto", core.TOUCHPAD, core.TOUCHPAD, ctrl=True), core.ZOOM)
         # Ctrl + a mouse wheel: FreeCAD's wheel zoom as before

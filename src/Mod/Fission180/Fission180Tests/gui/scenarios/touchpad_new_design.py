@@ -218,6 +218,41 @@ def shift_orbits():
     h.check("Shift let go: it pans again (no turn)", angle < 1e-6 and (position() - where).Length > 1e-6, angle)
 
 
+PREFS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
+
+
+def yaw(scroll_x=None, drag_x=None):
+    """Degrees the view turns about the world's up axis (Z) for a Shift + two-finger scroll
+    of `scroll_x` units sideways, or for a mouse orbit drag of `drag_x` pixels (orbit_ui)."""
+    from fission180 import orbit_ui
+
+    before = h.view().getCameraOrientation()
+    if scroll_x is not None:
+        for _ in range(3):
+            scroll((scroll_x, 0), QtCore.Qt.ShiftModifier)
+    else:
+        orbit_ui.drag_camera(h.view(), drag_x, 0)
+    turn = h.view().getCameraOrientation().multiply(before.inverted())
+    return turn.Angle * 57.29578 * (1 if turn.Axis.z >= 0 else -1)
+
+
+def orbit_direction():
+    """Luca (2026-11-23): "the touchpad is backwards when revolving using shift and two
+    fingers ... add the option to swap which way the trackpad turns"."""
+    group = App.ParamGet(PREFS)
+    group.SetString("TouchpadOrbit", "standard")
+    standard = yaw(scroll_x=40)
+    group.SetString("TouchpadOrbit", "reversed")
+    reversed_ = yaw(scroll_x=40)
+    group.RemString("TouchpadOrbit")
+    # (a scroll of +x units pans the model +x pixels; Standard turns as a mouse drag the other
+    # way, Reversed as one the same way: Reversed is how 0.1.0-beta.4.2.1 turned)
+    mouse = yaw(drag_x=40)
+    h.check("Touchpad orbit Standard and Reversed turn opposite ways", standard * reversed_ < 0, (standard, reversed_))
+    h.check("Standard turns as a mouse drag the other way", standard * mouse < 0, (standard, mouse))
+    h.check("Reversed turns as it did before (as a mouse drag the same way)", reversed_ * mouse > 0, (reversed_, mouse))
+
+
 h.run(
     "touchpad_new_design",
     [
@@ -231,6 +266,7 @@ h.run(
         interface_off,
         interface_on,
         shift_orbits,
+        orbit_direction,
     ],
     paced_by="state",
 )

@@ -49,6 +49,15 @@ def mode():
         return core.DEFAULT_MODE
 
 
+def orbit_direction():
+    """Preferences > General > Navigation > Touchpad orbit (touchpad_core.ORBIT_*)."""
+    try:
+        value = App.ParamGet(PARAMS).GetString("TouchpadOrbit", core.ORBIT_DEFAULT)
+    except Exception:
+        return core.ORBIT_DEFAULT
+    return value if value in (core.ORBIT_STANDARD, core.ORBIT_REVERSED) else core.ORBIT_DEFAULT
+
+
 def set_mode(value):
     App.ParamGet(PARAMS).SetString(KEY, core.normalise_mode(value))
 
@@ -172,7 +181,8 @@ class _Filter(QtCore.QObject):
                 from . import orbit, orbit_ui
 
                 deg_x, deg_y = orbit.degrees_per_pixel(gl.width(), gl.height(), orbit_ui._sensitivity())
-                orbit_ui.drag_camera(view, dx, dy, deg_x, deg_y)
+                ox, oy = core.orbit_drag(dx, dy, orbit_direction())
+                orbit_ui.drag_camera(view, ox, oy, deg_x, deg_y)
         else:
             step, _invert = _zoom_settings()
             self._zoom(viewer, event.globalPosition(), core.ctrl_wheel_log(angle.y(), step))
