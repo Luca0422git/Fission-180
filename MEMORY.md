@@ -4,6 +4,13 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-23: 0.1.0-beta.4.2.1 released 20:29 UTC** (patch release run #22; `Release` and the tag
+at c8cdd88b; Luca: "go for it"). New: Shift + two fingers on a touchpad orbits. Fixed: Measure's
+points one size on screen (not yellow, the distance in its own box), Windows Static Stress up to
+three solves when ccx.exe crashes, touchscreen pinch direction and two-finger pan shake, sketch
+messages name bad constraints by the list's numbers (palette note clickable). CI #185 green
+(the Windows simulation too). [ ] Luca tries the touch fixes on his laptop.
+
 **2026-11-23: 0.1.0-beta.4.2.0 released 05:53 UTC** (patch release run #21; `Release` and the tag
 at 7a720918; Luca: "once its green, release it"). New: touchscreen in the 3D view (one finger
 orbits, two pan and pinch-zoom, tap clicks, long press / two-finger tap right-click; mouse-like
