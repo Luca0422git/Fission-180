@@ -1551,6 +1551,19 @@ def solver_unexplained(output):
     return solver_failure(output).startswith("CalculiX could not solve the study.")
 
 
+# CalculiX 2.22 for Windows (FreeCAD's ccx.exe) sometimes stops with an access violation (exit
+# 0xC0000005) and no word, on an input it solves the next time (CI #94, #166, #182; the SPOOLES
+# retry crashed too): a study is solved up to this many times before such a stop counts.
+MAX_SOLVE_ATTEMPTS = 3
+
+
+def solve_again(attempt, output):
+    """After solve number `attempt` (1: the first) stopped without a result: True when it is
+    to be solved once more (with SPOOLES): CalculiX gave no reason it knows (solver_failure)
+    and fewer than MAX_SOLVE_ATTEMPTS were made."""
+    return solver_unexplained(output) and int(attempt) < MAX_SOLVE_ATTEMPTS
+
+
 def with_spooles(text):
     """(CalculiX input, changed): the input with SPOOLES as its equation solver (the first
     *STATIC line without a SOLVER= gets one), the solver every Fission 180 accuracy test runs

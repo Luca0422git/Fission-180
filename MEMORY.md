@@ -1414,7 +1414,17 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   crash log (or, during a freeze, `pkill -ABRT -x fission180` makes the crash log hold every
   thread's stack: Fission 180's faulthandler writes it).
 
-- **Open: CalculiX crashes on Windows now and then (exit 3221225477 = 0xC0000005, an access
+- **Fixed in 0.1.0-beta.4.2.1 (Luca, 2026-11-23: "if theres a known issue, maybe lets fix it
+  ... FUCKING FIX IT"): a study is solved up to `simulation_core.MAX_SOLVE_ATTEMPTS` = 3 times**
+  (`solve_again(attempt, output)`: only a stop CalculiX gives no reason for; the 2nd and 3rd
+  with SPOOLES; `Job._solve_attempts` per pass). CI #182 had failed once more
+  (`simqa cantilever_edge_vertex/fine`: default crashed, the SPOOLES retry crashed too).
+  Tests: unit test_a_stop_without_a_reason_is_tried_up_to_three_times; engine check "CalculiX
+  stops without a reason" (stand-in ccx: two stops then solved; always stops: fails after
+  exactly 3 tries; both failed on the old code). Windows diagnosis (temporary workflow on the
+  session branch, `tools/fission180/ccx_diag`: 26 inputs of the crashing QA cases x 10 solves
+  x 8 settings) to see whether SPOOLES first or one thread avoids the crash. The history:
+- **Was open: CalculiX crashes on Windows now and then (exit 3221225477 = 0xC0000005, an access
   violation in ccx 2.22's default solver), seen on GitHub runs #284, #349 and #94
   (2026-11-16), and #166 (2026-11-21: `simqa cantilever_edge_vertex/fine`, SPOOLES retry crashed
   too).** Fission 180 solves again with SPOOLES; in #349 and #94 that retry crashed

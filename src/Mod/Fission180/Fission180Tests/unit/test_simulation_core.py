@@ -660,6 +660,17 @@ class ProgramText(unittest.TestCase):
         self.assertEqual(core.with_spooles(named), (named, False))
         self.assertEqual(core.with_spooles("*FREQUENCY\n10\n"), ("*FREQUENCY\n10\n", False))
 
+    def test_a_stop_without_a_reason_is_tried_up_to_three_times(self):
+        # (CI #94, #166, #182: on Windows the SPOOLES retry crashed too, exit 0xC0000005, and
+        # the study failed; the same input solved on the job's re-run: the crash comes and
+        # goes, so one more try is not enough; Luca, 2026-11-23: "FUCKING FIX IT")
+        silent = "You are using an executable made on Mon Aug  5 19:15:25 CEST 2024\n"
+        self.assertEqual(core.MAX_SOLVE_ATTEMPTS, 3)
+        self.assertTrue(core.solve_again(1, silent))
+        self.assertTrue(core.solve_again(2, silent))
+        self.assertFalse(core.solve_again(3, silent))  # (three crashes: the failure stands)
+        self.assertFalse(core.solve_again(1, " *ERROR: zero pivot in node 12"))  # a real reason
+
     def test_mesh_quality_note(self):
         fine = {"worst_aspect": 15.2, "over_limit": 6, "elements": 73561}
         self.assertIsNone(core.mesh_quality_note(fine, 10))

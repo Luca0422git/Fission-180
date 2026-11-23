@@ -2405,6 +2405,15 @@ def _use_spooles(path):
         return False
 
 
+def _asks_spooles(path):
+    """Whether the CalculiX input at `path` names SPOOLES as its solver already."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            return "SOLVER=SPOOLES" in handle.read().upper().replace(" ", "")
+    except OSError:
+        return False
+
+
 def _inject(path, cards):
     """Put Fission 180's cards into FreeCAD's CalculiX input: the node sets and equations before
     the step, the boundaries, loads and outputs at the end of the step."""
@@ -2849,6 +2858,7 @@ class Job:
         self._gmsh_problem = None
         self._straight = False  # mesh again with straight-sided elements (bad curved ones)
         self._spooles = False  # CalculiX's SPOOLES solver asked for (after a stop without reason)
+        self._solve_attempts = 1  # this pass's solves so far (simulation_core.solve_again)
         self._solve_env = None  # the environment CalculiX ran in (a second try uses it again)
         self._curved = None  # (made straight, still bad, error) of the check before a solve
         self._curved_text = None  # its note
@@ -3098,17 +3108,26 @@ class Job:
             self._stage_results()
 
     def _solve_again_with_spooles(self):
-        """CalculiX stopped without a result and without saying why (on Windows its default
-        equation solver stopped like that on some small models): the same input once more
-        with SPOOLES, the solver Fission 180's accuracy tests run with. False when the input
-        could not be changed (the failure then stands)."""
+        """CalculiX stopped without a result and without saying why (on Windows its ccx.exe
+        stops like that now and then, exit 0xC0000005, on an input it solves the next time):
+        the same input once more with SPOOLES, the solver Fission 180's accuracy tests run
+        with, up to simulation_core.MAX_SOLVE_ATTEMPTS solves in all. False when the input
+        could not be made to ask for SPOOLES (the failure then stands)."""
         self._spooles = True
-        if not _use_spooles(os.path.join(self.work, self._input + ".inp")):
+        self._solve_attempts += 1
+        path = os.path.join(self.work, self._input + ".inp")
+        if not _use_spooles(path) and not _asks_spooles(path):
             return False
         lines = [line.strip() for line in (self._output or "").splitlines() if line.strip()]
         log(
             "simulation: CalculiX stopped without a reason (exit code %s; it last said: %s); "
-            "solving again with its SPOOLES solver" % (self._returncode, " | ".join(lines[-12:]))
+            "solving again with its SPOOLES solver (solve %d of at most %d)"
+            % (
+                self._returncode,
+                " | ".join(lines[-12:]),
+                self._solve_attempts,
+                core.MAX_SOLVE_ATTEMPTS,
+            )
         )
         for ext in (".frd", ".dat", ".sta", ".cvg"):
             try:
@@ -3357,6 +3376,7 @@ class Job:
                 ": a big mesh, it can take several minutes and some GB of memory (a larger "
                 "element size solves faster)"
             )
+        self._solve_attempts = 1
         env = dict(os.environ)
         if not env.get("OMP_NUM_THREADS"):
             env["OMP_NUM_THREADS"] = str(max(1, (os.cpu_count() or 2) - 1))
@@ -3404,7 +3424,7 @@ class Job:
                 self._analysis = None
                 self.stage, self.message = "model", "Meshing again with straight-sided elements"
                 return
-            if not self._spooles and core.solver_unexplained(self._output):
+            if core.solve_again(self._solve_attempts, self._output):
                 if self._solve_again_with_spooles():
                     return
             raise SimulationError(_solver_failure(self._output))

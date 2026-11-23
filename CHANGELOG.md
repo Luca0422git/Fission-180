@@ -24,6 +24,10 @@ releases published under the old name (their tags are `sciforge-v...`).
   and the distance sits in its own small box beside the line, never under the dots (it was
   pale text on top of pale yellow dots, and unreadable in the Light look). The snap dots and
   the Center of Mass dot keep one size on screen too.
+- **Static Stress on Windows no longer fails now and then with "CalculiX could not solve the
+  study".** The CalculiX solver that comes with FreeCAD for Windows sometimes stops with a
+  crash on a study it solves fine the next time. Fission 180 tried once more and gave up when
+  that try crashed too; it now tries up to three times before it reports a failure.
 - **Pinching on a touchscreen zoomed the wrong way.** Fingers apart now zoom in and fingers
   together zoom out, as much as the fingers' distance changes.
 - **Panning with two fingers on a touchscreen no longer shakes the view.** The fingers'

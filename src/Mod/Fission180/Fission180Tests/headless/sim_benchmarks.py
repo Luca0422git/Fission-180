@@ -1417,11 +1417,19 @@ def check_spooles_again(doc, out):
     tip = (job.summary or {}).get("stats", {}).get("displacement", {}).get("max")
     same = tip is not None and abs(tip - 0.2) < 0.006
     out.append(("it bends as with CalculiX's own choice (3 %)", same, tip))
-    # a stop that keeps happening still fails, with CalculiX's words
+    # Windows' ccx.exe also crashed on the SPOOLES retry now and then (exit 0xC0000005, CI #94,
+    # #166, #182) and solved the same input the next time: two stops, then it solves
     folder = tempfile.mkdtemp(prefix="fission180_ccx_")
     script = os.path.join(folder, "ccx")
+    count = os.path.join(folder, "count")
     with open(script, "w", encoding="utf-8") as handle:
-        handle.write("#!/bin/sh\necho ' property cards:            0'\nexit 3\n")
+        handle.write(
+            "#!/bin/sh\n"
+            'n=$(cat "%s" 2>/dev/null || echo 0); n=$((n + 1)); echo $n > "%s"\n'
+            'if [ $n -ge 3 ]; then exec "%s" "$@"; fi\n'
+            "echo ' property cards:            0'\n"
+            "exit 3\n" % (count, count, real("ccx"))
+        )
     os.chmod(script, 0o755)
     sim._binary = lambda name: script if name == "ccx" else real(name)
     try:
@@ -1429,14 +1437,36 @@ def check_spooles_again(doc, out):
         job.wait(600)
     finally:
         sim._binary = real
+    out.append(("two stops, then solved on the third try", job.state == "done", job.message))
+    shutil.rmtree(folder, ignore_errors=True)
+    # a stop that keeps happening still fails, with CalculiX's words, after three tries
+    folder = tempfile.mkdtemp(prefix="fission180_ccx_")
+    script = os.path.join(folder, "ccx")
+    count = os.path.join(folder, "count")
+    with open(script, "w", encoding="utf-8") as handle:
+        handle.write(
+            "#!/bin/sh\n"
+            'n=$(cat "%s" 2>/dev/null || echo 0); n=$((n + 1)); echo $n > "%s"\n'
+            "echo ' property cards:            0'\nexit 3\n" % (count, count)
+        )
+    os.chmod(script, 0o755)
+    sim._binary = lambda name: script if name == "ccx" else real(name)
+    try:
+        job = sim.Job(study)
+        job.wait(600)
+        with open(count, encoding="utf-8") as handle:
+            tries = int(handle.read().strip() or 0)
+    finally:
+        sim._binary = real
         shutil.rmtree(folder, ignore_errors=True)
     out.append(
         (
-            "a second stop fails with CalculiX's words",
+            "a stop that keeps happening fails with CalculiX's words",
             job.state == "failed" and "property cards" in (job.message or ""),
             job.message,
         )
     )
+    out.append(("... after three tries", tries == 3, tries))
 
 
 @engine_check("adaptive mesh refinement")
