@@ -151,8 +151,45 @@ def b_close():
     App.closeDocument(App.ActiveDocument.Name)
 
 
+class _Changes:
+    """What changes in a document after it is opened (a failed "changed nothing" says what)."""
+
+    def __init__(self):
+        self.seen = []
+        self.stacks = []
+
+    def _note(self, what):
+        self.seen.append(what)
+        if len(self.stacks) < 3:
+            import os
+            import traceback
+
+            frames = traceback.extract_stack(limit=14)[:-2]
+            self.stacks.append(
+                "%s <- %s"
+                % (what, " < ".join("%s:%d %s" % (os.path.basename(f.filename), f.lineno, f.name) for f in reversed(frames)))
+            )
+
+    def slotChangedObject(self, obj, prop):
+        try:
+            self._note("%s.%s" % (obj.Name, prop))
+        except Exception:
+            pass
+
+    def slotChangedDocument(self, doc, prop):
+        try:
+            self._note("document.%s" % prop)
+        except Exception:
+            pass
+
+    def describe(self):
+        return "changed: %s; first: %s" % (", ".join(sorted(set(self.seen)))[:600], " | ".join(self.stacks))
+
+
 def b_open():
     App.openDocument(state["file"])
+    state["changes"] = _Changes()
+    App.addDocumentObserver(state["changes"])
 
 
 def b_browser():
@@ -173,7 +210,14 @@ def b_whole():
     h.check("the DRAWING tab", d.current_tab() == "drawing", d.current_tab())
     import FreeCADGui as Gui
 
-    h.check("looking at it changed nothing", not Gui.getDocument(page.Document.Name).Modified)
+    changes = state.get("changes")
+    modified = Gui.getDocument(page.Document.Name).Modified
+    if modified and changes is not None:
+        print("[Fission 180] drawing_reopen: changed after opening: %r" % (changes.describe(),), flush=True)
+    h.check("looking at it changed nothing", not modified, changes.describe() if changes else None)
+    if changes is not None:
+        App.removeDocumentObserver(changes)
+        state["changes"] = None
     views = drawing.all_views(page)
     h.check("the three views", sorted(v.Label for v in views) == state["views"], views)
     h.check("all drawn", all(drawing.has_geometry(v) for v in views))
