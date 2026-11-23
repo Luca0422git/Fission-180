@@ -1304,6 +1304,20 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Known issues / findings
 
+- **Fixed in 0.1.0-beta.4.1.1: the wheel did not zoom over a strip on the right of the 3D view**
+  (Luca, 2026-11-23, screenshot: from the ViewCube down to the bottom, both looks). FreeCAD's
+  right overlay (OverlayRight, the Tasks panel, Width 382 from start_in) floats over the view
+  even when empty; Qt sent the wheel (and clicks) to the empty Gui::TaskView::TaskPanel. FreeCAD's
+  own see-through pass-through (OverlayManager::eventFilter, testAlpha) did not redirect it,
+  although the panel's grab was alpha 0 and "Transparent" was on (cause inside FreeCAD not
+  found; not needed). Proven with real X wheel events (xdotool under Xvfb: a QWheelEvent sent
+  with sendEvent zooms nothing anywhere, so it proves nothing). Fix: shell.py
+  `empty_panel_lets_mouse_through` (a 150 ms timer while Fission 180 is on): no dialog and no
+  task box shown -> WA_TransparentForMouseEvents on the overlay; a dialog open -> a mask of the
+  dialog's parts (TaskEditControl, the task boxes as far as the scroll area shows them, its
+  scroll bar, +6 px). Scenario `view_wheel_strip` (widgetAt in the strip is the GL widget; the
+  dialog's OK button keeps the mouse) failed on the old code (TaskPanel under the mouse).
+
 - **Fixed in 0.1.0-beta.4.1.1: an offline NAS froze Fission 180** (Luca, 2026-11-22, CachyOS
   laptop with a NAS mounted, only offline: "freezes on launch, and then eventually works ... has
   trouble saving ... even freezes when trying to close it", "half the time it crashes").
@@ -2538,6 +2552,10 @@ did not reproduce it (start 2.5 s). A FUSE share that hangs 15 s per look (fusep
 sampler (main thread's Python stack frozen 2 s) showed `home_ui._collect` -> isdir. Fix above
 (Known issues). Trick worth keeping: during a freeze, `kill -ABRT` of the process makes Fission
 180's crash log (faulthandler, all threads) say where it was stuck.
+Then (2026-11-23) Luca: the wheel does not zoom over a strip on the right of the 3D view: the
+empty Tasks overlay took it (Known issues); fixed into the same 0.1.0-beta.4.1.1. And: on
+Windows an AI agent's screenshot freezes Fission 180 silently until the agent's 15-minute
+timeout: investigated by a separate agent in a worktree (see its entry when merged).
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 

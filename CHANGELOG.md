@@ -22,6 +22,13 @@ releases published under the old name (their tags are `sciforge-v...`).
   for NAS..." and then "Offline", and its designs come back by themselves when the NAS is
   reachable again.
 
+- **The mouse wheel zooms over the whole 3D view again.** Over a strip on the right of the
+  view (below the ViewCube, down to the bottom) the wheel did nothing: FreeCAD's Tasks panel
+  floats there, empty and invisible when no command is open, and it took the wheel (and the
+  clicks). Now the empty panel lets the mouse through, and while a command's dialog is open
+  only the dialog itself takes it: below the dialog the wheel zooms and a click picks in the
+  3D view, as in Fusion.
+
 ## 0.1.0-beta.4.1.0
 
 ### New

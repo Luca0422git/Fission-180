@@ -14,7 +14,7 @@ put back when it turns off.
 """
 
 from . import config, log, warn
-from .compat import QtCore, QtWidgets
+from .compat import QtCore, QtGui, QtWidgets
 
 FISSION180_WB = "Fission180Workbench"
 SKETCH_WB = "SketcherWorkbench"
@@ -276,6 +276,7 @@ def enable():
     _install_close_guard()
     _hide_panels()
     _safely(_hide_overlay_titles)
+    _safely(_empty_panel_on)
     shortcuts.apply()
     timeline_ui.show()
     navbar_ui.show()
@@ -559,6 +560,128 @@ def _overlay_titles_off():
     watcher = _state.pop("overlay_watcher", None)
     if watcher is not None:
         watcher.release()
+    _empty_panel_off()
+
+
+# -- the empty Tasks panel lets the mouse through to the 3D view --------------------------------
+# FreeCAD's Tasks panel floats over the right of the 3D view (its "overlay") even when no
+# command is open: empty and see-through, but it still took the mouse wheel, so zooming did
+# nothing over a strip on the right of the view (Luca, 2026-11-23: "in the area circled red, i
+# cant zoom in and out with my scroll wheel"). FreeCAD's own pass-through of see-through parts
+# did not take the wheel there. While no command dialog is open (and nothing shows in the
+# panel), the panel ignores the mouse; while one is open, only the dialog itself takes the
+# mouse (a mask): below it the wheel zooms and a click picks in the 3D view, as in Fusion.
+EMPTY_PANEL_MS = 150
+MASK_MARGIN = 6  # px around the dialog's parts (Neon Lights' glow stays inside)
+_TASK_CONTENT = ("Gui::TaskView::TaskBox", "QSint::ActionGroup", "Gui::TaskView::TaskWatcher")
+
+
+def _right_overlay():
+    try:
+        main = _main()
+        for widget in main.findChildren(QtWidgets.QTabWidget, "OverlayRight"):
+            if widget.metaObject().className() == "Gui::OverlayTabWidget":
+                return widget
+    except RuntimeError:
+        pass
+    return None
+
+
+def _panel_shows_something(overlay):
+    """A task box (a command's dialog or one of FreeCAD's task watchers) is visible in it."""
+    for widget in overlay.findChildren(QtWidgets.QWidget):
+        if widget.metaObject().className() in _TASK_CONTENT and widget.isVisible():
+            if widget.height() > 2:
+                return True
+    return False
+
+
+def _dialog_rects(overlay):
+    """The parts of the panel a dialog shows, as QRects in the overlay's pixels: the bar
+    with OK / Cancel and every task box (inside the scroll area, as far as it shows)."""
+    rects = []
+    for view in overlay.findChildren(QtWidgets.QWidget):
+        if view.metaObject().className() != "Gui::TaskView::TaskView" or not view.isVisible():
+            continue
+        for child in view.findChildren(QtWidgets.QWidget, options=QtCore.Qt.FindDirectChildrenOnly):
+            if not child.isVisible() or child.width() <= 0 or child.height() <= 0:
+                continue
+            if isinstance(child, QtWidgets.QScrollArea):
+                port = child.viewport()
+                shown = QtCore.QRect(port.mapTo(overlay, QtCore.QPoint(0, 0)), port.size())
+                content = child.widget()
+                if content is not None:
+                    for box in content.findChildren(
+                        QtWidgets.QWidget, options=QtCore.Qt.FindDirectChildrenOnly
+                    ):
+                        if box.isVisible() and box.width() > 0 and box.height() > 0:
+                            area = QtCore.QRect(box.mapTo(overlay, QtCore.QPoint(0, 0)), box.size())
+                            rects.append(area.intersected(shown))
+                bar = child.verticalScrollBar()
+                if bar is not None and bar.isVisible():
+                    rects.append(QtCore.QRect(bar.mapTo(overlay, QtCore.QPoint(0, 0)), bar.size()))
+            else:
+                rects.append(QtCore.QRect(child.mapTo(overlay, QtCore.QPoint(0, 0)), child.size()))
+    return [r for r in rects if not r.isEmpty()]
+
+
+def empty_panel_lets_mouse_through():
+    """(the timer) The right overlay ignores the mouse while it is empty, and takes it only
+    where the dialog is while one is open."""
+    try:
+        import FreeCADGui as Gui
+
+        overlay = _right_overlay()
+        if overlay is None:
+            return
+        dialog = bool(Gui.Control.activeDialog())
+        empty = not dialog and not _panel_shows_something(overlay)
+        if overlay.testAttribute(QtCore.Qt.WA_TransparentForMouseEvents) != empty:
+            overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, empty)
+        rects = _dialog_rects(overlay) if dialog else []
+        if rects:
+            region = QtGui.QRegion()
+            for rect in rects:
+                region = region.united(
+                    QtGui.QRegion(rect.adjusted(-MASK_MARGIN, -MASK_MARGIN, MASK_MARGIN, MASK_MARGIN))
+                )
+            key = tuple(region.boundingRect().getRect()) + tuple(
+                tuple(r.getRect()) for r in rects
+            )
+        else:
+            region, key = None, None
+        if _state.get("panel_mask") != key:
+            _state["panel_mask"] = key
+            if region is None:
+                overlay.clearMask()
+            else:
+                overlay.setMask(region)
+    except Exception as exc:
+        warn("interface: the Tasks panel: %s" % exc)
+
+
+def _empty_panel_on():
+    timer = _state.get("empty_panel_timer")
+    if timer is None:
+        timer = _state["empty_panel_timer"] = QtCore.QTimer()
+        timer.setInterval(EMPTY_PANEL_MS)
+        timer.timeout.connect(empty_panel_lets_mouse_through)
+    timer.start()
+    empty_panel_lets_mouse_through()
+
+
+def _empty_panel_off():
+    timer = _state.get("empty_panel_timer")
+    if timer is not None:
+        timer.stop()
+    try:
+        overlay = _right_overlay()
+        if overlay is not None:
+            overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+            overlay.clearMask()
+        _state["panel_mask"] = None
+    except Exception as exc:
+        warn("interface: the Tasks panel: %s" % exc)
 
 
 def _in_overlay(widget):
