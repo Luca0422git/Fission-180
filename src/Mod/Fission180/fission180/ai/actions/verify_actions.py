@@ -981,13 +981,17 @@ def _window(ctx, doc, args, marked):
         right, up, forward = render_core.camera(args.get("view", "iso"), args.get("direction"))
     except render_core.RenderError as exc:
         raise UserError(str(exc))
+    from .view_actions import still_camera
+
     saved = ctx.host.push_highlight(doc, marked)
     try:
-        _turn(view, right, up, forward)
-        if args.get("fit", True):
-            view.fitAll()
-            _frame(view, _corners(doc, marked), right, up, width, height)
-        data = ctx.host.screenshot(doc, width, height)
+        # (Fit All at once: no animation still moving the camera; window work: never long)
+        with still_camera(view, "turning the 3D view and taking its picture"):
+            _turn(view, right, up, forward)
+            if args.get("fit", True):
+                view.fitAll()
+                _frame(view, _corners(doc, marked), right, up, width, height)
+            data = ctx.host.screenshot(doc, width, height)
     finally:
         drawn = ctx.host.pop_highlight(doc, saved)
         if camera is not None:

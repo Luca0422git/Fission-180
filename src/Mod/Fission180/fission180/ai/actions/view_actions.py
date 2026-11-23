@@ -1,9 +1,17 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """AI actions for the 3D view: screenshot (capture_ui.py, through the host: only with the
 Fission 180 window), turn and fit the view, Look At a face, the design's Named Views (kept in
-the file the way the browser keeps them) and Show / Hide (bodies.set_shown)."""
+the file the way the browser keeps them) and Show / Hide (bodies.set_shown).
 
-from .. import bridge_core
+The camera moves of these tools (and of render's window pictures, show_study_results) happen
+at once, inside still_camera(): with FreeCAD's navigation animations on (its default) a
+standard view turned the camera over half a second after the call, so a picture showed a
+camera still on its way, and Fit All waited in an event loop of its own (alive.py). That
+work is window work (progress.window_work): stuck there, the AI app is answered at once."""
+
+import contextlib
+
+from .. import bridge_core, progress
 from ..executor import UserError, json_result
 from . import action
 
@@ -27,15 +35,48 @@ def _view(ctx):
     return doc, view
 
 
+@contextlib.contextmanager
+def still_camera(view, what="turning the 3D view"):
+    """Inside it the camera of `view` moves at once (FreeCAD's navigation animations off for
+    that view, then as they were): a standard view is reached before the picture is taken,
+    and Fit All does not animate (it waits for timers in an event loop of its own). It is the
+    call's window work (`what`: progress.window_work)."""
+    with progress.window_work(what):
+        with _no_animation(view):
+            yield view
+
+
+@contextlib.contextmanager
+def _no_animation(view):
+    try:
+        was = bool(view.isAnimationEnabled())
+    except Exception:
+        was = False
+    if was:
+        try:
+            view.setAnimationEnabled(False)  # (also ends a camera move still going on)
+        except Exception:
+            was = False
+    try:
+        yield view
+    finally:
+        if was:
+            try:
+                view.setAnimationEnabled(True)
+            except Exception:
+                pass
+
+
 @action("screenshot")
 def screenshot(ctx, args):
     doc, view = _view(ctx)
     turn = ORIENTATIONS.get(args.get("view") or "")
-    if turn:
-        getattr(view, turn)()
-        view.fitAll()
     width, height = int(args.get("width", 1024)), int(args.get("height", 768))
-    data = ctx.host.screenshot(doc, width, height)
+    with still_camera(view, "turning the 3D view and taking its picture"):
+        if turn:
+            getattr(view, turn)()
+            view.fitAll()
+        data = ctx.host.screenshot(doc, width, height)
     return bridge_core.result(
         "A %d x %d picture of %s%s."
         % (width, height, doc.Label, (" (%s view)" % args["view"]) if args.get("view") else ""),
@@ -46,6 +87,11 @@ def screenshot(ctx, args):
 @action("set_view")
 def set_view(ctx, args):
     doc, view = _view(ctx)
+    with still_camera(view):
+        return _set_view(ctx, args, doc, view)
+
+
+def _set_view(ctx, args, doc, view):
     done = []
     orientation = args.get("orientation")
     if orientation == "home":

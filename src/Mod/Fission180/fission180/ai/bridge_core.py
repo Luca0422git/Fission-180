@@ -91,6 +91,56 @@ def dropped_text(tool, current, seconds):
     )
 
 
+# (Luca, 2026-11-23: an AI screenshot froze Fission 180 for good, and the AI app only gave up
+# after 15 minutes) The tools that work Fission 180's window alone: they take well under a
+# second, so the MCP server watches that Fission 180 still answers at all while it waits for one
+# (fission180_mcp.BridgeClient), and the bridge answers one stuck in its window work at once
+# (progress.window_work, progress.WINDOW_LIMIT).
+WINDOW_TOOLS = ("screenshot", "set_view", "render")
+_FROZEN_HELP = (
+    "Do not keep asking: tell the person that Fission 180's window seems frozen. If it does "
+    "not respond, it has to be closed and started again; where it stopped is written in "
+    "Fission 180's crash log."
+)
+
+
+def stuck_text(tool, what, seconds):
+    """The answer of a call stuck in its window work (`what`, for `seconds`)."""
+    return (
+        "Not done: Fission 180's window got stuck in %s (%s, for %s; it normally takes well "
+        "under a second), so there is no answer, and nothing in the design was changed. %s"
+        % (
+            tool,
+            what or "turning the 3D view and taking its picture",
+            duration_words(seconds),
+            _FROZEN_HELP,
+        )
+    )
+
+
+def stuck_busy_text(tool, current, seconds):
+    """A new call while `current` is stuck in its window work for `seconds`."""
+    return (
+        "Not done: Fission 180's window is stuck in %s (for %s), so %s was not run and "
+        "nothing was changed. %s" % (current, duration_words(seconds), tool, _FROZEN_HELP)
+    )
+
+
+def frozen_text(tool, seconds, sent=True):
+    """(The MCP server) Fission 180 has answered nothing, not even a status check, for
+    `seconds`: its window's thread is stuck, or inside one very long step. sent: the call
+    `tool` went to it (it may still finish there; a window tool changes no design)."""
+    if sent:
+        what = "%s gave no answer" % tool
+    else:
+        what = "%s was not sent to it, so nothing was changed" % tool
+    return (
+        "Fission 180 is not responding: it has answered nothing for %s, not even a status "
+        "check, so its window is stuck (or inside one very long step); %s. %s"
+        % (duration_words(seconds), what, _FROZEN_HELP)
+    )
+
+
 def bridge_path(user_data_dir):
     """<user data>/Fission180/ai/bridge.json."""
     return os.path.join(user_data_dir, *FOLDER, BRIDGE_FILE)
@@ -257,10 +307,13 @@ def encode_result(answer):
 
 def status_answer(status, line=""):
     """The /status answer for progress.current() (None: no call runs): {"working", "tool",
-    "call_id", "seconds", "what", "done", "total", "stopping", "line"}."""
+    "call_id", "seconds", "what", "done", "total", "stopping", "window", "window_seconds",
+    "line"} (window: the window work going on, progress.window_work)."""
     out = {"working": bool(status)}
     if status:
-        for key in ("tool", "call_id", "seconds", "what", "done", "total", "stopping"):
+        keys = ("tool", "call_id", "seconds", "what", "done", "total", "stopping", "window",
+                "window_seconds")  # fmt: skip
+        for key in keys:
             out[key] = status.get(key)
         out["line"] = line
     return out

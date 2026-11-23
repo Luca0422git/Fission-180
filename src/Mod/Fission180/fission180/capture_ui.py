@@ -203,10 +203,12 @@ def _neon():
         return False
 
 
-def save(path, width, height, transparent=False, normal=False):
+def save(path, width, height, transparent=False, normal=False, view=None):
     """The 3D view as an image file of width x height pixels; `normal`: in the normal look
-    while Neon Lights is on (otherwise what is on screen)."""
-    view = Gui.ActiveDocument.ActiveView
+    while Neon Lights is on (otherwise what is on screen). view: the 3D view to picture (the
+    AI's design may not be the active one; default: the active design's)."""
+    if view is None:
+        view = Gui.ActiveDocument.ActiveView
     background = "Transparent" if transparent else "Current"
     if os.path.isfile(path):
         os.remove(path)  # the save dialog asked about replacing it: a failure must show

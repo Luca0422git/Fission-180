@@ -909,10 +909,13 @@ def _look(ctx, view=None):
     gui_view = ctx.host.view(ctx.doc)
     if gui_view is None:
         return
+    from .view_actions import still_camera
+
     try:
-        if view:
-            getattr(gui_view, _VIEW_CALLS[view])()
-        gui_view.fitAll()
+        with still_camera(gui_view):  # (at once: no camera animation going on after the call)
+            if view:
+                getattr(gui_view, _VIEW_CALLS[view])()
+            gui_view.fitAll()
     except Exception as exc:
         from ... import warn
 

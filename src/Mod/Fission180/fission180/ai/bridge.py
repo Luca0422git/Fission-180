@@ -16,6 +16,11 @@ The tools themselves are listed in the catalogue (fission180/ai/catalog). Safety
   * while a Fission 180 dialog or a sketch is open, changing calls answer "Fission 180 is busy";
   * overwriting a file always asks the person; there is no "run any code" tool;
   * every call is listed in the AI activity panel (with Undo and Stop).
+A call stuck in work on the window alone (progress.window_work: turning the 3D view, taking
+its picture, which takes well under a second) for progress.WINDOW_LIMIT seconds is answered at
+once from this thread ("the window got stuck"), and so is every call after it while it stays
+stuck; the crash log gets every thread's stack (crashlog.note, crashlog.watch). Luca,
+2026-11-23: an AI screenshot froze Fission 180 for good and the AI app waited 15 minutes.
 """
 
 import base64
@@ -30,12 +35,13 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from .. import commands, log, warn
+from .. import commands, crashlog, log, warn
 from ..compat import QtCore, QtWidgets
 from . import bridge_core, catalog, executor, progress
 
 OPTION = ("User parameter:BaseApp/Preferences/Mod/Fission180/AI", "AllowControl")
 WAIT = 115.0  # seconds a call waits for Fission 180 (the MCP server waits 120)
+LOOK_EVERY = 0.25  # seconds between two looks of a waiting call at whether its work is stuck
 ASK = None  # tests: function(title, text) -> True / False instead of the question
 _state = {
     "server": None,
@@ -52,6 +58,8 @@ _state = {
     "activity": [],  # (time, tool, text, is_error)
     "last_used": None,
     "listeners": [],  # functions called after every call (the activity panel, Home)
+    "notes": [],  # lines from the bridge's thread, logged when the window's thread runs again
+    "stuck": set(),  # call ids answered as stuck (each one recorded once)
 }
 
 
@@ -137,6 +145,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             except bridge_core.BridgeError as exc:
                 self._send(400, bridge_core.error_result(str(exc)))
                 return
+            live = progress.current()
+            if progress.stuck(live):  # (the window is stuck: waiting only adds to the wait)
+                self._send(
+                    200,
+                    bridge_core.error_result(
+                        bridge_core.stuck_busy_text(tool, live["tool"], live["window_seconds"])
+                    ),
+                )
+                return
             current = _state["current"]
             if current is not None and time.time() - current[1] > bridge_core.BUSY_AFTER:
                 # (one call at a time on the window's thread: a long one is not queued behind)
@@ -164,7 +181,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             with _LOCK:
                 _state["queued"][call_id] = job
             _state["jobs"].put(job)
-            if not job["done"].wait(WAIT):
+            waited = _await(job, call_id)
+            if isinstance(waited, dict):  # (stuck in its window work: answered now)
+                self._send(200, waited)
+                return
+            if not waited:
                 with job["lock"]:
                     dropped = job["state"] == "queued"
                     if dropped:
@@ -216,6 +237,81 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 
 _LOCK = threading.Lock()
+
+
+def _await(job, call_id):
+    """The bridge's thread waits for `job` (the window's thread does it): True when it is done,
+    False after WAIT seconds, or at once the answer to send (a dict) when its work got stuck
+    on the window (progress.stuck: in window_work for WINDOW_LIMIT seconds)."""
+    end = time.monotonic() + WAIT
+    while True:
+        left = end - time.monotonic()
+        if job["done"].wait(max(0.0, min(LOOK_EVERY, left))):
+            return True
+        try:
+            live = progress.current()
+            if live is not None and live.get("call_id") == call_id and progress.stuck(live):
+                return _stuck(job, live)
+        except Exception:
+            pass  # (only a look: waiting goes on)
+        if left <= 0:
+            return False
+
+
+def _stuck(job, live):
+    """The answer for a call stuck in its window work. On the bridge's thread (the window's
+    thread is the stuck one, and FreeCAD's Report view must not be written from here): the
+    crash log gets a line and every thread's stack, the recent messages a line, and the
+    Report view the same line once the window's thread runs again (_pump). A read-only call
+    is asked to stop at its next safe point (nobody waits for it any more)."""
+    tool = job["tool"]
+    seconds = live.get("window_seconds") or 0
+    job["late"] = True
+    text = "AI bridge: %s stuck in the window (%s) for %.0f s; the AI app was told at once" % (
+        tool,
+        live.get("window") or "window work",
+        seconds,
+    )
+    call_id = live.get("call_id")
+    with _LOCK:
+        first = call_id not in _state["stuck"]
+        if len(_state["stuck"]) > 100:
+            _state["stuck"].clear()  # (calls of long ago)
+        _state["stuck"].add(call_id)
+        if first:
+            _state["notes"].append(text)
+    if first:
+        crashlog.note(text + "; the stack of every thread follows", stacks=True)
+        crashlog.watch(None)  # (its own dump would only repeat these stacks)
+        progress.request_stop(
+            "stuck in the window; the AI app was told", call_id, only_read_only=True
+        )
+    return bridge_core.error_result(bridge_core.stuck_text(tool, live.get("window"), seconds))
+
+
+def _watch_window(kind, call):
+    """progress listener (the window's thread): while a call works the window alone, the crash
+    log is set to get every thread's stack if that work still goes on a moment after
+    WINDOW_LIMIT, even a hang inside a graphics driver that keeps all Python code (this
+    bridge's thread too) from running; once it ends late, the Report view says so."""
+    try:
+        if kind == "window":
+            crashlog.watch(progress.WINDOW_LIMIT + 2.0)
+        elif kind == "window_end":
+            crashlog.watch(None)
+            took = call.get("window_took") or 0.0
+            if took >= progress.WINDOW_LIMIT:
+                text = "AI: %s: its window work took %.0f s (stuck); see the crash log" % (
+                    call.get("tool"),
+                    took,
+                )
+                warn(text)
+                crashlog.note(text)
+    except Exception as exc:
+        warn("AI bridge: %s" % exc)
+
+
+progress.add_listener(_watch_window)
 
 
 def _status():
@@ -310,8 +406,21 @@ def _answer(job, answer):
     job["done"].set()
 
 
+def _flush_notes():
+    """What the bridge's thread noted while the window's thread was stuck, in the Report view."""
+    try:
+        with _LOCK:
+            notes, _state["notes"] = _state["notes"], []
+        for text in notes:
+            warn(text)
+    except Exception:
+        pass  # (never one up into Qt's timer)
+
+
 def _pump():
     """Takes the waiting calls one by one (on Fission 180's own thread)."""
+    if _state["notes"]:
+        _flush_notes()
     if _state["running"]:
         return  # (a question of this call is open: its own event loop calls the timer)
     while True:
@@ -571,12 +680,23 @@ class GuiHost(executor.Host):
         return saved["drawn"]
 
     def screenshot(self, doc, width, height):
+        """The picture of `doc`'s 3D view (base64 PNG). Only on the window's thread: Qt and
+        OpenGL must never be touched from another one (on Windows that hangs or crashes)."""
         from .. import capture_ui
 
+        if threading.current_thread() is not threading.main_thread():
+            raise executor.UserError(
+                "Fission 180 takes pictures of its 3D view only on its window's thread, and "
+                "this call came from another one; nothing was done."
+            )
+        view = self.view(doc)
+        if view is None:
+            raise executor.UserError("There is no 3D view of %s to take a picture of." % doc.Label)
         handle, path = tempfile.mkstemp(suffix=".png", prefix="fission180-ai-")
         os.close(handle)
         try:
-            capture_ui.save(path, width, height)
+            with progress.window_work("taking the picture of the 3D view"):
+                capture_ui.save(path, width, height, view=view)
             with open(path, "rb") as stream:
                 return base64.b64encode(stream.read()).decode("ascii")
         finally:

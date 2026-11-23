@@ -37,11 +37,17 @@ line (and the headless MCP server sends it as a progress notification).
 Pure Python (no FreeCAD, no Qt): the MCP server imports it too. Thread-safe where it says so.
 """
 
+import contextlib
 import threading
 import time
 
 PUMP_EVERY = 0.1  # seconds between two looks at the window during a call (at most)
 SHOW_AFTER = 0.4  # seconds a call runs before its working line shows (short calls never flash)
+# Work on the window alone (turning the 3D view, taking its picture: window_work) takes well
+# under a second (a 1024 x 768 picture: about 0.1 s). Past this it is stuck, and the AI app is
+# answered at once instead of waiting (Luca, 2026-11-23: a screenshot froze Fission 180 for
+# good and the AI app waited 15 minutes): bridge.py, fission180_mcp.py.
+WINDOW_LIMIT = 15.0
 
 
 class Stopped(BaseException):
@@ -83,6 +89,7 @@ def _new_call(tool, call_id, read_only):
         "next_pump": now + min(PUMP_EVERY, SHOW_AFTER),
         "stop": None,  # the reason, once a stop was asked
         "stopped": False,  # Stopped was raised
+        "window": None,  # (what, monotonic time it began) while in window_work()
     }
 
 
@@ -143,6 +150,31 @@ def set_guard(fn):
     """fn() -> True when now is not a safe point (a design recomputing): step() then neither
     pumps nor raises (it does as soon as the next safe point comes)."""
     _state["guard"] = fn
+
+
+# -- work on the window alone ------------------------------------------------------------------
+@contextlib.contextmanager
+def window_work(what):
+    """Marks the part of the call running now that only works Fission 180's window ("turning
+    the 3D view and taking its picture"): it never takes long, so once it has gone on for
+    WINDOW_LIMIT seconds (current()["window_seconds"]) the call is stuck there and the bridge
+    answers the AI app at once. Listeners get "window" / "window_end" (the crash log's
+    watch). Nested: the outer one counts. Does nothing outside a call. The call's own thread."""
+    call = _state["call"]
+    if call is None or call["window"] is not None:
+        yield
+        return
+    with _lock:
+        call["window"] = (str(what), time.monotonic())
+    _notify("window", call)
+    try:
+        yield
+    finally:
+        with _lock:
+            began = call["window"][1] if call["window"] else time.monotonic()
+            call["window"] = None
+            call["window_took"] = time.monotonic() - began
+        _notify("window_end", call)
 
 
 # -- the safe point (the tools' long loops) ----------------------------------------------------
@@ -243,6 +275,7 @@ def current():
         call = _state["call"]
         if call is None:
             return None
+        window = call["window"]
         return {
             "tool": call["tool"],
             "call_id": call["call_id"],
@@ -252,7 +285,17 @@ def current():
             "total": call["total"],
             "read_only": call["read_only"],
             "stopping": call["stop"] is not None,
+            "window": window[0] if window else None,  # window_work's words, or None
+            "window_seconds": round(time.monotonic() - window[1], 3) if window else None,
         }
+
+
+def stuck(status, limit=None):
+    """True when the call `status` (current()) has been in its window work for the limit
+    (default WINDOW_LIMIT) or longer: stuck there."""
+    if not status or status.get("window_seconds") is None:
+        return False
+    return status["window_seconds"] >= (WINDOW_LIMIT if limit is None else limit)
 
 
 # -- words ---------------------------------------------------------------------------------------

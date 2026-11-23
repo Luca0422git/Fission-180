@@ -202,6 +202,70 @@ class Stop(Base):
         progress.end(token)
 
 
+class WindowWork(Base):
+    """Work on the window alone (turning the 3D view, taking its picture) is marked, so a call
+    stuck there is told apart from a long computation (Luca, 2026-11-23: an AI screenshot
+    froze Fission 180 for good; the AI app waited 15 minutes)."""
+
+    def setUp(self):
+        Base.setUp(self)
+        self.saved_limit = progress.WINDOW_LIMIT
+        self.events = []
+        self.listener = lambda kind, call: self.events.append((kind, call.get("window")))
+        progress.add_listener(self.listener)
+
+    def tearDown(self):
+        progress.remove_listener(self.listener)
+        progress.WINDOW_LIMIT = self.saved_limit
+        Base.tearDown(self)
+
+    def test_outside_a_call_it_does_nothing(self):
+        with progress.window_work("taking the picture"):
+            self.assertIsNone(progress.current())
+        self.assertEqual(self.events, [])
+
+    def test_marked_while_it_runs(self):
+        token = progress.begin("screenshot", "c1")
+        self.assertIsNone(progress.current()["window"])
+        with progress.window_work("taking the picture"):
+            with progress.window_work("inner"):  # (the outer one counts)
+                live = progress.current()
+                self.assertEqual(live["window"], "taking the picture")
+                self.assertGreaterEqual(live["window_seconds"], 0.0)
+        live = progress.current()
+        self.assertIsNone(live["window"])
+        self.assertIsNone(live["window_seconds"])
+        self.assertEqual(
+            [kind for kind, _ in self.events], ["begin", "window", "window_end"], self.events
+        )
+        self.assertGreaterEqual(token["window_took"], 0.0)
+
+    def test_stuck_only_in_window_work_past_the_limit(self):
+        progress.WINDOW_LIMIT = 0.05
+        progress.begin("check_design", "c1")
+        progress.step("a long computation")
+        time.sleep(0.1)  # (a long computation is never stuck: only window work is)
+        self.assertFalse(progress.stuck(progress.current()))
+        with progress.window_work("taking the picture"):
+            self.assertFalse(progress.stuck(progress.current(), limit=10.0))
+            time.sleep(0.1)
+            self.assertTrue(progress.stuck(progress.current()))
+        self.assertFalse(progress.stuck(progress.current()))
+        self.assertFalse(progress.stuck(None))
+
+    def test_read_from_another_thread(self):
+        progress.WINDOW_LIMIT = 0.05
+        progress.begin("screenshot", "c1")
+        seen = []
+        with progress.window_work("taking the picture"):
+            time.sleep(0.1)
+            other = threading.Thread(target=lambda: seen.append(progress.current()))
+            other.start()
+            other.join(5)
+        self.assertTrue(progress.stuck(seen[0]))
+        self.assertEqual(seen[0]["window"], "taking the picture")
+
+
 class Words(unittest.TestCase):
     def test_line(self):
         status = {

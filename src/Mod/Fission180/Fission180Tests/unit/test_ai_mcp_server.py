@@ -322,10 +322,14 @@ class SlowBridge:
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
                 length = int(self.headers.get("Content-Length") or 0)
-                tool, args = bridge_core.decode_request(self.rfile.read(length))
-                owner.calls.append(tool)
-                time.sleep(owner.delay)
-                body = bridge_core.encode_result(bridge_core.result("answered %s" % tool))
+                data = self.rfile.read(length)
+                if self.path.startswith(bridge_core.STATUS_PATH):  # (the bridge's own thread)
+                    body = json.dumps(bridge_core.status_answer(None)).encode("utf-8")
+                else:
+                    tool, args = bridge_core.decode_request(data)
+                    owner.calls.append(tool)
+                    time.sleep(owner.delay)
+                    body = bridge_core.encode_result(bridge_core.result("answered %s" % tool))
                 try:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
@@ -395,6 +399,130 @@ class BusyFission180(unittest.TestCase):
         self.assertEqual(bridge.calls, ["get_timeline", "get_timeline"])
 
 
+class FrozenBridge:
+    """Fission 180 with its window's thread stuck holding all of its Python (a hang inside a
+    graphics driver: even the bridge's own thread cannot answer): requests are taken (the
+    system accepts the connection) and never answered, /status neither. `status_lives`: the
+    bridge's thread still answers /status (Fission 180 alive, only slow: a question waiting for
+    the person); /call then answers after `delay` seconds."""
+
+    def __init__(self, key, status_lives=False, delay=None):
+        self.key = key
+        self.calls = []
+        self.release = threading.Event()
+        owner = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(length)
+                if self.path.startswith(bridge_core.STATUS_PATH):
+                    if not status_lives:
+                        owner.release.wait(30)
+                        return
+                    answer = json.dumps(bridge_core.status_answer(None)).encode("utf-8")
+                else:
+                    tool, _args = bridge_core.decode_request(body)
+                    owner.calls.append(tool)
+                    if delay is None:
+                        owner.release.wait(30)
+                        return
+                    owner.release.wait(delay)
+                    answer = bridge_core.encode_result(bridge_core.result("answered %s" % tool))
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(answer)))
+                    self.end_headers()
+                    self.wfile.write(answer)
+                except OSError:
+                    pass
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.release.set()
+        self.server.shutdown()
+        self.server.server_close()
+
+
+class FrozenFission180(unittest.TestCase):
+    """Luca, 2026-11-23: an AI screenshot froze Fission 180 for good and the AI app only gave
+    up after 15 minutes. A window tool (screenshot, set_view, render: well under a second of
+    work) whose Fission 180 answers nothing at all, not even a status check, is answered within
+    seconds that its window seems stuck; the next call is not even sent while it stays so. A
+    Fission 180 that still answers its status is waited for as before."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.bridge_file = bridge_core.bridge_path(self.tmp.name)
+
+    def bridge(self, **kwargs):
+        key = bridge_core.make_key()
+        bridge = FrozenBridge(key, **kwargs)
+        self.addCleanup(bridge.close)
+        bridge_core.write_bridge_file(self.bridge_file, bridge_core.bridge_info(bridge.port, key))
+        return bridge
+
+    def client(self):
+        # (the waits made short; TIMEOUT stays long: the answer must not come from it)
+        client = fission180_mcp.BridgeClient(self.bridge_file, timeout=60, retry_wait=0.01)
+        client.watch_every = 0.1
+        client.silent_after = 0.8
+        client.status_timeout = 0.2
+        return client
+
+    def test_a_stuck_window_call_is_answered_within_seconds(self):
+        bridge = self.bridge()
+        client = self.client()
+        began = time.monotonic()
+        answer = client.call_tool("screenshot", {"view": "iso"})
+        took = time.monotonic() - began
+        self.assertLess(took, 5.0, answer)
+        self.assertTrue(answer["is_error"])
+        self.assertIn("Fission 180 is not responding", answer["text"])
+        self.assertIn("screenshot gave no answer", answer["text"])
+        self.assertIn("closed and started again", answer["text"])
+        self.assertEqual(bridge.calls, ["screenshot"])  # (sent once, not asked again)
+        # the next call is not sent while Fission 180 still answers nothing
+        began = time.monotonic()
+        answer = client.call_tool("get_design", {})
+        self.assertLess(time.monotonic() - began, 5.0, answer)
+        self.assertTrue(answer["is_error"])
+        self.assertIn("get_design was not sent to it, so nothing was changed", answer["text"])
+        self.assertEqual(bridge.calls, ["screenshot"])
+
+    def test_a_living_fission180_is_waited_for(self):
+        bridge = self.bridge(status_lives=True, delay=1.5)  # (longer than silent_after)
+        answer = self.client().call_tool("screenshot", {})
+        self.assertFalse(answer["is_error"], answer)
+        self.assertEqual(answer["text"], "answered screenshot")
+        self.assertEqual(bridge.calls, ["screenshot"])
+
+    def test_other_tools_wait_as_before(self):
+        bridge = self.bridge(status_lives=True, delay=1.0)
+        answer = self.client().call_tool("get_design", {})
+        self.assertEqual(answer["text"], "answered get_design")
+        self.assertEqual(bridge.calls, ["get_design"])
+
+    def test_after_a_time_out_with_no_status_the_next_call_looks_first(self):
+        bridge = self.bridge()
+        client = self.client()
+        client.timeout = 0.5  # (a long non-window call that got no answer)
+        answer = client.call_tool("get_timeline", {})
+        self.assertIn("not asked again", answer["text"])
+        answer = client.call_tool("get_design", {})
+        self.assertIn("get_design was not sent to it", answer["text"])
+        self.assertEqual(bridge.calls, ["get_timeline"])
+
+
 class BusyTexts(unittest.TestCase):
     def test_durations(self):
         self.assertEqual(bridge_core.duration_words(4.4), "4 s")
@@ -409,6 +537,18 @@ class BusyTexts(unittest.TestCase):
         self.assertIn("busy with describe_reference for 2 min 10 s", text)
         self.assertIn("it is not run later either", text)
         self.assertIn("Fission 180 was busy, so", bridge_core.dropped_text("save", "", 0))
+
+    def test_stuck_texts(self):
+        text = bridge_core.stuck_text("screenshot", "taking the picture of the 3D view", 15.2)
+        self.assertIn("window got stuck in screenshot (taking the picture of the 3D view", text)
+        self.assertIn("for 15 s", text)
+        self.assertIn("nothing in the design was changed", text)
+        self.assertIn("Do not keep asking", text)
+        text = bridge_core.stuck_busy_text("get_design", "screenshot", 75)
+        self.assertIn("stuck in screenshot (for 1 min 15 s), so get_design was not run", text)
+        self.assertIn("1 min 15 s", bridge_core.frozen_text("render", 75))
+        self.assertIn("not sent", bridge_core.frozen_text("extrude", 3, sent=False))
+        self.assertEqual(bridge_core.WINDOW_TOOLS, ("screenshot", "set_view", "render"))
 
 
 class BridgeFileLocation(unittest.TestCase):

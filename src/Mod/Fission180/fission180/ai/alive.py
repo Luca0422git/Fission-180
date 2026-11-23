@@ -21,6 +21,12 @@ at most every progress.PUMP_EVERY seconds, pump() lets the window live for a mom
         own pump, the chat panel's, the browser's and timeline's polls, Coin's sensors) is
         dropped, and Qt sends it again at its next interval: postponed, never lost. Widget
         and window timers (a blinking cursor, Qt's own repaint requests) run;
+      - except inside an event loop the call's own code opened (deeper than the loop the call
+        began in): there every timer runs. Such a loop waits for a timer of its own and ends
+        only when it fires: FreeCAD's Fit All with navigation animations on (FreeCAD's
+        default) waits ten times for a 20 ms QTimer (View3DInventorViewer::animatedViewAll),
+        a camera move that waits for its animation likewise. Held back, the loop never ended:
+        an AI screenshot froze Fission 180 for good (Luca, 2026-11-23);
       - a zero-delay QTimer.singleShot(0, fn) started from Python during a call becomes a
         1 ms timer (_defer_zero), so Fission 180's deferred follow-ups also wait for the end of
         the call instead of running in the middle of it;
@@ -63,6 +69,7 @@ _state = {
     "cursor": False,  # the busy cursor is ours to take back
     "refused_at": 0.0,  # when a click outside Stop was last dropped
     "stats": None,  # per call: paints, timers held, inputs dropped, pumps (tests read it)
+    "level": None,  # the window thread's event loop level when the call began
 }
 
 _INPUT = None  # the event types that are a person's input (made on first use)
@@ -106,14 +113,35 @@ def _input_types():
 
 
 def _new_stats():
-    return {"paints": 0, "timers_held": 0, "inputs_dropped": 0, "presses_dropped": 0,
-            "closes_refused": 0, "pumps": 0, "shown": False, "lines": []}  # fmt: skip
+    return {"paints": 0, "timers_held": 0, "timers_nested": 0, "inputs_dropped": 0,
+            "presses_dropped": 0, "closes_refused": 0, "pumps": 0, "shown": False,
+            "lines": []}  # fmt: skip
 
 
 def stats():
-    """What the last (or current) call's pumps did: {paints, timers_held, inputs_dropped,
-    presses_dropped, closes_refused, pumps, shown, lines} (tests)."""
+    """What the last (or current) call's pumps did: {paints, timers_held, timers_nested
+    (timers let run inside a loop the call opened), inputs_dropped, presses_dropped,
+    closes_refused, pumps, shown, lines} (tests)."""
     return dict(_state["stats"] or _new_stats())
+
+
+def _loop_level():
+    """How many event loops the window's thread is inside now (QThread::loopLevel: a nested
+    QEventLoop.exec adds one; processEvents does not), or None when Qt cannot tell."""
+    try:
+        return QtCore.QThread.currentThread().loopLevel()
+    except Exception:
+        return None
+
+
+def _nested_loop():
+    """True inside an event loop opened after the call began, by the call's own code (FreeCAD's
+    animated Fit All, a camera animation it waits for): its timers must run (module docstring)."""
+    base = _state["level"]
+    if base is None:
+        return False
+    level = _loop_level()
+    return level is not None and level > base
 
 
 # -- the filter ----------------------------------------------------------------------------------
@@ -204,6 +232,9 @@ def _decide(obj, event):
     E = QtCore.QEvent
     if kind == E.Timer:
         if isinstance(obj, (QtWidgets.QWidget, QtGui.QWindow)):
+            return False
+        if _nested_loop():  # (a loop the call opened ends only when its timer fires)
+            stats["timers_nested"] += 1
             return False
         stats["timers_held"] += 1
         return True
@@ -452,6 +483,7 @@ def _event(kind, call):
         _state["call"] = call
         _state["stats"] = _new_stats()
         _state["refused_at"] = 0.0
+        _state["level"] = _loop_level()
         if _state["filter"] is None:
             _state["filter"] = _Filter()
         QtWidgets.QApplication.instance().installEventFilter(_state["filter"])
@@ -462,6 +494,7 @@ def _event(kind, call):
             pass
         _hide_line()
         _state["call"] = None
+        _state["level"] = None
         stats = _state["stats"]
         if stats is not None and (stats["presses_dropped"] or stats["closes_refused"]):
             log(

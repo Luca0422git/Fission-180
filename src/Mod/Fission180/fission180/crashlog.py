@@ -102,6 +102,7 @@ def end():
             return
         _state["ended"] = True
         try:
+            faulthandler.cancel_dump_traceback_later()  # (watch: not into a closed file)
             faulthandler.disable()
         except Exception:
             pass
@@ -126,6 +127,42 @@ def _write(text):
         return
     handle.write(text)
     handle.flush()
+
+
+def note(text, stacks=False):
+    """`text` in the crash log ("[Fission 180] ...") and in the recent messages, and with
+    stacks=True the stack of every thread: for what goes wrong while the window's thread is
+    stuck (the AI bridge's thread calls it; FreeCAD's Report view must not be written from
+    there). Any thread. Never raises."""
+    try:
+        _remember("ERROR", text)
+        _write("[%s] [Fission 180] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), text))
+        handle = _state["file"]
+        if stacks and handle is not None:
+            faulthandler.dump_traceback(file=handle, all_threads=True)
+            _write("\n")
+    except Exception:
+        pass
+
+
+def watch(seconds):
+    """Arms (seconds) or cancels (None) a dump of every thread's stack into the crash log
+    `seconds` from now, unless cancelled before (one at a time). Python's faulthandler writes
+    it from a thread of its own, so it works even when the window's thread hangs inside FreeCAD,
+    Qt or a graphics driver while holding Python's lock, when no Python code can run (the AI
+    bridge's window work, progress.window_work). Any thread. Never raises; False when there is
+    no crash log."""
+    try:
+        if seconds is None:
+            faulthandler.cancel_dump_traceback_later()
+            return True
+        handle = _state["file"]
+        if handle is None:
+            return False
+        faulthandler.dump_traceback_later(float(seconds), repeat=False, file=handle, exit=False)
+        return True
+    except Exception:
+        return False
 
 
 def _excepthook(exc_type, exc_value, exc_tb):

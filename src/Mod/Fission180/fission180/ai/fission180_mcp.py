@@ -57,6 +57,15 @@ TIMEOUT = 120.0  # seconds; one design step can take a while to compute
 PROGRESS_FIRST = 1.0
 PROGRESS_EVERY = 2.0
 STATUS_TIMEOUT = 3.0  # seconds for /status and /stop (answered on the bridge's own thread)
+# (Luca, 2026-11-23: an AI screenshot froze Fission 180 for good and the AI app gave up only
+# after 15 minutes) While a window tool (bridge_core.WINDOW_TOOLS: well under a second of work)
+# waits, its answer is watched: /status every WATCH_EVERY seconds. When Fission 180 has answered
+# nothing, not even that, for SILENT_AFTER seconds, its window's thread is stuck holding all of
+# Fission 180's Python (a hang inside a graphics driver does that: the bridge's own thread cannot
+# answer either), and the AI app is told so at once. Once that happened, the next call first
+# looks whether Fission 180 answers again (one /status) before it is sent.
+WATCH_EVERY = 1.0
+SILENT_AFTER = 10.0
 ENV_BRIDGE_FILE = "FISSION180_BRIDGE_FILE"
 RETRIES = 2  # a read-only tool whose reply was lost is asked again this many times
 RETRY_WAIT = 0.5  # seconds before asking again
@@ -159,6 +168,10 @@ class BridgeClient:
         self.timeout = timeout
         self.retries = retries
         self.retry_wait = retry_wait
+        self.watch_every = WATCH_EVERY
+        self.silent_after = SILENT_AFTER
+        self.status_timeout = STATUS_TIMEOUT
+        self.silent_since = None  # time.monotonic() since when Fission 180 answers nothing
         # 127.0.0.1 must never go through a proxy set in the environment (HTTP_PROXY ...)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -242,10 +255,79 @@ class BridgeClient:
                     )
                 return bridge_core.error_result(MAYBE_APPLIED % (lost, name))
 
+    def _silent(self, info):
+        """True when Fission 180 took the /status request but answered nothing within
+        STATUS_TIMEOUT: its Python is stuck. Any answer (an old Fission 180's 404 too) is
+        False, and so is a refused or broken connection (the call itself then says what that
+        means). Never raises."""
+        try:
+            self._post(info, bridge_core.STATUS_PATH, {}, self.status_timeout)
+            return False
+        except urllib.error.HTTPError:
+            return False
+        except (socket.timeout, TimeoutError):
+            return True
+        except urllib.error.URLError as exc:
+            return isinstance(exc.reason, (socket.timeout, TimeoutError))
+        except Exception:
+            return False
+
     def _call(self, name, args, call_id=None):
         info = self._bridge()
         if info is None:
             return bridge_core.error_result(bridge_core.NOT_RUNNING)
+        if self.silent_since is not None:  # (it answered nothing last time: look first)
+            if self._silent(info):
+                seconds = time.monotonic() - self.silent_since
+                log("[Fission 180] MCP: %s not sent: Fission 180 still answers nothing" % name)
+                return bridge_core.error_result(bridge_core.frozen_text(name, seconds, sent=False))
+            self.silent_since = None
+        if name in bridge_core.WINDOW_TOOLS:
+            return self._watched(info, name, args, call_id)
+        return self._send(info, name, args, call_id)
+
+    def _watched(self, info, name, args, call_id):
+        """A window tool's call: sent as any other (on a thread of its own), while this thread
+        looks every watch_every seconds whether Fission 180 still answers at all (/status).
+        Silent for silent_after seconds: the AI app is told now that Fission 180's window is
+        stuck (WATCH_EVERY above), instead of after TIMEOUT. Raises what the call raised."""
+        box = {}
+        done = threading.Event()
+
+        def send():
+            try:
+                box["answer"] = self._send(info, name, args, call_id)
+            except BaseException as exc:  # (handed to the waiting thread, raised there)
+                box["error"] = exc
+            finally:
+                done.set()
+
+        threading.Thread(target=send, name="fission180-mcp-window-call", daemon=True).start()
+        heard = time.monotonic()
+        while not done.wait(self.watch_every):
+            if not self._silent(info):
+                heard = time.monotonic()
+                continue
+            if time.monotonic() - heard >= self.silent_after and not done.is_set():
+                self.silent_since = heard
+                seconds = time.monotonic() - heard
+                log(
+                    "[Fission 180] MCP: %s: Fission 180 has answered nothing for %d s, not even "
+                    "a status check: its window seems stuck; the AI app was told" % (name, seconds)
+                )
+                return bridge_core.error_result(bridge_core.frozen_text(name, seconds))
+        if "error" in box:
+            raise box["error"]
+        return box["answer"]
+
+    def _note_silence(self, info):
+        """A call got no answer in time: when Fission 180 does not even answer /status now,
+        the next call looks first (silent_since) instead of waiting TIMEOUT again."""
+        if self.silent_since is None and self._silent(info):
+            self.silent_since = time.monotonic() - self.timeout
+
+    def _send(self, info, name, args, call_id=None):
+        """The call itself: POST /call, then its answer (_LostReply when it is lost)."""
         request = urllib.request.Request(
             "http://127.0.0.1:%d%s" % (info["port"], bridge_core.CALL_PATH),
             data=bridge_core.encode_request(name, args, call_id),
@@ -271,12 +353,14 @@ class BridgeClient:
             answer["is_error"] = True
             return answer
         except (socket.timeout, TimeoutError):
+            self._note_silence(info)
             raise _LostReply(
                 "no answer within %d seconds; it may still be working" % self.timeout, True
             )
         except urllib.error.URLError as exc:
             reason = exc.reason
             if isinstance(reason, (socket.timeout, TimeoutError)):
+                self._note_silence(info)
                 raise _LostReply("no answer within %d seconds" % self.timeout, True)
             if isinstance(reason, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
                 raise _LostReply("the connection broke")

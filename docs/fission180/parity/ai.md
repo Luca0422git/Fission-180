@@ -1024,7 +1024,7 @@ behaves during its own long computations.
 | A long computation | Fusion's window often goes "Not Responding" during long computes and scripts; its progress window's Cancel does not answer while a script runs | Forum: forums.autodesk.com "When running a Python Script, Fusion goes into Not Responding mode" (2024), "fusion360 progress bar blocking" | the window keeps repainting during a long AI call (at every safe point of the tool's own loops, at most every 0.1 s) |
 | Stop a computation | Esc stops timeline playback; Autodesk staff said Esc-to-stop for Compute All, fillets and some solves was being worked on; a Compute All progress bar exists (missing in one 2023 update) | Forum: "Esc to stop current calculation" (Idea Station, Autodesk replies), "Compute All Progress Bar Not Displaying" (2023) | a working line over the 3D view, "AI: working on compare_to_reference (12 s): comparing faces 1,200 of 3,209", with **Stop** (and on the AI panel's Activity tab); Stop ends the call at its next safe point, its half-made change taken back, and the AI is told "Stopped after 12 s: ... Nothing was changed." |
 | Clicks while busy | Fusion's progress filter (FreeCAD's too, Base::SequencerBar) beeps and drops clicks | FreeCAD src/Gui/ProgressBar.cpp | every click, key and wheel outside Stop is dropped while the call runs; the line says "busy with the AI's call: wait, or press Stop"; closing the window is refused |
-| Timers during a long call | n/a | Guess | postponed until the call is over: autosave and recovery copies, the AI bridge's own queue, the chat panel, the browser and timeline polls never run into a half-made change |
+| Timers during a long call | n/a | Guess | postponed until the call is over: autosave and recovery copies, the AI bridge's own queue, the chat panel, the browser and timeline polls never run into a half-made change; except inside an event loop the call's own code opened (FreeCAD's animated Fit All waits for its timer there: held back, it never ended, 2026-11-23) |
 | MCP progress | an MCP client may send `_meta.progressToken`; the server may send `notifications/progress` (progress growing every time, optional total and message), none after the answer | MCP specification, basic/utilities/progress (2025-03-26 and later) | sent every 2 s while Fission 180 works on a call that asked, with the working line's words |
 | Claude Desktop / Claude Code and long calls | community reports: Claude Desktop cancels stdio tool calls at about 60 s and does not reliably extend the wait on progress notifications; Claude Code's limit is MCP_TOOL_TIMEOUT (progress keepalive also reported unreliable); the TypeScript SDK changed resetTimeoutOnProgress's default to true | Forum: github.com/anthropics/claude-code issues 22542, 58687, 63379, 65643 (2026, read through search excerpts; not verified on a real install) | the call the AI app cancels (`notifications/cancelled`) is stopped in Fission 180 when it only reads; a change is left to finish (its result is there when the AI looks; stopping it would make the AI do it all again); no answer is sent for a cancelled call (MCP) |
 
@@ -1047,3 +1047,32 @@ and Stop are not ribbon commands. Proofs: scenario `ai_speed_alive` (through the
 server and bridge), headless `speed_checks` (in runner.py), the benchmark
 `Fission180Tests/headless/ai_speed_bench.py` (`run_tests.sh --only speed`), unit
 `test_ai_progress`, `test_ai_mcp_progress`, `test_ai_geometry_index`.
+
+### A screenshot froze Fission 180 for good (2026-11-23)
+
+Luca (Windows): "an AI agent taking a screenshot crashes the program silently. It freezes and
+doesn't report a crash. And the only way the agent knows that it crashed is after waiting 15
+minutes". Not Windows-only: reproduced on Linux once FreeCAD's navigation animations are on
+(FreeCAD's default; every GUI scenario turns them off, so no test met it). Fit All with
+animations waits in an event loop of its own for a 20 ms QTimer, ten times
+(`View3DInventorViewer::animatedViewAll`); during an AI call alive.py's filter held back every
+timer of a non-widget object, so that loop never ended: the window's thread stayed in
+`view.fitAll()` (screenshot, set_view, render's window picture, show_study_results), every
+click was dropped, the bridge answered "still working" after 115 s and "busy" after that,
+and the AI app was told to wait.
+
+- `alive.py`: inside an event loop the call's own code opened (deeper than the loop the call
+  began in, `QThread.loopLevel`), timers run; elsewhere they still wait.
+- `view_actions.still_camera` (screenshot, set_view, render's window picture, the study results'
+  view): the camera moves at once (animations off for that view, then as they were), so the
+  picture shows the view asked for, not a camera still on its way.
+- Answered within seconds whatever happens: that work is marked (`progress.window_work`); stuck
+  there for `progress.WINDOW_LIMIT` (15 s), the bridge answers the AI app at once that the
+  window got stuck, and every call after it while it stays so; the crash log gets the line and
+  every thread's stack, the recent messages and (once the window answers) the Report view the
+  line. A hang that holds all of Fission 180's Python (inside a graphics driver) is seen by the
+  MCP server: no answer even to `/status` for 10 s while a window tool waits, the AI app is told
+  that Fission 180 is not responding, and the next call is not sent while it stays so;
+  `crashlog.watch` (faulthandler) still writes where the window's thread hangs.
+- Tests: scenario `ai_screenshot_alive` (animations on, through the bridge), unit
+  `FrozenFission180` / `BusyTexts` (test_ai_mcp_server), `WindowWork` (test_ai_progress).
