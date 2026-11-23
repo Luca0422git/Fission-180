@@ -13,7 +13,9 @@ Where the events arrive (Qt 6):
 * A pinch is a zoom gesture (QNativeGestureEvent: macOS, Wayland, X11 with XInput 2.4) on
   the drawing area; on a Windows precision touchpad it is Ctrl + wheel.
 
-Pan: the camera moves sideways like Navigation bar > Pan does (navigate_ui.pan_by). Zoom:
+Pan: the camera moves sideways like Navigation bar > Pan does (navigate_ui.pan_by). With Shift
+held, two fingers orbit instead, as Shift + middle-drag does (orbit_ui.drag_camera; Luca,
+2026-11-23: "if im panning with two fingers and i press shift, i should start rotating"). Zoom:
 FreeCAD gets a wheel event of the right size at the pointer, so it is FreeCAD's own zoom at
 the cursor (orthographic and perspective alike).
 
@@ -36,7 +38,7 @@ KEY = "Touchpad"
 VIEW_PARAMS = "User parameter:BaseApp/Preferences/View"
 VIEWER = "Gui::View3DInventorViewer"
 
-_state = {"filter": None, "widgets": [], "area": None, "on": False}
+_state = {"filter": None, "area": None, "on": False}
 
 
 def mode():
@@ -146,8 +148,9 @@ class _Filter(QtCore.QObject):
         )
         kind = self.stream.judge(seen, time.monotonic())
         ctrl = bool(event.modifiers() & QtCore.Qt.ControlModifier)
+        shift = bool(event.modifiers() & QtCore.Qt.ShiftModifier)
         buttons = event.buttons() != QtCore.Qt.NoButton
-        what = core.action(chosen, seen, kind, ctrl=ctrl, buttons=buttons)
+        what = core.action(chosen, seen, kind, ctrl=ctrl, buttons=buttons, shift=shift)
         if what == core.PASS:
             return False
         view, gl, viewer = _parts(obj)
@@ -157,12 +160,19 @@ class _Filter(QtCore.QObject):
             "scroll %s (angle %d, %d; pixels %d, %d; phase %d)"
             % (what, angle.x(), angle.y(), pixel.x(), pixel.y(), _phase(event))
         )
-        if what == core.PAN:
+        if what in (core.PAN, core.ORBIT):
             dx, dy = core.pan_pixels((pixel.x(), pixel.y()), (angle.x(), angle.y()), sys.platform)
-            if dx or dy:
+            if (dx or dy) and what == core.PAN:
                 from . import navigate_ui
 
                 navigate_ui.pan_by(view, gl, dx, dy)
+            elif dx or dy:
+                # Shift + two fingers: the orbit of Shift + middle-drag (the Orbit type and the
+                # pivot as set), as much per pixel as FreeCAD's own mouse orbit
+                from . import orbit, orbit_ui
+
+                deg_x, deg_y = orbit.degrees_per_pixel(gl.width(), gl.height(), orbit_ui._sensitivity())
+                orbit_ui.drag_camera(view, dx, dy, deg_x, deg_y)
         else:
             step, _invert = _zoom_settings()
             self._zoom(viewer, event.globalPosition(), core.ctrl_wheel_log(angle.y(), step))
@@ -243,23 +253,13 @@ def _finger_count(event):
 # -- turning it on and off ------------------------------------------------------------------
 
 
-def _install():
-    if _state["filter"] is None:
-        return
-    from .orbit_ui import _is_valid, _same, _view_widgets
+PROPERTY = "fission180Touchpad"  # (view_hooks: which filter is on a view's widget)
 
-    try:
-        widgets = _view_widgets()
-    except RuntimeError:
-        return
-    _state["widgets"] = [w for w in _state["widgets"] if _is_valid(w)]  # closed views go
-    for widget in widgets:
-        try:
-            if not any(_same(widget, w) for w in _state["widgets"]):
-                widget.installEventFilter(_state["filter"])
-                _state["widgets"].append(widget)
-        except RuntimeError:
-            pass  # the view of a design being closed
+
+def _install():
+    from . import view_hooks
+
+    view_hooks.install(_state["filter"], PROPERTY)
 
 
 def _installed_soon():
@@ -296,19 +296,22 @@ def _mdi_area():
 
 def disable():
     """Fission 180's interface turned off: FreeCAD's own wheel handling everywhere."""
-    from .orbit_ui import _is_valid
+    from . import view_hooks
 
     _state["on"] = False
     filt, _state["filter"] = _state["filter"], None
-    for widget in _state["widgets"]:
-        try:
-            if filt is not None and _is_valid(widget):
-                widget.removeEventFilter(filt)
-        except RuntimeError:
-            pass
-    _state["widgets"] = []
+    view_hooks.remove(filt, PROPERTY)
 
 
 def watched():
-    """How many widgets the filter is on (tests)."""
-    return len(_state["widgets"])
+    """How many widgets of the open views the filter is on (tests)."""
+    from . import view_hooks
+
+    return view_hooks.count(_state["filter"], PROPERTY)
+
+
+def watching(widget):
+    """Whether the filter is on `widget` (tests)."""
+    from . import view_hooks
+
+    return view_hooks.on(widget, _state["filter"], PROPERTY)

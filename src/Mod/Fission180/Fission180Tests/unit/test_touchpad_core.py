@@ -102,6 +102,16 @@ class Action(unittest.TestCase):
         self.assertEqual(core.action("auto", core.FINE, core.WHEEL), core.PASS)
         self.assertEqual(core.action("auto", core.WHEEL, core.TOUCHPAD), core.PAN)
 
+    def test_shift_two_finger_scroll_orbits(self):
+        # Luca (2026-11-23): "if im panning with two fingers and i press shift, i should start
+        # rotating, kinda like using a mouse middle click and pressing shift"
+        self.assertEqual(core.action("auto", core.TOUCHPAD, core.TOUCHPAD, shift=True), core.ORBIT)
+        self.assertEqual(core.action("on", core.WHEEL, core.WHEEL, shift=True), core.ORBIT)
+        # a pinch on Windows (Ctrl + scroll) stays a zoom; a mouse wheel stays FreeCAD's
+        self.assertEqual(core.action("auto", core.TOUCHPAD, core.TOUCHPAD, ctrl=True, shift=True), core.ZOOM)
+        self.assertEqual(core.action("auto", core.WHEEL, core.WHEEL, shift=True), core.PASS)
+        self.assertEqual(core.action("off", core.TOUCHPAD, core.TOUCHPAD, shift=True), core.PASS)
+
     def test_pinch_as_ctrl_wheel(self):
         self.assertEqual(core.action("auto", core.TOUCHPAD, core.TOUCHPAD, ctrl=True), core.ZOOM)
         # Ctrl + a mouse wheel: FreeCAD's wheel zoom as before

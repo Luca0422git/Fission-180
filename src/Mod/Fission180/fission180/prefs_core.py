@@ -293,8 +293,8 @@ OPTIONS = [
         (PREFS, "String", "Touchpad"),
         group="Navigation",
         choices=[(value, label, True, "") for value, label in _touchpad.CHOICES],
-        tip="Auto: on a laptop's touchpad, two fingers dragged pan the view and a pinch zooms "
-        "about the pointer; a mouse wheel still zooms. Off: scrolling zooms, as with a mouse "
+        tip="Auto: on a laptop's touchpad, two fingers dragged pan the view (with Shift held "
+        "they orbit it) and a pinch zooms about the pointer; a mouse wheel still zooms. Off: scrolling zooms, as with a mouse "
         "wheel (pick it if your mouse's wheel ever pans). On: scrolling always pans and a "
         "pinch or Ctrl + scroll zooms (for a touchpad Auto does not recognise; a mouse wheel "
         "then pans too).",

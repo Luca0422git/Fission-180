@@ -50,7 +50,7 @@ FINE_STEPS = (15, 20, 24)
 STREAM_GAP = 0.3  # seconds without an event that end one scroll
 
 TOUCHPAD, WHEEL, FINE, NOTHING = "touchpad", "wheel", "fine", "nothing"
-PAN, ZOOM, PASS = "pan", "zoom", "pass"
+PAN, ZOOM, PASS, ORBIT = "pan", "zoom", "pass", "orbit"
 
 # Widget pixels one notch (120 units) moves the model when the system gives no pixels.
 # Windows: a precision touchpad's units are scaled like a wheel's, which scrolls 3 lines
@@ -112,17 +112,20 @@ class Stream:
         self.last = None
 
 
-def action(mode, seen, kind, ctrl=False, buttons=False):
-    """What to do with a wheel event: PAN, ZOOM (a pinch: Ctrl + touchpad scroll, Windows) or
-    PASS (FreeCAD's own handling: the wheel zooms). seen: look() of the event; kind: the
-    scroll's (Stream.judge); ctrl: Ctrl held; buttons: a mouse button held (a middle-drag pan
-    with a tilted wheel: left to FreeCAD, as before)."""
+def action(mode, seen, kind, ctrl=False, buttons=False, shift=False):
+    """What to do with a wheel event: PAN, ORBIT (Shift held: as Shift + middle-drag; Luca,
+    2026-11-23), ZOOM (a pinch: Ctrl + touchpad scroll, Windows) or PASS (FreeCAD's own
+    handling: the wheel zooms). seen: look() of the event; kind: the scroll's (Stream.judge);
+    ctrl / shift: held; buttons: a mouse button held (a middle-drag pan with a tilted wheel:
+    left to FreeCAD, as before)."""
     mode = normalise_mode(mode)
     if mode == OFF or buttons or seen == NOTHING:
         return PASS
     if mode == AUTO and kind != TOUCHPAD:
         return PASS
-    return ZOOM if ctrl else PAN
+    if ctrl:
+        return ZOOM
+    return ORBIT if shift else PAN
 
 
 def pixels_per_notch(platform):
