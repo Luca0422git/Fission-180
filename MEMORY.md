@@ -1304,6 +1304,25 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
 
 ## Known issues / findings
 
+- **Fixed in 0.1.0-beta.4.1.1: an AI app's screenshot froze Fission 180 for good** (Luca,
+  2026-11-23: "on Windows, using ai will crash Fission ... an AI agent taking a screenshot
+  crashes the program silently ... after waiting 15 minutes"). Not Windows-only (found by a
+  worktree agent, verified here): during an AI call `ai/alive.py`'s app filter dropped every
+  timer event aimed at a non-widget; `view.fitAll()` with FreeCAD's navigation animations on
+  (FreeCAD's default; the GUI harness turns them off, harness.py ~2032, which is why no test
+  saw it) waits in a nested event loop for a 20 ms QTimer ten times
+  (View3DInventorViewer::animatedViewAll) -> never ended. Also hit set_view, render's window
+  picture, show_study_results. The "15 minutes" was the agent: the bridge answered after
+  bridge.WAIT (115 s) "still working", then "Not done: still working" to every retry. Fix
+  (cherry-picked as b1619949): timers run inside a loop deeper than the call's start
+  (QThread.loopLevel); `view_actions.still_camera` turns animations off around camera moves
+  (pictures of the finished view); `progress.window_work` + bridge answer a stuck window in
+  15 s ("Fission 180's window got stuck ... restart") and refuse later calls; crashlog.watch
+  dumps every thread's stack after ~17 s of a total Python stall; the MCP connector checks
+  Fission 180's status every second during picture calls (10 s silence -> "not responding").
+  Scenario `ai_screenshot_alive` (animations ON, real bridge) failed on the old code (each
+  call stuck until released at 25 s). Open: the chat panel keeps its own 180 s wait.
+
 - **Fixed in 0.1.0-beta.4.1.1: the wheel did not zoom over a strip on the right of the 3D view**
   (Luca, 2026-11-23, screenshot: from the ViewCube down to the bottom, both looks). FreeCAD's
   right overlay (OverlayRight, the Tasks panel, Width 382 from start_in) floats over the view
@@ -2559,7 +2578,8 @@ sampler (main thread's Python stack frozen 2 s) showed `home_ui._collect` -> isd
 Then (2026-11-23) Luca: the wheel does not zoom over a strip on the right of the 3D view: the
 empty Tasks overlay took it (Known issues); fixed into the same 0.1.0-beta.4.1.1. And: on
 Windows an AI agent's screenshot freezes Fission 180 silently until the agent's 15-minute
-timeout: investigated by a separate agent in a worktree (see its entry when merged).
+timeout: found by a separate agent in a worktree (Known issues: alive.py held FreeCAD's
+animated Fit All timer back), merged as b1619949 and checked here (fails on the old code).
 
 ### Session log: Neon Lights CI and release 0.1.0-beta.4.1.0 (`develop`, 2026-11-21 night)
 

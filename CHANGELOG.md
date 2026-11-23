@@ -29,6 +29,16 @@ releases published under the old name (their tags are `sciforge-v...`).
   only the dialog itself takes it: below the dialog the wheel zooms and a click picks in the
   3D view, as in Fusion.
 
+- **An AI app's screenshot no longer freezes Fission 180.** When an AI app connected to
+  Fission 180 (Claude through the AI connector) asked for a picture of the design, Fission 180
+  could freeze for good, show no error, and leave the AI app waiting until it gave up. While an
+  AI call runs, Fission 180 holds back its own background timers to keep the window steady,
+  but the 3D view's animated "Fit All" waits for one of those timers, so it waited forever.
+  Timers now run inside such a wait, the camera moves at once for a picture (so the picture
+  shows the finished view), and if the window ever gets stuck during an AI call anyway, the
+  AI app is told within seconds that Fission 180 needs to be restarted, and the crash log
+  records where it was stuck.
+
 ## 0.1.0-beta.4.1.0
 
 ### New
