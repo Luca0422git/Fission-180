@@ -760,6 +760,62 @@ def _empty_panel_off():
         warn("interface: the Tasks panel: %s" % exc)
 
 
+def _in_overlay(widget):
+    parent = widget.parentWidget()
+    while parent is not None:
+        if parent.metaObject().className() in ("Gui::OverlayTabWidget", "Gui::OverlaySplitter"):
+            return True
+        parent = parent.parentWidget()
+    return False
+
+
+class _OverlayTitleWatcher(QtCore.QObject):
+    """Flattens FreeCAD's overlay title bars: the ones there now and the ones FreeCAD makes
+    later inside a watched overlay or panel (they are made as children of those)."""
+
+    def __init__(self):
+        super().__init__()
+        self.flat = []  # (title bar, its old maximum height)
+        self.watched = []
+
+    def watch(self, widget):
+        if widget not in self.watched:
+            widget.installEventFilter(self)
+            self.watched.append(widget)
+
+    def flatten(self, widget):
+        """Only title bars over the 3D view: docked panels (the BROWSER) keep theirs."""
+        if _in_overlay(widget) and all(w is not widget for w, _ in self.flat):
+            self.flat.append((widget, widget.maximumHeight()))
+            widget.setMaximumHeight(0)
+
+    def eventFilter(self, obj, event):
+        try:
+            if event.type() in (QtCore.QEvent.ChildAdded, QtCore.QEvent.ChildPolished):
+                child = event.child()
+                if (
+                    isinstance(child, QtWidgets.QWidget)
+                    and child.metaObject().className() == "Gui::OverlayTitleBar"
+                ):
+                    self.flatten(child)
+        except Exception as exc:
+            warn("interface: %s" % exc)
+        return False
+
+    def release(self):
+        for widget in self.watched:
+            try:
+                widget.removeEventFilter(self)
+            except RuntimeError:
+                pass
+        for widget, height in self.flat:
+            try:
+                widget.setMaximumHeight(height)
+            except RuntimeError:
+                pass
+        self.watched, self.flat = [], []
+
+
 def _safely(step):
     try:
         step()
