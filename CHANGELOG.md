@@ -8,6 +8,31 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.2.1
+
+### New
+
+- **Shift + two fingers on a touchpad orbits the view.** Panning with two fingers and pressing
+  Shift turns the view instead, as Shift + middle-drag does with a mouse; let go of Shift and
+  the fingers pan again.
+
+### Fixed
+
+- **Pinching on a touchscreen zoomed the wrong way.** Fingers apart now zoom in and fingers
+  together zoom out, as much as the fingers' distance changes.
+- **Panning with two fingers on a touchscreen no longer shakes the view.** The fingers'
+  distance changes a little while they move together, and each little change zoomed in or
+  out. A pinch now starts only when the fingers clearly move apart or together, and small
+  wobbles after that are ignored.
+- **A sketch's redundant constraints were named with the wrong numbers.** The timeline (and
+  the AI tools) passed on FreeCAD's own message, which counts constraints from 1, while the
+  constraint list counts from 0: deleting the constraints it named removed a needed one and
+  kept the redundant one. The message now names them in words and with the list's numbers,
+  for example "It has a redundant constraint: the Coincident between Line 1 and Arc 1
+  (constraint 3)", for conflicting and broken constraints too. In an open sketch, a click on
+  the Sketch Palette's "Redundant constraints" or "Conflicting constraints" note shows which
+  ones, highlighted in the sketch.
+
 ## 0.1.0-beta.4.2.0
 
 ### New

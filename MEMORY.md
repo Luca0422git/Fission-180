@@ -1321,8 +1321,16 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   Navigation > Touchscreen On/Off. Scenario `touch_screen` (QTest.createTouchDevice +
   touchEvent sequences). Not tried on a real screen yet (Luca checks it). Found on the way:
   a new design's subWindowActivated comes before its QOpenGLWidget exists, so install on the
-  next event-loop turn; **touchpad_ui has that flaw too** (its widgets were deleted ones after
-  a new design in a probe; navigation_touchpad still passes): not changed, to check.
+  next event-loop turn; touchpad_ui seemed to have that flaw too. **Corrected 2026-11-23
+  (0.1.0-beta.4.2.1): no timing flaw; a bookkeeping one.** touchpad_ui's filter IS on a new
+  design's drawing area and viewer at once (script, Ctrl+N, reopened file: scenario
+  `touchpad_new_design`); what looked "deleted" were the Python objects of those live widgets:
+  PySide soon calls the wrapper that `findChildren` gave "deleted" (shiboken6.isValid False)
+  while the widget lives on, so a list of wrappers lies. touch_ui and touchpad_ui now keep
+  track on the widgets themselves (`view_hooks.py`: a dynamic property naming the filter;
+  turning off looks at the views open now; `watching(widget)`). orbit_ui, selection_ui and
+  marking_menu still keep wrapper lists (same lie; harmless there so far: their filters stay
+  as long as Fission 180's interface is on).
   The final review (fresh reviewer, real FreeCAD probes) found and we fixed before release:
   a touch starting on a child of the drawing area (ViewCube, a sketch's green check) is left to
   Qt's own mouse emulation (the drawing area took it and clicked the model behind the cube);
@@ -1332,6 +1340,13 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   lost end releases a mouse-like drag (no button left held); one finger orbits at FreeCAD's
   own mouse rate for the view size (orbit.degrees_per_pixel, was the ViewCube's 0.8 deg/px:
   2-4x too fast); a pinch needs > 4 % and > 8 px (a two-finger tap close together zoomed).
+  **Luca on his real touchscreen (2026-11-23), fixed in 0.1.0-beta.4.2.1:** the pinch zoomed
+  the wrong way (touch_core's zoom log is how much the MODEL grows, touchpad_core.zoom_units
+  takes how much the VIEW grows: touch_ui now negates it; the scenario checks the model's size
+  on screen), and two-finger pans shook (the fingers' distance wobbles: pinch now starts at
+  > 8 % and > 24 px, then a back-and-forth under JITTER_PX 6 px is ignored, the zoom follows
+  6 px behind). Zoom is 1:1 with the fingers' distance; if Luca still finds it too
+  sensitive, scale the log in touch_ui._zoom.
   Deferred minors (not fixed): the long-press timer keeps ticking after a long press opened
   the menu (the popup takes the rest of the touch); in a command a second finger landing after
   the first moved 8 px makes a mouse drag, not a pan; FreeCAD's GestureOverride events still
@@ -2601,6 +2616,23 @@ Plan `docs/fission180/plan-beta3.md`; briefs `docs/fission180/dev/briefs/beta3-*
   default; Ruled's default type. Each guess is marked G in the parity docs.
 
 ## Session log
+
+### Session log: constraint numbers, touchpad Shift orbit, touchscreen zoom: 0.1.0-beta.4.2.1 (`develop`, 2026-11-23)
+
+A bug report Luca passed on (from an AI session on his sketch): the timeline said "Remove the
+following redundant constraints:59\n, 60" while get_sketch said [58, 59]; 60 was a needed
+Coincident. FreeCAD's SketchObject::execute builds that text from its 1-based lists
+(`appendConstraintsMsg`, also the stray newline); timeline_ops.problem() explained only
+conflicts and passed the rest through. Fixed (`timeline_ops.sketch_failure`, numbers from 0
+plus words; the palette note clickable: highlight). Not done, needs a repro: the report's
+redundant constraints were added automatically (drawing/trim/fillet next to an endpoint
+tangent): skip an auto-constraint already implied, or FreeCAD's auto-remove-redundants.
+Also from Luca: "get that touchpad timing flaw fixed" (it was bookkeeping, see Known issues),
+"get the measure tool fix going" (worktree agent: dots a fixed size on screen, darker, text
+readable), and from his touchscreen: zoom reversed, two-finger pan shakes, and "on the
+trackpad, if im panning with two fingers and i press shift, i should start rotating"
+(touchpad_core.ORBIT: Shift + two-finger scroll -> orbit_ui.drag_camera at the mouse's rate;
+Ctrl still zooms; a mouse wheel stays FreeCAD's).
 
 ### Session log: offline NAS freezes, wheel strip, AI screenshot, touchscreen: 0.1.0-beta.4.2.0 (`develop`, 2026-11-22/23)
 
