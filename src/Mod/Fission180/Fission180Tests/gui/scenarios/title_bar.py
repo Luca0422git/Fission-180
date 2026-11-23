@@ -106,6 +106,16 @@ def a_own():
         all(b.parentWidget().parentWidget() is profile.parentWidget() for b in found),
     )
     h.shot("own-title-bar")
+    close = found[-1]
+    h.pointer_to(close, close.rect().center())
+    QtTest.QTest.mouseMove(close, close.rect().center())
+    QtWidgets.QApplication.processEvents()
+    corner = close.grab().toImage().pixelColor(2, 2)
+    h.check(
+        "close turns red under the mouse",
+        corner.red() > 200 and corner.green() < 60 and corner.blue() < 70,
+        corner.name(),
+    )
     edges = sorted(g.property("fission180Edge") for g in visible_grips())
     h.check("eight grips line the edges", len(edges) == 8, edges)
     right = [g for g in visible_grips() if g.property("fission180Edge") == "right"]

@@ -121,6 +121,29 @@ def _glyph(kind, colour, size=16, ratio=2.0):
     return QtGui.QIcon(px)
 
 
+CLOSE_RED = (232, 17, 35)  # Windows' red behind close while the mouse is on it
+
+
+class _CloseButton(QtWidgets.QToolButton):
+    """Close: red with a white cross while the mouse is on it (painted here, not by a style
+    sheet: Dark and Light stay exactly as they were, theme_identity)."""
+
+    def paintEvent(self, event):
+        try:
+            if self.isEnabled() and self.underMouse():
+                p = QtGui.QPainter(self)
+                p.fillRect(self.rect(), QtGui.QColor(*CLOSE_RED))
+                size = self.iconSize()
+                x = (self.width() - size.width()) // 2
+                y = (self.height() - size.height()) // 2
+                _glyph("close", QtGui.QColor(255, 255, 255)).paint(p, x, y, size.width(), size.height())
+                p.end()
+                return
+        except Exception as exc:
+            warn("title bar: %s" % exc)
+        super().paintEvent(event)
+
+
 class WindowButtons(QtWidgets.QWidget):
     """Minimize, maximize / restore and close, for the end of the top row."""
 
@@ -136,7 +159,7 @@ class WindowButtons(QtWidgets.QWidget):
             ("Maximize", "Maximize", lambda: _toggle_maximize(_main())),
             ("Close", "Close", lambda: _close(_main())),
         ):
-            b = QtWidgets.QToolButton(self)
+            b = (_CloseButton if name == "Close" else QtWidgets.QToolButton)(self)
             b.setObjectName("Fission180Window" + name)
             b.setAutoRaise(True)
             b.setToolTip(tip)
@@ -146,10 +169,6 @@ class WindowButtons(QtWidgets.QWidget):
             b.clicked.connect(lambda _=False, f=act: self._run(f))
             row.addWidget(b)
             self.buttons[name] = b
-        # (Windows' red behind close; the look's own colours for the rest)
-        self.setStyleSheet(
-            "QToolButton#Fission180WindowClose:hover { background: #e81123; border: none; }"
-        )
         self.refresh()
 
     def fit(self, reference):
