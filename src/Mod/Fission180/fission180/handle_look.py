@@ -435,6 +435,42 @@ def disc_grab(coin):
     return board
 
 
+def marker_shape(coin, colour, radius, rim=0.0, rim_colour=core.OUTLINE):
+    """A point marker in pixels (Measure's points, snap points; under PixelScale): a flat dot
+    facing the viewer in exactly `colour` (no lighting to turn it pale), with a `rim` px rim
+    of `rim_colour` round it. For an annotation pass without depth test (Coin's SoAnnotation):
+    the rim, then the dot, drawn in that order. Returns (node, the dot's SoBaseColor, whose
+    colour can be changed: lit under the mouse)."""
+    sep = coin.SoSeparator()
+    board = _billboard(coin)
+    light = coin.SoLightModel()
+    light.model = coin.SoLightModel.BASE_COLOR
+    board.addChild(light)
+    if rim > 0:
+        edge = coin.SoBaseColor()
+        edge.rgb.setValue(*rim_colour)
+        board.addChild(edge)
+        board.addChild(_polygon(coin, radius + rim, steps=24))
+    base = coin.SoBaseColor()
+    base.rgb.setValue(*colour)
+    board.addChild(base)
+    board.addChild(_polygon(coin, radius, steps=24))
+    sep.addChild(board)
+    return sep, base
+
+
+def facing_viewer(coin, child):
+    """`child` (a picture drawn at a point: an SoImage) moved by a translation in pixels, x to
+    the right and y up on the screen (under PixelScale). Returns (node, the SoTranslation)."""
+    sep = coin.SoSeparator()
+    board = _billboard(coin)
+    shift = coin.SoTranslation()
+    board.addChild(shift)
+    board.addChild(child)
+    sep.addChild(board)
+    return sep, shift
+
+
 def ball_shape(coin, colour=core.BLUE, hot=core.BLUE_HOT):
     """A blue ball in pixels (a point slid along a path) with the light outline behind it.
     Returns (node, Paint)."""

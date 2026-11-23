@@ -17,8 +17,8 @@ or Esc ends Measure only. It also ends when the sketch is finished."""
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import commands, handles3d, hole_common, log, measure, preview, taskui, ui_icon, warn
-from . import neon_qss_panels, theme, ui_icon_path
+from . import commands, handles3d, hole_common, log, marker_core, measure, preview, taskui
+from . import neon_qss_panels, theme, ui_icon, ui_icon_path, warn
 from .compat import QtCore, QtGui, QtWidgets
 from .neon_scene_core import Live
 
@@ -27,9 +27,14 @@ FILTERS = [
     ("Body", "body", True, ""),
     ("Component", "component", True, "A click picks the whole component it lands on"),
 ]
-LINE = Live((0.98, 0.78, 0.25), "measure")  # the measured distance, drawn over the part
-DOT = Live((0.98, 0.78, 0.25), "measure")
+# The measured distance and its points, drawn over the part: a deep red-orange, the points
+# flat dots of one size on the screen with a light rim (marker_core; Luca 2026-11-20: they
+# were pale yellow balls that grew with the zoom and hid the distance).
+LINE = marker_core.MEASURE
+DOT = marker_core.MEASURE
 SNAP = Live((0.55, 0.85, 0.55), "snap")
+# The dots at both ends of the distance, with their rim: what its label keeps clear of.
+DOT_CLEAR_PX = marker_core.DOT_RADIUS_PX + marker_core.RIM_PX
 GREEDY = 1
 NORMAL = 0
 # Results lists: light text on the dark panel like Fusion's (FreeCAD's task panel drew the
@@ -98,6 +103,11 @@ class _EscCloses(QtCore.QObject):
             QtWidgets.QApplication.instance().removeEventFilter(self)
         except Exception:
             pass
+
+
+def _hex(colour):
+    """#rrggbb of an (r, g, b) in 0..1 (a Live colour: as the look in use has it)."""
+    return "#%02x%02x%02x" % tuple(max(0, min(255, int(round(float(c) * 255)))) for c in colour)
 
 
 def _units(doc):
@@ -387,7 +397,7 @@ class MeasurePanel:
                 for name, value, quantity in measure.properties(e):
                     QtWidgets.QTreeWidgetItem(top, [name, self.text(value, quantity)])
                 if e.kind == "point":
-                    self.overlay.dot(e.point, self._dot_size(), DOT)
+                    self.overlay.marker(e.point, DOT, marker_core.DOT_RADIUS_PX)
             if len(self.entities) == 2:
                 rows, relation = measure.results(self.entities[0], self.entities[1])
                 self.relation = relation
@@ -397,9 +407,15 @@ class MeasurePanel:
                     QtWidgets.QTreeWidgetItem(top, [name, self.text(value, quantity)])
                 a, b = relation["points"]
                 self.overlay.line(a, b, LINE, 2.0)
-                self.overlay.dot(a, self._dot_size(), DOT)
-                self.overlay.dot(b, self._dot_size(), DOT)
-                self.overlay.text((a + b) * 0.5, self.text(relation["distance"], "length"))
+                self.overlay.marker(a, DOT, marker_core.DOT_RADIUS_PX)
+                self.overlay.marker(b, DOT, marker_core.DOT_RADIUS_PX)
+                self.overlay.label(
+                    a,
+                    b,
+                    self.text(relation["distance"], "length"),
+                    DOT_CLEAR_PX,
+                    marker_core.label_colours(theme.palette(), _hex(DOT)),
+                )
             self.tree.expandAll()
             self.tree.resizeColumnToContents(0)
             if not self.entities:
@@ -413,14 +429,6 @@ class MeasurePanel:
         except Exception as exc:
             warn("Measure: %s" % exc)
             self.say("⚠ %s" % exc)
-
-    def _dot_size(self):
-        try:
-            body = commands.find_body()
-            size = body.Shape.BoundBox.DiagonalLength if body is not None else 50.0
-        except Exception:
-            size = 50.0
-        return max(0.3, size * 0.008)
 
     def _copy(self, item, column):
         try:
@@ -645,7 +653,7 @@ class MeasurePanel:
             if self.snaps:
                 dots = [(i, p, SNAP) for i, (_n, p) in enumerate(self.snaps)]
                 self.dots = handles3d.PointDots(
-                    self.view, dots, self._snap_picked, size=self._dot_size() * 4
+                    self.view, dots, self._snap_picked, pixels=marker_core.SNAP_RADIUS_PX, flat=True
                 )
         except Exception as exc:
             warn("Measure snap: %s" % exc)
@@ -674,7 +682,7 @@ class MeasurePanel:
                 dots.append((obj.Name, App.Vector(obj.Position), DOT))
             if dots:
                 self.com_dots = handles3d.PointDots(
-                    self.view, dots, self._com_picked, size=self._dot_size() * 2.5
+                    self.view, dots, self._com_picked, pixels=marker_core.COM_RADIUS_PX, flat=True
                 )
         except Exception as exc:
             warn("Measure: centre of mass: %s" % exc)

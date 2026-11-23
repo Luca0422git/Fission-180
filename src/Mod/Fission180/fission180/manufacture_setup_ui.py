@@ -426,7 +426,7 @@ class SetupPanel(panels.CamPanel):
         if not wanted or self.view is None:
             return
         try:
-            from . import handles3d
+            from . import handles3d, marker_core
 
             chosen = tuple(int(self.value("box_point_" + axis)) for axis, _n in AXIS_NAMES)
             dots = []
@@ -436,8 +436,10 @@ class SetupPanel(panels.CamPanel):
                         point = frame.to_design(core.box_point(box, (ix, iy, iz)))
                         colour = (0.2, 0.75, 1.0) if (ix, iy, iz) == chosen else (0.95, 0.95, 0.95)
                         dots.append(((ix, iy, iz), point, colour))
-            size = 0.04 * max(core.box_size(box))
-            self.dots = handles3d.PointDots(self.view, dots, self._dot_picked, max(size, 0.8))
+            # one size on the screen at every zoom (marker_core), as they are clicked
+            self.dots = handles3d.PointDots(
+                self.view, dots, self._dot_picked, pixels=marker_core.BALL_RADIUS_PX
+            )
             self._dots_on()
         except Exception as exc:
             warn("setup: box points: %s" % exc)

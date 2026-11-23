@@ -239,7 +239,8 @@ neon icon falls back to a recoloured copy of the normal one, never to a blank.
   previews and overlays** (`handles3d`, `preview`, about 50 files that colour the scene) take
   neon colours: shared helpers map the existing colours to neon roles (like `translate()` does
   for style sheets), files with their own colours are swept.
-- Measure's dots/labels follow too (see the note in MEMORY.md's known issues about their size).
+- Measure's dots/labels follow too (since the markers fix of 2026-11-23 the dots keep one size on
+  the screen and the distance has a box of the look's own colours: `marker_core`).
 - **Pictures made from the view** (Luca, 2026-11-20: "Previews normal, Capture = screen"): the
   preview picture FreeCAD saves inside a design (shown on Home, the Data Panel, Versions) is
   always made in the normal look: `neon_view` takes every neon scene change off around FreeCAD's

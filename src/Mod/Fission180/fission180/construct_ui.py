@@ -23,7 +23,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 from . import bodypick, commands, construct, handles3d, hole_common, log, pickpanel, preview, warn
-from . import ui_icon_path
+from . import marker_core, ui_icon_path
 from .compat import QtCore, QtWidgets
 from .taskui import DistanceField, ValueBoxes
 from .neon_scene_core import Live
@@ -828,7 +828,10 @@ class ConstructPanel(bodypick.Tones, pickpanel.PickPanel):
             return AxisPicker(view, lines, self._overlay_pick, competing=self._takes_under)
         feature = origin.get("Origin")
         dots = [(feature, place.Base, ORIGIN_DOT)] if feature is not None else []
-        return handles3d.PointDots(view, dots, self._overlay_pick, size=size * 0.04)
+        # one size on the screen at every zoom (marker_core), as it is clicked
+        return handles3d.PointDots(
+            view, dots, self._overlay_pick, pixels=marker_core.BALL_RADIUS_PX
+        )
 
     def _takes_under(self, position):
         """True when what FreeCAD picks under the mouse can go into the blue box (or is a

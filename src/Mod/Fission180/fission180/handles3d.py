@@ -7,6 +7,9 @@ dialogs (construct_ui.py, section_ui.py, measure_ui.py).
   PointDots     points drawn as dots that can be clicked (the origin point, snap points).
   Overlay       lines, dots and text drawn over the part (measure results).
 
+Measure's points, its snap points and the balls other dialogs give to click keep one size
+on the screen (marker_core): drawn in pixels under FreeCAD's SoShapeScale like the handles.
+
 Like revolve_ui.AngleHandle they are drawn over the part (Fusion's handles are never hidden
 by it) and they are not Coin draggers: Coin lets only the nearest object take a click, and
 its dragger callbacks run Python without its lock. FreeCAD's own mouse callbacks
@@ -20,7 +23,7 @@ import time
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from . import drag_guard, handle_look, increments, taskui, warn
+from . import drag_guard, handle_look, increments, marker_core, taskui, warn
 from .compat import QtCore
 from .taskui import BoxCarrier
 from .neon_scene_core import Live
@@ -648,17 +651,26 @@ class PathHandle(_Handle):
 
 class PointDots:
     """Points drawn as dots that light up under the mouse and can be clicked:
-    on_pick(key) for a click within a few pixels. dots: [(key, App.Vector, colour)]."""
+    on_pick(key) for a click within a few pixels. dots: [(key, App.Vector, colour)].
+
+    size: a ball of 0.25 * size mm (it grows and shrinks with the zoom). pixels: a ball of
+    that radius on the screen instead, the same at every zoom (they are clicked within
+    PICK_PIXELS of their middle, also a size on the screen); flat: drawn as a flat dot with a
+    light rim in exactly its colour (Measure's points, marker_core) rather than a shaded
+    ball."""
 
     PICK_PIXELS = 9.0
 
-    def __init__(self, view, dots, on_pick, size=1.0):
+    def __init__(self, view, dots, on_pick, size=1.0, pixels=None, flat=False):
         from pivy import coin
 
         self.coin = coin
         self.view = view
         self.on_pick = on_pick
         self.size = float(size)
+        self.pixels = None if pixels is None else float(pixels)
+        self.flat = bool(flat) and self.pixels is not None
+        self.scales = []  # (PixelScale, point): kept right by hand only without SoShapeScale
         self.dots = []
         self.hovered = None
         self.enabled = True
@@ -681,18 +693,42 @@ class PointDots:
     def _dot(self, key, point, color):
         coin = self.coin
         sep = coin.SoSeparator()
-        material = coin.SoMaterial()
-        material.diffuseColor.setValue(*color)
-        material.emissiveColor.setValue(*[c * 0.6 for c in color])
         move = coin.SoTranslation()
         move.translation.setValue(point.x, point.y, point.z)
-        ball = coin.SoSphere()
-        ball.radius.setValue(0.25 * self.size)
-        sep.addChild(material)
-        sep.addChild(move)
-        sep.addChild(ball)
+        if self.flat:
+            shape, paint = handle_look.marker_shape(
+                coin, color, self.pixels, marker_core.RIM_PX, marker_core.RIM
+            )
+            sep.addChild(move)
+            sep.addChild(self._in_pixels(shape, point))
+        else:
+            paint = coin.SoMaterial()
+            paint.diffuseColor.setValue(*color)
+            paint.emissiveColor.setValue(*[c * 0.6 for c in color])
+            ball = coin.SoSphere()
+            sep.addChild(paint)
+            sep.addChild(move)
+            if self.pixels is None:
+                ball.radius.setValue(0.25 * self.size)
+                sep.addChild(ball)
+            else:
+                ball.radius.setValue(self.pixels)
+                sep.addChild(self._in_pixels(ball, point))
         self.switch.addChild(sep)
-        return [key, App.Vector(point), color, material]
+        return [key, App.Vector(point), color, paint]
+
+    def _in_pixels(self, shape, point):
+        pixels = handle_look.PixelScale(self.coin, shape, self.view, point)
+        if pixels.scale is not None:  # no SoShapeScale: kept for the zoom on each mouse move
+            self.scales.append((pixels, App.Vector(point)))
+        return pixels.node
+
+    def _paint(self, dot, color):
+        if self.flat:
+            dot[3].rgb.setValue(*color)
+        else:
+            dot[3].diffuseColor.setValue(*color)
+            dot[3].emissiveColor.setValue(*[c * 0.6 for c in color])
 
     def set_enabled(self, enabled):
         self.enabled = bool(enabled)
@@ -718,14 +754,14 @@ class PointDots:
 
     def _moved(self, info):
         try:
+            for pixels, point in self.scales:
+                pixels.update(self.view, point)
             hit = self.dot_at(info["Position"])
             if hit is self.hovered:
                 return
             for dot, on in ((self.hovered, False), (hit, True)):
                 if dot is not None:
-                    color = BLUE_ACTIVE if on else dot[2]
-                    dot[3].diffuseColor.setValue(*color)
-                    dot[3].emissiveColor.setValue(*[c * 0.6 for c in color])
+                    self._paint(dot, BLUE_ACTIVE if on else dot[2])
             self.hovered = hit
         except Exception as exc:
             warn("point hover: %s" % exc)
@@ -759,7 +795,12 @@ class PointDots:
 
 
 class Overlay:
-    """Lines, dots and labels drawn over the part (not clickable). clear() empties it."""
+    """Lines, dots and labels drawn over the part (not clickable). clear() empties it.
+
+    marker() and label() keep one size on the screen at every zoom (marker_core); a label is
+    put beside its line again when the view turns (a poll, while there is a label)."""
+
+    POLL_MS = 50
 
     def __init__(self, view=None):
         from pivy import coin
@@ -773,9 +814,74 @@ class Overlay:
         self.content = coin.SoSeparator()
         self.root.addChild(self.content)
         self.view.getSceneGraph().addChild(self.root)
+        self.labels = []  # the _Labels shown (the scenarios read where they are)
+        self.scales = []  # (PixelScale, point) kept right by hand: only without SoShapeScale
+        self._timer = None
+        self._failed = False
 
     def clear(self):
         self.content.removeAllChildren()
+        self.labels = []
+        self.scales = []
+        if self._timer is not None:
+            self._timer.stop()
+
+    def marker(self, p, color=BLUE, pixels=marker_core.DOT_RADIUS_PX, rim=marker_core.RIM_PX):
+        """A point as a flat dot of `pixels` radius on the screen at every zoom, in exactly
+        `color`, with a thin light rim (marker_core)."""
+        coin = self.coin
+        sep = coin.SoSeparator()
+        move = coin.SoTranslation()
+        move.translation.setValue(p.x, p.y, p.z)
+        shape, _paint = handle_look.marker_shape(coin, color, pixels, rim, marker_core.RIM)
+        sep.addChild(move)
+        sep.addChild(self._in_pixels(shape, p))
+        self.content.addChild(sep)
+
+    def label(self, a, b, text, clear, colours):
+        """The distance from a to b written in a box beside its line, clear of dots of
+        radius `clear` (pixels) at a and b. colours: (backing, rim, text) as hex
+        (marker_core.label_colours). Returns the _Label."""
+        label = _Label(self, a, b, text, clear, colours)
+        self.content.addChild(label.node)
+        self.labels.append(label)
+        self._poll_on()
+        return label
+
+    def _in_pixels(self, shape, point):
+        pixels = handle_look.PixelScale(self.coin, shape, self.view, point)
+        if pixels.scale is not None:  # no SoShapeScale: kept for the zoom by the poll
+            self.scales.append((pixels, App.Vector(point)))
+            self._poll_on()
+        return pixels.node
+
+    def _poll_on(self):
+        if self._failed:
+            return
+        if self._timer is None:
+            self._timer = QtCore.QTimer()
+            self._timer.setInterval(self.POLL_MS)
+            self._timer.timeout.connect(self._poll)
+        if not self._timer.isActive():
+            self._timer.start()
+
+    def _poll(self):
+        try:
+            if not self.labels and not self.scales:
+                self._timer.stop()
+                return
+            for pixels, point in self.scales:
+                pixels.update(self.view, point)
+            for label in self.labels:
+                label.place()
+        except Exception as exc:
+            # (the view went with its design): stop asking it
+            self._failed = True
+            try:
+                self._timer.stop()
+            except Exception:
+                pass
+            warn("labels in the 3D view: %s" % exc)
 
     def _material(self, color):
         material = self.coin.SoMaterial()
@@ -845,7 +951,121 @@ class Overlay:
         self.content.addChild(sep)
 
     def remove(self):
+        if self._timer is not None:
+            self._timer.stop()
+        self.labels = []
+        self.scales = []
         try:
             self.view.getSceneGraph().removeChild(self.root)
         except Exception:
             pass
+
+
+def _label_picture(text, colours, ratio):
+    """The label's picture, drawn by Qt: `text` in the window's font on a rounded box (colours:
+    backing, rim, text as hex), at the screen's pixel ratio (Coin shows a picture pixel for
+    pixel). Returns (RGBA bytes, bottom row first as Coin wants them, width, height in the
+    screen's own pixels)."""
+    from .compat import QtGui, QtWidgets
+
+    backing, rim, ink = colours
+    font = QtGui.QFont(QtWidgets.QApplication.font())
+    font.setPixelSize(max(1, int(round(marker_core.LABEL_FONT_PX * ratio))))
+    font.setWeight(QtGui.QFont.Weight.DemiBold)
+    metrics = QtGui.QFontMetricsF(font)
+    w, h = marker_core.label_size(metrics.horizontalAdvance(text) / ratio, metrics.height() / ratio)
+    width, height = int(math.ceil(w * ratio)), int(math.ceil(h * ratio))
+    image = QtGui.QImage(width, height, QtGui.QImage.Format_RGBA8888)
+    image.fill(QtGui.QColor(0, 0, 0, 0))
+    painter = QtGui.QPainter(image)
+    try:
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+        pen = QtGui.QPen(QtGui.QColor(rim))
+        pen.setWidthF(ratio)
+        painter.setPen(pen)
+        painter.setBrush(QtGui.QColor(backing))
+        inset = ratio / 2.0
+        corner = marker_core.LABEL_CORNER_PX * ratio
+        painter.drawRoundedRect(
+            QtCore.QRectF(inset, inset, width - 2.0 * inset, height - 2.0 * inset), corner, corner
+        )
+        painter.setPen(QtGui.QColor(ink))
+        painter.setFont(font)
+        painter.drawText(QtCore.QRectF(0.0, 0.0, width, height), QtCore.Qt.AlignCenter, text)
+    finally:
+        painter.end()
+    image = image.mirrored(False, True)  # Coin's rows run from the bottom
+    return bytes(image.constBits())[: width * height * 4], width, height
+
+
+class _Label:
+    """A distance written in a box beside its line (Measure's result): a picture of the text
+    on a backing, shown pixel for pixel, put across the line from its middle by
+    marker_core.label_offset so that it never covers the dots or the line. The offset is in
+    pixels under FreeCAD's SoShapeScale (zooming and panning leave it right); turning the view
+    changes which way is across the line, so the overlay's poll places it again."""
+
+    def __init__(self, overlay, a, b, text, clear, colours):
+        from .neon_palette import rgb01
+
+        coin = overlay.coin
+        self.overlay = overlay
+        self.a, self.b = App.Vector(a), App.Vector(b)
+        self.middle = (self.a + self.b) * 0.5
+        self.text = text
+        self.clear = float(clear)
+        self.backing = tuple(rgb01(colours[0]))
+        ratio = handle_look._pixel_ratio()
+        data, width, height = _label_picture(text, colours, ratio)
+        self.size = (width / ratio, height / ratio)
+        picture = coin.SoImage()
+        picture.vertAlignment = coin.SoImage.HALF
+        picture.horAlignment = coin.SoImage.CENTER
+        picture.image.setValue(coin.SbVec2s(width, height), 4, data)
+        shape, self.shift = handle_look.facing_viewer(coin, picture)
+        self.node = coin.SoSeparator()
+        move = coin.SoTranslation()
+        move.translation.setValue(self.middle.x, self.middle.y, self.middle.z)
+        self.node.addChild(move)
+        self.node.addChild(overlay._in_pixels(shape, self.middle))
+        self.offset = None
+        self.place()
+
+    def _screen(self, point):
+        x, y = self.overlay.view.getPointOnViewport(point)
+        ratio = handle_look._pixel_ratio()
+        return float(x) / ratio, float(y) / ratio
+
+    def wanted(self):
+        """The offset (pixels, y up) from the line's middle that the view as it is now asks."""
+        ratio = handle_look._pixel_ratio()
+        size = self.overlay.view.getSize()
+        area = (float(size[0]) / ratio, float(size[1]) / ratio)
+        return marker_core.label_offset(
+            self._screen(self.a), self._screen(self.b), self.size, self.clear, view=area
+        )
+
+    def place(self):
+        offset = self.wanted()
+        if self.offset is not None and max(abs(u - v) for u, v in zip(offset, self.offset)) < 0.25:
+            return
+        self.offset = offset
+        self.shift.translation.setValue(offset[0], offset[1], 0.0)
+
+    def settled(self):
+        """True when the label is where the view as it is now puts it."""
+        if self.offset is None:
+            return False
+        return max(abs(u - v) for u, v in zip(self.wanted(), self.offset)) < 0.5
+
+    def box(self):
+        """(x, y, w, h) of the label in the 3D view's widget pixels (y down), as placed."""
+        if self.offset is None:
+            return None
+        mx, my = self._screen(self.middle)
+        ratio = handle_look._pixel_ratio()
+        height = float(self.overlay.view.getSize()[1]) / ratio
+        w, h = self.size
+        cx, cy = mx + self.offset[0], my + self.offset[1]
+        return (cx - w / 2.0, height - (cy + h / 2.0), w, h)
