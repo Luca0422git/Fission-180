@@ -4,7 +4,13 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
-**2026-11-24: 0.1.0-beta.4.2.3 on `develop`, the NREAL benchmark's findings** (Luca pasted the
+**2026-11-24: 0.1.0-beta.4.2.3 released 17:45 UTC** (patch release run #24; `Release` and the tag
+at da4317c0; Luca: "release it"). The NREAL benchmark's findings (entry below): free-form faces
+compared, exact volumes / areas, spline definitions read and written, spline tangents as
+directions with a warning, an original's flaws said, no "0 mm" chamfer. CI #196 green.
+[ ] Luca's `nreal air HMD.FCStd` to reproduce the 0 mm chamfer and the `count: 2` fillet.
+
+**2026-11-24: 0.1.0-beta.4.2.3, the NREAL benchmark's findings** (Luca pasted the
 book parity summary of 2026-11-10, already done in wave 7 / 4.0.x: its five "fix first" bugs
 checked fixed in today's code, and a new Auto Timeline benchmark, the NREAL AIR HMD STEP: four
 imported bodies rebuilt as timelines through the AI tools). Checks:
@@ -38,7 +44,7 @@ is affine, so flattened control points are exact). [~] F6 `recognize_core.real_c
 chamfer with a leg under 1e-3 mm or 1/50 of the other (the "0 mm" plan step); NOT reproduced
 with stand-ins (slivers become part of the base outline, a round through stacked layers got the
 right count): [ ] ask Luca for `nreal air HMD.FCStd` to reproduce the 0 mm chamfer and the
-`count: 2` fillet. [ ] GitHub's full run, then Luca's go for the patch release.
+`count: 2` fillet. [x] GitHub's full run (#196 green) [x] Luca: release (run #24).
 
 **2026-11-24: 0.1.0-beta.4.2.2 released 01:21 UTC** (patch release run #23; `Release`, the tag
 and `develop` at 83f00a10; Luca: "go for it"). New: Fission 180's own title bar (Windows and
