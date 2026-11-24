@@ -4,6 +4,14 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-24: 0.1.0-beta.4.2.2 released 01:21 UTC** (patch release run #23; `Release`, the tag
+and `develop` at 83f00a10; Luca: "go for it"). New: Fission 180's own title bar (Windows and
+Linux; Preferences > Appearance > Title bar), Preferences > Navigation > Touchpad orbit. Fixed:
+Shift + two fingers turned the wrong way. CI #190 was red first (four scenarios: the title bar
+switch took the keyboard from the window, see the title bar entry's lesson 4); CI #192 green.
+[ ] Luca tries on his machines: Windows maximize must not cover the taskbar; KDE drag-move and
+edge resize of the top row; Touchpad orbit Standard/Reversed.
+
 **2026-11-23: 0.1.0-beta.4.2.1 released 20:29 UTC** (patch release run #22; `Release` and the tag
 at c8cdd88b; Luca: "go for it"). New: Shift + two fingers on a touchpad orbits. Fixed: Measure's
 points one size on screen (not yellow, the distance in its own box), Windows Static Stress up to

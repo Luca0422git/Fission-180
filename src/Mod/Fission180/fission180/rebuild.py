@@ -2169,10 +2169,25 @@ def _near_face(point, row, tol):
         return False
 
 
+# kinds of free-form face: one surface may come as any of them (a STEP file gives an extruded
+# sketch spline back as a BSplineSurface, the rebuild's extrude makes a SurfaceOfExtrusion;
+# a revolved spline is "other"), so they are measured against each other
+FREE_FORM = ("bspline", "extrusion", "other")
+
+
+def _family(kind):
+    return "free-form" if kind in FREE_FORM else kind
+
+
 def _on_surfaces(row, others, tol):
     """A face without an analytic key (free-form, cone, torus): every sample point within
-    tol of a face of the other part of the same type (exact distances)."""
-    same = [o for o in others if o.kind == row.kind and _boxes_near(row.box, o.box, tol)]
+    tol of a face of the other part of the same type (exact distances); free-form faces of
+    any kind count as one type (Luca's NREAL benchmark: an imported spline wall 0.2 um from
+    the rebuilt one never matched, so the rebuild could not reach done)."""
+    family = _family(row.kind)
+    same = [
+        o for o in others if _family(o.kind) == family and _boxes_near(row.box, o.box, tol)
+    ]
     if not same:
         return False
     distance = _Distances(same)

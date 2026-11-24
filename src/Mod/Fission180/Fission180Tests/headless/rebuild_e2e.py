@@ -654,6 +654,10 @@ def main():
         from . import rebuild_qa
 
         rebuild_qa.run(agent)
+    if not wanted or wanted == "freeform":  # (free-form parts: rebuild_freeform.py)
+        from . import rebuild_freeform
+
+        rebuild_freeform.run(agent)
     text, passed = markdown("Auto Timeline end to end (in-process)", agent, rows)
     report = {"passed": passed, "parts": rows, "checks": agent.checks, "calls": agent.log}
     with open(os.path.join(out_dir, "rebuild-e2e-report.json"), "w", encoding="utf-8") as handle:

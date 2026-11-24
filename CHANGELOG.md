@@ -8,6 +8,16 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.2.3
+
+### Fixed
+
+- **Auto Timeline: a rebuilt part with a spline wall could never be "done".** An imported part
+  keeps a spline wall as one kind of surface and the rebuild's extruded spline makes another
+  kind; Compare only measured surfaces of the same kind against each other, so the wall never
+  matched even when it lay 0.2 micrometres from the original. Free-form surfaces of any kind are
+  now measured against each other.
+
 ## 0.1.0-beta.4.2.2
 
 ### New
