@@ -138,34 +138,33 @@ def measure(body):
     """[solid dict] (properties_core.combine) of a body's solids, in design coordinates."""
     from . import material
 
+    from . import mass_exact
+
     try:
         if not bodies.has_solid(body):
             return []
         shape = bodies.global_shape(body, copy=False)
         kg = material.mass(body)
-        total = sum(s.Volume for s in shape.Solids) or 0.0
+        # (exact for free-form solids: OpenCASCADE's default measuring was 1e-4 to 3e-4 off
+        # on a spline wall, Luca's NREAL benchmark; mass_exact)
+        measured = [mass_exact.solid_properties(s) for s in shape.Solids]
+        total = sum(m["volume"] for m in measured) or 0.0
     except Exception:
         return []
     out = []
-    for solid in shape.Solids:
+    for solid, props in zip(shape.Solids, measured):
         try:
-            volume = solid.Volume
+            volume = props["volume"]
             if volume <= 0:
                 continue
-            centre = solid.CenterOfMass
-            matrix = solid.MatrixOfInertia
             box = solid.BoundBox
             out.append(
                 {
                     "volume": volume,
-                    "area": solid.Area,
+                    "area": props["area"],
                     "mass": (kg * volume / total) if kg is not None and total > 0 else None,
-                    "center": (centre.x, centre.y, centre.z),
-                    "inertia": [
-                        [matrix.A11, matrix.A12, matrix.A13],
-                        [matrix.A21, matrix.A22, matrix.A23],
-                        [matrix.A31, matrix.A32, matrix.A33],
-                    ],
+                    "center": tuple(props["center"]),
+                    "inertia": props["inertia"],
                     "box": (box.XMin, box.YMin, box.ZMin, box.XMax, box.YMax, box.ZMax),
                 }
             )

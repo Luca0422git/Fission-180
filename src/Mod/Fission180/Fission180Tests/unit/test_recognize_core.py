@@ -641,5 +641,24 @@ class BaseSpans(unittest.TestCase):
         self.assertEqual(out[0], (0.0, 40.0))
 
 
+class ChamferLegs(unittest.TestCase):
+    """Luca's NREAL benchmark: the plan of a board had a "0 mm" chamfer (a leg a few
+    hundred-thousandths of a millimetre long, printed as 0): a strip that lies almost in a
+    neighbour's plane is not a chamfer."""
+
+    def test_real_chamfers(self):
+        for d1, d2 in ((1.0, 1.0), (0.5, 2.0), (0.2, 5.0), (0.01, 0.01)):
+            self.assertTrue(core.real_chamfer(d1, d2), (d1, d2))
+
+    def test_a_leg_of_nothing_is_no_chamfer(self):
+        for d1, d2 in ((0.00004, 1.0), (1.0, 0.00004), (0.0, 1.0), (0.0005, 0.0005)):
+            self.assertFalse(core.real_chamfer(d1, d2), (d1, d2))
+
+    def test_a_sliver_is_no_chamfer(self):
+        # (one leg under 1/50 of the other: a strip almost in the plane of a face)
+        self.assertFalse(core.real_chamfer(0.01, 1.0))
+        self.assertFalse(core.real_chamfer(3.0, 0.05))
+
+
 if __name__ == "__main__":
     unittest.main()

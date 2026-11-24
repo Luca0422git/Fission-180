@@ -18,6 +18,7 @@ Bring model geometry into a sketch; it follows the model. project: edges / faces
 | `edges` | object |  |  |  | model edges (an edge selector: filters type, parallel, radius, on_faces, not_on_faces, at, all, count, any_of; see get_help topic selectors). Give count. |
 | `faces` | object |  |  |  | model faces (a face selector: filters type, normal, along, radius, at, all, count, any_of; see get_help topic selectors). Give count. |
 | `body` | boolean |  | `false` |  | every edge of the body |
+| `linked` | boolean |  | `true` |  | project: false copies the edges in as the sketch's own curves, exactly, that do not follow the model (Fusion's Projection Link off) |
 | `curves` | array of integers |  |  | at least 1 item(s) | project_to_surface: sketch curve indexes |
 | `along` | `closest` \| `normal` |  | `"closest"` |  | project_to_surface |
 | `direction` | `U` \| `V` |  | `"U"` |  | isoparametric |

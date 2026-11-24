@@ -64,11 +64,20 @@ def _geometry_row(sketch, index, geo):
                 minor=round(geo.MinorRadius, 6),
             )
         elif kind == "BSplineCurve":
+            from .. import spline_def
+
             row.update(
                 start=_xy(geo.StartPoint),
                 end=_xy(geo.EndPoint),
                 poles=geo.NbPoles,
                 closed=bool(geo.isClosed()),
+            )
+            # (its definition: create_sketch's control_spline takes it back, the same curve;
+            # Luca's NREAL benchmark had no way to read one)
+            row.update(
+                spline_def.definition(
+                    geo, lambda q: [round(q.x, spline_def.DIGITS), round(q.y, spline_def.DIGITS)]
+                )
             )
     except Exception:
         pass
@@ -206,10 +215,12 @@ def add_to_sketch(ctx, args):
     doc = sketch.Document
     construction = bool(args.get("construction"))
 
+    notes = []
+
     def work():
         first = len(sketch.Geometry)
         if args.get("geometry"):
-            core.draw(sketch, args["geometry"], first_index=len(sketch.Constraints))
+            core.draw(sketch, args["geometry"], first_index=len(sketch.Constraints), notes=notes)
         if args.get("curves"):
             draw_curves(sketch, args["curves"], "add_to_sketch")
         added = list(range(first, len(sketch.Geometry)))
@@ -223,8 +234,11 @@ def add_to_sketch(ctx, args):
 
     before = _broken(doc)
     added = ctx.change(work)
+    said = "".join(" " + note for note in dict.fromkeys(notes))
     return ctx.done(
-        "Done: %s. New curves %s in %s." % (ctx.title, _span(added), sketch.Name), doc, before
+        "Done: %s. New curves %s in %s.%s" % (ctx.title, _span(added), sketch.Name, said),
+        doc,
+        before,
     )
 
 
@@ -1465,6 +1479,26 @@ def sketch_project(ctx, args):
     def work():
         count = len(sketch.ExternalGeo)
         made = None
+        if kind == "project" and args.get("linked") is False:
+            # Projection Link off: the model's edges copied in as the sketch's own curves
+            # (they do not follow the model; Luca's NREAL benchmark: "copy edge as sketch curve")
+            from ... import hole_common, sketch_copy
+
+            picks, _body = _model_picks(ctx, sketch, args)
+            shapes = []
+            for obj, sub in picks:
+                shape = hole_common.global_shape(obj, sub)
+                if shape is not None:
+                    shapes.append(shape)
+            added = sketch_copy.copy_into(sketch, shapes)
+            doc.recompute()
+            if not added:
+                raise UserError("project: nothing came into %s." % sketch.Name)
+            return (
+                "%d curve%s copied in (not linked: they stay as they are when the model "
+                "changes)" % (len(added), "" if len(added) == 1 else "s"),
+                None,
+            )
         if kind in ("project", "include_3d", "intersect"):
             picks, _body = _model_picks(ctx, sketch, args, faces_for_body=kind == "intersect")
             defining = kind != "include_3d"

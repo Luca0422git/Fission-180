@@ -228,16 +228,43 @@ def solid_volume(shape):
     volume (one integration over its faces, not two)."""
     if _one_solid(shape):
         return volume(shape)
-    return _kept(shape, "solid_volume", lambda: sum(s.Volume for s in shape.Solids))
+    return _kept(shape, "solid_volume", lambda: _exact_volume(shape))
+
+
+def _exact_volume(shape):
+    """shape.Volume, exact when it has free-form solids (mass_exact: OpenCASCADE's default
+    measuring was 1e-4 to 3e-4 off on a spline wall, Luca's NREAL benchmark)."""
+    from .. import mass_exact
+
+    try:
+        if shape.Solids:
+            return mass_exact.volume(shape)
+    except Exception:
+        pass
+    return shape.Volume
 
 
 def volume(shape):
-    """shape.Volume, kept."""
-    return _kept(shape, "volume", lambda: shape.Volume)
+    """shape.Volume (exact for free-form solids: mass_exact), kept."""
+    return _kept(shape, "volume", lambda: _exact_volume(shape))
+
+
+def _face_area(face):
+    """A face's area, exact when it is free-form (mass_exact; Luca's NREAL benchmark: an
+    extruded spline wall read 73.2950 mm2 for 73.2606)."""
+    from .. import mass_exact
+
+    try:
+        return mass_exact.area(face)
+    except Exception:
+        return face.Area
 
 
 def area(shape):
-    return _kept(shape, "area", lambda: shape.Area)
+    """shape.Area (exact for free-form faces: mass_exact), kept."""
+    from .. import mass_exact
+
+    return _kept(shape, "area", lambda: mass_exact.area(shape))
 
 
 def counts(shape):
@@ -361,7 +388,7 @@ def elements(shape, element):
 # -- facts --------------------------------------------------------------------------------------
 def face_facts(face):
     kind = selectors.face_type(face)
-    out = {"type": kind, "area_mm2": _r(face.Area), "center_mm": _xyz(face.CenterOfMass)}
+    out = {"type": kind, "area_mm2": _r(_face_area(face)), "center_mm": _xyz(face.CenterOfMass)}
     surface = face.Surface
     try:
         if kind == "plane":
@@ -412,6 +439,12 @@ def edge_facts(edge):
             else:
                 out["major_radius_mm"] = _r(curve.MajorRadius)
                 out["minor_radius_mm"] = _r(curve.MinorRadius)
+        elif kind == "bspline":
+            from . import spline_def
+
+            spline = spline_def.of_edge(edge)  # (create_sketch's control_spline takes it back)
+            if spline is not None:
+                out["spline"] = spline
     except Exception:
         pass
     return out

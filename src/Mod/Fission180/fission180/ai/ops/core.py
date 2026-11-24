@@ -64,6 +64,7 @@ class Builder:
         self.body = doc.addObject("PartDesign::Body", "Body")
         self.objects = {}  # step id -> FreeCAD object
         self.ops = {}  # step id -> op name
+        self.notes = []  # what the tool's answer should also say (a spline that swings out)
 
     @classmethod
     def attach(cls, doc, body):
@@ -77,6 +78,7 @@ class Builder:
         builder.body = body
         builder.objects = {}
         builder.ops = {}
+        builder.notes = []
         builder.learn()
         return builder
 
@@ -169,7 +171,7 @@ class Builder:
             sketch.AttachmentOffset = App.Placement(
                 App.Vector(0, 0, step["offset"]), App.Rotation()
             )
-        draw(sketch, step["geometry"])
+        draw(sketch, step["geometry"], notes=getattr(self, "notes", None))
         self.objects[step["id"]] = sketch
         self.ops[step["id"]] = "sketch"
         self.doc.recompute()
@@ -721,10 +723,11 @@ class Builder:
 
 
 # -- sketch geometry with Fusion-like dimensions --------------------------
-def draw(sketch, geometry, first_index=0):
+def draw(sketch, geometry, first_index=0, notes=None):
     """Add create_sketch geometry items (rect, center_rect, circle, polyline, polygon, slot,
     line, ellipse, spline_loop, segments) to a sketch, with Fusion-style named dimensions.
-    Used by the "sketch" step and by the AI tool that draws in an existing sketch."""
+    Used by the "sketch" step and by the AI tool that draws in an existing sketch. notes: a
+    list that gets what the answer should also say (a spline that swings out)."""
     # (wave 8, ai-speed) the circles' dimensions are added together, before the next item
     # (so every constraint keeps its number): FreeCAD solves the whole sketch after each
     # constraint added alone, and a sketch of 320 circles took 216 s to draw (0.2 s a solve);
@@ -771,9 +774,11 @@ def draw(sketch, geometry, first_index=0):
             curve = Part.BSplineCurve()
             curve.interpolate([_v(x, y) for x, y in item["spline_loop"]], PeriodicFlag=True)
             sketch.addGeometry(curve)
+        elif "control_spline" in item:  # a spline by its control points (spline_def)
+            sketch.addGeometry(_control_spline(item["control_spline"]))
         elif "segments" in item:  # a closed chain of lines, arcs and open splines
             for segment in item["segments"]:
-                sketch.addGeometry(_segment(segment))
+                sketch.addGeometry(_segment(segment, notes))
     _add_named(sketch, pending)
 
 
@@ -864,10 +869,12 @@ def _circle(sketch, name, cx, cy, r):
     _named(sketch, Sketcher.Constraint("DistanceY", -1, 1, g, 3, cy), name + ".y")
 
 
-def _segment(spec):
+def _segment(spec, notes=None):
     """One piece of a "segments" chain: {"line": [x0, y0, x1, y1]}, {"arc": [cx, cy, r, a0,
     a1]} (degrees, counter-clockwise) or {"spline": [[x, y], ...], "tangents": [[tx, ty],
-    [tx, ty]]} (an open B-spline through the points, optionally with its end tangents)."""
+    [tx, ty]]} (an open B-spline through the points, optionally with its end tangents: their
+    directions; their lengths do not matter). notes: a list that gets a sentence when the
+    spline swings out between two of its points."""
     if "line" in spec:
         x0, y0, x1, y1 = spec["line"]
         return Part.LineSegment(_v(x0, y0), _v(x1, y1))
@@ -879,14 +886,98 @@ def _segment(spec):
         points = [_v(x, y) for x, y in spec["spline"]]
         curve = Part.BSplineCurve()
         if "tangents" in spec:
-            (t0x, t0y), (t1x, t1y) = spec["tangents"]
-            tangents = [_v(t0x, t0y)] + [_v(0, 0)] * (len(points) - 2) + [_v(t1x, t1y)]
+            # Directions, made unit length and not scaled by OpenCASCADE (Luca's NREAL
+            # benchmark: with Scale=True reversing the chain changed the curve by 9 um, and an
+            # unscaled tangent of any other length than 1 made a loop)
+            ends = []
+            for tx, ty in spec["tangents"]:
+                direction = _v(tx, ty)
+                if direction.Length < 1e-12:
+                    raise BuildError("segment spline: a tangent of length 0 has no direction")
+                ends.append(direction.normalize())
+            tangents = [ends[0]] + [_v(0, 0)] * (len(points) - 2) + [ends[1]]
             flags = [True] + [False] * (len(points) - 2) + [True]
-            curve.interpolate(points, Tangents=tangents, TangentFlags=flags)
+            curve.interpolate(points, Tangents=tangents, TangentFlags=flags, Scale=False)
         else:
             curve.interpolate(points)
+        if notes is not None:
+            said = _swings_out(curve, points, "tangents" in spec)
+            if said:
+                notes.append(said)
         return curve
-    raise BuildError("segment %r: expected 'line', 'arc' or 'spline'" % (spec,))
+    if "control_spline" in spec:
+        return _control_spline(spec["control_spline"])
+    raise BuildError("segment %r: expected 'line', 'arc', 'spline' or 'control_spline'" % (spec,))
+
+
+def _control_spline(spec):
+    """A spline by its definition (fission180/ai/spline_def: what get_sketch and query_geometry
+    give; control points alone: clamped, evenly spaced knots, degree 3)."""
+    from fission180.ai import spline_def
+
+    try:
+        return spline_def.build(spec, lambda p: _v(p[0], p[1]))
+    except (spline_def.SplineError, TypeError, IndexError, ValueError) as exc:
+        raise BuildError(str(exc))
+
+
+def _swings_out(curve, points, tangents):
+    """A sentence when the spline bends away where its points do not ask for it; None
+    otherwise. Two tests: an end tangent that fights its points (the curve leaves the spline
+    the same points make without tangents by more than half the end's gap: with points 0.03
+    mm apart at an end, a tangent 20 to 60 degrees off them swung the curve 0.15 to 0.34 mm
+    out, which compare's sample grid did not see), and a hook between any two neighbouring
+    points (more than half their distance off the straight line between them)."""
+    try:
+        params = [curve.parameter(p) for p in points]
+
+        def samples(curve_, u0, u1, n=24):
+            return [curve_.value(u0 + (u1 - u0) * k / float(n)) for k in range(1, n)]
+
+        if tangents and len(points) > 2:
+            free = Part.BSplineCurve()
+            free.interpolate(points)
+            free_edge = free.toShape()
+            for end, (i0, i1, near) in enumerate(
+                ((0, 2, 1), (len(points) - 3, len(points) - 1, len(points) - 2))
+            ):
+                gap = (points[near] - points[0 if end == 0 else -1]).Length
+                if gap <= 0:
+                    continue
+                far = max(
+                    free_edge.distToShape(Part.Vertex(p))[0]
+                    for p in samples(curve, params[i0], params[i1], 48)
+                )
+                if far > 0.5 * gap and far > 1e-3:
+                    side = "first" if end == 0 else "last"
+                    return (
+                        "Careful: the %s tangent does not point along the %s points (%.3g mm "
+                        "apart): the spline bends up to %.3g mm away from where the points alone "
+                        "put it, which compare's sample grid may not see. Leave that tangent out "
+                        "or check its direction." % (side, side, gap, far)
+                    )
+        worst = None
+        for i in range(len(points) - 1):
+            a, b = points[i], points[i + 1]
+            chord = (b - a).Length
+            if chord <= 0:
+                continue
+            far = 0.0
+            for p in samples(curve, params[i], params[i + 1]):
+                t = max(0.0, min(1.0, (p - a).dot(b - a) / (chord * chord)))
+                far = max(far, (p - (a + (b - a) * t)).Length)
+            if far > 0.5 * chord and far > 1e-3 and (worst is None or far / chord > worst[0]):
+                worst = (far / chord, i, far, chord)
+        if worst is None:
+            return None
+        _ratio, i, far, chord = worst
+        return (
+            "Careful: the spline swings %.3g mm away from the straight line between its points "
+            "%d and %d (%.3g mm apart), a hook compare's sample grid may not see."
+            % (far, i + 1, i + 2, chord)
+        )
+    except Exception:
+        return None
 
 
 def _polyline(sketch, pts):

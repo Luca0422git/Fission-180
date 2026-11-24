@@ -76,12 +76,21 @@ _GEOMETRY_ITEM = {
             "minItems": 3,
             "description": "[[x, y], ...] a closed smooth curve through these points",
         },
+        "control_spline": {
+            "type": "object",
+            "description": "a spline by its control points: {control_points: [[x, y], ...], "
+            "degree (3), knots, multiplicities, weights, periodic}; control points alone: it "
+            "starts and ends on its end points (Fusion's control point spline). get_sketch and "
+            "query_geometry give a spline's definition in this form: the same curve back",
+        },
         "segments": {
             "type": "array",
             "items": {"type": "object"},
             "minItems": 2,
             "description": "a closed chain: {line: [x0, y0, x1, y1]} | {arc: [cx, cy, r, a0, a1]} "
-            "| {spline: [[x, y], ...], tangents: [[tx, ty], [tx, ty]]}",
+            "| {spline: [[x, y], ...], tangents: [[tx, ty], [tx, ty]]} (tangents: the end "
+            "directions, their length ignored; the answer says when a tangent fights its points) "
+            "| {control_spline: {...}} (as the item of that name)",
         },
         "name": {"type": "string", "description": "names its dimensions, e.g. <name>.width"},
     },
@@ -126,6 +135,7 @@ GEOMETRY_KINDS = (
     "line",
     "ellipse",
     "spline_loop",
+    "control_spline",
     "segments",
 )
 
@@ -148,8 +158,12 @@ def check_geometry(geometry, problems, path="geometry"):
             problems.append("%s.name may only use letters, digits and _" % where)
         if kind == "segments":
             for j, seg in enumerate(value if isinstance(value, list) else []):
-                if not isinstance(seg, dict) or len({"line", "arc", "spline"} & set(seg)) != 1:
-                    problems.append("%s.segments[%d] must be one line, arc or spline" % (where, j))
+                pieces = {"line", "arc", "spline", "control_spline"}
+                if not isinstance(seg, dict) or len(pieces & set(seg)) != 1:
+                    problems.append(
+                        "%s.segments[%d] must be one line, arc, spline or control_spline"
+                        % (where, j)
+                    )
             continue
         if not isinstance(value, list) or not all(is_type(v, "number") for v in value):
             continue  # polygon / polyline / spline, or already reported by the schema check

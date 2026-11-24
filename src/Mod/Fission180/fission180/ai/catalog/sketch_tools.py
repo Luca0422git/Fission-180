@@ -814,6 +814,11 @@ define(
             "edges": kit.selector("model edges", "edges"),
             "faces": kit.selector("model faces"),
             "body": boolean("every edge of the body", default=False),
+            "linked": boolean(
+                "project: false copies the edges in as the sketch's own curves, exactly, that do "
+                "not follow the model (Fusion's Projection Link off)",
+                default=True,
+            ),
             "curves": array(integer(minimum=0), "project_to_surface: sketch curve indexes", 1),
             "along": enum(["closest", "normal"], "project_to_surface", default="closest"),
             "direction": enum(["U", "V"], "isoparametric", default="U"),

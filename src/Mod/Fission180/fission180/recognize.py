@@ -1496,8 +1496,8 @@ class _Reader:
                 if core.dot(f.normal, na) <= 1e-6 or core.dot(f.normal, nb) <= 1e-6:
                     continue
                 d1, d2 = _chamfer_distances(self.facts[ja], self.facts[jb], ea, eb)
-                if d1 is None:
-                    continue
+                if d1 is None or not core.real_chamfer(d1, d2):
+                    continue  # (a leg of next to nothing: no chamfer, a "0 mm" plan step)
                 width = _line_distance(ea, eb)
                 reach_a = _extent_across(self.facts[ja].face, da)
                 reach_b = _extent_across(self.facts[jb].face, db)

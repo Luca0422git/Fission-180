@@ -74,7 +74,12 @@ def _item(obj, short):
             shape = bodies.global_shape(target, copy=False)
             if shape.isNull() or not shape.Solids:
                 return None, None
-            return {"kind": "body", "volume": shape.Volume, "area": shape.Area}, shape
+            from . import mass_exact
+
+            return (
+                {"kind": "body", "volume": mass_exact.volume(shape), "area": mass_exact.area(shape)},
+                shape,
+            )
         except Exception:
             return None, None
     shape = hole_common.global_shape(obj, short)
@@ -83,7 +88,9 @@ def _item(obj, short):
     try:
         if short.startswith("Face"):
             loop = shape.OuterWire.Length if shape.Wires else 0.0
-            return {"kind": "face", "area": shape.Area, "loop": loop}, shape
+            from . import mass_exact
+
+            return {"kind": "face", "area": mass_exact.area(shape), "loop": loop}, shape
         if short.startswith("Edge"):
             item = {"kind": "edge", "length": shape.Length}
             if shape.Curve.TypeId == "Part::GeomCircle":

@@ -284,13 +284,13 @@ def properties(e):
             r = e.shape.Curve.Radius
             rows += [("Radius", r, "length"), ("Diameter", 2 * r, "length")]
     elif e.kind == "face":
-        rows.append(("Area", e.shape.Area, "area"))
+        rows.append(("Area", _exact_area(e.shape), "area"))
         if _round_kind(e.shape, "face"):
             r = e.shape.Surface.Radius
             rows += [("Radius", r, "length"), ("Diameter", 2 * r, "length")]
         rows.append(("Perimeter", perimeter(e.shape), "length"))
     elif e.kind in ("body", "component"):
-        rows += [("Volume", e.shape.Volume, "volume"), ("Area", e.shape.Area, "area")]
+        rows += [("Volume", _exact_volume(e.shape), "volume"), ("Area", _exact_area(e.shape), "area")]
     elif e.kind == "plane":
         p = e.point
         rows += [("X", p.x, "coordinate"), ("Y", p.y, "coordinate"), ("Z", p.z, "coordinate")]
@@ -504,3 +504,22 @@ def fmt(value, quantity, decimals=DEFAULT_PRECISION, unit="mm"):
     if text.startswith("-") and float(text) == 0.0:
         text = text[1:]
     return "%s %s%s" % (text, unit, _SUFFIX.get(quantity, ""))
+
+
+def _exact_volume(shape):
+    """The volume, exact for free-form solids (mass_exact: OpenCASCADE's default measuring was
+    1e-4 to 3e-4 off on a spline wall, Luca's NREAL benchmark)."""
+    from . import mass_exact
+
+    try:
+        if shape.Solids:
+            return mass_exact.volume(shape)
+    except Exception:
+        pass
+    return shape.Volume
+
+
+def _exact_area(shape):
+    from . import mass_exact
+
+    return mass_exact.area(shape)

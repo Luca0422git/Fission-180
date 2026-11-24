@@ -543,6 +543,7 @@ class Context:
         """A tool that is design steps: built with fission180/ai/ops in one Undo step."""
         doc = self.need_doc(create="design" not in self.entry["needs"])
         builder = self.builder(doc)
+        builder.notes = []  # (what this call's answer should also say: a spline that swings out)
         step_id = self.new_id(self.entry["id_base"] or DEFAULT_IDS.get(self.tool, "Step"))
         steps = catalog.to_steps(self.tool, self.args, step_id)
         steps = [_prepared(doc, builder, s) for s in steps]
@@ -603,8 +604,11 @@ class Context:
         ):
             unchanged = NOTHING_CHANGED
             log("%s changed no solid" % self.title)
+        said = ""
+        for note in dict.fromkeys(getattr(builder, "notes", None) or []):
+            said += " " + note
         return bridge_core.result(
-            "Done: %s.%s %s%s%s" % (self.title, named, summary(doc), broke, unchanged)
+            "Done: %s.%s %s%s%s%s" % (self.title, named, summary(doc), broke, unchanged, said)
         )
 
     def _run_steps(self, doc, builder, steps, step_id, before, shapes_before, limited):

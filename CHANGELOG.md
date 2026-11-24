@@ -17,6 +17,26 @@ releases published under the old name (their tags are `sciforge-v...`).
   kind; Compare only measured surfaces of the same kind against each other, so the wall never
   matched even when it lay 0.2 micrometres from the original. Free-form surfaces of any kind are
   now measured against each other.
+- **Volumes and areas of parts with spline walls are exact.** FreeCAD's measuring was 1 to 3
+  parts in 10,000 off on spline walls, and differently for two copies of the same wall (a
+  rebuilt part read 2903.63 mm³ against the original's 2902.63 mm³). Inspect > Properties,
+  Measure and the AI's numbers now measure such parts exactly.
+- **AI splines with end tangents could hide a small loop.** The tangents are now directions
+  (their length does not matter), the same points in reverse order give the same curve, and
+  create_sketch warns when a tangent fights its points (the curve bends away from where the
+  points alone put it). A spline drawn this way is a little fuller than before.
+- **Auto Timeline says when the original part's solid has flaws** (for example "Unorientable
+  shape" from its file), also when a repaired copy is used for comparing.
+- **Auto Timeline's plan no longer proposes a "0 mm" chamfer** for a sliver that lies almost in
+  the plane of a neighbouring face.
+
+### New
+
+- **The AI can read and write a spline's exact definition.** get_sketch and query_geometry give
+  a spline's control points, knots and degree; create_sketch takes them back as a control point
+  spline (the same curve, or Fusion's control point spline from its points alone); and
+  sketch_project with linked false copies model edges into a sketch as its own curves (Fusion's
+  Project with Projection Link off).
 
 ## 0.1.0-beta.4.2.2
 

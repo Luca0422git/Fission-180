@@ -4,6 +4,42 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-24: 0.1.0-beta.4.2.3 on `develop`, the NREAL benchmark's findings** (Luca pasted the
+book parity summary of 2026-11-10, already done in wave 7 / 4.0.x: its five "fix first" bugs
+checked fixed in today's code, and a new Auto Timeline benchmark, the NREAL AIR HMD STEP: four
+imported bodies rebuilt as timelines through the AI tools). Checks:
+`Fission180Tests/headless/rebuild_freeform.py` (run by rebuild_e2e.main, filter `freeform`; 24
+checks, each failed first). [x] F1 free-form faces of any kind compared (`rebuild.FREE_FORM`:
+bspline / extrusion / other one family in `_on_surfaces`; a STEP spline wall is a
+BSplineSurface, the rebuild's extruded spline a SurfaceOfExtrusion: never compared, never done).
+[x] F2 `fission180/mass_exact.py`: OpenCASCADE's default measuring (FreeCAD's Volume / Area /
+CenterOfMass) is 1e-4 to 3e-4 off on spline walls and differently for the two kinds of the same
+wall; cut into 4 / 8 / 16 pieces by planes (ONE General Fuse; a common per slab was 10x slower)
+until two counts agree it is exact (2e-11). Used by geometry_facts.volume / area (the AI's
+numbers), properties_ui.measure, the readout and Measure; FreeCAD's own number for shapes
+without free-form geometry, over 400 faces, or a cut that does not add up within 1 %. A
+solid's area: the pieces' faces minus the cut faces (a face two pieces share). A compound's or
+shell's General Fuse does not name its pieces (map empty): solids one by one, else faces one by
+one. Face.Volume is NOT a face's share of its solid (do not sum it). [x] F4 create_sketch
+spline tangents are directions: normalised, `Scale=False` (with Scale=True a reversed chain was
+9 um off; an unscaled tangent of length != 1 loops) + `core._swings_out`: a note in the answer
+when a tangent fights its points (the spline leaves the tangent-free one by more than half the
+end gap) or a hook between two points; `Builder.notes` -> the executor's answer. Golden
+`sf_draft_tangent_chain` re-derived for the new curve (same 400000-point method gives the old
+numbers for the old curve to 1e-11). [x] F5 start_rebuild says the original's flaws
+(`rebuild._flaws`: OpenCASCADE's check words, e.g. "Unorientable shape") also when the repaired
+copy is used (a bowtie extrusion is a stand-in: FreeCAD's Part.Shell / Solid repair a reversed
+face by themselves). The AI's import_file already counted invalid bodies. [x] F3
+`fission180/ai/spline_def.py`: get_sketch rows and query_geometry edges give {degree,
+control_points, knots, multiplicities, weights?, periodic}; create_sketch / add_to_sketch take
+`control_spline` (item or segment; control points alone: clamped, even knots); sketch_project
+`linked: false` copies edges as the sketch's own curves (`fission180/sketch_copy.py`: flattening
+is affine, so flattened control points are exact). [~] F6 `recognize_core.real_chamfer`: no
+chamfer with a leg under 1e-3 mm or 1/50 of the other (the "0 mm" plan step); NOT reproduced
+with stand-ins (slivers become part of the base outline, a round through stacked layers got the
+right count): [ ] ask Luca for `nreal air HMD.FCStd` to reproduce the 0 mm chamfer and the
+`count: 2` fillet. [ ] GitHub's full run, then Luca's go for the patch release.
+
 **2026-11-24: 0.1.0-beta.4.2.2 released 01:21 UTC** (patch release run #23; `Release`, the tag
 and `develop` at 83f00a10; Luca: "go for it"). New: Fission 180's own title bar (Windows and
 Linux; Preferences > Appearance > Title bar), Preferences > Navigation > Touchpad orbit. Fixed:

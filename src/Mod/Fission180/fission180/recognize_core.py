@@ -88,6 +88,19 @@ def same(a, b, tol=TOL):
     return abs(a - b) <= tol
 
 
+MIN_CHAMFER_LEG = 1e-3  # mm
+MIN_CHAMFER_RATIO = 0.02  # the shorter leg / the longer one
+
+
+def real_chamfer(d1, d2):
+    """Both legs of a chamfer candidate are real: at least MIN_CHAMFER_LEG long, and the
+    shorter at least MIN_CHAMFER_RATIO of the longer (Luca's NREAL benchmark: a board's plan
+    had a "0 mm" chamfer, a leg a few hundred-thousandths of a millimetre long: a strip that
+    lies almost in a neighbour's plane, not a chamfer)."""
+    short, long_ = sorted((abs(d1), abs(d2)))
+    return short >= MIN_CHAMFER_LEG and short >= MIN_CHAMFER_RATIO * long_
+
+
 # -- vectors (3D tuples) ------------------------------------------------------------------------
 # (wave 8, ai-speed) 3D vectors written out, other lengths the general way: the same numbers
 # (the same additions in the same order), without a generator per call; describe_reference

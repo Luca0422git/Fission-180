@@ -416,6 +416,9 @@ def _solid_of(kind, source):
         solids = list(shape.Solids)
         solid = solids[0] if len(solids) == 1 else Part.makeCompound(solids)
     if not solid.isValid():
+        # (said even when the repair works: the NREAL file's Body1 was "Unorientable shape",
+        # its copy was repaired and nobody was told the original was flawed)
+        flaws = _flaws(solid)
         fixed = solid.copy()
         try:
             fixed.fix(1e-7, 1e-7, 1e-4)
@@ -423,11 +426,32 @@ def _solid_of(kind, source):
             pass
         if fixed.isValid():
             solid = fixed
-        else:
-            note = (note + "; " if note else "") + (
-                "OpenCASCADE finds flaws in this solid, so comparisons may be less exact"
+            said = (
+                "the original's solid has flaws (OpenCASCADE: %s): a repaired copy is the "
+                "reference, and the rebuild will be a valid solid" % flaws
             )
+        else:
+            said = (
+                "the original's solid has flaws (OpenCASCADE: %s), so comparisons may be less "
+                "exact" % flaws
+            )
+        note = (note + "; " if note else "") + said
     return solid, note
+
+
+def _flaws(shape):
+    """What OpenCASCADE's check finds wrong with a shape, in its own words ("errors" when it
+    names nothing)."""
+    try:
+        shape.check(True)
+        return "errors"
+    except Exception as exc:
+        words = []
+        for part in str(exc).replace("\n", "|").split("|"):
+            part = part.strip()
+            if part and part.lower() != "no error" and part not in words:
+                words.append(part)
+        return ", ".join(words[:4]) or "errors"
 
 
 def _mesh_problem(mesh):
