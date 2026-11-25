@@ -317,6 +317,8 @@ def disable():
     from . import navbar_ui, shortcuts, theme, timeline_ui
 
     _state["on"] = False
+    # (the VIEW workspace first: it hid the window's parts the interface now takes away)
+    _safely(lambda: __import__("fission180.view_ui").view_ui.leave_workspace())
     _safely(lambda: __import__("fission180.text_ui").text_ui.disable())
     _safely(_sketch_mode_off)
     if not config.USE_RIBBON:

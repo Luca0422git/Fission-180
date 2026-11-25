@@ -20,7 +20,8 @@ No Qt widgets of its own; needs the program's window only for the shortcuts."""
 
 from . import warn
 
-WORKSPACES = ("animation", "simulation", "manufacture")
+# (and Fission 180's own VIEW workspace, view_ui: nothing but the visible bodies on black)
+WORKSPACES = ("animation", "simulation", "manufacture", "view")
 
 # Keys that change the design (Fusion's design shortcuts do nothing in another workspace):
 # Press Pull, Extrude, Fillet, Hole, Move, Joint, Appearance, copy / paste, Compute All,
@@ -59,7 +60,7 @@ def module(name):
 
 def current(doc=None):
     """The workspace the design (default: the one in front) is in: "animation", "simulation",
-    "manufacture", or "design"."""
+    "manufacture", "view", or "design"."""
     for name in WORKSPACES:
         try:
             if module(name).in_workspace(doc):

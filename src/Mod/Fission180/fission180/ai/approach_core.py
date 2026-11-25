@@ -50,6 +50,7 @@ WORKSPACES = (
     ("manufacture", "MANUFACTURE", "milling: setups, 2D / 3D / drilling operations, posts"),
     ("animation", "ANIMATION", "storyboards, explode, transforms, callouts, video"),
     ("drawing", "DRAWING", "drawings of the design: views, dimensions, tables, PDF / DXF"),
+    ("view", "VIEW", "nothing but the visible bodies, full screen on black (see-through XR glasses)"),
 )
 WORKSPACE_KEYS = tuple(w[0] for w in WORKSPACES)
 WORKSPACE_TITLES = {w[0]: w[1] for w in WORKSPACES}

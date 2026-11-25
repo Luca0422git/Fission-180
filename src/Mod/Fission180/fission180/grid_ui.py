@@ -43,7 +43,14 @@ Y_COLOR = Live((0.30, 0.65, 0.30), "axis_y")
 ORIGIN_COLOR = Live((0.93, 0.93, 0.93), "bright")  # the dot where they cross
 NUMBER_COLOR = Live((0.62, 0.64, 0.68), "grid_text")
 MAX_NUMBERS = 40  # reference numbers along one axis
-_STATE = {"nodes": {}, "timer": None, "step": None, "locked_step": None, "observer": None}
+_STATE = {
+    "nodes": {},
+    "timer": None,
+    "step": None,
+    "locked_step": None,
+    "observer": None,
+    "held": set(),  # who wants the layout grid off for now (the VIEW workspace: view_ui)
+}
 
 
 def _group():
@@ -187,7 +194,7 @@ def draw(doc, view=None):
     from . import view_fit
 
     _detach(doc.Name)
-    if not get("LayoutGrid"):
+    if not get("LayoutGrid") or _STATE["held"]:
         return
     if editing_sketch() is not None:
         return  # a sketch being edited has its own grid, on its own plane (one grid at a time)
@@ -296,6 +303,17 @@ def _numbers(coin, extent, step):
             one.addChild(text)
             sep.addChild(one)
     return sep
+
+
+def hold(reason, on):
+    """The layout grid off while `reason` holds it (the VIEW workspace shows nothing but the
+    bodies), drawn again when the last one lets go. The setting is untouched."""
+    if on:
+        _STATE["held"].add(reason)
+    else:
+        _STATE["held"].discard(reason)
+    _LAST["sig"] = None
+    redraw_all()
 
 
 def redraw_all():

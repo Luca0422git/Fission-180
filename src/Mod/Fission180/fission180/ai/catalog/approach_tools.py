@@ -122,11 +122,14 @@ define(
     "show_workspace",
     "Show workspace",
     "view",
-    "WORKSPACE menu (DESIGN, SIMULATION, MANUFACTURE, ANIMATION, DRAWING) and the ribbon's tabs",
+    "WORKSPACE menu (DESIGN, SIMULATION, MANUFACTURE, ANIMATION, DRAWING, VIEW) and the ribbon's "
+    "tabs",
     "Show a workspace in the Fission 180 window so the person sees what you do: design (tab "
     "solid, surface, mesh, sheet_metal, plastic or utilities), simulation (tab setup or "
     "results; a study must exist: create_study), manufacture, animation, drawing (the newest "
-    "drawing, or drawing) or flat_pattern (the open sheet metal body's flat pattern: "
+    "drawing, or drawing), view (only the visible bodies, full screen on black, for "
+    "see-through XR glasses; it hides everything else, this chat too: only when the person "
+    "asks) or flat_pattern (the open sheet metal body's flat pattern: "
     "flat_pattern makes one). Only what the window shows changes: every tool works from any "
     "workspace, so never switch just to call a tool. Not an undo step. Needs the window; "
     "inspect_design and get_design say which workspace is shown.",

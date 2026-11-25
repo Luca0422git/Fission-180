@@ -8,6 +8,22 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.3.0
+
+### New
+
+- **The VIEW workspace, for see-through XR glasses.** Workspace menu > View shows nothing but the
+  bodies that are visible when you switch to it: the window goes full screen, the background is
+  black (in Dark, Light and Neon Lights alike), and the ribbon, browser, timeline, navigation bar,
+  ViewCube, grid, sketches, origin and every other helper are gone. On OLED glasses black is
+  see-through, so only the model shows. The mouse still turns, pans and zooms the view; clicks
+  select nothing. Two small buttons stay in the corner: the workspace button (back to Design or
+  any other workspace; Esc goes back too) and Hologram. Nothing in your design changes.
+- **Hologram in Dark and Light.** In the View workspace the Hologram button also works in Dark
+  and Light: the bodies turn into Fission blue glass with glowing edges. In Neon Lights it is Neon's
+  own hologram, in Neon's colours, as before. It is one setting, shared with Neon Lights' Hologram
+  button.
+
 ## 0.1.0-beta.4.2.3
 
 ### Fixed

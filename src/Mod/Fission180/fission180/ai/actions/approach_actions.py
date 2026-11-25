@@ -22,7 +22,7 @@ MESH_CHECK = 300000  # (isSolid takes 0.05 s at 78,000 triangles)
 
 # -- the workspace the window shows --------------------------------------------------------------
 def shown_workspace(host, doc=None):
-    """{"workspace": design | simulation | manufacture | animation | drawing | flat_pattern,
+    """{"workspace": design | simulation | manufacture | animation | drawing | view | flat_pattern,
     "tab": the ribbon tab in front} the window shows, or None without the window. get_design
     and inspect_design answer it too."""
     if not getattr(host, "gui", False):
@@ -395,11 +395,11 @@ def ask_person(ctx, args):
 # -- show_workspace ---------------------------------------------------------------------------
 def _leave_all(doc):
     """Back to DESIGN through each workspace's own leaving (the workspace menu's Design)."""
-    from ... import animation_ui, drawing_ui, flatpattern_ui, manufacture_ui, simulation_ui
+    from ... import animation_ui, drawing_ui, flatpattern_ui, manufacture_ui, simulation_ui, view_ui
 
     if flatpattern_ui.active() is not None:
         flatpattern_ui.leave()
-    for mod in (animation_ui, manufacture_ui, simulation_ui):
+    for mod in (animation_ui, manufacture_ui, simulation_ui, view_ui):
         if mod.in_workspace(doc) or mod.STATE.get("on"):
             if not mod.leave_workspace():
                 return False
@@ -478,6 +478,12 @@ def show_workspace(ctx, args):
                 " The design has no components: an animation moves components "
                 "(components_from_bodies makes them)."
             )
+    elif ws == "view":
+        from ... import view_ui
+
+        if not view_ui.enter_workspace():
+            raise UserError("Fission 180 could not show VIEW (a dialog is open?).")
+        note = " Esc or VIEW's workspace button brings the person back (View hides this chat too)."
     elif ws == "drawing":
         from ... import drawing, drawing_ui
 

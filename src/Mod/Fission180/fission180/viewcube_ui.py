@@ -66,7 +66,15 @@ AXIS_COLOURS = {
 # their meaning (X red, Y green, Z blue) in brighter, neon shades.
 NEON_AXIS = {"X": "#ff2e55", "Y": "#39ff88", "Z": "#2e9bff"}
 
-_state = {"on": False, "timer": None, "shown": True, "warned": set(), "view": None, "cube": None}
+_state = {
+    "on": False,
+    "timer": None,
+    "shown": True,
+    "warned": set(),
+    "view": None,
+    "cube": None,
+    "held": set(),  # who wants the cubes off for now (the VIEW workspace: view_ui)
+}
 
 
 def _warn_once(msg):
@@ -909,9 +917,10 @@ def _tick():
         if _state.get("view") is not view or not _alive(cube):
             cube = _cube_for(view)
             _state["view"], _state["cube"] = view, cube
-        if cube.isVisible() != _state["shown"]:
-            cube.setVisible(_state["shown"])
-        if _state["shown"]:
+        want = _state["shown"] and not _state["held"]
+        if cube.isVisible() != want:
+            cube.setVisible(want)
+        if want:
             cube.sync(view)
     except Exception as exc:
         _warn_once("ViewCube: %s" % exc)
@@ -919,6 +928,22 @@ def _tick():
 
 def is_shown():
     return _state["shown"]
+
+
+def hold(reason, on):
+    """The cubes off while `reason` holds them (the VIEW workspace shows nothing but the
+    bodies), back as the setting says when the last one lets go. The setting is untouched."""
+    if on:
+        _state["held"].add(reason)
+    else:
+        _state["held"].discard(reason)
+    want = _state["shown"] and _state["on"] and not _state["held"]
+    for cube in _cubes():
+        try:
+            cube.setVisible(want)
+        except RuntimeError:
+            pass
+    _tick()
 
 
 def enable():
@@ -954,7 +979,7 @@ def toggle():
     App.ParamGet(PARAMS).SetBool("ShowViewCube", _state["shown"])
     for cube in _cubes():
         try:
-            cube.setVisible(_state["shown"] and _state["on"])
+            cube.setVisible(_state["shown"] and _state["on"] and not _state["held"])
         except RuntimeError:
             pass
     _tick()

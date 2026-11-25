@@ -4,6 +4,46 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-25: 0.1.0-beta.4.3.0 on `develop`: the VIEW workspace** (Luca: "the last addition to the
+'Cyberpunk UI' ... a new workspace ... called 'View' ... I have XR glasses. they use oled pannels.
+So when the screen is black, you see through it ... get rid of EVERYTHING except for the bodies
+that are visible ... only a couple buttons ... The workspace button ... and the hologram body
+button ... Include the holigram setting in non neon lights mode, and make the holigram Fission
+blue"). Outline 7.21. `fission180/view_ui.py` (a workspace like animation_ui: STATE, active,
+in_workspace, enter_workspace, leave_workspace; in `workspace_switch.WORKSPACES`, so every other
+workspace leaves it; the ribbon's workspace menu has View last; marking menu off; AI
+`show_workspace view`; shell.disable leaves it first). All display only, nothing saved:
+full screen; every visible child of the main window (ribbon bar, docks, FreeCAD's overlay
+panels, grips) and of the MDI area (navigation bar) hidden, kept hidden by an app event filter
+(Show -> hide; also Esc leaves, the window's Close leaves first); `viewcube_ui.hold` and
+`grid_ui.hold` (new); the viewer black via `setBackgroundColor` / `setGradientBackground`, put
+back from the View preferences the way View3DSettings applies them (never the saved
+preferences: a crash leaves no black behind); navigation cube, axis cross and **corner axes**
+(`view.setCornerCrossVisible`: FreeCAD's CornerCoordSystem, a triad bottom right) off; the
+selection node's `preselectionMode` / `selectionMode` / `selectionEnabled` off (pivy's
+`field.get()` is an SbString: store `.getString()`, else nothing can be put back and clicks stay
+dead after View); everything but bodies, solids, meshes, links and containers taken out by its
+view provider's `SwitchNode` AND every `SoToggleSwitch` under it (**a sketch draws its filled
+areas, SoSketchFaces, behind its own toggle outside the mode switch**: the switch alone left a
+blue disc); Neon's screen effects `set_hidden` (counted). **Qt keeps room for the MDI area's tab
+bar (its size hint, 34 px) while Fission keeps the bar hidden**: in View a style sheet gives the
+bar tabs of no height, then the maximized 3D view window is re-maximized (Qt left it at its old
+size); again after leaving. Hologram: one setting (neon_settings "Hologram"); Neon: neon_view's
+own; Dark/Light: in View only, `neon_view.apply` with `neon_view_core.colours` of FISSION_BLUE
+"#3fa9f5" on black (neon_view._style() needs Neon's palette: Dark has no "primary"); 
+`neon_view.set_hologram` tells view_ui. The two buttons are painted (no style sheet: Light's
+colours would come in; theme_identity flags `#hex` with `:`/`{`). Icon `workspace_view`
+(tools/fission180/icons_view.py + icons_neon_view.py; make_icons, then restore split_body.svg).
+**The theme identity fixture got exactly one key** (`icon:workspace_view.svg`: a new icon for a
+new menu entry, added on purpose; every other key checked unchanged first). Scenario
+`view_workspace` (83 checks: Dark, Light, Neon, Esc, Animation from View, the design closed in
+View; screenshots dark / dark-hologram / neon-hologram). Decisions (Luca can overrule): full
+screen; Esc leaves; clicks select nothing; Hologram in Dark/Light only inside View; buttons top
+left, drawn in Fission blue (Neon: its primary). Not testable here: real full screen (xvfb has
+no window manager: the state is full screen, the size stays) and the glasses themselves.
+[ ] Luca tries it with his XR glasses (Windows and the laptop). [ ] GitHub's full run, then
+Luca's go for the patch release.
+
 **2026-11-24: 0.1.0-beta.4.2.3 released 17:45 UTC** (patch release run #24; `Release` and the tag
 at da4317c0; Luca: "release it"). The NREAL benchmark's findings (entry below): free-form faces
 compared, exact volumes / areas, spline definitions read and written, spline tangents as

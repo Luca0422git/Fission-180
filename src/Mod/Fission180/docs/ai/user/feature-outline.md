@@ -230,6 +230,9 @@ Fusion's ANIMATION workspace: storyboards, Transform Components, Auto Explode (o
 ### 7.20 Manufacture workspace: milling [P1, L2] (added 2026-11-11, Luca, after the book parity report)
 Fusion's MANUFACTURE workspace for 3-axis milling: Setup (WCS, stock), 2D operations (Face, Adaptive Clearing, Pocket, Contour with tabs, Slot, Bore, Engrave, Chamfer), Drill, 3D operations where the engine has them, Tool Library, Simulate, Post Process, Setup Sheet, with Fusion's dialogs (Tool, Geometry, Heights, Passes, Linking). Built on FreeCAD's CAM module behind Fission 180's own workspace; the person never sees FreeCAD's CAM workbench. Turning, additive and multi-axis stay out. Spec: `docs/fission180/parity/manufacture.md`.
 
+### 7.21 View workspace: for see-through XR glasses [P2, L1] (added 2026-11-25, Luca; Fission 180's own, not Fusion's)
+"I have XR glasses. they use oled pannels. So when the screen is black, you see through it." The VIEW workspace (workspace menu > View) shows nothing but the bodies visible when it is entered: full screen, black background in every look (Dark, Light, Neon Lights), no ribbon, browser, timeline, navigation bar, ViewCube, grid, sketches, origin or other helpers, no selection. Only two buttons stay: the workspace button (back to any workspace; Esc too) and Hologram. Hologram works in every look: Neon Lights' colours in Neon Lights, Fission blue (#3fa9f5) in Dark and Light (there only inside View, so Dark and Light are unchanged elsewhere). Display only: nothing in the design changes. Code `fission180/view_ui.py`, scenario `view_workspace`.
+
 ### 7.17 Quality and packaging [P0]
 Installer, portable zip, side-by-side install with FreeCAD, Linux package, docs (cheat sheet, "Fusion to Fission 180" mapping), update mechanism, compatibility notes.
 

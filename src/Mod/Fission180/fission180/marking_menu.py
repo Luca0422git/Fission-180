@@ -291,6 +291,13 @@ def _open_for_state(global_pos, view_widget=None):
             return sketch_marking.open_at(global_pos)
     except Exception as exc:
         warn("marking menu: %s" % exc)
+    try:  # the VIEW workspace shows nothing but the bodies: no ring (view_ui)
+        from . import view_ui
+
+        if view_ui.active():
+            return None
+    except Exception as exc:
+        warn("marking menu: %s" % exc)
     try:  # the ANIMATION workspace's own ring (animation_ui, wave 7 animation)
         from . import animation_ui
 

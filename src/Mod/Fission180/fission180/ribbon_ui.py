@@ -839,6 +839,24 @@ class RibbonWidget(QtWidgets.QWidget):
             drawing_ui.fill_workspace_menu(drawings)
         except Exception as exc:
             warn("workspace menu: %s" % exc)
+        # Fission 180's own VIEW workspace (view_ui: nothing but the visible bodies on black,
+        # for see-through XR glasses). Design and a drawing picked leave it; Animation,
+        # Simulation and Manufacture leave it themselves (workspace_switch.leave_others).
+        view = menu.addAction(ui_icon("workspace_view"), "View")
+        view.setObjectName("Fission180WorkspaceView")
+        view.setCheckable(True)
+        try:
+            from . import view_ui
+
+            view.setChecked(view_ui.active())
+            if view_ui.active():
+                for other in (design, simulation, manufacture, animation):
+                    other.setChecked(False)
+            design.triggered.connect(lambda *_a: view_ui.leave_workspace())
+            drawings.triggered.connect(lambda *_a: view_ui.leave_workspace())
+            view.triggered.connect(lambda *_a: view_ui.enter_workspace())
+        except Exception as exc:
+            warn("workspace menu: %s" % exc)
         try:  # Fusion's SIMULATION workspace (beta 3, simulation_ui)
             from . import simulation_ui
 
@@ -852,6 +870,7 @@ class RibbonWidget(QtWidgets.QWidget):
             (manufacture, "workspace_manufacture"),
             (animation, "workspace_animation"),
             (drawings.menuAction(), "dw_base_view"),
+            (view, "workspace_view"),
         ):
             action.setProperty("fission180Icon", icon)  # (redrawn for a new look)
         menu.exec_(button.mapToGlobal(QtCore.QPoint(0, button.height())))
