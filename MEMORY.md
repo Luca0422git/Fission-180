@@ -4,7 +4,8 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
-**2026-11-25: 0.1.0-beta.4.3.0 on `develop`: the VIEW workspace** (Luca: "the last addition to the
+**2026-11-25: 0.1.0-beta.4.3.0 released 04:06 UTC: the VIEW workspace** (patch release run #25;
+`Release`, the tag and develop at 5a58de00; CI #200 green; Luca: "release it"; Luca: "the last addition to the
 'Cyberpunk UI' ... a new workspace ... called 'View' ... I have XR glasses. they use oled pannels.
 So when the screen is black, you see through it ... get rid of EVERYTHING except for the bodies
 that are visible ... only a couple buttons ... The workspace button ... and the hologram body
@@ -36,13 +37,13 @@ colours would come in; theme_identity flags `#hex` with `:`/`{`). Icon `workspac
 (tools/fission180/icons_view.py + icons_neon_view.py; make_icons, then restore split_body.svg).
 **The theme identity fixture got exactly one key** (`icon:workspace_view.svg`: a new icon for a
 new menu entry, added on purpose; every other key checked unchanged first). Scenario
-`view_workspace` (83 checks: Dark, Light, Neon, Esc, Animation from View, the design closed in
-View; screenshots dark / dark-hologram / neon-hologram). Decisions (Luca can overrule): full
+`view_workspace` (86 checks: Dark, Light, Neon, Esc, Animation from View, a maximized window, the
+design closed in View; screenshots dark / dark-hologram / neon-hologram). Decisions (Luca can overrule): full
 screen; Esc leaves; clicks select nothing; Hologram in Dark/Light only inside View; buttons top
 left, drawn in Fission blue (Neon: its primary). Not testable here: real full screen (xvfb has
 no window manager: the state is full screen, the size stays) and the glasses themselves.
-[ ] Luca tries it with his XR glasses (Windows and the laptop). [ ] GitHub's full run, then
-Luca's go for the patch release.
+[ ] Luca tries it with his XR glasses (Windows and the laptop). [x] GitHub's full run (#200),
+then Luca's go for the patch release (run #25).
 
 **2026-11-24: 0.1.0-beta.4.2.3 released 17:45 UTC** (patch release run #24; `Release` and the tag
 at da4317c0; Luca: "release it"). The NREAL benchmark's findings (entry below): free-form faces
