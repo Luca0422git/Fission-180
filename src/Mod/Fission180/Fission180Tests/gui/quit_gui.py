@@ -138,10 +138,10 @@ def _answer():
                 for b in w.findChildren(QtWidgets.QAbstractButton):
                     label = b.text().replace("&", "").lower()
                     if b.objectName() == "Fission180CloseDiscard" or label in ("discard", "don't save"):
-                        QtCore.QTimer.singleShot(100, b.click)
+                        h._later(0, b.click)  # (it shows: answered as it is)
                         break
                 else:
-                    QtCore.QTimer.singleShot(100, w.reject)
+                    h._later(0, w.reject)
     except Exception as exc:
         print("[Fission 180] quit %s: %s" % (CASE, exc))
     h._later(50, _answer)
