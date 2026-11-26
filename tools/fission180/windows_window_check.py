@@ -124,6 +124,14 @@ user32.GetCursorPos.argtypes = [ctypes.POINTER(W.POINT)]
 user32.SendInput.argtypes = [W.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
 user32.GetSystemMetrics.argtypes = [ctypes.c_int]
 user32.SetForegroundWindow.argtypes = [W.HWND]
+user32.WindowFromPoint.restype = W.HWND
+user32.WindowFromPoint.argtypes = [W.POINT]
+user32.GetAncestor.restype = W.HWND
+user32.GetAncestor.argtypes = [W.HWND, W.UINT]
+user32.GetClassNameW.argtypes = [W.HWND, W.LPWSTR, ctypes.c_int]
+user32.GetWindowTextW.argtypes = [W.HWND, W.LPWSTR, ctypes.c_int]
+user32.IsWindowEnabled.argtypes = [W.HWND]
+user32.GetWindowThreadProcessId.argtypes = [W.HWND, ctypes.POINTER(W.DWORD)]
 dwmapi.DwmGetWindowAttribute.argtypes = [W.HWND, W.DWORD, ctypes.c_void_p, W.DWORD]
 shell32.SHAppBarMessage.restype = ULONG_PTR
 shell32.SHAppBarMessage.argtypes = [W.DWORD, ctypes.POINTER(APPBARDATA)]
@@ -182,6 +190,25 @@ def placement(hwnd):
     p.length = ctypes.sizeof(p)
     user32.GetWindowPlacement(hwnd, ctypes.byref(p))
     return {"showCmd": p.showCmd, "normal": _rect(p.rcNormalPosition)}
+
+
+def describe(hwnd):
+    if not hwnd:
+        return None
+    cls = ctypes.create_unicode_buffer(128)
+    user32.GetClassNameW(hwnd, cls, 128)
+    title = ctypes.create_unicode_buffer(128)
+    user32.GetWindowTextW(hwnd, title, 128)
+    pid = W.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return {"hwnd": int(hwnd), "class": cls.value, "title": title.value, "pid": pid.value}
+
+
+def under(x, y):
+    """The window under a screen point and its top-level window (what a click there hits)."""
+    hwnd = user32.WindowFromPoint(W.POINT(x, y))
+    root = user32.GetAncestor(hwnd, 2) if hwnd else None
+    return {"at": describe(hwnd), "root": describe(root)}
 
 
 def cursor():
@@ -261,6 +288,7 @@ def press(*vks):
 
 
 def click(x, y):
+    print("[Fission 180] click at %s,%s on %s" % (x, y, json.dumps(under(x, y))))
     move(x, y)
     time.sleep(0.15)
     down()
@@ -270,6 +298,7 @@ def click(x, y):
 
 
 def double_click(x, y):
+    print("[Fission 180] double-click at %s,%s on %s" % (x, y, json.dumps(under(x, y))))
     move(x, y)
     time.sleep(0.15)
     for _ in range(2):
@@ -281,6 +310,7 @@ def double_click(x, y):
 
 
 def drag(x0, y0, dx, dy, steps=15):
+    print("[Fission 180] drag from %s,%s by %s,%s on %s" % (x0, y0, dx, dy, json.dumps(under(x0, y0))))
     move(x0, y0)
     time.sleep(0.2)
     down()
@@ -356,7 +386,7 @@ def check(name, ok, detail=""):
 def facts(app, label):
     s = app.state()
     hwnd = s.get("hwnd")
-    f = {"label": label, "qt": {k: s.get(k) for k in ("qt_maximized", "qt_fullscreen", "qt_geometry", "qt_frame", "frameless", "mode", "active", "maximize_tip")}}
+    f = {"label": label, "qt": {k: s.get(k) for k in ("t", "qt_maximized", "qt_fullscreen", "qt_geometry", "qt_frame", "frameless", "mode", "active", "maximize_tip", "events", "last_event", "modal", "popup", "active_window", "other_windows", "enabled")}}
     if hwnd:
         mon, work = monitor(hwnd)
         f["win"] = {
@@ -365,6 +395,7 @@ def facts(app, label):
             "zoomed": bool(user32.IsZoomed(hwnd)),
             "iconic": bool(user32.IsIconic(hwnd)),
             "styles": styles(hwnd),
+            "enabled": bool(user32.IsWindowEnabled(hwnd)),
             "placement": placement(hwnd),
             "foreground": user32.GetForegroundWindow() == hwnd,
             "monitor": mon,
@@ -427,6 +458,17 @@ def run(app):
     user32.SetForegroundWindow(hwnd)
     facts(app, "start")
     memo = {}
+
+    def a0_start_drag():
+        s, f = facts(app, "start, before a drag")
+        before = f["win"]["rect"]
+        x, y = point(app, "row_empty")
+        drag(x, y, 60, 40)
+        s, f = facts(app, "start, after a drag")
+        after = f["win"]["rect"]
+        moved = [after[0] - before[0], after[1] - before[1]]
+        check("As FreeCAD starts: Qt gets the presses", (s.get("events") or {}).get("press", 0) > 0, str(s.get("events")))
+        check("As FreeCAD starts: dragging the top row moves the window", near(moved, [60, 40]), "moved %s" % moved)
 
     def a_system_normal():
         app.command("titlebar", "system")
@@ -562,6 +604,7 @@ def run(app):
             time.sleep(1.5)
 
     for name, fn in (
+        ("start: drag", a0_start_drag),
         ("system title bar, normal", a_system_normal),
         ("own title bar while maximized", b_switch_while_maximized),
         ("restore", c_restore),

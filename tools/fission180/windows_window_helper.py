@@ -29,7 +29,33 @@ COMMAND = os.path.join(OUT, "command.json")
 LOG = os.path.join(OUT, "helper.log")
 PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"
 
-_S = {"ready": False, "done": set(), "ack": 0, "started": time.time(), "timer": None, "notes": []}
+_S = {"ready": False, "done": set(), "ack": 0, "started": time.time(), "timer": None, "notes": [], "events": {}, "last": None}
+
+
+class _Input(QtCore.QObject):
+    """Counts the mouse and key presses Qt delivers (does the checker's input arrive?)."""
+
+    KINDS = {
+        QtCore.QEvent.MouseButtonPress: "press",
+        QtCore.QEvent.MouseButtonRelease: "release",
+        QtCore.QEvent.MouseButtonDblClick: "double",
+        QtCore.QEvent.KeyPress: "key",
+        QtCore.QEvent.NonClientAreaMouseButtonPress: "nc_press",
+    }
+
+    def eventFilter(self, obj, event):
+        try:
+            kind = self.KINDS.get(event.type())
+            if kind and isinstance(obj, QtWidgets.QWidget):
+                _S["events"][kind] = _S["events"].get(kind, 0) + 1
+                pos = event.globalPosition().toPoint() if hasattr(event, "globalPosition") else None
+                _S["last"] = [kind, type(obj).__name__, obj.objectName(), [pos.x(), pos.y()] if pos else None]
+        except Exception:
+            pass
+        return False
+
+
+_INPUT = _Input()
 
 
 def log(text):
@@ -133,6 +159,23 @@ def _state():
         except RuntimeError:
             pass
     out["points"] = points
+    out["events"] = dict(_S["events"])
+    out["last_event"] = _S["last"]
+    app = QtWidgets.QApplication.instance()
+    modal, popup = app.activeModalWidget(), app.activePopupWidget()
+    out["modal"] = [type(modal).__name__, modal.objectName(), modal.windowTitle()] if modal is not None else None
+    out["popup"] = [type(popup).__name__, popup.objectName()] if popup is not None else None
+    out["active_window"] = type(app.activeWindow()).__name__ if app.activeWindow() is not None else None
+    tops = []
+    for w in app.topLevelWidgets():
+        try:
+            if w.isVisible() and w is not mw:
+                g = w.geometry()
+                tops.append([type(w).__name__, w.objectName(), w.windowTitle()[:40], [g.x(), g.y(), g.width(), g.height()], bool(w.isModal())])
+        except RuntimeError:
+            pass
+    out["other_windows"] = tops[:12]
+    out["enabled"] = mw.isEnabled()
     return out
 
 
@@ -220,6 +263,7 @@ def _start():
         Gui.activateWorkbench("Fission180Workbench")
     except Exception:
         log("activate: %s" % traceback.format_exc())
+    QtWidgets.QApplication.instance().installEventFilter(_INPUT)
     timer = QtCore.QTimer()
     timer.setInterval(100)
     timer.timeout.connect(_tick)
