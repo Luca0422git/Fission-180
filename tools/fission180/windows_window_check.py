@@ -288,7 +288,7 @@ def press(*vks):
 
 
 def click(x, y):
-    print("[Fission 180] click at %s,%s on %s" % (x, y, json.dumps(under(x, y))))
+    print("[Fission 180] click at %s,%s on %s" % (x, y, (under(x, y)["root"] or {}).get("title")))
     move(x, y)
     time.sleep(0.15)
     down()
@@ -298,7 +298,7 @@ def click(x, y):
 
 
 def double_click(x, y):
-    print("[Fission 180] double-click at %s,%s on %s" % (x, y, json.dumps(under(x, y))))
+    print("[Fission 180] double-click at %s,%s on %s" % (x, y, (under(x, y)["root"] or {}).get("title")))
     move(x, y)
     time.sleep(0.15)
     for _ in range(2):
@@ -310,7 +310,7 @@ def double_click(x, y):
 
 
 def drag(x0, y0, dx, dy, steps=15):
-    print("[Fission 180] drag from %s,%s by %s,%s on %s" % (x0, y0, dx, dy, json.dumps(under(x0, y0))))
+    print("[Fission 180] drag from %s,%s by %s,%s on %s" % (x0, y0, dx, dy, (under(x0, y0)["root"] or {}).get("title")))
     move(x0, y0)
     time.sleep(0.2)
     down()
@@ -404,7 +404,17 @@ def facts(app, label):
             "taskbar": window_rect(tray()) if tray() else None,
             "autohide": autohide(),
         }
-    print("[Fission 180] facts %s: %s" % (label, json.dumps(f)))
+    q, w = f["qt"], f.get("win") or {}
+    short = {"MAXIMIZE": "MAX", "CAPTION": "CAP", "THICKFRAME": "THICK", "POPUP": "POPUP"}
+    style = "+".join(short[s[3:]] for s in w.get("styles", []) if s[3:] in short)
+    print(
+        "[Fission 180] facts %s | qt max=%s geom=%s press=%s modal=%s | win rect=%s zoomed=%s %s enabled=%s fg=%s work=%s cursor=%s"
+        % (label, q.get("qt_maximized"), q.get("qt_geometry"), (q.get("events") or {}).get("press", 0),
+           (q.get("modal") or [None, None, None])[2], w.get("rect"), w.get("zoomed"), style,
+           w.get("enabled"), w.get("foreground"), w.get("work"), w.get("cursor"))
+    )
+    with open(os.path.join(app.out, "facts.jsonl"), "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(f) + "\n")
     sys.stdout.flush()
     shot(app, label)
     return s, f
@@ -673,6 +683,9 @@ def main():
     lines += ["- %s %s%s" % ("✅" if r["passed"] else "❌", r["name"], (" (%s)" % r["detail"]) if r["detail"] else "") for r in RESULTS]
     with open(os.path.join(out, "window-report.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+    print("[Fission 180] -- all checks")
+    for r in RESULTS:
+        print("[Fission 180]   %s %s (%s)" % ("PASS" if r["passed"] else "FAIL", r["name"], r["detail"][:160]))
     print("[Fission 180] window summary: %d checks, %d failed" % (len(RESULTS), len(failed)))
     return 1 if failed or not RESULTS else 0
 
