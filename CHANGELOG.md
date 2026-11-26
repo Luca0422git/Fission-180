@@ -8,6 +8,28 @@ problems are in [docs/fission180/known-issues.md](docs/fission180/known-issues.m
 Fission 180 was called **SciForge** until 0.1.0-beta.3.2.1; the sections below that one describe
 releases published under the old name (their tags are `sciforge-v...`).
 
+## 0.1.0-beta.4.3.1
+
+### Fixed
+
+- **Quitting with a design open no longer freezes, and no longer asks to save a saved design.**
+  Fission 180 used to switch its whole interface off the moment you closed the window, before
+  FreeCAD asked anything, and then on again while the question was up: that was the long pause.
+  Switching off also gave FreeCAD its own sketch colours back, which FreeCAD counted as a change
+  to every open design, so it asked "Save changes?" even right after you saved. Now Fission 180
+  only switches off once the close has gone through. A saved design closes without a question;
+  a changed one gets Fission 180's own Save / Don't Save question at once (or becomes a version by
+  itself, with Automatic version on close). Switching FreeCAD's workbench away from Fission 180
+  and back no longer marks a saved design as changed either.
+- **Windows: Fission 180's own title bar behaves like a normal window again.** The window could
+  jump to the side when its top row was clicked, could not be moved or resized, hid a taskbar set
+  to hide itself, and Windows+Down minimized it. On Windows the window now keeps its normal
+  Windows frame and only its caption is taken away: drag the empty part of the top row to move
+  the window (to the screen's top edge to maximize, to a side for half the screen), double-click
+  it to maximize or restore, right-click it for the window menu, drag any edge to resize (the top
+  edge too), and Windows+arrows, the Windows key and a self-hiding taskbar work as with any
+  other window. Linux is unchanged.
+
 ## 0.1.0-beta.4.3.0
 
 ### New

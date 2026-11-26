@@ -4,6 +4,48 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
+**2026-11-26: 0.1.0-beta.4.3.1 on `develop` (not released yet): quitting, and Windows' title
+bar.** Two of Luca's reports. (1) Every system: "if i exit out of the app with a design open, no
+matter if ive saved or not, it freezes for 10 seconds, then gives me a 'unsaved document. would
+you like to save' window". Cause: shell's close guard switched the whole interface off on the main
+window's Close event (before FreeCAD asked anything) and a 0 ms timer switched it on again while
+FreeCAD's question was up (a modal loop runs timers); switching off gave FreeCAD its sketch
+parameters back (sketch_mode._restore_params), and FreeCAD's ViewProviderSketch takes parameter
+changes into its view properties, which marks every open design modified (so also on every
+workbench switch with a design open). Fix: shell._window_closed on FreeCAD's `mainWindowClosed()`
+signal (MainWindow::closeEvent, after tryClose accepted and every design closed, before
+saveWindowSettings; PySide connects with `QtCore.QObject.connect(mw,
+QtCore.SIGNAL("mainWindowClosed()"), fn)`), no re-enable timer; shell.enable/disable keep saved
+designs saved (_saved_designs / _still_saved: Gui document Modified back to False); titlebar_ui's
+closing flag and View's leave move to the accepted close. Test `Fission180Tests/gui/quit_gui.py`
+(run_tests.sh gui-base, cases saved and changed; the result written at aboutToQuit): RED on the old
+code (FreeCAD's QMessageBox for the saved design, the workbench switch marked it modified, Fission
+180 was ON again when the layout was saved), GREEN now (no question, quit in 0.3 s; a changed
+design gets Fission 180's CloseDialog in 0.05 s). (2) Windows: "If i even look at the top bar
+wrong, the window glitches out ... I cant resize the window, nor move it around ... i cant access
+my hidden taskbar. and pressing the windows key causes the window to move randomly". New
+workflow `.github/workflows/fission180-windows-window.yml` (push to develop / claude/** touching
+the title bar): FreeCAD for Windows + Fission 180 on GitHub's Windows runner, driven by
+`tools/fission180/windows_window_check.py` with SendInput (real clicks, drags, keys) and Win32
+facts, `windows_window_helper.py` inside FreeCAD reports Qt's side (state.json, command.json).
+Lessons: the runner shows FreeCAD's modal "Invalid OpenGL Version" box (disables the main window:
+close it first); os.replace of a file FreeCAD has open fails on Windows (retry); a drag ending in
+the screen's bottom-right corner hits Show desktop. The old code reproduced everything: switched
+frameless while maximized, Qt's WindowCreationData::applyWindowFlags keeps only WS_VISIBLE /
+WS_DISABLED, so WS_MAXIMIZE was lost (8 px off every edge, not maximized, the normal size gone);
+Windows+Down MINIMIZED the window and Windows+Up could not bring it back; Qt's frameless
+"maximize" (MoveWindow to rcWork) covers the whole monitor when the taskbar hides itself, so the
+taskbar never came out. Fix: on Windows the window keeps its frame; `titlebar_win.py` (a Python
+QAbstractNativeEventFilter: PySide6 6.8.3 takes a `(handled, result)` tuple; checked) answers
+WM_NCCALCSIZE (DefWindowProc, then the client's top back to the window's top; maximized: as far in
+as the left border), WM_NCHITTEST (DefWindowProc's borders; inside, titlebar_core.hit_test: a 5 px
+top band resizes, the empty top row is HTCAPTION, titlebar_ui._empty_at) and WM_GETMINMAXINFO
+(titlebar_core.autohide_gaps: 2 px short of a hiding taskbar's edge, primary monitor only). Qt 6.8
+follows a frame whose left/right/bottom stay Windows' own (calculateFullFrameMargins' "typical
+frame", QTBUG-113736), one geometry event late: SWP_FRAMECHANGED moves and resizes the inside, so
+WM_MOVE and WM_SIZE both come and the second one is right. Linux keeps FramelessWindowHint.
+[ ] Windows check green (taskbar gap first). [ ] CI, Luca's go, Luca tries it on Windows.
+
 **2026-11-25: 0.1.0-beta.4.3.0 released 04:06 UTC: the VIEW workspace** (patch release run #25;
 `Release`, the tag and develop at 5a58de00; CI #200 green; Luca: "release it"; Luca: "the last addition to the
 'Cyberpunk UI' ... a new workspace ... called 'View' ... I have XR glasses. they use oled pannels.
