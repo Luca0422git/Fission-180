@@ -662,8 +662,11 @@ def run(app):
             time.sleep(1.0)
             s, f = facts(app, "maximized, taskbar hides itself")
             print("[Fission 180] native: %s" % json.dumps(s.get("native")))
-            mon, vis = f["win"]["monitor"], f["win"]["visible"]
-            check("With a hiding taskbar the maximized window leaves the screen's edge free", vis[3] < mon[3] or vis[1] > mon[1] or vis[0] > mon[0] or vis[2] < mon[2], "%s vs monitor %s" % (vis, mon))
+            mon = f["win"]["monitor"]
+            x, y, w, h = inside(hwnd)
+            vis = [x, y, x + w, y + h]
+            check("With a hiding taskbar the maximized window's inside leaves the screen's edge free", vis[3] < mon[3] or vis[1] > mon[1] or vis[0] > mon[0] or vis[2] < mon[2], "%s vs monitor %s" % (vis, mon))
+            agree(app, "Maximized, the taskbar hiding itself")
             move((mon[0] + mon[2]) // 2, mon[3] - 1)
             time.sleep(2.0)
             s, f = facts(app, "mouse at the bottom edge")
