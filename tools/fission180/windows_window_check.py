@@ -376,7 +376,14 @@ class App:
         tmp = os.path.join(self.out, "command.json.tmp")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"id": self.cid, "do": do, "arg": arg}, f)
-        os.replace(tmp, os.path.join(self.out, "command.json"))
+        for attempt in range(50):  # (Windows: FreeCAD may have the file open just then)
+            try:
+                os.replace(tmp, os.path.join(self.out, "command.json"))
+                break
+            except PermissionError:
+                time.sleep(0.05)
+        else:
+            raise RuntimeError("cannot hand the helper %s" % do)
         cid = self.cid
         if self.wait(lambda s: s.get("ack") == cid, 20) is None:
             raise RuntimeError("the helper did not do %s" % do)
@@ -499,7 +506,8 @@ def run(app):
         s, f = facts(app, "start, after a drag")
         after = f["win"]["rect"]
         moved = [after[0] - before[0], after[1] - before[1]]
-        check("As FreeCAD starts: Qt gets the presses", (s.get("events") or {}).get("press", 0) > 0, str(s.get("events")))
+        ev = s.get("events") or {}
+        check("As FreeCAD starts: the press arrives (Qt's or Windows' caption)", ev.get("press", 0) + ev.get("nc_press", 0) > 0, str(ev))
         check("As FreeCAD starts: dragging the top row moves the window", near(moved, [60, 40]), "moved %s" % moved)
 
     def a_system_normal():
@@ -532,6 +540,7 @@ def run(app):
         agree(app, "Own title bar, restored")
 
     def d_drag():
+        place()
         s, f = facts(app, "before drag")
         before = f["win"]["rect"]
         x, y = point(app, "row_empty")
@@ -547,6 +556,7 @@ def run(app):
         check("After the drag, moving the mouse alone moves nothing", near(f2["win"]["rect"], after, 1), "%s -> %s" % (after, f2["win"]["rect"]))
 
     def e_click():
+        place()
         s, f = facts(app, "before click")
         before = f["win"]["rect"]
         x, y = point(app, "row_empty")
@@ -556,7 +566,16 @@ def run(app):
         s, f = facts(app, "mouse moved after a click on the top row")
         check("A click on the top row, then moving the mouse, moves nothing", near(f["win"]["rect"], before, 1), "%s -> %s" % (before, f["win"]["rect"]))
 
+    def place():
+        """A known, whole-on-screen place to start from (a drag before may have left the
+        window half off the screen, and a corner of the screen is the taskbar's Show desktop)."""
+        app.command("activate", settle=0.3)
+        app.command("normal", settle=0.8)
+        app.command("geometry", [150, 110, 640, 420], settle=1.2)
+        user32.SetForegroundWindow(hwnd)
+
     def f_resize():
+        place()
         s, f = facts(app, "before resize")
         before = f["win"]["rect"]
         v = f["win"]["visible"]
@@ -580,6 +599,7 @@ def run(app):
         memo["normal_client"] = s["qt_geometry"][2:]
 
     def g_double_click():
+        place()
         x, y = point(app, "row_empty")
         double_click(x, y)
         s, f = facts(app, "double-click on the top row")
@@ -591,6 +611,7 @@ def run(app):
         check("Double-click again restores the size", not s["qt_maximized"] and near(s["qt_geometry"][2:], memo["normal_client"], 12), "%s vs %s" % (s["qt_geometry"][2:], memo["normal_client"]))
 
     def h_drag_maximized():
+        place()
         click(*point(app, "maximize"))
         s, f = facts(app, "maximize button")
         check("The maximize button fills the work area", s["qt_maximized"] and fills_work(f), "%s vs work %s" % (f["win"]["visible"], f["win"]["work"]))
@@ -603,6 +624,7 @@ def run(app):
         check("... and the mouse still holds its top row", r[0] <= c[0] <= r[2] and r[1] <= c[1] <= r[1] + 60, "cursor %s, window %s" % (c, r))
 
     def i_windows_key():
+        place()
         click(*point(app, "maximize"))
         s, f = facts(app, "maximized again")
         before = f["win"]["visible"]
@@ -637,6 +659,7 @@ def run(app):
             click(*point(app, "maximize"))
             time.sleep(1.0)
             s, f = facts(app, "maximized, taskbar hides itself")
+            print("[Fission 180] native: %s" % json.dumps(s.get("native")))
             mon, vis = f["win"]["monitor"], f["win"]["visible"]
             check("With a hiding taskbar the maximized window leaves the screen's edge free", vis[3] < mon[3] or vis[1] > mon[1] or vis[0] > mon[0] or vis[2] < mon[2], "%s vs monitor %s" % (vis, mon))
             move((mon[0] + mon[2]) // 2, mon[3] - 1)

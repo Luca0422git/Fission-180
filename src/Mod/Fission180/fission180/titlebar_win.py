@@ -131,17 +131,35 @@ def _signed16(value):
     return value - 0x10000 if value & 0x8000 else value
 
 
+EDGE_NAMES = {0: "left", 1: "top", 2: "right", 3: "bottom"}
+
+
 def _hidden_edges(monitor_rect):
-    """The edges of this monitor where a taskbar hides itself (ABM_GETAUTOHIDEBAREX)."""
+    """The edges of this monitor where a taskbar hides itself: ABM_GETAUTOHIDEBAREX for each
+    edge; else Windows' own taskbar (ABM_GETSTATE says it hides itself, ABM_GETTASKBARPOS says on
+    which edge) when it is on this monitor."""
     api = _win()
+    ctypes, shell32 = api["ctypes"], api["shell32"]
     edges = []
-    for code, name in ((0, "left"), (1, "top"), (2, "right"), (3, "bottom")):
+    for code, name in EDGE_NAMES.items():
         abd = api["APPBARDATA"]()
-        abd.cbSize = api["ctypes"].sizeof(abd)
+        abd.cbSize = ctypes.sizeof(abd)
         abd.uEdge = code
         abd.rc.left, abd.rc.top, abd.rc.right, abd.rc.bottom = monitor_rect
-        if api["shell32"].SHAppBarMessage(0x0000000B, api["ctypes"].byref(abd)):
+        if shell32.SHAppBarMessage(0x0000000B, ctypes.byref(abd)):
             edges.append(name)
+    if not edges:
+        abd = api["APPBARDATA"]()
+        abd.cbSize = ctypes.sizeof(abd)
+        if shell32.SHAppBarMessage(0x00000004, ctypes.byref(abd)) & 0x1:  # ABM_GETSTATE: ABS_AUTOHIDE
+            pos = api["APPBARDATA"]()
+            pos.cbSize = ctypes.sizeof(pos)
+            if shell32.SHAppBarMessage(0x00000005, ctypes.byref(pos)):  # ABM_GETTASKBARPOS
+                left, top, right, bottom = monitor_rect
+                cx, cy = (pos.rc.left + pos.rc.right) // 2, (pos.rc.top + pos.rc.bottom) // 2
+                near = left - 64 <= cx <= right + 64 and top - 64 <= cy <= bottom + 64
+                if near and pos.uEdge in EDGE_NAMES:
+                    edges.append(EDGE_NAMES[pos.uEdge])
     return edges
 
 
@@ -211,11 +229,12 @@ class _Filter(QtCore.QAbstractNativeEventFilter):
         info.cbSize = api["ctypes"].sizeof(info)
         if not user32.GetMonitorInfoW(user32.MonitorFromWindow(msg.hwnd, 2), api["ctypes"].byref(info)):
             return
-        if not info.dwFlags & 1:  # (MONITORINFOF_PRIMARY: see the module's note)
-            return
         mon = (info.rcMonitor.left, info.rcMonitor.top, info.rcMonitor.right, info.rcMonitor.bottom)
         work = (info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom)
-        rect = core.autohide_gaps(mon, work, _hidden_edges(mon))
+        primary = bool(info.dwFlags & 1)
+        edges = _hidden_edges(mon) if primary else []  # (MONITORINFOF_PRIMARY: the module's note)
+        rect = core.autohide_gaps(mon, work, edges)
+        _state["last_max"] = {"primary": primary, "monitor": mon, "work": work, "edges": edges, "rect": rect}
         if rect is None:
             return
         mmi = api["MINMAXINFO"].from_address(msg.lParam)

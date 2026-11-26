@@ -176,6 +176,17 @@ def _state():
             pass
     out["other_windows"] = tops[:12]
     out["enabled"] = mw.isEnabled()
+    try:
+        from fission180 import titlebar_win
+
+        flt = titlebar_win._state.get("filter")
+        out["native"] = {
+            "on": bool(flt is not None and flt.on),
+            "installed": titlebar_win._state.get("installed"),
+            "last_max": titlebar_win._state.get("last_max"),
+        }
+    except Exception as exc:
+        out["native"] = str(exc)
     return out
 
 
