@@ -26,10 +26,11 @@ The answers:
   caption (Windows then moves the window, snaps it to the screen's edges, maximizes it on a
   double-click and opens the window menu on a right-click), the rest is the program's
   (titlebar_core.hit_test).
-* Maximized on a monitor whose taskbar hides itself, the window's inside stops 2 px short of
-  that edge (in WM_NCCALCSIZE; titlebar_core.autohide_gaps), so the mouse there still brings the
-  taskbar out: a window whose inside covers the whole screen is taken for a full screen program
-  and the taskbar stays away. (On GitHub's runner Windows ignored a smaller maximized size asked
+* Maximized on a monitor whose taskbar hides itself, the window's inside starts 2 px below the
+  screen's top (in WM_NCCALCSIZE; titlebar_core.autohide_gaps), so the mouse at the taskbar's
+  edge still brings it out: a window whose inside covers the whole screen is taken for a full
+  screen program and the taskbar stays away. Always at the top: Qt 6.8 follows only a change of
+  the top border. (On GitHub's runner Windows ignored a smaller maximized size asked
   for in WM_GETMINMAXINFO, and put back a maximized rectangle trimmed in WM_WINDOWPOSCHANGING.)
 
 Maximize, restore, minimize, Windows+arrows, the Windows key, snap and the taskbar are then
@@ -195,36 +196,33 @@ class _Filter(QtCore.QAbstractNativeEventFilter):
             # (maximized, Windows puts the frame's border outside the screen: as much at the top
             # as it put at the left)
             r.top = top + (r.left - left)
-            sides, above = self._autohide_inset(api, msg.hwnd)
-            # (Qt follows a frame whose left, right and bottom borders are equal: a gap at any of
-            # those three edges goes on all three; one at the top on its own)
-            r.left += sides
-            r.right -= sides
-            r.bottom -= sides
-            r.top += above
+            # (the gap at the top whatever edge the taskbar hides on: Qt 6.8 takes the left, right
+            # and bottom borders to be Windows' own and works out only the top from the rest, so
+            # a gap anywhere else put Qt's picture 2 px off and cut 4 px off its right end. The
+            # taskbar only needs the inside not to cover the whole screen: checked on the runner)
+            r.top += self._autohide_inset(api, msg.hwnd)
         else:
             r.top = top
         return True, result
 
     def _autohide_inset(self, api, hwnd):
-        """(sides, top): how much less of a maximized window is the program's where a taskbar
-        hides itself on this monitor (titlebar_core.autohide_gaps), so the mouse at that edge
-        still brings it out: a window whose inside covers the whole screen is taken for a full
-        screen program and the taskbar stays away (Luca, 2026-11-26)."""
+        """How much less of a maximized window is the program's on a monitor where a taskbar
+        hides itself (titlebar_core.autohide_gaps), so the mouse at its edge still brings it out:
+        a window whose inside covers the whole screen is taken for a full screen program and the
+        taskbar stays away (Luca, 2026-11-26)."""
         user32, ctypes = api["user32"], api["ctypes"]
         info = api["MONITORINFO"]()
         info.cbSize = ctypes.sizeof(info)
         if not user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, 2), ctypes.byref(info)):
-            return 0, 0
+            return 0
         mon = (info.rcMonitor.left, info.rcMonitor.top, info.rcMonitor.right, info.rcMonitor.bottom)
         work = (info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom)
         edges = _hidden_edges(mon)
         rect = core.autohide_gaps(mon, work, edges)
         _state["last_max"] = {"monitor": mon, "work": work, "edges": edges, "rect": rect}
         if rect is None:
-            return 0, 0
-        sides = max(rect[0] - work[0], work[2] - rect[2], work[3] - rect[3])
-        return sides, rect[1] - work[1]
+            return 0
+        return max(rect[0] - work[0], rect[1] - work[1], work[2] - rect[2], work[3] - rect[3])
 
     def _hit_test(self, api, msg):
         user32 = api["user32"]

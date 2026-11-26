@@ -40,8 +40,10 @@ QAbstractNativeEventFilter: PySide6 6.8.3 takes a `(handled, result)` tuple; che
 WM_NCCALCSIZE (DefWindowProc, then the client's top back to the window's top; maximized: as far in
 as the left border), WM_NCHITTEST (DefWindowProc's borders; inside, titlebar_core.hit_test: a 5 px
 top band resizes, the empty top row is HTCAPTION, titlebar_ui._empty_at); maximized with a hiding
-taskbar the INSIDE stops 2 px short in WM_NCCALCSIZE (left/right/bottom alike, so Qt's typical-frame
-margins hold; titlebar_core.autohide_gaps). Windows ignored a smaller WM_GETMINMAXINFO ptMaxSize and
+taskbar the INSIDE starts 2 px lower in WM_NCCALCSIZE (always at the TOP: Qt 6.8's
+calculateFullFrameMargins takes left/right/bottom as the system's border and derives only the top,
+so a gap there put Qt 2 px off and cut 4 px off its right end, run 12; the taskbar only needs the
+inside not to cover the screen; titlebar_core.autohide_gaps). Windows ignored a smaller WM_GETMINMAXINFO ptMaxSize and
 put back a maximized WINDOWPOS trimmed in WM_WINDOWPOSCHANGING (even answered without
 DefWindowProc): both tried on the runner, runs 8 and 10. Qt 6.8
 follows a frame whose left/right/bottom stay Windows' own (calculateFullFrameMargins' "typical
