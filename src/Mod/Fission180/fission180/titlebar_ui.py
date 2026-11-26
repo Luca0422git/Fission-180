@@ -12,6 +12,11 @@ quick-access buttons and the document tabs) is the title bar:
 * without the system's frame the window has no resize border: thin grips line its edges
   and corners (titlebar_core.grips) and start the system's own resize; not while maximized.
 
+That is Linux. On Windows the window keeps its Windows frame and Fission 180 only answers
+Windows' questions about it (titlebar_win): the caption goes, the empty parts of the top row
+become the caption, and moving, snapping, maximizing, Windows+arrows and the hidden taskbar
+stay Windows' own (0.1.0-beta.4.3.1: the frameless window broke all of these on Windows).
+
 Preferences > General > Appearance > Title bar: Fission 180's (the default) or the system's.
 Switching Fission 180's interface off gives the system's title bar back. The window keeps its
 title (the taskbar shows it). Never lets an exception out of an event filter.
@@ -21,7 +26,13 @@ import FreeCAD as App
 
 from . import log, warn
 from . import titlebar_core as core
+from . import titlebar_win
 from .compat import QtCore, QtGui, QtWidgets
+
+# Windows: the window keeps its Windows frame and Fission 180 answers what is under the mouse
+# (titlebar_win: snap, Windows+arrows, the hidden taskbar and maximize stay Windows' own);
+# elsewhere Qt's FramelessWindowHint, a drag of the top row and resize grips.
+NATIVE = titlebar_win.available()
 
 PARAMS = "User parameter:BaseApp/Preferences/Mod/Fission180/Preferences"  # prefs_core.PREFS
 KEY = "TitleBar"
@@ -33,7 +44,7 @@ _state = {
     "grips": [],
     "watcher": None,
     "drag": None,
-    "closing": False,  # the window is closing: its frame is left alone
+    "closing": False,  # the window is closing (its close accepted): its frame is left alone
     "quit_hook": False,
 }
 
@@ -280,6 +291,30 @@ def _place_grips():
             pass
 
 
+def _is_empty(widget, point):
+    """A press at `point` of `widget` (the top row or a child of it) reaches the row itself:
+    nothing there takes it (a label, a plain container, a tab bar beside its tabs)."""
+    if widget is None:
+        return True
+    if isinstance(widget, QtWidgets.QTabBar):
+        return widget.tabAt(point) < 0
+    return type(widget) in (QtWidgets.QWidget, QtWidgets.QFrame, QtWidgets.QLabel)
+
+
+def _empty_at(window, x, y):
+    """titlebar_win: is (x, y) of the window's inside (Qt's pixels) an empty part of the top
+    row (Windows then takes it for the window's caption)?"""
+    controls = _state["controls"]
+    row = controls.parentWidget() if controls is not None and _alive(controls) else None
+    if row is None or not row.isVisible():
+        return False
+    p = row.mapFrom(window, QtCore.QPoint(int(x), int(y)))
+    if not row.rect().contains(p):
+        return False
+    child = row.childAt(p)
+    return _is_empty(child, child.mapFrom(row, p) if child is not None else p)
+
+
 # -- the top row: move and maximize ---------------------------------------------------------
 class _Watcher(QtCore.QObject):
     """On the main window: its size and state (the grips, the maximize button). On the top
@@ -290,11 +325,6 @@ class _Watcher(QtCore.QObject):
             kind = event.type()
             mw = _main()
             if obj is mw:
-                if kind == QtCore.QEvent.Close:
-                    # (shell's close guard switches Fission 180 off next: the frame is not
-                    # given back to a window that is going away; enable() clears this when
-                    # the close was cancelled)
-                    _state["closing"] = True
                 if kind in (QtCore.QEvent.Resize, QtCore.QEvent.WindowStateChange, QtCore.QEvent.Show):
                     _place_grips()
                     controls = _state["controls"]
@@ -397,7 +427,7 @@ def apply():
             row.layout().addWidget(_state["controls"])
         if row is not None and _state["watcher"] is not None:
             row.removeEventFilter(_state["watcher"])
-            if want:
+            if want and not NATIVE:  # (Windows moves the window from the row itself)
                 row.installEventFilter(_state["watcher"])
         if _state["controls"] is not None:
             _state["controls"].setVisible(want)
@@ -405,10 +435,18 @@ def apply():
             # (close flush with the window's right edge, as on a system title bar)
             m = row.layout().contentsMargins()
             row.layout().setContentsMargins(m.left(), m.top(), 0 if want else m.left(), m.bottom())
-        if want and not _state["grips"]:
-            _state["grips"] = [Grip(name, mw) for name in core.EDGES]
-        if want or not _state["closing"]:
-            _frameless(mw, want)
+        if NATIVE:
+            # (Windows' own borders resize; a window made frameless by an older version is
+            # given its frame back first)
+            if bool(mw.windowFlags() & QtCore.Qt.FramelessWindowHint) and not _state["closing"]:
+                _frameless(mw, False)
+            if not _state["closing"]:
+                titlebar_win.set_on(mw, want, _empty_at)
+        else:
+            if want and not _state["grips"]:
+                _state["grips"] = [Grip(name, mw) for name in core.EDGES]
+            if want or not _state["closing"]:
+                _frameless(mw, want)
         _place_grips()
         if _state["controls"] is not None:
             _state["controls"].refresh()
@@ -416,11 +454,19 @@ def apply():
         warn("title bar: %s" % exc)
 
 
+def window_closing():
+    """The main window is going away (shell._window_closed: FreeCAD accepted the close): its
+    frame is not given back, and nothing asks it for anything from now on."""
+    _state["closing"] = True
+    titlebar_win.closing()
+
+
 def _quitting():
     """Qt's aboutToQuit: the watcher off the window before FreeCAD destroys it (a Python event
     filter called while the window was being destroyed crashed FreeCAD at every exit)."""
     try:
         _state["closing"] = True
+        titlebar_win.remove()
         watcher = _state["watcher"]
         if watcher is None:
             return

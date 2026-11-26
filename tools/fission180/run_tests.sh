@@ -371,6 +371,13 @@ run_gui_base() {
         FISSION180_RESTART_PHASE="${phase}" run_gui_script restart restart_gui.py \
             "restart-${phase}.log" "restart-${phase}.json"
     done
+    # Quitting with a design open, each case a start and a quit (Luca, 2026-11-26: a 10 s
+    # freeze, then FreeCAD's "save changes?" for a design just saved)
+    local case
+    for case in saved changed; do
+        FISSION180_QUIT_CASE="${case}" run_gui_script quit quit_gui.py \
+            "quit-${case}.log" "quit-${case}.json"
+    done
     return 0
 }
 

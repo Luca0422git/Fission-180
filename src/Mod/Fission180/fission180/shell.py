@@ -245,7 +245,59 @@ def _sketch_mode_off():
     sketch_mode.disable()
 
 
+def _saved_designs():
+    """The open designs FreeCAD has as saved (no unsaved changes)."""
+    names = []
+    try:
+        import FreeCAD as App
+        import FreeCADGui as Gui
+
+        for name in App.listDocuments():
+            gdoc = Gui.getDocument(name)
+            if gdoc is not None and not gdoc.Modified:
+                names.append(name)
+    except Exception as exc:
+        warn("saved designs: %s" % exc)
+    return names
+
+
+def _still_saved(names):
+    """Switching the interface on or off changes only how designs look: FreeCAD's sketch
+    settings go and come back (sketch_mode), and FreeCAD's sketches take the new colours into
+    their own display settings, which FreeCAD counts as a change. A design that was saved
+    stays saved (Luca, 2026-11-26: FreeCAD asked to save a design just saved when he quit)."""
+    if not names:
+        return
+    try:
+        import FreeCAD as App
+        import FreeCADGui as Gui
+
+        for name in names:
+            if name in App.listDocuments():
+                gdoc = Gui.getDocument(name)
+                if gdoc is not None and gdoc.Modified:
+                    gdoc.Modified = False
+    except Exception as exc:
+        warn("saved designs: %s" % exc)
+
+
 def enable():
+    saved = _saved_designs()
+    try:
+        _enable()
+    finally:
+        _still_saved(saved)
+
+
+def disable():
+    saved = _saved_designs()
+    try:
+        _disable()
+    finally:
+        _still_saved(saved)
+
+
+def _enable():
     _connect()
     if not config.USE_RIBBON:  # legacy mode: plain toolbars, no theme
         if not _state["on"]:
@@ -311,7 +363,7 @@ def enable():
     log("interface on")
 
 
-def disable():
+def _disable():
     if not _state["on"]:
         return
     from . import navbar_ui, shortcuts, theme, timeline_ui
@@ -486,36 +538,43 @@ def _restore_menubar():
     _state["menubar"] = None
 
 
-class _CloseGuard(QtCore.QObject):
-    """FreeCAD saves toolbar/dock layout when its window closes. Turn Fission 180 off
-    first so only FreeCAD's own layout is saved; if the close is cancelled (unsaved
-    changes > Cancel), turn it back on."""
+def _window_closed():
+    """FreeCAD's mainWindowClosed: the close was accepted (every design is closed, after
+    FreeCAD's or Fission 180's own question about unsaved changes) and FreeCAD saves its window
+    layout next. Fission 180 goes off now, so only FreeCAD's own layout is saved.
 
-    def eventFilter(self, obj, event):
-        if event.type() == QtCore.QEvent.Close and _state["on"]:
-            disable()
-            QtCore.QTimer.singleShot(0, _reenable_if_still_open)
-        return False
-
-
-def _reenable_if_still_open():
-    import FreeCADGui as Gui
-
+    (Until 0.1.0-beta.4.3.1 it went off on the window's Close event, before FreeCAD asked
+    anything, and a timer switched it all on again while the question was up: every quit
+    switched the whole interface off and on before FreeCAD could ask, and switching off put
+    FreeCAD's own sketch settings back, which marked every open design as changed. Luca: "if i
+    exit out of the app with a design open, no matter if ive saved or not, it freezes for 10
+    seconds, then gives me a 'unsaved document. would you like to save' window".)"""
     try:
-        main = _main()
-        if main.isVisible() and Gui.activeWorkbench().name() == FISSION180_WB:
-            enable()
-    except Exception:
-        pass
+        from . import titlebar_ui
+
+        titlebar_ui.window_closing()
+    except Exception as exc:
+        warn("closing: %s" % exc)
+    try:
+        if _state["on"]:
+            disable()
+    except Exception as exc:
+        warn("closing: %s" % exc)
 
 
-_guard = {"filter": None}
+_guard = {"hooked": False}
 
 
 def _install_close_guard():
-    if _guard["filter"] is None:
-        _guard["filter"] = _CloseGuard()
-        _main().installEventFilter(_guard["filter"])
+    """_window_closed on FreeCAD's mainWindowClosed signal (MainWindow::closeEvent, once the
+    close is accepted, before saveWindowSettings)."""
+    if _guard["hooked"]:
+        return
+    try:
+        QtCore.QObject.connect(_main(), QtCore.SIGNAL("mainWindowClosed()"), _window_closed)
+        _guard["hooked"] = True
+    except Exception as exc:
+        warn("close hook: %s" % exc)
 
 
 def _hide_panels():

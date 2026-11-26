@@ -841,8 +841,9 @@ def _panel(on):
 # -- what View listens to --------------------------------------------------------------------------
 class _Filter(QtCore.QObject):
     """While View shows: Esc leaves; a widget View hid that shows itself is hidden again; the
-    window's close leaves View first (so the window's layout is saved as it was); the buttons
-    stay on top at the corner."""
+    buttons stay on top at the corner. (Quitting leaves View only once the close is accepted:
+    the design closes first (_Watch), so the window's layout is saved as it was, and a quit
+    cancelled at FreeCAD's question stays in View.)"""
 
     def eventFilter(self, obj, event):
         try:
@@ -857,8 +858,6 @@ class _Filter(QtCore.QObject):
             elif kind == QtCore.QEvent.Show and obj is not STATE.get("panel"):
                 if any(obj is w for w in STATE["hidden"]):
                     QtCore.QTimer.singleShot(0, lambda w=obj: _keep_hidden(w))
-            elif kind == QtCore.QEvent.Close and obj is _main():
-                leave_workspace()
             elif kind == QtCore.QEvent.Resize and obj is _main():
                 panel = STATE.get("panel")
                 if panel is not None:

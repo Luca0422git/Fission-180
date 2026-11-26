@@ -132,6 +132,8 @@ user32.GetClassNameW.argtypes = [W.HWND, W.LPWSTR, ctypes.c_int]
 user32.GetWindowTextW.argtypes = [W.HWND, W.LPWSTR, ctypes.c_int]
 user32.IsWindowEnabled.argtypes = [W.HWND]
 user32.GetWindowThreadProcessId.argtypes = [W.HWND, ctypes.POINTER(W.DWORD)]
+user32.GetClientRect.argtypes = [W.HWND, ctypes.POINTER(W.RECT)]
+user32.ClientToScreen.argtypes = [W.HWND, ctypes.POINTER(W.POINT)]
 dwmapi.DwmGetWindowAttribute.argtypes = [W.HWND, W.DWORD, ctypes.c_void_p, W.DWORD]
 shell32.SHAppBarMessage.restype = ULONG_PTR
 shell32.SHAppBarMessage.argtypes = [W.DWORD, ctypes.POINTER(APPBARDATA)]
@@ -171,6 +173,15 @@ def visible_rect(hwnd):
     if dwmapi.DwmGetWindowAttribute(hwnd, 9, ctypes.byref(r), ctypes.sizeof(r)) == 0:
         return _rect(r)
     return window_rect(hwnd)
+
+
+def inside(hwnd):
+    """The window's inside (the program's part) on the screen: [x, y, width, height]."""
+    r = W.RECT()
+    user32.GetClientRect(hwnd, ctypes.byref(r))
+    p = W.POINT(0, 0)
+    user32.ClientToScreen(hwnd, ctypes.byref(p))
+    return [p.x, p.y, r.right - r.left, r.bottom - r.top]
 
 
 def monitor(hwnd):
@@ -454,6 +465,17 @@ def fills_work(f):
     return near(f["win"]["visible"], f["win"]["work"])
 
 
+def agree(app, label):
+    """Qt draws the window where Windows has its inside (the runner is at 100 %: Qt's pixels
+    are the screen's)."""
+    s = app.state()
+    hwnd = s.get("hwnd")
+    if not hwnd:
+        return
+    win = inside(hwnd)
+    check("%s: Qt and Windows agree where the window's inside is" % label, near(s.get("qt_geometry") or [], win, 2), "Qt %s, Windows %s" % (s.get("qt_geometry"), win))
+
+
 def step(name, fn):
     try:
         fn()
@@ -486,6 +508,8 @@ def run(app):
         app.command("geometry", [120, 90, 760, 540], settle=1.5)
         s, f = facts(app, "system title bar, normal")
         memo["client"] = s["qt_geometry"][2:]
+        memo["visible"] = size(f["win"]["visible"])
+        agree(app, "System title bar")
         check("With the system's title bar the window is where it was put", not s["qt_maximized"] and on_screen(f["win"]["visible"], f["win"]["monitor"]), str(f["win"]["visible"]))
 
     def b_switch_while_maximized():
@@ -496,13 +520,16 @@ def run(app):
         s, f = facts(app, "own title bar switched on while maximized")
         check("Switched on while maximized: still maximized (restore button)", s["qt_maximized"] and s.get("maximize_tip") == "Restore Down", s.get("maximize_tip"))
         check("Switched on while maximized: fills the work area, no more", fills_work(f), "%s vs work %s" % (f["win"]["visible"], f["win"]["work"]))
+        check("Switched on while maximized: Windows still has it maximized", f["win"]["zoomed"] and "WS_MAXIMIZE" in f["win"]["styles"], f["win"]["styles"])
+        agree(app, "Own title bar, maximized")
 
     def c_restore():
         click(*point(app, "maximize"))
         s, f = facts(app, "restore button")
         check("Restore Down: no longer maximized", not s["qt_maximized"], s.get("maximize_tip"))
-        check("Restore Down: the earlier size", near(s["qt_geometry"][2:], memo["client"], 12), "%s vs %s" % (s["qt_geometry"][2:], memo["client"]))
+        check("Restore Down: the window's earlier size", near(size(f["win"]["visible"]), memo["visible"], 12), "%s vs %s" % (size(f["win"]["visible"]), memo["visible"]))
         check("Restore Down: on the screen", on_screen(f["win"]["visible"], f["win"]["monitor"]), str(f["win"]["visible"]))
+        agree(app, "Own title bar, restored")
 
     def d_drag():
         s, f = facts(app, "before drag")
@@ -532,17 +559,24 @@ def run(app):
     def f_resize():
         s, f = facts(app, "before resize")
         before = f["win"]["rect"]
-        x, y = point(app, "grip_right")
-        drag(x, y, 100, 0)
+        v = f["win"]["visible"]
+        # (Windows' own invisible border just outside the visible window, as a person grabs it)
+        drag(v[2] + 3, (v[1] + v[3]) // 2, 100, 0)
         s, f = facts(app, "after right edge")
         after = f["win"]["rect"]
         check("Dragging the right edge makes the window wider", near(size(after), [size(before)[0] + 100, size(before)[1]]), "%s -> %s" % (size(before), size(after)))
-        x, y = point(app, "grip_bottom_right")
-        drag(x, y, -80, 50)
+        v = f["win"]["visible"]
+        drag(v[2] + 3, v[3] + 3, -80, 50)
         s, f = facts(app, "after bottom-right corner")
         after2 = f["win"]["rect"]
         check("Dragging the bottom-right corner resizes both ways", near(size(after2), [size(after)[0] - 80, size(after)[1] + 50]), "%s -> %s" % (size(after), size(after2)))
-        memo["normal"] = size(after2)
+        v = f["win"]["visible"]
+        drag((v[0] + v[2]) // 2, v[1] + 2, 0, -40)
+        s, f = facts(app, "after top edge")
+        after3 = f["win"]["rect"]
+        check("Dragging the top edge makes the window taller", near(size(after3), [size(after2)[0], size(after2)[1] + 40]) and near([after3[1]], [after2[1] - 40]), "%s -> %s" % (after2, after3))
+        agree(app, "Own title bar, resized")
+        memo["normal"] = size(after3)
         memo["normal_client"] = s["qt_geometry"][2:]
 
     def g_double_click():
@@ -550,6 +584,7 @@ def run(app):
         double_click(x, y)
         s, f = facts(app, "double-click on the top row")
         check("Double-click on the top row maximizes", s["qt_maximized"] and fills_work(f), "%s vs work %s" % (f["win"]["visible"], f["win"]["work"]))
+        agree(app, "Own title bar, maximized by a double-click")
         x, y = point(app, "row_empty")
         double_click(x, y)
         s, f = facts(app, "double-click again")

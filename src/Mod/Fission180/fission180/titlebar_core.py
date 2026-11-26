@@ -52,3 +52,47 @@ def grips(width, height, grip=GRIP, corner=CORNER):
         "bottom_left": (0, h - c, c, c),
         "bottom_right": (w - c, h - c, c, c),
     }
+
+
+# -- Windows: the window keeps its frame, Fission 180 answers what is under the mouse ---------------
+TOP_BAND = 5  # px: along the top edge (the frame's own border is gone there), it resizes
+TOP_CORNER = 12  # px: at the top band's ends, it resizes two edges at once
+AUTOHIDE_GAP = 2  # px: kept free where the taskbar hides itself (titlebar_win)
+
+CLIENT, CAPTION, TOP, TOP_LEFT, TOP_RIGHT = "client", "caption", "top", "top_left", "top_right"
+
+
+def hit_test(x, y, width, maximized, empty_row, band=TOP_BAND, corner=TOP_CORNER):
+    """What the point (x, y) of the window's inside is, `width` wide: the top band resizes
+    (not when maximized), an empty part of the top row is the window's caption (Windows moves
+    the window from it), anything else is the program's. empty_row: the point is on the top
+    row where no button, tab or field is."""
+    if not maximized and 0 <= y < band:
+        if x < corner:
+            return TOP_LEFT
+        if x >= width - corner:
+            return TOP_RIGHT
+        return TOP
+    return CAPTION if empty_row else CLIENT
+
+
+def autohide_gaps(monitor, work, hidden_edges, gap=AUTOHIDE_GAP):
+    """The maximized window's rectangle (left, top, right, bottom) on a monitor whose taskbar
+    hides itself on `hidden_edges` ("left", "top", "right", "bottom"): the work area, `gap`
+    pixels short of each such edge, so the mouse at that edge still brings the taskbar out (a
+    window that covers the whole screen is taken for a full screen program and the taskbar
+    stays hidden). None when nothing hides on this monitor's edges."""
+    if not hidden_edges:
+        return None
+    left, top, right, bottom = work
+    if "left" in hidden_edges and left <= monitor[0]:
+        left += gap
+    if "top" in hidden_edges and top <= monitor[1]:
+        top += gap
+    if "right" in hidden_edges and right >= monitor[2]:
+        right -= gap
+    if "bottom" in hidden_edges and bottom >= monitor[3]:
+        bottom -= gap
+    if (left, top, right, bottom) == tuple(work):
+        return None
+    return (left, top, right, bottom)

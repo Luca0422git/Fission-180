@@ -59,5 +59,53 @@ class Grips(unittest.TestCase):
             self.assertGreaterEqual(h, 0)
 
 
+
+class WindowsHitTest(unittest.TestCase):
+    """Windows keeps the window's frame; Fission 180 says what is under the mouse inside it
+    (titlebar_win, Luca 2026-11-26: the frameless window broke moving, resizing, maximize and
+    the hidden taskbar on Windows)."""
+
+    def test_the_top_band_resizes(self):
+        self.assertEqual(core.hit_test(500, 0, 1000, False, True), core.TOP)
+        self.assertEqual(core.hit_test(500, core.TOP_BAND - 1, 1000, False, True), core.TOP)
+
+    def test_the_top_band_ends_resize_two_edges(self):
+        self.assertEqual(core.hit_test(2, 1, 1000, False, False), core.TOP_LEFT)
+        self.assertEqual(core.hit_test(999, 1, 1000, False, False), core.TOP_RIGHT)
+
+    def test_an_empty_part_of_the_top_row_is_the_caption(self):
+        self.assertEqual(core.hit_test(500, core.TOP_BAND, 1000, False, True), core.CAPTION)
+        self.assertEqual(core.hit_test(500, 20, 1000, False, True), core.CAPTION)
+
+    def test_buttons_and_the_rest_are_the_programs(self):
+        self.assertEqual(core.hit_test(500, 20, 1000, False, False), core.CLIENT)
+        self.assertEqual(core.hit_test(500, 400, 1000, False, False), core.CLIENT)
+
+    def test_maximized_has_no_top_band(self):
+        # (a maximized window does not resize: its top row is caption up to the screen's edge)
+        self.assertEqual(core.hit_test(500, 0, 1000, True, True), core.CAPTION)
+        self.assertEqual(core.hit_test(2, 0, 1000, True, False), core.CLIENT)
+
+
+class AutohideGaps(unittest.TestCase):
+    MON = (0, 0, 1920, 1080)
+
+    def test_a_hiding_taskbar_at_the_bottom_keeps_two_pixels(self):
+        self.assertEqual(core.autohide_gaps(self.MON, self.MON, ["bottom"]), (0, 0, 1920, 1078))
+
+    def test_each_hiding_edge(self):
+        self.assertEqual(core.autohide_gaps(self.MON, self.MON, ["left"]), (2, 0, 1920, 1080))
+        self.assertEqual(core.autohide_gaps(self.MON, self.MON, ["top"]), (0, 2, 1920, 1080))
+        self.assertEqual(core.autohide_gaps(self.MON, self.MON, ["right"]), (0, 0, 1918, 1080))
+
+    def test_no_hiding_taskbar_changes_nothing(self):
+        self.assertIsNone(core.autohide_gaps(self.MON, (0, 0, 1920, 1040), []))
+
+    def test_an_edge_the_work_area_already_leaves_free(self):
+        # (a taskbar that stays at the bottom, another that hides at the top)
+        self.assertEqual(core.autohide_gaps(self.MON, (0, 0, 1920, 1040), ["top"]), (0, 2, 1920, 1040))
+        self.assertIsNone(core.autohide_gaps(self.MON, (0, 0, 1920, 1040), ["bottom"]))
+
+
 if __name__ == "__main__":
     unittest.main()
