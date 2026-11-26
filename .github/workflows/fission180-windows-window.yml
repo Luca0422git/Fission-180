@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Fission 180's own title bar on a real Windows desktop: FreeCAD for Windows with Fission 180 as an
+# add-on, driven with real mouse and key presses (tools/fission180/windows_window_check.py).
+# Luca (2026-11-26) on Windows: the window jumped when its top row was clicked, could not be
+# moved or resized, covered the hidden taskbar and moved when the Windows key was pressed.
+# Linux's virtual screen has no window manager, so only a Windows desktop can show these.
+name: Fission 180 Windows window
+
+on:
+  push:
+    branches: [develop, "claude/**"]
+    paths:
+      - src/Mod/Fission180/fission180/titlebar_ui.py
+      - src/Mod/Fission180/fission180/titlebar_core.py
+      - src/Mod/Fission180/fission180/titlebar_win.py
+      - src/Mod/Fission180/fission180/shell.py
+      - tools/fission180/windows_window_check.py
+      - tools/fission180/windows_window_helper.py
+      - .github/workflows/fission180-windows-window.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fission180-windows-window-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FREECAD_VERSION: "1.1.4"
+
+jobs:
+  window:
+    name: tests (Windows window)
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Cache FreeCAD ${{ env.FREECAD_VERSION }} for Windows
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .fission180-cache/freecad-windows
+          key: freecad-windows-${{ env.FREECAD_VERSION }}
+
+      - name: FreeCAD for Windows
+        run: |
+          DIR=.fission180-cache/freecad-windows
+          if ! ls "${DIR}"/*/bin/freecad.exe >/dev/null 2>&1; then
+            NAME="FreeCAD_${FREECAD_VERSION}-Windows-x86_64-py311.7z"
+            mkdir -p "${DIR}"
+            curl -fsSL --retry 4 -o "${DIR}/${NAME}" \
+              "https://github.com/FreeCAD/FreeCAD/releases/download/${FREECAD_VERSION}/${NAME}"
+            7z x -y -o"${DIR}" "${DIR}/${NAME}" >/dev/null
+            rm -f "${DIR}/${NAME}"
+          fi
+          ls "${DIR}"/*/bin/ | grep -iE "freecad|python" || true
+
+      - name: Pillow for the screenshots
+        run: python -m pip install --quiet pillow || true
+
+      - name: The title bar, driven like a person
+        run: python tools/fission180/windows_window_check.py --freecad .fission180-cache/freecad-windows --out test-output
+
+      - name: Add the report to the run summary
+        if: always()
+        run: |
+          if [ -f test-output/window-report.md ]; then cat test-output/window-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload the report and screenshots
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: fission180-windows-window
+          path: test-output/
+          retention-days: 14
