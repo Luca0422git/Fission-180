@@ -39,8 +39,11 @@ taskbar never came out. Fix: on Windows the window keeps its frame; `titlebar_wi
 QAbstractNativeEventFilter: PySide6 6.8.3 takes a `(handled, result)` tuple; checked) answers
 WM_NCCALCSIZE (DefWindowProc, then the client's top back to the window's top; maximized: as far in
 as the left border), WM_NCHITTEST (DefWindowProc's borders; inside, titlebar_core.hit_test: a 5 px
-top band resizes, the empty top row is HTCAPTION, titlebar_ui._empty_at) and WM_WINDOWPOSCHANGING
-(titlebar_core.autohide_gaps: 2 px short of a hiding taskbar's edge). Qt 6.8
+top band resizes, the empty top row is HTCAPTION, titlebar_ui._empty_at); maximized with a hiding
+taskbar the INSIDE stops 2 px short in WM_NCCALCSIZE (left/right/bottom alike, so Qt's typical-frame
+margins hold; titlebar_core.autohide_gaps). Windows ignored a smaller WM_GETMINMAXINFO ptMaxSize and
+put back a maximized WINDOWPOS trimmed in WM_WINDOWPOSCHANGING (even answered without
+DefWindowProc): both tried on the runner, runs 8 and 10. Qt 6.8
 follows a frame whose left/right/bottom stay Windows' own (calculateFullFrameMargins' "typical
 frame", QTBUG-113736), one geometry event late: SWP_FRAMECHANGED moves and resizes the inside, so
 WM_MOVE and WM_SIZE both come and the second one is right. Linux keeps FramelessWindowHint.
