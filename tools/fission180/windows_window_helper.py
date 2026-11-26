@@ -184,6 +184,7 @@ def _state():
             "on": bool(flt is not None and flt.on),
             "installed": titlebar_win._state.get("installed"),
             "last_max": titlebar_win._state.get("last_max"),
+            "trimmed": titlebar_win._state.get("trimmed", 0),
         }
     except Exception as exc:
         out["native"] = str(exc)
