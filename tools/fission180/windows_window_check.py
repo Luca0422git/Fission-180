@@ -600,6 +600,7 @@ def run(app):
 
     def g_double_click():
         place()
+        memo["normal_client"] = app.state()["qt_geometry"][2:]  # (the size it comes back to)
         x, y = point(app, "row_empty")
         double_click(x, y)
         s, f = facts(app, "double-click on the top row")
@@ -612,6 +613,7 @@ def run(app):
 
     def h_drag_maximized():
         place()
+        memo["normal_client"] = app.state()["qt_geometry"][2:]
         click(*point(app, "maximize"))
         s, f = facts(app, "maximize button")
         check("The maximize button fills the work area", s["qt_maximized"] and fills_work(f), "%s vs work %s" % (f["win"]["visible"], f["win"]["work"]))

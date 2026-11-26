@@ -26,9 +26,9 @@ The three answers:
   caption (Windows then moves the window, snaps it to the screen's edges, maximizes it on a
   double-click and opens the window menu on a right-click), the rest is the program's
   (titlebar_core.hit_test).
-* WM_GETMINMAXINFO, how big maximized is: 2 px short of an edge where the taskbar hides
-  itself, so the mouse there still brings it out (titlebar_core.autohide_gaps). Only on the
-  main monitor: Windows itself fits these numbers to the others only when they are its own.
+* WM_WINDOWPOSCHANGING, where a maximized window goes: 2 px short of an edge where the taskbar
+  hides itself, so the mouse there still brings it out (titlebar_core.autohide_gaps; a window
+  covering the whole screen is taken for a full screen program and the taskbar stays away).
 
 Maximize, restore, minimize, Windows+arrows, the Windows key, snap and the taskbar are then
 Windows' own. Nothing here lets an exception out of the filter.
@@ -40,7 +40,7 @@ from . import titlebar_core as core
 from . import warn
 from .compat import QtCore
 
-WM_GETMINMAXINFO = 0x0024
+WM_WINDOWPOSCHANGING = 0x0046
 WM_NCCALCSIZE = 0x0083
 WM_NCHITTEST = 0x0084
 HTCLIENT = 1
@@ -77,13 +77,15 @@ def _win():
     class NCCALCSIZE_PARAMS(ctypes.Structure):
         _fields_ = [("rgrc", W.RECT * 3), ("lppos", ctypes.c_void_p)]
 
-    class MINMAXINFO(ctypes.Structure):
+    class WINDOWPOS(ctypes.Structure):
         _fields_ = [
-            ("ptReserved", W.POINT),
-            ("ptMaxSize", W.POINT),
-            ("ptMaxPosition", W.POINT),
-            ("ptMinTrackSize", W.POINT),
-            ("ptMaxTrackSize", W.POINT),
+            ("hwnd", W.HWND),
+            ("hwndInsertAfter", W.HWND),
+            ("x", ctypes.c_int),
+            ("y", ctypes.c_int),
+            ("cx", ctypes.c_int),
+            ("cy", ctypes.c_int),
+            ("flags", W.UINT),
         ]
 
     class MONITORINFO(ctypes.Structure):
@@ -107,8 +109,8 @@ def _win():
     user32.GetWindowRect.argtypes = [W.HWND, ctypes.POINTER(W.RECT)]
     user32.ClientToScreen.argtypes = [W.HWND, ctypes.POINTER(W.POINT)]
     user32.SetWindowPos.argtypes = [W.HWND, W.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, W.UINT]
-    user32.MonitorFromWindow.restype = W.HMONITOR
-    user32.MonitorFromWindow.argtypes = [W.HWND, W.DWORD]
+    user32.MonitorFromRect.restype = W.HMONITOR
+    user32.MonitorFromRect.argtypes = [ctypes.POINTER(W.RECT), W.DWORD]
     user32.GetMonitorInfoW.argtypes = [W.HMONITOR, ctypes.POINTER(MONITORINFO)]
     shell32.SHAppBarMessage.restype = ctypes.c_size_t
     shell32.SHAppBarMessage.argtypes = [W.DWORD, ctypes.POINTER(APPBARDATA)]
@@ -119,7 +121,7 @@ def _win():
         shell32=shell32,
         MSG=MSG,
         NCCALCSIZE_PARAMS=NCCALCSIZE_PARAMS,
-        MINMAXINFO=MINMAXINFO,
+        WINDOWPOS=WINDOWPOS,
         MONITORINFO=MONITORINFO,
         APPBARDATA=APPBARDATA,
     )
@@ -164,7 +166,7 @@ def _hidden_edges(monitor_rect):
 
 
 class _Filter(QtCore.QAbstractNativeEventFilter):
-    """Answers WM_NCCALCSIZE, WM_NCHITTEST and WM_GETMINMAXINFO for the main window while
+    """Answers WM_NCCALCSIZE, WM_NCHITTEST and WM_WINDOWPOSCHANGING for the main window while
     `on`; everything else, and every other window, goes on to Qt untouched."""
 
     def __init__(self):
@@ -188,8 +190,8 @@ class _Filter(QtCore.QAbstractNativeEventFilter):
                 return self._calc_size(api, msg)
             if kind == WM_NCHITTEST:
                 return self._hit_test(api, msg)
-            if kind == WM_GETMINMAXINFO:
-                self._max_size(api, msg)
+            if kind == WM_WINDOWPOSCHANGING:
+                self._position(api, msg)
         except Exception as exc:  # (never out of a native filter)
             _warn_once("title bar (Windows): %s" % exc)
         return False, 0
@@ -223,25 +225,36 @@ class _Filter(QtCore.QAbstractNativeEventFilter):
         what = core.hit_test(lx, ly, window.width(), bool(user32.IsZoomed(msg.hwnd)), empty)
         return True, HITS.get(what, HTCLIENT)
 
-    def _max_size(self, api, msg):
+    def _position(self, api, msg):
+        """Maximized on a monitor whose taskbar hides itself: the window's rectangle 2 px short
+        of that edge (WM_WINDOWPOSCHANGING, just before Windows sizes the window; Windows took
+        no notice of a smaller WM_GETMINMAXINFO maximum on its runner). The borders Windows puts
+        outside the screen stay as they are, so Qt's frame stays the one it knows."""
         user32 = api["user32"]
+        pos = api["WINDOWPOS"].from_address(msg.lParam)
+        if pos.flags & 0x0001 or not user32.IsZoomed(msg.hwnd):  # (SWP_NOSIZE)
+            return
+        ctypes, W = api["ctypes"], api["W"]
+        wanted = W.RECT(pos.x, pos.y, pos.x + pos.cx, pos.y + pos.cy)
         info = api["MONITORINFO"]()
-        info.cbSize = api["ctypes"].sizeof(info)
-        if not user32.GetMonitorInfoW(user32.MonitorFromWindow(msg.hwnd, 2), api["ctypes"].byref(info)):
+        info.cbSize = ctypes.sizeof(info)
+        if not user32.GetMonitorInfoW(user32.MonitorFromRect(ctypes.byref(wanted), 2), ctypes.byref(info)):
             return
         mon = (info.rcMonitor.left, info.rcMonitor.top, info.rcMonitor.right, info.rcMonitor.bottom)
         work = (info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom)
-        primary = bool(info.dwFlags & 1)
-        edges = _hidden_edges(mon) if primary else []  # (MONITORINFOF_PRIMARY: the module's note)
+        right, bottom = pos.x + pos.cx, pos.y + pos.cy
+        # (only Windows' own maximized rectangle: the work area and its borders around it)
+        if not (pos.x <= work[0] and pos.y <= work[1] and right >= work[2] and bottom >= work[3]):
+            return
+        edges = _hidden_edges(mon)
         rect = core.autohide_gaps(mon, work, edges)
-        _state["last_max"] = {"primary": primary, "monitor": mon, "work": work, "edges": edges, "rect": rect}
+        _state["last_max"] = {"monitor": mon, "work": work, "edges": edges, "rect": rect}
         if rect is None:
             return
-        mmi = api["MINMAXINFO"].from_address(msg.lParam)
-        mmi.ptMaxPosition.x += rect[0] - work[0]
-        mmi.ptMaxPosition.y += rect[1] - work[1]
-        mmi.ptMaxSize.x -= (rect[0] - work[0]) + (work[2] - rect[2])
-        mmi.ptMaxSize.y -= (rect[1] - work[1]) + (work[3] - rect[3])
+        bx, by = work[0] - pos.x, work[1] - pos.y  # (the borders outside the screen)
+        pos.x, pos.y = rect[0] - bx, rect[1] - by
+        pos.cx = rect[2] + (right - work[2]) - pos.x
+        pos.cy = rect[3] + (bottom - work[3]) - pos.y
 
 
 _warned = set()
