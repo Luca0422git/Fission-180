@@ -243,6 +243,15 @@ def _wait_ready(tries=[0]):
         from fission180 import titlebar_ui
 
         tries[0] += 1
+        # (GitHub's Windows runner has no real graphics card: FreeCAD greets it with its
+        # "Invalid OpenGL Version" box, a modal dialog that disables the main window and so
+        # every click the checker makes. Closed here, as a person would.)
+        modal = QtWidgets.QApplication.instance().activeModalWidget()
+        if isinstance(modal, QtWidgets.QDialog):
+            log("closing a dialog in the way: %s %r" % (modal.objectName(), modal.windowTitle()))
+            modal.accept()
+            QtCore.QTimer.singleShot(300, _wait_ready)
+            return
         on = titlebar_ui._state.get("on") and titlebar_ui._state.get("controls") is not None
         if on:
             _S["ready"] = True

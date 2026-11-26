@@ -645,7 +645,7 @@ def main():
     print("[Fission 180] FreeCAD: %s; screen %dx%d" % (exe, user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)))
     app = App(exe, out)
     try:
-        if app.wait(lambda s: s.get("ready"), 180) is None:
+        if app.wait(lambda s: s.get("ready") and not s.get("modal"), 180) is None:
             print("[Fission 180] Fission 180 did not come on")
             return 1
         run(app)
