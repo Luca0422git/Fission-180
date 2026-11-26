@@ -4,8 +4,9 @@ This file is the project's memory across work sessions. **Read it first, every s
 `docs/fission180/feature-outline.md` (the spec). Update it at the end of every session: what was
 done, what was learned, what is next. Newest session goes at the top of the log.
 
-**2026-11-26: 0.1.0-beta.4.3.1 on `develop` (not released yet): quitting, and Windows' title
-bar.** Two of Luca's reports. (1) Every system: "if i exit out of the app with a design open, no
+**2026-11-26: 0.1.0-beta.4.3.1 released 23:05 UTC: quitting, and Windows' title bar** (patch
+release run #26; `Release`, the tag and develop at fa2610ca; tests run #222 green; Windows window
+check 34/34, run 14; Luca: "Once it's done, release it"). Two of Luca's reports. (1) Every system: "if i exit out of the app with a design open, no
 matter if ive saved or not, it freezes for 10 seconds, then gives me a 'unsaved document. would
 you like to save' window". Cause: shell's close guard switched the whole interface off on the main
 window's Close event (before FreeCAD asked anything) and a 0 ms timer switched it on again while
@@ -49,7 +50,9 @@ DefWindowProc): both tried on the runner, runs 8 and 10. Qt 6.8
 follows a frame whose left/right/bottom stay Windows' own (calculateFullFrameMargins' "typical
 frame", QTBUG-113736), one geometry event late: SWP_FRAMECHANGED moves and resizes the inside, so
 WM_MOVE and WM_SIZE both come and the second one is right. Linux keeps FramelessWindowHint.
-[ ] Windows check green (taskbar gap first). [ ] CI, Luca's go, Luca tries it on Windows.
+[x] Windows check green (34/34). [x] CI (#222; #221 stopped at check_waits: quit_gui answered
+the dialog through QTimer.singleShot(100), now h._later(0)) and Luca's go. [ ] Luca tries it on
+Windows (his laptop and PC; the hidden taskbar; quitting with a saved design).
 
 **2026-11-25: 0.1.0-beta.4.3.0 released 04:06 UTC: the VIEW workspace** (patch release run #25;
 `Release`, the tag and develop at 5a58de00; CI #200 green; Luca: "release it"; Luca: "the last addition to the
